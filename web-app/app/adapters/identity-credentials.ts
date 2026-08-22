@@ -1,6 +1,6 @@
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 import {
     nowUtc,
     type Id,
@@ -24,7 +24,7 @@ async function appendCredentialEvent(
     status: IdentityCredentialStatus,
     secret: string,
 ): Promise<void> {
-    const id = generateCryptoSafeBase62();
+    const id = generateIdentifier();
     await ctx.PUT(
         `identities/${identityId}/credentials/${id}`,
         {

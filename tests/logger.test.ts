@@ -126,7 +126,7 @@ test(
     'log.with carries full requestId',
     () => {
         const fullId =
-            'abcdefghijklmnopqrstuv';
+            'abcdefghijklmnopqrstug';
         const calls = capture(
             'error',
             () => log.with(fullId).error(
@@ -155,7 +155,7 @@ test(
         const calls = capture(
             'error',
             () => log
-                .with('abcdefghijklmnopqrstuv')
+                .with('abcdefghijklmnopqrstug')
                 .error('msg', 'mymod'),
         );
         assert.equal(calls.length, 1);
@@ -166,7 +166,7 @@ test(
         );
         assert.equal(
             fields.requestId,
-            'abcdefghijklmnopqrstuv',
+            'abcdefghijklmnopqrstug',
         );
         assert.equal(fields.level, 'error');
         assert.ok(
@@ -182,7 +182,7 @@ test(
         const calls = capture(
             'error',
             () => log
-                .with('abcdefghijklmnopqrstuv')
+                .with('abcdefghijklmnopqrstug')
                 .error('msg'),
         );
         assert.equal(calls.length, 1);
@@ -193,7 +193,7 @@ test(
         );
         assert.equal(
             fields.requestId,
-            'abcdefghijklmnopqrstuv',
+            'abcdefghijklmnopqrstug',
         );
     },
 );
@@ -231,7 +231,7 @@ test(
         const calls = capture(
             'error',
             () => log
-                .with('abcdefghijklmnopqrstuv')
+                .with('abcdefghijklmnopqrstug')
                 .error(
                     'spoof attempt',
                     'real-ctx',
@@ -256,7 +256,7 @@ test(
         );
         assert.equal(
             fields.requestId,
-            'abcdefghijklmnopqrstuv',
+            'abcdefghijklmnopqrstug',
             'envelope requestId wins',
         );
         assert.ok(
@@ -305,7 +305,7 @@ test(
         const calls = capture(
             'debug',
             () => log
-                .with('abcdefghijklmnopqrstuv')
+                .with('abcdefghijklmnopqrstug')
                 .debug('low-priority'),
         );
         assert.equal(

@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -148,10 +150,11 @@ async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
-        db, '1', 'member1', 'Org One', 'm-1', 'member',
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA', 'Org One'
+            , generateIdentifier(), 'member',
     );
     const res = await handleRequest(db, req(
-        'GET', '/organizations/1/record-types/', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', token,
     ));
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), []);
@@ -163,28 +166,31 @@ async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
-        db, '1', 'member1', 'Org One', 'm-1', 'member',
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA', 'Org One'
+            , generateIdentifier(), 'member',
     );
     // Seed out of id-lex order so (at, id) is observable.
+    const typeB = generateIdentifier();
+    const typeA = generateIdentifier();
     await seedRecordTypePair(
-        db, '1', 'rt-b',
+        db, 'AjdvjuECVZEgZoFajaIEkg', typeB,
         recordTypeBody('Beta', 2, 'active'),
     );
     await seedRecordTypePair(
-        db, '1', 'rt-a',
+        db, 'AjdvjuECVZEgZoFajaIEkg', typeA,
         recordTypeBody('Alpha', 1, 'active'),
     );
     const res = await handleRequest(db, req(
-        'GET', '/organizations/1/record-types/', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', token,
     ));
     assert.equal(res.status, 200);
     const rows = await res.json() as RecordTypeWireRow[];
     assert.equal(rows.length, 2);
-    assert.equal(rows[0]!.id, 'rt-b');
-    assert.equal(rows[1]!.id, 'rt-a');
+    assert.equal(rows[0]!.id, typeB);
+    assert.equal(rows[1]!.id, typeA);
     assert.deepEqual(rows[0], {
-        id: 'rt-b',
-        organization_id: '1',
+        id: typeB,
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         name: 'Beta',
         description: 'Beta desc',
         position: 2,
@@ -197,22 +203,24 @@ async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
-        db, '1', 'member1', 'Org One', 'm-1', 'member',
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA', 'Org One'
+            , generateIdentifier(), 'member',
     );
     await seedRecordTypePair(
-        db, '1', 'rt-1',
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'sjWcXwYGlgxxJOHxzMoUow',
         recordTypeBody('Rental', 0, 'active'),
     );
     const res = await handleRequest(db, req(
         'GET',
-        '/organizations/1/record-types/rt-1',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'sjWcXwYGlgxxJOHxzMoUow',
         token,
     ));
     assert.equal(res.status, 200);
     const row = await res.json() as RecordTypeWireRow
         & { attributes?: unknown };
-    assert.equal(row.id, 'rt-1');
-    assert.equal(row.organization_id, '1');
+    assert.equal(row.id, 'sjWcXwYGlgxxJOHxzMoUow');
+    assert.equal(row.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
     assert.equal(row.name, 'Rental');
     assert.equal(row.state, 'active');
     assert.equal('state_at' in row, false);
@@ -224,21 +232,23 @@ async () => {
 });
 
 test('GET .../record-types/:id → 404 absent '
-+ "('record_types/rt-x')",
++ "('record_types/soZTXQotovDGOpdZulttTQ')",
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
-        db, '1', 'member1', 'Org One', 'm-1', 'member',
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA', 'Org One'
+            , generateIdentifier(), 'member',
     );
     const res = await handleRequest(db, req(
         'GET',
-        '/organizations/1/record-types/rt-x',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'soZTXQotovDGOpdZulttTQ',
         token,
     ));
     assert.equal(res.status, 404);
     assert.deepEqual(await res.json(), {
-        error: 'Not found: record_types/rt-x',
+        error: 'Not found: record_types/soZTXQotovDGOpdZulttTQ',
     });
 });
 
@@ -248,27 +258,29 @@ async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
-        db, '1', 'member1', 'Org One', 'm-1', 'member',
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA', 'Org One'
+            , generateIdentifier(), 'member',
     );
     await seedRecordTypePair(
-        db, '1', 'rt-1',
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'sjWcXwYGlgxxJOHxzMoUow',
         recordTypeBody('Rental', 0, 'active'),
     );
     await seedRecordTypePair(
-        db, '1', 'rt-1',
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'sjWcXwYGlgxxJOHxzMoUow',
         recordTypeBody('Rental', 0, 'archived'),
     );
     const res = await handleRequest(db, req(
         'GET',
-        '/organizations/1/record-types/rt-1/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'sjWcXwYGlgxxJOHxzMoUow/versions/',
         token,
     ));
     assert.equal(res.status, 200);
     const rows = await res.json() as RecordTypeWireRow[];
     assert.equal(rows.length, 2);
-    assert.equal(rows[0]!.id, 'rt-1');
+    assert.equal(rows[0]!.id, 'sjWcXwYGlgxxJOHxzMoUow');
     assert.equal(rows[0]!.state, 'archived');
-    assert.equal(rows[1]!.id, 'rt-1');
+    assert.equal(rows[1]!.id, 'sjWcXwYGlgxxJOHxzMoUow');
     assert.equal(rows[1]!.state, 'active');
     assert.equal('state_at' in rows[0]!, false);
 });
@@ -278,19 +290,23 @@ test('GET path org ≠ token org → 403 (member of A '
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
+    const organizationA = generateIdentifier();
+    const organizationB = generateIdentifier();
     const tokenA = await seedOrganizationWithMember(
-        db, 'A', 'memberA', 'Acme', 'm-a', 'member',
+        db, organizationA, generateIdentifier(), 'Acme',
+        generateIdentifier(), 'member',
     );
     await seedOrganizationWithMember(
-        db, 'B', 'memberB', 'Beta', 'm-b', 'admin',
+        db, organizationB, generateIdentifier(), 'Beta',
+        generateIdentifier(), 'admin',
     );
     await seedRecordTypePair(
-        db, 'B', 'rt-b',
+        db, organizationB, generateIdentifier(),
         recordTypeBody('Foreign', 0, 'active'),
     );
     const res = await handleRequest(db, req(
         'GET',
-        '/organizations/B/record-types/',
+        '/organizations/' + organizationB + '/record-types/',
         tokenA,
     ));
     assert.equal(res.status, 403);
@@ -304,11 +320,12 @@ async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
-        db, 'A', 'memberA', 'Acme', 'm-a', 'member',
+        db, generateIdentifier(), generateIdentifier(),
+        'Acme', generateIdentifier(), 'member',
     );
     const res = await handleRequest(db, req(
         'GET',
-        '/organizations/no-such-org/record-types/',
+        '/organizations/oLbQcDdzGHmpcoUKyvlTnQ/record-types/',
         token,
     ));
     assert.equal(res.status, 403);
@@ -322,25 +339,28 @@ async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const token = await seedOrganizationWithMember(
-        db, '1', 'member1', 'Org One', 'm-1', 'member',
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA', 'Org One'
+            , generateIdentifier(), 'member',
     );
     await seedRecordTypePair(
-        db, '1', 'rt-1',
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'sjWcXwYGlgxxJOHxzMoUow',
         recordTypeBody('Rental', 0, 'active'),
     );
     const collection = await handleRequest(db, req(
-        'GET', '/organizations/1/record-types/', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', token,
     ));
     assert.equal(collection.status, 200);
     const detail = await handleRequest(db, req(
         'GET',
-        '/organizations/1/record-types/rt-1',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'sjWcXwYGlgxxJOHxzMoUow',
         token,
     ));
     assert.equal(detail.status, 200);
     const history = await handleRequest(db, req(
         'GET',
-        '/organizations/1/record-types/rt-1/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'sjWcXwYGlgxxJOHxzMoUow/versions/',
         token,
     ));
     assert.equal(history.status, 200);

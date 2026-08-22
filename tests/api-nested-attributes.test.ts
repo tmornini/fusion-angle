@@ -28,6 +28,8 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Nested attributes surface under record-types (Task 7):
 // member GET (ACL arrays visible), admin PUT create/replace,
@@ -38,10 +40,10 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
-const ORGANIZATION = '1';
-const TYPE_ID = 'rt-attr-1';
-const ATTR_ID = 'attr-nested-1';
-const INSTANCE_ID = 'inst-attr-restrict-1';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
+const TYPE_ID = generateIdentifier();
+const ATTR_ID = generateIdentifier();
+const INSTANCE_ID = generateIdentifier();
 
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
@@ -104,19 +106,19 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, 'm-member1', {
+    await seedMembershipPair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
-        identity_id: 'member1',
+        identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
         at: AT,
     });
     return {
         db,
         adminToken: await organizationToken(
-            'current', ORGANIZATION,
+            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
         ),
         memberToken: await organizationToken(
-            'member1', ORGANIZATION,
+            'nkgaOHZISTQrILTfPThWCA', ORGANIZATION,
         ),
     };
 }
@@ -327,9 +329,11 @@ async () => {
     await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, attrCore(),
     ));
+    const flowId = generateIdentifier();
+    const nodeId = generateIdentifier();
     const flowCreate = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/', adminToken, {
-            id: 'flow-attr-restrict-1',
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', adminToken, {
+            id: flowId,
             flow: {
                 name: 'Intake',
                 is_locked: false,
@@ -337,20 +341,20 @@ async () => {
                 is_auto_fit: false,
                 lock_timeout: 0,
             },
-            projectFlowId: 'flow-attr-restrict-1-pf',
+            projectFlowId: generateIdentifier(),
             projectFlow: {
-                project_id: 'proj-attr-restrict-1',
-                flow_id: 'flow-attr-restrict-1',
+                project_id: generateIdentifier(),
+                flow_id: flowId,
                 at: AT,
             },
             initialState: 'active',
             initialStateEventId:
-                'flow-attr-restrict-1-ev',
+                generateIdentifier(),
             initialStateAt: AT,
             graphDelta: {
                 nodes: [{
-                    id: 'n1',
-                    flow_id: 'flow-attr-restrict-1',
+                    id: nodeId,
+                    flow_id: flowId,
                     name: 'Step',
                     position_x: 0,
                     position_y: 0,
@@ -363,8 +367,8 @@ async () => {
                 deletions: [],
                 memberEvents: [],
                 attributeEvents: [{
-                    id: 'fna1',
-                    flow_node_id: 'n1',
+                    id: generateIdentifier(),
+                    flow_node_id: nodeId,
                     attribute_id: ATTR_ID,
                     mode: 'editable',
                     is_required: false,
@@ -382,7 +386,7 @@ async () => {
     const body = await del.json() as { error: string };
     assert.match(
         body.error,
-        /flow\(s\) flow-attr-restrict-1/,
+        new RegExp('flow\\(s\\) ' + flowId),
     );
     assert.match(
         body.error,

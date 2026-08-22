@@ -16,7 +16,7 @@ export function buildIdeas():
     >[] {
     return [
         {
-            id: 'eT5xdKjzLDmuRn3r7XMX4R',
+            id: 'YvOylAxOjQcgmNmsSoVBPQ',
             title: 'AI-Powered Customer'
                 + ' Segmentation',
             position: 1,
@@ -48,7 +48,7 @@ export function buildIdeas():
                 + ' conversion rates',
         },
         {
-            id: 'cbTuSs0Ex84PeFGSvoAEFZ',
+            id: 'WurwPqXxGtLhRAoCEcPzfQ',
             title: 'Automated Report'
                 + ' Generation',
             position: 2,
@@ -82,7 +82,7 @@ export function buildIdeas():
                 + ' 100% on-time delivery',
         },
         {
-            id: 'wuCMQqo4IkEksx7MYmu8g2',
+            id: 'yrDiezFyhDHGgXzGeIWoSQ',
             title: 'Predictive Maintenance'
                 + ' System',
             position: 3,
@@ -110,7 +110,7 @@ export function buildIdeas():
             success_metrics: '',
         },
         {
-            id: 'ojOEXtdzdtTZtpM81TxVca',
+            id: 'pYmalQFqpoXdbpYAJfOswA',
             title: 'Real-time Analytics'
                 + ' Dashboard',
             position: 4,
@@ -144,7 +144,7 @@ export function buildIdeas():
                 + ' by leadership',
         },
         {
-            id: 'T2vAafLDcshDONlYxpzPLc',
+            id: 'RAHAvUqwVABJnzTniWhUTQ',
             title: 'Smart Inventory'
                 + ' Optimization',
             position: 5,
@@ -166,7 +166,7 @@ export function buildIdeas():
             success_metrics: '',
         },
         {
-            id: 'HRYrImq1rBJ5ZRe1T9TAVk',
+            id: 'IjrYiSuRyjkQaqiRLhadAg',
             title: 'Employee Training'
                 + ' Assistant',
             position: 6,
@@ -197,7 +197,7 @@ export function buildIdeas():
                 + ' productivity scores',
         },
         {
-            id: 'MCxK0hzT9CPjJx1ZV5unfr',
+            id: 'MmMKBsQBLxNfbMAOlAaKkQ',
             title: 'AI-Powered Customer'
                 + ' Support Chatbot',
             position: 8,
@@ -229,7 +229,7 @@ export function buildIdeas():
                 + ' under 30 seconds',
         },
         {
-            id: 'SUb4gKXsZ1OsEauzqszg0t',
+            id: 'QtpzfPiJsMdmoDpPaHvtVQ',
             title: 'Mobile App Push'
                 + ' Notification Revamp',
             position: 10,
@@ -257,7 +257,7 @@ export function buildIdeas():
                 + ' on push notifications',
         },
         {
-            id: 'gxa84W9KvEgD0wT1F4TOM9',
+            id: 'eizcntIrQMWrajcGkQZvUA',
             title: 'Sustainability Dashboard'
                 + ' for Operations',
             position: 9,
@@ -283,7 +283,7 @@ export function buildIdeas():
                 + ' delivery on schedule',
         },
         {
-            id: '1Z68gROMrlTAfPEGiyJJAY',
+            id: 'AzSBhumyEAkdkFSUBaJrpA',
             title: 'Employee Wellness'
                 + ' Program Integration',
             position: 11,
@@ -312,7 +312,7 @@ export function buildIdeas():
                 + ' voluntary turnover',
         },
         {
-            id: 'Q2On2xwMpFdzOklBQJXrni',
+            id: 'PkrEwSLQlrldLRwlAMVhRA',
             title: 'Real-time Inventory'
                 + ' Tracking System',
             position: 7,
@@ -348,69 +348,69 @@ export function buildIdeas():
 export function buildIdeaSubmissions(): IdeaSubmissionEntity[] {
     return [
         {
-            id: 'k4dY2dPq90mQVwwCkhWIo3',
-            idea_id: 'eT5xdKjzLDmuRn3r7XMX4R',
-            member_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            id: 'kjChIrvrvaNXEhpohHPURg',
+            idea_id: 'YvOylAxOjQcgmNmsSoVBPQ',
+            member_id: 'MQFcPtrZPIGjMCRAXtZUnA',
             at: daysFromNow(-75, 9, 30),
         },
         {
-            id: 'XC7hsfNJueKQ8q0UfCuC7o',
-            idea_id: 'cbTuSs0Ex84PeFGSvoAEFZ',
-            member_id: 'bLP3X1hb1mSz8gY9neogU3',
+            id: 'SuheyYcQfTOPXGyeqsqmUw',
+            idea_id: 'WurwPqXxGtLhRAoCEcPzfQ',
+            member_id: 'VvzFEpfYONDAsCCwNlIFCQ',
             at: daysFromNow(-70, 9, 0),
         },
         {
-            id: 'YmzT46BbGVFALpiXFDnlVd',
-            idea_id: 'wuCMQqo4IkEksx7MYmu8g2',
-            member_id: '53J8h9dr76XFqCjYcNVwIR',
+            id: 'TWVpNUvGVKNcergXlXZfPA',
+            idea_id: 'yrDiezFyhDHGgXzGeIWoSQ',
+            member_id: 'CJrglMsNBxOWWfbihHQSeg',
             at: daysFromNow(-65, 9, 0),
         },
         {
-            id: 'cmoTu4GRGmO8y5QrfPIHSm',
-            idea_id: 'ojOEXtdzdtTZtpM81TxVca',
-            member_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            id: 'XLrkPPZXeWzBgjErAzUUVA',
+            idea_id: 'pYmalQFqpoXdbpYAJfOswA',
+            member_id: 'jrMOZzVdWXvLgMpcHoyBTw',
             at: daysFromNow(-55, 9, 0),
         },
         {
-            id: 'kIUtvgTOLPjsSmAEVOhPb1',
-            idea_id: 'T2vAafLDcshDONlYxpzPLc',
-            member_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            id: 'kmYrAaAsYYbipfyTCZATOg',
+            idea_id: 'RAHAvUqwVABJnzTniWhUTQ',
+            member_id: 'RPzLGrWcstxLaHoBcViPLQ',
             at: daysFromNow(-50, 9, 0),
         },
         {
-            id: 'r04u9qpJKSyNjP9Owxr5Be',
-            idea_id: 'HRYrImq1rBJ5ZRe1T9TAVk',
-            member_id: '6xBfK5If82JKfThXb1wlzS',
+            id: 'rOBaIUyyvaMtzsXBEqTuJA',
+            idea_id: 'IjrYiSuRyjkQaqiRLhadAg',
+            member_id: 'DAjUkaBUIZbXSQeoLDZEXQ',
             at: daysFromNow(-45, 9, 0),
         },
         {
-            id: '2mPJTlujj1RF6gexFwbDqJ',
-            idea_id: 'MCxK0hzT9CPjJx1ZV5unfr',
-            member_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            id: 'BKNuxAUFxJBYZwYAUcJQjw',
+            idea_id: 'MmMKBsQBLxNfbMAOlAaKkQ',
+            member_id: 'MQFcPtrZPIGjMCRAXtZUnA',
             at: daysFromNow(-75, 10, 0),
         },
         {
-            id: 'caBSqTgzDnvP8joamAG9OG',
-            idea_id: 'SUb4gKXsZ1OsEauzqszg0t',
-            member_id: 'I5ntELi16X3N3JYCCnxMjZ',
+            id: 'WqNYwKeOTRiYFhEYbZbliQ',
+            idea_id: 'QtpzfPiJsMdmoDpPaHvtVQ',
+            member_id: 'IzdIgJaTTfIZQUudGcmdtA',
             at: daysFromNow(-35, 9, 0),
         },
         {
-            id: 'UfsCp7WYUybhwxD170okb4',
-            idea_id: 'gxa84W9KvEgD0wT1F4TOM9',
-            member_id: '53J8h9dr76XFqCjYcNVwIR',
+            id: 'RiylIfXqZbLtQacHWFSnFA',
+            idea_id: 'eizcntIrQMWrajcGkQZvUA',
+            member_id: 'CJrglMsNBxOWWfbihHQSeg',
             at: daysFromNow(-30, 9, 0),
         },
         {
-            id: 'mbTZAQbC5cJSEIzhEEFpyq',
-            idea_id: '1Z68gROMrlTAfPEGiyJJAY',
-            member_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            id: 'nTNaMOcABmOmLEiPAfPWGw',
+            idea_id: 'AzSBhumyEAkdkFSUBaJrpA',
+            member_id: 'jrMOZzVdWXvLgMpcHoyBTw',
             at: daysFromNow(-25, 9, 0),
         },
         {
-            id: '0LjTHFflWNaDZkKDqxmwJi',
-            idea_id: 'Q2On2xwMpFdzOklBQJXrni',
-            member_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            id: 'AMALRwMTMjEEJTztGHiINg',
+            idea_id: 'PkrEwSLQlrldLRwlAMVhRA',
+            member_id: 'RPzLGrWcstxLaHoBcViPLQ',
             at: daysFromNow(-20, 9, 0),
         },
     ];

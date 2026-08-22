@@ -30,15 +30,15 @@ import {
     SYSTEM_MEMBER_ID,
     nowUtc,
 } from './types.ts';
-import {
-    generateCryptoSafeBase62,
-} from '../shared/crypto-safe-base62.ts';
+import { generateSecret } from
+    '../shared/secret.ts';
 import { hashPassword } from '../shared/password-hash.ts';
 import type { MessagePair } from './message-pair.ts';
 import { appendMessagePair } from './message-pair.ts';
 import {
     humanMemberPoolsByOrganization,
     pickHumanMember,
+    seedIdentifier,
 } from './mock-data/seed-kit.ts';
 import {
     MOCK_SEED_TIMESTAMP,
@@ -184,6 +184,53 @@ export interface SeededCredentials {
 // a post-tx identityPii/identities row scan. Stripping the
 // identity-spine row halves must not drop 1514→1503 /
 // 14→13 or empty SeededCredentials on the wire.
+
+const SEED_PASSWORD_CREDENTIAL_BY_IDENTITY:
+    Readonly<Record<string, string>> = {
+    'MQFcPtrZPIGjMCRAXtZUnA': 'LaequOyCoUesHcujaVqOMA',
+    'VvzFEpfYONDAsCCwNlIFCQ': 'IFhgIHadHsALGCKLIOssbg',
+    'zyGBRshxOnKHUfcyFRqowg': 'uyfznoPqIuXmXpCcRECzXQ',
+    'DAjUkaBUIZbXSQeoLDZEXQ': 'hMyWhWPpuQsyGuhoqjnIIQ',
+    'CJrglMsNBxOWWfbihHQSeg': 'BYheHlJLizGxgfwfSCelMg',
+    'IzdIgJaTTfIZQUudGcmdtA': 'XzeLDCkqriuWnqXphMgIkQ',
+    'SsVAZghfSzMZRZmxNKIizw': 'PAoLzUXIczjduyLpIVhkWA',
+    'jrMOZzVdWXvLgMpcHoyBTw': 'eVUgUIJnGrvddYcojUXPPg',
+    'RPzLGrWcstxLaHoBcViPLQ': 'qDAmzkUKHjUmzObmTGmrKQ',
+    'ovKCDVqguNMVIiAyjSYeIg': 'oqpasBaTuYshSZlMeAIfXA',
+    'XXZruirZyAOoRpNxaDnpSA': 'hRFubvlhanwDtFRwinlFCA',
+    'VbxXtvAkgQzhoXQZkbnHVg': 'VhzYtBXmJdbLNwCzUIULZg',
+    'dtmZgnDBlVcoyjxKzlaKgA': 'bOMGBKTGNCuZxtrUYLAkMQ',
+    'dmGzDTZwsyIYCQhhRISXrw': 'BpqpoywaRNVNGplpFduhSw',
+    'uVgzITlKxKcWZtGSPzmsqA': 'OKUnRcADsiFabnVTmveTFA',
+    'JbaPyILUCkLRVIVxJlHMSg': 'doiqitfReBBNaXouPmQNpA',
+    'rgrOKkoZRGtCKXoZCKwkTw': 'xWvGfhdTzelnxfPOrqmuKA',
+    'PVNrLzrfvTzAwGkxEOvTdw': 'HlLxYJTogBPjopIKArIPIw',
+    'VhtqMAOlJREIqexMYxwZOQ': 'CyPrwmgvqrgXHIzqhCTCQQ',
+    'filDOGmwcxtlYjNqiNTFeg': 'IkggeGVkMnqXJXBnvzhfsg',
+    'xaLPEsKuiAJXlaNLnHLVkw': 'DvpItaUQVNMKcWyQsQETiQ',
+    'WxXaodvJSfkEjgtLcoIAHw': 'HcIoKyHvRGMxcVWDLfEBOw',
+    'kHaSgLhnsobjMXxNLEzpBw': 'tgsWnFRPItnMUlpJYXxaug',
+    'PLJUlcSlswqOmpGbwDzwZw': 'FdnYnVJMdUUCCnNsqiiJuA',
+    'RlVXjLbPPTsOimpvwqwLsA': 'HRmZCqpEiBfirOXNJkpRAA',
+    'JfHbTXkOyLzJSNWFWFGrMg': 'QzqHjTvgpVUPAEDdaIHAUQ',
+    'zuIFDMrBwxTWqLJpRrQWog': 'ljBZzdcZWOSvCekzDQwlOA',
+    'hPrdaZfedPOJYevSaGziHw': 'yUTTGOBIUIRXFLdXmPmFGA'
+};
+
+function seedPasswordCredentialId(
+    identityId: string,
+): string {
+    const id = SEED_PASSWORD_CREDENTIAL_BY_IDENTITY[
+        identityId
+    ];
+    if (id === undefined) {
+        throw new Error(
+            'no seed credential id for identity',
+        );
+    }
+    return id;
+}
+
 type CredentialRecipient = {
     readonly identityId: string;
     readonly email: string;
@@ -200,10 +247,10 @@ export async function seedHumanCredentials(
 ): Promise<SeededCredentials> {
     const planned = await Promise.all(
         recipients.map(async recipient => {
-            const password = generateCryptoSafeBase62();
+            const password = generateSecret();
             return {
-                id: 'seed-cred-'
-                    + recipient.identityId + '-password',
+                id: seedPasswordCredentialId(
+                    recipient.identityId),
                 identityId: recipient.identityId,
                 username: recipient.email,
                 password,
@@ -211,9 +258,9 @@ export async function seedHumanCredentials(
             };
         }));
     const systemCredentialId =
-        'seed-cred-system-client-secret';
+        'cFiyyRHxbIEVqeVFNPmDnw';
     const systemSecret = await hashPasswordFn(
-        generateCryptoSafeBase62());
+        generateSecret());
     // Pass 1 (no tx): each credential's message pair, formed from
     // the SAME post-hash secret pass 2 below writes — the row
     // content is unknown until PBKDF2 resolves above, so this
@@ -332,9 +379,9 @@ async function postMockDataLoadIn(
 
     await Promise.all([
         ...members.flatMap((member, index) => {
-            // 'current' (the admin) joins BOTH orgs; every
+            // 'XXZruirZyAOoRpNxaDnpSA' (the admin) joins BOTH orgs; every
             // other human is single-org via assignOrganization.
-            const organizations = member.id === 'current'
+            const organizations = member.id === 'XXZruirZyAOoRpNxaDnpSA'
                 ? [STARK_ORGANIZATION, ORGANIZATION_TWO]
                 : [assignOrganization(index)];
             return [
@@ -343,7 +390,7 @@ async function postMockDataLoadIn(
                         adapter,
                         member.id,
                         seatSeedBody(
-                            member.id === 'current'
+                            member.id === 'XXZruirZyAOoRpNxaDnpSA'
                                 ? 'admin'
                                 : 'member',
                         ),
@@ -478,7 +525,8 @@ async function postMockDataLoadIn(
     // org-2 override's own event) is imported from
     // seed-message-pairs.ts — pass 1 there needs the SAME array
     // to form each project's pair before this transaction opens.
-    // projectOrg2 extends projects[0] under organization '2' —
+    // projectOrg2 extends projects[0] under organization
+    // 'BBjWJsjYIDkTRKIIPrzWRw' —
     // the SAME construction pass 1 uses, so a seeded pair can
     // never drift from what this write actually stores.
     const projectStateEventById = new Map(
@@ -613,10 +661,12 @@ async function postMockDataLoadIn(
                 flowPairs,
             );
         }),
-        // Organization '2' owns a small, self-contained slice so each
+        // Organization 'BBjWJsjYIDkTRKIIPrzWRw' owns a small, self-contained
+        // slice so each
         // org owns at least one project (postProjectDocumentOp
         // above seeds projectOrg2) and flow. The whole
-        // work-order graph stays in org '1', so org '2' gets a
+        // work-order graph stays in org 'AjdvjuECVZEgZoFajaIEkg', so org
+        // 'BBjWJsjYIDkTRKIIPrzWRw' gets a
         // work-order-free flow and a flow-free project — no
         // cross-org coupling. seed-flow-org2 has no
         // project_flows join row, so it drives through
@@ -624,12 +674,15 @@ async function postMockDataLoadIn(
         // postFlowCreationOp, which requires one.
         postFlowDocumentOp(
             adapter,
-            'seed-flow-org2',
+            seedIdentifier('seed-flow-org2'),
             flowOrg2SeedBody(),
             SYSTEM_MEMBER_ID,
             requirePair(
                 pairs,
-                seedPairKey('flows/:id', 'seed-flow-org2'),
+                seedPairKey(
+                    'flows/:id',
+                    seedIdentifier('seed-flow-org2'),
+                ),
             ),
         ),
     ]);
@@ -884,7 +937,9 @@ async function postMockDataLoadIn(
         // key (seed-message-pairs.ts) — fixed 1+1+1. The
         // revision id is recomputed identically to
         // objectiveSeedBody's own construction (deterministic).
-        const revisionId = `${seed.id}:${MOCK_SEED_TIMESTAMP}`;
+        const revisionId = seedIdentifier(
+            `${seed.id}:${MOCK_SEED_TIMESTAMP}`,
+        );
         const objectivePairs: ObjectiveCreationPairs = {
             operation: requirePair(
                 pairs, seedPairKey('objectives', seed.id),
@@ -908,10 +963,12 @@ async function postMockDataLoadIn(
         );
     }
 
-    // Organization '2' owns one objective so each org owns
+    // Organization 'BBjWJsjYIDkTRKIIPrzWRw' owns one objective so each org
+    // owns
     // at least one (pair plane only after Task 2 strip).
-    const org2RevisionId =
-        `${ORGANIZATION_TWO_OBJECTIVE.id}:${MOCK_SEED_TIMESTAMP}`;
+    const org2RevisionId = seedIdentifier(
+        `${ORGANIZATION_TWO_OBJECTIVE.id}:${MOCK_SEED_TIMESTAMP}`,
+    );
     await postObjectiveCreationOp(
         adapter,
         objectiveSeedBody(
@@ -986,7 +1043,7 @@ export async function postBootstrap(
     adapter: DbAdapter,
     options?: PostMockDataLoadOptions,
 ): Promise<SeededCredentials> {
-    // Pass 1 (no tx): the lone 'current' human-member create's
+    // Pass 1 (no tx): the lone 'XXZruirZyAOoRpNxaDnpSA' human-member create's
     // bundle, formed up front — see postMockDataLoad's pass 1
     // for why. Formed pre-tx — crypto, hashing, and timers
     // never run inside an open transaction (CLAUDE.md §
@@ -1041,7 +1098,7 @@ export async function postBootstrap(
             defaultOrganizationPair, organizationPair,
         ),
     );
-    // Task 1(d): bootstrap's lone human is 'current' with
+    // Task 1(d): bootstrap's lone human is 'XXZruirZyAOoRpNxaDnpSA' with
     // the same PII body pass 2 wrote — no row read.
     const bootstrapPii = bootstrapCurrentMemberPiiBody();
     const bootstrapEmail = bootstrapPii['email'];
@@ -1053,7 +1110,7 @@ export async function postBootstrap(
     const creds = await seedHumanCredentials(
         adapter,
         [{
-            identityId: 'current',
+            identityId: 'XXZruirZyAOoRpNxaDnpSA',
             email: bootstrapEmail,
         }],
         options?.hashPassword,
@@ -1081,21 +1138,22 @@ export async function postBootstrapIn(
         ),
         postIdentityDocumentOp(
             adapter,
-            'current',
+            'XXZruirZyAOoRpNxaDnpSA',
             bootstrapCurrentIdentityBody(),
             SYSTEM_MEMBER_ID,
             identityPair,
         ),
         postMembershipDocumentOp(
             adapter,
-            'current',
+            'XXZruirZyAOoRpNxaDnpSA',
             seatSeedBody('admin', seatPair.requestAt),
             SYSTEM_MEMBER_ID,
             seatPair,
         ),
         appendMessagePair(adapter, defaultOrganizationPair),
         postIdentityPiiDocumentOp(
-            adapter, 'current', bootstrapCurrentMemberPiiBody(),
+            adapter, 'XXZruirZyAOoRpNxaDnpSA'
+                , bootstrapCurrentMemberPiiBody(),
             SYSTEM_MEMBER_ID, piiPair,
         ),
         appendMessagePair(adapter, organizationPair),

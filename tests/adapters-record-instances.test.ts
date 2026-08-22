@@ -26,14 +26,16 @@ import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
 } from '../api/http-errors.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Adapter instances surface (Task 21): create → list →
 // patch(with etag) → 412-on-stale → re-read → retry →
 // delete → history. Nested under org record-types.
 
-const TYPE_ID = 'rt-adapter-1';
-const ATTR_ID = 'attr-adapter-1';
-const INSTANCE_ID = 'inst-adapter-1';
+const TYPE_ID = generateIdentifier();
+const ATTR_ID = generateIdentifier();
+const INSTANCE_ID = generateIdentifier();
 
 async function seededCtx() {
     const db = memoryDbAdapter();
@@ -108,7 +110,7 @@ test(
                 set: [
                     {
                         attributeId: ATTR_ID,
-                        value: 'v1',
+                        value: 'xDyDkxEPwtcNmJVknUHDsg',
                     },
                 ],
             },

@@ -246,7 +246,7 @@ async () => {
         'not-found/index.html': '<p>gone</p>',
     }, undefined, async (base) => {
         const res = await getDocument(
-            base + '/no-such-page',
+            base + '/oPmOpJCSqfhhTFTjvPkLpw',
         );
         assert.equal(res.status, 200);
         assert.match(
@@ -268,7 +268,7 @@ async () => {
         'not-found/index.html': '<p>gone</p>',
     }, handle, async (base) => {
         const res = await fetch(
-            base + '/no-such-page',
+            base + '/oPmOpJCSqfhhTFTjvPkLpw',
         );
         assert.equal(res.status, HTTP_NOT_FOUND);
         assert.match(
@@ -294,11 +294,11 @@ async () => {
     };
     await withServer({}, handle, async (base) => {
         const res = await fetch(
-            base + '/api/organizations/1/ideas/',
+            base + '/api/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         );
         assert.equal(res.status, 200);
         assert.equal(
-            seen, '/organizations/1/ideas/',
+            seen, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         );
     });
 });
@@ -340,7 +340,7 @@ test('unsigned fetch under /api/ is 401 JSON',
 async () => {
     await withServer({}, undefined, async (base) => {
         const res = await fetch(
-            base + '/api/organizations/1/ideas/',
+            base + '/api/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         );
         assert.equal(res.status, HTTP_UNAUTHORIZED);
         assert.match(

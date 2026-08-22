@@ -7,8 +7,8 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
-import { generateCryptoSafeBase62 } from
-    '../shared/crypto-safe-base62.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 
 // Parameterized store acceptance. ./test-postgres will
@@ -16,8 +16,8 @@ import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 // covering the cases without Postgres.
 
 const AT = '2026-01-01T00:00:00.000000Z';
-const IDEA_PREFIX = '/organizations/1/ideas/';
-const FLOW_PREFIX = '/organizations/1/flows/';
+const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
+const FLOW_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/';
 
 function req(
     method: string,
@@ -57,7 +57,7 @@ function membershipDocument(
     identityId: string,
 ): Record<string, unknown> {
     return {
-        organization_id: '1',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         identity_id: identityId,
         type: 'member',
         at: AT,
@@ -105,14 +105,14 @@ function flowCreate(id: string): Record<string, unknown> {
     return {
         id,
         flow: flowFields('Acceptance'),
-        projectFlowId: id + '-pf',
+        projectFlowId: generateIdentifier(),
         projectFlow: {
-            project_id: 'sa-project',
+            project_id: generateIdentifier(),
             flow_id: id,
             at: AT,
         },
         initialState: 'active',
-        initialStateEventId: id + '-ev',
+        initialStateEventId: generateIdentifier(),
         initialStateAt: AT,
         graphDelta: emptyDelta(),
     };
@@ -161,14 +161,17 @@ export function defineStoreAcceptance(
     test(name + ': get live PUT', async () => {
         const { db, token } = await ready();
         const put = await handleRequest(db, req(
-            'PUT', '/organizations/1/ideas/sa-live', token,
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'tcoFxeBipRIaYftXqNfjIg', token,
             ideaDocument('Live', 'ev-sa-live'),
         ));
         assert.equal(put.status, 201);
         const putEtag = put.headers.get('ETag');
         assert.ok(putEtag !== null && putEtag !== '');
         const got = await handleRequest(
-            db, req('GET', '/organizations/1/ideas/sa-live', token),
+            db, req('GET'
+                , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'tcoFxeBipRIaYftXqNfjIg', token),
         );
         assert.equal(got.status, 200);
         assert.equal(got.headers.get('ETag'), putEtag);
@@ -179,14 +182,16 @@ export function defineStoreAcceptance(
     test(name + ': DELETE head is gone', async () => {
         const { db, token } = await ready();
         const put = await handleRequest(db, req(
-            'PUT', '/organizations/1/members/sa-del', token,
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+                + 'tOGidMXUNrBnbXkIQWSpag', token,
             { type: 'member', at: '2026-01-01T00:00:00.000000Z' },
         ));
         assert.equal(put.status, 201);
         const del = await handleRequest(
             db, req(
                 'DELETE',
-                '/organizations/1/members/sa-del',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+                    + 'tOGidMXUNrBnbXkIQWSpag',
                 token,
             ),
         );
@@ -194,7 +199,8 @@ export function defineStoreAcceptance(
         const got = await handleRequest(
             db, req(
                 'GET',
-                '/organizations/1/members/sa-del',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+                    + 'tOGidMXUNrBnbXkIQWSpag',
                 token,
             ),
         );
@@ -205,22 +211,25 @@ export function defineStoreAcceptance(
         const { db, token } = await ready();
         const body = ideaDocument('Same', 'ev-sa-same');
         const first = await handleRequest(
-            db, req('PUT', '/organizations/1/ideas/sa-same', token, body),
+            db, req('PUT'
+                , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'tlQsXUYcTRtLtuHsWqBJBQ', token, body),
         );
         assert.equal(first.status, 201);
         const firstEtag = first.headers.get('ETag');
         assert.equal(
-            await pairsAt(db, IDEA_PREFIX, 'sa-same'),
+            await pairsAt(db, IDEA_PREFIX, 'tlQsXUYcTRtLtuHsWqBJBQ'),
             1,
         );
         const second = await handleRequest(db, req(
-            'PUT', '/organizations/1/ideas/sa-same', token, body,
-            undefined, generateCryptoSafeBase62(),
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'tlQsXUYcTRtLtuHsWqBJBQ', token, body,
+            undefined, generateIdentifier(),
         ));
         assert.equal(second.status, 200);
         assert.equal(second.headers.get('ETag'), firstEtag);
         assert.equal(
-            await pairsAt(db, IDEA_PREFIX, 'sa-same'),
+            await pairsAt(db, IDEA_PREFIX, 'tlQsXUYcTRtLtuHsWqBJBQ'),
             1,
         );
     });
@@ -229,14 +238,18 @@ export function defineStoreAcceptance(
         const { db, token } = await ready();
         const body = ideaDocument('Retry', 'ev-sa-retry');
         const first = await handleRequest(
-            db, req('PUT', '/organizations/1/ideas/sa-retry', token, body),
+            db, req('PUT'
+                , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'tjrZLujBtBVqFwOsBDWdQQ', token, body),
         );
         assert.equal(first.status, 201);
         const firstId = first.headers.get('Response-ID');
         const firstOp = first.headers.get('Operation-ID');
         const firstBytes = await first.text();
         const second = await handleRequest(
-            db, req('PUT', '/organizations/1/ideas/sa-retry', token, body),
+            db, req('PUT'
+                , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'tjrZLujBtBVqFwOsBDWdQQ', token, body),
         );
         assert.equal(second.status, 201);
         assert.equal(
@@ -247,7 +260,7 @@ export function defineStoreAcceptance(
         );
         assert.equal(await second.text(), firstBytes);
         assert.equal(
-            await pairsAt(db, IDEA_PREFIX, 'sa-retry'),
+            await pairsAt(db, IDEA_PREFIX, 'tjrZLujBtBVqFwOsBDWdQQ'),
             1,
         );
     });
@@ -255,12 +268,15 @@ export function defineStoreAcceptance(
     test(name + ': address miss is 404', async () => {
         const { db, token } = await ready();
         const put = await handleRequest(db, req(
-            'PUT', '/organizations/1/projects/sa-miss', token,
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'tiYxjzuiloksGbOADnuMWA', token,
             projectDocument('Other', 'ev-sa-miss'),
         ));
         assert.equal(put.status, 201);
         const got = await handleRequest(
-            db, req('GET', '/organizations/1/ideas/sa-miss', token),
+            db, req('GET'
+                , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'tiYxjzuiloksGbOADnuMWA', token),
         );
         assert.equal(got.status, 404);
     });
@@ -268,11 +284,14 @@ export function defineStoreAcceptance(
     test(name + ': If-Match stale is 412', async () => {
         const { db, token } = await ready();
         const created = await handleRequest(db, req(
-            'POST', '/organizations/1/flows/', token, flowCreate('sa-flow'),
+            'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token
+                , flowCreate('tYhGBKEoBjBYeqTcJWMNVQ'),
         ));
         assert.equal(created.status, 201);
         const live = await handleRequest(
-            db, req('GET', '/organizations/1/flows/sa-flow', token),
+            db, req('GET'
+                , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'tYhGBKEoBjBYeqTcJWMNVQ', token),
         );
         assert.equal(live.status, 200);
         const liveEtag = live.headers.get('ETag');
@@ -281,20 +300,23 @@ export function defineStoreAcceptance(
         };
         assert.equal(liveBody.name, 'Acceptance');
         const before = await pairsAt(
-            db, FLOW_PREFIX, 'sa-flow',
+            db, FLOW_PREFIX, 'tYhGBKEoBjBYeqTcJWMNVQ',
         );
         const stale = await handleRequest(db, req(
-            'PUT', '/organizations/1/flows/sa-flow', token,
-            flowDocument('Stale', 'sa-flow-a'),
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'tYhGBKEoBjBYeqTcJWMNVQ', token,
+            flowDocument('Stale', generateIdentifier()),
             { 'if-match': '"' + 'b'.repeat(64) + '"' },
         ));
         assert.equal(stale.status, 412);
         assert.equal(
-            await pairsAt(db, FLOW_PREFIX, 'sa-flow'),
+            await pairsAt(db, FLOW_PREFIX, 'tYhGBKEoBjBYeqTcJWMNVQ'),
             before,
         );
         const again = await handleRequest(
-            db, req('GET', '/organizations/1/flows/sa-flow', token),
+            db, req('GET'
+                , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'tYhGBKEoBjBYeqTcJWMNVQ', token),
         );
         assert.equal(again.status, 200);
         assert.equal(again.headers.get('ETag'), liveEtag);

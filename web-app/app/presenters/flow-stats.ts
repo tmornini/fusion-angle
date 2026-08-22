@@ -28,11 +28,12 @@ function fmtDur(sec: number | null): string {
         ? DISPLAY_ABSENT
         : formatMinAscending(sec);
 }
-// Throughput below 1/wk shown as "<1/wk" to
+// Throughput below AjdvjuECVZEgZoFajaIEkg/wk shown as
+// "<AjdvjuECVZEgZoFajaIEkg/wk" to
 // avoid implying false precision.
 function fmtThroughput(n: number): string {
     return n < 1
-        ? '<1/wk'
+        ? '<AjdvjuECVZEgZoFajaIEkg/wk'
         : `~${Math.round(n)}/wk`;
 }
 

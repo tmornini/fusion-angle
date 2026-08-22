@@ -72,18 +72,21 @@ test(
     async () => {
         const db = await freshDb();
         const res = await handleRequest(db, req(
-            'PUT', '/organizations/1/ideas/idea-1', DEV_TOKEN,
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'gVvtDIaqhnkXZQcxZeSuiw', DEV_TOKEN,
             // Far-future timestamp forces a distinct, verifiable
             // at value so the test can confirm the caller's time
             // was threaded to the event — not a server nowUtc().
             ideaGenesisBody(
-                'idea-1', 'Fresh Idea',
+                'gVvtDIaqhnkXZQcxZeSuiw', 'Fresh Idea',
                 '2099-01-01T00:00:00.000000Z',
             ),
         ));
         assert.equal(res.status, 201);
         const ideaRes = await handleRequest(
-            db, req('GET', '/organizations/1/ideas/idea-1', DEV_TOKEN),
+            db, req('GET'
+                , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'gVvtDIaqhnkXZQcxZeSuiw', DEV_TOKEN),
         );
         const idea = await ideaRes.json() as {
             title: string;
@@ -91,12 +94,13 @@ test(
         };
         assert.equal(idea.title, 'Fresh Idea');
         // The fence stamped the bound org — never the body.
-        assert.equal(idea.organization_id, '1');
+        assert.equal(idea.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
         // surviving /versions.
         const stateRes = await handleRequest(db, req(
-            'GET', '/organizations/1/ideas/idea-1/versions/',
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'gVvtDIaqhnkXZQcxZeSuiw/versions/',
             DEV_TOKEN,
         ));
         const history = await stateRes.json() as {
@@ -106,7 +110,7 @@ test(
         }[];
         assert.equal(history.length, 1);
         const current = history[0]!;
-        assert.equal(current.id, 'idea-1');
+        assert.equal(current.id, 'gVvtDIaqhnkXZQcxZeSuiw');
         assert.equal(current.title, 'Fresh Idea');
         assert.equal(current.state, 'active');
         assert.equal('state_at' in current, false);
@@ -123,7 +127,8 @@ test(
         // pair-plane genesis PUT.
     // Phase Final Stage B: states table retired.
         const res = await handleRequest(db, req(
-            'PUT', '/organizations/1/ideas/idea-survives', DEV_TOKEN,
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'hNFXShiDyVzvGBLJCFFFcw', DEV_TOKEN,
             {
                 ...ideaFields('Survives'),
                 state: 'active',
@@ -131,7 +136,8 @@ test(
         ));
         assert.equal(res.status, 201);
         const getRes = await handleRequest(db, req(
-            'GET', '/organizations/1/ideas/idea-survives', DEV_TOKEN,
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'hNFXShiDyVzvGBLJCFFFcw', DEV_TOKEN,
         ));
         assert.equal(getRes.status, 200);
     },
@@ -150,15 +156,17 @@ test(
     async () => {
         const db = await freshDb();
         const body = ideaGenesisBody(
-            'idea-retry', 'Retried',
+            'hJeymLqQwgpIHWgKlcHWNA', 'Retried',
             '2026-01-01T00:00:00.000000Z',
         );
         const first = await handleRequest(db, req(
-            'PUT', '/organizations/1/ideas/idea-retry', DEV_TOKEN, body,
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'hJeymLqQwgpIHWgKlcHWNA', DEV_TOKEN, body,
         ));
         assert.equal(first.status, 201);
         const second = await handleRequest(db, req(
-            'PUT', '/organizations/1/ideas/idea-retry', DEV_TOKEN, body,
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'hJeymLqQwgpIHWgKlcHWNA', DEV_TOKEN, body,
         ));
         assert.equal(second.status, 201);
         assert.equal(
@@ -169,7 +177,7 @@ test(
             '../api/derive-ideas.ts'
         );
         const events = await deriveIdeaStateHistory(
-            db, '1', 'idea-retry',
+            db, 'AjdvjuECVZEgZoFajaIEkg', 'hJeymLqQwgpIHWgKlcHWNA',
         );
         assert.equal(events.length, 1);
         assert.equal((await db.pairs.getAll()).length, 3);
@@ -183,7 +191,7 @@ test(
     async () => {
         const db = await freshDb();
         const res = await handleRequest(db, req(
-            'POST', '/organizations/1/ideas/', DEV_TOKEN,
+            'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', DEV_TOKEN,
             ideaGenesisBody(
                 'idea-405', 'Should Not Create',
                 '2026-01-01T00:00:00.000000Z',

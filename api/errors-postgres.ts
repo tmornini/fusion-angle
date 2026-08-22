@@ -1,6 +1,7 @@
 // Map Postgres faults to wire errors by constraint name.
 // SQLSTATE is used only when it is the whole story
-// (deadlock, timeout, missing table, bad JSON at GIN).
+// (deadlock, timeout, missing table,
+// invalid text representation).
 // Deadlock is loud 500 — no retry.
 
 import {
@@ -123,7 +124,7 @@ function messageOf(fault: Fault): string {
         return 'missing table';
     }
     if (fault.code === '22P02') {
-        return 'bad JSON at GIN';
+        return 'invalid text representation';
     }
     if (isPrimaryKey(fault)) {
         return 'duplicate primary key';

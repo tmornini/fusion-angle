@@ -23,6 +23,8 @@ import {
     DEFAULT_LOCK_TIMEOUT,
     type WorkOrderFlowGraph,
 } from '../api/types.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const AT = '2026-05-01T00:00:00.000000Z';
 
@@ -42,8 +44,8 @@ async function seedFlow(
     const ctx = createRequestContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId: id,
-        linkId: id + '-link',
-        projectId: 'p-' + id,
+        linkId: generateIdentifier(),
+        projectId: generateIdentifier(),
         name,
     });
 }
@@ -80,7 +82,8 @@ async function seedWorkOrder(
     // same
     // reason, different address.
     await ctx.PUT(
-        'organizations/1/flows/' + flowId + '/work-orders/fwo-' + id,
+        'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
+            + '/work-orders/' + generateIdentifier(),
         {
             flow_id: flowId,
             work_order_id: id,
@@ -94,14 +97,14 @@ test(
     + ' the binding',
     async () => {
         const { ctx } = await adminContext();
-        await putFlowRecord(ctx, 'fr-1', {
-            flow_id: 'flow-1',
-            record_id: 'rec-1',
+        await putFlowRecord(ctx, 'dCnpryxCNwuTnCrBBDIMOw', {
+            flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
+            record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
         assert.equal(
-            await getRecordForFlow(ctx, 'flow-1'),
-            'rec-1',
+            await getRecordForFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw'),
+            'rbfHGatkwQzGZJVXKJEeyw',
         );
     },
 );
@@ -111,18 +114,18 @@ test(
     + ' record id, or null if unbound',
     async () => {
         const { ctx } = await adminContext();
-        await putFlowRecord(ctx, 'fr-1', {
-            flow_id: 'flow-1',
-            record_id: 'rec-1',
+        await putFlowRecord(ctx, 'dCnpryxCNwuTnCrBBDIMOw', {
+            flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
+            record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
         assert.equal(
-            await getRecordForFlow(ctx, 'flow-1'),
-            'rec-1',
+            await getRecordForFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw'),
+            'rbfHGatkwQzGZJVXKJEeyw',
         );
         assert.equal(
             await getRecordForFlow(
-                ctx, 'flow-unbound',
+                ctx, generateIdentifier(),
             ),
             null,
         );
@@ -134,19 +137,20 @@ test(
     + ' via flow_work_orders then flow_records',
     async () => {
         const { db, ctx } = await adminContext();
+        const workOrderId = generateIdentifier();
         await seedWorkOrder(
-            db, 'wo-1', 'A001', 'flow-1', 1,
+            db, workOrderId, 'A001', 'aEsGMmBEFaVdWihhHXwCbw', 1,
         );
-        await putFlowRecord(ctx, 'fr-1', {
-            flow_id: 'flow-1',
-            record_id: 'rec-1',
+        await putFlowRecord(ctx, 'dCnpryxCNwuTnCrBBDIMOw', {
+            flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
+            record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
         assert.equal(
             await getRecordForWorkOrder(
-                ctx, 'wo-1',
+                ctx, workOrderId,
             ),
-            'rec-1',
+            'rbfHGatkwQzGZJVXKJEeyw',
         );
     },
 );
@@ -156,14 +160,14 @@ test(
     + ' work order with no flow link',
     async () => {
         const { ctx } = await adminContext();
-        await putFlowRecord(ctx, 'fr-1', {
-            flow_id: 'flow-1',
-            record_id: 'rec-1',
+        await putFlowRecord(ctx, 'dCnpryxCNwuTnCrBBDIMOw', {
+            flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
+            record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
         assert.equal(
             await getRecordForWorkOrder(
-                ctx, 'wo-unlinked',
+                ctx, generateIdentifier(),
             ),
             null,
         );
@@ -175,12 +179,13 @@ test(
     + ' linked flow has no record binding',
     async () => {
         const { db, ctx } = await adminContext();
+        const workOrderId = generateIdentifier();
         await seedWorkOrder(
-            db, 'wo-1', 'A001', 'flow-1', 1,
+            db, workOrderId, 'A001', 'aEsGMmBEFaVdWihhHXwCbw', 1,
         );
         assert.equal(
             await getRecordForWorkOrder(
-                ctx, 'wo-1',
+                ctx, workOrderId,
             ),
             null,
         );
@@ -192,27 +197,30 @@ test(
     + ' name for every flow bound to a record',
     async () => {
         const { db, ctx } = await adminContext();
-        await seedFlow(db, 'flow-a', 'Alpha');
-        await seedFlow(db, 'flow-b', 'Beta');
-        await seedFlow(db, 'flow-c', 'Gamma');
-        await putFlowRecord(ctx, 'fr-1', {
-            flow_id: 'flow-a',
-            record_id: 'rec-1',
+        const flowA = generateIdentifier();
+        const flowB = generateIdentifier();
+        const flowC = generateIdentifier();
+        await seedFlow(db, flowA, 'Alpha');
+        await seedFlow(db, flowB, 'Beta');
+        await seedFlow(db, flowC, 'Gamma');
+        await putFlowRecord(ctx, generateIdentifier(), {
+            flow_id: flowA,
+            record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
-        await putFlowRecord(ctx, 'fr-2', {
-            flow_id: 'flow-b',
-            record_id: 'rec-1',
+        await putFlowRecord(ctx, generateIdentifier(), {
+            flow_id: flowB,
+            record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
-        await putFlowRecord(ctx, 'fr-3', {
-            flow_id: 'flow-c',
-            record_id: 'rec-other',
+        await putFlowRecord(ctx, generateIdentifier(), {
+            flow_id: flowC,
+            record_id: generateIdentifier(),
             at: AT,
         });
         const flows =
             await getFlowSummariesForRecord(
-                ctx, 'rec-1',
+                ctx, 'rbfHGatkwQzGZJVXKJEeyw',
             );
         assert.deepEqual(
             flows.toSorted(
@@ -220,9 +228,12 @@ test(
                     a.id.localeCompare(b.id),
             ),
             [
-                { id: 'flow-a', name: 'Alpha' },
-                { id: 'flow-b', name: 'Beta' },
-            ],
+                { id: flowA, name: 'Alpha' },
+                { id: flowB, name: 'Beta' },
+            ].toSorted(
+                (a, b) =>
+                    a.id.localeCompare(b.id),
+            ),
         );
     },
 );
@@ -234,38 +245,42 @@ test(
     + ' to multiple flows',
     async () => {
         const { db, ctx } = await adminContext();
-        // Bind rec-1 to two flows.
-        await putFlowRecord(ctx, 'fr-1', {
-            flow_id: 'flow-a',
-            record_id: 'rec-1',
+        // Bind rbfHGatkwQzGZJVXKJEeyw to two flows.
+        const flowA = generateIdentifier();
+        const flowB = generateIdentifier();
+        const woA = generateIdentifier();
+        const woB = generateIdentifier();
+        await putFlowRecord(ctx, generateIdentifier(), {
+            flow_id: flowA,
+            record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
-        await putFlowRecord(ctx, 'fr-2', {
-            flow_id: 'flow-b',
-            record_id: 'rec-1',
+        await putFlowRecord(ctx, generateIdentifier(), {
+            flow_id: flowB,
+            record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
         // One work order on each.
         await seedWorkOrder(
-            db, 'wo-a', 'A001', 'flow-a', 1,
+            db, woA, 'A001', flowA, 1,
         );
         await seedWorkOrder(
-            db, 'wo-b', 'B001', 'flow-b', 2,
+            db, woB, 'B001', flowB, 2,
         );
         // Plus a noise work order on an
         // unrelated flow.
         await seedWorkOrder(
-            db, 'wo-other', 'X001',
-            'flow-other', 3,
+            db, generateIdentifier(), 'X001',
+            generateIdentifier(), 3,
         );
         const workOrders =
             await getWorkOrdersForRecord(
-                ctx, 'rec-1',
+                ctx, 'rbfHGatkwQzGZJVXKJEeyw',
             );
         const ids = workOrders
             .map(w => w.id)
             .sort();
-        assert.deepEqual(ids, ['wo-a', 'wo-b']);
+        assert.deepEqual(ids, [woA, woB].sort());
     },
 );
 
@@ -276,7 +291,7 @@ test(
         const { ctx } = await adminContext();
         const workOrders =
             await getWorkOrdersForRecord(
-                ctx, 'rec-unknown',
+                ctx, generateIdentifier(),
             );
         assert.equal(workOrders.length, 0);
     },
@@ -286,14 +301,15 @@ test(
     'deleteFlowRecord removes the binding row',
     async () => {
         const { ctx } = await adminContext();
-        await putFlowRecord(ctx, 'fr-1', {
-            flow_id: 'flow-1',
-            record_id: 'rec-1',
+        await putFlowRecord(ctx, 'dCnpryxCNwuTnCrBBDIMOw', {
+            flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
+            record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
-        await deleteFlowRecord(ctx, 'flow-1', 'fr-1');
+        await deleteFlowRecord(ctx, 'aEsGMmBEFaVdWihhHXwCbw'
+            , 'dCnpryxCNwuTnCrBBDIMOw');
         assert.equal(
-            await getRecordForFlow(ctx, 'flow-1'),
+            await getRecordForFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw'),
             null,
         );
     },

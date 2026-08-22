@@ -1,4 +1,8 @@
 import { test } from 'node:test';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+import { seedIdentifier } from
+    '../api/mock-data/seed-kit.ts';
 import assert from 'node:assert/strict';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -30,6 +34,45 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+
+const SEED_FLOW_ORGANIZATION_TWO = seedIdentifier('seed-flow-org2');
+const FLOW_DRIFT_JOIN = generateIdentifier();
+const FLOW_DRIFT_DUP_EV_A = generateIdentifier();
+const FLOW_DRIFT_DUP_EV_B = generateIdentifier();
+const FLOW_DRIFT_METHOD_FILTER = generateIdentifier();
+const SIDECAR_GRAPH_NODE = generateIdentifier();
+const FLOW_DRIFT_SIDECAR_EV = generateIdentifier();
+const SIDECAR_DELTA_NODE = generateIdentifier();
+const FLOW_DRIFT_SIDECAR_RESTORE = generateIdentifier();
+const SOME_UNRELATED_ENTITY = generateIdentifier();
+const FLOW_DRIFT_LOCK_HEAD_CHAIN = generateIdentifier();
+const FLOW_DRIFT_LOCK_HEAD_GENESIS = generateIdentifier();
+const ZZ_MEMBER = generateIdentifier();
+const AA_MEMBER = generateIdentifier();
+const ZZ_ATTR = generateIdentifier();
+const AA_ATTR = generateIdentifier();
+const MULTI_NODE_1_FNM_AA = generateIdentifier();
+const MULTI_NODE_1_FNM_ZZ = generateIdentifier();
+const MULTI_NODE_1_FNA_AA = generateIdentifier();
+const MULTI_NODE_1_FNA_ZZ = generateIdentifier();
+const FLOW_DRIFT_MULTI_NODE_EV = generateIdentifier();
+const FLOW_DRIFT_RETRY_PF_SHARED = generateIdentifier();
+const FLOW_DRIFT_RETRY_A = generateIdentifier();
+const FLOW_DRIFT_RETRY_EV_A = generateIdentifier();
+const FLOW_DRIFT_RETRY_B = generateIdentifier();
+const FLOW_DRIFT_RETRY_EV_B = generateIdentifier();
+const FLOWID_SAVE = generateIdentifier();
+const FLOWID_VERSIONED = generateIdentifier();
+const FLOWID_DELETE_NODE = generateIdentifier();
+const FLOWID_DEL_N2 = generateIdentifier();
+const FLOWID_DEL_E1 = generateIdentifier();
+const FLOWID_UNDO_EV = generateIdentifier();
+const FLOWID_REDO = generateIdentifier();
+const FLOWID_REDO_DEL_N2 = generateIdentifier();
+const FLOWID_REDO_DEL_E1 = generateIdentifier();
+const FLOWID_TOMB = generateIdentifier();
+const FLOWID_PF = generateIdentifier();
+const FLOWID_EV = generateIdentifier();
 
 // Phase Final Task 2: flows(+graph relations+flow_versions)
 // dual-write stripped. This file no longer compares derive
@@ -197,10 +240,12 @@ async function headResponseId(
     flowId: string,
 ): Promise<string> {
     const got = await handleRequest(db, req(
-        'GET', '/organizations/1/flows/' + flowId, token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
     const id = got.headers.get('Response-ID');
-    assert.ok(id, 'no Response-ID on GET /organizations/1/flows/' + flowId);
+    assert.ok(id
+        , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+        + '' + flowId);
     return id!;
 }
 
@@ -210,10 +255,12 @@ async function headEtag(
     flowId: string,
 ): Promise<string> {
     const got = await handleRequest(db, req(
-        'GET', '/organizations/1/flows/' + flowId, token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
     const tag = got.headers.get('ETag');
-    assert.ok(tag, 'no ETag on GET /organizations/1/flows/' + flowId);
+    assert.ok(tag
+        , 'no ETag on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+        + flowId);
     return tag!;
 }
 
@@ -226,7 +273,7 @@ async function createFlow(
     eventId: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'POST', '/organizations/1/flows/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token, {
             id: flowId,
             flow: flowFields('Fresh Flow'),
             projectFlowId,
@@ -251,7 +298,7 @@ async function wireFlowText(
     flowId: string,
 ): Promise<string> {
     const token = await organizationToken(
-        'current', organization,
+        'XXZruirZyAOoRpNxaDnpSA', organization,
     );
     const res = await handleRequest(
         db, req(
@@ -270,7 +317,7 @@ async function wireFlowsText(
     organization: string,
 ): Promise<string> {
     const token = await organizationToken(
-        'current', organization,
+        'XXZruirZyAOoRpNxaDnpSA', organization,
     );
     const res = await handleRequest(
         db, req(
@@ -333,7 +380,8 @@ async function derivedHeadPairId(
 
 // Every seeded flow's own id, paired with the org the seed
 // actually stamped it into: buildFlows() (4 rows) all land on
-// STARK_ORGANIZATION; the 5th is org '2's own flow (Task 6's
+// STARK_ORGANIZATION; the 5th is org 'BBjWJsjYIDkTRKIIPrzWRw's own flow (Task
+// 6's
 // closure proof), driven through postFlowDocumentOp directly —
 // no exported id constant exists for it (unlike the projects
 // sibling's secondOrganizationProjectId), so the literal
@@ -344,18 +392,18 @@ const SEEDED_FLOWS = [
         organization: STARK_ORGANIZATION,
     })),
     {
-        id: 'seed-flow-org2',
+        id: SEED_FLOW_ORGANIZATION_TWO,
         organization: ORGANIZATION_TWO,
     },
 ];
 
 // The project ids mockProjectFlows.ts joins a seeded flow to —
-// 'u6YkHhlGc91oDMkr3x0isa' carries TWO (Customer Onboarding AND
+// 'wqGTTFdYUGnmBxWCppmkOQ' carries TWO (Customer Onboarding AND
 // Layout Test), the multi-row ordering case.
-const TWO_FLOWS_PROJECT_ID = 'u6YkHhlGc91oDMkr3x0isa';
+const TWO_FLOWS_PROJECT_ID = 'wqGTTFdYUGnmBxWCppmkOQ';
 const SEEDED_PROJECT_FLOW_PROJECT_IDS = [
     TWO_FLOWS_PROJECT_ID,
-    'jRE2Tj32NHsFGZIeEADp0p',
+    'kAxUZTXdcMCAttuoyCdSYA',
     l2cProjectId,
 ];
 
@@ -364,7 +412,8 @@ const SEEDED_PROJECT_FLOW_PROJECT_IDS = [
 test('seeded GET /flows wire equals deriveFlows per org',
 async () => {
     const db = await seededDb();
-    for (const organization of ['1', '2']) {
+    for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
+        , 'BBjWJsjYIDkTRKIIPrzWRw']) {
         const wireText = await wireFlowsText(
             db, organization,
         );
@@ -394,15 +443,15 @@ test('a foreign-org flow id 404s on GET and on derive',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_FLOWS.find(
-        (seed) => seed.organization === '1',
+        (seed) => seed.organization === 'AjdvjuECVZEgZoFajaIEkg',
     )!;
-    const otherOrganization = '2';
+    const otherOrganization = 'BBjWJsjYIDkTRKIIPrzWRw';
     await assert.rejects(
         () => deriveFlow(db, otherOrganization, foreign.id),
         EntityNotFoundError,
     );
     const token = await organizationToken(
-        'current', otherOrganization,
+        'XXZruirZyAOoRpNxaDnpSA', otherOrganization,
     );
     const res = await handleRequest(
         db, req(
@@ -441,11 +490,12 @@ test('project-flows wire equals derive across every'
 + ' seeded project', async () => {
     const db = await seededDb();
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     for (const projectId of SEEDED_PROJECT_FLOW_PROJECT_IDS) {
         const res = await handleRequest(db, req(
-            'GET', '/organizations/1/projects/' + projectId +
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + projectId +
                 '/flows/', token,
         ));
         assert.equal(res.status, 200);
@@ -461,11 +511,12 @@ test('the two-flows project orders both join rows'
 + ' on wire and derive', async () => {
     const db = await seededDb();
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const res = await handleRequest(db, req(
         'GET',
-        '/organizations/1/projects/' + TWO_FLOWS_PROJECT_ID + '/flows/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + TWO_FLOWS_PROJECT_ID + '/flows/',
         token,
     ));
     assert.equal(res.status, 200);
@@ -489,12 +540,12 @@ test('live-write chain: create, save, node delete, undo, '
 + 'at every step', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const flowId = 'flow-drift-chain';
+    const flowId = generateIdentifier();
     const projectId = l2cProjectId;
 
-    const n1 = 'chain-n1';
-    const n2 = 'chain-n2';
-    const e1 = 'chain-e1';
+    const n1 = generateIdentifier();
+    const n2 = generateIdentifier();
+    const YiJPbufDpkyrZcZCYbUJpg = generateIdentifier();
     const genesisAt = '2026-03-01T00:00:00.000000Z';
 
     async function assertStep(): Promise<FlowWithGraph> {
@@ -510,17 +561,17 @@ test('live-write chain: create, save, node delete, undo, '
 
     // Create: two nodes, one edge.
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token, {
             id: flowId,
             flow: flowFields('Chain Flow'),
-            projectFlowId: flowId + '-pf',
+            projectFlowId: generateIdentifier(),
             projectFlow: {
                 project_id: projectId,
                 flow_id: flowId,
                 at: genesisAt,
             },
             initialState: 'active',
-            initialStateEventId: flowId + '-ev',
+            initialStateEventId: generateIdentifier(),
             initialStateAt: genesisAt,
             graphDelta: {
                 nodes: [
@@ -530,7 +581,7 @@ test('live-write chain: create, save, node delete, undo, '
                         genesisAt),
                 ],
                 edges: [
-                    deltaEdge(e1, flowId, 'begin', n1, n2,
+                    deltaEdge(YiJPbufDpkyrZcZCYbUJpg, flowId, 'begin', n1, n2,
                         genesisAt),
                 ],
                 deletions: [], memberEvents: [],
@@ -543,15 +594,15 @@ test('live-write chain: create, save, node delete, undo, '
 
     const fullGraph = graphJson(
         [wireNode(n1, 'Create', true), wireNode(n2, 'Review')],
-        [wireEdge(e1, 'begin', n1, n2)],
+        [wireEdge(YiJPbufDpkyrZcZCYbUJpg, 'begin', n1, n2)],
     );
 
     // Plain save: rename only, no graph change.
     let headId = await headResponseId(db, token, flowId);
     const saveAt = '2026-03-02T00:00:00.000000Z';
     const saved = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/' + flowId, token,
-        documentBody('Chain Flow Saved', flowId + '-save', {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
+        documentBody('Chain Flow Saved', FLOWID_SAVE, {
             state_at: saveAt, graph: fullGraph,
         }),
         { 'if-match': await headEtag(db, token, flowId) },
@@ -563,9 +614,9 @@ test('live-write chain: create, save, node delete, undo, '
     // Further save (versions POST retired Phase 15 Task 7).
     const versionAt = '2026-03-03T00:00:00.000000Z';
     const versionedSave = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/' + flowId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
         documentBody(
-            'Chain Flow Versioned', flowId + '-versioned', {
+            'Chain Flow Versioned', FLOWID_VERSIONED, {
                 state_at: versionAt, graph: fullGraph,
             },
         ),
@@ -575,26 +626,26 @@ test('live-write chain: create, save, node delete, undo, '
     headId = versionedSave.headers.get('Response-ID')!;
     derived = await assertStep();
 
-    // Node delete via save: n2 and e1 are tombstoned.
+    // Node delete via save: n2 and YiJPbufDpkyrZcZCYbUJpg are tombstoned.
     const deleteAt = '2026-03-04T00:00:00.000000Z';
     const deletedGraph = graphJson(
         [wireNode(n1, 'Create', true)], [],
     );
     const deletedSave = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/' + flowId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
         documentBody(
-            'Chain Flow Trimmed', flowId + '-delete-node', {
+            'Chain Flow Trimmed', FLOWID_DELETE_NODE, {
                 state_at: deleteAt, graph: deletedGraph,
                 graphDelta: {
                     ...emptyDelta(),
                     deletions: [
                         {
-                            eventId: flowId + '-del-n2',
+                            eventId: FLOWID_DEL_N2,
                             entityId: n2, at: deleteAt,
                         },
                         {
-                            eventId: flowId + '-del-e1',
-                            entityId: e1, at: deleteAt,
+                            eventId: FLOWID_DEL_E1,
+                            entityId: YiJPbufDpkyrZcZCYbUJpg, at: deleteAt,
                         },
                     ],
                 },
@@ -614,8 +665,9 @@ test('live-write chain: create, save, node delete, undo, '
     // Undo-as-replay: reverts to Versioned (fullGraph).
     const undoAt = '2026-03-05T00:00:00.000000Z';
     const undone = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/' + flowId + '/undo', token, {
-            eventId: flowId + '-undo-ev',
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
+            + '/undo', token, {
+            eventId: FLOWID_UNDO_EV,
             at: undoAt,
         },
     ));
@@ -632,19 +684,19 @@ test('live-write chain: create, save, node delete, undo, '
     // Redo-as-save: re-apply the node deletion.
     const redoAt = '2026-03-06T00:00:01.000000Z';
     const redone = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/' + flowId, token,
-        documentBody('Chain Flow Redone', flowId + '-redo', {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
+        documentBody('Chain Flow Redone', FLOWID_REDO, {
             state_at: redoAt, graph: deletedGraph,
             graphDelta: {
                 ...emptyDelta(),
                 deletions: [
                     {
-                        eventId: flowId + '-redo-del-n2',
+                        eventId: FLOWID_REDO_DEL_N2,
                         entityId: n2, at: redoAt,
                     },
                     {
-                        eventId: flowId + '-redo-del-e1',
-                        entityId: e1, at: redoAt,
+                        eventId: FLOWID_REDO_DEL_E1,
+                        entityId: YiJPbufDpkyrZcZCYbUJpg, at: redoAt,
                     },
                 ],
             },
@@ -659,8 +711,8 @@ test('live-write chain: create, save, node delete, undo, '
     // list, 404s on GET and derive.
     const tombstoneAt = '2026-03-07T00:00:00.000000Z';
     const tombstoned = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/' + flowId, token,
-        documentBody('Chain Flow Deleted', flowId + '-tomb', {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
+        documentBody('Chain Flow Deleted', FLOWID_TOMB, {
             state: 'deleted', state_at: tombstoneAt,
             graph: deletedGraph,
         }),
@@ -673,7 +725,8 @@ test('live-write chain: create, save, node delete, undo, '
         EntityNotFoundError,
     );
     const gone = await handleRequest(
-        db, req('GET', '/organizations/1/flows/' + flowId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + flowId, token),
     );
     assert.equal(gone.status, 404);
     const derivedList = await deriveFlows(
@@ -702,15 +755,16 @@ test('live join-row chain: PUT appears on wire/derive, '
     const db = await seededDb();
     const token = await organizationToken();
     const projectId = l2cProjectId;
-    const pfid = 'pf-drift-join-1';
-    const listPath = '/organizations/1/projects/' + projectId + '/flows/';
+    const pfid = generateIdentifier();
+    const listPath = '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+        + projectId + '/flows/';
 
     const putRes = await handleRequest(db, req(
         'PUT', listPath + pfid,
         token,
         {
             project_id: projectId,
-            flow_id: 'flow-drift-join',
+            flow_id: FLOW_DRIFT_JOIN,
             at: AT,
         },
     ));
@@ -766,19 +820,19 @@ test('duplicate-create: two creates, same flow id, distinct '
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const flowId = 'flow-drift-dup';
+    const flowId = generateIdentifier();
     const projectId = l2cProjectId;
-    const pfidA = 'flow-drift-dup-pf-a';
-    const pfidB = 'flow-drift-dup-pf-b';
+    const pfidA = generateIdentifier();
+    const pfidB = generateIdentifier();
 
     const first = await createFlow(
         db, token, flowId, pfidA, projectId,
-        'flow-drift-dup-ev-a',
+        FLOW_DRIFT_DUP_EV_A,
     );
     assert.equal(first.status, 201);
     const second = await createFlow(
         db, token, flowId, pfidB, projectId,
-        'flow-drift-dup-ev-b',
+        FLOW_DRIFT_DUP_EV_B,
     );
     // The create op holds no echo of its own — a duplicate
     // create succeeds outright, never 412ing.
@@ -804,7 +858,8 @@ async () => {
     // TWO join rows on wire and derive (Phase Final Task 2:
     // project_flows row half stripped).
     const joinsRes = await handleRequest(db, req(
-        'GET', '/organizations/1/projects/' + projectId + '/flows/', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + projectId + '/flows/', token,
     ));
     const wireJoins = (await joinsRes.json() as {
         id: string;
@@ -827,17 +882,18 @@ test('the create-op POST pair is not read as a document pair '
 + '(the method-filter proof at drift altitude)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const flowId = 'flow-drift-method-filter';
+    const flowId = FLOW_DRIFT_METHOD_FILTER;
 
     const created = await createFlow(
-        db, token, flowId, flowId + '-pf', l2cProjectId,
-        flowId + '-ev',
+        db, token, flowId, FLOWID_PF, l2cProjectId,
+        FLOWID_EV,
     );
     assert.equal(created.status, 201);
 
     const requests = await db.pairs.getAll();
     const atAddress = requests.filter(
-        (r) => r.uri_collection === '/organizations/1/flows/'
+        (r) => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'flows/'
             && r.uri_id === flowId,
     );
     // Both an operation (POST, 204) pair and a document (PUT)
@@ -871,7 +927,7 @@ test('sidecar insensitivity: graphDelta/revivals disagreeing '
 + 'with graph derives from graph alone', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const flowId = 'flow-drift-sidecar';
+    const flowId = generateIdentifier();
 
     // A shape no real client ever sends: `graph` claims ONE
     // node while `graphDelta` upserts a DIFFERENT one and
@@ -883,25 +939,26 @@ test('sidecar insensitivity: graphDelta/revivals disagreeing '
     // deriveFlowGraphStates (SIDECAR-KEEP), not the working
     // graph.
     const graph = graphJson(
-        [wireNode('sidecar-graph-node', 'Graph Node')], [],
+        [wireNode(SIDECAR_GRAPH_NODE, 'Graph Node')], [],
     );
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/' + flowId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
+            , token, {
             ...flowFields('Sidecar Flow'),
             state: 'active',
             state_at: AT,
-            state_event_id: 'flow-drift-sidecar-ev',
+            state_event_id: FLOW_DRIFT_SIDECAR_EV,
             graph,
             graphDelta: {
                 ...emptyDelta(),
                 nodes: [deltaNode(
-                    'sidecar-delta-node', flowId,
+                    SIDECAR_DELTA_NODE, flowId,
                     'Delta Node', false, AT,
                 )],
             },
             revivals: [{
-                eventId: 'flow-drift-sidecar-restore',
-                entityId: 'some-unrelated-entity', at: AT,
+                eventId: FLOW_DRIFT_SIDECAR_RESTORE,
+                entityId: SOME_UNRELATED_ENTITY, at: AT,
             }],
         },
     ));
@@ -914,7 +971,7 @@ test('sidecar insensitivity: graphDelta/revivals disagreeing '
         nodes: { id: string }[];
     }).nodes;
     assert.deepEqual(
-        derivedNodes.map((n) => n.id), ['sidecar-graph-node'],
+        derivedNodes.map((n) => n.id), [SIDECAR_GRAPH_NODE],
     );
     const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
@@ -923,7 +980,7 @@ test('sidecar insensitivity: graphDelta/revivals disagreeing '
     // graphDelta node never becomes the working graph head.
     assert.equal(
         derivedNodes.some(
-            (n) => n.id === 'sidecar-delta-node',
+            (n) => n.id === SIDECAR_DELTA_NODE,
         ),
         false,
     );
@@ -935,11 +992,11 @@ test('the lock-head terminal reaches exactly the derived '
 + 'head pair id', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const flowId = 'flow-drift-lock-head-chain';
+    const flowId = FLOW_DRIFT_LOCK_HEAD_CHAIN;
 
     const genesis = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/' + flowId, token,
-        documentBody('Genesis', 'flow-drift-lock-head-genesis'),
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
+        documentBody('Genesis', FLOW_DRIFT_LOCK_HEAD_GENESIS),
     ));
     assert.equal(genesis.status, 201);
     const genesisId = genesis.headers.get('Response-ID')!;
@@ -948,9 +1005,10 @@ test('the lock-head terminal reaches exactly the derived '
     const saveCount = 4; // N >= 3 sequential saves beyond genesis
     for (let i = 0; i < saveCount; i++) {
         const saved = await handleRequest(db, req(
-            'PUT', '/organizations/1/flows/' + flowId, token,
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
+                , token,
             documentBody(
-                'Save ' + i, 'flow-drift-lock-head-ev-' + i,
+                'Save ' + i, generateIdentifier(),
             ),
             { 'if-match': await headEtag(db, token, flowId) },
         ));
@@ -978,22 +1036,22 @@ test('a live multi-member, multi-attribute node save derives '
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const flowId = 'flow-drift-multi-node';
-    const nodeId = 'multi-node-1';
+    const flowId = generateIdentifier();
+    const nodeId = generateIdentifier();
 
     // Deliberately reverse-alphabetical in `graph` and the
     // OPPOSITE order in the storage-shaped delta events.
     const graph = graphJson(
         [wireNode(
             nodeId, 'Multi Node', false,
-            ['zz-member', 'aa-member'],
+            [ZZ_MEMBER, AA_MEMBER],
             [
                 {
-                    attribute_id: 'zz-attr', mode: 'editable',
+                    attribute_id: ZZ_ATTR, mode: 'editable',
                     isRequired: true,
                 },
                 {
-                    attribute_id: 'aa-attr', mode: 'readonly',
+                    attribute_id: AA_ATTR, mode: 'readonly',
                     isRequired: false,
                 },
             ],
@@ -1006,29 +1064,30 @@ async () => {
         deletions: [],
         memberEvents: [
             deltaMember(
-                'multi-node-1-fnm-aa', nodeId, 'aa-member', AT,
+                MULTI_NODE_1_FNM_AA, nodeId, AA_MEMBER, AT,
             ),
             deltaMember(
-                'multi-node-1-fnm-zz', nodeId, 'zz-member', AT,
+                MULTI_NODE_1_FNM_ZZ, nodeId, ZZ_MEMBER, AT,
             ),
         ],
         attributeEvents: [
             deltaAttribute(
-                'multi-node-1-fna-aa', nodeId, 'aa-attr',
+                MULTI_NODE_1_FNA_AA, nodeId, AA_ATTR,
                 'readonly', false, AT,
             ),
             deltaAttribute(
-                'multi-node-1-fna-zz', nodeId, 'zz-attr',
+                MULTI_NODE_1_FNA_ZZ, nodeId, ZZ_ATTR,
                 'editable', true, AT,
             ),
         ],
     };
 
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/' + flowId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
+            , token, {
             ...flowFields('Multi-Member Flow'),
             state: 'active', state_at: AT,
-            state_event_id: 'flow-drift-multi-node-ev',
+            state_event_id: FLOW_DRIFT_MULTI_NODE_EV,
             graph, graphDelta, revivals: [],
         },
     ));
@@ -1054,11 +1113,11 @@ async () => {
     const node = nodes.find((n) => n.id === nodeId)!;
     assert.deepEqual(
         [...node.memberIds].sort(),
-        ['aa-member', 'zz-member'],
+        [AA_MEMBER, ZZ_MEMBER].sort(),
     );
     assert.deepEqual(
         node.attributes.map((a) => a.attribute_id).sort(),
-        ['aa-attr', 'zz-attr'],
+        [AA_ATTR, ZZ_ATTR].sort(),
     );
 });
 
@@ -1078,11 +1137,11 @@ test('same-join-id retry: two different flow creates reusing '
     const db = await seededDb();
     const token = await organizationToken();
     const projectId = l2cProjectId;
-    const sharedPfid = 'flow-drift-retry-pf-shared';
+    const sharedPfid = FLOW_DRIFT_RETRY_PF_SHARED;
 
     const first = await createFlow(
-        db, token, 'flow-drift-retry-a', sharedPfid, projectId,
-        'flow-drift-retry-ev-a',
+        db, token, FLOW_DRIFT_RETRY_A, sharedPfid, projectId,
+        FLOW_DRIFT_RETRY_EV_A,
     );
     assert.equal(first.status, 201);
 
@@ -1090,14 +1149,15 @@ test('same-join-id retry: two different flow creates reusing '
     // not a byte-identical resend, which would replay via the E6
     // fast path and append no second pair at all.
     const second = await createFlow(
-        db, token, 'flow-drift-retry-b', sharedPfid, projectId,
-        'flow-drift-retry-ev-b',
+        db, token, FLOW_DRIFT_RETRY_B, sharedPfid, projectId,
+        FLOW_DRIFT_RETRY_EV_B,
     );
     assert.equal(second.status, 201);
 
     const joinPrefix = canonicalUriCollection(
         STARK_ORGANIZATION,
-        '/organizations/1/projects/' + projectId + '/flows/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
+            + '/flows/',
     );
     const joinResponses = await db.pairs.getAllAtAddress(
         joinPrefix, sharedPfid,

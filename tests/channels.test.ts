@@ -136,8 +136,8 @@ test(
         const poster = new BroadcastChannel(CHANNEL_NAME);
         poster.postMessage({
             kind: 'scoped',
-            organizationIds: ['1'],
-            identityIds: ['current'],
+            organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
+            identityIds: ['XXZruirZyAOoRpNxaDnpSA'],
         });
         await deliver();
         poster.close();
@@ -149,7 +149,8 @@ test(
     'a scoped event naming the active organization fires',
     async () => {
         putSessionToken(
-            await organizationToken('current', '1'),
+            await organizationToken('XXZruirZyAOoRpNxaDnpSA'
+                , 'AjdvjuECVZEgZoFajaIEkg'),
         );
         const ch = createSubscriptionChannel();
         let fired = 0;
@@ -157,7 +158,7 @@ test(
         const poster = new BroadcastChannel(CHANNEL_NAME);
         poster.postMessage({
             kind: 'scoped',
-            organizationIds: ['1'],
+            organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
             identityIds: [],
         });
         await deliver();
@@ -167,7 +168,7 @@ test(
 );
 
 test('a scoped event naming this identity fires', async () => {
-    putSessionToken(await reachableToken('current', []));
+    putSessionToken(await reachableToken('XXZruirZyAOoRpNxaDnpSA', []));
     const ch = createSubscriptionChannel();
     let fired = 0;
     ch.subscribe(() => { fired += 1; });
@@ -175,7 +176,7 @@ test('a scoped event naming this identity fires', async () => {
     poster.postMessage({
         kind: 'scoped',
         organizationIds: [],
-        identityIds: ['current'],
+        identityIds: ['XXZruirZyAOoRpNxaDnpSA'],
     });
     await deliver();
     poster.close();
@@ -190,7 +191,8 @@ test(
     + ' on a flat session',
     async () => {
         putSessionToken(
-            await reachableToken('current', ['1', '2']),
+            await reachableToken('XXZruirZyAOoRpNxaDnpSA'
+                , ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw']),
         );
         const ch = createSubscriptionChannel();
         let fired = 0;
@@ -198,7 +200,7 @@ test(
         const poster = new BroadcastChannel(CHANNEL_NAME);
         poster.postMessage({
             kind: 'scoped',
-            organizationIds: ['1'],
+            organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
             identityIds: [],
         });
         await deliver();
@@ -211,7 +213,8 @@ test(
     'a scoped event naming neither is a miss',
     async () => {
         putSessionToken(
-            await organizationToken('current', '1'),
+            await organizationToken('XXZruirZyAOoRpNxaDnpSA'
+                , 'AjdvjuECVZEgZoFajaIEkg'),
         );
         const ch = createSubscriptionChannel();
         let fired = 0;
@@ -219,8 +222,8 @@ test(
         const poster = new BroadcastChannel(CHANNEL_NAME);
         poster.postMessage({
             kind: 'scoped',
-            organizationIds: ['2'],
-            identityIds: ['someone-else'],
+            organizationIds: ['BBjWJsjYIDkTRKIIPrzWRw'],
+            identityIds: ['uTGrEpVpODbNhDhDVdWeqQ'],
         });
         await deliver();
         poster.close();
@@ -231,7 +234,8 @@ test(
 test('notify posts a scoped event other tabs hear',
 async () => {
     putSessionToken(
-        await organizationToken('current', '1'),
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA'
+            , 'AjdvjuECVZEgZoFajaIEkg'),
     );
     const seen: unknown[] = [];
     const listener = new BroadcastChannel(
@@ -251,15 +255,16 @@ async () => {
     assert.equal(local, 1);
     assert.deepEqual(seen, [{
         kind: 'scoped',
-        organizationIds: ['1'],
-        identityIds: ['current'],
+        organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
+        identityIds: ['XXZruirZyAOoRpNxaDnpSA'],
     }]);
 });
 
 test('notify on a flat session names reachable orgs',
 async () => {
     putSessionToken(
-        await reachableToken('current', ['1', '2']),
+        await reachableToken('XXZruirZyAOoRpNxaDnpSA'
+            , ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw']),
     );
     const seen: unknown[] = [];
     const listener = new BroadcastChannel(
@@ -273,8 +278,8 @@ async () => {
     listener.close();
     assert.deepEqual(seen, [{
         kind: 'scoped',
-        organizationIds: ['1', '2'],
-        identityIds: ['current'],
+        organizationIds: ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw'],
+        identityIds: ['XXZruirZyAOoRpNxaDnpSA'],
     }]);
 });
 
@@ -306,8 +311,8 @@ async () => {
     );
     poster.postMessage({
         kind: 'scoped',
-        organizationIds: ['1'],
-        identityIds: ['current'],
+        organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
+        identityIds: ['XXZruirZyAOoRpNxaDnpSA'],
     });
     await deliver();
     poster.close();

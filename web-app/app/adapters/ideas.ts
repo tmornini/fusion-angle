@@ -33,8 +33,8 @@ import {
     notifyProjectScoreChange,
 } from './project-scoring.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -388,14 +388,14 @@ export async function postIdeaConversion(
         projectId,
         project: project as unknown as AnyBody,
         idea: promotedIdea as unknown as AnyBody,
-        ideaStateEventId: generateCryptoSafeBase62(),
+        ideaStateEventId: generateIdentifier(),
         ideaState: 'promoted',
         ideaStateAt,
-        projectStateEventId: generateCryptoSafeBase62(),
+        projectStateEventId: generateIdentifier(),
         projectState,
         projectStateAt,
         baselines: baselines.map(b => ({
-            id: generateCryptoSafeBase62(),
+            id: generateIdentifier(),
             fields: {
                 project_id: projectId,
                 objective_id: b.objectiveId,

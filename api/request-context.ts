@@ -2,8 +2,9 @@ import type { GuardedDbAdapter } from './db.ts';
 import { nowUtc, type Id } from './types.ts';
 import type { Principal } from './access-token.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
 
 // The server half of the request vessel (Office of the
 // Context): one context enters at the gate and rides the
@@ -21,7 +22,7 @@ import {
 // rewrite re-enters handleRequest with this header so the
 // inner hop keeps the outer request's id — one user request,
 // one trace.
-export const REQUEST_ID_HEADER = 'x-request-id';
+export const REQUEST_ID_HEADER = 'request-id';
 
 export interface IncomingContext {
     readonly requestId: string;
@@ -62,10 +63,12 @@ export function incomingContext(
     base: GuardedDbAdapter,
     request: Request,
 ): IncomingContext {
+    const raw = request.headers.get(REQUEST_ID_HEADER);
     return {
         requestId:
-            request.headers.get(REQUEST_ID_HEADER)
-                ?? generateCryptoSafeBase62(),
+            raw !== null && isIdentifier(raw)
+                ? raw
+                : generateIdentifier(),
         method: request.method,
         pathname: new URL(request.url).pathname,
         base,

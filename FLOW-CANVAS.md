@@ -56,7 +56,7 @@ generator all read `node.name` and emit it verbatim;
 persistence and presentation share one vocabulary.
 `isCreate` and `isArchive` are properties of the graph node,
 not state values. A work order's state at any node is
-recorded as that node's id (a base62 token), distinct in
+recorded as that node's id (an identifier), distinct in
 shape from the closed claim alphabet
 (`'claimed'`, `'claim_released'`, `'claim_expired'`) on
 the same `entity_id`. The states log carries both families;

@@ -25,7 +25,7 @@ test('GET /organizations/:id/ideas/ is the'
     + ' collection', () => {
     const match = matchRoute(
         routes,
-        pathSegmentsOf('/organizations/1/ideas/'),
+        pathSegmentsOf('/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'),
     );
     assert.ok(match);
     assert.equal(typeof match.route.get, 'function');
@@ -38,7 +38,7 @@ async () => {
     const token = await organizationToken();
     const res = await handleRequest(db,
         new Request(
-            'http://localhost/organizations/1'
+            'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg'
                 + '/identities', {
             headers: {
                 Authorization: 'Bearer ' + token,
@@ -55,7 +55,7 @@ test('GET /organizations/:id/authentication/token'
     const token = await organizationToken();
     const res = await handleRequest(db,
         new Request(
-            'http://localhost/organizations/1'
+            'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg'
                 + '/authentication/token', {
             headers: {
                 Authorization: 'Bearer ' + token,

@@ -17,6 +17,8 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Family-history ownership fence. Own-org history is 200
 // with the document-trio genesis; a miss at this address
@@ -61,20 +63,25 @@ async function seedMembershipPair(
 async function seed(): Promise<{
     db: MemoryDbAdapter;
     token: string;
+    organizationA: string;
+    memberA: string;
 }> {
     const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    const memberA = generateIdentifier();
     await db.postSchemaCreation();
-    await seedOrganizationDocument(db, 'A', 'Acme');
-    await seedMembershipPair(db, 'm-a', {
-        organization_id: 'A',
-        identity_id: 'memberA',
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    await seedMembershipPair(db, generateIdentifier(), {
+        organization_id: organizationA,
+        identity_id: memberA,
         type: 'admin',
         at: AT,
     });
     // Own-org idea document — family-history reads target it.
-    const token = await organizationToken('memberA', 'A');
+    const token = await organizationToken(memberA, organizationA);
     const idea = await handleRequest(db, req(
-        'PUT', '/organizations/A/ideas/idea-a', token, {
+        'PUT', '/organizations/' + organizationA
+            + '/ideas/gfwcurTzrfssEsWJyNeUyQ', token, {
             title: 'Idea A',
             position: 1,
             problem_statement: 'p',
@@ -86,13 +93,15 @@ async function seed(): Promise<{
         },
     ));
     assert.equal(idea.status, 201);
-    return { db, token };
+    return { db, token, organizationA, memberA };
 }
 
 test('GET /organizations/:id/ideas/:id/versions/ is 200', async () => {
-    const { db, token } = await seed();
+    const { db, token, organizationA } = await seed();
     const res = await handleRequest(db, req(
-        'GET', '/organizations/A/ideas/idea-a/versions/', token,
+        'GET', '/organizations/' + organizationA
+            + '/ideas/gfwcurTzrfssEsWJyNeUyQ/versions/'
+            , token,
     ));
     assert.equal(res.status, 200);
     const rows = await res.json() as {
@@ -100,7 +109,8 @@ test('GET /organizations/:id/ideas/:id/versions/ is 200', async () => {
         state: string;
     }[];
     assert.ok(
-        rows.some(r => r.id === 'idea-a' && r.state === 'active'),
+        rows.some(r => r.id === 'gfwcurTzrfssEsWJyNeUyQ'
+            && r.state === 'active'),
         'own-org versions list the idea collection item',
     );
 });
@@ -108,17 +118,20 @@ test('GET /organizations/:id/ideas/:id/versions/ is 200', async () => {
 test('GET /organizations/:id/ideas/:id/versions/ foreign miss is 404'
 + ' at this address',
 async () => {
-    const { db, token } = await seed();
-    await seedOrganizationDocument(db, 'B', 'Beta');
-    await seedMembershipPair(db, 'm-b', {
-        organization_id: 'B',
-        identity_id: 'memberB',
+    const { db, token, organizationA } = await seed();
+    const organizationB = generateIdentifier();
+    const memberB = generateIdentifier();
+    await seedOrganizationDocument(db, organizationB, 'Beta');
+    await seedMembershipPair(db, generateIdentifier(), {
+        organization_id: organizationB,
+        identity_id: memberB,
         type: 'admin',
         at: AT,
     });
-    const tokenB = await organizationToken('memberB', 'B');
+    const tokenB = await organizationToken(memberB, organizationB);
     const foreignIdea = await handleRequest(db, req(
-        'PUT', '/organizations/B/ideas/idea-b', tokenB, {
+        'PUT', '/organizations/' + organizationB
+            + '/ideas/glHawNZBNrzAmZIaCDGpJQ', tokenB, {
             title: 'Idea B',
             position: 1,
             problem_statement: 'p',
@@ -131,13 +144,15 @@ async () => {
     ));
     assert.equal(foreignIdea.status, 201);
     const res = await handleRequest(db, req(
-        'GET', '/organizations/A/ideas/idea-b/versions/', token,
+        'GET', '/organizations/' + organizationA
+            + '/ideas/glHawNZBNrzAmZIaCDGpJQ/versions/'
+            , token,
     ));
     assert.equal(res.status, 404);
     assert.deepEqual(
         await res.json(),
         {
-            error: 'Not found: ideas/idea-b',
+            error: 'Not found: ideas/glHawNZBNrzAmZIaCDGpJQ',
         },
     );
 });

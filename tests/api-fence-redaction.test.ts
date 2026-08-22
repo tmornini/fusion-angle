@@ -41,7 +41,7 @@ test(
                 column: string, key: string,
             ) => ReturnType<typeof original>;
         }).getAllWhere = async (column, key) => {
-            if (key === '/identities/current/'
+            if (key === '/identities/XXZruirZyAOoRpNxaDnpSA/'
                 + 'default-organization/') {
                 throw new Error('secret fence fault detail');
             }
@@ -53,7 +53,8 @@ test(
                 'error',
                 () => handleRequest(
                     db,
-                    new Request('http://localhost/organizations/1/ideas/', {
+                    new Request('http://localhost/organizations/'
+                        + 'AjdvjuECVZEgZoFajaIEkg/ideas/', {
                         headers: {
                             'Authorization':
                                 'Bearer ' + flatToken,
@@ -84,7 +85,7 @@ test(
                 column: string, key: string,
             ) => ReturnType<typeof original>;
         }).getAllWhere = async (column, key) => {
-            if (key === '/identities/current/'
+            if (key === '/identities/XXZruirZyAOoRpNxaDnpSA/'
                 + 'default-organization/') {
                 throw new MissingTableError('pairs');
             }
@@ -94,7 +95,8 @@ test(
         await assert.rejects(
             () => handleRequest(
                 db,
-                new Request('http://localhost/organizations/1/ideas/', {
+                new Request('http://localhost/organizations/'
+                    + 'AjdvjuECVZEgZoFajaIEkg/ideas/', {
                     headers: {
                         'Authorization':
                             'Bearer ' + flatToken,

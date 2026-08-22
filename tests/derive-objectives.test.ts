@@ -15,6 +15,8 @@ import {
 } from './http-fixtures.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Objectives' own state-history reduction (states-address
 // retirement): unit-level trio walk + echo dedup, and the
@@ -50,23 +52,26 @@ test('deriveObjectiveStateHistory returns the trio walk in'
 + ' (state_at, id) order with echo dedup', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const id = 'obj-derive-1';
+    const id = generateIdentifier();
     const genesisAt = nowUtc();
     await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + id, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
+            , token, {
             position: 1, state: 'active',
         },
     ));
     const archiveAt = nowUtc();
     await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + id, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
+            , token, {
             position: 1, state: 'archived',
         },
     ));
     // a byte-identical echo of ev2 (drag-reorder style
     // re-put) must NOT mint a third event
     await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + id, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
+            , token, {
             position: 2, state: 'archived',
         },
     ));
@@ -83,21 +88,24 @@ test('GET organizations/:id/objectives/:id/versions carries the objective'
 + ' trio rows (DESC current-first)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const id = 'obj-derive-history-1';
+    const id = generateIdentifier();
     const genesisAt = nowUtc();
     await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + id, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
+            , token, {
             position: 1, state: 'active',
         },
     ));
     const archiveAt = nowUtc();
     await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + id, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
+            , token, {
             position: 1, state: 'archived',
         },
     ));
     const res = await handleRequest(db, req(
-        'GET', '/organizations/1/objectives/' + id + '/versions/', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
+            + '/versions/', token,
     ));
     assert.equal(res.status, 200);
     const rows = JSON.parse(await res.text()) as {

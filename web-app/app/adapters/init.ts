@@ -7,8 +7,8 @@ import {
     ANONYMOUS_ID,
 } from '../../../api/access-token.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 import {
     nowEpochSeconds,
 } from '../../../api/types.ts';
@@ -66,7 +66,7 @@ async function mintSessionToken(
         name,
         iat: nowEpochSeconds(),
         ttlSeconds: SESSION_TTL_SECONDS,
-        jti: generateCryptoSafeBase62(),
+        jti: generateIdentifier(),
     });
 }
 

@@ -13,6 +13,8 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // The Phase 14 Task 1 core: invitationOpStateFor is the ENTITY-
 // SCOPED sibling of the whole-ledger-scanning (private)
@@ -78,14 +80,14 @@ async function grant(
     email: string,
 ): Promise<void> {
     const admin = await organizationToken(
-        'current', ORGANIZATION_TWO,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
     const res = await handleRequest(db, req(
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/invitations/', admin, {
             email,
             invitationId,
-            grantEventId: invitationId + '-grant',
+            grantEventId: generateIdentifier(),
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
@@ -96,7 +98,7 @@ test('invitationOpStateFor: pending (granted, unanswered)'
 + ' derives undefined, matching the row-plane pending default',
 async () => {
     const db = await seededDb();
-    const id = 'inv-opstate-pending';
+    const id = generateIdentifier();
     await grant(db, id, 'sarah.chen@company.com');
 
     assert.equal(
@@ -111,8 +113,8 @@ async () => {
 test('invitationOpStateFor: accepted derives \'accepted\','
 + ' matching the row-plane current state', async () => {
     const db = await seededDb();
-    const id = 'inv-opstate-accepted';
-    const inviteeId = 'LhfaUUf4IumVsCSGB4xjdK'; // Sarah Chen
+    const id = generateIdentifier();
+    const inviteeId = 'MQFcPtrZPIGjMCRAXtZUnA'; // Sarah Chen
     await grant(db, id, 'sarah.chen@company.com');
 
     const accept = await handleRequest(db, req(
@@ -121,8 +123,8 @@ test('invitationOpStateFor: accepted derives \'accepted\','
         await organizationToken(inviteeId, ORGANIZATION_TWO),
         {
             state: 'accepted',
-            membershipId: id + '-ms',
-            eventId: id + '-accept',
+            membershipId: generateIdentifier(),
+            eventId: generateIdentifier(),
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
@@ -138,8 +140,8 @@ test('invitationOpStateFor: accepted derives \'accepted\','
 test('invitationOpStateFor: declined derives \'declined\','
 + ' matching the row-plane current state', async () => {
     const db = await seededDb();
-    const id = 'inv-opstate-declined';
-    const inviteeId = 'zyTbfbjcGEfbpCsNTP0XjX'; // Jessica Park
+    const id = generateIdentifier();
+    const inviteeId = 'zyGBRshxOnKHUfcyFRqowg'; // Jessica Park
     await grant(db, id, 'jessica.park@company.com');
 
     const decline = await handleRequest(db, req(
@@ -148,7 +150,7 @@ test('invitationOpStateFor: declined derives \'declined\','
         await organizationToken(inviteeId, ORGANIZATION_TWO),
         {
             state: 'declined',
-            eventId: id + '-decline',
+            eventId: generateIdentifier(),
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
@@ -164,17 +166,17 @@ test('invitationOpStateFor: declined derives \'declined\','
 test('invitationOpStateFor: revoked derives \'revoked\','
 + ' matching the row-plane current state', async () => {
     const db = await seededDb();
-    const id = 'inv-opstate-revoked';
+    const id = generateIdentifier();
     await grant(db, id, 'emily.rodriguez@company.com');
 
     const revoke = await handleRequest(db, req(
         'PUT',
         '/organizations/' + ORGANIZATION_TWO
             + '/invitations/' + id,
-        await organizationToken('current', ORGANIZATION_TWO),
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO),
         {
             state: 'revoked',
-            eventId: id + '-revoke',
+            eventId: generateIdentifier(),
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
@@ -191,10 +193,10 @@ test('invitationOpStateFor: a never-granted id derives'
 + ' undefined, no throw', async () => {
     const db = await seededDb();
     await assert.doesNotReject(
-        () => invitationOpStateFor(db, 'no-such-invitation'),
+        () => invitationOpStateFor(db, generateIdentifier()),
     );
     assert.equal(
-        await invitationOpStateFor(db, 'no-such-invitation'),
+        await invitationOpStateFor(db, generateIdentifier()),
         undefined,
     );
 });

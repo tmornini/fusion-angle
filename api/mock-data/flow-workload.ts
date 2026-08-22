@@ -16,6 +16,7 @@ import {
     now,
     mulberry32,
     b62Id,
+    seedIdentifier,
     pickWeighted,
     sampleUniform,
     sampleLogNormal,
@@ -105,7 +106,7 @@ export function generateFlowWorkload(args: {
     const nowMs = now.getTime();
 
     for (let i = 0; i < totalWorkOrders; i++) {
-        const woId = b62Id(rng, 22);
+        const woId = seedIdentifier(b62Id(rng, 22));
         const displayId = b62Id(rng, 8);
         const path = pickWeighted(
             rng, paths, p => p.weight,
@@ -172,7 +173,7 @@ export function generateFlowWorkload(args: {
             workingSteps[0]!.member;
 
         stateEvents.push({
-            id: b62Id(rng, 22),
+            id: seedIdentifier(b62Id(rng, 22)),
             entity_id: woId,
             state: path.nodeIds[0]!,
             member_id: creatorPerson,
@@ -182,7 +183,7 @@ export function generateFlowWorkload(args: {
         if (N >= 2) {
             cursorMs += CREATE_DWELL_MS;
             stateEvents.push({
-                id: b62Id(rng, 22),
+                id: seedIdentifier(b62Id(rng, 22)),
                 entity_id: woId,
                 state: path.nodeIds[1]!,
                 member_id: creatorPerson,
@@ -200,7 +201,7 @@ export function generateFlowWorkload(args: {
                 cursorMs = nowMs - 1000;
             }
             stateEvents.push({
-                id: b62Id(rng, 22),
+                id: seedIdentifier(b62Id(rng, 22)),
                 entity_id: woId,
                 state: path.nodeIds[j]!,
                 member_id: prior.member,
@@ -216,7 +217,7 @@ export function generateFlowWorkload(args: {
             position: i + 1,
         });
         flowWorkOrders.push({
-            id: b62Id(rng, 22),
+            id: seedIdentifier(b62Id(rng, 22)),
             flow_id: flow.flowId,
             work_order_id: woId,
             at:

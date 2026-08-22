@@ -81,9 +81,9 @@ test('MemoryDbAdapter exposes message stores', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await db.pairs.put('pair-1', {
-        uri_collection: '/organizations/1/ideas/',
+        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         uri_id: '42',
-        requester_identity_id: 'current',
+        requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         method: 'PUT',
         request_at: '2026-01-01T00:00:00.000000Z',
         request_hash: 'a'.repeat(64),
@@ -91,7 +91,7 @@ test('MemoryDbAdapter exposes message stores', async () => {
         response_at: '2026-01-01T00:00:00.000000Z',
         version: 'e'.repeat(64),
         response: '{"kind":"response"}',
-        operation_id: '0123456789ABCDEFGHIJKL',
+        operation_id: '0123456789ABCDEFGHIJKw',
     });
     const rows = await db.pairs.getAll();
     assert.equal(rows.length, 1);

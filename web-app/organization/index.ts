@@ -45,7 +45,7 @@ import {
     getSentInvitations,
     postInvitationRevocation,
     subscribeInvitationChanges,
-    generateCryptoSafeBase62,
+    generateIdentifier,
 } from '../app/adapters/index.ts';
 import { initDragReorder } from '../app/drag-reorder.ts';
 import {
@@ -381,7 +381,7 @@ export async function init(): Promise<void> {
         const position = nextPosition(
             objs.map(o => o.position),
         );
-        const newId = generateCryptoSafeBase62();
+        const newId = generateIdentifier();
         await postObjectiveCreation(
             ctx, newId, name, desc, position,
         );

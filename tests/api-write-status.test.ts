@@ -16,8 +16,8 @@ import { sha256HexOfBytes } from '../shared/digest.ts';
 import { messageStore } from '../api/message-store.ts';
 import { strongEtagOf } from '../api/message-pair.ts';
 
-const IDEA_PREFIX = '/organizations/1/ideas/';
-const MEMBERSHIP_PREFIX = '/organizations/1/members/';
+const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
+const MEMBERSHIP_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/';
 
 function ideaDocument(
     title: string,
@@ -113,7 +113,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/ws-1', token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'yNqCXXgKLCqDESGScIzYrQ', token,
         ideaDocument('First', 'ev-ws-1'),
     ));
     assert.equal(res.status, 201);
@@ -122,7 +123,7 @@ async () => {
         TEST_OPERATION_ID,
     );
     const stored = await storedResponseAt(
-        db, IDEA_PREFIX, 'ws-1',
+        db, IDEA_PREFIX, 'yNqCXXgKLCqDESGScIzYrQ',
     );
     assert.equal(stored.method, 'PUT');
     assert.equal(stored.status, 200);
@@ -135,18 +136,21 @@ async () => {
     const token = await organizationToken();
     const body = ideaDocument('Same', 'ev-ws-same');
     const first = await handleRequest(
-        db, req('PUT', '/organizations/1/ideas/ws-same', token, body),
+        db, req('PUT'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'yjsYYXruOryrZjnfLsgSJg', token, body),
     );
     assert.equal(first.status, 201);
     const firstEtag = first.headers.get('ETag');
     assert.ok(firstEtag !== null && firstEtag !== '');
     const before = await pairsAt(
-        db, IDEA_PREFIX, 'ws-same',
+        db, IDEA_PREFIX, 'yjsYYXruOryrZjnfLsgSJg',
     );
     assert.equal(before, 1);
     const second = await handleRequest(
         db,
-        new Request('http://localhost/organizations/1/ideas/ws-same', {
+        new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'ideas/yjsYYXruOryrZjnfLsgSJg', {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -160,7 +164,7 @@ async () => {
     assert.equal(second.status, 200);
     assert.equal(second.headers.get('ETag'), firstEtag);
     assert.equal(
-        await pairsAt(db, IDEA_PREFIX, 'ws-same'),
+        await pairsAt(db, IDEA_PREFIX, 'yjsYYXruOryrZjnfLsgSJg'),
         1,
     );
 });
@@ -171,14 +175,18 @@ async () => {
     const token = await organizationToken();
     const body = ideaDocument('Retry', 'ev-ws-retry');
     const first = await handleRequest(
-        db, req('PUT', '/organizations/1/ideas/ws-retry', token, body),
+        db, req('PUT'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'yggAqfvrChBmrMfrOilSUg', token, body),
     );
     assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID');
     const firstOp = first.headers.get('Operation-ID');
     const firstBytes = await first.text();
     const second = await handleRequest(
-        db, req('PUT', '/organizations/1/ideas/ws-retry', token, body),
+        db, req('PUT'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'yggAqfvrChBmrMfrOilSUg', token, body),
     );
     assert.equal(second.status, 201);
     assert.equal(
@@ -189,7 +197,7 @@ async () => {
     );
     assert.equal(await second.text(), firstBytes);
     assert.equal(
-        await pairsAt(db, IDEA_PREFIX, 'ws-retry'),
+        await pairsAt(db, IDEA_PREFIX, 'yggAqfvrChBmrMfrOilSUg'),
         1,
     );
 });
@@ -199,28 +207,30 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/1/members/ws-del-live',
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            + 'yTCVdPetYIGKpMKGzQJxPQ',
         token,
-        membershipDocument('ws-del-live'),
+        membershipDocument('yTCVdPetYIGKpMKGzQJxPQ'),
     ));
     assert.equal(put.status, 201);
     const before = await pairsAt(
-        db, MEMBERSHIP_PREFIX, 'ws-del-live',
+        db, MEMBERSHIP_PREFIX, 'yTCVdPetYIGKpMKGzQJxPQ',
     );
     assert.equal(before, 1);
     const del = await handleRequest(db, req(
-        'DELETE', '/organizations/1/members/ws-del-live',
+        'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            + 'yTCVdPetYIGKpMKGzQJxPQ',
         token,
     ));
     assert.equal(del.status, 204);
     const stored = await storedResponseAt(
-        db, MEMBERSHIP_PREFIX, 'ws-del-live',
+        db, MEMBERSHIP_PREFIX, 'yTCVdPetYIGKpMKGzQJxPQ',
     );
     assert.equal(stored.method, 'DELETE');
     assert.equal(stored.status, 204);
     assert.equal(
         await pairsAt(
-            db, MEMBERSHIP_PREFIX, 'ws-del-live',
+            db, MEMBERSHIP_PREFIX, 'yTCVdPetYIGKpMKGzQJxPQ',
         ),
         2,
     );
@@ -231,24 +241,26 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await handleRequest(db, req(
-        'PUT', '/organizations/1/members/ws-del-gone',
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            + 'yPsWmFGqnMtjifSSmvZrUw',
         token,
-        membershipDocument('ws-del-gone'),
+        membershipDocument('yPsWmFGqnMtjifSSmvZrUw'),
     ));
     const first = await handleRequest(db, req(
-        'DELETE', '/organizations/1/members/ws-del-gone',
+        'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            + 'yPsWmFGqnMtjifSSmvZrUw',
         token,
     ));
     assert.equal(first.status, 204);
     const before = await pairsAt(
-        db, MEMBERSHIP_PREFIX, 'ws-del-gone',
+        db, MEMBERSHIP_PREFIX, 'yPsWmFGqnMtjifSSmvZrUw',
     );
     assert.equal(before, 2);
     const second = await handleRequest(
         db,
         new Request(
-            'http://localhost/organizations/1/members/'
-            + 'ws-del-gone',
+            'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            + 'yPsWmFGqnMtjifSSmvZrUw',
             {
                 method: 'DELETE',
                 headers: {
@@ -262,7 +274,7 @@ async () => {
     assert.equal(second.status, 204);
     assert.equal(
         await pairsAt(
-            db, MEMBERSHIP_PREFIX, 'ws-del-gone',
+            db, MEMBERSHIP_PREFIX, 'yPsWmFGqnMtjifSSmvZrUw',
         ),
         2,
     );
@@ -274,7 +286,7 @@ async () => {
     const token = await organizationToken();
     const before = (await db.pairs.getAll()).length;
     const res = await handleRequest(db, req(
-        'DELETE', '/memberships/ws-never', token,
+        'DELETE', '/memberships/yatHlUsoiwxMlkqjKvCVGQ', token,
     ));
     assert.equal(res.status, 404);
     assert.equal(
@@ -282,7 +294,7 @@ async () => {
     );
     assert.equal(
         await pairsAt(
-            db, MEMBERSHIP_PREFIX, 'ws-never',
+            db, MEMBERSHIP_PREFIX, 'yatHlUsoiwxMlkqjKvCVGQ',
         ),
         0,
     );
@@ -294,7 +306,8 @@ async () => {
     const token = await organizationToken();
     const res = await handleRequest(
         db,
-        new Request('http://localhost/organizations/1/ideas/ws-empty', {
+        new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'ideas/yXVKeCiguypnNcNelXVldQ', {
             method: 'PUT',
             headers: {
                 Authorization: 'Bearer ' + token,
@@ -308,12 +321,12 @@ async () => {
     );
     assert.equal(res.headers.get('ETag'), emptyTag);
     const stored = await storedResponseAt(
-        db, IDEA_PREFIX, 'ws-empty',
+        db, IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
     );
     assert.equal(stored.method, 'PUT');
     assert.equal(stored.status, 200);
     const live = await messageStore(db).get(
-        IDEA_PREFIX, 'ws-empty',
+        IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
     );
     assert.ok(live !== undefined, 'empty PUT must live');
     assert.equal(live.version, emptyTag.slice(1, -1));

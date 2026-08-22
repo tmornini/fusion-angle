@@ -9,6 +9,8 @@ import { serializeWire } from
     '../shared/http-message/wire-codec.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
+import { decodeIdentifier } from
+    '../shared/identifier.ts';
 
 // Live EXPLAIN pins for schema indexes. ./validate stays
 // Postgres-free: skip when POSTGRES_URL is unset. Private
@@ -17,23 +19,23 @@ import { Octets } from
 const POSTGRES_URL = process.env['POSTGRES_URL'];
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-const IDEA_COLLECTION = '/organizations/1/ideas/';
+const IDEA_COLLECTION = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const FILLER_COLLECTION = '/filler/';
 const AUTH_COLLECTION = '/authentication/authorize/';
 const VERSION_COLLECTION = '/versioned/';
-const IDEA_URI_ID = '1';
+const IDEA_URI_ID = 'AjdvjuECVZEgZoFajaIEkg';
 const IDEA_N = 1;
 const AUTH_N = 9;
 const AUTH_OTHER_START = 10;
 const AUTH_OTHER_COUNT = 199;
-const VERSION_URI_ID = '1';
+const VERSION_URI_ID = 'AjdvjuECVZEgZoFajaIEkg';
 const VERSION_N = 500;
 const VERSION_EXTRA_START = 501;
 const VERSION_EXTRA_COUNT = 80;
 const FILLER_START = 1000;
 const FILLER_COUNT = 2000;
-const REQUESTER = 'bbbbbbbbbbbbbbbbbbbbbb';
-const OPERATION = 'cccccccccccccccccccccc';
+const REQUESTER = 'WOTMsfERBVJEuTRTgrQptQ';
+const OPERATION = 'WvNiHVgksjrlfhPfdgfcyQ';
 const AUTH_CONTAINMENT = { code: 'abc' };
 
 function schemaName(): string {
@@ -65,7 +67,22 @@ function urlWithSearchPath(
 }
 
 function id22(n: number): string {
-    return n.toString(10).padStart(22, 'a');
+    return n.toString(10).padStart(21, 'a') + 'A';
+}
+
+function uuidTextOfIdentifier(id: string): string {
+    const bytes = decodeIdentifier(id);
+    let hex = '';
+    for (const b of bytes) {
+        hex += b.toString(16).padStart(2, '0');
+    }
+    return (
+        hex.slice(0, 8) + '-'
+        + hex.slice(8, 12) + '-'
+        + hex.slice(12, 16) + '-'
+        + hex.slice(16, 20) + '-'
+        + hex.slice(20)
+    );
 }
 
 function hex64(n: number): string {
@@ -188,7 +205,8 @@ async function seedRows(
             // Fat address (81 versions at one uri_id):
             // version triple beats address + filter;
             // address ORDER BY prefers responses_address.
-            // Keep /organizations/1/ideas/ small for the collection pin.
+            // Keep /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/ small for the
+            // collection pin.
             await putPair(
                 tx,
                 VERSION_N,
@@ -297,7 +315,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         >`
             EXPLAIN
             SELECT * FROM pairs
-            WHERE id = ${ideaId}
+            WHERE id = ${uuidTextOfIdentifier(ideaId)}
         `;
         assertIndexPlan(
             explainText(plans),

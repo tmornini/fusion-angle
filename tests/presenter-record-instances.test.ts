@@ -85,7 +85,7 @@ test(
                     field({
                         attributeId: 'a-write',
                         name: 'Writable',
-                        value: 'w1',
+                        value: 'xdaJyuuPyHfffCGLhqDrOQ',
                         access: 'writable',
                         attributeType: 'text',
                         options: [],
@@ -93,7 +93,7 @@ test(
                     field({
                         attributeId: 'a-read',
                         name: 'ReadOnly',
-                        value: 'r1',
+                        value: 'rOEPOcVMQdJiiiMuiiEhlg',
                         access: 'readonly',
                         attributeType: 'text',
                         options: [],
@@ -110,12 +110,12 @@ test(
             html,
             /data-action="instance-field-value"/,
         );
-        assert.match(html, /value="w1"/);
+        assert.match(html, /value="xdaJyuuPyHfffCGLhqDrOQ"/);
         assert.match(
             html, /data-attribute-id="a-read"/,
         );
         assert.match(html, /ReadOnly/);
-        assert.match(html, /r1/);
+        assert.match(html, /rOEPOcVMQdJiiiMuiiEhlg/);
         // Only one editable instance field input
         // (writable); readonly is display-only.
         const fieldInputs = html.match(
@@ -147,7 +147,7 @@ test(
                 instanceId: 'inst-c',
                 fields: [
                     field({
-                        attributeId: 'a1',
+                        attributeId: 'UQTJZvCoKlFjEoDlDUwekw',
                         name: 'Title',
                         value: 'fresh',
                         access: 'writable',

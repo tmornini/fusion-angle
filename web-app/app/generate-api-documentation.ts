@@ -247,7 +247,7 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
     writeExample('put', '/ai-agents/:id', {
         name: 'name',
         description: 'description',
-        model: 'mnte677fU2G1V2B9vJp9z7',
+        model: 'nqNVXnBkUBLoKlenbyPIZQ',
         skill_focus: 'skill_focus',
     }),
     writeExample('put', '/identities/:id/pii', {

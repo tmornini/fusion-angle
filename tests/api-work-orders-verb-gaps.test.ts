@@ -52,7 +52,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/', token, {},
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token
+            , {},
     ));
     assert.equal(res.status, 405);
 });
@@ -63,7 +64,8 @@ test('PATCH organizations/:id/work-orders/:id 405s (no patch handler'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PATCH', '/organizations/1/work-orders/wo1', token, {},
+        'PATCH', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA', token, {},
     ));
     assert.equal(res.status, 405);
 });
@@ -73,7 +75,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/organizations/1/work-orders/', token),
+        db, req('DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + '', token),
     );
     assert.equal(res.status, 405);
 });
@@ -83,7 +86,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/wo1', token, {},
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA', token, {},
     ));
     assert.equal(res.status, 405);
 });
@@ -94,7 +98,9 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/organizations/1/work-orders/wo1', token),
+        db, req('DELETE'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA', token),
     );
     assert.equal(res.status, 405);
 });
@@ -104,7 +110,9 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('GET', '/organizations/1/work-orders/wo1/claim', token),
+        db, req('GET'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA/claim', token),
     );
     assert.equal(res.status, 404);
 });
@@ -114,7 +122,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/wo1/claim', token, {},
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA/claim', token, {},
     ));
     assert.equal(res.status, 400);
 });
@@ -124,7 +133,9 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/organizations/1/work-orders/wo1/claim', token),
+        db, req('DELETE'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA/claim', token),
     );
     assert.equal(res.status, 404);
 });
@@ -134,7 +145,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/wo1/claim', token, {},
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA/claim', token, {},
     ));
     assert.equal(res.status, 405);
 });
@@ -144,7 +156,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/wo1/release', token, {},
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA/release', token, {},
     ));
     assert.equal(res.status, 404);
 });
@@ -154,7 +167,9 @@ test('GET organizations/:id/work-orders/:id/transition 405s (no get handler'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('GET', '/organizations/1/work-orders/wo1/transition', token),
+        db, req('GET'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA/transition', token),
     );
     assert.equal(res.status, 405);
 });
@@ -164,7 +179,8 @@ test('PUT organizations/:id/work-orders/:id/transition 405s (no put handler'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/wo1/transition', token, {},
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA/transition', token, {},
     ));
     assert.equal(res.status, 405);
 });
@@ -174,7 +190,9 @@ test('DELETE organizations/:id/work-orders/:id/transition 405s (no delete'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/organizations/1/work-orders/wo1/transition',
+        db, req('DELETE'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA/transition',
             token),
     );
     assert.equal(res.status, 405);
@@ -185,7 +203,9 @@ test('GET organizations/:id/work-orders/:id/binding 405s (no get handler'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('GET', '/organizations/1/work-orders/w1/binding', token),
+        db, req('GET'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'xdaJyuuPyHfffCGLhqDrOQ/binding', token),
     );
     assert.equal(res.status, 405);
 });
@@ -195,7 +215,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/w1/binding', token, {},
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'xdaJyuuPyHfffCGLhqDrOQ/binding', token, {},
     ));
     assert.equal(res.status, 404);
 });
@@ -205,7 +226,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/w1/binding', token, {},
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'xdaJyuuPyHfffCGLhqDrOQ/binding', token, {},
     ));
     assert.equal(res.status, 405);
 });
@@ -215,7 +237,9 @@ test('DELETE organizations/:id/work-orders/:id/binding 405s (no delete'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/organizations/1/work-orders/w1/binding', token),
+        db, req('DELETE'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'xdaJyuuPyHfffCGLhqDrOQ/binding', token),
     );
     assert.equal(res.status, 405);
 });
@@ -225,7 +249,8 @@ test('POST organizations/:id/flows/:id/work-orders 405s (no post handler'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/f1/work-orders/', token, {},
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ/work-orders/', token, {},
     ));
     assert.equal(res.status, 405);
 });
@@ -236,7 +261,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/f1/work-orders/', token, {},
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ/work-orders/', token, {},
     ));
     assert.equal(res.status, 405);
 });
@@ -246,7 +272,9 @@ test('DELETE organizations/:id/flows/:id/work-orders 405s (no delete handler'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/organizations/1/flows/f1/work-orders/', token),
+        db, req('DELETE'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ/work-orders/', token),
     );
     assert.equal(res.status, 405);
 });
@@ -263,7 +291,10 @@ test('GET organizations/:id/flows/:id/work-orders/:woid 405s (no get handler'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('GET', '/organizations/1/flows/f1/work-orders/wo1', token),
+        db, req('GET'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ/work-orders/yNSSnbrpacodQTzUEcdEVA'
+            , token),
     );
     assert.equal(res.status, 405);
 });
@@ -274,7 +305,9 @@ test('POST organizations/:id/flows/:id/work-orders/:woid'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/f1/work-orders/wo1', token, {},
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ/work-orders/yNSSnbrpacodQTzUEcdEVA'
+            , token, {},
     ));
     assert.equal(res.status, 405);
 });

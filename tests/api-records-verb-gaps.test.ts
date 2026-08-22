@@ -59,12 +59,12 @@ async () => {
     assert.equal(res.status, 404);
 });
 
-test('POST /records/rec1 → 404 (flat retired)',
+test('POST /records/sRqRSyldQDFbqkDYSObDqw → 404 (flat retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/records/rec1', token, {},
+        'POST', '/records/sRqRSyldQDFbqkDYSObDqw', token, {},
     ));
     assert.equal(res.status, 404);
 });
@@ -99,12 +99,13 @@ async () => {
     assert.equal(res.status, 404);
 });
 
-test('POST /record-attributes/attr1 → 404 (flat retired)',
+test('POST /record-attributes/'
+    + 'VXTdVVRluJDRBqbXWZBntA → 404 (flat retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/record-attributes/attr1', token, {},
+        'POST', '/record-attributes/VXTdVVRluJDRBqbXWZBntA', token, {},
     ));
     assert.equal(res.status, 404);
 });
@@ -114,7 +115,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/f1/records/', token, {},
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ/records/', token, {},
     ));
     assert.equal(res.status, 405);
 });
@@ -124,7 +126,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/f1/records/', token, {},
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ/records/', token, {},
     ));
     assert.equal(res.status, 405);
 });
@@ -134,7 +137,9 @@ test('DELETE organizations/:id/flows/:id/records 405s (no delete handler'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/organizations/1/flows/f1/records/', token),
+        db, req('DELETE'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ/records/', token),
     );
     assert.equal(res.status, 405);
 });
@@ -144,27 +149,30 @@ test('POST organizations/:id/flows/:id/records/:frid 405s (no post handler'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/f1/records/frid1', token, {},
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ/records/dMtgdDIobtMiwOttuwPbFw', token
+            , {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('PATCH /records/rec1 → 404 (flat retired)',
+test('PATCH /records/sRqRSyldQDFbqkDYSObDqw → 404 (flat retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PATCH', '/records/rec1', token, {},
+        'PATCH', '/records/sRqRSyldQDFbqkDYSObDqw', token, {},
     ));
     assert.equal(res.status, 404);
 });
 
-test('PATCH /record-attributes/attr1 → 404 (flat retired)',
+test('PATCH /record-attributes/'
+    + 'VXTdVVRluJDRBqbXWZBntA → 404 (flat retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PATCH', '/record-attributes/attr1', token, {},
+        'PATCH', '/record-attributes/VXTdVVRluJDRBqbXWZBntA', token, {},
     ));
     assert.equal(res.status, 404);
 });

@@ -16,11 +16,11 @@ test('bootstrap seeds current as admin', async () => {
     await db.postSchemaCreation();
     await postBootstrap(db);
     const rows = await deriveMembershipsForIdentity(
-        db, 'current',
+        db, 'XXZruirZyAOoRpNxaDnpSA',
     );
     assert.ok(
         rows.some(
-            m => m.organization_id === '1'
+            m => m.organization_id === 'AjdvjuECVZEgZoFajaIEkg'
                 && m.type === 'admin',
         ),
     );
@@ -29,11 +29,11 @@ test('bootstrap seeds current as admin', async () => {
 test('mock data seeds current as admin', async () => {
     const db = await seededMockDb();
     const rows = await deriveMembershipsForIdentity(
-        db, 'current',
+        db, 'XXZruirZyAOoRpNxaDnpSA',
     );
     assert.ok(
         rows.some(
-            m => m.organization_id === '1'
+            m => m.organization_id === 'AjdvjuECVZEgZoFajaIEkg'
                 && m.type === 'admin',
         ),
     );

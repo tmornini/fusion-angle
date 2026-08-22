@@ -90,7 +90,7 @@ test('create accepts write_roles without read_roles'
 test('create rejects unknown key record_id', () => {
     assert.throws(
         () => validateAttributeDocumentCreate(
-            coreFields({ record_id: 'rec-1' }),
+            coreFields({ record_id: 'rbfHGatkwQzGZJVXKJEeyw' }),
         ),
         (err: unknown) => {
             assert.ok(err instanceof ValidationError);

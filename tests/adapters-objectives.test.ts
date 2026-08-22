@@ -30,6 +30,8 @@ import {
     seedCurrentMember,
 } from './member-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 function ctxFor(db: MemoryDbAdapter) {
     return createRequestContext(db, DEV_TOKEN);
@@ -54,12 +56,15 @@ test('getObjectives returns all', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const ctx = ctxFor(db);
+    const o2 = generateIdentifier();
     await ctx.PUT(
-        'organizations/1/objectives/o1',
+        'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + 'ohqxgUBEaFQwYbXsonRPmg',
         objectiveDoc(0, 'active', 'ev-o1'),
     );
     await ctx.PUT(
-        'organizations/1/objectives/o2',
+        'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + o2,
         objectiveDoc(1, 'active', 'ev-o2'),
     );
     const rows = await getObjectives(ctx);
@@ -75,7 +80,7 @@ function revision(
         objective_id: objectiveId,
         name,
         description: 'd:' + name,
-        member_id: 'w1',
+        member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
         at,
     };
 }
@@ -86,40 +91,51 @@ test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = ctxFor(db);
+        const o2 = generateIdentifier();
+        const r1t0 = generateIdentifier();
+        const r1t1 = generateIdentifier();
+        const r2t0 = generateIdentifier();
         await ctx.PUT(
-            'organizations/1/objectives/o1/revisions/o1:t0',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + 'ohqxgUBEaFQwYbXsonRPmg/revisions/'
+                + r1t0,
             revision(
-                'o1', 'A',
+                'ohqxgUBEaFQwYbXsonRPmg', 'A',
                 '2026-05-14T00:00:00.000000Z',
             ),
         );
         await ctx.PUT(
-            'organizations/1/objectives/o1/revisions/o1:t1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + 'ohqxgUBEaFQwYbXsonRPmg/revisions/'
+                + r1t1,
             revision(
-                'o1', 'B',
+                'ohqxgUBEaFQwYbXsonRPmg', 'B',
                 '2026-05-15T00:00:00.000000Z',
             ),
         );
         await ctx.PUT(
-            'organizations/1/objectives/o2/revisions/o2:t0',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + o2 + '/revisions/' + r2t0,
             revision(
-                'o2', 'C',
+                o2, 'C',
                 '2026-05-14T00:00:00.000000Z',
             ),
         );
         const grouped =
             await getObjectiveRevisionsByObjective(
-                ctx, ['o1', 'o2'],
+                ctx, ['ohqxgUBEaFQwYbXsonRPmg', o2],
             );
         assert.equal(grouped.size, 2);
-        assert.equal(grouped.get('o1')!.length, 2);
-        assert.equal(grouped.get('o2')!.length, 1);
-        assert.deepEqual(grouped.get('o2')![0], {
-            id: 'o2:t0',
-            objectiveId: 'o2',
+        assert.equal(
+            grouped.get('ohqxgUBEaFQwYbXsonRPmg')!.length, 2,
+        );
+        assert.equal(grouped.get(o2)!.length, 1);
+        assert.deepEqual(grouped.get(o2)![0], {
+            id: r2t0,
+            objectiveId: o2,
             name: 'C',
             description: 'd:C',
-            memberId: 'w1',
+            memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
             at: '2026-05-14T00:00:00.000000Z',
         });
     },
@@ -132,36 +148,43 @@ test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = ctxFor(db);
+        const o2 = generateIdentifier();
         await ctx.PUT(
-            'organizations/1/objectives/o1/revisions/o1:t0',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + 'ohqxgUBEaFQwYbXsonRPmg/revisions/'
+                + generateIdentifier(),
             revision(
-                'o1', 'Old',
+                'ohqxgUBEaFQwYbXsonRPmg', 'Old',
                 '2026-05-14T00:00:00.000000Z',
             ),
         );
         await ctx.PUT(
-            'organizations/1/objectives/o1/revisions/o1:t1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + 'ohqxgUBEaFQwYbXsonRPmg/revisions/'
+                + generateIdentifier(),
             revision(
-                'o1', 'New',
+                'ohqxgUBEaFQwYbXsonRPmg', 'New',
                 '2026-05-15T00:00:00.000000Z',
             ),
         );
         await ctx.PUT(
-            'organizations/1/objectives/o2/revisions/o2:t0',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + o2 + '/revisions/'
+                + generateIdentifier(),
             revision(
-                'o2', 'Other',
+                o2, 'Other',
                 '2026-05-14T00:00:00.000000Z',
             ),
         );
         const defs =
             await getCurrentObjectiveDefinitions(
-                ctx, ['o1', 'o2'],
+                ctx, ['ohqxgUBEaFQwYbXsonRPmg', o2],
             );
-        assert.equal(defs.get('o1')!.name, 'New');
+        assert.equal(defs.get('ohqxgUBEaFQwYbXsonRPmg')!.name, 'New');
         assert.equal(
-            defs.get('o1')!.description, 'd:New',
+            defs.get('ohqxgUBEaFQwYbXsonRPmg')!.description, 'd:New',
         );
-        assert.equal(defs.get('o2')!.name, 'Other');
+        assert.equal(defs.get(o2)!.name, 'Other');
     },
 );
 
@@ -171,11 +194,19 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
+        const ghost = generateIdentifier();
         await assert.rejects(
             getCurrentObjectiveDefinitions(
-                ctxFor(db), ['ghost'],
+                ctxFor(db), [ghost],
             ),
-            /no revisions for objective ghost/,
+            (err: unknown) => {
+                assert.ok(err instanceof Error);
+                assert.equal(
+                    err.message,
+                    'no revisions for objective ' + ghost,
+                );
+                return true;
+            },
         );
     },
 );
@@ -188,11 +219,12 @@ test('getArchivedObjectiveIds returns a Set', async () => {
     // lifecycle trio — GET objectives stamps state on
     // the row (states-URI elimination B6).
     await ctx.PUT(
-        'organizations/1/objectives/o1',
+        'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + 'ohqxgUBEaFQwYbXsonRPmg',
         objectiveDoc(0, 'archived', 'ev-o1-arch'),
     );
     const ids = await getArchivedObjectiveIds(ctx);
-    assert.ok(ids.has('o1'));
+    assert.ok(ids.has('ohqxgUBEaFQwYbXsonRPmg'));
     assert.equal(ids.size, 1);
 });
 
@@ -205,15 +237,15 @@ test(
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
-            ctxFor(db), 'o1', 'Rev', 'd', 0,
+            ctxFor(db), 'ohqxgUBEaFQwYbXsonRPmg', 'Rev', 'd', 0,
         );
-        await postObjectiveArchival(ctxFor(db), 'o1');
-        await postObjectiveReactivation(ctxFor(db), 'o1');
-        await postObjectiveArchival(ctxFor(db), 'o1');
+        await postObjectiveArchival(ctxFor(db), 'ohqxgUBEaFQwYbXsonRPmg');
+        await postObjectiveReactivation(ctxFor(db), 'ohqxgUBEaFQwYbXsonRPmg');
+        await postObjectiveArchival(ctxFor(db), 'ohqxgUBEaFQwYbXsonRPmg');
 
         const histories =
             await getObjectiveHistories(ctx);
-        const versions = histories.get('o1');
+        const versions = histories.get('ohqxgUBEaFQwYbXsonRPmg');
         assert.ok(versions);
         assert.ok(
             versions.some(r => r.state === 'active'),
@@ -229,7 +261,7 @@ test(
             await getObjectiveArchivalEvents(ctx);
         assert.equal(archivals.length, 2);
         for (const a of archivals) {
-            assert.equal(a.objectiveId, 'o1');
+            assert.equal(a.objectiveId, 'ohqxgUBEaFQwYbXsonRPmg');
         }
     },
 );
@@ -243,29 +275,30 @@ test(
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
-            ctx, 'o1', 'Revenue', 'Top line', 1,
+            ctx, 'ohqxgUBEaFQwYbXsonRPmg', 'Revenue', 'Top line', 1,
         );
 
         // Phase Final Task 2: row halves stripped — assert via
         // adapter GETs (pair plane).
         const objectives = await getObjectives(ctx);
         assert.equal(objectives.length, 1);
-        assert.equal(objectives[0]!.id, 'o1');
+        assert.equal(objectives[0]!.id, 'ohqxgUBEaFQwYbXsonRPmg');
         assert.equal(objectives[0]!.position, 1);
-        assert.equal(objectives[0]!.organization_id, '1');
+        assert.equal(objectives[0]!.organization_id
+            , 'AjdvjuECVZEgZoFajaIEkg');
         // GET stamps lifecycle-current genesis trio.
         assert.equal(objectives[0]!.state, 'active');
 
         const revisions =
             await getObjectiveRevisionsByObjective(
-                ctx, ['o1'],
+                ctx, ['ohqxgUBEaFQwYbXsonRPmg'],
             );
-        const revs = revisions.get('o1')!;
+        const revs = revisions.get('ohqxgUBEaFQwYbXsonRPmg')!;
         assert.equal(revs.length, 1);
-        assert.equal(revs[0]!.objectiveId, 'o1');
+        assert.equal(revs[0]!.objectiveId, 'ohqxgUBEaFQwYbXsonRPmg');
         assert.equal(revs[0]!.name, 'Revenue');
         assert.equal(revs[0]!.description, 'Top line');
-        assert.equal(revs[0]!.memberId, 'current');
+        assert.equal(revs[0]!.memberId, 'XXZruirZyAOoRpNxaDnpSA');
 
         const archived = await getArchivedObjectiveIds(ctx);
         assert.equal(archived.size, 0);
@@ -283,18 +316,20 @@ test(
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
-            ctx, 'o1', 'A', 'd', 1,
+            ctx, 'ohqxgUBEaFQwYbXsonRPmg', 'A', 'd', 1,
+        );
+        const o2 = generateIdentifier();
+        const o3 = generateIdentifier();
+        await postObjectiveCreation(
+            ctx, o2, 'B', 'd', 2,
         );
         await postObjectiveCreation(
-            ctx, 'o2', 'B', 'd', 2,
-        );
-        await postObjectiveCreation(
-            ctx, 'o3', 'C', 'd', 3,
+            ctx, o3, 'C', 'd', 3,
         );
 
         const active = await getActiveObjectives(ctx);
         const others = active.filter(
-            o => o.id !== 'o3',
+            o => o.id !== o3,
         );
         const newPos = computeNewPosition(
             others.map(o => o.position),
@@ -302,7 +337,7 @@ test(
         );
         const details = await getObjectiveStateDetails(ctx);
         await putObjectivePosition(
-            ctx, 'o3', newPos, details.get('o3')!,
+            ctx, o3, newPos, details.get(o3)!,
         );
 
         // Phase Final Task 2: positions from GET (pair plane).
@@ -310,9 +345,9 @@ test(
         const map = new Map(
             all.map(o => [o.id, o.position]),
         );
-        assert.equal(map.get('o3'), 1.5);
-        assert.equal(map.get('o1'), 1);
-        assert.equal(map.get('o2'), 2);
+        assert.equal(map.get(o3), 1.5);
+        assert.equal(map.get('ohqxgUBEaFQwYbXsonRPmg'), 1);
+        assert.equal(map.get(o2), 2);
     },
 );
 
@@ -326,21 +361,23 @@ test(
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
-            ctx, 'o1', 'A', 'd', 1,
+            ctx, 'ohqxgUBEaFQwYbXsonRPmg', 'A', 'd', 1,
+        );
+        const o2 = generateIdentifier();
+        const o3 = generateIdentifier();
+        await postObjectiveCreation(
+            ctx, o2, 'B', 'd', 2,
         );
         await postObjectiveCreation(
-            ctx, 'o2', 'B', 'd', 2,
-        );
-        await postObjectiveCreation(
-            ctx, 'o3', 'C', 'd', 3,
+            ctx, o3, 'C', 'd', 3,
         );
 
         const details = await getObjectiveStateDetails(ctx);
         await putObjectivePosition(
-            ctx, 'o2', 1.5, details.get('o2')!,
+            ctx, o2, 1.5, details.get(o2)!,
         );
         await putObjectivePosition(
-            ctx, 'o3', 1.25, details.get('o3')!,
+            ctx, o3, 1.25, details.get(o3)!,
         );
 
         // Phase Final Task 2: positions from GET (pair plane).
@@ -348,9 +385,9 @@ test(
         const map = new Map(
             all.map(o => [o.id, o.position]),
         );
-        assert.equal(map.get('o1'), 1);
-        assert.equal(map.get('o3'), 1.25);
-        assert.equal(map.get('o2'), 1.5);
+        assert.equal(map.get('ohqxgUBEaFQwYbXsonRPmg'), 1);
+        assert.equal(map.get(o3), 1.25);
+        assert.equal(map.get(o2), 1.5);
     },
 );
 
@@ -375,8 +412,9 @@ function recordingCtx(
 ): { ctx: RequestContext; calls: RecordedCall[] } {
     const calls: RecordedCall[] = [];
     const ctx = {
-        requestId: 'r1',
-        identity: { id: 'current', organization: '1' },
+        requestId: 'rOEPOcVMQdJiiiMuiiEhlg',
+        identity: { id: 'XXZruirZyAOoRpNxaDnpSA'
+            , organization: 'AjdvjuECVZEgZoFajaIEkg' },
         GET: async <T>(path: string): Promise<T> => {
             calls.push({ method: 'GET', path });
             if (!handlers.GET) {
@@ -415,22 +453,28 @@ test(
     async () => {
         const { ctx, calls } = recordingCtx({
             GET: async (path) => {
-                assert.equal(path, 'organizations/1/objectives/o1');
+                assert.equal(path
+                    , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + 'ohqxgUBEaFQwYbXsonRPmg');
                 return {
-                    id: 'o1',
-                    organization_id: '1',
+                    id: 'ohqxgUBEaFQwYbXsonRPmg',
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                     position: 3,
                     state: 'active',
                 };
             },
             PUT: async () => ({}),
         });
-        await postObjectiveArchival(ctx, 'o1');
+        await postObjectiveArchival(ctx, 'ohqxgUBEaFQwYbXsonRPmg');
         assert.equal(calls.length, 2);
         assert.equal(calls[0]!.method, 'GET');
-        assert.equal(calls[0]!.path, 'organizations/1/objectives/o1');
+        assert.equal(calls[0]!.path
+            , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + 'ohqxgUBEaFQwYbXsonRPmg');
         assert.equal(calls[1]!.method, 'PUT');
-        assert.equal(calls[1]!.path, 'organizations/1/objectives/o1');
+        assert.equal(calls[1]!.path
+            , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + 'ohqxgUBEaFQwYbXsonRPmg');
         const body = calls[1]!.body!;
         assert.equal(body['position'], 3);
         assert.equal(body['state'], 'archived');
@@ -446,13 +490,15 @@ test(
             PUT: async () => ({}),
         });
         await putObjectivePosition(
-            ctx, 'o1', 1.5, {
+            ctx, 'ohqxgUBEaFQwYbXsonRPmg', 1.5, {
                 state: 'active',
             },
         );
         assert.equal(calls.length, 1);
         assert.equal(calls[0]!.method, 'PUT');
-        assert.equal(calls[0]!.path, 'organizations/1/objectives/o1');
+        assert.equal(calls[0]!.path
+            , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + 'ohqxgUBEaFQwYbXsonRPmg');
         assert.deepEqual(calls[0]!.body, {
             position: 1.5,
             state: 'active',

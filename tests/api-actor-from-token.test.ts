@@ -13,8 +13,8 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedHumanMember(db, 'current', 'Demo');
-        await PUT(db, 'identities/current', {
+        await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo');
+        await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA', {
             kind: 'person',
             title: 'Admin',
             department: 'Product',
@@ -24,8 +24,8 @@ test(
         const requests = await db.pairs.getAll();
         const row = requests.find(r =>
             r.uri_collection === '/identities/'
-            && r.uri_id === 'current'
-            && r.requester_identity_id === 'current',
+            && r.uri_id === 'XXZruirZyAOoRpNxaDnpSA'
+            && r.requester_identity_id === 'XXZruirZyAOoRpNxaDnpSA',
         );
         assert.ok(row, 'identity PUT pair missing');
     },
@@ -46,7 +46,7 @@ test(
             principalFromToken(token).id, 'alice',
         );
         const seats = await GET<{ id: string }[]>(
-            db, 'organizations/1/members/', token,
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', token,
         );
         assert.ok(seats.some(s => s.id === 'alice'));
     },

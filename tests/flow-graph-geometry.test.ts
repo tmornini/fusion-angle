@@ -67,12 +67,12 @@ test(
             node('a', 0, 0),
             node('b', 300, 120),
         ];
-        const edges = [edge('e1', 'a', 'b')];
+        const edges = [edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b')];
         const offsets =
             computeEdgeAimOffsets(edges);
         const geo = computeEdgeGeometry(
             nodes[0]!, nodes[1]!,
-            offsets.get('e1')!, [],
+            offsets.get('YiJPbufDpkyrZcZCYbUJpg')!, [],
         );
         const out = render(
             nodes, edges, new Map(),
@@ -95,12 +95,12 @@ test(
             node('b', 300, 0),
         ];
         const edges = [
-            edge('e1', 'a', 'b'),
+            edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b'),
             edge('e2', 'b', 'a'),
         ];
         const offsets =
             computeEdgeAimOffsets(edges);
-        assert.equal(offsets.get('e1'), 1);
+        assert.equal(offsets.get('YiJPbufDpkyrZcZCYbUJpg'), 1);
         assert.equal(offsets.get('e2'), 1);
         const g1 = computeEdgeGeometry(
             nodes[0]!, nodes[1]!, 1, [],
@@ -126,12 +126,12 @@ test(
     + ' straight',
     () => {
         const edges = [
-            edge('e1', 'a', 'b'),
+            edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b'),
             edge('e2', 'b', 'c'),
         ];
         const offsets =
             computeEdgeAimOffsets(edges);
-        assert.equal(offsets.get('e1'), 0);
+        assert.equal(offsets.get('YiJPbufDpkyrZcZCYbUJpg'), 0);
         assert.equal(offsets.get('e2'), 0);
     },
 );
@@ -144,14 +144,14 @@ test(
             node('a', 0, 0),
             node('b', 400, 200),
         ];
-        const edges = [edge('e1', 'a', 'b')];
+        const edges = [edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b')];
         const wps = [{ x: 200, y: 0 }];
         const geo = computeEdgeGeometry(
             nodes[0]!, nodes[1]!, 0, wps,
         );
         const out = render(
             nodes, edges,
-            new Map([['e1', wps]]),
+            new Map([['YiJPbufDpkyrZcZCYbUJpg', wps]]),
         );
         assert.ok(
             out.includes(`d="${geo.pathD}"`),

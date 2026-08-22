@@ -10,6 +10,8 @@ import { jitteredBackoff } from
     '../web-app/app/adapters/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Facade plumbing that carries the C6 retry loop's If-Match
 // echo (web-app/app/adapters/flow-mutations.ts). Ideas/:id is
@@ -47,13 +49,15 @@ test('PUT threads an arbitrary header field into the stored'
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const ideaId = generateIdentifier();
     await PUT(
-        db, 'organizations/1/ideas/idea-hdr-1',
-        ideaPutBody('idea-hdr-1', 'Headers'), token,
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + ideaId,
+        ideaPutBody(ideaId, 'Headers'), token,
         [['if-match', '"probe-value-123"']],
     );
     const stored = (await db.pairs.getAll())
-        .find(r => r.uri_id === 'idea-hdr-1');
+        .find(r => r.uri_id === ideaId);
     assert.ok(stored, 'a request row was stored');
     assert.ok(
         stored!.request.includes('probe-value-123'),
@@ -66,9 +70,11 @@ test('PUT with no headerFields behaves exactly as before —'
 + ' the parameter is purely additive', async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const ideaId = generateIdentifier();
     const written = await PUT<{ id: string; title: string }>(
-        db, 'organizations/1/ideas/idea-hdr-2',
-        ideaPutBody('idea-hdr-2', 'No Headers'), token,
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + ideaId,
+        ideaPutBody(ideaId, 'No Headers'), token,
     );
     assert.equal(written.title, 'No Headers');
 });
@@ -78,14 +84,17 @@ test('GETWithEtag returns the parsed body and the'
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const ideaId = generateIdentifier();
     await PUT(
-        db, 'organizations/1/ideas/idea-hdr-3',
-        ideaPutBody('idea-hdr-3', 'Plain'), token,
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + ideaId,
+        ideaPutBody(ideaId, 'Plain'), token,
     );
     const { body, etag } =
         await GETWithEtag<{
             id: string; title: string;
-        }>(db, 'organizations/1/ideas/idea-hdr-3', token);
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + ideaId, token);
     assert.equal(body.title, 'Plain');
     assert.ok(etag !== undefined && HEX64.test(etag));
 });
@@ -95,17 +104,21 @@ test('GETWithEtag and GET agree on the body for the'
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const ideaId = generateIdentifier();
     await PUT(
-        db, 'organizations/1/ideas/idea-hdr-4',
-        ideaPutBody('idea-hdr-4', 'Agree'), token,
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + ideaId,
+        ideaPutBody(ideaId, 'Agree'), token,
     );
     const viaGet = await GET<{ id: string; title: string }>(
-        db, 'organizations/1/ideas/idea-hdr-4', token,
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + ideaId, token,
     );
     const { body: viaGetWithEtag } =
         await GETWithEtag<{
             id: string; title: string;
-        }>(db, 'organizations/1/ideas/idea-hdr-4', token);
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + ideaId, token);
     assert.deepEqual(viaGetWithEtag, viaGet);
 });
 

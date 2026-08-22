@@ -5,6 +5,8 @@ import type {
 } from './types.ts';
 import { pickString } from './validators.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
+import { compareIdentifiers } from
+    '../shared/identifier.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 
@@ -97,9 +99,7 @@ export function documentPairsAt(
     return out.sort((left, right) =>
         left.at < right.at ? -1
             : left.at > right.at ? 1
-                : left.id < right.id ? -1
-                    : left.id > right.id ? 1
-                        : 0);
+                : compareIdentifiers(left.id, right.id));
 }
 
 // The head document per uri_id at a prefix. Family-agnostic and
@@ -247,9 +247,7 @@ export function stateHistoryFrom(
     return rows.sort((a, b) =>
         a.at < b.at ? -1
             : a.at > b.at ? 1
-                : a.id < b.id ? -1
-                    : a.id > b.id ? 1
-                        : 0);
+                : compareIdentifiers(a.id, b.id));
 }
 
 // The CURRENT lifecycle event: the (state_at, state_event_id)
@@ -266,8 +264,8 @@ export function stateHistoryFrom(
 export function currentLifecycleEvent(
     history: readonly StateEntity[],
 ): StateEntity | undefined {
-    return latestByKey(history, () => 'current')
-        .get('current');
+    return latestByKey(history, () => 'XXZruirZyAOoRpNxaDnpSA')
+        .get('XXZruirZyAOoRpNxaDnpSA');
 }
 
 export function currentDocumentState(
@@ -276,7 +274,7 @@ export function currentDocumentState(
     return currentLifecycleEvent(history)?.state;
 }
 
-// The shared id-lex ordering every document family's list
+// The shared identifier order every document family's list
 // derivation sorts its final rows by — byte-identical
 // across families, so it lives here. The order is the
 // derivation's own: the seam promises rows, never an
@@ -284,5 +282,5 @@ export function currentDocumentState(
 export function byIdAscending<T extends { id: Id }>(
     a: T, b: T,
 ): number {
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    return compareIdentifiers(a.id, b.id);
 }

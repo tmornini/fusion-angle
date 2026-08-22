@@ -21,7 +21,7 @@ import {
     postIdeaConversion,
     createRequestContext,
     sessionContext,
-    generateCryptoSafeBase62,
+    generateIdentifier,
     type IdeaEntity,
 } from '../app/adapters/index.ts';
 import {
@@ -475,7 +475,7 @@ export async function init(
                 }
 
                 const projectId =
-                    generateCryptoSafeBase62();
+                    generateIdentifier();
                 try {
                     await performConversion(
                         ctx,

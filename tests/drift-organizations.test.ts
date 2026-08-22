@@ -80,10 +80,10 @@ async function bootstrappedDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-// 'current' is the seed's own MULTI-organization identity
+// 'XXZruirZyAOoRpNxaDnpSA' is the seed's own MULTI-organization identity
 // (both STARK and ORGANIZATION_TWO). buildMembers()[0] is
 // SINGLE-organization (STARK only).
-const MULTI_ORGANIZATION_IDENTITY_ID: Id = 'current';
+const MULTI_ORGANIZATION_IDENTITY_ID: Id = 'XXZruirZyAOoRpNxaDnpSA';
 const SINGLE_ORGANIZATION_IDENTITY_ID: Id =
     buildMembers()[0]!.id;
 
@@ -334,7 +334,7 @@ test('leg 6b: organizations/:id successBody is id-last',
     const body = entry.successBody!(
         [STARK_ORGANIZATION],
         organizationRow('Stark Industries Renamed'),
-        'current',
+        'XXZruirZyAOoRpNxaDnpSA',
         undefined,
     ) as { id: string };
     assert.equal(Object.keys(body).at(-1), 'id');

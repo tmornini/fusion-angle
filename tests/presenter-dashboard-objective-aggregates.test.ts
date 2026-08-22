@@ -6,15 +6,16 @@ import type { TrendPoint } from
     '../web-app/app/adapters/project-scoring.ts';
 
 const activeObjs = [
-    { id: 'o1', position: 0 },
+    { id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 },
     { id: 'o2', position: 1 },
 ];
 const defs = new Map([
-    ['o1', { name: 'Increase incomes', description: 'd1' }],
+    ['ohqxgUBEaFQwYbXsonRPmg', { name: 'Increase incomes'
+        , description: 'd1' }],
     ['o2', { name: 'Lower expenses', description: 'd2' }],
 ]);
 const aggregates = [
-    { objectiveId: 'o1',
+    { objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
       baselineMean: 32, latestActualMean: 25,
       projectsBaselineScored: 12,
       projectsActualScored: 8 },
@@ -25,7 +26,7 @@ const aggregates = [
       projectsActualScored: 0 },
 ];
 const trendlines = new Map<string, TrendPoint[]>([
-    ['o1', [
+    ['ohqxgUBEaFQwYbXsonRPmg', [
         { at: '2026-05-01T00:00:00.000000Z', value: 20 },
         { at: '2026-05-10T00:00:00.000000Z', value: 40 },
         { at: '2026-05-20T00:00:00.000000Z', value: 25 },
@@ -115,7 +116,7 @@ test(
     'row gauge reflects the aggregate baseline and'
     + ' actual signs',
     () => {
-        // o1 has baseline=+32 (right half on outer)
+        // ohqxgUBEaFQwYbXsonRPmg has baseline=+32 (right half on outer)
         // and actual=+25 (right half on inner). The
         // half-arc fill paths starting at M 90 20
         // (outer) and M 90 40 (inner) must appear.
@@ -167,7 +168,7 @@ test('row renders colored segments and dots', () => {
     );
     const html = p.buildCard().toString();
     const o1RowStart =
-        html.indexOf('data-objective-id="o1"');
+        html.indexOf('data-objective-id="ohqxgUBEaFQwYbXsonRPmg"');
     const o1Slice = html.slice(o1RowStart);
     const o1Row = o1Slice.slice(
         0, o1Slice.indexOf('</li>'),
@@ -200,7 +201,7 @@ test('points carry dated, signed-change tooltips', () => {
     );
     const html = p.buildCard().toString();
     const o1RowStart =
-        html.indexOf('data-objective-id="o1"');
+        html.indexOf('data-objective-id="ohqxgUBEaFQwYbXsonRPmg"');
     const o1Slice = html.slice(o1RowStart);
     const o1Row = o1Slice.slice(
         0, o1Slice.indexOf('</li>'),
@@ -258,12 +259,12 @@ test('origin line sits at the baseline value', () => {
     );
     const html = p.buildCard().toString();
     const o1RowStart =
-        html.indexOf('data-objective-id="o1"');
+        html.indexOf('data-objective-id="ohqxgUBEaFQwYbXsonRPmg"');
     const o1Slice = html.slice(o1RowStart);
     const o1Row = o1Slice.slice(
         0, o1Slice.indexOf('</li>'),
     );
-    // o1 trend [20, 40, 25]: min 20 == baseline, so the
+    // ohqxgUBEaFQwYbXsonRPmg trend [20, 40, 25]: min 20 == baseline, so the
     // axis sits at the bottom edge (SPARK_HEIGHT -
     // SPARK_PAD = 26), not the geometric mid (15).
     assert.match(
@@ -280,7 +281,7 @@ test('baseline dot is grey; dots match their segment',
     );
     const html = p.buildCard().toString();
     const o1RowStart =
-        html.indexOf('data-objective-id="o1"');
+        html.indexOf('data-objective-id="ohqxgUBEaFQwYbXsonRPmg"');
     const o1Slice = html.slice(o1RowStart);
     const o1Row = o1Slice.slice(
         0, o1Slice.indexOf('</li>'),

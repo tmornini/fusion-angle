@@ -18,6 +18,8 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 function aiDraft(name: string) {
     return {
@@ -28,29 +30,24 @@ function aiDraft(name: string) {
     };
 }
 
-const SEEDED_AI_TRIO = {
-    state: 'active' as const,
-    stateAt: '2026-01-01T00:00:00.000000Z',
-    stateEventId: 'st-ai1',
-};
-
 test(
     'postAIMemberCreation writes PUT /ai-agents/:id',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedHumanMember(db, 'current', 'Demo User');
+        await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
         const ctx = createRequestContext(db, await devToken());
+        const agentId = generateIdentifier();
 
         await postAIMemberCreation(
-            ctx, 'ai1', aiDraft('Claude'),
+            ctx, agentId, aiDraft('Claude'),
         );
 
-        const detail = await getAIMemberEntity(ctx, 'ai1');
+        const detail = await getAIMemberEntity(ctx, agentId);
         assert.equal(detail.name, 'Claude');
         const agent = await ctx.GET<{
             id: string; name: string;
-        }>('ai-agents/ai1');
+        }>('ai-agents/' + agentId);
         assert.equal(agent.name, 'Claude');
     },
 );
@@ -60,17 +57,22 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedHumanMember(db, 'current', 'Demo User');
-        await seedAIMember(db, 'ai1', 'Claude');
+        await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
+        const agentId = generateIdentifier();
+        await seedAIMember(db, agentId, 'Claude');
         const ctx = createRequestContext(db, await devToken());
 
         await putAIMember(
-            ctx, 'ai1',
+            ctx, agentId,
             { ...aiDraft('Renamed'), skill_focus: 'qa' },
-            SEEDED_AI_TRIO,
+            {
+                state: 'active',
+                stateAt: '2026-01-01T00:00:00.000000Z',
+                stateEventId: generateIdentifier(),
+            },
         );
 
-        const detail = await getAIMemberEntity(ctx, 'ai1');
+        const detail = await getAIMemberEntity(ctx, agentId);
         assert.equal(detail.name, 'Renamed');
         assert.equal(detail.skill_focus, 'qa');
     },

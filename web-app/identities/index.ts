@@ -22,7 +22,7 @@ import {
     getIdentityRoster,
     postIdentityCreation,
     subscribeIdentityChanges,
-    generateCryptoSafeBase62,
+    generateIdentifier,
     IdentityPiiIntakeFailedError,
     type IdentityRosterRow,
     type RequestContext,
@@ -45,7 +45,7 @@ let identityListEl: HTMLElement | null = null;
 let pendingIdentityId: string | null = null;
 
 function currentIdentityId(): string {
-    pendingIdentityId ??= generateCryptoSafeBase62();
+    pendingIdentityId ??= generateIdentifier();
     return pendingIdentityId;
 }
 

@@ -33,7 +33,7 @@ async function setup() {
 test('postIdentityCreation mints a person identity'
     + ' with PII', async () => {
     const { db, ctx } = await setup();
-    await postIdentityCreation(ctx, 'i1', {
+    await postIdentityCreation(ctx, 'fndCYAsXazdzMUlEGMNIZw', {
         kind: 'person',
         pii: {
             name: 'Pat', email: 'pat@example.com',
@@ -41,10 +41,10 @@ test('postIdentityCreation mints a person identity'
         },
     });
     const identity = await GET<{ kind: string }>(
-        db, 'identities/i1', DEV_TOKEN,
+        db, 'identities/fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
     );
     assert.equal(identity.kind, 'person');
-    const pii = await deriveIdentityPii(db, 'i1');
+    const pii = await deriveIdentityPii(db, 'fndCYAsXazdzMUlEGMNIZw');
     assert.equal(pii.email, 'pat@example.com');
     // Phase Final Stage B: identity spine tables retired.
     // Phase Final Stage B: identity spine tables retired.
@@ -53,14 +53,14 @@ test('postIdentityCreation mints a person identity'
 test('postIdentityCreation mints a service identity'
     + ' with a hashed client_secret', async () => {
     const { db, ctx } = await setup();
-    await postIdentityCreation(ctx, 's1', {
+    await postIdentityCreation(ctx, 'syWUUcdBSbBgMwBiCrgbDw', {
         kind: 'service', secret: 'top-secret',
     });
     const identity = await GET<{ kind: string }>(
-        db, 'identities/s1', DEV_TOKEN,
+        db, 'identities/syWUUcdBSbBgMwBiCrgbDw', DEV_TOKEN,
     );
     assert.equal(identity.kind, 'service');
-    const creds = await deriveCredentialsFor(db, 's1');
+    const creds = await deriveCredentialsFor(db, 'syWUUcdBSbBgMwBiCrgbDw');
     const cred = creds.find(r => r.kind === 'client_secret');
     assert.ok(cred, 'credential exists on pair plane');
     assert.equal(cred.status, 'set');
@@ -69,7 +69,7 @@ test('postIdentityCreation mints a service identity'
         await verifyPassword('top-secret', cred.secret),
         true);
     await assert.rejects(
-        () => deriveIdentityPii(db, 's1'),
+        () => deriveIdentityPii(db, 'syWUUcdBSbBgMwBiCrgbDw'),
     );
 });
 
@@ -80,17 +80,17 @@ async () => {
         kind: 'person' as const,
         pii: {
             name: 'A', email: 'a@example.com',
-            phone: '1', bio: 'b',
+            phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
         },
     };
-    await postIdentityCreation(ctx, 'i1', spec);
-    await postIdentityCreation(ctx, 'i1', spec);
+    await postIdentityCreation(ctx, 'fndCYAsXazdzMUlEGMNIZw', spec);
+    await postIdentityCreation(ctx, 'fndCYAsXazdzMUlEGMNIZw', spec);
     // Pair-plane document at identities/:id is one head.
     const identity = await GET<{ kind: string }>(
-        db, 'identities/i1', DEV_TOKEN,
+        db, 'identities/fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
     );
     assert.equal(identity.kind, 'person');
-    const pii = await deriveIdentityPii(db, 'i1');
+    const pii = await deriveIdentityPii(db, 'fndCYAsXazdzMUlEGMNIZw');
     assert.equal(pii.email, 'a@example.com');
 });
 
@@ -100,9 +100,9 @@ test('two service creations for the same id leave'
     const spec = {
         kind: 'service' as const, secret: 'top-secret',
     };
-    await postIdentityCreation(ctx, 's1', spec);
-    await postIdentityCreation(ctx, 's1', spec);
-    const creds = (await deriveCredentialsFor(db, 's1'))
+    await postIdentityCreation(ctx, 'syWUUcdBSbBgMwBiCrgbDw', spec);
+    await postIdentityCreation(ctx, 'syWUUcdBSbBgMwBiCrgbDw', spec);
+    const creds = (await deriveCredentialsFor(db, 'syWUUcdBSbBgMwBiCrgbDw'))
         .filter(r => r.kind === 'client_secret');
     assert.equal(creds.length, 1);
 });

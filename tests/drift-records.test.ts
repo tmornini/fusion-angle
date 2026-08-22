@@ -67,6 +67,39 @@ import {
     apiRequest, TEST_OPERATION_ID,
     storedPutBodyText,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+import { seedIdentifier } from
+    '../api/mock-data/seed-kit.ts';
+
+const SEED_FLOW_ORGANIZATION_TWO = seedIdentifier('seed-flow-org2');
+const REC_DRIFT_CHAIN_1_ATTR_A = generateIdentifier();
+const REC_DRIFT_CHAIN_1_ATTR_B = generateIdentifier();
+const REC_DRIFT_CHAIN_1_ATTR_C = generateIdentifier();
+const REC_DRIFT_CHAIN_1_GENESIS = generateIdentifier();
+const REC_DRIFT_CHAIN_1_EDIT = generateIdentifier();
+const REC_DRIFT_CHAIN_1_REJECTED = generateIdentifier();
+const REC_DRIFT_CHAIN_2_GENESIS = generateIdentifier();
+const REC_DRIFT_DUP_1_A_ATTR = generateIdentifier();
+const REC_DRIFT_DUP_1_A_EV = generateIdentifier();
+const REC_DRIFT_DUP_1_B_ATTR = generateIdentifier();
+const REC_DRIFT_DUP_1_B_EV = generateIdentifier();
+const REC_DRIFT_METHOD_FILTER_1 = generateIdentifier();
+const REC_DRIFT_METHOD_FILTER_1_ATTR = generateIdentifier();
+const REC_DRIFT_METHOD_FILTER_1_EV = generateIdentifier();
+const REC_DRIFT_SKEW_1_GENESIS = generateIdentifier();
+const REC_DRIFT_SKEW_1_SKEWED = generateIdentifier();
+const REC_DRIFT_Z = generateIdentifier();
+const EV_DRIFT_Z = generateIdentifier();
+const REC_DRIFT_A = generateIdentifier();
+const EV_DRIFT_A = generateIdentifier();
+const REC_DRIFT_M = generateIdentifier();
+const EV_DRIFT_M = generateIdentifier();
+const N_START = generateIdentifier();
+const WO_DRIFT_VALUECOUNT_1_ATTR_X = generateIdentifier();
+const WO_DRIFT_VALUECOUNT_1_ATTR_Y = generateIdentifier();
+const DRIFT_VALUECOUNT_1 = generateIdentifier();
+const N_MIDDLE = generateIdentifier();
 
 // Phase Final Task 2: records(+record_attributes+flow_records)
 // dual-write stripped. This file no longer compares derive vs
@@ -120,7 +153,14 @@ const RECORDS_TEST_WIRING: DocumentFamilyWiring = {
     },
 };
 
-const READER_ACTOR: Id = 'drift-reader';
+const READER_ACTOR: Id = generateIdentifier();
+const LIVEWORKORDERID_FWO = generateIdentifier();
+const LIVEWORKORDERID_EV1 = generateIdentifier();
+const LIVEWORKORDERID_EV2 = generateIdentifier();
+const LIVEWORKORDERID_EV3 = generateIdentifier();
+const LIVEWORKORDERID_TE1 = generateIdentifier();
+const LIVEWORKORDERID_FV1 = generateIdentifier();
+const LIVEWORKORDERID_FV2 = generateIdentifier();
 
 async function derivedRecords(
     db: DbAdapter, organization: Id,
@@ -143,7 +183,7 @@ async function derivedRecordAttributes(
     db: DbAdapter, organization: Id,
 ): Promise<RecordAttributeEntity[]> {
     const token = await organizationToken(
-        'current', organization,
+        'XXZruirZyAOoRpNxaDnpSA', organization,
     );
     const typesRes = await handleRequest(
         db,
@@ -217,7 +257,7 @@ async function derivedRecordAttribute(
     db: DbAdapter, organization: Id, id: Id,
 ): Promise<RecordAttributeEntity> {
     const token = await organizationToken(
-        'current', organization,
+        'XXZruirZyAOoRpNxaDnpSA', organization,
     );
     const path = await resolveAttributePath(
         db, organization, id,
@@ -351,13 +391,15 @@ function decodeRequestMessage(message: string): {
 // -- 1. records collection wire equals derive --------------------
 
 test('seeded GET nested record-types wire equals derived'
-+ ' collection, both orgs (the 1/1 split)', async () => {
++ ' collection'
+    + ', both orgs (the AjdvjuECVZEgZoFajaIEkg/'
+    + 'AjdvjuECVZEgZoFajaIEkg split)', async () => {
     const db = await seededDb();
     for (const organization of [
         STARK_ORGANIZATION, ORGANIZATION_TWO,
     ]) {
         const token = await organizationToken(
-            'current', organization,
+            'XXZruirZyAOoRpNxaDnpSA', organization,
         );
         const res = await handleRequest(
             db, req(
@@ -388,7 +430,7 @@ test('a foreign-org GET 404s on wire and on derive, for'
 async () => {
     const db = await seededDb();
     const tokenTwo = await organizationToken(
-        'current', ORGANIZATION_TWO,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
 
     // Nested path org = token org (TWO); foreign id was
@@ -418,7 +460,7 @@ async () => {
             && err.message === expectedRecordMessage,
     );
 
-    const attributeId = '5JZ0LeKdPCa4QMtg1RsF1M';
+    const attributeId = 'CPJmMPXRaBIiNdGBofUPVg';
     // Nested GET probes the parent type first — miss at
     // this org's record-types address → 404.
     const expectedTypeMessage =
@@ -449,8 +491,8 @@ async () => {
             && err.message === expectedAttributeMessage,
     );
 
-    const joinId = 'frb01CustOnbCustProfA1';
-    const flowId = 'h5mErVBQhwdMKwi1co30jB';
+    const joinId = 'dDmnfQddFbigpThjftUlWg';
+    const flowId = 'esKujtyQFYUJaVSXWwavzA';
     const expectedJoinMessage =
         'Not found: flow_records/' + joinId;
     const joinRes = await handleRequest(
@@ -493,7 +535,7 @@ async () => {
     ];
     for (const { id, organization } of records) {
         const token = await organizationToken(
-            'current', organization,
+            'XXZruirZyAOoRpNxaDnpSA', organization,
         );
         const res = await handleRequest(
             db, req(
@@ -524,7 +566,7 @@ async () => {
                 attribute.record_id
             ]!;
         const token = await organizationToken(
-            'current', organization,
+            'XXZruirZyAOoRpNxaDnpSA', organization,
         );
         const res = await handleRequest(
             db,
@@ -559,35 +601,36 @@ async () => {
 
 // -- 4. flow_records join wire equals derive ---------------------
 
-const EMPTY_FLOW_ID = '7COt7Kf4OaOBg6AjaNO04s'; // Layout Test
+const EMPTY_FLOW_ID = 'DDUhYDIRInXtIrRraxcyHQ'; // Layout Test
 
 const SEEDED_JOIN_FLOWS = [
     {
-        flowId: 'h5mErVBQhwdMKwi1co30jB', // Customer Onboarding
+        flowId: 'esKujtyQFYUJaVSXWwavzA', // Customer Onboarding
         organization: STARK_ORGANIZATION,
-        joinId: 'frb01CustOnbCustProfA1',
+        joinId: 'dDmnfQddFbigpThjftUlWg',
     },
     {
         flowId: l2cFlowId, // Lead-to-Close
         organization: STARK_ORGANIZATION,
-        joinId: 'frb02L3adt0ClCustProf2',
+        joinId: 'dEOBUSXWcOtSmtDXJpVNuQ',
     },
     {
-        flowId: 'seed-flow-org2',
+        flowId: SEED_FLOW_ORGANIZATION_TWO,
         organization: ORGANIZATION_TWO,
-        joinId: 'frb03Fus10nPr0jBri3f03',
+        joinId: 'dGFWxGmaxtWWawferGBezQ',
     },
 ];
 
 test('flow_records join wire equals derive across every'
-+ ' seeded flow (the 1/1/1 split) + empty + :frid',
++ ' seeded flow (the AjdvjuECVZEgZoFajaIEkg/AjdvjuECVZEgZoFajaIEkg/'
+    + 'AjdvjuECVZEgZoFajaIEkg split) + empty + :frid',
 async () => {
     const db = await seededDb();
     for (const { flowId, organization, joinId } of
         SEEDED_JOIN_FLOWS
     ) {
         const token = await organizationToken(
-            'current', organization,
+            'XXZruirZyAOoRpNxaDnpSA', organization,
         );
         const listRes = await handleRequest(
             db,
@@ -628,7 +671,8 @@ async () => {
         db,
         req(
             'GET',
-            '/organizations/1/flows/' + EMPTY_FLOW_ID + '/records/',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + EMPTY_FLOW_ID
+                + '/records/',
             token,
         ),
     );
@@ -650,10 +694,10 @@ test('live-write chain: create, edit, RESTRICT 409, echoed'
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const recordId = 'rec-drift-chain-1';
-    const attrA = 'rec-drift-chain-1-attr-a';
-    const attrB = 'rec-drift-chain-1-attr-b';
-    const attrC = 'rec-drift-chain-1-attr-c';
+    const recordId = generateIdentifier();
+    const attrA = REC_DRIFT_CHAIN_1_ATTR_A;
+    const attrB = REC_DRIFT_CHAIN_1_ATTR_B;
+    const attrC = REC_DRIFT_CHAIN_1_ATTR_C;
 
     async function assertRecordWire(): Promise<void> {
         const res = await handleRequest(
@@ -711,7 +755,7 @@ async () => {
                     attrB, recordId, 'Attr B', STARK_ORGANIZATION,
                 ),
             ],
-            'rec-drift-chain-1-genesis', nowUtc(),
+            REC_DRIFT_CHAIN_1_GENESIS, nowUtc(),
         ),
     ));
     assert.equal(created.status, 201);
@@ -722,7 +766,7 @@ async () => {
 
     // Step 2: edit — add attrC, remove attrA.
     const editStateAt = nowUtc();
-    const editStateEventId = 'rec-drift-chain-1-edit';
+    const editStateEventId = REC_DRIFT_CHAIN_1_EDIT;
     const edited = await handleRequest(db, req(
         'POST', '/organizations/' + STARK_ORGANIZATION
             + '/record-types/', token,
@@ -754,8 +798,8 @@ async () => {
             + '/record-types/', token,
         editRecordBody(
             recordId, STARK_ORGANIZATION, 'Chain Record',
-            [], ['5JZ0LeKdPCa4QMtg1RsF1M'],
-            'active', nowUtc(), 'rec-drift-chain-1-rejected',
+            [], ['CPJmMPXRaBIiNdGBofUPVg'],
+            'active', nowUtc(), REC_DRIFT_CHAIN_1_REJECTED,
         ),
     ));
     assert.equal(rejected.status, 409);
@@ -847,13 +891,13 @@ async () => {
     assert.equal(derivedHistory.length, 3);
 
     // Step 7: physical DELETE on a second record.
-    const secondRecordId = 'rec-drift-chain-2';
+    const secondRecordId = generateIdentifier();
     const secondCreated = await handleRequest(db, req(
         'POST', '/organizations/' + STARK_ORGANIZATION
             + '/record-types/', token,
         createRecordBody(
             secondRecordId, STARK_ORGANIZATION, 'Second Record',
-            [], 'rec-drift-chain-2-genesis', nowUtc(),
+            [], REC_DRIFT_CHAIN_2_GENESIS, nowUtc(),
         ),
     ));
     assert.equal(secondCreated.status, 201);
@@ -882,7 +926,7 @@ test('duplicate-create supersession: second document pair'
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const recordId = 'rec-drift-dup-1';
+    const recordId = generateIdentifier();
     const prefix = canonicalUriCollection(
         STARK_ORGANIZATION, '/record-types/',
     );
@@ -894,11 +938,11 @@ async () => {
             recordId, STARK_ORGANIZATION, 'Dup First',
             [
                 attributeBody(
-                    'rec-drift-dup-1-a-attr', recordId,
+                    REC_DRIFT_DUP_1_A_ATTR, recordId,
                     'Attr A', STARK_ORGANIZATION,
                 ),
             ],
-            'rec-drift-dup-1-a-ev',
+            REC_DRIFT_DUP_1_A_EV,
             '2026-05-02T00:00:00.000000Z',
         ),
     ));
@@ -919,11 +963,11 @@ async () => {
             recordId, STARK_ORGANIZATION, 'Dup Second',
             [
                 attributeBody(
-                    'rec-drift-dup-1-b-attr', recordId,
+                    REC_DRIFT_DUP_1_B_ATTR, recordId,
                     'Attr B', STARK_ORGANIZATION,
                 ),
             ],
-            'rec-drift-dup-1-b-ev',
+            REC_DRIFT_DUP_1_B_EV,
             '2026-05-02T00:00:01.000000Z',
         ),
     ));
@@ -966,8 +1010,8 @@ test('the create-op POST pair is not read as a document pair —'
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const recordId = 'rec-drift-method-filter-1';
-    const attributeId = 'rec-drift-method-filter-1-attr';
+    const recordId = REC_DRIFT_METHOD_FILTER_1;
+    const attributeId = REC_DRIFT_METHOD_FILTER_1_ATTR;
 
     const created = await handleRequest(db, req(
         'POST', '/organizations/' + STARK_ORGANIZATION
@@ -980,7 +1024,7 @@ async () => {
                     STARK_ORGANIZATION,
                 ),
             ],
-            'rec-drift-method-filter-1-ev',
+            REC_DRIFT_METHOD_FILTER_1_EV,
             '2026-05-03T00:00:00.000000Z',
         ),
     ));
@@ -1052,11 +1096,11 @@ test('GET record trio is lifecycle-current under clock skew'
 + ' (genesis-wins-under-skew, case 7d)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const recordId = 'rec-drift-skew-1';
+    const recordId = generateIdentifier();
     const genesisAt = '2026-06-01T00:00:00.000000Z';
-    const genesisEv = 'rec-drift-skew-1-genesis';
+    const genesisEv = REC_DRIFT_SKEW_1_GENESIS;
     const skewedAt = '2020-01-01T00:00:00.000000Z';
-    const skewedEv = 'rec-drift-skew-1-skewed';
+    const skewedEv = REC_DRIFT_SKEW_1_SKEWED;
 
     const genesis = await handleRequest(db, req(
         'PUT', '/organizations/' + STARK_ORGANIZATION
@@ -1102,22 +1146,22 @@ async () => {
     const token = await organizationToken();
     const fixtures = [
         {
-            id: 'rec-drift-z',
+            id: REC_DRIFT_Z,
             name: 'Zulu',
             at: '2026-07-01T00:00:00.000000Z',
-            ev: 'ev-drift-z',
+            ev: EV_DRIFT_Z,
         },
         {
-            id: 'rec-drift-a',
+            id: REC_DRIFT_A,
             name: 'Alpha',
             at: '2026-07-01T00:00:01.000000Z',
-            ev: 'ev-drift-a',
+            ev: EV_DRIFT_A,
         },
         {
-            id: 'rec-drift-m',
+            id: REC_DRIFT_M,
             name: 'Mike',
             at: '2026-07-01T00:00:02.000000Z',
-            ev: 'ev-drift-m',
+            ev: EV_DRIFT_M,
         },
     ];
     for (const f of fixtures) {
@@ -1134,7 +1178,7 @@ async () => {
     }
     // Oldest live head (at, id): z, a, m — insertion.
     const expectedIds = [
-        'rec-drift-z', 'rec-drift-a', 'rec-drift-m',
+        REC_DRIFT_Z, REC_DRIFT_A, REC_DRIFT_M,
     ];
     const res = await handleRequest(
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
@@ -1143,7 +1187,9 @@ async () => {
     assert.equal(res.status, 200);
     const list = await res.json() as { id: string }[];
     const added = list.filter((row) =>
-        row.id.startsWith('rec-drift-'));
+        [
+            REC_DRIFT_Z, REC_DRIFT_A, REC_DRIFT_M,
+        ].includes(row.id));
     assert.deepEqual(
         added.map((r) => r.id), expectedIds,
     );
@@ -1160,7 +1206,7 @@ test('delete-then-recreate: DELETE via the wire, re-PUT the'
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const recordId = 'rec-drift-recreate-1';
+    const recordId = generateIdentifier();
 
     const genesis = await handleRequest(db, req(
         'PUT', '/organizations/' + STARK_ORGANIZATION
@@ -1233,7 +1279,8 @@ async function transitionFieldValueCounts(
 ): Promise<Map<string, number>> {
     const prefix = canonicalUriCollection(
         organization,
-        '/organizations/1/work-orders/' + workOrderId + '/transition/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
+            + '/transition/',
     );
     const [requests, responses] = await Promise.all([
         db.pairs.getAllWhere('uri_collection', prefix),
@@ -1276,14 +1323,14 @@ function workOrderFlowGraph(
         lockTimeout: lockTimeoutSeconds,
         nodes: [
             {
-                id: 'n-start', name: 'Start',
+                id: N_START, name: 'Start',
                 positionX: 0, positionY: 0,
                 isCreate: true, isArchive: false,
                 memberIds: [], attributes: [],
                 taskInstructions: '',
             },
             {
-                id: 'n-middle', name: 'Middle',
+                id: N_MIDDLE, name: 'Middle',
                 positionX: 0, positionY: 0,
                 isCreate: false, isArchive: false,
                 memberIds: [], attributes: [],
@@ -1303,15 +1350,15 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
     // Seeded flagship WO: value-bearing transitions migrate to
     // instance-head SoT (Task 6) — legacy bags gone; instance
     // head holds the seven-value union.
-    const flagshipWorkOrderId = 'wg25b0R2gwy5kYPIhQB6cS';
+    const flagshipWorkOrderId = 'xqcXYHXBJJXcLkRYkRngKA';
     const flagshipAttributeIds = [
-        '5JZ0LeKdPCa4QMtg1RsF1M', // Company Name
-        'nplTIh0qXNtAyoWSwRaBYe', // Contact Email
-        'kzHpMw9f1thq79VoBYeIX3', // Contact Phone
-        'QsmqiOmPtoMLGpSjHOqdHA', // Industry
-        '0TyjQRcygn3DIyXTe6x1F6', // Annual Revenue
-        '8Z62tcRHBpwCRH1kBffx0G', // Number of Employees
-        'AdQlKf43JV6yrhQbyskDkR', // Reviewer Notes
+        'CPJmMPXRaBIiNdGBofUPVg', // Company Name
+        'oeqelDVElwxHYWkWRVTCYw', // Contact Email
+        'kxbdVhmkaEzkJvghWKFzkw', // Contact Phone
+        'QHzHnEAmqGSgiEfkXoWMTw', // Industry
+        'AXxvHyKNpNYXYKOorywqRQ', // Annual Revenue
+        'DfkwfBiyfyCyRHvsHnDiqQ', // Number of Employees
+        'ElVKgkCreTEHQXJZPBJDKw', // Reviewer Notes
     ];
     assert.equal(flagshipAttributeIds.length, 7);
 
@@ -1373,32 +1420,32 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
 
     // Live ledger-backed transition.
     const token = await organizationToken();
-    const liveWorkOrderId = 'wo-drift-valuecount-1';
-    const liveAttributeX = 'wo-drift-valuecount-1-attr-x';
-    const liveAttributeY = 'wo-drift-valuecount-1-attr-y';
+    const liveWorkOrderId = generateIdentifier();
+    const liveAttributeX = WO_DRIFT_VALUECOUNT_1_ATTR_X;
+    const liveAttributeY = WO_DRIFT_VALUECOUNT_1_ATTR_Y;
     const graph = workOrderFlowGraph(8 * 60 * 60);
 
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token, {
             id: liveWorkOrderId,
             workOrder: {
-                display_id: 'drift-valuecount-1',
+                display_id: DRIFT_VALUECOUNT_1,
                 flow_graph: graph,
                 position: 1,
             },
-            flowWorkOrderId: liveWorkOrderId + '-fwo',
+            flowWorkOrderId: LIVEWORKORDERID_FWO,
             flowWorkOrder: {
                 flow_id: EMPTY_FLOW_ID,
                 work_order_id: liveWorkOrderId,
                 at: nowUtc(),
             },
             stateEventIds: [
-                liveWorkOrderId + '-ev1',
-                liveWorkOrderId + '-ev2',
-                liveWorkOrderId + '-ev3',
+                LIVEWORKORDERID_EV1,
+                LIVEWORKORDERID_EV2,
+                LIVEWORKORDERID_EV3,
             ],
             stateEventAts: [nowUtc(), nowUtc(), nowUtc()],
-            states: ['n-start', 'n-middle', 'claimed'],
+            states: [N_START, N_MIDDLE, 'claimed'],
         },
     ));
     assert.equal(created.status, 201);
@@ -1407,23 +1454,23 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
     // (live leg still seeds STORED SFV fold shape).
     await appendLegacyTransition(
         db, STARK_ORGANIZATION, liveWorkOrderId, {
-            transitionEventId: liveWorkOrderId + '-te1',
-            targetState: 'n-middle',
+            transitionEventId: LIVEWORKORDERID_TE1,
+            targetState: N_MIDDLE,
             fieldValues: [
                 {
-                    id: liveWorkOrderId + '-fv1',
+                    id: LIVEWORKORDERID_FV1,
                     fields: {
                         state_event_id:
-                            liveWorkOrderId + '-te1',
+                            LIVEWORKORDERID_TE1,
                         attribute_id: liveAttributeX,
                         value: 'x-value',
                     },
                 },
                 {
-                    id: liveWorkOrderId + '-fv2',
+                    id: LIVEWORKORDERID_FV2,
                     fields: {
                         state_event_id:
-                            liveWorkOrderId + '-te1',
+                            LIVEWORKORDERID_TE1,
                         attribute_id: liveAttributeY,
                         value: 'y-value',
                     },

@@ -23,15 +23,15 @@ const AT = '2026-06-15T09:30:00.123456Z';
 
 const validInput = {
     method: 'PUT',
-    pathname: '/organizations/1/ideas/42',
+    pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/42',
     routePattern: 'organizations/:id/ideas/:id',
     routeSegments: ['ideas', ':id'],
     pathSegments: ['ideas', '42'],
     headerFields: [],
     body: { title: 'T' },
-    requesterIdentityId: 'current',
+    requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
     requestAt: AT,
-    organization: '1',
+    organization: 'AjdvjuECVZEgZoFajaIEkg',
     responseStatus: 204,
     responseBody: undefined,
     operationId: TEST_OPERATION_ID,
@@ -41,7 +41,7 @@ test('canonical JSON is stable across key permutations',
 () => {
     const a = buildRequestModel({
         method: 'PUT',
-        target: '/organizations/1/ideas/42',
+        target: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/42',
         fields: [
             { name: 'idempotency-key', value: 'k1' },
             { name: 'authorization', value: 'Bearer x' },
@@ -50,7 +50,7 @@ test('canonical JSON is stable across key permutations',
     });
     const b = buildRequestModel({
         method: 'PUT',
-        target: '/organizations/1/ideas/42',
+        target: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/42',
         fields: [
             { name: 'authorization', value: 'Bearer x' },
             { name: 'idempotency-key', value: 'k1' },
@@ -90,7 +90,7 @@ test('documentVersion covers only the body octets',
 async () => {
     const a = buildResponseModel({
         status: 200,
-        fields: [{ name: 'x-trace', value: 'r1' }],
+        fields: [{ name: 'x-trace', value: 'rOEPOcVMQdJiiiMuiiEhlg' }],
         body: { v: 1 },
     });
     const b = buildResponseModel({

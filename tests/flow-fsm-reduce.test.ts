@@ -584,11 +584,11 @@ test(
                 ['n1', { x: 0, y: 0 }],
             ]),
         });
-        const r1 = reduceFsm(
+        const rOEPOcVMQdJiiiMuiiEhlg = reduceFsm(
             state0, downInput(1000),
         );
         const r2 = reduceFsm(
-            r1.state, downInput(1200),
+            rOEPOcVMQdJiiiMuiiEhlg.state, downInput(1200),
         );
         const open = findAction(
             r2.actions, 'open-panel',

@@ -46,7 +46,7 @@ function makeAttributeRef(
     overrides: Partial<NodeAttribute> = {},
 ): NodeAttribute {
     return {
-        attributeId: 'a-1',
+        attributeId: 'UQBiHFcwJeCDSnmkPBoYRA',
         mode: 'editable',
         isRequired: false,
         ...overrides,
@@ -59,9 +59,9 @@ function makeAttribute(
     const attributeType: AttributeType =
         overrides.attributeType ?? 'text';
     return {
-        id: 'a-1',
-        organizationId: '1',
-        recordId: 'rec-1',
+        id: 'UQBiHFcwJeCDSnmkPBoYRA',
+        organizationId: 'AjdvjuECVZEgZoFajaIEkg',
+        recordId: 'rbfHGatkwQzGZJVXKJEeyw',
         name: 'Notes',
         attributeType,
         sortOrder: 0,
@@ -108,7 +108,7 @@ function makeFlowGraph(
     overrides: Partial<WorkOrderFlowGraph> = {},
 ): WorkOrderFlowGraph {
     return {
-        flowId: 'flow-1',
+        flowId: 'aEsGMmBEFaVdWihhHXwCbw',
         name: 'Expense approval',
         description: '',
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
@@ -137,7 +137,7 @@ function makeWorkOrder(
 ): WorkOrder {
     return {
         id: 'wo-1',
-        organizationId: '1',
+        organizationId: 'AjdvjuECVZEgZoFajaIEkg',
         displayId: 'WO-42',
         flowGraph: graph,
         position: 0,
@@ -153,7 +153,7 @@ function makeCreation(
         id: 't-1',
         workOrderId: 'wo-1',
         toNodeId: 'n-1',
-        memberId: 'p-1',
+        memberId: 'pjQzgITAPDQVyvCVpzpIfQ',
         at: '2026-04-01T12:00:00.000000Z',
         ...overrides,
     };
@@ -168,7 +168,7 @@ function makeStep(
         workOrderId: 'wo-1',
         fromNodeId: 'n-1',
         toNodeId: 'n-2',
-        memberId: 'p-1',
+        memberId: 'pjQzgITAPDQVyvCVpzpIfQ',
         at: '2026-04-01T12:00:00.000000Z',
         ...overrides,
     };
@@ -195,8 +195,8 @@ function makeAttributeMap(
 }
 
 const MEMBER_MAP = makeMemberMap([
-    makeHumanMember('p-1', 'Ada Park'),
-    makeHumanMember('p-2', 'Bo Park'),
+    makeHumanMember('pjQzgITAPDQVyvCVpzpIfQ', 'Ada Park'),
+    makeHumanMember('pnKMhTzcIZVQQBIoQlyAfw', 'Bo Park'),
 ]);
 
 function makePresenter(
@@ -243,7 +243,7 @@ function makePresenter(
         ? args.binding
         : {
             instanceId: 'inst-1',
-            recordTypeId: 'rt-1',
+            recordTypeId: 'sjWcXwYGlgxxJOHxzMoUow',
         };
     return new WorkboxDetailPresenter(
         workOrder,
@@ -251,7 +251,7 @@ function makePresenter(
         args.fieldValues ?? new Map(),
         args.activeClaim ?? null,
         MEMBER_MAP,
-        args.currentMemberId ?? 'p-1',
+        args.currentMemberId ?? 'pjQzgITAPDQVyvCVpzpIfQ',
         makeAttributeMap(attributes),
         instanceValues,
         binding,
@@ -325,7 +325,7 @@ test(
     + ' values and shows a bound badge',
     () => {
         const attr = makeAttribute({
-            id: 'a-1',
+            id: 'UQBiHFcwJeCDSnmkPBoYRA',
             name: 'Notes',
             attributeType: 'text',
         });
@@ -336,7 +336,7 @@ test(
                     name: 'Triage',
                     attributes: [
                         makeAttributeRef({
-                            attributeId: 'a-1',
+                            attributeId: 'UQBiHFcwJeCDSnmkPBoYRA',
                         }),
                     ],
                 }),
@@ -346,7 +346,7 @@ test(
             graph,
             attributes: [attr],
             instanceValues: new Map([
-                ['a-1', 'from-head'],
+                ['UQBiHFcwJeCDSnmkPBoYRA', 'from-head'],
             ]),
             binding: {
                 instanceId: 'inst-xyz',
@@ -367,7 +367,7 @@ test(
     + ' bind prompt and picker button',
     () => {
         const attr = makeAttribute({
-            id: 'a-1',
+            id: 'UQBiHFcwJeCDSnmkPBoYRA',
             name: 'Notes',
             attributeType: 'text',
         });
@@ -378,7 +378,7 @@ test(
                     name: 'Triage',
                     attributes: [
                         makeAttributeRef({
-                            attributeId: 'a-1',
+                            attributeId: 'UQBiHFcwJeCDSnmkPBoYRA',
                         }),
                     ],
                 }),
@@ -504,8 +504,8 @@ test(
             ref, attribute,
         ).toString();
         assert.match(out, /type="radio"/);
-        assert.match(out, /name="a-1"/);
-        assert.match(out, /data-attribute-id="a-1"/);
+        assert.match(out, /name="UQBiHFcwJeCDSnmkPBoYRA"/);
+        assert.match(out, /data-attribute-id="UQBiHFcwJeCDSnmkPBoYRA"/);
         assert.match(out, /value="Low"/);
         assert.match(out, /value="High"/);
     },
@@ -786,14 +786,14 @@ test(
                 makeCreation({
                     id: 't-1',
                     toNodeId: 'n-1',
-                    memberId: 'p-1',
+                    memberId: 'pjQzgITAPDQVyvCVpzpIfQ',
                     at:
                         '2026-04-01T12:00:00.000000Z',
                 }),
                 makeStep({
                     id: 't-2', fromNodeId: 'n-1',
                     toNodeId: 'n-2',
-                    memberId: 'p-2',
+                    memberId: 'pnKMhTzcIZVQQBIoQlyAfw',
                     at:
                         '2026-04-03T08:00:00.000000Z',
                 }),
@@ -821,10 +821,10 @@ test(
     () => {
         const presenter = makePresenter({
             activeClaim: {
-                memberId: 'p-1',
+                memberId: 'pjQzgITAPDQVyvCVpzpIfQ',
                 at: nowUtc(),
             },
-            currentMemberId: 'p-1',
+            currentMemberId: 'pjQzgITAPDQVyvCVpzpIfQ',
         });
         const status = presenter.claimStatus();
         assert.equal(status.kind, 'claimed');
@@ -842,10 +842,10 @@ test(
     () => {
         const presenter = makePresenter({
             activeClaim: {
-                memberId: 'p-2',
+                memberId: 'pnKMhTzcIZVQQBIoQlyAfw',
                 at: nowUtc(),
             },
-            currentMemberId: 'p-1',
+            currentMemberId: 'pjQzgITAPDQVyvCVpzpIfQ',
         });
         const status = presenter.claimStatus();
         assert.equal(status.kind, 'claimed');

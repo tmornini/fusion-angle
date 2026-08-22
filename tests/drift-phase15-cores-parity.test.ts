@@ -55,12 +55,40 @@ import {
     isClaimEventExpired,
 } from '../api/work-order-claims.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../shared/identifier.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+
+const N_START = generateIdentifier();
+const N_FINISH = generateIdentifier();
+const NO_SUCH_CLAIM_GRAPH_WO = generateIdentifier();
+const GHOST_EVENT_NOWHERE = generateIdentifier();
+const GHOST_NOWHERE_P15_FENCE = generateIdentifier();
+const P15_FNA_ADD = generateIdentifier();
+const P15_FNA_RM = generateIdentifier();
+const P15_SOFTDEL_FNA = generateIdentifier();
+const P15_SOFTDEL_DEL = generateIdentifier();
+const GHOST_P15_VIS = generateIdentifier();
+const P15_RESTRICT_FNA = generateIdentifier();
+const N_WO = generateIdentifier();
+const P15_RESTRICT_WO = generateIdentifier();
+const WORKORDERID_FWO = generateIdentifier();
+const WORKORDERID_EV1 = generateIdentifier();
+const WORKORDERID_EV2 = generateIdentifier();
+const WORKORDERID_EV3 = generateIdentifier();
+const WORKORDERID_TE1 = generateIdentifier();
+const FLOWID_EV_RM = generateIdentifier();
+const FLOWID_EV_DEL = generateIdentifier();
+const WORKORDERID_TE = generateIdentifier();
+const WORKORDERID_FV = generateIdentifier();
+const WORKORDERID_ATTR = generateIdentifier();
+const WOID_FWO = generateIdentifier();
+const WOID_EV1 = generateIdentifier();
+const WOID_EV2 = generateIdentifier();
+const WOID_EV3 = generateIdentifier();
 
 // Phase 15: view-safe derive cores (Task 1) + claim-gate
 // graph re-anchor pins (Task 2) + field-values visibility
@@ -100,14 +128,14 @@ function workOrderFlowGraph(
         lockTimeout: lockTimeoutSeconds,
         nodes: [
             {
-                id: 'n-start', name: 'Start',
+                id: N_START, name: 'Start',
                 positionX: 0, positionY: 0,
                 isCreate: true, isArchive: false,
                 memberIds: [], attributes: [],
                 taskInstructions: '',
             },
             {
-                id: 'n-finish', name: 'Finish',
+                id: N_FINISH, name: 'Finish',
                 positionX: 0, positionY: 0,
                 isCreate: false, isArchive: true,
                 memberIds: [], attributes: [],
@@ -116,9 +144,9 @@ function workOrderFlowGraph(
         ],
         edges: [
             {
-                id: 'e1', name: '',
-                fromNodeId: 'n-start',
-                toNodeId: 'n-finish',
+                id: 'YiJPbufDpkyrZcZCYbUJpg', name: '',
+                fromNodeId: N_START,
+                toNodeId: N_FINISH,
             },
         ],
     };
@@ -129,7 +157,7 @@ function workOrderFlowGraph(
 // work_orders dropped (ROW half stripped).
 const CLAIM_TX_TABLES = MESSAGE_TABLES;
 
-const EMPTY_FLOW_ID = 'E2BnBlZyrriqsQYkmS4usb';
+const EMPTY_FLOW_ID = 'GgfDbXOJUvvaCekCTcvhuw';
 
 // -- workOrderDocumentHeadFor ------------------------------------
 
@@ -140,36 +168,37 @@ test('workOrderDocumentHeadFor: wire GET equals head for a'
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const workOrderId = 'wo-p15-doc-head';
+    const workOrderId = generateIdentifier();
     const graph = workOrderFlowGraph(8 * 60 * 60);
 
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token, {
             id: workOrderId,
             workOrder: {
                 display_id: 'p15-' + workOrderId,
                 flow_graph: graph,
                 position: 7,
             },
-            flowWorkOrderId: workOrderId + '-fwo',
+            flowWorkOrderId: WORKORDERID_FWO,
             flowWorkOrder: {
                 flow_id: EMPTY_FLOW_ID,
                 work_order_id: workOrderId,
                 at: nowUtc(),
             },
             stateEventIds: [
-                workOrderId + '-ev1',
-                workOrderId + '-ev2',
-                workOrderId + '-ev3',
+                WORKORDERID_EV1,
+                WORKORDERID_EV2,
+                WORKORDERID_EV3,
             ],
             stateEventAts: [nowUtc(), nowUtc(), nowUtc()],
-            states: ['n-start', 'n-finish', 'claimed'],
+            states: [N_START, N_FINISH, 'claimed'],
         },
     ));
     assert.equal(created.status, 201);
 
     const getRes = await handleRequest(
-        db, req('GET', '/organizations/1/work-orders/' + workOrderId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId, token),
     );
     assert.equal(getRes.status, 200);
     const wire = await getRes.json();
@@ -189,19 +218,20 @@ async () => {
     // Absent id: pair plane returns null (Task 2 maps to the
     // same EntityNotFoundError bytes as workOrders.getById).
     const preTxMissing = await workOrderDocumentHeadFor(
-        db, STARK_ORGANIZATION, 'no-such-work-order',
+        db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
     );
     const inTxMissing = await db.transaction(
         [...CLAIM_TX_TABLES],
         (view) => workOrderDocumentHeadFor(
-            view, STARK_ORGANIZATION, 'no-such-work-order',
+            view, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
         ),
     );
     assert.equal(preTxMissing, null);
     assert.equal(inTxMissing, null);
     const missRes = await handleRequest(
         db,
-        req('GET', '/organizations/1/work-orders/no-such-work-order', token),
+        req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'oYnbiWXzroVnyolOhmkBIQ', token),
     );
     assert.equal(missRes.status, 404);
 });
@@ -211,12 +241,13 @@ test('workOrderDocumentHeadFor: tracks a later document PUT'
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const workOrderId = 'wo-p15-doc-head-edit';
+    const workOrderId = generateIdentifier();
     const graph1 = workOrderFlowGraph(4 * 60 * 60);
     const graph2 = workOrderFlowGraph(12 * 60 * 60);
 
     const put1 = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + workOrderId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId, token, {
             display_id: 'before',
             flow_graph: graph1,
             position: 1,
@@ -225,7 +256,8 @@ async () => {
     assert.equal(put1.status, 201);
 
     const put2 = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + workOrderId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId, token, {
             display_id: 'after',
             flow_graph: graph2,
             position: 3,
@@ -234,7 +266,8 @@ async () => {
     assert.equal(put2.status, 201);
 
     const getRes = await handleRequest(
-        db, req('GET', '/organizations/1/work-orders/' + workOrderId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId, token),
     );
     assert.equal(getRes.status, 200);
     const wire = await getRes.json() as {
@@ -259,12 +292,13 @@ test('claim graph: pre-tx vs in-tx flow_graph parity and'
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const workOrderId = 'wo-p15-claim-graph';
+    const workOrderId = generateIdentifier();
     const lockTimeoutSeconds = 8 * 60 * 60;
     const graph = workOrderFlowGraph(lockTimeoutSeconds);
 
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + workOrderId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId, token, {
             display_id: 'p15-cg-' + workOrderId,
             flow_graph: graph,
             position: 2,
@@ -304,11 +338,12 @@ async () => {
     // Live path: claim against the re-anchored gate succeeds.
     const claimResponse = await handleRequest(db, req(
         'PUT',
-        '/organizations/1/work-orders/' + workOrderId + '/claim',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
+            + '/claim',
         token, {
-            claimEventId: generateCryptoSafeBase62(),
+            claimEventId: generateIdentifier(),
             claimAt: nowUtc(),
-            expireEventId: generateCryptoSafeBase62(),
+            expireEventId: generateIdentifier(),
             expireAt: nowUtc(),
         },
     ));
@@ -316,7 +351,7 @@ async () => {
 
     // Absent id: document head null pre-tx and in-tx; wire
     // 404 carries the same Not found: work_orders/:id bytes.
-    const missingId = 'no-such-claim-graph-wo';
+    const missingId = NO_SUCH_CLAIM_GRAPH_WO;
     const preMissing = await workOrderDocumentHeadFor(
         db, STARK_ORGANIZATION, missingId,
     );
@@ -329,7 +364,8 @@ async () => {
     assert.equal(preMissing, null);
     assert.equal(inMissing, null);
     const missRes = await handleRequest(
-        db, req('GET', '/organizations/1/work-orders/' + missingId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + missingId, token),
     );
     assert.equal(missRes.status, 404);
     const missBody = await missRes.json() as {
@@ -427,19 +463,19 @@ test('stateEventVisibilityFor: tier (i) event-append pairs'
 
     // Nowhere → orphan.
     const preOrphan = await stateEventVisibilityFor(
-        db, STARK_ORGANIZATION, 'ghost-event-nowhere',
+        db, STARK_ORGANIZATION, GHOST_EVENT_NOWHERE,
     );
     const inOrphan = await db.transaction(
         txTables,
         (view) => stateEventVisibilityFor(
-            view, STARK_ORGANIZATION, 'ghost-event-nowhere',
+            view, STARK_ORGANIZATION, GHOST_EVENT_NOWHERE,
         ),
     );
     assert.equal(preOrphan, 'orphan');
     assert.equal(inOrphan, 'orphan');
     assert.equal(
         await pairPlaneVisibility(
-            db, STARK_ORGANIZATION, 'ghost-event-nowhere',
+            db, STARK_ORGANIZATION, GHOST_EVENT_NOWHERE,
         ),
         'orphan',
     );
@@ -450,42 +486,43 @@ test('stateEventVisibilityFor: tier (ii) op-born transition'
 + ' foreign org (tier iii)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const workOrderId = 'wo-p15-vis-transition';
+    const workOrderId = generateIdentifier();
     const graph = workOrderFlowGraph(8 * 60 * 60);
-    const transitionEventId = workOrderId + '-te1';
+    const transitionEventId = WORKORDERID_TE1;
 
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token, {
             id: workOrderId,
             workOrder: {
                 display_id: 'vis-' + workOrderId,
                 flow_graph: graph,
                 position: 1,
             },
-            flowWorkOrderId: workOrderId + '-fwo',
+            flowWorkOrderId: WORKORDERID_FWO,
             flowWorkOrder: {
                 flow_id: EMPTY_FLOW_ID,
                 work_order_id: workOrderId,
                 at: nowUtc(),
             },
             stateEventIds: [
-                workOrderId + '-ev1',
-                workOrderId + '-ev2',
-                workOrderId + '-ev3',
+                WORKORDERID_EV1,
+                WORKORDERID_EV2,
+                WORKORDERID_EV3,
             ],
             stateEventAts: [nowUtc(), nowUtc(), nowUtc()],
-            states: ['n-start', 'n-finish', 'claimed'],
+            states: [N_START, N_FINISH, 'claimed'],
         },
     ));
     assert.equal(created.status, 201);
 
     const transitioned = await handleRequest(db, req(
         'POST',
-        '/organizations/1/work-orders/' + workOrderId + '/transition',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
+            + '/transition',
         token,
         {
             transitionEventId,
-            targetState: 'n-finish',
+            targetState: N_FINISH,
             release: null,
             transitionAt: nowUtc(),
         },
@@ -522,7 +559,7 @@ async () => {
     const db = await seededDb();
     const token = await organizationToken();
 
-    const unownedId = 'hm-p15-vis-unowned';
+    const unownedId = generateIdentifier();
     const unownedCreate = await handleRequest(db, req(
         'PUT', '/identities/' + unownedId, token, {
             kind: 'person',
@@ -541,7 +578,7 @@ async () => {
         null,
     );
 
-    const ownedId = 'hm-p15-vis-owned';
+    const ownedId = generateIdentifier();
     const ownedCreate = await handleRequest(db, req(
         'PUT', '/identities/' + ownedId, token, {
             kind: 'person',
@@ -677,10 +714,11 @@ test('residual pin: workOrderDocumentHeadFor matches wire'
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const listRes = await handleRequest(
-        db, req('GET', '/organizations/1/work-orders/', token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            , token),
     );
     assert.equal(listRes.status, 200);
     const rows = await listRes.json() as {
@@ -689,7 +727,9 @@ async () => {
     assert.ok(rows.length > 0);
     for (const row of rows) {
         const getRes = await handleRequest(
-            db, req('GET', '/organizations/1/work-orders/' + row.id, token),
+            db, req('GET'
+                , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + row.id, token),
         );
         assert.equal(getRes.status, 200);
         // Wire GET attaches bind embeds (instance_id /
@@ -809,7 +849,7 @@ async () => {
         db, ORGANIZATION_TWO,
     );
     const recordToken = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const recordsRes = await handleRequest(
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
@@ -829,7 +869,7 @@ async () => {
         '../api/derive-memberships.ts'
     );
     const currentMemberships =
-        await deriveMembershipsForIdentity(db, 'current');
+        await deriveMembershipsForIdentity(db, 'XXZruirZyAOoRpNxaDnpSA');
     const memberStark = currentMemberships.find(
         (m) => m.organization_id === STARK_ORGANIZATION,
     )!;
@@ -851,7 +891,7 @@ async () => {
     assert.ok(flowTwo, 'org-two flows non-empty');
     // A live node id from the pair-plane graph (graphDelta
     // upserts) — seed Customer Onboarding create node.
-    const nodeStarkId = 'lzkYvFNCEHARBQmZ4YHAn4';
+    const nodeStarkId = 'laXQcGGyWrbEiExtgkyCcw';
 
     for (const [entityId, owner] of [
         [ideaStark.id, STARK_ORGANIZATION],
@@ -893,7 +933,7 @@ async () => {
     // Genuine orphan: null.
     assert.equal(
         await pairOwner(
-            'ghost-nowhere-p15-fence',
+            GHOST_NOWHERE_P15_FENCE,
             STARK_ORGANIZATION,
         ),
         null,
@@ -935,17 +975,17 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
 + ' pair plane', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const flowId = 'p15-bind-flow';
-    const nodeId = 'p15-bind-node';
-    const attrId = 'p15-bind-attr';
+    const flowId = generateIdentifier();
+    const nodeId = generateIdentifier();
+    const attrId = generateIdentifier();
     const at1 = '2026-06-15T00:00:00.000000Z';
     const at2 = '2026-06-15T00:00:01.000000Z';
     // A seeded project the create can join.
-    const projectId = 'u6YkHhlGc91oDMkr3x0isa';
+    const projectId = 'wqGTTFdYUGnmBxWCppmkOQ';
 
     const attrPut = await handleRequest(db, req(
         'PUT', '/organizations/' + STARK_ORGANIZATION
-            + '/record-types/' + 'rec01CustProfRec0rdAB1'
+            + '/record-types/' + 'sJxkGGTrPegHqFbQAkXnjw'
             + '/attributes/' + attrId, token, {
             name: 'P15 Bind',
             attribute_type: 'text',
@@ -958,7 +998,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
 
     // Create with the binding already 'added'.
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token, {
             id: flowId,
             flow: {
                 name: 'P15 Bind Flow',
@@ -967,14 +1007,14 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
                 is_auto_fit: false,
                 lock_timeout: 8 * 60 * 60,
             },
-            projectFlowId: flowId + '-pf',
+            projectFlowId: generateIdentifier(),
             projectFlow: {
                 project_id: projectId,
                 flow_id: flowId,
                 at: at1,
             },
             initialState: 'active',
-            initialStateEventId: flowId + '-ev',
+            initialStateEventId: generateIdentifier(),
             initialStateAt: at1,
             graphDelta: {
                 nodes: [{
@@ -988,7 +1028,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
                 deletions: [],
                 memberEvents: [],
                 attributeEvents: [{
-                    id: 'p15-fna-add',
+                    id: P15_FNA_ADD,
                     flow_node_id: nodeId,
                     attribute_id: attrId,
                     mode: 'editable',
@@ -1005,7 +1045,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
         db, STARK_ORGANIZATION,
     );
     const addRow = afterAdd.attributeEvents.find(
-        (r) => r.id === 'p15-fna-add',
+        (r) => r.id === P15_FNA_ADD,
     );
     assert.ok(addRow);
     assert.equal(addRow!.action, 'added');
@@ -1015,14 +1055,15 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
 
     // Chain a remove off the create's document head.
     const headGet = await handleRequest(
-        db, req('GET', '/organizations/1/flows/' + flowId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + flowId, token),
     );
     assert.equal(headGet.status, 200);
     const headId = headGet.headers.get('Response-ID');
     assert.ok(headId);
 
     const putRemove = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/' + flowId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
         {
             name: 'P15 Bind Flow',
             is_locked: false,
@@ -1031,7 +1072,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
             lock_timeout: 8 * 60 * 60,
             state: 'active',
             state_at: at2,
-            state_event_id: flowId + '-ev-rm',
+            state_event_id: FLOWID_EV_RM,
             graph: {
                 nodes: [{
                     id: nodeId, name: 'Bind',
@@ -1055,7 +1096,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
                 deletions: [],
                 memberEvents: [],
                 attributeEvents: [{
-                    id: 'p15-fna-rm',
+                    id: P15_FNA_RM,
                     flow_node_id: nodeId,
                     attribute_id: attrId,
                     mode: 'editable',
@@ -1069,7 +1110,8 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
         { 'if-match': (
             await handleRequest(
                 db,
-                req('GET', '/organizations/1/flows/' + flowId, token),
+                req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + flowId, token),
             )
         ).headers.get('ETag')! },
     ));
@@ -1079,7 +1121,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
         db, STARK_ORGANIZATION,
     );
     const rmRow = afterRm.attributeEvents.find(
-        (r) => r.id === 'p15-fna-rm',
+        (r) => r.id === P15_FNA_RM,
     );
     assert.ok(rmRow);
     assert.equal(rmRow!.action, 'removed');
@@ -1103,16 +1145,16 @@ test('residual pin: soft-deleted node drops from'
 + ' RESTRICT referrer (DELETE → 204)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const flowId = 'p15-softdel-flow';
-    const nodeId = 'p15-softdel-node';
-    const attrId = 'p15-softdel-attr';
+    const flowId = generateIdentifier();
+    const nodeId = generateIdentifier();
+    const attrId = generateIdentifier();
     const at1 = '2026-06-17T00:00:00.000000Z';
     const at2 = '2026-06-17T00:00:01.000000Z';
-    const projectId = 'u6YkHhlGc91oDMkr3x0isa';
+    const projectId = 'wqGTTFdYUGnmBxWCppmkOQ';
 
     const attrPut = await handleRequest(db, req(
         'PUT', '/organizations/' + STARK_ORGANIZATION
-            + '/record-types/' + 'rec01CustProfRec0rdAB1'
+            + '/record-types/' + 'sJxkGGTrPegHqFbQAkXnjw'
             + '/attributes/' + attrId, token, {
             name: 'P15 SoftDel',
             attribute_type: 'text',
@@ -1124,7 +1166,7 @@ test('residual pin: soft-deleted node drops from'
     assert.equal(attrPut.status, 201);
 
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token, {
             id: flowId,
             flow: {
                 name: 'P15 SoftDel Flow',
@@ -1133,14 +1175,14 @@ test('residual pin: soft-deleted node drops from'
                 is_auto_fit: false,
                 lock_timeout: 8 * 60 * 60,
             },
-            projectFlowId: flowId + '-pf',
+            projectFlowId: generateIdentifier(),
             projectFlow: {
                 project_id: projectId,
                 flow_id: flowId,
                 at: at1,
             },
             initialState: 'active',
-            initialStateEventId: flowId + '-ev',
+            initialStateEventId: generateIdentifier(),
             initialStateAt: at1,
             graphDelta: {
                 nodes: [{
@@ -1154,7 +1196,7 @@ test('residual pin: soft-deleted node drops from'
                 deletions: [],
                 memberEvents: [],
                 attributeEvents: [{
-                    id: 'p15-softdel-fna',
+                    id: P15_SOFTDEL_FNA,
                     flow_node_id: nodeId,
                     attribute_id: attrId,
                     mode: 'editable',
@@ -1175,7 +1217,8 @@ test('residual pin: soft-deleted node drops from'
     );
 
     const headGet = await handleRequest(
-        db, req('GET', '/organizations/1/flows/' + flowId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + flowId, token),
     );
     assert.equal(headGet.status, 200);
     const headId = headGet.headers.get('Response-ID');
@@ -1184,7 +1227,7 @@ test('residual pin: soft-deleted node drops from'
     // Soft-delete the bound node only — residual 'added'
     // attributeEvent remains; no attributeEvents 'removed'.
     const putDelete = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/' + flowId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
         {
             name: 'P15 SoftDel Flow',
             is_locked: false,
@@ -1193,7 +1236,7 @@ test('residual pin: soft-deleted node drops from'
             lock_timeout: 8 * 60 * 60,
             state: 'active',
             state_at: at2,
-            state_event_id: flowId + '-ev-del',
+            state_event_id: FLOWID_EV_DEL,
             graph: {
                 nodes: [],
                 edges: [],
@@ -1202,7 +1245,7 @@ test('residual pin: soft-deleted node drops from'
                 nodes: [],
                 edges: [],
                 deletions: [{
-                    eventId: 'p15-softdel-del',
+                    eventId: P15_SOFTDEL_DEL,
                     entityId: nodeId,
                     at: at2,
                 }],
@@ -1214,7 +1257,8 @@ test('residual pin: soft-deleted node drops from'
         { 'if-match': (
             await handleRequest(
                 db,
-                req('GET', '/organizations/1/flows/' + flowId, token),
+                req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + flowId, token),
             )
         ).headers.get('ETag')! },
     ));
@@ -1229,7 +1273,7 @@ test('residual pin: soft-deleted node drops from'
     );
     // Residual 'added' still in the event ledger.
     const residual = afterDel.attributeEvents.find(
-        (r) => r.id === 'p15-softdel-fna',
+        (r) => r.id === P15_SOFTDEL_FNA,
     );
     assert.ok(residual);
     assert.equal(residual!.action, 'added');
@@ -1237,7 +1281,7 @@ test('residual pin: soft-deleted node drops from'
     // recordTypeId scopes the Task 7 instance leg (empty
     // until Task 14 writes instances).
     const pairPlane = await collectAttributeReferrers(
-        db, STARK_ORGANIZATION, [attrId], 'r1',
+        db, STARK_ORGANIZATION, [attrId], 'rOEPOcVMQdJiiiMuiiEhlg',
     );
     assert.deepEqual(
         pairPlane.get(attrId)!.flowIds, [],
@@ -1249,7 +1293,7 @@ test('residual pin: soft-deleted node drops from'
     const deleted = await handleRequest(db, req(
         'DELETE',
         '/organizations/' + STARK_ORGANIZATION
-            + '/record-types/' + 'rec01CustProfRec0rdAB1'
+            + '/record-types/' + 'sJxkGGTrPegHqFbQAkXnjw'
             + '/attributes/' + attrId,
         token,
     ));
@@ -1272,26 +1316,26 @@ async function transitionWithFieldValue(
     const token = await organizationToken();
     const graph = workOrderFlowGraph(8 * 60 * 60);
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token, {
             id: workOrderId,
             workOrder: {
                 display_id: 'fv-' + workOrderId,
                 flow_graph: graph,
                 position: 1,
             },
-            flowWorkOrderId: workOrderId + '-fwo',
+            flowWorkOrderId: WORKORDERID_FWO,
             flowWorkOrder: {
                 flow_id: EMPTY_FLOW_ID,
                 work_order_id: workOrderId,
                 at: nowUtc(),
             },
             stateEventIds: [
-                workOrderId + '-ev1',
-                workOrderId + '-ev2',
-                workOrderId + '-ev3',
+                WORKORDERID_EV1,
+                WORKORDERID_EV2,
+                WORKORDERID_EV3,
             ],
             stateEventAts: [nowUtc(), nowUtc(), nowUtc()],
-            states: ['n-start', 'n-finish', 'claimed'],
+            states: [N_START, N_FINISH, 'claimed'],
         },
     ));
     assert.equal(created.status, 201);
@@ -1300,7 +1344,7 @@ async function transitionWithFieldValue(
     const typePut = await handleRequest(db, req(
         'PUT',
         '/organizations/' + STARK_ORGANIZATION
-            + '/record-types/rec-p15-fv',
+            + '/record-types/rrAaARbMuzlMVlOpTxcsmA',
         token,
         {
             name: 'P15 FV Parent', description: '',
@@ -1312,7 +1356,7 @@ async function transitionWithFieldValue(
     const attrWrite = await handleRequest(db, req(
         'PUT',
         '/organizations/' + STARK_ORGANIZATION
-            + '/record-types/rec-p15-fv'
+            + '/record-types/rrAaARbMuzlMVlOpTxcsmA'
             + '/attributes/' + attributeId,
         token,
         {
@@ -1329,7 +1373,7 @@ async function transitionWithFieldValue(
     await appendLegacyTransition(
         db, STARK_ORGANIZATION, workOrderId, {
             transitionEventId,
-            targetState: 'n-finish',
+            targetState: N_FINISH,
             fieldValues: [{
                 id: fieldValueId,
                 fields: {
@@ -1353,17 +1397,17 @@ test('work-order history GET: 200/404 two-way for'
 + ' own / foreign-or-absent work orders', async () => {
     const db = await seededDb();
     const starkToken = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const twoToken = await organizationToken(
-        'current', ORGANIZATION_TWO,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
-    const workOrderId = 'wo-p15-fv-get';
-    const transitionEventId = workOrderId + '-te';
-    const fieldValueId = workOrderId + '-fv';
+    const workOrderId = generateIdentifier();
+    const transitionEventId = WORKORDERID_TE;
+    const fieldValueId = WORKORDERID_FV;
     await transitionWithFieldValue(
         db, workOrderId, transitionEventId,
-        fieldValueId, workOrderId + '-attr',
+        fieldValueId, WORKORDERID_ATTR,
     );
 
     // (own) Stark sees the folded row on history.
@@ -1371,7 +1415,8 @@ test('work-order history GET: 200/404 two-way for'
         db,
         req(
             'GET',
-            '/organizations/1/work-orders/' + workOrderId + '/history',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + workOrderId + '/history',
             starkToken,
         ),
     );
@@ -1411,7 +1456,8 @@ test('work-order history GET: 200/404 two-way for'
         db,
         req(
             'GET',
-            '/organizations/1/work-orders/ghost-p15-nowhere/history',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'ecupcwyehqSNYeaJpJtNFw/history',
             starkToken,
         ),
     );
@@ -1420,7 +1466,7 @@ test('work-order history GET: 200/404 two-way for'
         await orphan.json() as { error: string };
     assert.equal(
         orphanBody.error,
-        'Not found: work_orders/ghost-p15-nowhere',
+        'Not found: work_orders/ecupcwyehqSNYeaJpJtNFw',
     );
 });
 
@@ -1431,12 +1477,12 @@ test('workOrderHistoryFor visibility: own field_values,'
 + ' foreign rejects, absent rejects',
 async () => {
     const db = await seededDb();
-    const workOrderId = 'wo-p15-fv-derive';
-    const transitionEventId = workOrderId + '-te';
-    const fieldValueId = workOrderId + '-fv';
+    const workOrderId = generateIdentifier();
+    const transitionEventId = WORKORDERID_TE;
+    const fieldValueId = WORKORDERID_FV;
     await transitionWithFieldValue(
         db, workOrderId, transitionEventId,
-        fieldValueId, workOrderId + '-attr',
+        fieldValueId, WORKORDERID_ATTR,
     );
 
     // Own → history returns the transition fold.
@@ -1485,19 +1531,19 @@ async () => {
     // Absent work order → EntityNotFoundError.
     assert.equal(
         await pairPlaneVisibility(
-            db, STARK_ORGANIZATION, 'ghost-p15-vis',
+            db, STARK_ORGANIZATION, GHOST_P15_VIS,
         ),
         'orphan',
     );
     assert.equal(
         await stateEventVisibilityFor(
-            db, STARK_ORGANIZATION, 'ghost-p15-vis',
+            db, STARK_ORGANIZATION, GHOST_P15_VIS,
         ),
         'orphan',
     );
     await assert.rejects(
         () => workOrderHistoryFor(
-            db, STARK_ORGANIZATION, 'ghost-p15-vis',
+            db, STARK_ORGANIZATION, GHOST_P15_VIS,
         ),
         EntityNotFoundError,
     );
@@ -1560,10 +1606,11 @@ async () => {
     // Phase Final Task 2: WO graphs from the pair plane.
     const attrFromWorkOrders = new Set<string>();
     const woToken = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const woListRes = await handleRequest(
-        db, req('GET', '/organizations/1/work-orders/', woToken),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            , woToken),
     );
     assert.equal(woListRes.status, 200);
     const workOrders = await woListRes.json() as {
@@ -1594,7 +1641,8 @@ async () => {
         db, STARK_ORGANIZATION, attributeIds, 'seed-type',
     );
     const inTx = await db.transaction(
-        // Stage B: roster + organizations/1/objectives/records retired.
+        // Stage B: roster +
+        // organizations/AjdvjuECVZEgZoFajaIEkg/objectives/records retired.
         MESSAGE_TABLES,
         (view) => collectAttributeReferrers(
             view,
@@ -1619,16 +1667,16 @@ test('collectAttributeReferrers graph legs: live-minted'
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const flowId = 'p15-restrict-flow';
-    const nodeId = 'p15-restrict-node';
-    const attrId = 'p15-restrict-attr';
-    const woId = 'p15-restrict-wo';
+    const flowId = generateIdentifier();
+    const nodeId = generateIdentifier();
+    const attrId = generateIdentifier();
+    const woId = generateIdentifier();
     const at = '2026-06-16T00:00:00.000000Z';
-    const projectId = 'u6YkHhlGc91oDMkr3x0isa';
+    const projectId = 'wqGTTFdYUGnmBxWCppmkOQ';
 
     const attrPut = await handleRequest(db, req(
         'PUT', '/organizations/' + STARK_ORGANIZATION
-            + '/record-types/' + 'rec01CustProfRec0rdAB1'
+            + '/record-types/' + 'sJxkGGTrPegHqFbQAkXnjw'
             + '/attributes/' + attrId, token, {
             name: 'P15 Restrict',
             attribute_type: 'text',
@@ -1640,7 +1688,7 @@ async () => {
     assert.equal(attrPut.status, 201);
 
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token, {
             id: flowId,
             flow: {
                 name: 'P15 Restrict Flow',
@@ -1649,14 +1697,14 @@ async () => {
                 is_auto_fit: false,
                 lock_timeout: 8 * 60 * 60,
             },
-            projectFlowId: flowId + '-pf',
+            projectFlowId: generateIdentifier(),
             projectFlow: {
                 project_id: projectId,
                 flow_id: flowId,
                 at,
             },
             initialState: 'active',
-            initialStateEventId: flowId + '-ev',
+            initialStateEventId: generateIdentifier(),
             initialStateAt: at,
             graphDelta: {
                 nodes: [{
@@ -1670,7 +1718,7 @@ async () => {
                 deletions: [],
                 memberEvents: [],
                 attributeEvents: [{
-                    id: 'p15-restrict-fna',
+                    id: P15_RESTRICT_FNA,
                     flow_node_id: nodeId,
                     attribute_id: attrId,
                     mode: 'editable',
@@ -1687,7 +1735,7 @@ async () => {
         name: 'P15 Restrict WO',
         lockTimeout: 8 * 60 * 60,
         nodes: [{
-            id: 'n-wo', name: 'Step',
+            id: N_WO, name: 'Step',
             positionX: 0, positionY: 0,
             isCreate: true, isArchive: false,
             memberIds: [],
@@ -1701,26 +1749,26 @@ async () => {
         edges: [],
     };
     const woCreated = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token, {
             id: woId,
             workOrder: {
-                display_id: 'p15-restrict-wo',
+                display_id: P15_RESTRICT_WO,
                 flow_graph: woGraph,
                 position: 1,
             },
-            flowWorkOrderId: woId + '-fwo',
+            flowWorkOrderId: WOID_FWO,
             flowWorkOrder: {
                 flow_id: EMPTY_FLOW_ID,
                 work_order_id: woId,
                 at: nowUtc(),
             },
             stateEventIds: [
-                woId + '-ev1',
-                woId + '-ev2',
-                woId + '-ev3',
+                WOID_EV1,
+                WOID_EV2,
+                WOID_EV3,
             ],
             stateEventAts: [nowUtc(), nowUtc(), nowUtc()],
-            states: ['n-start', 'n-finish', 'claimed'],
+            states: [N_START, N_FINISH, 'claimed'],
         },
     ));
     assert.equal(woCreated.status, 201);
@@ -1728,7 +1776,7 @@ async () => {
     // recordTypeId scopes the Task 7 instance leg (empty
     // until Task 14 writes instances).
     const pairPlane = await collectAttributeReferrers(
-        db, STARK_ORGANIZATION, [attrId], 'r1',
+        db, STARK_ORGANIZATION, [attrId], 'rOEPOcVMQdJiiiMuiiEhlg',
     );
     // Pre-tx vs in-tx parity (pair plane only).
     const inTx = await db.transaction(
@@ -1738,7 +1786,7 @@ async () => {
             view,
             STARK_ORGANIZATION,
             [attrId],
-            'r1',
+            'rOEPOcVMQdJiiiMuiiEhlg',
         ),
     );
     assertReferrerParity(

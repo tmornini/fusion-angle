@@ -24,8 +24,24 @@ import {
 import {
     postFlowFromBackup,
     postFlowFromMermaid,
+    getFlowZip,
     type Backup,
 } from '../web-app/app/adapters/flow-export.ts';
+import {
+    postFlowCreation,
+    putFlow,
+} from '../web-app/app/adapters/flow-mutations.ts';
+import {
+    mermaidIdOf,
+} from '../web-app/app/mermaid-generate.ts';
+import {
+    DEFAULT_ZIP_LIMITS,
+    getZipEntries,
+} from '../web-app/app/zip.ts';
+import {
+    encodeIdentifier,
+    generateIdentifier,
+} from '../shared/identifier.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
@@ -44,9 +60,9 @@ async function setup(): Promise<{
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(
-        db, 'current', 'Demo User',
+        db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User',
     );
-    await seedHumanMember(db, 'm1', 'Member One');
+    await seedHumanMember(db, 'mFNSxZqywTSMXhgUTdTqtA', 'Member One');
     const ctx = createRequestContext(
         db, await organizationToken(),
     );
@@ -54,56 +70,64 @@ async function setup(): Promise<{
 }
 
 function buildBackupWithMembersAndAttrs(
-): Backup {
+): { backup: Backup; attributeId: string } {
+    const n1 = generateIdentifier();
+    const n2 = generateIdentifier();
+    const attributeId = generateIdentifier();
     return {
-        exportedAt: '2026-01-01T00:00:00.000000Z',
-        projectId: 'project-1',
-        flow: {
-            id: 'backup-flow-1',
-            name: 'Backup Flow',
-            isLocked: false,
-            isAutoLayout: false,
-            isAutoFit: false,
-            lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            graph: {
-                nodes: [
-                    {
-                        id: 'orig-n1',
-                        name: 'Start',
-                        positionX: 0,
-                        positionY: 0,
-                        isCreate: true,
-                        isArchive: false,
-                        memberIds: ['m1'],
-                        attributes: [
-                            {
-                                attributeId: 'attr-x',
-                                mode: 'readonly',
-                                isRequired: true,
-                            },
-                        ],
-                        taskInstructions: '',
-                    },
-                    {
-                        id: 'orig-n2',
-                        name: 'Done',
-                        positionX: 200,
-                        positionY: 0,
-                        isCreate: false,
-                        isArchive: true,
-                        memberIds: [],
-                        attributes: [],
-                        taskInstructions: '',
-                    },
-                ],
-                edges: [
-                    {
-                        id: 'orig-e1',
-                        name: 'Approve',
-                        fromNodeId: 'orig-n1',
-                        toNodeId: 'orig-n2',
-                    },
-                ],
+        attributeId,
+        backup: {
+            exportedAt: '2026-01-01T00:00:00.000000Z',
+            projectId: generateIdentifier(),
+            flow: {
+                id: generateIdentifier(),
+                name: 'Backup Flow',
+                isLocked: false,
+                isAutoLayout: false,
+                isAutoFit: false,
+                lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                graph: {
+                    nodes: [
+                        {
+                            id: n1,
+                            name: 'Start',
+                            positionX: 0,
+                            positionY: 0,
+                            isCreate: true,
+                            isArchive: false,
+                            memberIds: [
+                                'mFNSxZqywTSMXhgUTdTqtA',
+                            ],
+                            attributes: [
+                                {
+                                    attributeId,
+                                    mode: 'readonly',
+                                    isRequired: true,
+                                },
+                            ],
+                            taskInstructions: '',
+                        },
+                        {
+                            id: n2,
+                            name: 'Done',
+                            positionX: 200,
+                            positionY: 0,
+                            isCreate: false,
+                            isArchive: true,
+                            memberIds: [],
+                            attributes: [],
+                            taskInstructions: '',
+                        },
+                    ],
+                    edges: [
+                        {
+                            id: generateIdentifier(),
+                            name: 'Approve',
+                            fromNodeId: n1,
+                            toNodeId: n2,
+                        },
+                    ],
+                },
             },
         },
     };
@@ -116,7 +140,7 @@ async function readPairGraph(
     flowId: string,
 ): Promise<StoredGraph> {
     const flow = await ctx.GET<FlowWithGraph>(
-        'organizations/1/flows/' + flowId,
+        'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
     );
     return asStoredGraph(
         flow.graph, 'flow.graph',
@@ -128,14 +152,16 @@ test(
     + ' node members AND attributes',
     async () => {
         const { ctx } = await setup();
-        const newFlowId = 'imported-flow-1';
-        const backup = buildBackupWithMembersAndAttrs();
+        const newFlowId = generateIdentifier();
+        const projectId = generateIdentifier();
+        const { backup, attributeId } =
+            buildBackupWithMembersAndAttrs();
 
         await postFlowFromBackup(
             ctx,
             newFlowId,
             backup,
-            'project-1',
+            projectId,
         );
 
         const graph = await readPairGraph(
@@ -160,7 +186,7 @@ test(
         // Members preserved
         assert.deepEqual(
             startNode.memberIds,
-            ['m1'],
+            ['mFNSxZqywTSMXhgUTdTqtA'],
             'memberIds must be preserved',
         );
 
@@ -171,7 +197,7 @@ test(
         );
         const attr = startNode.attributes[0]!;
         assert.equal(
-            attr.attributeId, 'attr-x',
+            attr.attributeId, attributeId,
         );
         assert.equal(
             attr.mode, 'readonly',
@@ -191,7 +217,7 @@ test(
     + ' a pair-plane graph from simple .mmd',
     async () => {
         const { ctx } = await setup();
-        const flowId = 'mermaid-import-1';
+        const flowId = generateIdentifier();
         const mmd = [
             'stateDiagram-v2',
             '[*] --> Draft',
@@ -199,7 +225,7 @@ test(
         ].join('\n');
 
         const result = await postFlowFromMermaid(
-            ctx, flowId, mmd, 'project-1',
+            ctx, flowId, mmd, generateIdentifier(),
         );
         assert.equal(result.flowId, flowId);
 
@@ -222,5 +248,110 @@ test(
             graph.edges.length >= 1,
             'at least one edge after auto-wire',
         );
+    },
+);
+
+test(
+    'zip sidecar mermaid ids stay injective',
+    async () => {
+        const { ctx } = await setup();
+        const dashBytes = new Uint8Array(16);
+        dashBytes[0] = 62 << 2;
+        const underBytes = new Uint8Array(16);
+        underBytes[0] = 63 << 2;
+        const dashId = encodeIdentifier(
+            dashBytes,
+        );
+        const underId = encodeIdentifier(
+            underBytes,
+        );
+        const flowId = generateIdentifier();
+        await postFlowCreation(ctx, {
+            flowId,
+            linkId: generateIdentifier(),
+            projectId: generateIdentifier(),
+            name: 'Injective',
+        });
+        await putFlow(ctx, flowId, {
+            name: 'Injective',
+            isLocked: false,
+            isAutoLayout: false,
+            isAutoFit: false,
+            lockTimeout: DEFAULT_LOCK_TIMEOUT,
+            nodes: [
+                {
+                    id: dashId,
+                    name: 'Dash',
+                    positionX: 0,
+                    positionY: 0,
+                    isCreate: true,
+                    isArchive: false,
+                    memberIds: [],
+                    attributes: [],
+                    taskInstructions: '',
+                },
+                {
+                    id: underId,
+                    name: 'Under',
+                    positionX: 200,
+                    positionY: 0,
+                    isCreate: false,
+                    isArchive: true,
+                    memberIds: [],
+                    attributes: [],
+                    taskInstructions: '',
+                },
+            ],
+            edges: [
+                {
+                    id: generateIdentifier(),
+                    name: '',
+                    fromNodeId: dashId,
+                    toNodeId: underId,
+                },
+            ],
+        });
+        const zip = await getFlowZip(
+            ctx, flowId,
+        );
+        const entries = await getZipEntries(
+            zip.data, DEFAULT_ZIP_LIMITS,
+        );
+        const sidecar = entries.find(
+            e => e.name === 'sidecar.json',
+        );
+        assert.ok(sidecar, 'sidecar.json');
+        const parsed = JSON.parse(
+            new TextDecoder().decode(
+                sidecar.data,
+            ),
+        ) as {
+            nodes: { mermaidId: string }[];
+            edges: {
+                mermaidFrom: string;
+                mermaidTo: string;
+            }[];
+        };
+        const dashHex = mermaidIdOf(dashId);
+        const underHex = mermaidIdOf(underId);
+        assert.notEqual(dashHex, underHex);
+        const ids = parsed.nodes.map(
+            n => n.mermaidId,
+        );
+        assert.equal(
+            new Set(ids).size, ids.length,
+        );
+        assert.ok(ids.includes(dashHex));
+        assert.ok(ids.includes(underHex));
+        assert.ok(!ids.includes(dashId));
+        assert.ok(!ids.includes(underId));
+        assert.ok(
+            !ids.includes(
+                dashId.replaceAll('-', '_'),
+            ),
+        );
+        const edge = parsed.edges[0];
+        assert.equal(edge?.mermaidFrom, dashHex);
+        assert.equal(edge?.mermaidTo, underHex);
     },
 );

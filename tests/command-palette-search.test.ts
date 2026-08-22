@@ -205,13 +205,13 @@ test(
     'ideaToSearchItem builds correct shape',
     () => {
         const tuple = {
-            idea: buildIdea('i1', 'My Idea'),
+            idea: buildIdea('fndCYAsXazdzMUlEGMNIZw', 'My Idea'),
             entity: undefined as unknown as never,
             submitterName: 'Alice',
             submittedAt: '2026-01-01',
         };
         const out = ideaToSearchItem(tuple);
-        assert.equal(out.id, 'idea-i1');
+        assert.equal(out.id, 'idea-fndCYAsXazdzMUlEGMNIZw');
         assert.equal(out.title, 'My Idea');
         assert.equal(out.category, 'ideas');
         assert.ok(
@@ -225,7 +225,7 @@ test(
     () => {
         const tuple = {
             idea: buildIdea(
-                'i2', 'Other',
+                'fxysGbBPBsnCwJNJsyZnkA', 'Other',
                 'approved',
             ),
             entity: undefined as unknown as never,
@@ -244,9 +244,9 @@ test(
     'projectToSearchItem builds correct shape',
     () => {
         const out = projectToSearchItem(
-            buildProject('p1', 'My Project'),
+            buildProject('pnXmXrxOWayANgDLdCjuBw', 'My Project'),
         );
-        assert.equal(out.id, 'project-p1');
+        assert.equal(out.id, 'project-pnXmXrxOWayANgDLdCjuBw');
         assert.equal(out.title, 'My Project');
         assert.equal(out.category, 'projects');
         assert.ok(

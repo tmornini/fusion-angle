@@ -61,13 +61,13 @@ async () => {
     assert.equal(res.status, 401);
 });
 
-test('facade GET /organizations/1/records → 404',
+test('facade GET /organizations/AjdvjuECVZEgZoFajaIEkg/records → 404',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db,
-        req('GET', '/organizations/1/records', token),
+        req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/records', token),
     );
     assert.equal(res.status, 404);
 });
@@ -75,12 +75,14 @@ async () => {
 test('member PUT nested attributes → 403',
 async () => {
     const db = await freshDb();
-    // Any sub other than 'current' mints member roles
+    // Any sub other than 'XXZruirZyAOoRpNxaDnpSA' mints member roles
     // (fixtureRoles in token-fixtures.ts).
-    const token = await organizationToken('member1', '1');
+    const token = await organizationToken('nkgaOHZISTQrILTfPThWCA'
+        , 'AjdvjuECVZEgZoFajaIEkg');
     const res = await handleRequest(db, req(
         'PUT',
-        '/organizations/1/record-types/rt-1/attributes/a-1',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'sjWcXwYGlgxxJOHxzMoUow/attributes/UQBiHFcwJeCDSnmkPBoYRA',
         token,
         {
             name: 'Email',

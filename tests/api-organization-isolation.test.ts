@@ -43,6 +43,8 @@ import { deriveOrganization } from
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const BASE = 'http://localhost';
 
@@ -62,67 +64,81 @@ function req(
 }
 
 // `current` holds admin in org A (the administered org) and
-// in org '1' (seedRootAdmin), and is a member of both. Ideas
+// in org 'AjdvjuECVZEgZoFajaIEkg' (seedRootAdmin), and is a member of both.
+// Ideas
 // exist in both A and B. Roles are per-org since Phase 3, so
 // the org-A grant authorizes the facade tests; seedRootAdmin's
-// org '1' grant + membership keep the flat-token enumerate
+// org 'AjdvjuECVZEgZoFajaIEkg' grant + membership keep the flat-token
+// enumerate
 // test authorized.
-async function twoOrganizations(): Promise<MemoryDbAdapter> {
+async function twoOrganizations(): Promise<{
+    db: MemoryDbAdapter;
+    organizationA: string;
+    organizationB: string;
+}> {
     const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    const organizationB = generateIdentifier();
     await seedAdminSchema(db);
     // A real organizations/:id document (Phase 13 Task 3's fixture
     // prerequisite): deriveMembershipsForIdentity enumerates via
     // deriveOrganizations before probing an org's own membership
     // prefix, so an org referenced only by a membership/role-grant
     // pair stays derivation-invisible without its own document.
-    await seedOrganizationDocument(db, 'A', 'Acme');
-    await seedMembershipPair(db, 'm-a', 'A', 'current');
-    // Seeded through the live document PUT so a1's message
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    await seedMembershipPair(
+        db, generateIdentifier(), organizationA, 'XXZruirZyAOoRpNxaDnpSA',
+    );
+    // Seeded through the live document PUT so UQTJZvCoKlFjEoDlDUwekw's
+    // message
     // pair exists — GET ideas / GET organizations/:id/ideas/:id derive from
     // the
     // ledger. No foreign b1 seed: ideas table is retired
     // (Phase Final Stage B); A-only visibility is proven by
-    // a1 alone (current is never a member of B).
+    // UQTJZvCoKlFjEoDlDUwekw alone (current is never a member of B).
     const { organization_id: _organizationId, ...a1Fields } =
-        ideaBody('A', 'mine');
+        ideaBody(organizationA, 'mine');
     await handleRequest(db, req(
-        'PUT', '/organizations/A/ideas/a1',
-        await organizationToken('current', 'A'),
+        'PUT', '/organizations/' + organizationA
+            + '/ideas/UQTJZvCoKlFjEoDlDUwekw',
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA),
         {
             ...a1Fields,
             state: 'active',
         },
     ));
-    return db;
+    return { db, organizationA, organizationB };
 }
 
 test('a facade GET returns only the bound org rows',
 async () => {
-    const db = await twoOrganizations();
+    const { db, organizationA } = await twoOrganizations();
     const res = await handleRequest(db, req(
-        'GET', '/organizations/A/ideas/',
-        await organizationToken('current', 'A')));
+        'GET', '/organizations/' + organizationA + '/ideas/',
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA)));
     assert.equal(res.status, 200);
     const rows = await res.json() as { id: string }[];
-    assert.deepEqual(rows.map(r => r.id), ['a1']);
+    assert.deepEqual(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
 });
 
 test('a facade into a non-member org is 403', async () => {
-    const db = await twoOrganizations();
+    const { db, organizationA, organizationB } = await twoOrganizations();
     const res = await handleRequest(db, req(
-        'GET', '/organizations/B/ideas/',
-        await organizationToken('current', 'A')));
+        'GET', '/organizations/' + organizationB + '/ideas/',
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA)));
     assert.equal(res.status, 403);
 });
 
 test('a facade PUT stamps the bound org over a forged body',
 async () => {
-    const db = await twoOrganizations();
+    const { db, organizationA, organizationB } = await twoOrganizations();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/A/ideas/a2',
-        await organizationToken('current', 'A'),
+        'PUT', '/organizations/' + organizationA
+            + '/ideas/UZgNCkZlSJcSaAmAJuSkcw',
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA),
         {
-            id: 'a2', ...ideaBody('B', 'forged'),
+            id: 'UZgNCkZlSJcSaAmAJuSkcw',
+            ...ideaBody(organizationB, 'forged'),
             state: 'active',
         }));
     assert.equal(res.status, 201);
@@ -132,29 +148,31 @@ async () => {
     const wire = await res.json() as {
         organization_id: string;
     };
-    assert.equal(wire.organization_id, 'A');
+    assert.equal(wire.organization_id, organizationA);
     const getRes = await handleRequest(db, req(
-        'GET', '/organizations/A/ideas/a2',
-        await organizationToken('current', 'A'),
+        'GET', '/organizations/' + organizationA
+            + '/ideas/UZgNCkZlSJcSaAmAJuSkcw',
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA),
     ));
     assert.equal(getRes.status, 200);
     const got = await getRes.json() as {
         organization_id: string;
     };
-    assert.equal(got.organization_id, 'A');
+    assert.equal(got.organization_id, organizationA);
 });
 
 test('enumerate returns only the caller member orgs',
 async () => {
-    const db = await twoOrganizations();
+    const { db, organizationA } = await twoOrganizations();
     // Seeded through the live document PUT (not a raw
-    // db.organizations.put) so 'A' has a message pair — the
+    // db.organizations.put) so organizationA has a message pair — the
     // GET /identities/:id/organizations/ derives from
-    // the ledger, not the old organizations table. 'B' stays a
+    // the ledger, not the old organizations table. organizationB stays a
     // raw row: `current` is never a member of B, so the
     // membership filter excludes it whether or not it derives.
     await handleRequest(db, req(
-        'PUT', '/organizations/A', await devToken('current'),
+        'PUT', '/organizations/' + organizationA,
+        await devToken('XXZruirZyAOoRpNxaDnpSA'),
         organizationRow('Acme'),
     ));
     // Phase Final Stage B: organizations table retired
@@ -162,25 +180,29 @@ async () => {
     // exclusion of non-members.
     // Enumerate is the path identity's live seats.
     const token = await claimToken({
-        organizations: ['1', 'A'],
-        roles: ['admin:1', 'admin:A'],
+        organizations: ['AjdvjuECVZEgZoFajaIEkg', organizationA],
+        roles: ['admin:AjdvjuECVZEgZoFajaIEkg', 'admin:' + organizationA],
     });
     const res = await handleRequest(db, req(
-        'GET', '/identities/current/organizations/',
+        'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
         token));
     assert.equal(res.status, 200);
     const rows = await res.json() as { id: string }[];
-    // 'current' is ALSO a member of seedRootAdmin's own org '1'
+    // 'XXZruirZyAOoRpNxaDnpSA' is ALSO a member of seedRootAdmin's own org
+    // 'AjdvjuECVZEgZoFajaIEkg'
     // (Phase 13 Task 3's fixture prerequisite gave it a real,
     // derivable organizations/:id document) — fixture-faithful,
     // not a narrowing of what this case proves.
-    assert.deepEqual(rows.map(r => r.id), ['1', 'A']);
+    assert.deepEqual(
+        rows.map(r => r.id).sort(),
+        ['AjdvjuECVZEgZoFajaIEkg', organizationA].sort(),
+    );
 });
 
 test('the facade requires a bearer token', async () => {
-    const db = await twoOrganizations();
+    const { db, organizationA } = await twoOrganizations();
     const res = await handleRequest(db, new Request(
-        `${BASE}/organizations/A/ideas`));
+        `${BASE}/organizations/` + organizationA + '/ideas'));
     assert.equal(res.status, 401);
 });
 
@@ -190,8 +212,12 @@ test('the facade requires a bearer token', async () => {
 // admin surfaces (members, memberships, orgs write) stay
 // admin-gated. Content surfaces (ideas) are member-permitted.
 
-async function contentMemberDb(): Promise<MemoryDbAdapter> {
+async function contentMemberDb(): Promise<{
+    db: MemoryDbAdapter;
+    organizationA: string;
+}> {
     const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
     // seedAdminSchema (not bare postSchemaCreation) so `current`
     // can create org A through the live document PUT below —
     // GET /identities/:id/organizations/ derives
@@ -200,46 +226,50 @@ async function contentMemberDb(): Promise<MemoryDbAdapter> {
     // here; it exists only to author the org A document.
     await seedAdminSchema(db);
     await handleRequest(db, req(
-        'PUT', '/organizations/A', await devToken('current'),
+        'PUT', '/organizations/' + organizationA,
+        await devToken('XXZruirZyAOoRpNxaDnpSA'),
         organizationRow('Acme'),
     ));
-    // B stays a raw row: sarah is never a member of B, so the
+    // B stays a raw row: toccYYkLEABmlbpHJalgtQ is never a member of B, so
+    // the
     // membership filter excludes it whether or not it derives.
     // Phase Final Stage B: organizations table retired
     // — B need not derive for membership-filter
     // exclusion of non-members.
-    await seedMembershipPair(db, 'm-sarah-a', 'A', 'sarah');
-    return db;
+    await seedMembershipPair(
+        db, generateIdentifier(), organizationA, 'toccYYkLEABmlbpHJalgtQ',
+    );
+    return { db, organizationA };
 }
 
 test('a content-tier member enumerates only their member orgs',
 async () => {
-    const db = await contentMemberDb();
+    const { db, organizationA } = await contentMemberDb();
     const res = await handleRequest(db, req(
-        'GET', '/identities/sarah/organizations/',
-        await organizationToken('sarah', 'A')));
+        'GET', '/identities/toccYYkLEABmlbpHJalgtQ/organizations/',
+        await organizationToken('toccYYkLEABmlbpHJalgtQ', organizationA)));
     assert.equal(res.status, 200);
     const rows = await res.json() as { id: string }[];
-    assert.deepEqual(rows.map(r => r.id), ['A']);
+    assert.deepEqual(rows.map(r => r.id), [organizationA]);
 });
 
 test('a content-tier member is still denied admin reads',
 async () => {
-    const db = await contentMemberDb();
+    const { db, organizationA } = await contentMemberDb();
     // GET /members is member-tier (roster display); memberships
     // is the admin-only surface.
     const res = await handleRequest(db, req(
         'GET', '/memberships',
-        await organizationToken('sarah', 'A')));
+        await organizationToken('toccYYkLEABmlbpHJalgtQ', organizationA)));
     assert.equal(res.status, 404);
 });
 
 test('a content-tier member is still denied admin writes',
 async () => {
-    const db = await contentMemberDb();
+    const { db, organizationA } = await contentMemberDb();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/A',
-        await organizationToken('sarah', 'A'),
+        'PUT', '/organizations/' + organizationA,
+        await organizationToken('toccYYkLEABmlbpHJalgtQ', organizationA),
         organizationRow('Hijack')));
     assert.equal(res.status, 403);
 });
@@ -276,15 +306,56 @@ function workOrderBody(organization: string) {
     };
 }
 
-// Seed a full parent→leaf chain in `org`, ids suffixed `s`.
+interface ChainIds {
+    idea: string;
+    project: string;
+    flow: string;
+    objective: string;
+    record: string;
+    workOrder: string;
+    projectFlow: string;
+    flowWorkOrder: string;
+    flowRecord: string;
+    ideaSubmission: string;
+    objectiveRevision: string;
+    baselineScore: string;
+    actualScore: string;
+    transitionEvent: string;
+    fieldValue: string;
+    attribute: string;
+}
+
+function mintChainIds(): ChainIds {
+    return {
+        idea: generateIdentifier(),
+        project: generateIdentifier(),
+        flow: generateIdentifier(),
+        objective: generateIdentifier(),
+        record: generateIdentifier(),
+        workOrder: generateIdentifier(),
+        projectFlow: generateIdentifier(),
+        flowWorkOrder: generateIdentifier(),
+        flowRecord: generateIdentifier(),
+        ideaSubmission: generateIdentifier(),
+        objectiveRevision: generateIdentifier(),
+        baselineScore: generateIdentifier(),
+        actualScore: generateIdentifier(),
+        transitionEvent: generateIdentifier(),
+        fieldValue: generateIdentifier(),
+        attribute: generateIdentifier(),
+    };
+}
+
+// Seed a full parent→leaf chain in `organization`.
 // `identity` authors the ONE seed write that now rides the wire
 // (the project-flow join, below) — it must hold a role in
-// `organization` (deepDb grants 'current' admin in A and 'pb'
+// `organization` (deepDb grants 'XXZruirZyAOoRpNxaDnpSA' admin in A and pb
 // admin in B, solely for this).
 async function seedChain(
-    db: MemoryDbAdapter, organization: string, s: string,
+    db: MemoryDbAdapter, organization: string,
     identity: string,
-): Promise<void> {
+): Promise<ChainIds> {
+    const ids = mintChainIds();
     // Seeded through the wire (NAMED re-pin: the READ-side
     // pair-plane fence, api/derive-states.ts's
     // resolveOwningOrganization, resolves an org-nested entity's
@@ -293,11 +364,12 @@ async function seedChain(
     // state event would resolve as a visible ORPHAN, not a
     // fenced-hidden foreign row, once the bulk lifecycle
     // collection is flipped), mirroring twoOrganizations()'s
-    // own a1 precedent above.
+    // own UQTJZvCoKlFjEoDlDUwekw precedent above.
     const { organization_id: _organizationId, ...ideaFields } =
         ideaBody(organization, 'idea');
     await handleRequest(db, req(
-        'PUT', '/organizations/' + organization + '/ideas/i' + s,
+        'PUT', '/organizations/' + organization
+            + '/ideas/' + ids.idea,
         await organizationToken(identity, organization),
         {
             ...ideaFields,
@@ -312,7 +384,8 @@ async function seedChain(
     } = projectBody(organization);
     await handleRequest(db, req(
         'PUT',
-        '/organizations/' + organization + '/projects/p' + s,
+        '/organizations/' + organization
+            + '/projects/' + ids.project,
         await organizationToken(identity, organization),
         {
             ...projectFields,
@@ -327,13 +400,14 @@ async function seedChain(
     } = flowBody(organization);
     const flowWrite = await handleRequest(db, req(
         'PUT',
-        '/organizations/' + organization + '/flows/f' + s,
+        '/organizations/' + organization
+            + '/flows/' + ids.flow,
         await organizationToken(identity, organization),
         {
             ...flowFields,
             state: 'active',
             state_at: T8_AT,
-            state_event_id: 'f' + s + '-genesis',
+            state_event_id: generateIdentifier(),
             graph: { nodes: [], edges: [] },
             revivals: [],
             graphDelta: {
@@ -353,7 +427,7 @@ async function seedChain(
     await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
-            + '/objectives/o' + s,
+            + '/objectives/' + ids.objective,
         await organizationToken(identity, organization),
         {
             position: 0,
@@ -363,7 +437,7 @@ async function seedChain(
     // Phase Final Stage B: records table retired — seed
     // through nested record-types PUT (admin-only schema
     // mutation; claimToken when identity is not `current`).
-    const recToken = identity === 'current'
+    const recToken = identity === 'XXZruirZyAOoRpNxaDnpSA'
         ? await organizationToken(identity, organization)
         : await claimToken({
             sub: identity,
@@ -374,7 +448,7 @@ async function seedChain(
     const recWrite = await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
-            + '/record-types/r' + s,
+            + '/record-types/' + ids.record,
         recToken,
         {
             name: 'r', description: 'd', position: 0,
@@ -391,7 +465,7 @@ async function seedChain(
     const woWrite = await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
-            + '/work-orders/wo' + s,
+            + '/work-orders/' + ids.workOrder,
         await organizationToken(identity, organization),
         woFields,
     ));
@@ -411,9 +485,13 @@ async function seedChain(
     await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
-            + '/projects/p' + s + '/flows/pf' + s,
+            + '/projects/' + ids.project
+            + '/flows/' + ids.projectFlow,
         await organizationToken(identity, organization),
-        { project_id: 'p' + s, flow_id: 'f' + s, at: T8_AT },
+        {
+            project_id: ids.project, flow_id: ids.flow,
+            at: T8_AT,
+        },
     ));
     // NAMED re-pin (Task 7): the flipped GET organizations/:id/flows/:id/
     // work-orders derives from the message ledger too, the SAME
@@ -422,9 +500,13 @@ async function seedChain(
     await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
-            + '/flows/f' + s + '/work-orders/fwo' + s,
+            + '/flows/' + ids.flow
+            + '/work-orders/' + ids.flowWorkOrder,
         await organizationToken(identity, organization),
-        { flow_id: 'f' + s, work_order_id: 'wo' + s, at: T8_AT },
+        {
+            flow_id: ids.flow, work_order_id: ids.workOrder,
+            at: T8_AT,
+        },
     ));
     // NAMED re-pin (Task 7): the flipped GET
     // organizations/:id/flows/:id/records
@@ -434,9 +516,13 @@ async function seedChain(
     await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
-            + '/flows/f' + s + '/records/fr' + s,
+            + '/flows/' + ids.flow
+            + '/records/' + ids.flowRecord,
         await organizationToken(identity, organization),
-        { flow_id: 'f' + s, record_id: 'r' + s, at: T8_AT },
+        {
+            flow_id: ids.flow, record_id: ids.record,
+            at: T8_AT,
+        },
     ));
     // Phase Final Stage B: idea_submissions table retired —
     // seed through the live nested PUT so the pair plane owns
@@ -444,10 +530,12 @@ async function seedChain(
     await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
-            + '/ideas/i' + s + '/submissions/is' + s,
+            + '/ideas/' + ids.idea
+            + '/submissions/' + ids.ideaSubmission,
         await organizationToken(identity, organization),
         {
-            idea_id: 'i' + s, member_id: 'system', at: T8_AT,
+            idea_id: ids.idea, member_id: SYSTEM_MEMBER_ID,
+            at: T8_AT,
         },
     ));
     // NAMED re-pin (Task 7 + Phase Final Task 2): the flipped
@@ -459,33 +547,37 @@ async function seedChain(
     await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
-            + '/objectives/o' + s + '/revisions/orev' + s,
+            + '/objectives/' + ids.objective
+            + '/revisions/' + ids.objectiveRevision,
         await organizationToken(identity, organization),
         {
-            objective_id: 'o' + s, name: 'n',
-            description: 'd', member_id: 'system', at: T8_AT,
+            objective_id: ids.objective, name: 'n',
+            description: 'd', member_id: SYSTEM_MEMBER_ID,
+            at: T8_AT,
         },
     ));
     await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
-            + '/projects/p' + s
-            + '/objective-baseline-scores/bs' + s,
+            + '/projects/' + ids.project
+            + '/objective-baseline-scores/' + ids.baselineScore,
         await organizationToken(identity, organization),
         {
-            project_id: 'p' + s, objective_id: 'o' + s,
-            score: 1, member_id: 'system', at: T8_AT,
+            project_id: ids.project,
+            objective_id: ids.objective,
+            score: 1, member_id: SYSTEM_MEMBER_ID, at: T8_AT,
         },
     ));
     await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
-            + '/projects/p' + s
-            + '/objective-actual-scores/as' + s,
+            + '/projects/' + ids.project
+            + '/objective-actual-scores/' + ids.actualScore,
         await organizationToken(identity, organization),
         {
-            project_id: 'p' + s, objective_id: 'o' + s,
-            score: 2, member_id: 'system', at: T8_AT,
+            project_id: ids.project,
+            objective_id: ids.objective,
+            score: 2, member_id: SYSTEM_MEMBER_ID, at: T8_AT,
         },
     ));
     // Transition op with a fieldValues fold — the sole SFV
@@ -494,20 +586,20 @@ async function seedChain(
     // keeps the se* ids the fence tests name.
     // Task 8 CUT: legacy bag is below-gate (stored SFV truth).
     const body: Record<string, unknown> = {
-        transitionEventId: 'se' + s,
+        transitionEventId: ids.transitionEvent,
         targetState: 'n-start',
         fieldValues: [{
-            id: 'sfv' + s,
+            id: ids.fieldValue,
             fields: {
-                state_event_id: 'se' + s,
-                attribute_id: 'x',
+                state_event_id: ids.transitionEvent,
+                attribute_id: ids.attribute,
                 value: 'v',
             },
         }],
         release: null,
         transitionAt: T8_AT,
     };
-    const woId = 'wo' + s;
+    const woId = ids.workOrder;
     const pathSegments = [
         'organizations', organization,
         'work-orders', woId, 'transition',
@@ -532,6 +624,7 @@ async function seedChain(
         db, woId, body, identity,
         undefined, [], pair,
     );
+    return ids;
 }
 
 // Two full chains (A, B) plus the identity spine; `current` is
@@ -556,11 +649,9 @@ async function seedMembershipPair(
     membershipId: string,
     organization: string,
     identityId: string,
+    asAdmin = identityId === 'XXZruirZyAOoRpNxaDnpSA',
 ): Promise<void> {
-    const type =
-        identityId === 'current' || identityId === 'pb'
-            ? 'admin'
-            : 'member';
+    const type = asAdmin ? 'admin' : 'member';
     const { seedSeat } = await import(
         './root-admin-fixture.ts'
     );
@@ -569,8 +660,26 @@ async function seedMembershipPair(
     );
 }
 
-async function deepDb(): Promise<MemoryDbAdapter> {
+interface DeepDb {
+    db: MemoryDbAdapter;
+    organizationA: string;
+    organizationB: string;
+    pa: string;
+    pb: string;
+    paCred: string;
+    pbCred: string;
+    chainA: ChainIds;
+    chainB: ChainIds;
+}
+
+async function deepDb(): Promise<DeepDb> {
     const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    const organizationB = generateIdentifier();
+    const pa = generateIdentifier();
+    const pb = generateIdentifier();
+    const paCred = 'XWKijniEuoqRNhnRQdJHEA';
+    const pbCred = 'XWjyCmjaGkYOFYNSanBvhg';
     await db.postSchemaCreation();
     // A's and B's own organizations/:id documents, FIRST and
     // below-facade (Phase 13 Task 3's fixture prerequisite): both
@@ -581,14 +690,16 @@ async function deepDb(): Promise<MemoryDbAdapter> {
     // with a token ALREADY scoped to the org it is creating —
     // leaves both derivation-invisible; deriveMembershipsForIdentity
     // enumerates via deriveOrganizations before probing an org's
-    // own membership prefix, so 'current'/'pb's membership/role-
+    // own membership prefix, so 'XXZruirZyAOoRpNxaDnpSA'/pb's
+    // membership/role-
     // grant pairs below need A/B to already be derivable, not the
     // other way around.
-    await seedOrganizationDocument(db, 'A', 'Acme');
-    await seedOrganizationDocument(db, 'B', 'Beta');
-    await seedMembershipPair(db, 'mem-current-a', 'A', 'current');
-    for (const [id, organization] of [
-        ['pa', 'A'], ['pb', 'B'],
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    await seedOrganizationDocument(db, organizationB, 'Beta');
+    await seedMembershipPair(db, generateIdentifier(), organizationA
+        , 'XXZruirZyAOoRpNxaDnpSA');
+    for (const [id, organization, admin] of [
+        [pa, organizationA, false], [pb, organizationB, true],
     ] as const) {
         // Re-pointed onto the SAME exported ops the live
         // identities/:id, identities/:id/pii and identities/:id/
@@ -600,28 +711,34 @@ async function deepDb(): Promise<MemoryDbAdapter> {
             name: id, email: id + '@x.com',
             phone: '', bio: '',
         });
-        await seedIdentityCredential(db, id, 'cred-' + id, {
+        await seedIdentityCredential(
+            db, id,
+            id === pa ? paCred : pbCred,
+            {
             identity_id: id, kind: 'password',
             status: 'set', secret: 'HASH-' + id, at: T8_AT,
         });
-        await seedMembershipPair(db, 'mem-' + id, organization, id);
+        await seedMembershipPair(
+            db, generateIdentifier(), organization, id, admin,
+        );
     }
-    // Grants 'pb' admin in B TOO (on top of its plain
+    // Grants pb admin in B TOO (on top of its plain
     // membership above) — solely so seedChain's project-flow
     // join can land through the wire-reachable :pfid PUT (the
     // flipped GET organizations/:id/projects/:id/flows route reads only the
-    // message ledger). No case in this file exercises 'pb's OWN
+    // message ledger). No case in this file exercises pb's OWN
     // authorization, so this is inert everywhere but the seed.
     // Member document trios for pa/pb (states/:id retired).
     // seMem-* event ids keep the collection-fence assertions
     // stable. Members are global-plane; ownership rides the
     // membership pairs already seeded above.
     for (const [id, organization, author] of [
-        ['pa', 'A', 'current'], ['pb', 'B', 'pb'],
+        [pa, organizationA, 'XXZruirZyAOoRpNxaDnpSA'],
+        [pb, organizationB, pb],
     ] as const) {
         // author is admin of the target org — claim roles must
         // say so (organizationToken only admins `current`).
-        const authorToken = author === 'current'
+        const authorToken = author === 'XXZruirZyAOoRpNxaDnpSA'
             ? await organizationToken(author, organization)
             : await claimToken({
                 sub: author,
@@ -639,8 +756,10 @@ async function deepDb(): Promise<MemoryDbAdapter> {
             || memberWrite.status === 200,
         );
     }
-    await seedChain(db, 'A', 'A', 'current');
-    await seedChain(db, 'B', 'B', 'pb');
+    const chainA = await seedChain(
+        db, organizationA, 'XXZruirZyAOoRpNxaDnpSA',
+    );
+    const chainB = await seedChain(db, organizationB, pb);
     // isA's message pair, on top of the raw row seedChain already
     // wrote above: the flipped GET organizations/:id/ideas/:id/submissions
     // route
@@ -650,19 +769,25 @@ async function deepDb(): Promise<MemoryDbAdapter> {
     // only through org A's facade, which the fence hides either
     // way.
     await handleRequest(db, req(
-        'PUT', '/organizations/A/ideas/iA/submissions/isA',
-        await organizationToken('current', 'A'),
-        { idea_id: 'iA', member_id: 'system', at: T8_AT },
+        'PUT', '/organizations/' + organizationA + '/ideas/'
+            + chainA.idea + '/submissions/'
+            + chainA.ideaSubmission,
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA),
+        { idea_id: chainA.idea, member_id: SYSTEM_MEMBER_ID,
+            at: T8_AT },
     ));
-    return db;
+    return {
+        db, organizationA, organizationB, pa, pb,
+        paCred, pbCred, chainA, chainB,
+    };
 }
 
 async function facadeGet(
-    db: MemoryDbAdapter, path: string,
+    db: MemoryDbAdapter, organizationA: string, path: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'GET', '/organizations/A' + path,
-        await organizationToken('current', 'A')));
+        'GET', '/organizations/' + organizationA + path,
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA)));
 }
 
 // The two entity-subordinate resources nest under their parent
@@ -680,26 +805,44 @@ interface LeafCase {
     b: string;
 }
 
-const LEAF_CASES: LeafCase[] = [
-    { name: 'organizations/:id/ideas/:id/submissions/',
-        aPath: '/ideas/iA/submissions/',
-        bPath: '/ideas/iB/submissions/',
-        a: 'isA', b: 'isB' },
-    { name: 'organizations/:id/objectives/:id/revisions/',
-        aPath: '/objectives/oA/revisions/',
-        bPath: '/objectives/oB/revisions/',
-        a: 'orevA', b: 'orevB' },
-];
+function leafCases(fx: DeepDb): LeafCase[] {
+    return [
+        {
+            name: 'organizations/:id/ideas/:id/submissions/',
+            aPath: '/ideas/' + fx.chainA.idea
+                + '/submissions/',
+            bPath: '/ideas/' + fx.chainB.idea
+                + '/submissions/',
+            a: fx.chainA.ideaSubmission,
+            b: fx.chainB.ideaSubmission,
+        },
+        {
+            name: 'organizations/:id/objectives/:id/revisions/',
+            aPath: '/objectives/' + fx.chainA.objective
+                + '/revisions/',
+            bPath: '/objectives/' + fx.chainB.objective
+                + '/revisions/',
+            a: fx.chainA.objectiveRevision,
+            b: fx.chainB.objectiveRevision,
+        },
+    ];
+}
 
-for (const c of LEAF_CASES) {
-    test('nested ' + c.name + ' lists only the bound parent',
+const LEAF_CASE_NAMES = [
+    'organizations/:id/ideas/:id/submissions/',
+    'organizations/:id/objectives/:id/revisions/',
+] as const;
+
+for (const name of LEAF_CASE_NAMES) {
+    test('nested ' + name + ' lists only the bound parent',
     async () => {
-        const db = await deepDb();
+        const fx = await deepDb();
+        const c = leafCases(fx).find(x => x.name === name)!;
         // Pair-plane foreign presence.
-        const foreign = await handleRequest(db, req(
+        const foreign = await handleRequest(fx.db, req(
             'GET',
-            '/organizations/B' + c.bPath,
-            await organizationToken('pb', 'B'),
+            '/organizations/' + fx.organizationB + c.bPath,
+            await organizationToken(fx.pb, fx.organizationB),
         ));
         assert.equal(foreign.status, 200);
         const foreignRows = await foreign.json() as {
@@ -709,18 +852,19 @@ for (const c of LEAF_CASES) {
             foreignRows.some((r) => r.id === c.b),
             'foreign ' + c.b + ' missing on B plane',
         );
-        const res = await facadeGet(db, c.aPath);
+        const res = await facadeGet(fx.db, fx.organizationA, c.aPath);
         assert.equal(res.status, 200);
         const rows = await res.json() as { id: string }[];
         assert.deepEqual(rows.map(r => r.id), [c.a]);
     });
 
-    test('nested ' + c.name + ' hides a foreign-org parent',
+    test('nested ' + name + ' hides a foreign-org parent',
     async () => {
-        const db = await deepDb();
+        const fx = await deepDb();
+        const c = leafCases(fx).find(x => x.name === name)!;
         // The B-org parent's collection, read through the A
         // facade, is fenced empty — the row resolves to org B.
-        const res = await facadeGet(db, c.bPath);
+        const res = await facadeGet(fx.db, fx.organizationA, c.bPath);
         assert.equal(res.status, 200);
         const rows = await res.json() as { id: string }[];
         assert.deepEqual(rows.map(r => r.id), []);
@@ -729,65 +873,86 @@ for (const c of LEAF_CASES) {
 
 // The three flow-subordinate resources nest under
 // organizations/:id/flows/:id.
-// The collection is fetched at organizations/1/flows/fA/<seg> — the SERVER
+// The collection is fetched at
+// organizations/AjdvjuECVZEgZoFajaIEkg/flows/fA/<seg> — the SERVER
 // filters to the parent flow — and the leaf at
-// organizations/1/flows/fA/<seg>/<id>. The org fence still rides the facade
+// organizations/AjdvjuECVZEgZoFajaIEkg/flows/fA/<seg>/<id>. The org fence
+// still rides the facade
 // re-entry, so a foreign leaf 404s through its parent flow's org.
 // Phase Final Task 2: work-orders + flow_records foreign
 // presence is proven via B-org wire GET (row plane empty).
 interface NestedFlowCase {
     seg: string;
-    a: string;
-    b: string;
     hasGetById?: boolean;
 }
 
 // versions row RETIRED (Phase 15 Task 7) with the routes.
 const NESTED_FLOW_CASES: NestedFlowCase[] = [
-    { seg: 'records', hasGetById: true, a: 'frA', b: 'frB' },
-    { seg: 'work-orders', a: 'fwoA', b: 'fwoB' },
+    { seg: 'records', hasGetById: true },
+    { seg: 'work-orders' },
 ];
+
+function nestedFlowIds(fx: DeepDb, seg: string): {
+    a: string; b: string;
+} {
+    if (seg === 'records') {
+        return {
+            a: fx.chainA.flowRecord, b: fx.chainB.flowRecord,
+        };
+    }
+    return {
+        a: fx.chainA.flowWorkOrder,
+        b: fx.chainB.flowWorkOrder,
+    };
+}
 
 for (const c of NESTED_FLOW_CASES) {
     test('nested organizations/:id/flows/:id/' + c.seg
         + ' lists only the bound flow',
     async () => {
-        const db = await deepDb();
-        const foreign = await handleRequest(db, req(
+        const fx = await deepDb();
+        const ids = nestedFlowIds(fx, c.seg);
+        const foreign = await handleRequest(fx.db, req(
             'GET',
-            '/organizations/B/flows/fB/' + c.seg + '/',
-            await organizationToken('pb', 'B'),
+            '/organizations/' + fx.organizationB + '/flows/'
+                + fx.chainB.flow + '/' + c.seg + '/',
+            await organizationToken(fx.pb, fx.organizationB),
         ));
         assert.equal(foreign.status, 200);
         const foreignRows = await foreign.json() as {
             id: string;
         }[];
         assert.ok(
-            foreignRows.some((r) => r.id === c.b),
-            'foreign ' + c.b + ' missing on B plane',
+            foreignRows.some((r) => r.id === ids.b),
+            'foreign ' + ids.b + ' missing on B plane',
         );
         const res = await facadeGet(
-            db, '/flows/fA/' + c.seg + '/');
+            fx.db, fx.organizationA,
+            '/flows/' + fx.chainA.flow + '/' + c.seg + '/');
         assert.equal(res.status, 200);
         const rows = await res.json() as { id: string }[];
-        assert.deepEqual(rows.map(r => r.id), [c.a]);
+        assert.deepEqual(rows.map(r => r.id), [ids.a]);
     });
 
     if (c.hasGetById) {
         test('nested organizations/:id/flows/:id/' + c.seg +
             ' 404s a foreign id',
         async () => {
-            const db = await deepDb();
+            const fx = await deepDb();
+            const ids = nestedFlowIds(fx, c.seg);
             // Prove foreign join exists on B plane.
-            const foreign = await handleRequest(db, req(
+            const foreign = await handleRequest(fx.db, req(
                 'GET',
-                '/organizations/B/flows/fB/' + c.seg
-                + '/' + c.b,
-                await organizationToken('pb', 'B'),
+                '/organizations/' + fx.organizationB + '/flows/'
+                    + fx.chainB.flow + '/' + c.seg
+                    + '/' + ids.b,
+                await organizationToken(fx.pb, fx.organizationB),
             ));
             assert.equal(foreign.status, 200);
             const res = await facadeGet(
-                db, '/flows/fA/' + c.seg + '/' + c.b);
+                fx.db, fx.organizationA,
+                '/flows/' + fx.chainA.flow + '/' + c.seg
+                    + '/' + ids.b);
             assert.equal(res.status, 404);
         });
     }
@@ -800,79 +965,101 @@ for (const c of NESTED_FLOW_CASES) {
 // fB belongs to org B (seeded via seedChain(db, 'B', 'B', 'pb')
 // in deepDb()), so a tag written there through 'pb's org-B token
 // lands at the '/organizations/B/flows/fB/tags/' address; a read
-// of the SAME path with 'current's org-A-scoped token resolves
+// of the SAME path with 'XXZruirZyAOoRpNxaDnpSA's org-A-scoped token resolves
 // an entirely different '/organizations/A/...' prefix — the
 // same structural fence every org-nested address rides, with no
 // tag-specific code of its own.
 test('nested organizations/:id/flows/:id/tags 404s a foreign-org flow',
     async () => {
-    const db = await deepDb();
-    const tagged = await handleRequest(db, req(
-        'PUT', '/organizations/B/flows/fB/tags/v1',
-        await organizationToken('pb', 'B'),
-        { flow_response_id: 'r-b-1' },
+    const fx = await deepDb();
+    const tagged = await handleRequest(fx.db, req(
+        'PUT', '/organizations/' + fx.organizationB + '/flows/'
+            + fx.chainB.flow
+            + '/tags/xDyDkxEPwtcNmJVknUHDsg',
+        await organizationToken(fx.pb, fx.organizationB),
+        { flow_response_id: generateIdentifier() },
     ));
     assert.equal(tagged.status, 201);
 
-    const res = await handleRequest(db, req(
-        'GET', '/organizations/A/flows/fB/tags/v1',
-        await organizationToken('current', 'A'),
+    const res = await handleRequest(fx.db, req(
+        'GET', '/organizations/' + fx.organizationA + '/flows/'
+            + fx.chainB.flow
+            + '/tags/xDyDkxEPwtcNmJVknUHDsg',
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        ),
     ));
     assert.equal(res.status, 404);
     const body = await res.json() as { error: string };
     assert.equal(
         body.error,
-        'Not found: flow_tags/v1',
+        'Not found: flow_tags/xDyDkxEPwtcNmJVknUHDsg',
     );
 });
 
 // The three project-subordinate resources nest under
 // organizations/:id/projects/:id. The collection is fetched at
-// organizations/1/projects/pA/<seg> —
+// organizations/AjdvjuECVZEgZoFajaIEkg/projects/pA/<seg> —
 // the SERVER filters to the parent project — so the foreign
 // row, bound to project pB, is excluded. The org fence still
 // rides the facade re-entry. None exposes a leaf GET /:id (the
 // leaves carry only PUT, or PUT+DELETE for flows), so no
 // foreign-id 404 case applies. Phase Final Task 2: foreign
 // presence is proven via B-org wire GET (row plane empty).
-interface NestedProjectCase {
-    seg: string;
-    a: string;
-    b: string;
+const NESTED_PROJECT_SEGS = [
+    'flows',
+    'objective-baseline-scores',
+    'objective-actual-scores',
+] as const;
+
+function nestedProjectIds(
+    fx: DeepDb, seg: string,
+): { a: string; b: string } {
+    if (seg === 'flows') {
+        return {
+            a: fx.chainA.projectFlow,
+            b: fx.chainB.projectFlow,
+        };
+    }
+    if (seg === 'objective-baseline-scores') {
+        return {
+            a: fx.chainA.baselineScore,
+            b: fx.chainB.baselineScore,
+        };
+    }
+    return {
+        a: fx.chainA.actualScore, b: fx.chainB.actualScore,
+    };
 }
 
-const NESTED_PROJECT_CASES: NestedProjectCase[] = [
-    { seg: 'flows', a: 'pfA', b: 'pfB' },
-    { seg: 'objective-baseline-scores',
-        a: 'bsA', b: 'bsB' },
-    { seg: 'objective-actual-scores',
-        a: 'asA', b: 'asB' },
-];
-
-for (const c of NESTED_PROJECT_CASES) {
-    test('nested organizations/:id/projects/:id/' + c.seg
+for (const seg of NESTED_PROJECT_SEGS) {
+    test('nested organizations/:id/projects/:id/' + seg
         + ' lists only the bound project',
     async () => {
-        const db = await deepDb();
+        const fx = await deepDb();
+        const ids = nestedProjectIds(fx, seg);
         // Foreign join/score exists on B's pair plane.
-        const foreign = await handleRequest(db, req(
+        const foreign = await handleRequest(fx.db, req(
             'GET',
-            '/organizations/B/projects/pB/' + c.seg + '/',
-            await organizationToken('pb', 'B'),
+            '/organizations/' + fx.organizationB + '/projects/'
+                + fx.chainB.project + '/' + seg + '/',
+            await organizationToken(fx.pb, fx.organizationB),
         ));
         assert.equal(foreign.status, 200);
         const foreignRows = await foreign.json() as {
             id: string;
         }[];
         assert.ok(
-            foreignRows.some((r) => r.id === c.b),
-            'foreign ' + c.b + ' missing on B plane',
+            foreignRows.some((r) => r.id === ids.b),
+            'foreign ' + ids.b + ' missing on B plane',
         );
         const res = await facadeGet(
-            db, '/projects/pA/' + c.seg + '/');
+            fx.db, fx.organizationA,
+            '/projects/' + fx.chainA.project
+                + '/' + seg + '/');
         assert.equal(res.status, 200);
         const rows = await res.json() as { id: string }[];
-        assert.deepEqual(rows.map(r => r.id), [c.a]);
+        assert.deepEqual(rows.map(r => r.id), [ids.a]);
     });
 }
 
@@ -887,51 +1074,66 @@ for (const c of NESTED_PROJECT_CASES) {
 test('organizations/:id/work-orders/:id/history fold'
     + ' carries own field_values',
 async () => {
-    const db = await deepDb();
+    const fx = await deepDb();
     // Phase Final Stage B: state_field_values table retired —
     // prove foreign transition fold via B history, then A's
     // history carries only A's fold.
-    const foreign = await handleRequest(db, req(
-        'GET', '/organizations/B/work-orders/woB/history',
-        await organizationToken('pb', 'B'),
+    const foreign = await handleRequest(fx.db, req(
+        'GET', '/organizations/' + fx.organizationB
+            + '/work-orders/' + fx.chainB.workOrder
+            + '/history',
+        await organizationToken(fx.pb, fx.organizationB),
     ));
     assert.equal(foreign.status, 200);
     const foreignRows = await foreign.json() as {
         id: string;
         field_values: { id: string }[];
     }[];
-    const foreignTe = foreignRows.find(r => r.id === 'seB');
-    assert.ok(foreignTe !== undefined, 'seB missing on B');
+    const foreignTe = foreignRows.find(
+        r => r.id === fx.chainB.transitionEvent,
+    );
     assert.ok(
-        foreignTe!.field_values.some(r => r.id === 'sfvB'),
+        foreignTe !== undefined,
+        'transition missing on B',
+    );
+    assert.ok(
+        foreignTe!.field_values.some(
+            r => r.id === fx.chainB.fieldValue,
+        ),
         'foreign SFV fold missing',
     );
     const res = await facadeGet(
-        db, '/work-orders/woA/history');
+        fx.db, fx.organizationA,
+        '/work-orders/' + fx.chainA.workOrder + '/history');
     assert.equal(res.status, 200);
     const rows = await res.json() as {
         id: string;
         field_values: { id: string }[];
     }[];
-    const ownTe = rows.find(r => r.id === 'seA');
-    assert.ok(ownTe !== undefined, 'seA missing on A');
+    const ownTe = rows.find(
+        r => r.id === fx.chainA.transitionEvent,
+    );
+    assert.ok(
+        ownTe !== undefined, 'transition missing on A',
+    );
     assert.deepEqual(
         ownTe!.field_values.map(r => r.id),
-        ['sfvA'],
+        [fx.chainA.fieldValue],
     );
 });
 
 test('organizations/:id/work-orders/:id/history 404s a foreign work order',
 async () => {
-    const db = await deepDb();
+    const fx = await deepDb();
     // woB is B-org; never written at A's address → 404.
     const res = await facadeGet(
-        db, '/work-orders/woB/history');
+        fx.db, fx.organizationA,
+        '/work-orders/' + fx.chainB.workOrder + '/history');
     assert.equal(res.status, 404);
     const body = await res.json() as { error: string };
     assert.equal(
         body.error,
-        'Not found: work_orders/woB',
+        'Not found: work_orders/' + fx.chainB.workOrder,
     );
 });
 
@@ -939,71 +1141,80 @@ async () => {
 // rides organizations/:id/ideas/:id/versions. A miss at this address is 404.
 test('ideas history gates on parent ownership',
 async () => {
-    const db = await deepDb();
+    const fx = await deepDb();
     const mine = await facadeGet(
-        db, '/ideas/iA/versions/');
+        fx.db, fx.organizationA,
+        '/ideas/' + fx.chainA.idea + '/versions/');
     assert.equal(mine.status, 200);
     const mineRows = await mine.json() as { id: string }[];
     assert.ok(mineRows.length >= 1);
     // iB exists on the pair plane (seedChain PUT), but A does
     // not own it — the history-leak bug. Phase Final Task 2:
     // no ideas row to assert; B-org GET proves presence.
-    const bOwns = await handleRequest(db, req(
-        'GET', '/organizations/B/ideas/iB',
-        await organizationToken('pb', 'B'),
+    const bOwns = await handleRequest(fx.db, req(
+        'GET', '/organizations/' + fx.organizationB + '/ideas/'
+            + fx.chainB.idea,
+        await organizationToken(fx.pb, fx.organizationB),
     ));
     assert.equal(bOwns.status, 200);
     const foreign = await facadeGet(
-        db, '/ideas/iB/versions/');
+        fx.db, fx.organizationA,
+        '/ideas/' + fx.chainB.idea + '/versions/');
     assert.equal(foreign.status, 404);
     const body = await foreign.json() as { error: string };
     assert.equal(
         body.error,
-        'Not found: ideas/iB',
+        'Not found: ideas/' + fx.chainB.idea,
     );
 });
 
 test('flat identity-pii is 404; nested foreign GET 403s',
 async () => {
-    const db = await deepDb();
-    const res = await handleRequest(db, req(
+    const fx = await deepDb();
+    const res = await handleRequest(fx.db, req(
         'GET', '/identity-pii',
-        await organizationToken('current', 'A')));
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(res.status, 404);
     // Pair plane proves pb's pii still exists while the
     // collection is gone. Nested GET of a FOREIGN-org
     // identity: authorizeIdentityPii allows admin; the org
     // fence should still 403 pb.
     assert.equal(
-        (await deriveIdentityPii(db, 'pb')).id, 'pb');
-    const foreign = await handleRequest(db, req(
-        'GET', '/identities/pb/pii',
-        await organizationToken('current', 'A')));
+        (await deriveIdentityPii(fx.db, fx.pb)).id, fx.pb);
+    const foreign = await handleRequest(fx.db, req(
+        'GET', '/identities/' + fx.pb + '/pii',
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(foreign.status, 403);
     const foreignBody =
         await foreign.json() as { error: string };
     assert.equal(
         foreignBody.error,
-        'forbidden: identity_pii/pb belongs to a'
+        'forbidden: identity_pii/' + fx.pb + ' belongs to a'
         + ' different organization',
     );
 });
 
 test('nested identities/:id/credentials hide secret, members',
 async () => {
-    const db = await deepDb();
+    const fx = await deepDb();
     // pa is a co-member of A — its nested collection lists the
     // credential with the secret projected out.
-    const res = await handleRequest(db, req(
-        'GET', '/identities/pa/credentials/',
-        await organizationToken('current', 'A')));
+    const res = await handleRequest(fx.db, req(
+        'GET', '/identities/' + fx.pa + '/credentials/',
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(res.status, 200);
     const rows = await res.json() as Array<{
         id: string;
         identity_id: string;
         secret?: string;
     }>;
-    assert.deepEqual(rows.map(r => r.id), ['cred-pa']);
+    assert.deepEqual(rows.map(r => r.id), [fx.paCred]);
     for (const r of rows) {
         assert.equal(r.secret, undefined);
     }
@@ -1012,37 +1223,47 @@ async () => {
     // Phase Final Task 2: pair plane proves pb's credential
     // exists while fence 403s under A.
     assert.equal(
-        (await deriveCredential(db, 'pb', 'cred-pb')).id,
-        'cred-pb');
+        (await deriveCredential(fx.db, fx.pb, fx.pbCred)).id,
+        fx.pbCred);
     // Phase Final Stage B: identity spine tables retired.
-    const other = await handleRequest(db, req(
-        'GET', '/identities/pb/credentials/',
-        await organizationToken('current', 'A')));
+    const other = await handleRequest(fx.db, req(
+        'GET', '/identities/' + fx.pb + '/credentials/',
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(other.status, 403);
     const otherBody = await other.json() as { error: string };
     assert.equal(
         otherBody.error,
-        'forbidden: identity_credentials/pb belongs to a'
+        'forbidden: identity_credentials/' + fx.pb
+            + ' belongs to a'
         + ' different organization',
     );
     // a single read projects secret out too
-    const one = await handleRequest(db, req(
-        'GET', '/identities/pa/credentials/cred-pa',
-        await organizationToken('current', 'A')));
+    const one = await handleRequest(fx.db, req(
+        'GET', '/identities/' + fx.pa
+            + '/credentials/' + fx.paCred,
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(one.status, 200);
     assert.equal(
         (await one.json() as { secret?: string }).secret,
         undefined);
     // a non-member credential 403s
-    const foreign = await handleRequest(db, req(
-        'GET', '/identities/pb/credentials/cred-pb',
-        await organizationToken('current', 'A')));
+    const foreign = await handleRequest(fx.db, req(
+        'GET', '/identities/' + fx.pb
+            + '/credentials/' + fx.pbCred,
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(foreign.status, 403);
     const foreignBody =
         await foreign.json() as { error: string };
     assert.equal(
         foreignBody.error,
-        'forbidden: identity_credentials/cred-pb belongs to'
+        'forbidden: identity_credentials/' + fx.pbCred
+            + ' belongs to'
         + ' a different organization',
     );
 });
@@ -1054,52 +1275,62 @@ async () => {
 // /identity-credentials route was.
 test('nested credentials are admin-only (member denied)',
 async () => {
-    const db = await deepDb();
+    const fx = await deepDb();
     // pa's membership type:"member" bakes claim role member:A
     // via organizationToken — admin surface stays denied.
-    const asAdmin = await handleRequest(db, req(
-        'GET', '/identities/pa/credentials/',
-        await organizationToken('current', 'A')));
+    const asAdmin = await handleRequest(fx.db, req(
+        'GET', '/identities/' + fx.pa + '/credentials/',
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(asAdmin.status, 200);
-    const asMember = await handleRequest(db, req(
-        'GET', '/identities/pa/credentials/',
-        await organizationToken('pa', 'A')));
+    const asMember = await handleRequest(fx.db, req(
+        'GET', '/identities/' + fx.pa + '/credentials/',
+        await organizationToken(fx.pa, fx.organizationA)));
     assert.equal(asMember.status, 403);
 });
 
 test('organizations/:id 403s a non-member org', async () => {
-    const db = await deepDb();
-    const mine = await handleRequest(db, req(
-        'GET', '/organizations/A',
-        await organizationToken('current', 'A')));
+    const fx = await deepDb();
+    const mine = await handleRequest(fx.db, req(
+        'GET', '/organizations/' + fx.organizationA,
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(mine.status, 200);
     // Phase Final Task 2: organizations ROW half stripped —
     // B still has a pair (seedOrganizationDocument), so
     // derive finds it; the membership fence 403s.
     assert.equal(
-        (await deriveOrganization(db, 'B')).id, 'B');
-    const foreign = await handleRequest(db, req(
-        'GET', '/organizations/B',
-        await organizationToken('current', 'A')));
+        (await deriveOrganization(fx.db, fx.organizationB)).id,
+        fx.organizationB);
+    const foreign = await handleRequest(fx.db, req(
+        'GET', '/organizations/' + fx.organizationB,
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(foreign.status, 403);
     const body = await foreign.json() as { error: string };
     assert.equal(
         body.error,
-        'forbidden: organizations/B belongs to a different'
+        'forbidden: organizations/' + fx.organizationB
+            + ' belongs to a different'
         + ' organization',
     );
 });
 
 test('organizations/:id 404s a genuinely absent org',
 async () => {
-    const db = await deepDb();
-    const res = await handleRequest(db, req(
-        'GET', '/organizations/no-such-org',
-        await organizationToken('current', 'A')));
+    const fx = await deepDb();
+    const res = await handleRequest(fx.db, req(
+        'GET', '/organizations/oLbQcDdzGHmpcoUKyvlTnQ',
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(res.status, 404);
     const body = await res.json() as { error: string };
     assert.equal(
-        body.error, 'Not found: /organizations/no-such-org',
+        body.error, 'Not found: /organizations/oLbQcDdzGHmpcoUKyvlTnQ',
     );
 });
 
@@ -1116,44 +1347,53 @@ async () => {
 
 test('identity-pii shows an orphan with no membership',
 async () => {
-    const db = await deepDb();
-    await seedIdentityPii(db, 'orphan', {
+    const fx = await deepDb();
+    const orphan = generateIdentifier();
+    await seedIdentityPii(fx.db, orphan, {
         name: 'orphan', email: 'orphan@x.com',
         phone: '', bio: '',
     });
-    const retired = await handleRequest(db, req(
+    const retired = await handleRequest(fx.db, req(
         'GET', '/identity-pii',
-        await organizationToken('current', 'A')));
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(retired.status, 404);
     const ids = new Set(
-        (await deriveIdentityPiiRows(db)).map(r => r.id));
-    assert.ok(ids.has('orphan'));
+        (await deriveIdentityPiiRows(fx.db)).map(r => r.id));
+    assert.ok(ids.has(orphan));
     assert.equal(
-        (await deriveIdentityPii(db, 'orphan')).id,
-        'orphan');
-    const res = await handleRequest(db, req(
-        'GET', '/identities/orphan/pii',
-        await organizationToken('current', 'A')));
+        (await deriveIdentityPii(fx.db, orphan)).id,
+        orphan);
+    const res = await handleRequest(fx.db, req(
+        'GET', '/identities/' + orphan + '/pii',
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(res.status, 200);
 });
 
 test('nested credentials show an orphan with no membership',
 async () => {
-    const db = await deepDb();
-    await seedIdentityCredential(db, 'orphan', 'cred-orphan', {
-        identity_id: 'orphan', kind: 'password',
+    const fx = await deepDb();
+    const orphan = generateIdentifier();
+    const credId = generateIdentifier();
+    await seedIdentityCredential(fx.db, orphan, credId, {
+        identity_id: orphan, kind: 'password',
         status: 'set', secret: 'HASH-orphan', at: T8_AT,
     });
     // orphan has no membership → null owner → visible orphan in
     // its own nested collection, read through the A facade.
-    const res = await handleRequest(db, req(
-        'GET', '/identities/orphan/credentials/',
-        await organizationToken('current', 'A')));
+    const res = await handleRequest(fx.db, req(
+        'GET', '/identities/' + orphan + '/credentials/',
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        )));
     assert.equal(res.status, 200);
     const ids = (await res.json() as Array<{
         identity_id: string;
     }>).map(r => r.identity_id);
-    assert.deepEqual(ids, ['orphan']);
+    assert.deepEqual(ids, [orphan]);
 });
 
 // Orphan states/:id writes retired with the address. Pin
@@ -1162,11 +1402,13 @@ async () => {
 // the vocabulary gate stays clean. Collection isolation
 // force lives on A2/A5 history legs.
 test('states/:id orphan write is router 404', async () => {
-    const db = await deepDb();
+    const fx = await deepDb();
     const retiredAppend = ['', 'states', 'seGhost'].join('/');
-    const ghost = await handleRequest(db, req(
+    const ghost = await handleRequest(fx.db, req(
         'PUT', retiredAppend,
-        await organizationToken('current', 'A'),
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        ),
         { entity_id: 'ghost', state: 'active', at: T8_AT },
     ));
     assert.equal(ghost.status, 404);

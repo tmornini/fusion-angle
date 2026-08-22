@@ -90,8 +90,10 @@ test(
         await backend.transaction(
             ['a', 'b'], 'readwrite',
             async (tx) => {
-                await tx.put<Row>('a', { id: '1', n: 1 });
-                await tx.put<Row>('b', { id: '2', n: 2 });
+                await tx.put<Row>('a', { id: 'AjdvjuECVZEgZoFajaIEkg'
+                    , n: 1 });
+                await tx.put<Row>('b', { id: 'BBjWJsjYIDkTRKIIPrzWRw'
+                    , n: 2 });
             },
         );
         const [ra, rb] = await backend.transaction(
@@ -116,10 +118,10 @@ test(
                 ['a', 'b'], 'readwrite',
                 async (tx) => {
                     await tx.put<Row>(
-                        'a', { id: '1', n: 1 },
+                        'a', { id: 'AjdvjuECVZEgZoFajaIEkg', n: 1 },
                     );
                     await tx.put<Row>(
-                        'b', { id: '2', n: 2 },
+                        'b', { id: 'BBjWJsjYIDkTRKIIPrzWRw', n: 2 },
                     );
                     throw new Error('boom');
                 },

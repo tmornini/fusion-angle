@@ -117,7 +117,7 @@ function makeIdeaEntity(
     overrides: Partial<IdeaEntity> = {},
 ): IdeaEntity {
     return {
-        id: 'idea-1',
+        id: 'gVvtDIaqhnkXZQcxZeSuiw',
         title: 'Self-serve onboarding',
         position: 3,
         problem_statement:
@@ -273,7 +273,7 @@ test(
         assert.match(out, /Active/);
         assert.ok(!out.includes('Incomplete'));
         assert.match(
-            out, /data-idea-card="idea-1"/,
+            out, /data-idea-card="gVvtDIaqhnkXZQcxZeSuiw"/,
         );
         assert.match(out, /data-position="3"/);
         assert.ok(!out.includes('undefined'));
@@ -313,7 +313,7 @@ test(
         assert.match(
             approved.buildCard(false)
                 .toString(),
-            /data-idea-convert="idea-1"/,
+            /data-idea-convert="gVvtDIaqhnkXZQcxZeSuiw"/,
         );
         assert.ok(
             !active.buildCard(false)
@@ -381,7 +381,7 @@ test(
         assert.equal(active.canSubmit(), true);
         assert.equal(active.isReviewable(), false);
         assert.equal(active.positionSortKey(), 9);
-        assert.equal(active.idForLink(), 'idea-1');
+        assert.equal(active.idForLink(), 'gVvtDIaqhnkXZQcxZeSuiw');
     },
 );
 
@@ -531,7 +531,7 @@ test(
             makeIdea(), FILLED_DRAFT,
             'Ada', '2026-01-15T10:00:00.000000Z',
         );
-        assert.equal(presenter.idForLink(), 'idea-1');
+        assert.equal(presenter.idForLink(), 'gVvtDIaqhnkXZQcxZeSuiw');
         assert.deepEqual(
             presenter.draft(), FILLED_DRAFT,
         );
@@ -701,17 +701,17 @@ test(
     () => {
         const ideas = [
             makeWithSubmitter(
-                { id: 'i1' },
+                { id: 'fndCYAsXazdzMUlEGMNIZw' },
                 'Ada', '2026-01-15T10:00:00Z',
                 'active',
             ),
             makeWithSubmitter(
-                { id: 'i2' },
+                { id: 'fxysGbBPBsnCwJNJsyZnkA' },
                 'Ada', '2026-01-15T10:00:00Z',
                 'active',
             ),
             makeWithSubmitter(
-                { id: 'i3' },
+                { id: 'gBbNAWlPwMfXZvevoUPhFQ' },
                 'Ada', '2026-01-15T10:00:00Z',
                 'in_review',
             ),

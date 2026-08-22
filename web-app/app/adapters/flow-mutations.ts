@@ -35,8 +35,8 @@ import {
     buildStartAndCompleteNodes,
 } from './flow-defaults.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -88,7 +88,7 @@ export async function postFlowCreation(
         { nodes: [], edges: [] },
         graph,
         input.flowId,
-        generateCryptoSafeBase62,
+        generateIdentifier,
         now,
     );
 
@@ -110,7 +110,7 @@ export async function postFlowCreation(
             at: now,
         },
         initialState: 'active',
-        initialStateEventId: generateCryptoSafeBase62(),
+        initialStateEventId: generateIdentifier(),
         initialStateAt: nowUtc(),
         graphDelta,
     });
@@ -158,7 +158,7 @@ export function buildFlowBody(
 // attributeId — added/removed per presence; changed mode or
 // is_required → a NEW 'added' row (latest-wins semantics,
 // never an update). Unchanged attributes emit NO event.
-// The caller passes `generateCryptoSafeBase62` as `mint` and
+// The caller passes `generateIdentifier` as `mint` and
 // a single `nowUtc()` as `at` (one moment for the whole save).
 export function buildSaveEvents(
     baseline: StoredGraph,
@@ -353,7 +353,7 @@ export function buildRevivals(
     for (const node of target.nodes) {
         if (!currentIds.has(node.id)) {
             revivals.push({
-                eventId: generateCryptoSafeBase62(),
+                eventId: generateIdentifier(),
                 entityId: node.id,
                 at,
             });
@@ -362,7 +362,7 @@ export function buildRevivals(
     for (const edge of target.edges) {
         if (!currentIds.has(edge.id)) {
             revivals.push({
-                eventId: generateCryptoSafeBase62(),
+                eventId: generateIdentifier(),
                 entityId: edge.id,
                 at,
             });
@@ -412,7 +412,7 @@ async function buildFlowPutBody(
         baseline,
         { nodes: save.nodes, edges: save.edges },
         id,
-        generateCryptoSafeBase62,
+        generateIdentifier,
         now,
     );
     const revivals = revivalTarget
@@ -423,7 +423,7 @@ async function buildFlowPutBody(
             ...buildFlowBody(save),
             state: 'updated',
             state_at: now,
-            state_event_id: generateCryptoSafeBase62(),
+            state_event_id: generateIdentifier(),
             graph: storedGraph({
                 nodes: save.nodes,
                 edges: save.edges,

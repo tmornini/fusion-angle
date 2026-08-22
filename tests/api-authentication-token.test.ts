@@ -134,11 +134,11 @@ test('a failed client assertion is 401 invalid_client',
 async () => {
     const db = await freshDb();
     await seedClientRegistration(
-        db, 'svc-client', activeClient,
+        db, 'uYaHKbNeVUcsFjuooOjMew', activeClient,
     );
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
-        client_id: 'svc-client',
+        client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: 'not-a-jwt',
     }));
     assert.equal(res.status, 401);
@@ -185,9 +185,9 @@ async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     await seedAuthorizationCodePair(
-        db, 'code-for-a', 'current', 'client-a');
+        db, 'code-for-a', 'XXZruirZyAOoRpNxaDnpSA', 'client-a');
     await seedAuthorizationCodePair(
-        db, 'code-for-match', 'current', 'client-a');
+        db, 'code-for-match', 'XXZruirZyAOoRpNxaDnpSA', 'client-a');
     const mismatch = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code',
         code: 'code-for-a',
@@ -224,7 +224,7 @@ async () => {
     const verifier = 'pkce-verifier-correct-value';
     const challenge = await s256Challenge(verifier);
     await seedAuthorizationCodePair(
-        db, 'pkce-code-ok', 'current', 'web',
+        db, 'pkce-code-ok', 'XXZruirZyAOoRpNxaDnpSA', 'web',
         { code_challenge: challenge },
     );
     const res = await handleRequest(db, tokenRequest({
@@ -244,7 +244,7 @@ async () => {
         'pkce-verifier-correct-value',
     );
     await seedAuthorizationCodePair(
-        db, 'pkce-code-bad', 'current', 'web',
+        db, 'pkce-code-bad', 'XXZruirZyAOoRpNxaDnpSA', 'web',
         { code_challenge: challenge },
     );
     const res = await handleRequest(db, tokenRequest({
@@ -268,7 +268,7 @@ async () => {
         'pkce-verifier-correct-value',
     );
     await seedAuthorizationCodePair(
-        db, 'pkce-code-none', 'current', 'web',
+        db, 'pkce-code-none', 'XXZruirZyAOoRpNxaDnpSA', 'web',
         { code_challenge: challenge },
     );
     const res = await handleRequest(db, tokenRequest({
@@ -307,7 +307,7 @@ async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     await seedAuthorizationCodePair(
-        db, 'the-code', 'current', 'web');
+        db, 'the-code', 'XXZruirZyAOoRpNxaDnpSA', 'web');
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
@@ -326,9 +326,9 @@ async () => {
 test('authorization_code grant issues a gate-valid token pair',
 async () => {
     const db = await freshDb();
-    await seedRootAdmin(db);   // 'current' is admin
+    await seedRootAdmin(db);   // 'XXZruirZyAOoRpNxaDnpSA' is admin
     await seedAuthorizationCodePair(
-        db, 'the-code', 'current', 'web');
+        db, 'the-code', 'XXZruirZyAOoRpNxaDnpSA', 'web');
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
@@ -350,21 +350,22 @@ async () => {
     // mirroring token-exchange); sub stays the user. The
     // refresh token never carries act.
     const claims = decodeAccessToken(body.access_token);
-    assert.equal(claims.sub, 'current');
+    assert.equal(claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
     assert.equal(claims.act?.sub, 'web');
     assert.equal(
         decodeAccessToken(refreshToken).act,
         undefined,
     );
     // the minted access token passes the SP-3 gate
-    const rows = await GET(db, 'organizations/1/members/', body.access_token);
+    const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+        + '', body.access_token);
     assert.ok(Array.isArray(rows));
 });
 
 test('replaying a consumed code is a 401 no-op', async () => {
     const db = await freshDb();
     await seedAuthorizationCodePair(
-        db, 'the-code', 'current', 'web');
+        db, 'the-code', 'XXZruirZyAOoRpNxaDnpSA', 'web');
     const first = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
@@ -388,7 +389,7 @@ test(
         const db = await freshDb();
         await seedRootAdmin(db);
         await seedAuthorizationCodePair(
-            db, 'the-code', 'current', 'web');
+            db, 'the-code', 'XXZruirZyAOoRpNxaDnpSA', 'web');
         const [a, b] = await Promise.all([
             handleRequest(db, tokenRequest({
                 grant_type: 'authorization_code',
@@ -439,7 +440,7 @@ test('GATE 3: unknown / spent / raced code all 401 with the'
         await unknown.json(), { error: INVALID_CODE_ERROR });
 
     await seedAuthorizationCodePair(
-        db, 'the-code-spent', 'current', 'web');
+        db, 'the-code-spent', 'XXZruirZyAOoRpNxaDnpSA', 'web');
     const first = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code',
         code: 'the-code-spent',
@@ -456,7 +457,7 @@ test('GATE 3: unknown / spent / raced code all 401 with the'
         await spent.json(), { error: INVALID_CODE_ERROR });
 
     await seedAuthorizationCodePair(
-        db, 'the-code-raced', 'current', 'web');
+        db, 'the-code-raced', 'XXZruirZyAOoRpNxaDnpSA', 'web');
     const [a, b] = await Promise.all([
         handleRequest(db, tokenRequest({
             grant_type: 'authorization_code',
@@ -480,7 +481,7 @@ test('GATE 3: unknown / spent / raced code all 401 with the'
     const derivedId =
         await deriveAuthorizationCodeId('the-code-spent');
     assert.equal(
-        await authorizationCodeSpent(db, derivedId, 'current'),
+        await authorizationCodeSpent(db, derivedId, 'XXZruirZyAOoRpNxaDnpSA'),
         true);
 });
 
@@ -488,7 +489,7 @@ async function initialPair(
     db: MemoryDbAdapter,
 ): Promise<{ access_token: string; refresh_token: string }> {
     await seedAuthorizationCodePair(
-        db, 'the-code', 'current', 'web');
+        db, 'the-code', 'XXZruirZyAOoRpNxaDnpSA', 'web');
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
@@ -522,7 +523,7 @@ async () => {
         refreshTokenFromSetCookie(res), pair1.refresh_token);
     assert.ok(Array.isArray(
         await GET(
-            db, 'organizations/1/members/',
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
             body['access_token'] as string,
         )));
 });
@@ -555,7 +556,8 @@ async () => {
         access_token: string;
     };
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members/', body.access_token)));
+        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , body.access_token)));
 });
 
 test('refresh rotates to a new pair', async () => {
@@ -573,7 +575,8 @@ test('refresh rotates to a new pair', async () => {
     assert.notEqual(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members/', pair2.access_token)));
+        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , pair2.access_token)));
 });
 
 test('replaying a rotated refresh token revokes the chain',
@@ -618,17 +621,18 @@ async () => {
     await seedRootAdmin(db);
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
-        subject_token: await devToken('current'),
-        actor_token: await devToken('current'),
+        subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
+        actor_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
     }));
     assert.equal(res.status, 201);
     const body = await res.json() as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
-    assert.equal(claims.sub, 'current');
-    assert.equal(claims.act?.sub, 'current');
+    assert.equal(claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
+    assert.equal(claims.act?.sub, 'XXZruirZyAOoRpNxaDnpSA');
     // the delegated token passes the gate (current = admin)
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members/', body.access_token)));
+        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , body.access_token)));
 });
 
 test('token-exchange 201 has no refresh Set-Cookie',
@@ -671,7 +675,7 @@ async () => {
         (await deriveIdentityTokens(db)).length;
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
-        subject_token: await devToken('current'),
+        subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
         actor_token: await devToken('agent-7'),
     }));
     assert.equal(res.status, 403);
@@ -700,31 +704,31 @@ test('token-exchange into a member org carries org + orgs',
 async () => {
     const db = await freshDb();
     await seedMembershipPair(db, 'm-current', {
-        organization_id: '1',
-        identity_id: 'current',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
-        subject_token: await devToken('current'),
-        actor_token: await devToken('current'),
-        organization: '1',
+        subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
+        actor_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
     }));
     assert.equal(res.status, 201);
     const body = await res.json() as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
-    assert.equal(claims.organization, '1');
-    assert.deepEqual(claims.organizations, ['1']);
+    assert.equal(claims.organization, 'AjdvjuECVZEgZoFajaIEkg');
+    assert.deepEqual(claims.organizations, ['AjdvjuECVZEgZoFajaIEkg']);
 });
 
 test('token-exchange into a non-member org is 403',
 async () => {
     const db = await freshDb();
-    // current is a member of '1' but not org '7'
+    // current is a member of 'AjdvjuECVZEgZoFajaIEkg' but not org '7'
     await seedMembershipPair(db, 'm-current', {
-        organization_id: '1',
-        identity_id: 'current',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
@@ -732,8 +736,8 @@ async () => {
         (await deriveIdentityTokens(db)).length;
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
-        subject_token: await devToken('current'),
-        actor_token: await devToken('current'),
+        subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
+        actor_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
         organization: '7',
     }));
     assert.equal(res.status, 403);
@@ -746,21 +750,21 @@ test('a flat exchange carries orgs but no active org',
 async () => {
     const db = await freshDb();
     await seedMembershipPair(db, 'm-current', {
-        organization_id: '1',
-        identity_id: 'current',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
-        subject_token: await devToken('current'),
-        actor_token: await devToken('current'),
+        subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
+        actor_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
     }));
     assert.equal(res.status, 201);
     const body = await res.json() as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
     assert.equal(claims.organization, undefined);
-    assert.deepEqual(claims.organizations, ['1']);
+    assert.deepEqual(claims.organizations, ['AjdvjuECVZEgZoFajaIEkg']);
 });
 
 const activeClient = {
@@ -775,7 +779,7 @@ async function signedClientSetup() {
     const signer = await makeAssertionSigner('ES256');
     const now = Math.floor(Date.now() / 1000);
     const assertion = await signer.sign({
-        iss: 'svc-client', sub: 'svc-client',
+        iss: 'uYaHKbNeVUcsFjuooOjMew', sub: 'uYaHKbNeVUcsFjuooOjMew',
         aud: 'fusion-angle',
         exp: now + 300, iat: now, jti: 'assert-1',
     });
@@ -789,23 +793,24 @@ test('client_credentials issues a gate-valid token', async () => {
     const db = await freshDb();
     // the service principal (client id) holds an admin role
     await seedMembershipPair(db, 'm-svc', {
-        organization_id: '1',
-        identity_id: 'svc-client',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'uYaHKbNeVUcsFjuooOjMew',
         type: 'member',
         at: '2020-01-01T00:00:00.000000Z',
     });
     const { client, assertion } =
         await signedClientSetup();
-    await seedClientRegistration(db, 'svc-client', client);
+    await seedClientRegistration(db, 'uYaHKbNeVUcsFjuooOjMew', client);
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
-        client_id: 'svc-client',
+        client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
     assert.equal(res.status, 201);
     const body = await res.json() as { access_token: string };
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members/', body.access_token)));
+        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , body.access_token)));
     assert.notEqual(
         decodeAccessToken(body.access_token).jti, 'assert-1',
     );
@@ -815,17 +820,17 @@ test('a second client_credentials grant with the same jti'
 + ' is 401 invalid_grant and mints nothing', async () => {
     const db = await freshDb();
     await seedMembershipPair(db, 'm-svc-replay', {
-        organization_id: '1',
-        identity_id: 'svc-client',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'uYaHKbNeVUcsFjuooOjMew',
         type: 'member',
         at: '2020-01-01T00:00:00.000000Z',
     });
     const { client, assertion } =
         await signedClientSetup();
-    await seedClientRegistration(db, 'svc-client', client);
+    await seedClientRegistration(db, 'uYaHKbNeVUcsFjuooOjMew', client);
     const first = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
-        client_id: 'svc-client',
+        client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
     assert.equal(first.status, 201);
@@ -834,11 +839,11 @@ test('a second client_credentials grant with the same jti'
         row.uri_collection === '/authentication/token/',
     ).length;
     const eventCount = before.filter((row) =>
-        row.uri_collection === '/identities/svc-client/tokens/',
+        row.uri_collection === '/identities/uYaHKbNeVUcsFjuooOjMew/tokens/',
     ).length;
     const second = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
-        client_id: 'svc-client',
+        client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
     assert.equal(second.status, 401);
@@ -854,7 +859,9 @@ test('a second client_credentials grant with the same jti'
     );
     assert.equal(
         after.filter((row) =>
-            row.uri_collection === '/identities/svc-client/tokens/',
+            row.uri_collection ===
+                '/identities/uYaHKbNeVUcsFjuooOjMew/tokens/'
+                + '',
         ).length,
         eventCount,
     );
@@ -864,32 +871,32 @@ test('an expired assertion-jti ticket is still spent',
 async () => {
     const db = await freshDb();
     await seedMembershipPair(db, 'm-svc-expired', {
-        organization_id: '1',
-        identity_id: 'svc-client',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'uYaHKbNeVUcsFjuooOjMew',
         type: 'member',
         at: '2020-01-01T00:00:00.000000Z',
     });
     const signer = await makeAssertionSigner('ES256');
     const now = Math.floor(Date.now() / 1000);
     const jti = 'assert-expired-spent';
-    await seedClientRegistration(db, 'svc-client', {
+    await seedClientRegistration(db, 'uYaHKbNeVUcsFjuooOjMew', {
         ...activeClient, jwks: signer.jwks,
     });
     const ticket = await formWritePair({
         method: 'PUT',
         pathname:
-            '/authentication/assertion-jtis/' + jti,
+            '/authentication/VOoVnUGteBpVZJqRqWZolw/' + jti,
         routePattern:
-            'authentication/assertion-jtis/:jti',
+            'authentication/VOoVnUGteBpVZJqRqWZolw/:jti',
         routeSegments: [
-            'authentication', 'assertion-jtis', ':jti',
+            'authentication', 'VOoVnUGteBpVZJqRqWZolw', ':jti',
         ],
         pathSegments: [
-            'authentication', 'assertion-jtis', jti,
+            'authentication', 'VOoVnUGteBpVZJqRqWZolw', jti,
         ],
         headerFields: [],
         body: { exp: now - 60 },
-        requesterIdentityId: 'svc-client',
+        requesterIdentityId: 'uYaHKbNeVUcsFjuooOjMew',
         requestAt: nowUtc(),
         organization: undefined,
         responseStatus: 200,
@@ -898,13 +905,13 @@ async () => {
     });
     await putMessagePair(db, ticket);
     const assertion = await signer.sign({
-        iss: 'svc-client', sub: 'svc-client',
+        iss: 'uYaHKbNeVUcsFjuooOjMew', sub: 'uYaHKbNeVUcsFjuooOjMew',
         aud: 'fusion-angle',
         exp: now + 300, iat: now, jti,
     });
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
-        client_id: 'svc-client',
+        client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
     assert.equal(res.status, 401);
@@ -920,19 +927,19 @@ test('client_credentials refuses an unsigned assertion',
 async () => {
     const db = await freshDb();
     const { client } = await signedClientSetup();
-    await seedClientRegistration(db, 'svc-client', client);
+    await seedClientRegistration(db, 'uYaHKbNeVUcsFjuooOjMew', client);
     // Well-formed JWT shape, right claims, NO valid
     // signature from the registered key.
     const impostor = await makeAssertionSigner('ES256');
     const now = Math.floor(Date.now() / 1000);
     const forged = await impostor.sign({
-        iss: 'svc-client', sub: 'svc-client',
+        iss: 'uYaHKbNeVUcsFjuooOjMew', sub: 'uYaHKbNeVUcsFjuooOjMew',
         aud: 'fusion-angle',
         exp: now + 300, iat: now, jti: 'assert-2',
     });
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
-        client_id: 'svc-client',
+        client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: forged,
     }));
     assert.equal(res.status, 401);
@@ -944,11 +951,11 @@ test('client_credentials with a malformed assertion is 401',
 async () => {
     const db = await freshDb();
     await seedClientRegistration(
-        db, 'svc-client', activeClient,
+        db, 'uYaHKbNeVUcsFjuooOjMew', activeClient,
     );
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
-        client_id: 'svc-client',
+        client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: 'not-a-jwt',
     }));
     assert.equal(res.status, 401);
@@ -981,7 +988,7 @@ async () => {
         'error',
         () => handleRequest(db, tokenRequest({
             grant_type: 'client_credentials',
-            client_id: 'svc-client',
+            client_id: 'uYaHKbNeVUcsFjuooOjMew',
             client_assertion: 'a.b.c',
         })),
     );
@@ -999,12 +1006,12 @@ async () => {
     const db = await freshDb();
     const { client, assertion } =
         await signedClientSetup();
-    await seedClientRegistration(db, 'svc-client', {
+    await seedClientRegistration(db, 'uYaHKbNeVUcsFjuooOjMew', {
         ...client, status: 'disabled',
     });
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
-        client_id: 'svc-client',
+        client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
     assert.equal(res.status, 401);
@@ -1017,12 +1024,12 @@ async () => {
     const db = await freshDb();
     const { client, assertion } =
         await signedClientSetup();
-    await seedClientRegistration(db, 'svc-client', {
+    await seedClientRegistration(db, 'uYaHKbNeVUcsFjuooOjMew', {
         ...client, grant_types: 'authorization_code',
     });
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
-        client_id: 'svc-client',
+        client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
     assert.equal(res.status, 400);
@@ -1033,11 +1040,11 @@ async () => {
     const db = await freshDb();
     const { client, assertion } =
         await signedClientSetup();
-    await seedClientRegistration(db, 'svc-client', client);
-    await seedClientRegistrationTombstone(db, 'svc-client');
+    await seedClientRegistration(db, 'uYaHKbNeVUcsFjuooOjMew', client);
+    await seedClientRegistrationTombstone(db, 'uYaHKbNeVUcsFjuooOjMew');
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
-        client_id: 'svc-client',
+        client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
     assert.equal(res.status, 401);

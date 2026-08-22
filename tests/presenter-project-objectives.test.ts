@@ -4,11 +4,11 @@ import { ProjectObjectivesPresenter } from
     '../web-app/app/presenters/project-objectives.ts';
 
 const activeObjs = [
-    { id: 'o1', position: 0 },
+    { id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 },
     { id: 'o2', position: 1 },
 ];
 const defs = new Map([
-    ['o1', { name: 'Revenue', description: 'd1' }],
+    ['ohqxgUBEaFQwYbXsonRPmg', { name: 'Revenue', description: 'd1' }],
     ['o2', { name: 'Cost', description: 'd2' }],
 ]);
 
@@ -16,7 +16,8 @@ test('renders one row per active objective', () => {
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs,
         [{ id: 'b1',
-           projectId: 'p1', objectiveId: 'o1',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
@@ -33,7 +34,8 @@ test('shows "none yet" when no actuals',
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs,
         [{ id: 'b1',
-           projectId: 'p1', objectiveId: 'o1',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
@@ -48,11 +50,13 @@ test('shows latest actual with sign', () => {
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs,
         [{ id: 'b1',
-           projectId: 'p1', objectiveId: 'o1',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
-        [{ id: 'a1',
-           projectId: 'p1', objectiveId: 'o1',
+        [{ id: 'UQTJZvCoKlFjEoDlDUwekw',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
            score: -10,
            at: '2026-05-15T00:00:00.000000Z' }],
         'approved',
@@ -86,7 +90,8 @@ test(
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs,
         [{ id: 'b1',
-           projectId: 'p1', objectiveId: 'o1',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
@@ -109,7 +114,8 @@ test(
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs,
         [{ id: 'b1',
-           projectId: 'p1', objectiveId: 'o1',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
@@ -132,7 +138,8 @@ test(
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs,
         [{ id: 'b1',
-           projectId: 'p1', objectiveId: 'o1',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
@@ -154,11 +161,13 @@ test(
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs,
         [{ id: 'b1',
-           projectId: 'p1', objectiveId: 'o1',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
-        [{ id: 'a1',
-           projectId: 'p1', objectiveId: 'o1',
+        [{ id: 'UQTJZvCoKlFjEoDlDUwekw',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
            score: 30,
            at: '2026-05-15T00:00:00.000000Z' }],
         'archived',
@@ -180,7 +189,8 @@ test(
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs,
         [{ id: 'b1',
-           projectId: 'p1', objectiveId: 'o1',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
@@ -188,9 +198,9 @@ test(
     );
     const html = p.buildSection().toString();
     const o1Row = html.match(
-        /data-objective-id="o1"[\s\S]*?<\/li>/,
+        /data-objective-id="ohqxgUBEaFQwYbXsonRPmg"[\s\S]*?<\/li>/,
     );
-    assert.ok(o1Row, 'o1 row should be present');
+    assert.ok(o1Row, 'ohqxgUBEaFQwYbXsonRPmg row should be present');
     const o2Row = html.match(
         /data-objective-id="o2"[\s\S]*?<\/li>/,
     );
@@ -199,7 +209,7 @@ test(
         !o1Row[0].match(
             /class="actual-slider"[^>]*disabled/,
         ),
-        'o1 actual should be enabled (baselined)',
+        'ohqxgUBEaFQwYbXsonRPmg actual should be enabled (baselined)',
     );
     assert.ok(
         o2Row[0].match(
@@ -227,11 +237,13 @@ test(
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs,
         [{ id: 'b1',
-           projectId: 'p1', objectiveId: 'o1',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
-        [{ id: 'a1',
-           projectId: 'p1', objectiveId: 'o1',
+        [{ id: 'UQTJZvCoKlFjEoDlDUwekw',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
            score: 30,
            at: '2026-05-15T00:00:00.000000Z' }],
         'archived',

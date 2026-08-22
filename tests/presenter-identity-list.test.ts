@@ -46,15 +46,15 @@ test('person row shows name, email, and Person badge',
     const rec = record();
     new IdentityRosterPresenter([
         {
-            id: 'p1', kind: 'person',
+            id: 'pnXmXrxOWayANgDLdCjuBw', kind: 'person',
             pii: {
                 erased: false, name: 'Ada',
-                email: 'ada@x.io', phone: '1', bio: 'b',
+                email: 'ada@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
             },
         },
     ]).render(rec.container);
     const out = rec.html();
-    assert.match(out, /data-identity-id="p1"/);
+    assert.match(out, /data-identity-id="pnXmXrxOWayANgDLdCjuBw"/);
     assert.match(out, /card card-hover/);
     assert.match(out, /Ada/);
     assert.match(out, /ada@x\.io/);
@@ -66,7 +66,7 @@ test('named service shows its name and detail, not the id',
     const rec = record();
     new IdentityRosterPresenter([
         {
-            id: 's1', kind: 'service',
+            id: 'syWUUcdBSbBgMwBiCrgbDw', kind: 'service',
             service: {
                 named: true, name: 'Grok 4.3',
                 detail: 'Fast reasoning model',
@@ -74,7 +74,7 @@ test('named service shows its name and detail, not the id',
         },
     ]).render(rec.container);
     const out = rec.html();
-    assert.match(out, /data-identity-id="s1"/);
+    assert.match(out, /data-identity-id="syWUUcdBSbBgMwBiCrgbDw"/);
     assert.match(out, /Service/);
     assert.match(out, /Grok 4\.3/);
     assert.match(out, /Fast reasoning model/);
@@ -88,7 +88,7 @@ async () => {
     const rec = record();
     new IdentityRosterPresenter([
         {
-            id: '42vHYDCvtkaO3sTnoqg7aJ',
+            id: 'BhdhBLQPyktOCbdJzGsggg',
             kind: 'service',
             service: { named: false },
         },
@@ -96,7 +96,7 @@ async () => {
     const out = rec.html();
     assert.match(out, new RegExp(UNNAMED_SERVICE_NAME));
     assert.doesNotMatch(
-        out, />\s*42vHYDCvtkaO3sTnoqg7aJ\s*</,
+        out, />\s*BhdhBLQPyktOCbdJzGsggg\s*</,
     );
 });
 
@@ -108,7 +108,7 @@ async () => {
     const rec = record();
     new IdentityRosterPresenter([
         {
-            id: 'p2', kind: 'person',
+            id: 'prBESZPjJDiuXCeZLmbiVw', kind: 'person',
             pii: { erased: true },
         },
     ]).render(rec.container);

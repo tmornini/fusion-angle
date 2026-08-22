@@ -18,20 +18,20 @@ test('K5 reactivation on the memory adapter',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedHumanMember(db, 'current', 'Demo User');
+        await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
         const ctx = createRequestContext(
             db, await organizationToken(),
         );
         await postObjectiveCreation(
-            ctx, 'o1', 'Rev', 'd', 0,
+            ctx, 'ohqxgUBEaFQwYbXsonRPmg', 'Rev', 'd', 0,
         );
-        await postObjectiveArchival(ctx, 'o1');
-        await postObjectiveReactivation(ctx, 'o1');
+        await postObjectiveArchival(ctx, 'ohqxgUBEaFQwYbXsonRPmg');
+        await postObjectiveReactivation(ctx, 'ohqxgUBEaFQwYbXsonRPmg');
         const active = await getActiveObjectives(ctx);
         const archivedIds =
             await getArchivedObjectiveIds(ctx);
-        assert.ok(active.some(o => o.id === 'o1'),
-            'o1 returns to active list');
+        assert.ok(active.some(o => o.id === 'ohqxgUBEaFQwYbXsonRPmg'),
+            'ohqxgUBEaFQwYbXsonRPmg returns to active list');
         assert.equal(archivedIds.size, 0,
             'active event supersedes archived');
     });

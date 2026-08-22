@@ -10,6 +10,8 @@ import {
     RECORD_TYPE_DETAIL_PATTERN,
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 function specsOf(
     entry: (typeof WRITE_RESPONSE_SPECS)[string],
@@ -26,6 +28,11 @@ function specsOf(
 // Per-pattern bodies that satisfy each family's validator
 // so the pin can observe the successBody return shape.
 const AT = '2026-01-01T00:00:00.000000Z';
+const ID = generateIdentifier();
+const ID2 = generateIdentifier();
+const ID3 = generateIdentifier();
+const ACTOR = generateIdentifier();
+const ORGANIZATION = generateIdentifier();
 const GRAPH = { nodes: [], edges: [] };
 const GRAPH_DELTA = {
     nodes: [], edges: [], deletions: [],
@@ -42,7 +49,7 @@ const DUMMY_BODIES: Readonly<
         success_metrics: 'm', state: 'active',
     },
     'organizations/:id/ideas/:id/submissions/:sid': {
-        idea_id: 'id', member_id: 'id', at: AT,
+        idea_id: ID, member_id: ID, at: AT,
     },
     'organizations/:id/projects/:id': {
         title: 'T', description: 'd', progress: 5,
@@ -52,13 +59,13 @@ const DUMMY_BODIES: Readonly<
         position: 1, state: 'submitted',
     },
     'organizations/:id/projects/:id/flows/:pfid': {
-        project_id: 'id', flow_id: 'id', at: AT,
+        project_id: ID, flow_id: ID, at: AT,
     },
     'organizations/:id/flows/:id': {
         name: 'F', is_locked: false,
         is_auto_layout: true, is_auto_fit: true,
         lock_timeout: 1, state: 'active',
-        state_at: AT, state_event_id: 'ev-1',
+        state_at: AT, state_event_id: ID,
         graph: GRAPH, graphDelta: GRAPH_DELTA,
         revivals: [],
     },
@@ -71,7 +78,7 @@ const DUMMY_BODIES: Readonly<
         position: 1,
     },
     'organizations/:id/flows/:id/work-orders/:woid': {
-        flow_id: 'id', work_order_id: 'id', at: AT,
+        flow_id: ID, work_order_id: ID, at: AT,
     },
     [RECORD_TYPE_DETAIL_PATTERN]: {
         name: 'R', description: 'd', position: 1,
@@ -82,41 +89,41 @@ const DUMMY_BODIES: Readonly<
         sort_order: 1, options: [], constraints: [],
     },
     [INSTANCE_DETAIL_PATTERN]: {
-        set: [{ attribute_id: 'a', value: 'v' }],
+        set: [{ attribute_id: ID, value: 'v' }],
     },
     'organizations/:id/flows/:id/records/:frid': {
-        flow_id: 'id', record_id: 'id', at: AT,
+        flow_id: ID, record_id: ID, at: AT,
     },
     'organizations/:id/flows/:id/tags/:name': {
-        flow_response_id: 'rid',
+        flow_response_id: ID,
     },
     'organizations/:id/objectives/:id': {
         position: 1, state: 'active',
     },
     'organizations/:id/objectives/:id/revisions/:rid': {
-        objective_id: 'id', name: 'N',
-        description: 'd', member_id: 'id', at: AT,
+        objective_id: ID, name: 'N',
+        description: 'd', member_id: ID, at: AT,
     },
     'organizations/:id/projects/:id/objective-baseline-scores/:sid': {
-        project_id: 'id', objective_id: 'id',
-        score: 0, member_id: 'id', at: AT,
+        project_id: ID, objective_id: ID,
+        score: 0, member_id: ID, at: AT,
     },
     'organizations/:id/projects/:id/objective-actual-scores/:sid': {
-        project_id: 'id', objective_id: 'id',
-        score: 0, member_id: 'id', at: AT,
+        project_id: ID, objective_id: ID,
+        score: 0, member_id: ID, at: AT,
     },
     'identities/:id': { kind: 'person' },
     'ai-agents/:id': {
         name: 'A', description: 'd',
-        model: 'mnte677fU2G1V2B9vJp9z7',
+        model: 'nqNVXnBkUBLoKlenbyPIZQ',
         skill_focus: 's',
     },
     'identities/:id/pii': {
-        name: 'N', email: 'e@x', phone: '1',
+        name: 'N', email: 'e@x', phone: 'AjdvjuECVZEgZoFajaIEkg',
         bio: 'b',
     },
     'identities/:id/credentials/:cid': {
-        identity_id: 'id', kind: 'password',
+        identity_id: ID, kind: 'password',
         status: 'set', secret: 's', at: AT,
     },
     'identities/:id/registration': {
@@ -128,11 +135,11 @@ const DUMMY_BODIES: Readonly<
         type: 'member', at: AT,
     },
     'identities/:id/tokens/:tid': {
-        jti: 'j', identity_id: 'id',
-        action: 'issued', chain_id: 'c', at: AT,
+        jti: ID, identity_id: ID,
+        action: 'issued', chain_id: ID, at: AT,
     },
     'identities/:id/token-revocations/:rid': {
-        identity_id: 'id', at: AT,
+        identity_id: ID, at: AT,
     },
     'organizations/:id': {
         name: 'O', domain: 'd.example',
@@ -140,7 +147,7 @@ const DUMMY_BODIES: Readonly<
         projects_limit: 1, ideas_limit: 1,
     },
     'identities/:id/providers/:eid': {
-        identity_id: 'id', provider: 'p',
+        identity_id: ID, provider: 'p',
         provider_subject: 's', action: 'linked',
         at: AT,
     },
@@ -169,12 +176,12 @@ test('every write successBody returns an object or is omitted',
         for (const spec of specsOf(entry)) {
             if (spec.successBody === undefined) continue;
             const dummy = DUMMY_BODIES[pattern]
-                ?? { id: 'id' };
+                ?? { id: ID };
             const body = spec.successBody(
-                ['id', 'id2', 'id3'],
+                [ID, ID2, ID3],
                 dummy,
-                'actor',
-                'organization-1',
+                ACTOR,
+                ORGANIZATION,
             );
             assert.equal(
                 typeof body, 'object', pattern,

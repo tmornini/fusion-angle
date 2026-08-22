@@ -8,8 +8,8 @@ import {
 import { OPERATION_ID_HEADER } from
     '../../../api/message-pair.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 import {
     getSessionToken,
     putSessionToken,
@@ -210,8 +210,8 @@ function makeRequestContext(
     // logs it, and every wire verb carries it as
     // REQUEST_ID_HEADER so the server gate reuses it instead
     // of minting a second, unrelated trace.
-    const requestId = generateCryptoSafeBase62();
-    const operationId = generateCryptoSafeBase62();
+    const requestId = generateIdentifier();
+    const operationId = generateIdentifier();
     function writeHeaders(
         extra?:
             readonly (readonly [string, string])[],

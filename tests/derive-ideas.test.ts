@@ -13,9 +13,11 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const BASE = 'http://localhost';
-const STARK_ORGANIZATION = '1';
+const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 
 function req(
     method: string,
@@ -60,7 +62,7 @@ function putIdea(
     state: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/' + id, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id, token,
         ideaDocument(title, state),
     ));
 }
@@ -68,15 +70,16 @@ function putIdea(
 test('a created idea derives', async () => {
     const db = await seededDb();
     const token = await organizationToken();
+    const ideaId = generateIdentifier();
     const res = await putIdea(
-        db, token, 'idea-drv-created', 'Fresh Idea', 'active',
+        db, token, ideaId, 'Fresh Idea', 'active',
     );
     assert.equal(res.status, 201);
     const derived = await deriveIdea(
-        db, STARK_ORGANIZATION, 'idea-drv-created',
+        db, STARK_ORGANIZATION, ideaId,
     );
     assert.deepEqual(derived, {
-        id: 'idea-drv-created',
+        id: ideaId,
         organization_id: STARK_ORGANIZATION,
         title: 'Fresh Idea',
         position: 1,
@@ -92,22 +95,23 @@ test('a created idea derives', async () => {
 test('an edited idea derives the edit body', async () => {
     const db = await seededDb();
     const token = await organizationToken();
+    const ideaId = generateIdentifier();
     await putIdea(
-        db, token, 'idea-drv-edited', 'Before Edit', 'active',
+        db, token, ideaId, 'Before Edit', 'active',
     );
     // Same domain state — only the entity fields move.
     const res = await putIdea(
-        db, token, 'idea-drv-edited', 'After Edit', 'active',
+        db, token, ideaId, 'After Edit', 'active',
     );
     assert.equal(res.status, 201);
     const derived = await deriveIdea(
-        db, STARK_ORGANIZATION, 'idea-drv-edited',
+        db, STARK_ORGANIZATION, ideaId,
     );
     assert.equal(derived.title, 'After Edit');
     // The unchanged trio replays the SAME event, not a new one —
     // still one row in the derived history.
     const history = await deriveIdeaStateHistory(
-        db, STARK_ORGANIZATION, 'idea-drv-edited',
+        db, STARK_ORGANIZATION, ideaId,
     );
     assert.equal(history.length, 1);
 });
@@ -117,22 +121,23 @@ test(
     async () => {
         const db = await seededDb();
         const token = await organizationToken();
+        const ideaId = generateIdentifier();
         await putIdea(
-            db, token, 'idea-drv-deleted', 'Doomed', 'active',
+            db, token, ideaId, 'Doomed', 'active',
         );
         const res = await putIdea(
-            db, token, 'idea-drv-deleted', 'Doomed', 'deleted',
+            db, token, ideaId, 'Doomed', 'deleted',
         );
         assert.equal(res.status, 201);
 
         const ideas = await deriveIdeas(db, STARK_ORGANIZATION);
         assert.equal(
-            ideas.some((idea) => idea.id === 'idea-drv-deleted'),
+            ideas.some((idea) => idea.id === ideaId),
             false,
         );
         await assert.rejects(
             () => deriveIdea(
-                db, STARK_ORGANIZATION, 'idea-drv-deleted',
+                db, STARK_ORGANIZATION, ideaId,
             ),
             EntityNotFoundError,
         );
@@ -144,28 +149,29 @@ test(
     async () => {
         const db = await seededDb();
         const token = await organizationToken();
+        const ideaId = generateIdentifier();
         await putIdea(
-            db, token, 'idea-drv-tomb', 'Genesis Title',
+            db, token, ideaId, 'Genesis Title',
             'active',
         );
         const res = await putIdea(
-            db, token, 'idea-drv-tomb', 'Tomb Title',
+            db, token, ideaId, 'Tomb Title',
             'deleted',
         );
         assert.equal(res.status, 201);
         const ideas = await deriveIdeas(db, STARK_ORGANIZATION);
         assert.equal(
-            ideas.some((idea) => idea.id === 'idea-drv-tomb'),
+            ideas.some((idea) => idea.id === ideaId),
             false,
         );
         await assert.rejects(
             () => deriveIdea(
-                db, STARK_ORGANIZATION, 'idea-drv-tomb',
+                db, STARK_ORGANIZATION, ideaId,
             ),
             EntityNotFoundError,
         );
         const history = await deriveIdeaStateHistory(
-            db, STARK_ORGANIZATION, 'idea-drv-tomb',
+            db, STARK_ORGANIZATION, ideaId,
         );
         assert.equal(history.length, 2);
         assert.equal(history[0]!.state, 'active');
@@ -177,7 +183,9 @@ test('ordering is oldest live head (at, id)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ids = [
-        'zz-order-idea', 'aa-order-idea', 'mm-order-idea',
+        generateIdentifier(),
+        generateIdentifier(),
+        generateIdentifier(),
     ];
     for (const id of ids) {
         await putIdea(
@@ -196,10 +204,11 @@ test(
     + 'row field-for-field',
     async () => {
         const db = await seededDb();
-        // A seeded idea (org '1' by assignOrganization(0)) whose
+        // A seeded idea (org 'AjdvjuECVZEgZoFajaIEkg' by
+        // assignOrganization(0)) whose
         // ONLY event is its own creation — no post-genesis
         // transitions in the mock data.
-        const ideaId = 'eT5xdKjzLDmuRn3r7XMX4R';
+        const ideaId = 'YvOylAxOjQcgmNmsSoVBPQ';
         const derivedHistory = await deriveIdeaStateHistory(
             db, STARK_ORGANIZATION, ideaId,
         );

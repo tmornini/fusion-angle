@@ -7,25 +7,25 @@ export const OBJECTIVE_SEEDS: Array<{
     description: string;
 }> = [
     {
-        id: 'JkW7aEqFdX3nOiPtVhMrCy',
+        id: 'JobGWBxUTEBusPcVhYEKtA',
         position: 1,
         name: 'Lower expenses',
         description: 'Reduce operational outlay across the business',
     },
     {
-        id: 'RgT2mNvKpQ8xLsYwBzHcUe',
+        id: 'QVZjTYvKwffyfGpYILwkOA',
         position: 2,
         name: 'Increase incomes',
         description: 'Grow top-line through new and existing channels',
     },
     {
-        id: 'bDf6uStZlA9eGmYjIoNcWq',
+        id: 'VhxqyRIQytSnUArslwxyog',
         position: 3,
         name: 'Raise customer NPS',
         description: 'Lift Net Promoter Score across the journey',
     },
     {
-        id: 'CvH4wRnXkU1pQsBgTyEzMo',
+        id: 'GNRUyOMVpjoeEQWrZkRMkQ',
         position: 4,
         name: 'Improve employee morale',
         description: 'Make daily work energizing and sustainable',

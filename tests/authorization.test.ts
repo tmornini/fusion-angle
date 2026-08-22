@@ -11,7 +11,8 @@ test('a :id segment in a prefix matches any path segment',
 () => {
     assert.equal(
         matchesOnSegmentBoundary(
-            '/organizations/1/flows/f1/versions/v1',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'ZOousbbnzpqlxJExVAruYQ/versions/xDyDkxEPwtcNmJVknUHDsg',
                 '/organizations/:id/flows/:id/versions',
         ), true);
 });
@@ -19,7 +20,8 @@ test('a :id segment in a prefix matches any path segment',
 test('a nested prefix does not match a shallower path', () => {
     assert.equal(
         matchesOnSegmentBoundary(
-            '/organizations/1/flows/f1',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'ZOousbbnzpqlxJExVAruYQ',
                 '/organizations/:id/flows/:id/versions',
         ), false);
 });
@@ -29,14 +31,16 @@ test('a prefix matches only on a segment boundary', () => {
         matchesOnSegmentBoundary('/memberships', '/members'),
         false);
     assert.equal(
-        matchesOnSegmentBoundary('/members/m1', '/members'),
+        matchesOnSegmentBoundary('/members/mFNSxZqywTSMXhgUTdTqtA'
+            , '/members'),
         true);
     assert.equal(
         matchesOnSegmentBoundary('/anything', '/'), true);
 });
 
 test('composeClaimRole joins type and organization', () => {
-    assert.equal(composeClaimRole('admin', '1'), 'admin:1');
+    assert.equal(composeClaimRole('admin', 'AjdvjuECVZEgZoFajaIEkg')
+        , 'admin:AjdvjuECVZEgZoFajaIEkg');
     assert.equal(composeClaimRole('member', 'A'), 'member:A');
 });
 
@@ -75,7 +79,8 @@ test('admin is permitted on every verb at root', () => {
             true);
         assert.equal(
             isPermitted(
-                verb, '/organizations/1/members', ['admin'],
+                verb, '/organizations/AjdvjuECVZEgZoFajaIEkg/members'
+                    , ['admin'],
             ), true);
     }
 });
@@ -83,42 +88,49 @@ test('admin is permitted on every verb at root', () => {
 test('deny-by-default: no held role is forbidden', () => {
     assert.equal(
         isPermitted(
-            'GET', '/organizations/1/members', [],
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members', [],
         ), false);
     assert.equal(
         isPermitted(
-            'GET', '/organizations/1/members', ['viewer'],
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members'
+                , ['viewer'],
         ), false);
 });
 
 test('member tier: content surfaces are permitted', () => {
     assert.equal(
         isPermitted(
-            'GET', '/organizations/1/ideas', ['member'],
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas', ['member'],
         ), true);
     assert.equal(
-        isPermitted('PUT', '/organizations/1/ideas/i1', ['member']), true);
+        isPermitted('PUT'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'fndCYAsXazdzMUlEGMNIZw', ['member']), true);
     assert.equal(
         isPermitted(
-            'PUT', '/organizations/1/work-orders/w1/claim', ['member']),
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'xdaJyuuPyHfffCGLhqDrOQ/claim', ['member']),
         true);
     assert.equal(
         isPermitted(
-            'DELETE', '/organizations/1/work-orders/w1/claim', ['member']),
+            'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'xdaJyuuPyHfffCGLhqDrOQ/claim', ['member']),
         true);
     assert.equal(
         isPermitted(
-            'POST', '/identities/current/tokens/j1/rotation',
+            'POST', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
+                + 'jmvogLnzTmiQlAkVvDHrvQ/rotation',
             ['member']),
         true);
     assert.equal(
-        isPermitted('GET', '/organizations/1', ['member']),
+        isPermitted('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            , ['member']),
         true);
 });
 
 test('member tier: admin surfaces stay denied', () => {
     assert.equal(
-        isPermitted('PUT', '/memberships/m1', ['member']),
+        isPermitted('PUT', '/memberships/mFNSxZqywTSMXhgUTdTqtA', ['member']),
         false);
     assert.equal(
         isPermitted('GET', '/memberships', ['member']),
@@ -127,14 +139,15 @@ test('member tier: admin surfaces stay denied', () => {
         isPermitted('GET', '/identities', ['member']),
         false);
     assert.equal(
-        isPermitted('PUT', '/organizations/1', ['member']),
+        isPermitted('PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            , ['member']),
         false);
     assert.equal(
-        isPermitted('PUT', '/members/m1', ['member']),
+        isPermitted('PUT', '/members/mFNSxZqywTSMXhgUTdTqtA', ['member']),
         false);
     assert.equal(
         isPermitted(
-            'GET', '/identities/current/tokens', ['member'],
+            'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens', ['member'],
         ),
         false);
 });
@@ -145,15 +158,16 @@ test('prefixes match on segment boundaries only', () => {
     // surface that merely shares the leading characters.
     assert.equal(
         isPermitted(
-            'GET', '/organizations/1/members', ['member'],
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members'
+                , ['member'],
         ), true);
     assert.equal(
-        isPermitted('GET', '/members/m1', ['member']),
+        isPermitted('GET', '/members/mFNSxZqywTSMXhgUTdTqtA', ['member']),
         false);
     assert.equal(
         isPermitted('GET', '/memberships', ['member']),
         false);
     assert.equal(
-        isPermitted('GET', '/memberships/m1', ['member']),
+        isPermitted('GET', '/memberships/mFNSxZqywTSMXhgUTdTqtA', ['member']),
         false);
 });

@@ -135,7 +135,7 @@ test('applyUpdateFlowName trims input', () => {
 });
 
 test('applyAddEdge appends new edge', () => {
-    const edges = [edge('e1', 'a', 'b')];
+    const edges = [edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b')];
     const result = applyAddEdge(
         edges, 'e2', 'goto', 'b', 'c',
     );
@@ -147,7 +147,7 @@ test('applyAddEdge appends new edge', () => {
 });
 
 test('applyAddEdge does not mutate input', () => {
-    const edges = [edge('e1', 'a', 'b')];
+    const edges = [edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b')];
     applyAddEdge(edges, 'e2', '', 'b', 'c');
     assert.equal(edges.length, 1);
 });
@@ -157,7 +157,7 @@ test('applyDeleteNodes removes nodes and orphan edges', () => {
         node('a'), node('b'), node('c'),
     ];
     const edges = [
-        edge('e1', 'a', 'b'),
+        edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b'),
         edge('e2', 'b', 'c'),
         edge('e3', 'a', 'c'),
     ];
@@ -170,14 +170,14 @@ test('applyDeleteNodes removes nodes and orphan edges', () => {
         result.nodes.map(n => n.id),
         ['a', 'c'],
     );
-    // e1 and e2 reference 'b', so are dropped
+    // YiJPbufDpkyrZcZCYbUJpg and e2 reference 'b', so are dropped
     assert.equal(result.edges.length, 1);
     assert.equal(result.edges[0]?.id, 'e3');
 });
 
 test('applyDeleteNodes empty id set leaves both arrays unchanged', () => {
     const nodes = [node('a'), node('b')];
-    const edges = [edge('e1', 'a', 'b')];
+    const edges = [edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b')];
     const result = applyDeleteNodes(
         nodes, edges, new Set(),
     );
@@ -185,17 +185,17 @@ test('applyDeleteNodes empty id set leaves both arrays unchanged', () => {
         result.nodes.map(n => n.id), ['a', 'b'],
     );
     assert.deepEqual(
-        result.edges.map(e => e.id), ['e1'],
+        result.edges.map(e => e.id), ['YiJPbufDpkyrZcZCYbUJpg'],
     );
 });
 
 test('applyDeleteEdge removes single edge by id', () => {
     const edges = [
-        edge('e1', 'a', 'b'),
+        edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b'),
         edge('e2', 'b', 'c'),
     ];
     const result = applyDeleteEdge(
-        edges, 'e1',
+        edges, 'YiJPbufDpkyrZcZCYbUJpg',
     );
     assert.equal(result.length, 1);
     assert.equal(result[0]?.id, 'e2');
@@ -203,7 +203,7 @@ test('applyDeleteEdge removes single edge by id', () => {
 
 test('applyDeleteEdge with non-matching id is a no-op', () => {
     const edges = [
-        edge('e1', 'a', 'b'),
+        edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b'),
         edge('e2', 'b', 'c'),
     ];
     const result = applyDeleteEdge(
@@ -211,7 +211,7 @@ test('applyDeleteEdge with non-matching id is a no-op', () => {
     );
     assert.equal(result.length, 2);
     assert.deepEqual(
-        result.map(e => e.id), ['e1', 'e2'],
+        result.map(e => e.id), ['YiJPbufDpkyrZcZCYbUJpg', 'e2'],
     );
 });
 
@@ -252,11 +252,11 @@ test(
 
 test('applyUpdateEdge patches matching id', () => {
     const edges = [
-        edge('e1', 'a', 'b'),
+        edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b'),
         edge('e2', 'b', 'c'),
     ];
     const result = applyUpdateEdge(
-        edges, 'e1', { name: 'go' },
+        edges, 'YiJPbufDpkyrZcZCYbUJpg', { name: 'go' },
     );
     assert.equal(result[0]?.name, 'go');
     assert.equal(result[1]?.name, '');
@@ -344,7 +344,7 @@ test('applyUpdateAttributeRequired flips the flag', () => {
 test('applyAutoLayout positions every node', () => {
     const result = applyAutoLayout(
         [{ ...node('a'), isCreate: true }, node('b')],
-        [edge('e1', 'a', 'b')],
+        [edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b')],
         800, 600, false, 0);
     for (const n of result.nodes) {
         assert.equal(typeof n.positionX, 'number');

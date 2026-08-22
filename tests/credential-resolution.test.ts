@@ -14,7 +14,7 @@ import {
 async function tokenWithExp(exp: number): Promise<string> {
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
-        sub: 'current', roles: [], name: 'Demo',
+        sub: 'XXZruirZyAOoRpNxaDnpSA', roles: [], name: 'Demo',
         iat: exp - 1000, ttlSeconds: 1000, jti: 'j' + exp,
     });
 }

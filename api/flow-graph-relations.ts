@@ -1,4 +1,6 @@
 import { latestByKey } from '../shared/ledger-reduction.ts';
+import { compareIdentifiers } from
+    '../shared/identifier.ts';
 import type {
     FlowNodeId,
     FlowNodeEntity,
@@ -42,7 +44,8 @@ export function relationFailClosed<
     const c = RELATION_ACTION_RANK[candidate.action];
     const i = RELATION_ACTION_RANK[incumbent.action];
     if (c !== i) return c > i;
-    return candidate.id > incumbent.id;
+    return compareIdentifiers(candidate.id, incumbent.id)
+        > 0;
 }
 
 // The member ids a node CURRENTLY joins: the latest action per
@@ -152,7 +155,7 @@ export function reduceCreateGraphDelta(
 // carried verbatim by postFlowDocumentOp — its nodes[]/edges[]
 // arrive in whatever order the client happened to serialize.
 // Re-sorting nodes[]/edges[] ascending-id here makes the
-// derived GET a stable id-lex snapshot of whatever order
+// derived GET a snapshot in identifier order of whatever
 // the client serialized. The seam promises rows, never an
 // order. Within-node
 // memberIds[]/attributes[] pass through UNSORTED — a cosmetic

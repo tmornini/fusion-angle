@@ -5,6 +5,8 @@ import {
     residualPageInitMs,
     MEASURE_BOOT_PAGE_INIT,
 } from './measure-viz-core.ts';
+import { isIdentifier } from
+    '../../shared/identifier.ts';
 
 export type ApiRequestHit = {
     method: string;
@@ -46,9 +48,8 @@ export function canonicalizeResource(
         .join('/');
 }
 
-// Crypto-safe base62 ids are length 22 (shared/).
 function isOpaqueIdSegment(seg: string): boolean {
-    return /^[A-Za-z0-9_-]{22}$/.test(seg);
+    return isIdentifier(seg);
 }
 
 export function summarizeRequestHits(

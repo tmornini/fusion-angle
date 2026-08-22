@@ -26,7 +26,7 @@ const FIELDS = {
 async function setup() {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedServiceIdentity(db, 'svc-1');
+    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
     return createRequestContext(db, await devToken());
 }
 
@@ -34,7 +34,7 @@ test('an unregistered service reads as registered: false',
 async () => {
     const ctx = await setup();
     assert.deepEqual(
-        await getClientRegistration(ctx, 'svc-1'),
+        await getClientRegistration(ctx, 'uWzjNIEeEtVWqZoJMLeYpw'),
         { registered: false },
     );
 });
@@ -42,9 +42,9 @@ async () => {
 test('put then get round-trips through the camelCase'
 + ' domain shape', async () => {
     const ctx = await setup();
-    await putClientRegistration(ctx, 'svc-1', FIELDS);
+    await putClientRegistration(ctx, 'uWzjNIEeEtVWqZoJMLeYpw', FIELDS);
     assert.deepEqual(
-        await getClientRegistration(ctx, 'svc-1'),
+        await getClientRegistration(ctx, 'uWzjNIEeEtVWqZoJMLeYpw'),
         { registered: true, ...FIELDS },
     );
 });
@@ -52,10 +52,10 @@ test('put then get round-trips through the camelCase'
 test('delete deregisters back to registered: false',
 async () => {
     const ctx = await setup();
-    await putClientRegistration(ctx, 'svc-1', FIELDS);
-    await deleteClientRegistration(ctx, 'svc-1');
+    await putClientRegistration(ctx, 'uWzjNIEeEtVWqZoJMLeYpw', FIELDS);
+    await deleteClientRegistration(ctx, 'uWzjNIEeEtVWqZoJMLeYpw');
     assert.deepEqual(
-        await getClientRegistration(ctx, 'svc-1'),
+        await getClientRegistration(ctx, 'uWzjNIEeEtVWqZoJMLeYpw'),
         { registered: false },
     );
 });

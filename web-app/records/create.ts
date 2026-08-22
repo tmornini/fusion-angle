@@ -8,7 +8,7 @@ import {
     sessionContext,
     getRecordEntities,
     postRecordChange,
-    generateCryptoSafeBase62,
+    generateIdentifier,
 } from '../app/adapters/index.ts';
 import {
     nextPosition,
@@ -55,7 +55,7 @@ async function handleSubmit(): Promise<void> {
     const position = nextPosition(
         existing.map(r => r.position),
     );
-    const id = generateCryptoSafeBase62();
+    const id = generateIdentifier();
     await postRecordChange(ctx, id, {
         kind: 'create',
         record: { name, description, position },

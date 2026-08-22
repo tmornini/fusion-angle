@@ -75,7 +75,7 @@ async function derivedRecords(
     db: MemoryDbAdapter, organization: string,
 ): Promise<RecordEntity[]> {
     return documentCollectionGetHandler(RECORDS_WIRING)(
-        db, [], 'current', organization,
+        db, [], 'XXZruirZyAOoRpNxaDnpSA', organization,
     ) as Promise<RecordEntity[]>;
 }
 
@@ -85,7 +85,7 @@ async function derivedRecordAttributes(
     db: MemoryDbAdapter, organization: string,
 ): Promise<RecordAttributeEntity[]> {
     const token = await organizationToken(
-        'current', organization,
+        'XXZruirZyAOoRpNxaDnpSA', organization,
     );
     const typesRes = await handleRequest(
         db,
@@ -156,12 +156,12 @@ async function derivedObjectives(
     db: MemoryDbAdapter, organization: string,
 ): Promise<ObjectiveEntity[]> {
     return documentCollectionGetHandler(OBJECTIVES_WIRING)(
-        db, [], 'current', organization,
+        db, [], 'XXZruirZyAOoRpNxaDnpSA', organization,
     ) as Promise<ObjectiveEntity[]>;
 }
 
-const ORGANIZATION_ONE = '1';
-const ORGANIZATION_TWO = '2';
+const ORGANIZATION_ONE = 'AjdvjuECVZEgZoFajaIEkg';
+const ORGANIZATION_TWO = 'BBjWJsjYIDkTRKIIPrzWRw';
 
 async function seed() {
     return { db: await seededMockDb() };
@@ -207,11 +207,12 @@ async () => {
     const { db } = await seed();
     // Phase Final Task 2: memberships on the pair plane.
     const organizations = (
-        await deriveMembershipsForIdentity(db, 'current')
+        await deriveMembershipsForIdentity(db, 'XXZruirZyAOoRpNxaDnpSA')
     )
         .map(m => m.organization_id)
         .sort();
-    assert.deepEqual(organizations, ['1', '2']);
+    assert.deepEqual(organizations, ['AjdvjuECVZEgZoFajaIEkg'
+        , 'BBjWJsjYIDkTRKIIPrzWRw']);
     // Phase Final Stage B: roster tables retired.
 });
 
@@ -220,7 +221,7 @@ test('current holds admin in both orgs', async () => {
     // Privilege is membership type:"admin"; mint bakes
     // claim roles from that type.
     const rows = await deriveMembershipsForIdentity(
-        db, 'current',
+        db, 'XXZruirZyAOoRpNxaDnpSA',
     );
     const byOrganization = new Map(
         rows.map(m => [m.organization_id, m.type]),
@@ -299,11 +300,12 @@ test('every work order belongs to org 1', async () => {
     const { db } = await seed();
     // Phase Final Task 2: work orders from the pair plane.
     const token = await organizationToken(
-        'current', ORGANIZATION_ONE,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_ONE,
     );
     const res = await handleRequest(
         db,
-        new Request('http://localhost/organizations/1/work-orders/', {
+        new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'work-orders/', {
             headers: {
                 Authorization: 'Bearer ' + token,
             },
@@ -320,7 +322,7 @@ test('every work order belongs to org 1', async () => {
     }
     // Org two carries none.
     const tokenTwo = await organizationToken(
-        'current', ORGANIZATION_TWO,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
     const empty = await handleRequest(
         db,
@@ -380,7 +382,7 @@ async () => {
     const persons = (await liveIdentityIds(db))
         .filter(id => id !== SYSTEM_MEMBER_ID);
     for (const id of persons) {
-        if (id === 'current') continue;
+        if (id === 'XXZruirZyAOoRpNxaDnpSA') continue;
         const organizations = byIdentity.get(id) ?? new Set();
         assert.ok(
             organizations.size <= 1,
@@ -523,7 +525,7 @@ async () => {
     const ids = await liveIdentityIds(db);
     let passwordCount = 0;
     for (const id of ids) {
-        if (id === 'system') continue;
+        if (id === SYSTEM_MEMBER_ID) continue;
         const rows = await deriveCredentialsFor(
             db, id,
         );

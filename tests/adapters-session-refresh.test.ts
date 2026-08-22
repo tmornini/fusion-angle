@@ -56,7 +56,7 @@ async function seedAuthorizationCodePair(
         password: 'seed-password', client_id: 'web',
     };
     const pair = await formAuthPair(
-        seed, requestBody, 'current', 200, { code },
+        seed, requestBody, 'XXZruirZyAOoRpNxaDnpSA', 200, { code },
     );
     await putMessagePair(db, pair);
 }
@@ -93,7 +93,8 @@ async () => {
         await postSessionRefresh(ctx, pair.refresh_token);
     assert.notEqual(creds.refreshToken, pair.refresh_token);
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members/', creds.accessToken)));
+        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , creds.accessToken)));
 });
 
 test('a garbage refresh token throws UnauthorizedError',

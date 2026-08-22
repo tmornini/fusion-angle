@@ -38,6 +38,8 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Instance create is public PATCH (Task 20). Public PUT
 // is 405. Pins use deriveInstanceHead for post-create
@@ -45,12 +47,12 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
-const ORGANIZATION = '1';
-const TYPE_ID = 'rt-inst-1';
-const ATTR_ID = 'attr-inst-1';
-const ATTR_NUM = 'attr-inst-num';
-const ATTR_LOCKED = 'attr-inst-locked';
-const INSTANCE_ID = 'inst-1';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
+const TYPE_ID = 'sleWPUnGznNnXLzcfFswjg';
+const ATTR_ID = generateIdentifier();
+const ATTR_NUM = generateIdentifier();
+const ATTR_LOCKED = generateIdentifier();
+const INSTANCE_ID = generateIdentifier();
 
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
@@ -97,19 +99,19 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, 'm-member1', {
+    await seedMembershipPair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
-        identity_id: 'member1',
+        identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
         at: AT,
     });
     return {
         db,
         adminToken: await organizationToken(
-            'current', ORGANIZATION,
+            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
         ),
         memberToken: await organizationToken(
-            'member1', ORGANIZATION,
+            'nkgaOHZISTQrILTfPThWCA', ORGANIZATION,
         ),
     };
 }

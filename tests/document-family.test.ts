@@ -51,6 +51,17 @@ import { ApiError, HTTP_PRECONDITION_FAILED } from
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+
+const PROJECT_1 = generateIdentifier();
+const ID_1 = generateIdentifier();
+const AG_1 = generateIdentifier();
+const DOC_CHILD = generateIdentifier();
+const SL_1 = generateIdentifier();
+const SL_2 = generateIdentifier();
+const SL_3 = generateIdentifier();
+const SL_4 = generateIdentifier();
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -93,9 +104,11 @@ test('documentWriteResponseSpec produces the ideas'
         state: 'active',
     };
     const actual = documentWriteResponseSpec(wiring)
-        .successBody!(['1', 'idea-1'], body, 'current', '1');
+        .successBody!(['AjdvjuECVZEgZoFajaIEkg', 'gVvtDIaqhnkXZQcxZeSuiw']
+            , body, 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
     assert.deepEqual(actual, {
-        id: 'idea-1', organization_id: '1',
+        id: 'gVvtDIaqhnkXZQcxZeSuiw'
+            , organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 'T', position: 1, problem_statement: 'p',
         target_users: 't', proposed_solution: 's',
         expected_outcome: 'o', success_metrics: 'm',
@@ -114,10 +127,11 @@ test('documentWriteResponseSpec produces the projects'
     };
     const actual = documentWriteResponseSpec(wiring)
         .successBody!(
-            ['1', 'project-1'], body, 'current', '1',
+            ['AjdvjuECVZEgZoFajaIEkg', PROJECT_1], body
+                , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
         );
     assert.deepEqual(actual, {
-        id: 'project-1', organization_id: '1',
+        id: PROJECT_1, organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 'T', description: 'd', progress: 5,
         start_date: '2026-01-01', target_end_date: '2026-02-01',
         estimated_cost: 100, actual_cost: 50, position: 1,
@@ -130,8 +144,9 @@ test('documentWriteResponseSpec produces the identities'
     const wiring = documentFamilyWiring('identities')!;
     const body = { kind: 'person' };
     const actual = documentWriteResponseSpec(wiring)
-        .successBody!(['id-1'], body, 'current', '1');
-    assert.deepEqual(actual, { id: 'id-1', kind: 'person' });
+        .successBody!([ID_1], body, 'XXZruirZyAOoRpNxaDnpSA'
+            , 'AjdvjuECVZEgZoFajaIEkg');
+    assert.deepEqual(actual, { id: ID_1, kind: 'person' });
 });
 
 test('leftover roster families have no document wiring',
@@ -153,12 +168,13 @@ test('documentWriteResponseSpec produces the ai-agents'
     const wiring = documentFamilyWiring('ai-agents')!;
     const body = {
         name: 'A', description: 'd',
-        model: 'mnte677fU2G1V2B9vJp9z7',
+        model: 'nqNVXnBkUBLoKlenbyPIZQ',
         skill_focus: 's',
     };
     const actual = documentWriteResponseSpec(wiring)
-        .successBody!(['ag-1'], body, 'current', '1');
-    assert.deepEqual(actual, { id: 'ag-1', ...body });
+        .successBody!([AG_1], body, 'XXZruirZyAOoRpNxaDnpSA'
+            , 'AjdvjuECVZEgZoFajaIEkg');
+    assert.deepEqual(actual, { id: AG_1, ...body });
 });
 
 // -- (b) documentEntityRoute('simple') dispatches PUT to the
@@ -180,28 +196,33 @@ test('documentEntityRoute (simple arm) PUTs through the'
         proposed_solution: 's', expected_outcome: 'o',
         success_metrics: 'm',
         state: 'active',
-        organization_id: '1',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
     const pair = await formWritePair({
-        method: 'PUT', pathname: '/organizations/1/ideas/idea-9',
+        method: 'PUT'
+            , pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'gZsGVjTnvrgHQLzbKnQckg',
         routePattern: 'organizations/:id/ideas/:id',
         routeSegments: ['ideas', ':id'],
-        pathSegments: ['ideas', 'idea-9'],
-        headerFields: [], body, requesterIdentityId: 'current',
-        requestAt: AT, organization: '1',
+        pathSegments: ['ideas', 'gZsGVjTnvrgHQLzbKnQckg'],
+        headerFields: [], body, requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+        requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
         operationId: TEST_OPERATION_ID,
     });
     const written = await route.put!(
-        db, ['1', 'idea-9'], body, 'current', pair,
+        db, ['AjdvjuECVZEgZoFajaIEkg', 'gZsGVjTnvrgHQLzbKnQckg'], body
+            , 'XXZruirZyAOoRpNxaDnpSA', pair,
     );
     assert.equal(
         (written as { title: string }).title, 'Generic',
     );
     const got = await route.get!(
-        db, ['1', 'idea-9'], 'current', '1',
+        db, ['AjdvjuECVZEgZoFajaIEkg', 'gZsGVjTnvrgHQLzbKnQckg']
+            , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
     );
-    assert.deepEqual(got, await deriveIdea(db, '1', 'idea-9'));
+    assert.deepEqual(got, await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg'
+        , 'gZsGVjTnvrgHQLzbKnQckg'));
 });
 
 // -- (c) the locked arm, against a SYNTHETIC registration. ---
@@ -351,7 +372,7 @@ async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const res = await handleRequest(db, req(
-            'PUT', '/' + TEST_FAMILY + '/doc-1', token,
+            'PUT', '/' + TEST_FAMILY + '/XufQcWIKhZshfJYOVNeUSw', token,
             { v: 'first' },
         ));
         assert.equal(res.status, 201);
@@ -367,7 +388,7 @@ test('locked arm: a sibling route under the SAME family'
         const db = await freshDb();
         const token = await organizationToken();
         const path = '/' + CHILD_PATTERN
-            .replace(':id', 'doc-child');
+            .replace(':id', DOC_CHILD);
         const first = await handleRequest(db, req(
             'PUT', path, token, { v: 'first' },
         ));
@@ -388,18 +409,18 @@ async () => {
         const db = await freshDb();
         const token = await organizationToken();
         await handleRequest(db, req(
-            'PUT', '/' + TEST_FAMILY + '/doc-2', token,
+            'PUT', '/' + TEST_FAMILY + '/YHvbnJSZHECuziaHXcsKpw', token,
             { v: 'first' },
         ));
         const res = await handleRequest(db, req(
-            'PUT', '/' + TEST_FAMILY + '/doc-2', token,
+            'PUT', '/' + TEST_FAMILY + '/YHvbnJSZHECuziaHXcsKpw', token,
             { v: 'second' },
         ));
         assert.equal(res.status, 428);
         assert.equal(
             (await res.json()).error,
             'If-Match is required to PUT /'
-            + TEST_FAMILY + '/doc-2',
+            + TEST_FAMILY + '/YHvbnJSZHECuziaHXcsKpw',
         );
     });
 });
@@ -409,11 +430,11 @@ test('locked arm: a stale If-Match echo 412s', async () => {
         const db = await freshDb();
         const token = await organizationToken();
         await handleRequest(db, req(
-            'PUT', '/' + TEST_FAMILY + '/doc-3', token,
+            'PUT', '/' + TEST_FAMILY + '/YIuEjXvCwXAgrpyvcvLJjg', token,
             { v: 'first' },
         ));
         const res = await handleRequest(db, req(
-            'PUT', '/' + TEST_FAMILY + '/doc-3', token,
+            'PUT', '/' + TEST_FAMILY + '/YIuEjXvCwXAgrpyvcvLJjg', token,
             { v: 'second' },
             { [IF_MATCH_HEADER]: strongEtagOf(
                 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
@@ -424,7 +445,7 @@ test('locked arm: a stale If-Match echo 412s', async () => {
         assert.equal(
             (await res.json()).error,
             'If-Match does not match the current document at '
-            + '/' + TEST_FAMILY + '/doc-3',
+            + '/' + TEST_FAMILY + '/YIuEjXvCwXAgrpyvcvLJjg',
         );
     });
 });
@@ -435,12 +456,12 @@ test('locked arm: a matching echo stores no predecessor'
         const db = await freshDb();
         const token = await organizationToken();
         const first = await handleRequest(db, req(
-            'PUT', '/' + TEST_FAMILY + '/doc-4', token,
+            'PUT', '/' + TEST_FAMILY + '/YKtyCizelcaUAaHGwetojA', token,
             { v: 'first' },
         ));
         const firstEtag = first.headers.get('ETag')!;
         const second = await handleRequest(db, req(
-            'PUT', '/' + TEST_FAMILY + '/doc-4', token,
+            'PUT', '/' + TEST_FAMILY + '/YKtyCizelcaUAaHGwetojA', token,
             { v: 'second' },
             { [IF_MATCH_HEADER]: firstEtag },
         ));
@@ -466,12 +487,12 @@ async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const first = await handleRequest(db, req(
-            'PUT', '/' + TEST_FAMILY + '/doc-5', token,
+            'PUT', '/' + TEST_FAMILY + '/YLbPBVpBLImxPQRqLKPKLw', token,
             { v: 'first' },
         ));
         const firstEtag = first.headers.get('ETag')!;
         const editRequest = req(
-            'PUT', '/' + TEST_FAMILY + '/doc-5', token,
+            'PUT', '/' + TEST_FAMILY + '/YLbPBVpBLImxPQRqLKPKLw', token,
             { v: 'second' },
             { [IF_MATCH_HEADER]: firstEtag },
         );
@@ -499,20 +520,21 @@ test('locked arm: a fresh-keyed replay echoing a superseded'
         const db = await freshDb();
         const token = await organizationToken();
         const genesis = await handleRequest(db, req(
-            'PUT', '/' + TEST_FAMILY + '/doc-6', token,
+            'PUT', '/' + TEST_FAMILY + '/YMhCOBWvbUQVTDYjSloGqw', token,
             { v: 'first' },
         ));
         const genesisEtag = genesis.headers.get('ETag')!;
         await handleRequest(db, req(
-            'PUT', '/' + TEST_FAMILY + '/doc-6', token,
+            'PUT', '/' + TEST_FAMILY + '/YMhCOBWvbUQVTDYjSloGqw', token,
             { v: 'second' },
             { [IF_MATCH_HEADER]: genesisEtag },
         ));
         // A DIFFERENT (fresh) address has no head of its own;
-        // echoing doc-6's now-superseded genesis tag is neither
+        // echoing YMhCOBWvbUQVTDYjSloGqw's now-superseded genesis tag is
+        // neither
         // "absent" nor "matches MY head" — 412.
         const res = await handleRequest(db, req(
-            'PUT', '/' + TEST_FAMILY + '/doc-7', token,
+            'PUT', '/' + TEST_FAMILY + '/YRIdjCmJlkfhIuSkvoTcnQ', token,
             { v: 'first' },
             { [IF_MATCH_HEADER]: genesisEtag },
         ));
@@ -530,8 +552,8 @@ test('locked arm: two writers racing the SAME echo — the'
         routeSegments: [TEST_FAMILY, ':id'],
         pathSegments: [TEST_FAMILY, 'race'],
         headerFields: [], body: { v: 'genesis' },
-        requesterIdentityId: 'current', requestAt: AT,
-        organization: '1', responseStatus: 200,
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
+        organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
         responseBody: undefined,
         operationId: TEST_OPERATION_ID,
     });
@@ -552,8 +574,8 @@ test('locked arm: two writers racing the SAME echo — the'
         routeSegments: [TEST_FAMILY, ':id'],
         pathSegments: [TEST_FAMILY, 'race'],
         headerFields: [echo], body: { v: 'a' },
-        requesterIdentityId: 'current', requestAt: AT,
-        organization: '1', responseStatus: 200,
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
+        organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
         responseBody: undefined,
         latchedHeadPairId: genesis.id,
         matchedEtag: genesis.responseEtag,
@@ -565,19 +587,19 @@ test('locked arm: two writers racing the SAME echo — the'
         routeSegments: [TEST_FAMILY, ':id'],
         pathSegments: [TEST_FAMILY, 'race'],
         headerFields: [echo], body: { v: 'b' },
-        requesterIdentityId: 'current', requestAt: AT,
-        organization: '1', responseStatus: 200,
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
+        organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
         responseBody: undefined,
         latchedHeadPairId: genesis.id,
         matchedEtag: genesis.responseEtag,
         operationId: TEST_OPERATION_ID,
     });
     await testDocumentOp(
-        db, 'race', { v: 'a' }, 'current', writerA,
+        db, 'race', { v: 'a' }, 'XXZruirZyAOoRpNxaDnpSA', writerA,
     );
     await assert.rejects(
         () => testDocumentOp(
-            db, 'race', { v: 'b' }, 'current', writerB,
+            db, 'race', { v: 'b' }, 'XXZruirZyAOoRpNxaDnpSA', writerB,
         ),
         (err: unknown) =>
             err instanceof ApiError
@@ -601,7 +623,7 @@ async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
         const token = await organizationToken();
-        const path = '/' + TEST_FAMILY + '/doc-race';
+        const path = '/' + TEST_FAMILY + '/YRLOudHOEHboXTwRDwLUTg';
         const genesis = await handleRequest(db, req(
             'PUT', path, token, { v: 'genesis' },
         ));
@@ -631,9 +653,9 @@ async () => {
         const atPath = pairs.filter(
             (row) =>
                 row.uri_collection
-                    === '/organizations/1/'
+                    === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + TEST_FAMILY + '/'
-                && row.uri_id === 'doc-race',
+                && row.uri_id === 'YRLOudHOEHboXTwRDwLUTg',
         );
         assert.equal(atPath.length, 2);
         // Genesis + exactly one winner write landed; the
@@ -711,8 +733,8 @@ async function putStatelessDocumentPair(
         routePattern: STATELESS_FAMILY + '/:id',
         routeSegments: [STATELESS_FAMILY, ':id'],
         pathSegments: [STATELESS_FAMILY, id],
-        headerFields: [], body, requesterIdentityId: 'current',
-        requestAt: AT, organization: '1',
+        headerFields: [], body, requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+        requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200,
         responseBody: { id, ...body },
         operationId: TEST_OPERATION_ID,
@@ -734,8 +756,8 @@ async function deleteStatelessDocumentPair(
         routeSegments: [STATELESS_FAMILY, ':id'],
         pathSegments: [STATELESS_FAMILY, id],
         headerFields: [], body: {},
-        requesterIdentityId: 'current',
-        requestAt: AT, organization: '1',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+        requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
         operationId: TEST_OPERATION_ID,
     });
@@ -749,12 +771,13 @@ test('stateless lifecycle: a trio-less document PUT derives'
 + ' through documentGetHandler with no throw', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await putStatelessDocumentPair(db, 'sl-1', { v: 'first' });
+    await putStatelessDocumentPair(db, SL_1, { v: 'first' });
     const got = await documentGetHandler(statelessWiring)(
-        db, ['1', 'sl-1'], 'current', '1',
+        db, ['AjdvjuECVZEgZoFajaIEkg', SL_1], 'XXZruirZyAOoRpNxaDnpSA'
+            , 'AjdvjuECVZEgZoFajaIEkg',
     );
     assert.deepEqual(got, {
-        id: 'sl-1', organization_id: '1', v: 'first',
+        id: SL_1, organization_id: 'AjdvjuECVZEgZoFajaIEkg', v: 'first',
     });
 });
 
@@ -762,12 +785,13 @@ test('stateless lifecycle: documentCollectionGetHandler skips'
 + ' the per-document history walk too', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await putStatelessDocumentPair(db, 'sl-2', { v: 'listed' });
+    await putStatelessDocumentPair(db, SL_2, { v: 'listed' });
     const rows = await documentCollectionGetHandler(
         statelessWiring,
-    )(db, [], 'current', '1');
+    )(db, [], 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
     assert.deepEqual(rows, [
-        { id: 'sl-2', organization_id: '1', v: 'listed' },
+        { id: SL_2, organization_id: 'AjdvjuECVZEgZoFajaIEkg'
+            , v: 'listed' },
     ]);
 });
 
@@ -775,11 +799,12 @@ test('stateless lifecycle: a DELETE head 404s carrying'
 + ' notFoundTable, never the family', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await putStatelessDocumentPair(db, 'sl-3', { v: 'first' });
-    await deleteStatelessDocumentPair(db, 'sl-3');
+    await putStatelessDocumentPair(db, SL_3, { v: 'first' });
+    await deleteStatelessDocumentPair(db, SL_3);
     await assert.rejects(
         documentGetHandler(statelessWiring)(
-            db, ['1', 'sl-3'], 'current', '1',
+            db, ['AjdvjuECVZEgZoFajaIEkg', SL_3], 'XXZruirZyAOoRpNxaDnpSA'
+                , 'AjdvjuECVZEgZoFajaIEkg',
         ),
         (error: unknown) => {
             assert.ok(error instanceof EntityNotFoundError);
@@ -796,10 +821,10 @@ test('stateless lifecycle: a DELETE head is absent from the'
 + ' collection too', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await putStatelessDocumentPair(db, 'sl-4', { v: 'first' });
-    await deleteStatelessDocumentPair(db, 'sl-4');
+    await putStatelessDocumentPair(db, SL_4, { v: 'first' });
+    await deleteStatelessDocumentPair(db, SL_4);
     const rows = await documentCollectionGetHandler(
         statelessWiring,
-    )(db, [], 'current', '1');
+    )(db, [], 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
     assert.deepEqual(rows, []);
 });

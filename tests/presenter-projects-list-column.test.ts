@@ -54,10 +54,10 @@ test(
     'projected impact column renders for each'
     + ' project',
     () => {
-        const projects = [makeProject('p1')];
+        const projects = [makeProject('pnXmXrxOWayANgDLdCjuBw')];
         const scoreMap = new Map([
-            ['p1', {
-                projectId: 'p1',
+            ['pnXmXrxOWayANgDLdCjuBw', {
+                projectId: 'pnXmXrxOWayANgDLdCjuBw',
                 baselineAvg: 47,
                 latestActualAvg: undefined,
                 baselineCount: 3,
@@ -98,10 +98,10 @@ test(
 test(
     'missing score renders absent and sorts last',
     () => {
-        const projects = [makeProject('p1')];
+        const projects = [makeProject('pnXmXrxOWayANgDLdCjuBw')];
         const scoreMap = new Map([
-            ['p1', {
-                projectId: 'p1',
+            ['pnXmXrxOWayANgDLdCjuBw', {
+                projectId: 'pnXmXrxOWayANgDLdCjuBw',
                 baselineAvg: undefined,
                 latestActualAvg: undefined,
                 baselineCount: 0,
@@ -210,7 +210,7 @@ test(
     () => {
         const state =
             buildInitialProjectListState(
-                [makeProject('p1')],
+                [makeProject('pnXmXrxOWayANgDLdCjuBw')],
             );
         const sortEl = {
             innerHTML: '',

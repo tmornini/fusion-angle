@@ -28,35 +28,38 @@ const { ProjectScoreHistoryPresenter } = await import(
 
 const baselines = [
     { id: 'b1',
-      projectId: 'p1', objectiveId: 'o1',
-      score: 50, memberId: 'w1',
+      projectId: 'pnXmXrxOWayANgDLdCjuBw'
+          , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+      score: 50, memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
       at: '2026-03-01T14:23:00.000000Z' },
     { id: 'b2',
-      projectId: 'p1', objectiveId: 'o1',
-      score: 40, memberId: 'w1',
+      projectId: 'pnXmXrxOWayANgDLdCjuBw'
+          , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+      score: 40, memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
       at: '2026-03-05T09:10:00.000000Z' },
 ];
 const actuals = [
-    { id: 'a1',
-      projectId: 'p1', objectiveId: 'o1',
-      score: 45, memberId: 'w1',
+    { id: 'UQTJZvCoKlFjEoDlDUwekw',
+      projectId: 'pnXmXrxOWayANgDLdCjuBw'
+          , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+      score: 45, memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
       at: '2026-04-01T16:45:00.000000Z' },
 ];
 const revisions = [
-    { id: 'r1',
-      objectiveId: 'o1', name: 'Increase Revenue',
-      description: 'd1', memberId: 'w1',
+    { id: 'rOEPOcVMQdJiiiMuiiEhlg',
+      objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', name: 'Increase Revenue',
+      description: 'd1', memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
       at: '2026-02-01T00:00:00.000000Z' },
     { id: 'r2',
-      objectiveId: 'o1', name: 'Drive Growth',
-      description: 'd2', memberId: 'w1',
+      objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', name: 'Drive Growth',
+      description: 'd2', memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
       at: '2026-03-18T11:02:00.000000Z' },
 ];
 const archivals: {
     objectiveId: string;
 }[] = [];
 
-const memberNames = new Map([['w1', 'Sarah Lee']]);
+const memberNames = new Map([['xdaJyuuPyHfffCGLhqDrOQ', 'Sarah Lee']]);
 function whoName(id: string): string {
     return memberNames.get(id) ?? id;
 }
@@ -129,7 +132,7 @@ test('revision event row shows the new objective name',
             .indexOf('Drive Growth', r2Pos);
         assert.ok(
             incrRevPos > r1Pos && incrRevPos < r2Pos,
-            'r1 row should render "Increase Revenue"',
+            'rOEPOcVMQdJiiiMuiiEhlg row should render "Increase Revenue"',
         );
         assert.ok(driveGrowthPos > r2Pos,
             'r2 row should render "Drive Growth"');
@@ -137,8 +140,9 @@ test('revision event row shows the new objective name',
 
 test('positive score TD carries data-tone="success"', () => {
     const p = new ProjectScoreHistoryPresenter(
-        [{ id: 'b1', projectId: 'p1', objectiveId: 'o1',
-            score: 40, memberId: 'w1',
+        [{ id: 'b1', projectId: 'pnXmXrxOWayANgDLdCjuBw'
+            , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+            score: 40, memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
             at: '2026-03-05T09:10:00.000000Z' }],
         [], revisions, archivals, resolver, whoName,
     );
@@ -149,9 +153,10 @@ test('positive score TD carries data-tone="success"', () => {
 
 test('negative score TD carries data-tone="error"', () => {
     const p = new ProjectScoreHistoryPresenter(
-        [], [{ id: 'a1', projectId: 'p1',
-            objectiveId: 'o1', score: -50,
-            memberId: 'w1',
+        [], [{ id: 'UQTJZvCoKlFjEoDlDUwekw'
+            , projectId: 'pnXmXrxOWayANgDLdCjuBw',
+            objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: -50,
+            memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
             at: '2026-04-01T16:45:00.000000Z' }],
         revisions, archivals, resolver, whoName,
     );
@@ -162,8 +167,9 @@ test('negative score TD carries data-tone="error"', () => {
 
 test('zero score TD carries data-tone="muted"', () => {
     const p = new ProjectScoreHistoryPresenter(
-        [{ id: 'b1', projectId: 'p1', objectiveId: 'o1',
-            score: 0, memberId: 'w1',
+        [{ id: 'b1', projectId: 'pnXmXrxOWayANgDLdCjuBw'
+            , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+            score: 0, memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
             at: '2026-03-05T09:10:00.000000Z' }],
         [], revisions, archivals, resolver, whoName,
     );
@@ -173,7 +179,7 @@ test('zero score TD carries data-tone="muted"', () => {
 
 test('archival event row labels the archive', () => {
     const dep = [{
-        objectiveId: 'o1',
+        objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
     }];
     const p = new ProjectScoreHistoryPresenter(
         [], [], revisions, dep, resolver, whoName,
@@ -187,11 +193,11 @@ test('archival event row labels the archive', () => {
 
 test('Who column renders the actor name per row', () => {
     const who = (id: string): string =>
-        id === 'w1' ? 'Sarah Lee' : id;
+        id === 'xdaJyuuPyHfffCGLhqDrOQ' ? 'Sarah Lee' : id;
     const p = new ProjectScoreHistoryPresenter(
-        [{ id: 'b1', projectId: 'p1',
-           objectiveId: 'o1', score: 40,
-           memberId: 'w1',
+        [{ id: 'b1', projectId: 'pnXmXrxOWayANgDLdCjuBw',
+           objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: 40,
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            at: '2026-03-05T09:10:00.000000Z' }],
         [], [], [], resolver, who,
     );

@@ -31,8 +31,8 @@ import {
 
 function documentFields() {
     return {
-        organization_id: '1',
-        identity_id: 'sarah',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'toccYYkLEABmlbpHJalgtQ',
         type: 'member',
         at: '2026-01-01T00:00:00.000000Z',
     };
@@ -110,11 +110,11 @@ async () => {
     await db.postSchemaCreation();
     const body = { type: 'member', at: documentFields().at };
     const pair = await seatDocumentPair(
-        '1', 'sarah', body,
+        'AjdvjuECVZEgZoFajaIEkg', 'toccYYkLEABmlbpHJalgtQ', body,
         '2026-01-01T00:00:00.000000Z',
     );
     const written = await postMembershipDocumentOp(
-        db, 'sarah', body, 'current', pair,
+        db, 'toccYYkLEABmlbpHJalgtQ', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
     );
     assert.deepEqual(written, body);
     assert.equal((await db.pairs.getAll()).length, 1);
@@ -129,14 +129,16 @@ test('a byte-identical PUT resend to a seat converges'
     await seedAdminSchema(db);
     const body = { type: 'member', at: documentFields().at };
     const first = await PUT(
-        db, 'organizations/1/members/sarah', body, DEV_TOKEN,
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            + 'toccYYkLEABmlbpHJalgtQ', body, DEV_TOKEN,
     );
     const second = await PUT(
-        db, 'organizations/1/members/sarah', body, DEV_TOKEN,
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            + 'toccYYkLEABmlbpHJalgtQ', body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
     // seedAdminSchema: org + current seat; one unique
-    // sarah seat PUT. Byte-identical resend dedups.
+    // toccYYkLEABmlbpHJalgtQ seat PUT. Byte-identical resend dedups.
     assert.equal((await db.pairs.getAll()).length, 4);
     assert.equal((await db.pairs.getAll()).length, 4);
 });
@@ -150,7 +152,8 @@ async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/organizations/1/members/sarah',
+            path: '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+                + 'toccYYkLEABmlbpHJalgtQ',
             token: DEV_TOKEN,
             body: first,
             operationId: TEST_OPERATION_ID,
@@ -161,7 +164,8 @@ async () => {
         db,
         apiRequest({
             method: 'GET',
-            path: '/organizations/1/members/sarah',
+            path: '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+                + 'toccYYkLEABmlbpHJalgtQ',
             token: DEV_TOKEN,
         }),
     );
@@ -179,7 +183,8 @@ async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/organizations/1/members/sarah',
+            path: '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+                + 'toccYYkLEABmlbpHJalgtQ',
             token: DEV_TOKEN,
             body: second,
             operationId: TEST_OPERATION_ID,
@@ -190,7 +195,8 @@ async () => {
         db,
         apiRequest({
             method: 'GET',
-            path: '/organizations/1/members/sarah',
+            path: '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+                + 'toccYYkLEABmlbpHJalgtQ',
             token: DEV_TOKEN,
         }),
     );
@@ -209,7 +215,8 @@ test('a seat DELETE-head is absent', async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/organizations/1/members/sarah',
+            path: '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+                + 'toccYYkLEABmlbpHJalgtQ',
             token: DEV_TOKEN,
             body: {
                 type: 'member',
@@ -222,7 +229,8 @@ test('a seat DELETE-head is absent', async () => {
         db,
         apiRequest({
             method: 'DELETE',
-            path: '/organizations/1/members/sarah',
+            path: '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+                + 'toccYYkLEABmlbpHJalgtQ',
             token: DEV_TOKEN,
             operationId: TEST_OPERATION_ID,
         }),
@@ -232,7 +240,8 @@ test('a seat DELETE-head is absent', async () => {
         db,
         apiRequest({
             method: 'GET',
-            path: '/organizations/1/members/sarah',
+            path: '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+                + 'toccYYkLEABmlbpHJalgtQ',
             token: DEV_TOKEN,
         }),
     );
@@ -243,7 +252,7 @@ test('stored PUT body equals the seat wire entity',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const id = 'sarah';
+    const id = 'toccYYkLEABmlbpHJalgtQ';
     const body = {
         type: 'member',
         at: documentFields().at,
@@ -252,7 +261,7 @@ async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/organizations/1/members/' + id,
+            path: '/organizations/AjdvjuECVZEgZoFajaIEkg/members/' + id,
             token: DEV_TOKEN,
             body,
             operationId: TEST_OPERATION_ID,
@@ -261,12 +270,12 @@ async () => {
     assert.equal(put.status, 201);
     const stored = JSON.parse(
         await storedPutBodyText(
-            db, '/organizations/1/members/', id,
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/members/', id,
         ),
     );
     assert.deepEqual(stored, {
         id,
-        organization_id: '1',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         identity_id: id,
         type: 'member',
         at: documentFields().at,

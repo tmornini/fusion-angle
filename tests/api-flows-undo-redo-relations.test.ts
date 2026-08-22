@@ -58,13 +58,18 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Phase Final Task 2: graph relation ROW halves stripped.
 // Undo/redo oracles re-home to pair-plane GET graph and
 // graphDelta.deletions / revivals on flow document pairs
 // (SIDECAR-KEEP). deriveFlowGraphStates retired with C3.
 
-const FLOW_ID = 'flow-ur';
+const FLOW_ID = generateIdentifier();
+const NODE_A = generateIdentifier();
+const NODE_X = generateIdentifier();
+const EDGE_XE = generateIdentifier();
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
@@ -72,13 +77,13 @@ async function setupMemDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedHumanMember(db, 'current', 'Demo User');
-    await seedHumanMember(db, 'm1', 'Member One');
+    await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
+    await seedHumanMember(db, 'mFNSxZqywTSMXhgUTdTqtA', 'Member One');
     const ctx = createRequestContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId: FLOW_ID,
-        linkId: FLOW_ID + '-link',
-        projectId: 'project-1',
+        linkId: generateIdentifier(),
+        projectId: generateIdentifier(),
         name: 'Undo/Redo Flow',
     });
     return { db, ctx };
@@ -178,7 +183,7 @@ async function pairGraph(
     ctx: RequestContext,
 ): Promise<StoredGraph> {
     const flow = await ctx.GET<FlowWithGraph>(
-        'organizations/1/flows/' + FLOW_ID,
+        'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID,
     );
     return asStoredGraph(
         flow.graph, 'flow.graph',
@@ -275,9 +280,9 @@ test(
     + " is 'restored'",
     async () => {
         const { db, ctx } = await setupMemDb();
-        const a = buildNode('a', { isCreate: true });
-        const x = buildNode('x');
-        const xEdge = buildEdge('xe', 'a', 'x');
+        const a = buildNode(NODE_A, { isCreate: true });
+        const x = buildNode(NODE_X);
+        const xEdge = buildEdge(EDGE_XE, NODE_A, NODE_X);
 
         // Save the graph that HAS X + its edge — undo's target.
         await saveGraph(
@@ -289,14 +294,14 @@ test(
 
         const afterDelete = await pairGraph(ctx);
         assert.ok(
-            !afterDelete.nodes.some(n => n.id === 'x'),
+            !afterDelete.nodes.some(n => n.id === NODE_X),
             'X is tombstoned after the deleting save',
         );
         assert.equal(
-            await latestSidecarStateFor(db, 'x'), 'deleted',
+            await latestSidecarStateFor(db, NODE_X), 'deleted',
         );
         assert.equal(
-            await latestSidecarStateFor(db, 'xe'), 'deleted',
+            await latestSidecarStateFor(db, EDGE_XE), 'deleted',
         );
 
         // UNDO from the current (X-less) graph back to the
@@ -311,21 +316,21 @@ test(
         // pair-plane graph includes them again.
         const afterUndo = await pairGraph(ctx);
         assert.ok(
-            afterUndo.nodes.some(n => n.id === 'x'),
+            afterUndo.nodes.some(n => n.id === NODE_X),
             'undo REVIVES the deleted node X',
         );
         assert.ok(
-            afterUndo.edges.some(e => e.id === 'xe'),
+            afterUndo.edges.some(e => e.id === EDGE_XE),
             'undo REVIVES the edge deleted alongside X',
         );
         // And X's LATEST state event supersedes the
         // tombstone with a non-'deleted' 'restored'.
         assert.equal(
-            await latestSidecarStateFor(db, 'x'), 'restored',
+            await latestSidecarStateFor(db, NODE_X), 'restored',
             "revived node's latest state is 'restored'",
         );
         assert.equal(
-            await latestSidecarStateFor(db, 'xe'), 'restored',
+            await latestSidecarStateFor(db, EDGE_XE), 'restored',
             "revived edge's latest state is 'restored'",
         );
     },
@@ -336,8 +341,8 @@ test(
     + ' omits it (working-not-target is a deletion)',
     async () => {
         const { db, ctx } = await setupMemDb();
-        const a = buildNode('a', { isCreate: true });
-        const x = buildNode('x');
+        const a = buildNode(NODE_A, { isCreate: true });
+        const x = buildNode(NODE_X);
 
         // Save the graph WITHOUT X — undo's target.
         await saveGraph(ctx, [a], []);
@@ -345,7 +350,7 @@ test(
         await putFlow(ctx, FLOW_ID, save([a, x], []));
 
         const afterAdd = await pairGraph(ctx);
-        assert.ok(afterAdd.nodes.some(n => n.id === 'x'));
+        assert.ok(afterAdd.nodes.some(n => n.id === NODE_X));
 
         // Undo the add -> X is in current-not-target, so it
         // is deleted by the undo delta.
@@ -357,11 +362,11 @@ test(
 
         const afterUndo = await pairGraph(ctx);
         assert.ok(
-            !afterUndo.nodes.some(n => n.id === 'x'),
+            !afterUndo.nodes.some(n => n.id === NODE_X),
             'undo of an add deletes the added node',
         );
         assert.equal(
-            await latestSidecarStateFor(db, 'x'), 'deleted',
+            await latestSidecarStateFor(db, NODE_X), 'deleted',
         );
     },
 );
@@ -370,21 +375,21 @@ test(
     'MEMBER add + undo: the member is gone after undo',
     async () => {
         const { ctx } = await setupMemDb();
-        const aBare = buildNode('a', { isCreate: true });
-        const aWithMember = buildNode('a', {
+        const aBare = buildNode(NODE_A, { isCreate: true });
+        const aWithMember = buildNode(NODE_A, {
             isCreate: true,
-            memberIds: ['m1'],
+            memberIds: ['mFNSxZqywTSMXhgUTdTqtA'],
         });
 
         // Save the graph whose node a has NO member — undo's target.
         await saveGraph(ctx, [aBare], []);
-        // Then save the graph where a gains member m1.
+        // Then save the graph where a gains member mFNSxZqywTSMXhgUTdTqtA.
         await putFlow(ctx, FLOW_ID, save([aWithMember], []));
 
         const afterAdd = await pairGraph(ctx);
         assert.ok(
-            afterAdd.nodes.find(n => n.id === 'a')!
-                .memberIds.includes('m1'),
+            afterAdd.nodes.find(n => n.id === NODE_A)!
+                .memberIds.includes('mFNSxZqywTSMXhgUTdTqtA'),
         );
 
         // Undo -> revert to the no-member version.
@@ -396,8 +401,8 @@ test(
 
         const afterUndo = await pairGraph(ctx);
         assert.ok(
-            !afterUndo.nodes.find(n => n.id === 'a')!
-                .memberIds.includes('m1'),
+            !afterUndo.nodes.find(n => n.id === NODE_A)!
+                .memberIds.includes('mFNSxZqywTSMXhgUTdTqtA'),
             'undo removes the added member',
         );
     },
@@ -408,9 +413,9 @@ test(
     + ' an undo revived it (X tombstoned again)',
     async () => {
         const { db, ctx } = await setupMemDb();
-        const a = buildNode('a', { isCreate: true });
-        const x = buildNode('x');
-        const xEdge = buildEdge('xe', 'a', 'x');
+        const a = buildNode(NODE_A, { isCreate: true });
+        const x = buildNode(NODE_X);
+        const xEdge = buildEdge(EDGE_XE, NODE_A, NODE_X);
 
         // Save the graph that HAS X — undo's target.
         await saveGraph(ctx, [a, x], [xEdge]);
@@ -424,7 +429,7 @@ test(
         assert.equal(undo.kind, 'ok');
         if (undo.kind !== 'ok') return;
         const afterUndo = await pairGraph(ctx);
-        assert.ok(afterUndo.nodes.some(n => n.id === 'x'));
+        assert.ok(afterUndo.nodes.some(n => n.id === NODE_X));
 
         // Redo -> re-apply the delete (X tombstoned again).
         const redo = await performRedo(
@@ -435,11 +440,11 @@ test(
 
         const afterRedo = await pairGraph(ctx);
         assert.ok(
-            !afterRedo.nodes.some(n => n.id === 'x'),
+            !afterRedo.nodes.some(n => n.id === NODE_X),
             'redo re-applies the delete: X tombstoned again',
         );
         assert.equal(
-            await latestSidecarStateFor(db, 'x'), 'deleted',
+            await latestSidecarStateFor(db, NODE_X), 'deleted',
             "redo re-tombstones X (latest state 'deleted')",
         );
     },

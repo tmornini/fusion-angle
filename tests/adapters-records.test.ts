@@ -21,6 +21,8 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 test(
     'postRecordChange create writes the row and'
@@ -30,7 +32,7 @@ test(
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
-        await postRecordChange(ctx, 'rec-1', {
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
                 name: 'Customer',
@@ -40,8 +42,8 @@ test(
             attributes: [],
             initialState: 'active',
         });
-        const stored = await getRecord(ctx, 'rec-1');
-        assert.equal(stored.id, 'rec-1');
+        const stored = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
+        assert.equal(stored.id, 'rbfHGatkwQzGZJVXKJEeyw');
         assert.equal(stored.name, 'Customer');
         // Lifecycle-current trio is stamped on the GET row.
         assert.equal(stored.state, 'active');
@@ -56,7 +58,7 @@ test(
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
-        await postRecordChange(ctx, 'rec-1', {
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
                 name: 'Q',
@@ -65,8 +67,8 @@ test(
             },
             attributes: [
                 {
-                    id: 'a-1',
-                    record_id: 'rec-1',
+                    id: 'UQBiHFcwJeCDSnmkPBoYRA',
+                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
                     name: 'Fee',
                     attribute_type: 'number',
                     sort_order: 0,
@@ -79,7 +81,8 @@ test(
         const attrs = await ctx.GET<
             { id: string; name: string }[]
         >(
-            'organizations/1/record-types/rec-1'
+            'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'rbfHGatkwQzGZJVXKJEeyw'
             + '/attributes/',
         );
         assert.equal(attrs.length, 1);
@@ -94,7 +97,7 @@ test(
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
-        await postRecordChange(ctx, 'rec-1', {
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
                 name: 'A',
@@ -104,13 +107,13 @@ test(
             attributes: [],
             initialState: 'active',
         });
-        await putRecord(ctx, 'rec-1', {
+        await putRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             name: 'B',
             description: 'second',
             position: 1,
             state: 'active',
         });
-        const stored = await getRecord(ctx, 'rec-1');
+        const stored = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
         assert.equal(stored.name, 'B');
         assert.equal(stored.description, 'second');
     },
@@ -124,7 +127,9 @@ test(
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
-        await postRecordChange(ctx, 'rec-1', {
+        const oldAttrId = generateIdentifier();
+        const newAttrId = generateIdentifier();
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
                 name: 'R', description: '',
@@ -132,8 +137,8 @@ test(
             },
             attributes: [
                 {
-                    id: 'a-old',
-                    record_id: 'rec-1',
+                    id: oldAttrId,
+                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
                     name: 'Old',
                     attribute_type: 'text',
                     sort_order: 0,
@@ -145,8 +150,8 @@ test(
         });
         // Echo the create's own known head from the GET row
         // trio — never a fresh mint (RecordChangeEdit).
-        const head = await getRecordModel(ctx, 'rec-1');
-        await postRecordChange(ctx, 'rec-1', {
+        const head = await getRecordModel(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'edit',
             record: {
                 name: 'R', description: '',
@@ -154,8 +159,8 @@ test(
             },
             attributes: [
                 {
-                    id: 'a-new',
-                    record_id: 'rec-1',
+                    id: newAttrId,
+                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
                     name: 'New',
                     attribute_type: 'text',
                     sort_order: 0,
@@ -164,16 +169,17 @@ test(
                 },
             ],
             state: head.stateValue(),
-            removedAttributeIds: ['a-old'],
+            removedAttributeIds: [oldAttrId],
         });
         const attrs = await ctx.GET<
             { id: string }[]
         >(
-            'organizations/1/record-types/rec-1'
+            'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'rbfHGatkwQzGZJVXKJEeyw'
             + '/attributes/',
         );
         assert.equal(attrs.length, 1);
-        assert.equal(attrs[0]!.id, 'a-new');
+        assert.equal(attrs[0]!.id, newAttrId);
     },
 );
 
@@ -185,7 +191,7 @@ test(
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
-        await postRecordChange(ctx, 'rec-1', {
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
                 name: 'Keep',
@@ -195,7 +201,7 @@ test(
             attributes: [],
             initialState: 'active',
         });
-        await postRecordChange(ctx, 'rec-2', {
+        await postRecordChange(ctx, 'rcaSzEaORBkezCxyhLhecA', {
             kind: 'create',
             record: {
                 name: 'Drop',
@@ -205,7 +211,7 @@ test(
             attributes: [],
             initialState: 'active',
         });
-        const rec2 = await getRecord(ctx, 'rec-2');
+        const rec2 = await getRecord(ctx, 'rcaSzEaORBkezCxyhLhecA');
         await postRecordStateChange(
             ctx, rec2, 'deleted',
         );
@@ -213,7 +219,7 @@ test(
         const ids = records
             .map(r => r.record.idForLink())
             .sort();
-        assert.deepEqual(ids, ['rec-1']);
+        assert.deepEqual(ids, ['rbfHGatkwQzGZJVXKJEeyw']);
     },
 );
 
@@ -226,7 +232,7 @@ test(
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
-        await postRecordChange(ctx, 'rec-1', {
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
                 name: 'X',
@@ -236,11 +242,11 @@ test(
             attributes: [],
             initialState: 'active',
         });
-        const before = await getRecord(ctx, 'rec-1');
+        const before = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
         await postRecordStateChange(
             ctx, before, 'archived',
         );
-        const after = await getRecord(ctx, 'rec-1');
+        const after = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
         // Entity content fields unchanged; GET trio advances
         // to the transition event (lifecycle-current stamp).
         assert.equal(after.name, before.name);
@@ -248,11 +254,11 @@ test(
         assert.equal(after.position, before.position);
         assert.equal(after.state, 'archived');
         const model = await getRecordModel(
-            ctx, 'rec-1',
+            ctx, 'rbfHGatkwQzGZJVXKJEeyw',
         );
         assert.equal(model.stateValue(), 'archived');
         const events = await deriveRecordStateHistory(
-            db, '1', 'rec-1',
+            db, 'AjdvjuECVZEgZoFajaIEkg', 'rbfHGatkwQzGZJVXKJEeyw',
         );
         assert.equal(events.at(-1)?.state, 'archived');
     },
@@ -269,7 +275,7 @@ test(
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await organizationToken());
         await assert.rejects(
-            () => getRecordModel(ctx, 'rec-missing'),
+            () => getRecordModel(ctx, generateIdentifier()),
             /Not found/,
         );
     },
@@ -287,7 +293,7 @@ test(
         const ctx = createRequestContext(
             db, await organizationToken(),
         );
-        await postRecordChange(ctx, 'r1', {
+        await postRecordChange(ctx, 'rOEPOcVMQdJiiiMuiiEhlg', {
             kind: 'create',
             record: {
                 name: 'R',
@@ -297,7 +303,8 @@ test(
             attributes: [],
             initialState: 'active',
         });
-        await ctx.PUT('organizations/1/ideas/i1', {
+        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'fndCYAsXazdzMUlEGMNIZw', {
             title: 'I',
             position: 1,
             problem_statement: 'p',
@@ -311,9 +318,9 @@ test(
         const ids = rows.map(
             r => r.record.idForLink(),
         );
-        assert.ok(ids.includes('r1'));
+        assert.ok(ids.includes('rOEPOcVMQdJiiiMuiiEhlg'));
         assert.ok(
-            !ids.includes('i1'),
+            !ids.includes('fndCYAsXazdzMUlEGMNIZw'),
             'idea must not leak into records',
         );
     },
@@ -327,7 +334,7 @@ test(
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
-        await postRecordChange(ctx, 'rec-1', {
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
                 name: 'X',
@@ -337,12 +344,14 @@ test(
             attributes: [],
             initialState: 'active',
         });
-        const rec1 = await getRecord(ctx, 'rec-1');
+        const sRqRSyldQDFbqkDYSObDqw = await getRecord(ctx
+            , 'rbfHGatkwQzGZJVXKJEeyw');
         await postRecordStateChange(
-            ctx, rec1, 'archived',
+            ctx, sRqRSyldQDFbqkDYSObDqw, 'archived',
         );
-        const events = await deriveRecordStateHistory(db, '1',
-            'rec-1',
+        const events = await deriveRecordStateHistory(db
+            , 'AjdvjuECVZEgZoFajaIEkg',
+            'rbfHGatkwQzGZJVXKJEeyw',
         );
         const values = events
             .map(e => e.state)

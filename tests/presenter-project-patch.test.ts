@@ -33,8 +33,8 @@ const {
 
 function buildView() {
     const project = new Project({
-        id: 'p1',
-        organization_id: '1',
+        id: 'pnXmXrxOWayANgDLdCjuBw',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 'Costly',
         description: 'd',
         progress: 25,

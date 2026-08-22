@@ -59,6 +59,8 @@ import type {
 import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import type {
     FlowGraph,
 } from '../web-app/app/adapters/flow-queries.ts';
@@ -69,7 +71,17 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 
-const FLOW_ID = 'flow-1';
+const FLOW_ID = 'aEsGMmBEFaVdWihhHXwCbw';
+
+const NODE_A = generateIdentifier();
+const NODE_B = generateIdentifier();
+const NODE_C = generateIdentifier();
+const NODE_S = generateIdentifier();
+const NODE_E = generateIdentifier();
+const MISSING_ID = generateIdentifier();
+const PROJECT_ID = generateIdentifier();
+const LINK_ID = generateIdentifier();
+const VERSION_ID = generateIdentifier();
 
 // -- Builders ---------------------------------
 
@@ -137,14 +149,14 @@ function buildFlowVersion(
     overrides?: Partial<FlowVersion>,
 ): FlowVersion {
     return {
-        id: 'ver-1',
+        id: VERSION_ID,
         flowId: FLOW_ID,
         name: 'Previous',
         isLocked: false,
         isAutoLayout: true,
         isAutoFit: true,
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
-        nodes: [buildNode('a'), buildNode('b')],
+        nodes: [buildNode(NODE_A), buildNode(NODE_B)],
         edges: [],
         createdAt: '2026-01-01T00:00:00.000000Z',
         ...overrides,
@@ -208,12 +220,12 @@ async function setupFlow(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedHumanMember(db, 'current', 'Demo User');
+    await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
     const ctx = createRequestContext(db, DEV_TOKEN);
     await postFlowCreation(ctx, {
         flowId: FLOW_ID,
-        linkId: FLOW_ID + '-link',
-        projectId: 'project-1',
+        linkId: LINK_ID,
+        projectId: PROJECT_ID,
         name: 'Test Flow',
     });
     return { db, ctx };
@@ -221,7 +233,9 @@ async function setupFlow(): Promise<{
 
 // A db with NO flow row: commitFlowMutation's / putFlow's own
 // baseline read (buildFlowPutBody's ctx.GETWithEtag)
-// does ctx.GET('organizations/1/flows/flow-1') which 404s, driving the catch
+// does
+// ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/flows/aEsGMmBEFaVdWihhHXwCbw'
+// ) which 404s, driving the catch
 // → failOp(...).
 async function setupNoFlow(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
@@ -234,7 +248,7 @@ async function persistedGraph(
 ): Promise<StoredGraph> {
     const flow = await createRequestContext(db, DEV_TOKEN)
         .GET<{ graph: Record<string, unknown> }>(
-            'organizations/1/flows/' + FLOW_ID,
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID,
         );
     return flow.graph as unknown as StoredGraph;
 }
@@ -279,15 +293,15 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('a'), buildNode('b'),
+            buildNode(NODE_A), buildNode(NODE_B),
         ]));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, 'a', 'b',
+            createRequestContext(db, DEV_TOKEN), snap, NODE_A, NODE_B,
         );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
-        assert.equal(op.edge.fromNodeId, 'a');
-        assert.equal(op.edge.toNodeId, 'b');
+        assert.equal(op.edge.fromNodeId, NODE_A);
+        assert.equal(op.edge.toNodeId, NODE_B);
         assert.equal(op.advanceHistory, true);
         const g = await persistedGraph(db);
         assert.equal(g.edges.length, 1);
@@ -309,11 +323,11 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('s', { isCreate: true }),
-            buildNode('a'),
+            buildNode(NODE_S, { isCreate: true }),
+            buildNode(NODE_A),
         ]));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, 's', 'a',
+            createRequestContext(db, DEV_TOKEN), snap, NODE_S, NODE_A,
         );
         assert.equal(op.kind, 'ok');
     },
@@ -324,10 +338,10 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = locked(snapFrom(buildGraph([
-            buildNode('a'), buildNode('b'),
+            buildNode(NODE_A), buildNode(NODE_B),
         ])));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, 'a', 'b',
+            createRequestContext(db, DEV_TOKEN), snap, NODE_A, NODE_B,
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -340,13 +354,21 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('b'),
+            buildNode(NODE_B),
         ]));
         await assert.rejects(
             () => performAddEdge(
-                createRequestContext(db, DEV_TOKEN), snap, 'missing', 'b',
+                createRequestContext(db, DEV_TOKEN), snap, MISSING_ID, NODE_B,
             ),
-            /unknown fromId missing/,
+            (error: unknown) => {
+                assert.ok(error instanceof Error);
+                assert.ok(
+                    error.message.includes(
+                        'unknown fromId ' + MISSING_ID,
+                    ),
+                );
+                return true;
+            },
         );
     },
 );
@@ -356,13 +378,21 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ]));
         await assert.rejects(
             () => performAddEdge(
-                createRequestContext(db, DEV_TOKEN), snap, 'a', 'missing',
+                createRequestContext(db, DEV_TOKEN), snap, NODE_A, MISSING_ID,
             ),
-            /unknown toId missing/,
+            (error: unknown) => {
+                assert.ok(error instanceof Error);
+                assert.ok(
+                    error.message.includes(
+                        'unknown toId ' + MISSING_ID,
+                    ),
+                );
+                return true;
+            },
         );
     },
 );
@@ -372,11 +402,11 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('e', { isArchive: true }),
-            buildNode('a'),
+            buildNode(NODE_E, { isArchive: true }),
+            buildNode(NODE_A),
         ]));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, 'e', 'a',
+            createRequestContext(db, DEV_TOKEN), snap, NODE_E, NODE_A,
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -389,11 +419,11 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('a'),
-            buildNode('s', { isCreate: true }),
+            buildNode(NODE_A),
+            buildNode(NODE_S, { isCreate: true }),
         ]));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, 'a', 's',
+            createRequestContext(db, DEV_TOKEN), snap, NODE_A, NODE_S,
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -406,11 +436,11 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph(
-            [buildNode('a'), buildNode('b')],
-            [buildEdge('e1', 'a', 'b')],
+            [buildNode(NODE_A), buildNode(NODE_B)],
+            [buildEdge('YiJPbufDpkyrZcZCYbUJpg', NODE_A, NODE_B)],
         ));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, 'a', 'b',
+            createRequestContext(db, DEV_TOKEN), snap, NODE_A, NODE_B,
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -425,13 +455,13 @@ test(
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph(
             [
-                buildNode('s', { isCreate: true }),
-                buildNode('a'), buildNode('b'),
+                buildNode(NODE_S, { isCreate: true }),
+                buildNode(NODE_A), buildNode(NODE_B),
             ],
-            [buildEdge('e1', 's', 'a')],
+            [buildEdge('YiJPbufDpkyrZcZCYbUJpg', NODE_S, NODE_A)],
         ));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, 's', 'b',
+            createRequestContext(db, DEV_TOKEN), snap, NODE_S, NODE_B,
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -447,13 +477,13 @@ test(
     async () => {
         const db = await setupNoFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('a'), buildNode('b'),
+            buildNode(NODE_A), buildNode(NODE_B),
         ]));
         const { result: op } = await captureConsole(
             'error',
             () => performAddEdge(
                 createRequestContext(db, DEV_TOKEN),
-                snap, 'a', 'b',
+                snap, NODE_A, NODE_B,
             ),
         );
         assert.equal(
@@ -475,14 +505,14 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ]));
         const op = await performAddNodeAtPosition(
-            createRequestContext(db, DEV_TOKEN), snap, 'a', 300, 200,
+            createRequestContext(db, DEV_TOKEN), snap, NODE_A, 300, 200,
         );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
-        assert.equal(op.edge.fromNodeId, 'a');
+        assert.equal(op.edge.fromNodeId, NODE_A);
         assert.equal(
             op.edge.toNodeId, op.node.id,
         );
@@ -507,10 +537,10 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = locked(snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ])));
         const op = await performAddNodeAtPosition(
-            createRequestContext(db, DEV_TOKEN), snap, 'a', 0, 0,
+            createRequestContext(db, DEV_TOKEN), snap, NODE_A, 0, 0,
         );
         assert.equal(op.kind, 'fail');
     },
@@ -524,9 +554,17 @@ test(
         const snap = snapFrom(buildGraph([]));
         await assert.rejects(
             () => performAddNodeAtPosition(
-                createRequestContext(db, DEV_TOKEN), snap, 'missing', 0, 0,
+                createRequestContext(db, DEV_TOKEN), snap, MISSING_ID, 0, 0,
             ),
-            /unknown fromNodeId missing/,
+            (error: unknown) => {
+                assert.ok(error instanceof Error);
+                assert.ok(
+                    error.message.includes(
+                        'unknown fromNodeId ' + MISSING_ID,
+                    ),
+                );
+                return true;
+            },
         );
     },
 );
@@ -537,10 +575,10 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('e', { isArchive: true }),
+            buildNode(NODE_E, { isArchive: true }),
         ]));
         const op = await performAddNodeAtPosition(
-            createRequestContext(db, DEV_TOKEN), snap, 'e', 0, 0,
+            createRequestContext(db, DEV_TOKEN), snap, NODE_E, 0, 0,
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -555,13 +593,13 @@ test(
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph(
             [
-                buildNode('s', { isCreate: true }),
-                buildNode('a'),
+                buildNode(NODE_S, { isCreate: true }),
+                buildNode(NODE_A),
             ],
-            [buildEdge('e1', 's', 'a')],
+            [buildEdge('YiJPbufDpkyrZcZCYbUJpg', NODE_S, NODE_A)],
         ));
         const op = await performAddNodeAtPosition(
-            createRequestContext(db, DEV_TOKEN), snap, 's', 0, 0,
+            createRequestContext(db, DEV_TOKEN), snap, NODE_S, 0, 0,
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -577,12 +615,12 @@ test(
     async () => {
         const db = await setupNoFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ]));
         const { result: op } = await captureConsole(
             'error',
             () => performAddNodeAtPosition(
-                createRequestContext(db, DEV_TOKEN), snap, 'a', 0, 0,
+                createRequestContext(db, DEV_TOKEN), snap, NODE_A, 0, 0,
             ),
         );
         const settled = await op;
@@ -602,20 +640,20 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('s', { isCreate: true }),
-            buildNode('a'),
-            buildNode('e', { isArchive: true }),
+            buildNode(NODE_S, { isCreate: true }),
+            buildNode(NODE_A),
+            buildNode(NODE_E, { isArchive: true }),
         ]));
         const op =
             await performDeleteSelectedNodes(
                 createRequestContext(db, DEV_TOKEN),
-                withNodeSelection(base, 'a'),
+                withNodeSelection(base, NODE_A),
             );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
         assert.equal(op.advanceHistory, true);
         assert.equal(
-            op.nodes.some(n => n.id === 'a'),
+            op.nodes.some(n => n.id === NODE_A),
             false,
         );
         const g = await persistedGraph(db);
@@ -630,21 +668,21 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('s', { isCreate: true }),
-            buildNode('a'),
-            buildNode('e', { isArchive: true }),
+            buildNode(NODE_S, { isCreate: true }),
+            buildNode(NODE_A),
+            buildNode(NODE_E, { isArchive: true }),
         ]));
         const op =
             await performDeleteSelectedNodes(
                 createRequestContext(db, DEV_TOKEN),
                 withNodeSelection(
-                    base, 's', 'a', 'e',
+                    base, NODE_S, NODE_A, NODE_E,
                 ),
             );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
         const ids = op.nodes.map(n => n.id).sort();
-        assert.deepEqual(ids, ['e', 's']);
+        assert.deepEqual(ids, [NODE_E, NODE_S].sort());
     },
 );
 
@@ -654,13 +692,13 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ]));
         const op =
             await performDeleteSelectedNodes(
                 createRequestContext(db, DEV_TOKEN),
                 locked(
-                    withNodeSelection(base, 'a'),
+                    withNodeSelection(base, NODE_A),
                 ),
             );
         assert.equal(op.kind, 'fail');
@@ -673,13 +711,13 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph(
-            [buildNode('a'), buildNode('b')],
-            [buildEdge('e1', 'a', 'b')],
+            [buildNode(NODE_A), buildNode(NODE_B)],
+            [buildEdge('YiJPbufDpkyrZcZCYbUJpg', NODE_A, NODE_B)],
         ));
         const op =
             await performDeleteSelectedNodes(
                 createRequestContext(db, DEV_TOKEN),
-                withEdgeSelection(base, 'e1'),
+                withEdgeSelection(base, 'YiJPbufDpkyrZcZCYbUJpg'),
             );
         assert.equal(op.kind, 'noop');
     },
@@ -691,13 +729,13 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('s', { isCreate: true }),
-            buildNode('e', { isArchive: true }),
+            buildNode(NODE_S, { isCreate: true }),
+            buildNode(NODE_E, { isArchive: true }),
         ]));
         const op =
             await performDeleteSelectedNodes(
                 createRequestContext(db, DEV_TOKEN),
-                withNodeSelection(base, 's', 'e'),
+                withNodeSelection(base, NODE_S, NODE_E),
             );
         assert.equal(op.kind, 'noop');
     },
@@ -709,13 +747,13 @@ test(
     async () => {
         const db = await setupNoFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ]));
         const { result: op } = await captureConsole(
             'error',
             () => performDeleteSelectedNodes(
                 createRequestContext(db, DEV_TOKEN),
-                withNodeSelection(base, 'a'),
+                withNodeSelection(base, NODE_A),
             ),
         );
         const settled = await op;
@@ -735,17 +773,17 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph(
-            [buildNode('a'), buildNode('b')],
-            [buildEdge('e1', 'a', 'b')],
+            [buildNode(NODE_A), buildNode(NODE_B)],
+            [buildEdge('YiJPbufDpkyrZcZCYbUJpg', NODE_A, NODE_B)],
         ));
         const op =
             await performDeleteSelectedEdge(
                 createRequestContext(db, DEV_TOKEN),
-                withEdgeSelection(base, 'e1'),
+                withEdgeSelection(base, 'YiJPbufDpkyrZcZCYbUJpg'),
             );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
-        assert.equal(op.edgeId, 'e1');
+        assert.equal(op.edgeId, 'YiJPbufDpkyrZcZCYbUJpg');
         assert.equal(op.advanceHistory, true);
         const g = await persistedGraph(db);
         assert.equal(g.edges.length, 0);
@@ -758,14 +796,14 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph(
-            [buildNode('a'), buildNode('b')],
-            [buildEdge('e1', 'a', 'b')],
+            [buildNode(NODE_A), buildNode(NODE_B)],
+            [buildEdge('YiJPbufDpkyrZcZCYbUJpg', NODE_A, NODE_B)],
         ));
         const op =
             await performDeleteSelectedEdge(
                 createRequestContext(db, DEV_TOKEN),
                 locked(
-                    withEdgeSelection(base, 'e1'),
+                    withEdgeSelection(base, 'YiJPbufDpkyrZcZCYbUJpg'),
                 ),
             );
         assert.equal(op.kind, 'fail');
@@ -778,12 +816,12 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ]));
         const op =
             await performDeleteSelectedEdge(
                 createRequestContext(db, DEV_TOKEN),
-                withNodeSelection(base, 'a'),
+                withNodeSelection(base, NODE_A),
             );
         assert.equal(op.kind, 'noop');
     },
@@ -795,14 +833,14 @@ test(
     async () => {
         const db = await setupNoFlow();
         const base = snapFrom(buildGraph(
-            [buildNode('a'), buildNode('b')],
-            [buildEdge('e1', 'a', 'b')],
+            [buildNode(NODE_A), buildNode(NODE_B)],
+            [buildEdge('YiJPbufDpkyrZcZCYbUJpg', NODE_A, NODE_B)],
         ));
         const { result: op } = await captureConsole(
             'error',
             () => performDeleteSelectedEdge(
                 createRequestContext(db, DEV_TOKEN),
-                withEdgeSelection(base, 'e1'),
+                withEdgeSelection(base, 'YiJPbufDpkyrZcZCYbUJpg'),
             ),
         );
         const settled = await op;
@@ -823,18 +861,18 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ]));
         const op = await performAddAttributeRef(
             createRequestContext(db, DEV_TOKEN),
-            withNodeSelection(base, 'a'),
-            'attr-1', 'editable', true,
+            withNodeSelection(base, NODE_A),
+            'VPckAwjJsTGCEkKaOOGRGw', 'editable', true,
         );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
-        assert.equal(op.nodeId, 'a');
+        assert.equal(op.nodeId, NODE_A);
         assert.equal(
-            op.ref.attributeId, 'attr-1',
+            op.ref.attributeId, 'VPckAwjJsTGCEkKaOOGRGw',
         );
         assert.equal(op.ref.mode, 'editable');
         assert.equal(op.ref.isRequired, true);
@@ -847,12 +885,12 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ]));
         const op = await performAddAttributeRef(
             createRequestContext(db, DEV_TOKEN),
-            locked(withNodeSelection(base, 'a')),
-            'attr-1', 'editable', false,
+            locked(withNodeSelection(base, NODE_A)),
+            'VPckAwjJsTGCEkKaOOGRGw', 'editable', false,
         );
         assert.equal(op.kind, 'fail');
     },
@@ -864,17 +902,17 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a'), buildNode('b'),
+            buildNode(NODE_A), buildNode(NODE_B),
         ]));
         const noneOp = await performAddAttributeRef(
             createRequestContext(db, DEV_TOKEN), withNoSelection(base),
-            'attr-1', 'editable', false,
+            'VPckAwjJsTGCEkKaOOGRGw', 'editable', false,
         );
         assert.equal(noneOp.kind, 'noop');
         const manyOp = await performAddAttributeRef(
             createRequestContext(db, DEV_TOKEN),
-            withNodeSelection(base, 'a', 'b'),
-            'attr-1', 'editable', false,
+            withNodeSelection(base, NODE_A, NODE_B),
+            'VPckAwjJsTGCEkKaOOGRGw', 'editable', false,
         );
         assert.equal(manyOp.kind, 'noop');
     },
@@ -886,12 +924,12 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ]));
         const op = await performAddAttributeRef(
             createRequestContext(db, DEV_TOKEN),
             withNodeSelection(base, 'ghost'),
-            'attr-1', 'editable', false,
+            'VPckAwjJsTGCEkKaOOGRGw', 'editable', false,
         );
         assert.equal(op.kind, 'noop');
     },
@@ -903,14 +941,14 @@ test(
     async () => {
         const db = await setupNoFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ]));
         const { result: op } = await captureConsole(
             'error',
             () => performAddAttributeRef(
                 createRequestContext(db, DEV_TOKEN),
-                withNodeSelection(base, 'a'),
-                'attr-1', 'editable', false,
+                withNodeSelection(base, NODE_A),
+                'VPckAwjJsTGCEkKaOOGRGw', 'editable', false,
             ),
         );
         const settled = await op;
@@ -931,21 +969,21 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a', {
+            buildNode(NODE_A, {
                 attributes: [
-                    buildAttributeRef('attr-1'),
+                    buildAttributeRef('VPckAwjJsTGCEkKaOOGRGw'),
                 ],
             }),
         ]));
         const op = await performRemoveAttributeRef(
             createRequestContext(db, DEV_TOKEN),
-            withNodeSelection(base, 'a'),
-            'attr-1',
+            withNodeSelection(base, NODE_A),
+            'VPckAwjJsTGCEkKaOOGRGw',
         );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
-        assert.equal(op.nodeId, 'a');
-        assert.equal(op.attributeId, 'attr-1');
+        assert.equal(op.nodeId, NODE_A);
+        assert.equal(op.attributeId, 'VPckAwjJsTGCEkKaOOGRGw');
         assert.equal(op.advanceHistory, true);
     },
 );
@@ -955,16 +993,16 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a', {
+            buildNode(NODE_A, {
                 attributes: [
-                    buildAttributeRef('attr-1'),
+                    buildAttributeRef('VPckAwjJsTGCEkKaOOGRGw'),
                 ],
             }),
         ]));
         const op = await performRemoveAttributeRef(
             createRequestContext(db, DEV_TOKEN),
-            locked(withNodeSelection(base, 'a')),
-            'attr-1',
+            locked(withNodeSelection(base, NODE_A)),
+            'VPckAwjJsTGCEkKaOOGRGw',
         );
         assert.equal(op.kind, 'fail');
     },
@@ -976,15 +1014,15 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a', {
+            buildNode(NODE_A, {
                 attributes: [
-                    buildAttributeRef('attr-1'),
+                    buildAttributeRef('VPckAwjJsTGCEkKaOOGRGw'),
                 ],
             }),
         ]));
         const op = await performRemoveAttributeRef(
             createRequestContext(db, DEV_TOKEN),
-            withNoSelection(base), 'attr-1',
+            withNoSelection(base), 'VPckAwjJsTGCEkKaOOGRGw',
         );
         assert.equal(op.kind, 'noop');
     },
@@ -996,9 +1034,9 @@ test(
     async () => {
         const db = await setupNoFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a', {
+            buildNode(NODE_A, {
                 attributes: [
-                    buildAttributeRef('attr-1'),
+                    buildAttributeRef('VPckAwjJsTGCEkKaOOGRGw'),
                 ],
             }),
         ]));
@@ -1006,8 +1044,8 @@ test(
             'error',
             () => performRemoveAttributeRef(
                 createRequestContext(db, DEV_TOKEN),
-                withNodeSelection(base, 'a'),
-                'attr-1',
+                withNodeSelection(base, NODE_A),
+                'VPckAwjJsTGCEkKaOOGRGw',
             ),
         );
         const settled = await op;
@@ -1028,9 +1066,9 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a', {
+            buildNode(NODE_A, {
                 attributes: [
-                    buildAttributeRef('attr-1', {
+                    buildAttributeRef('VPckAwjJsTGCEkKaOOGRGw', {
                         mode: 'editable',
                     }),
                 ],
@@ -1038,13 +1076,13 @@ test(
         ]));
         const op = await performUpdateAttributeMode(
             createRequestContext(db, DEV_TOKEN),
-            withNodeSelection(base, 'a'),
-            'attr-1', 'readonly',
+            withNodeSelection(base, NODE_A),
+            'VPckAwjJsTGCEkKaOOGRGw', 'readonly',
         );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
-        assert.equal(op.nodeId, 'a');
-        assert.equal(op.attributeId, 'attr-1');
+        assert.equal(op.nodeId, NODE_A);
+        assert.equal(op.attributeId, 'VPckAwjJsTGCEkKaOOGRGw');
         assert.equal(op.mode, 'readonly');
         assert.equal(op.advanceHistory, true);
     },
@@ -1055,16 +1093,16 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a', {
+            buildNode(NODE_A, {
                 attributes: [
-                    buildAttributeRef('attr-1'),
+                    buildAttributeRef('VPckAwjJsTGCEkKaOOGRGw'),
                 ],
             }),
         ]));
         const op = await performUpdateAttributeMode(
             createRequestContext(db, DEV_TOKEN),
-            locked(withNodeSelection(base, 'a')),
-            'attr-1', 'readonly',
+            locked(withNodeSelection(base, NODE_A)),
+            'VPckAwjJsTGCEkKaOOGRGw', 'readonly',
         );
         assert.equal(op.kind, 'fail');
     },
@@ -1076,15 +1114,15 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a', {
+            buildNode(NODE_A, {
                 attributes: [
-                    buildAttributeRef('attr-1'),
+                    buildAttributeRef('VPckAwjJsTGCEkKaOOGRGw'),
                 ],
             }),
         ]));
         const op = await performUpdateAttributeMode(
             createRequestContext(db, DEV_TOKEN), withNoSelection(base),
-            'attr-1', 'readonly',
+            'VPckAwjJsTGCEkKaOOGRGw', 'readonly',
         );
         assert.equal(op.kind, 'noop');
     },
@@ -1098,9 +1136,9 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a', {
+            buildNode(NODE_A, {
                 attributes: [
-                    buildAttributeRef('attr-1', {
+                    buildAttributeRef('VPckAwjJsTGCEkKaOOGRGw', {
                         isRequired: false,
                     }),
                 ],
@@ -1109,13 +1147,13 @@ test(
         const op =
             await performUpdateAttributeRequired(
                 createRequestContext(db, DEV_TOKEN),
-                withNodeSelection(base, 'a'),
-                'attr-1', true,
+                withNodeSelection(base, NODE_A),
+                'VPckAwjJsTGCEkKaOOGRGw', true,
             );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
-        assert.equal(op.nodeId, 'a');
-        assert.equal(op.attributeId, 'attr-1');
+        assert.equal(op.nodeId, NODE_A);
+        assert.equal(op.attributeId, 'VPckAwjJsTGCEkKaOOGRGw');
         assert.equal(op.isRequired, true);
         assert.equal(op.advanceHistory, true);
     },
@@ -1127,9 +1165,9 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a', {
+            buildNode(NODE_A, {
                 attributes: [
-                    buildAttributeRef('attr-1'),
+                    buildAttributeRef('VPckAwjJsTGCEkKaOOGRGw'),
                 ],
             }),
         ]));
@@ -1137,9 +1175,9 @@ test(
             await performUpdateAttributeRequired(
                 createRequestContext(db, DEV_TOKEN),
                 locked(
-                    withNodeSelection(base, 'a'),
+                    withNodeSelection(base, NODE_A),
                 ),
-                'attr-1', true,
+                'VPckAwjJsTGCEkKaOOGRGw', true,
             );
         assert.equal(op.kind, 'fail');
     },
@@ -1151,16 +1189,16 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('a', {
+            buildNode(NODE_A, {
                 attributes: [
-                    buildAttributeRef('attr-1'),
+                    buildAttributeRef('VPckAwjJsTGCEkKaOOGRGw'),
                 ],
             }),
         ]));
         const op =
             await performUpdateAttributeRequired(
                 createRequestContext(db, DEV_TOKEN), withNoSelection(base),
-                'attr-1', true,
+                'VPckAwjJsTGCEkKaOOGRGw', true,
             );
         assert.equal(op.kind, 'noop');
     },
@@ -1180,7 +1218,7 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('a'), buildNode('b'),
+            buildNode(NODE_A), buildNode(NODE_B),
         ]));
         const op = await performUndo(
             createRequestContext(db, DEV_TOKEN), snap,
@@ -1200,7 +1238,7 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = locked(snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ])));
         const op = await performUndo(
             createRequestContext(db, DEV_TOKEN), snap,
@@ -1224,14 +1262,14 @@ test(
         const { db, ctx } = await setupFlow();
         // The 2-node baseline — undo's own target.
         await seedCurrentGraph(ctx, [
-            buildNode('a'),
-            buildNode('b'),
+            buildNode(NODE_A),
+            buildNode(NODE_B),
         ]);
         // Current state has a third node.
         const currentNodes = [
-            buildNode('a'),
-            buildNode('b'),
-            buildNode('c'),
+            buildNode(NODE_A),
+            buildNode(NODE_B),
+            buildNode(NODE_C),
         ];
         await seedCurrentGraph(ctx, currentNodes);
         const snap = snapFrom(buildGraph(currentNodes));
@@ -1278,7 +1316,7 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('a'), buildNode('b'),
+            buildNode(NODE_A), buildNode(NODE_B),
         ]));
         const op = await performRedo(
             createRequestContext(db, DEV_TOKEN), snap,
@@ -1295,7 +1333,7 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = locked(snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ])));
         const op = await performRedo(
             createRequestContext(db, DEV_TOKEN), snap,
@@ -1318,15 +1356,15 @@ test(
         // so GET /organizations/:id/flows/:id reflects the snap; redo diffs
         // this
         // current graph against the popped (a,b) version.
-        const currentNodes = [buildNode('a')];
+        const currentNodes = [buildNode(NODE_A)];
         await seedCurrentGraph(ctx, currentNodes);
         const snap = snapFrom(buildGraph(currentNodes));
         const history = appendToRedoStack(
             buildFlowHistorySnapshot(false),
             buildFlowVersion({
                 nodes: [
-                    buildNode('a'),
-                    buildNode('b'),
+                    buildNode(NODE_A),
+                    buildNode(NODE_B),
                 ],
             }),
         );
@@ -1374,7 +1412,7 @@ test(
     async () => {
         const db = await setupNoFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ]));
         const history = appendToRedoStack(
             buildFlowHistorySnapshot(false),
@@ -1480,12 +1518,13 @@ test(
     async () => {
         const { db, ctx } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('a'),
-            buildNode('b'),
-            buildNode('c'),
+            buildNode(NODE_A),
+            buildNode(NODE_B),
+            buildNode(NODE_C),
         ]));
         const faulting = faultingPostCtx(
-            ctx, 'organizations/1/flows/' + FLOW_ID + '/undo',
+            ctx, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
+                + '/undo',
         );
         const { result: op } = await captureConsole(
             'error',
@@ -1536,19 +1575,19 @@ test(
     async () => {
         const { db, ctx } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('a'),
+            buildNode(NODE_A),
         ]));
         const history = appendToRedoStack(
             buildFlowHistorySnapshot(false),
             buildFlowVersion({
                 nodes: [
-                    buildNode('a'),
-                    buildNode('b'),
+                    buildNode(NODE_A),
+                    buildNode(NODE_B),
                 ],
             }),
         );
         const faulting = faultingPutCtx(
-            ctx, 'organizations/1/flows/' + FLOW_ID,
+            ctx, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID,
         );
         const { result: op } = await captureConsole(
             'error',

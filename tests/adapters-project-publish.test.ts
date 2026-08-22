@@ -20,6 +20,8 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // organization_id EXCLUDED — the client never supplies it (the
 // org fence stamps it downstream); see ProjectDocumentFields.
@@ -35,8 +37,8 @@ const SAMPLE_PROJECT_BODY = {
 test('validator: not ready when objectives unscored',
     () => {
         const r = validateProjectForApproval(
-            [{ id: 'o1', position: 0 },
-             { id: 'o2', position: 1 }],
+            [{ id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 },
+             { id: generateIdentifier(), position: 1 }],
             [],
         );
         assert.equal(r.ready, false);
@@ -45,10 +47,11 @@ test('validator: not ready when objectives unscored',
 
 test('validator: ready when all scored', () => {
     const r = validateProjectForApproval(
-        [{ id: 'o1', position: 0 }],
-        [{ id: 'b1', projectId: 'p1',
-           objectiveId: 'o1', score: 50,
-           memberId: 'w1',
+        [{ id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 }],
+        [{ id: generateIdentifier(),
+           projectId: 'pnXmXrxOWayANgDLdCjuBw',
+           objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: 50,
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            at: '2026-05-14T00:00:00.000000Z' }],
     );
     assert.equal(r.ready, true);
@@ -58,9 +61,10 @@ test('validator: ready when all scored', () => {
 test('archival validator: not ready when actuals missing',
     () => {
         const r = validateProjectForArchival(
-            [{ id: 'b1', projectId: 'p1',
-               objectiveId: 'o1', score: 50,
-               memberId: 'w1',
+            [{ id: generateIdentifier(),
+               projectId: 'pnXmXrxOWayANgDLdCjuBw',
+               objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: 50,
+               memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
                at: '2026-05-14T00:00:00.000000Z' }],
             [],
         );
@@ -77,11 +81,11 @@ test('postProjectApproval moves state to approved',
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
         // Seeded through the live document PUT (not a raw
-        // db.projects.put + db.states.postEvent) so p1's
+        // db.projects.put + db.states.postEvent) so pnXmXrxOWayANgDLdCjuBw's
         // message pair exists — postProjectApproval /
         // postProjectArchival gate on the flipped GET
         // organizations/:id/projects/:id existence check (Phase 3 Task 6).
-        await putProject(ctx, 'p1', {
+        await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
             ...SAMPLE_PROJECT_BODY,
             state: 'under_review',
         });
@@ -93,19 +97,23 @@ test('postProjectApproval moves state to approved',
         // flipped GET objectives / GET
         // organizations/:id/projects/:id/objective-
         // baseline-scores routes.
-        await ctx.PUT('organizations/1/objectives/o1', {
+        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + 'ohqxgUBEaFQwYbXsonRPmg', {
             position: 0,
             state: 'active',
         });
         await ctx.PUT(
-            'organizations/1/projects/p1/objective-baseline-scores/b1',
-            { project_id: 'p1', objective_id: 'o1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/'
+                + generateIdentifier(),
+            { project_id: 'pnXmXrxOWayANgDLdCjuBw'
+                , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
               score: 50,
-              member_id: 'w1',
+              member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
               at: '2026-05-14T00:00:00.000000Z' },
         );
-        await postProjectApproval(ctx, 'p1');
-        const row = await getProjectEntity(ctx, 'p1');
+        await postProjectApproval(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+        const row = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
         assert.equal(row.state, 'approved');
     });
 
@@ -117,16 +125,17 @@ test('postProjectApproval throws when not ready',
         const ctx = createRequestContext(db, await organizationToken());
         // A SYNTHESIZED trio (this fixture never carried one) —
         // the state itself is irrelevant to this test.
-        await putProject(ctx, 'p1', {
+        await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
             ...SAMPLE_PROJECT_BODY,
             state: 'under_review',
         });
-        await ctx.PUT('organizations/1/objectives/o1', {
+        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + 'ohqxgUBEaFQwYbXsonRPmg', {
             position: 0,
             state: 'active',
         });
         await assert.rejects(
-            () => postProjectApproval(ctx, 'p1'),
+            () => postProjectApproval(ctx, 'pnXmXrxOWayANgDLdCjuBw'),
             /not ready|unscored/i,
         );
     });
@@ -137,29 +146,36 @@ test('postProjectArchival moves state to archived',
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
-        await putProject(ctx, 'p1', {
+        await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
             ...SAMPLE_PROJECT_BODY,
             state: 'approved',
         });
-        await ctx.PUT('organizations/1/objectives/o1', {
+        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + 'ohqxgUBEaFQwYbXsonRPmg', {
             position: 0,
             state: 'active',
         });
         await ctx.PUT(
-            'organizations/1/projects/p1/objective-baseline-scores/b1',
-            { project_id: 'p1', objective_id: 'o1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/'
+                + generateIdentifier(),
+            { project_id: 'pnXmXrxOWayANgDLdCjuBw'
+                , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
               score: 50,
-              member_id: 'w1',
+              member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
               at: '2026-05-14T00:00:00.000000Z' },
         );
         await ctx.PUT(
-            'organizations/1/projects/p1/objective-actual-scores/a1',
-            { project_id: 'p1', objective_id: 'o1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'pnXmXrxOWayANgDLdCjuBw/objective-actual-scores/'
+                + 'UQTJZvCoKlFjEoDlDUwekw',
+            { project_id: 'pnXmXrxOWayANgDLdCjuBw'
+                , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
               score: 40,
-              member_id: 'w1',
+              member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
               at: '2026-05-15T00:00:00.000000Z' },
         );
-        await postProjectArchival(ctx, 'p1');
-        const row = await getProjectEntity(ctx, 'p1');
+        await postProjectArchival(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+        const row = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
         assert.equal(row.state, 'archived');
     });

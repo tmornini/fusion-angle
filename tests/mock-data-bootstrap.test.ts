@@ -49,7 +49,7 @@ test(
         assert.ok(
             requests.some(r =>
                 r.uri_collection === '/identities/'
-                && r.uri_id === 'current',
+                && r.uri_id === 'XXZruirZyAOoRpNxaDnpSA',
             ),
             'current identity seeded',
         );
@@ -62,7 +62,8 @@ test(
         );
         // Phase Final Stage B: roster tables retired.
         // Phase Final Task 2: organizations ROW half stripped.
-        const organization = await deriveOrganization(db, '1');
+        const organization = await deriveOrganization(db
+            , 'AjdvjuECVZEgZoFajaIEkg');
         assert.ok(
             organization.id.length > 0,
             'organization seeded',

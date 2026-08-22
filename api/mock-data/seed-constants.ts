@@ -7,15 +7,18 @@ export const MOCK_SEED_TIMESTAMP =
 
 // The seed's root org id (Stark Industries). Local to the
 // seed — there is no global default org any more.
-export const STARK_ORGANIZATION = '1';
+export const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 
-// The demo's second organization. org '2' is a new ROW, not
+// The demo's second organization. org 'BBjWJsjYIDkTRKIIPrzWRw' is a new ROW,
+// not
 // a new table — generate-schema-svg derives FK targets from
 // *_id pluralization, so a new table would shift the schema.
-export const ORGANIZATION_TWO = '2';
+export const ORGANIZATION_TWO = 'BBjWJsjYIDkTRKIIPrzWRw';
 
 // Deterministic org partition for non-admin seeds: even
-// index → org '1', odd → org '2'. ~half/half; the seed test
+// index → org 'AjdvjuECVZEgZoFajaIEkg', odd →
+// org 'BBjWJsjYIDkTRKIIPrzWRw'.
+// ~half/half; the seed test
 // pins per-org invariants, not the exact assignments.
 export function assignOrganization(index: number): string {
     return index % 2 === 0 ? STARK_ORGANIZATION : ORGANIZATION_TWO;

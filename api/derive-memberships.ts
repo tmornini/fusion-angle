@@ -10,6 +10,8 @@ import {
     deriveDocumentsAt,
     type DerivedDocument,
 } from './derive-documents.ts';
+import { compareIdentifiers } from
+    '../shared/identifier.ts';
 
 // The membership ledger's own reduction — Phase 13 Task 2, the
 // auth/authz/session spine's membership derivation. NOTHING reads
@@ -21,7 +23,7 @@ import {
 // organizations/members/identities' GLOBAL plane, so there is no
 // single flat prefix to scan for "every membership an identity
 // holds" — an identity can join MULTIPLE organizations at once
-// (the seed's own 'current', both STARK and ORGANIZATION_TWO).
+// (the seed's own 'XXZruirZyAOoRpNxaDnpSA', both STARK and ORGANIZATION_TWO).
 // deriveMembershipsForIdentity is therefore ENUMERATE-THEN-PROBE:
 // deriveOrganizations(db) (api/derive-organizations.ts) enumerates
 // every LIVE organization, then this walks each organization's
@@ -129,9 +131,7 @@ function byAtThenIdAscending(
 ): number {
     return a.at < b.at ? -1
         : a.at > b.at ? 1
-            : a.id < b.id ? -1
-                : a.id > b.id ? 1
-                    : 0;
+            : compareIdentifiers(a.id, b.id);
 }
 
 // Every LIVE membership row naming `identityId`, across EVERY

@@ -42,12 +42,12 @@ test('PUT /ai-agents/:id writes the agent', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const put = await handleRequest(db, req(
-        'PUT', '/ai-agents/a1', token,
+        'PUT', '/ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
         agentFields('Claude'),
     ));
     assert.ok(put.status === 201 || put.status === 200);
     const got = await GET<{ name: string }>(
-        db, 'ai-agents/a1', token,
+        db, 'ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
     );
     assert.equal(got.name, 'Claude');
 });
@@ -56,7 +56,7 @@ test('POST /ai-members is retired 404', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
         'POST', '/ai-members', DEV_TOKEN, {
-            id: 'a1',
+            id: 'UQTJZvCoKlFjEoDlDUwekw',
             detail: agentFields('Claude'),
         },
     ));
@@ -67,13 +67,14 @@ test('a flow write with an AI agent id in memberIds'
 + ' is 400', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    await PUT(db, 'ai-agents/agent-1',
+    await PUT(db, 'ai-agents/UuvoBhQJUSEsiJwscXPkUg',
         agentFields('Bot'), token);
     const { DEFAULT_LOCK_TIMEOUT } = await import(
         '../api/types.ts'
     );
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-ai-agent', token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aJVLTHvDCMwaHWIrPvPlkA', token, {
             name: 'Blocked',
             is_locked: false,
             is_auto_layout: false,
@@ -90,7 +91,7 @@ test('a flow write with an AI agent id in memberIds'
                     positionY: 0,
                     isCreate: false,
                     isArchive: false,
-                    memberIds: ['agent-1'],
+                    memberIds: ['UuvoBhQJUSEsiJwscXPkUg'],
                     attributes: [],
                     taskInstructions: '',
                 }],

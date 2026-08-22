@@ -79,20 +79,21 @@ function fakeClient(): {
 }
 
 const PAIR_ROW = {
-    id: 'aaaaaaaaaaaaaaaaaaaaaa',
-    uri_collection: '/organizations/1/ideas/',
+    id: 'UuPWIGbUyaAgmEgGDRfnvA',
+    uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     uri_id: '42',
-    requester_identity_id: 'bbbbbbbbbbbbbbbbbbbbbb',
+    requester_identity_id: 'WOTMsfERBVJEuTRTgrQptQ',
     method: 'PUT',
     request_at: '2026-01-01T00:00:00.000000Z',
     request_hash: 'a'.repeat(64),
-    request: 'PUT /organizations/1/ideas/42 HTTP/1.1\r\n\r\n'
+    request: 'PUT /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/42 HTTP/'
+        + '1.1\r\n\r\n'
         + String.fromCharCode(0x80, 0x9c, 0xe9),
     response_at: '2026-01-01T00:00:00.000001Z',
     version: 'e'.repeat(64),
     response: 'HTTP/1.1 200 OK\r\n\r\n'
         + String.fromCharCode(0x80, 0x9c, 0xe9),
-    operation_id: 'cccccccccccccccccccccc',
+    operation_id: 'WvNiHVgksjrlfhPfdgfcyQ',
 };
 
 test('ensureTables runs compile-time SCHEMA', async () => {
@@ -173,7 +174,8 @@ async () => {
         ['pairs'],
         'readonly',
         (tx) => tx.getWhere(
-            'pairs', 'uri_collection', '/organizations/1/ideas/',
+            'pairs', 'uri_collection'
+                , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         ),
     );
     const text = fake.calls[0]!.text;
@@ -186,7 +188,7 @@ async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     await backend.getAddress(
-        'pairs', '/organizations/1/ideas/', '42',
+        'pairs', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42',
     );
     const text = fake.calls[0]!.text;
     assert.match(text, /WHERE uri_collection = \$1/);
@@ -194,7 +196,7 @@ async () => {
     assert.match(text, /ORDER BY response_at, id/);
     assert.deepEqual(
         fake.calls[0]!.values,
-        ['/organizations/1/ideas/', '42'],
+        ['/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42'],
     );
 });
 
@@ -206,7 +208,8 @@ async () => {
         ['pairs'],
         'readonly',
         (tx) => tx.getAddressVersion(
-            'pairs', '/organizations/1/ideas/', '42', 'ab',
+            'pairs', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42'
+                , 'ab',
         ),
     );
     const text = fake.calls[0]!.text;
@@ -217,7 +220,7 @@ async () => {
     assert.match(text, /ORDER BY response_at, id/);
     assert.deepEqual(
         fake.calls[0]!.values,
-        ['/organizations/1/ideas/', '42', 'ab'],
+        ['/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42', 'ab'],
     );
 });
 
@@ -256,7 +259,7 @@ test('getWhere throws for operation_id', async () => {
             (tx) => tx.getWhere(
                 'pairs',
                 'operation_id',
-                'cccccccccccccccccccccc',
+                'WvNiHVgksjrlfhPfdgfcyQ',
             ),
         ),
         (error: unknown) =>

@@ -53,7 +53,7 @@ test('malformed wire events throw', () => {
 test('scoped wire events round-trip', () => {
     const event = {
         kind: 'scoped',
-        organizationIds: ['1'],
+        organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
         identityIds: [],
     };
     assert.deepEqual(

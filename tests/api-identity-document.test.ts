@@ -33,6 +33,8 @@ import {
     apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Phase 10 Task 4 (twelfth registered family): PUT
 // /identities/:id takes `kind` plus, for a person, the
@@ -141,19 +143,19 @@ async () => {
     const body = identityFields();
     const pair = await formWritePair({
         method: 'PUT',
-        pathname: '/identities/id-doc-op-1',
+        pathname: '/identities/gTMDzYjclgPKfPUYsUdtoQ',
         routePattern: 'identities/:id',
         routeSegments: ['identities', ':id'],
-        pathSegments: ['identities', 'id-doc-op-1'],
+        pathSegments: ['identities', 'gTMDzYjclgPKfPUYsUdtoQ'],
         headerFields: [], body,
-        requesterIdentityId: 'current',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
         responseStatus: 200, responseBody: undefined,
         operationId: TEST_OPERATION_ID,
     });
     const written = await postIdentityDocumentOp(
-        db, 'id-doc-op-1', body, 'current', pair,
+        db, 'gTMDzYjclgPKfPUYsUdtoQ', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
     );
     assert.deepEqual(written, body);
     // Phase Final Stage B: identity spine tables retired.
@@ -168,11 +170,12 @@ test('a byte-identical PUT resend to identities/:id converges'
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const body = identityFields();
+    const id = generateIdentifier();
     const first = await PUT(
-        db, 'identities/id-resend-1', body, DEV_TOKEN,
+        db, 'identities/' + id, body, DEV_TOKEN,
     );
     const second = await PUT(
-        db, 'identities/id-resend-1', body, DEV_TOKEN,
+        db, 'identities/' + id, body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
     assert.equal((await db.pairs.getAll()).length, 3);
@@ -202,7 +205,7 @@ async function putDocumentPair(
         routeSegments: ['identities', ':id'],
         pathSegments: ['identities', id],
         headerFields: [], body,
-        requesterIdentityId: 'current',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt,
         organization: undefined,
         responseStatus: 200, responseBody: undefined,
@@ -227,7 +230,7 @@ async function deleteDocumentPair(
         routeSegments: ['identities', ':id'],
         pathSegments: ['identities', id],
         headerFields: [], body: {},
-        requesterIdentityId: 'current',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt,
         organization: undefined,
         responseStatus: 204, responseBody: undefined,
@@ -246,30 +249,31 @@ test('a PUT chain Supersedes-chains and the head derives the'
     await db.postSchemaCreation();
     const wiring = documentFamilyWiring('identities')!;
     const first = identityFields();
+    const id = generateIdentifier();
     const firstId = await putDocumentPair(
-        db, 'identities-chain-1', first,
+        db, id, first,
         '2026-02-01T00:00:00.000000Z',
     );
     const headAfterFirst = await documentGetHandler(wiring)(
-        db, ['identities-chain-1'], 'current', 'ignored',
+        db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored',
     );
     assert.deepEqual(headAfterFirst, {
-        id: 'identities-chain-1', ...first,
+        id, ...first,
     });
 
     const second = { kind: 'service' as const };
     const secondId = await putDocumentPair(
-        db, 'identities-chain-1', second,
+        db, id, second,
         '2026-02-02T00:00:00.000000Z', firstId,
     );
     const secondResponse = await db.pairs.getById(secondId);
     assert.equal('supersedes' in secondResponse, false);
 
     const headAfterSecond = await documentGetHandler(wiring)(
-        db, ['identities-chain-1'], 'current', 'ignored',
+        db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored',
     );
     assert.deepEqual(headAfterSecond, {
-        id: 'identities-chain-1', ...second,
+        id, ...second,
     });
 });
 
@@ -278,16 +282,17 @@ test('a DELETE-head derives absent through the generic document'
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const wiring = documentFamilyWiring('identities')!;
+    const id = generateIdentifier();
     await putDocumentPair(
-        db, 'identities-del-1', identityFields(),
+        db, id, identityFields(),
         '2026-02-01T00:00:00.000000Z',
     );
     await deleteDocumentPair(
-        db, 'identities-del-1', '2026-02-02T00:00:00.000000Z',
+        db, id, '2026-02-02T00:00:00.000000Z',
     );
     await assert.rejects(
         documentGetHandler(wiring)(
-            db, ['identities-del-1'], 'current', 'ignored',
+            db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored',
         ),
         (error: unknown) => {
             assert.ok(error instanceof EntityNotFoundError);
@@ -297,7 +302,7 @@ test('a DELETE-head derives absent through the generic document'
             );
             assert.equal(
                 (error as EntityNotFoundError).message,
-                'Not found: identities/identities-del-1',
+                'Not found: identities/' + id,
             );
             return true;
         },
@@ -314,14 +319,15 @@ test('documentWriteResponseSpec(IDENTITIES_WIRING) emits'
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const body = identityFields();
+    const id = generateIdentifier();
     const written = await PUT<Record<string, unknown>>(
-        db, 'identities/id-resp-1', body, DEV_TOKEN,
+        db, 'identities/' + id, body, DEV_TOKEN,
     );
     assert.deepEqual(
         Object.keys(written).sort(),
         ['id', 'kind'],
     );
-    assert.equal(written['id'], 'id-resp-1');
+    assert.equal(written['id'], id);
     assert.equal(written['kind'], 'person');
 });
 
@@ -329,7 +335,7 @@ test('stored PUT body equals identityDocumentEntityOf',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const id = 'id-g3-stream';
+    const id = generateIdentifier();
     const body = identityFields();
     const put = await handleRequest(
         db,
@@ -377,7 +383,7 @@ test('PUT service identity with title is 400', async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/identities/svc-title-1',
+            path: '/identities/uYxxmcHuFJghfKLveLDneg',
             token: DEV_TOKEN,
             body: { kind: 'service', title: 'Bot' },
             operationId: TEST_OPERATION_ID,
@@ -393,7 +399,7 @@ test('PUT person identity with title is 201', async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/identities/person-title-1',
+            path: '/identities/qUceZILomWDFIEtnAaLHKg',
             token: DEV_TOKEN,
             body: { kind: 'person', title: 'Engineer' },
             operationId: TEST_OPERATION_ID,
@@ -405,7 +411,7 @@ test('PUT person identity with title is 201', async () => {
         kind: string;
         title?: string;
     };
-    assert.equal(written.id, 'person-title-1');
+    assert.equal(written.id, 'qUceZILomWDFIEtnAaLHKg');
     assert.equal(written.kind, 'person');
     assert.equal(written.title, 'Engineer');
 });
@@ -414,7 +420,7 @@ test('GET identity returns title for that person',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const id = 'person-title-get';
+    const id = generateIdentifier();
     const put = await handleRequest(
         db,
         apiRequest({
@@ -444,7 +450,7 @@ async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/identities/current',
+            path: '/identities/XXZruirZyAOoRpNxaDnpSA',
             token: DEV_TOKEN,
             body: { kind: 'person', title: 'CEO' },
             operationId: TEST_OPERATION_ID,
@@ -457,7 +463,7 @@ async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/identities/current/pii',
+            path: '/identities/XXZruirZyAOoRpNxaDnpSA/pii',
             token: DEV_TOKEN,
             body: PII_FACET,
             operationId: TEST_OPERATION_ID,
@@ -467,12 +473,12 @@ async () => {
         piiPut.status === 201 || piiPut.status === 200,
     );
     const pii = await GET<Record<string, unknown>>(
-        db, 'identities/current/pii', DEV_TOKEN,
+        db, 'identities/XXZruirZyAOoRpNxaDnpSA/pii', DEV_TOKEN,
     );
     assert.equal(pii['name'], 'Ada');
     assert.equal('title' in pii, false);
     const identity = await GET<Record<string, unknown>>(
-        db, 'identities/current', DEV_TOKEN,
+        db, 'identities/XXZruirZyAOoRpNxaDnpSA', DEV_TOKEN,
     );
     assert.equal(identity['title'], 'CEO');
     assert.equal('name' in identity, false);

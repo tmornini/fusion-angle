@@ -1,5 +1,5 @@
-import { generateCryptoSafeBase62 } from
-    '../../../shared/crypto-safe-base62.ts';
+import { generateIdentifier } from
+    '../../../shared/identifier.ts';
 import {
     UnauthorizedError,
     RequestError,
@@ -139,7 +139,7 @@ function requestHeaders(
     if (write && !headers.has(OPERATION_ID_HEADER)) {
         headers.set(
             OPERATION_ID_HEADER,
-            generateCryptoSafeBase62(),
+            generateIdentifier(),
         );
     }
     return headers;

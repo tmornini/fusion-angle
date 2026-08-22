@@ -6,8 +6,8 @@ import {
     DEFAULT_NODE_TASK_INSTRUCTIONS,
 } from '../../../api/types.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 
 const DEFAULT_START_X = -300;
 const DEFAULT_START_Y = 0;
@@ -20,7 +20,7 @@ export function buildStartAndCompleteNodes(): {
 } {
     return {
         start: {
-            id: generateCryptoSafeBase62(),
+            id: generateIdentifier(),
             name: 'Create',
             positionX: DEFAULT_START_X,
             positionY: DEFAULT_START_Y,
@@ -38,7 +38,7 @@ export function buildStartAndCompleteNodes(): {
             taskInstructions: DEFAULT_NODE_TASK_INSTRUCTIONS,
         },
         complete: {
-            id: generateCryptoSafeBase62(),
+            id: generateIdentifier(),
             name: 'Archive',
             positionX: DEFAULT_COMPLETE_X,
             positionY: DEFAULT_COMPLETE_Y,

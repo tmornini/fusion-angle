@@ -34,7 +34,7 @@ import {
     postAIMemberCreation,
     postInvitationGrant,
     type InvitationGrantOutcome,
-    generateCryptoSafeBase62,
+    generateIdentifier,
     subscribeHumanMemberChanges,
     subscribeAIMemberChanges,
     HumanMemberPiiIntakeFailedError,
@@ -67,7 +67,7 @@ let memberListEl: HTMLElement | null = null;
 let pendingMemberId: string | null = null;
 
 function currentMemberId(): string {
-    pendingMemberId ??= generateCryptoSafeBase62();
+    pendingMemberId ??= generateIdentifier();
     return pendingMemberId;
 }
 

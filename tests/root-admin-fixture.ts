@@ -23,7 +23,7 @@ import { TEST_OPERATION_ID } from './http-fixtures.ts';
 // would, with a pair formed from the SAME WRITE_RESPONSE_SPECS
 // entry. Role grants retired — membership `type` is the
 // privilege; tokens bake claim roles at mint.
-const ROOT_ADMIN_ORGANIZATION: Id = '1';
+const ROOT_ADMIN_ORGANIZATION: Id = 'AjdvjuECVZEgZoFajaIEkg';
 
 // A complete organization row (minus id) for tests needing a
 // tenant root. `name` varies; the rest are fixed demo values.
@@ -162,7 +162,8 @@ export async function seedSeat(
 
 // Seed the demo `current` identity as a root admin directly at
 // the storage layer (below the gate): seat with
-// type:"admin" in org '1'. Tokens bake claim roles from that
+// type:"admin" in org 'AjdvjuECVZEgZoFajaIEkg'. Tokens bake claim roles from
+// that
 // type at mint (tests/token-fixtures.ts).
 export async function seedRootAdmin(
     db: DbAdapter,
@@ -171,11 +172,12 @@ export async function seedRootAdmin(
         db, ROOT_ADMIN_ORGANIZATION, 'Root Admin Org',
     );
     await seedSeat(
-        db, ROOT_ADMIN_ORGANIZATION, 'current', 'admin',
+        db, ROOT_ADMIN_ORGANIZATION, 'XXZruirZyAOoRpNxaDnpSA', 'admin',
     );
 }
 
-// Seed an identity as a plain content-tier member of org '1':
+// Seed an identity as a plain content-tier member of org
+// 'AjdvjuECVZEgZoFajaIEkg':
 // seat with type:"member". The member-tier counterpart of
 // seedRootAdmin above.
 export async function seedOrganizationMember(

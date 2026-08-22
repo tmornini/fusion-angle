@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { ProjectActionBarPresenter } from
     '../web-app/app/presenters/project-action-bar.ts';
 
-const PROJECT_ID = 'p1';
+const PROJECT_ID = 'pnXmXrxOWayANgDLdCjuBw';
 
 test('under_review with no scores: Approve disabled',
     () => {
@@ -13,7 +13,7 @@ test('under_review with no scores: Approve disabled',
                 ready: false,
                 problems: [
                     { kind: 'baseline_unscored',
-                      objectiveId: 'o1' },
+                      objectiveId: 'ohqxgUBEaFQwYbXsonRPmg' },
                 ],
             },
             { ready: true, problems: [] },
@@ -51,7 +51,7 @@ test('approved project: Archive shown',
                 ready: false,
                 problems: [
                     { kind: 'actual_unscored',
-                      objectiveId: 'o1' },
+                      objectiveId: 'ohqxgUBEaFQwYbXsonRPmg' },
                 ],
             },
             new Map(),
@@ -130,7 +130,7 @@ test('sent_back project: Score button hidden, other review actions shown',
 test('Approve tooltip enumerates unscored objective names',
     () => {
         const names = new Map([
-            ['o1', 'Increase incomes'],
+            ['ohqxgUBEaFQwYbXsonRPmg', 'Increase incomes'],
             ['o2', 'Raise customer NPS'],
         ]);
         const p = new ProjectActionBarPresenter(
@@ -139,7 +139,7 @@ test('Approve tooltip enumerates unscored objective names',
                 ready: false,
                 problems: [
                     { kind: 'baseline_unscored',
-                      objectiveId: 'o1' },
+                      objectiveId: 'ohqxgUBEaFQwYbXsonRPmg' },
                     { kind: 'baseline_unscored',
                       objectiveId: 'o2' },
                 ],
@@ -162,7 +162,7 @@ test('Approve tooltip enumerates unscored objective names',
 test('Archive tooltip enumerates objectives lacking actuals',
     () => {
         const names = new Map([
-            ['o1', 'Improve employee morale'],
+            ['ohqxgUBEaFQwYbXsonRPmg', 'Improve employee morale'],
         ]);
         const p = new ProjectActionBarPresenter(
             PROJECT_ID, 'approved',
@@ -171,7 +171,7 @@ test('Archive tooltip enumerates objectives lacking actuals',
                 ready: false,
                 problems: [
                     { kind: 'actual_unscored',
-                      objectiveId: 'o1' },
+                      objectiveId: 'ohqxgUBEaFQwYbXsonRPmg' },
                 ],
             },
             names,

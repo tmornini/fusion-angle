@@ -31,7 +31,7 @@ test('seededMockDb seeds verifying current password',
 async () => {
     const db = await seededMockDb();
     const rows = await deriveCredentialsFor(
-        db, 'current',
+        db, 'XXZruirZyAOoRpNxaDnpSA',
     );
     const passwordCred = rows.find(
         r => r.kind === 'password',

@@ -24,6 +24,30 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+
+const M_A = generateIdentifier();
+const FLOW_X = generateIdentifier();
+const N_START = generateIdentifier();
+const N_MIDDLE = generateIdentifier();
+const WO_LIFECYCLE_RELEASE_1 = generateIdentifier();
+const WO_LIFECYCLE_TRANSITION_1 = generateIdentifier();
+const N_FINISH = generateIdentifier();
+const ORGANIZATION_A = generateIdentifier();
+const ADMIN_A = generateIdentifier();
+const WORKORDERID_FWO = generateIdentifier();
+const WORKORDERID_EV1 = generateIdentifier();
+const WORKORDERID_EV2 = generateIdentifier();
+const WORKORDERID_EV3 = generateIdentifier();
+const WORKORDERID_CE1 = generateIdentifier();
+const WORKORDERID_EE1 = generateIdentifier();
+const WORKORDERID_CE2 = generateIdentifier();
+const WORKORDERID_EE2 = generateIdentifier();
+const WORKORDERID_TE1 = generateIdentifier();
+const WORKORDERID_TE2 = generateIdentifier();
+const WORKORDERID_REL1 = generateIdentifier();
+const WORKORDERID_GENESIS = generateIdentifier();
 
 // The work-order lifecycle derivation — create/claim/
 // transition/release OPERATION pairs (states-address
@@ -33,6 +57,11 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
+
+function workOrderPath(id: string, rest = ''): string {
+    return '/organizations/' + ORGANIZATION_A
+        + '/work-orders/' + id + rest;
+}
 
 function req(
     method: string,
@@ -85,9 +114,9 @@ async function seed(): Promise<MemoryDbAdapter> {
     // prerequisite) — a raw db.organizations.put leaves A
     // derivation-invisible to deriveMembershipsForIdentity's own
     // enumerate-then-probe (via deriveOrganizations).
-    await seedOrganizationDocument(db, 'A', 'Acme');
-    await seedMembershipPair(db, 'm-a', {
-        organization_id: 'A', identity_id: 'adminA',
+    await seedOrganizationDocument(db, ORGANIZATION_A, 'Acme');
+    await seedMembershipPair(db, M_A, {
+        organization_id: ORGANIZATION_A, identity_id: ADMIN_A,
         type: 'admin', at: AT,
     });
     return db;
@@ -145,26 +174,26 @@ function forWorkOrder(
 test('a live create births exactly the three initial state'
 + ' events, byte-equal to the old plane', async () => {
     const db = await seed();
-    const token = await organizationToken('adminA', 'A');
-    const workOrderId = 'wo-lifecycle-create-1';
+    const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
+    const workOrderId = generateIdentifier();
 
     const created = await handleRequest(db, req(
-        'POST', '/organizations/A/work-orders/', token,
+        'POST', workOrderPath(''), token,
         createWorkOrderBody(
-            workOrderId, workOrderId + '-fwo', 'flow-x',
+            workOrderId, WORKORDERID_FWO, FLOW_X,
             workOrderFlowGraph(8 * 60 * 60),
             {
                 ids: [
-                    workOrderId + '-ev1',
-                    workOrderId + '-ev2',
-                    workOrderId + '-ev3',
+                    WORKORDERID_EV1,
+                    WORKORDERID_EV2,
+                    WORKORDERID_EV3,
                 ],
                 ats: [
                     '2026-05-02T00:00:00.000000Z',
                     '2026-05-02T00:00:00.000001Z',
                     '2026-05-02T00:00:00.000002Z',
                 ],
-                states: ['n-start', 'n-middle', 'claimed'],
+                states: [N_START, N_MIDDLE, 'claimed'],
             },
             '2026-05-02T00:00:00.000000Z',
         ),
@@ -185,11 +214,11 @@ test('a SEEDED-shape work order (a bare document PUT, no create'
 + ' operation pair) derives zero rows and never throws — EDGE 1,'
 + ' the create-pair relaxation', async () => {
     const db = await seed();
-    const token = await organizationToken('adminA', 'A');
-    const workOrderId = 'wo-lifecycle-seeded-1';
+    const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
+    const workOrderId = generateIdentifier();
 
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId, token,
+        'PUT', workOrderPath(workOrderId), token,
         {
             display_id: 'seeded',
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
@@ -207,12 +236,12 @@ test('a SEEDED-shape work order (a bare document PUT, no create'
 test('a claim, then a claim past lockTimeout supersedes with'
 + ' claim_expired + claimed', async () => {
     const db = await seed();
-    const token = await organizationToken('adminA', 'A');
-    const workOrderId = 'wo-lifecycle-claim-1';
+    const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
+    const workOrderId = generateIdentifier();
     const tinyLockTimeoutSeconds = 1;
 
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId, token,
+        'PUT', workOrderPath(workOrderId), token,
         {
             display_id: 'claimable',
             flow_graph:
@@ -224,12 +253,12 @@ test('a claim, then a claim past lockTimeout supersedes with'
 
     const claim1At = nowUtc();
     const claim1 = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId +
+        'PUT', workOrderPath(workOrderId) +
             '/claim', token,
         {
-            claimEventId: workOrderId + '-ce1',
+            claimEventId: WORKORDERID_CE1,
             claimAt: claim1At,
-            expireEventId: workOrderId + '-ee1',
+            expireEventId: WORKORDERID_EE1,
             expireAt: claim1At,
         },
     ));
@@ -250,12 +279,12 @@ test('a claim, then a claim past lockTimeout supersedes with'
     const expire2At = nowUtc();
     const claim2At = nowUtc();
     const claim2 = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId +
+        'PUT', workOrderPath(workOrderId) +
             '/claim', token,
         {
-            claimEventId: workOrderId + '-ce2',
+            claimEventId: WORKORDERID_CE2,
             claimAt: claim2At,
-            expireEventId: workOrderId + '-ee2',
+            expireEventId: WORKORDERID_EE2,
             expireAt: expire2At,
         },
     ));
@@ -277,11 +306,11 @@ test('claim → release → reclaim derives claimed,'
 + ' claim_released, claimed; a release with no live claim'
 + ' derives zero events', async () => {
     const db = await seed();
-    const token = await organizationToken('adminA', 'A');
-    const workOrderId = 'wo-lifecycle-release-1';
+    const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
+    const workOrderId = WO_LIFECYCLE_RELEASE_1;
 
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId, token,
+        'PUT', workOrderPath(workOrderId), token,
         {
             display_id: 'releasable',
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
@@ -293,7 +322,7 @@ test('claim → release → reclaim derives claimed,'
     // DELETE with no claim row is 404; derive stays empty.
     const bareRelease = await handleRequest(db, req(
         'DELETE',
-        '/organizations/A/work-orders/' + workOrderId + '/claim',
+        workOrderPath(workOrderId, '/claim'),
         token,
     ));
     assert.equal(bareRelease.status, 404);
@@ -306,12 +335,12 @@ test('claim → release → reclaim derives claimed,'
 
     const claim1At = nowUtc();
     const claim1 = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId +
+        'PUT', workOrderPath(workOrderId) +
             '/claim', token,
         {
-            claimEventId: workOrderId + '-ce1',
+            claimEventId: WORKORDERID_CE1,
             claimAt: claim1At,
-            expireEventId: workOrderId + '-ee1',
+            expireEventId: WORKORDERID_EE1,
             expireAt: claim1At,
         },
     ));
@@ -319,19 +348,19 @@ test('claim → release → reclaim derives claimed,'
 
     const release = await handleRequest(db, req(
         'DELETE',
-        '/organizations/A/work-orders/' + workOrderId + '/claim',
+        workOrderPath(workOrderId, '/claim'),
         token,
     ));
     assert.equal(release.status, 204);
 
     const claim2At = nowUtc();
     const claim2 = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId +
+        'PUT', workOrderPath(workOrderId) +
             '/claim', token,
         {
-            claimEventId: workOrderId + '-ce2',
+            claimEventId: WORKORDERID_CE2,
             claimAt: claim2At,
-            expireEventId: workOrderId + '-ee2',
+            expireEventId: WORKORDERID_EE2,
             expireAt: claim2At,
         },
     ));
@@ -344,9 +373,9 @@ test('claim → release → reclaim derives claimed,'
         derived.map((row) => row.state),
         ['claimed', 'claim_released', 'claimed'],
     );
-    assert.equal(derived[0]!.id, workOrderId + '-ce1');
+    assert.equal(derived[0]!.id, WORKORDERID_CE1);
     assert.equal(derived[1]!.state, 'claim_released');
-    assert.equal(derived[2]!.id, workOrderId + '-ce2');
+    assert.equal(derived[2]!.id, WORKORDERID_CE2);
 });
 
 // -- 4. a transition, then a transition with release --------------
@@ -354,26 +383,26 @@ test('claim → release → reclaim derives claimed,'
 test('a transition, then a transition with release ends the'
 + ' claim', async () => {
     const db = await seed();
-    const token = await organizationToken('adminA', 'A');
-    const workOrderId = 'wo-lifecycle-transition-1';
+    const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
+    const workOrderId = WO_LIFECYCLE_TRANSITION_1;
 
     const created = await handleRequest(db, req(
-        'POST', '/organizations/A/work-orders/', token,
+        'POST', workOrderPath(''), token,
         createWorkOrderBody(
-            workOrderId, workOrderId + '-fwo', 'flow-x',
+            workOrderId, WORKORDERID_FWO, FLOW_X,
             workOrderFlowGraph(8 * 60 * 60),
             {
                 ids: [
-                    workOrderId + '-ev1',
-                    workOrderId + '-ev2',
-                    workOrderId + '-ev3',
+                    WORKORDERID_EV1,
+                    WORKORDERID_EV2,
+                    WORKORDERID_EV3,
                 ],
                 ats: [
                     '2026-05-02T00:00:00.000000Z',
                     '2026-05-02T00:00:00.000001Z',
                     '2026-05-02T00:00:00.000002Z',
                 ],
-                states: ['n-start', 'n-middle', 'claimed'],
+                states: [N_START, N_MIDDLE, 'claimed'],
             },
             '2026-05-02T00:00:00.000000Z',
         ),
@@ -381,10 +410,10 @@ test('a transition, then a transition with release ends the'
     assert.equal(created.status, 201);
 
     const transition1 = await handleRequest(db, req(
-        'POST', '/organizations/A/work-orders/' + workOrderId + '/transition',
+        'POST', workOrderPath(workOrderId, '/transition'),
         token, {
-            transitionEventId: workOrderId + '-te1',
-            targetState: 'n-middle',
+            transitionEventId: WORKORDERID_TE1,
+            targetState: N_MIDDLE,
             release: null,
             transitionAt: '2026-05-02T00:00:01.000000Z',
         },
@@ -392,12 +421,12 @@ test('a transition, then a transition with release ends the'
     assert.equal(transition1.status, 201);
 
     const transition2 = await handleRequest(db, req(
-        'POST', '/organizations/A/work-orders/' + workOrderId + '/transition',
+        'POST', workOrderPath(workOrderId, '/transition'),
         token, {
-            transitionEventId: workOrderId + '-te2',
-            targetState: 'n-finish',
+            transitionEventId: WORKORDERID_TE2,
+            targetState: N_FINISH,
             release: {
-                id: workOrderId + '-rel1',
+                id: WORKORDERID_REL1,
                 state: 'claim_released',
                 at: '2026-05-02T00:00:03.000000Z',
             },
@@ -422,13 +451,13 @@ test('the MOVING lock_timeout case: an entity PUT changing'
 + ' document head AS OF that claim, never a single cached'
 + ' value', async () => {
     const db = await seed();
-    const token = await organizationToken('adminA', 'A');
-    const workOrderId = 'wo-lifecycle-moving-1';
+    const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
+    const workOrderId = generateIdentifier();
     const bigLockTimeoutSeconds = 8 * 60 * 60;
     const tinyLockTimeoutSeconds = 1;
 
     const put1 = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId, token,
+        'PUT', workOrderPath(workOrderId), token,
         {
             display_id: 'moving',
             flow_graph:
@@ -440,12 +469,12 @@ test('the MOVING lock_timeout case: an entity PUT changing'
 
     const claim1At = nowUtc();
     const claim1 = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId +
+        'PUT', workOrderPath(workOrderId) +
             '/claim', token,
         {
-            claimEventId: workOrderId + '-ce1',
+            claimEventId: WORKORDERID_CE1,
             claimAt: claim1At,
-            expireEventId: workOrderId + '-ee1',
+            expireEventId: WORKORDERID_EE1,
             expireAt: claim1At,
         },
     ));
@@ -457,7 +486,7 @@ test('the MOVING lock_timeout case: an entity PUT changing'
     // value, crossed by the fake-clock advance below, it reads as
     // expired.
     const put2 = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId, token,
+        'PUT', workOrderPath(workOrderId), token,
         {
             display_id: 'moving',
             flow_graph:
@@ -476,12 +505,12 @@ test('the MOVING lock_timeout case: an entity PUT changing'
     const expire2At = nowUtc();
     const claim2At = nowUtc();
     const claim2 = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId +
+        'PUT', workOrderPath(workOrderId) +
             '/claim', token,
         {
-            claimEventId: workOrderId + '-ce2',
+            claimEventId: WORKORDERID_CE2,
             claimAt: claim2At,
-            expireEventId: workOrderId + '-ee2',
+            expireEventId: WORKORDERID_EE2,
             expireAt: expire2At,
         },
     ));
@@ -503,11 +532,11 @@ test('HYBRID: a bare document PUT plus a transition genesis'
 + ' and a live claim — both events ride the lifecycle'
 + ' reader (states/:id retired)', async () => {
     const db = await seed();
-    const token = await organizationToken('adminA', 'A');
-    const workOrderId = 'wo-lifecycle-hybrid-1';
+    const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
+    const workOrderId = generateIdentifier();
 
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId, token,
+        'PUT', workOrderPath(workOrderId), token,
         {
             display_id: 'hybrid',
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
@@ -518,10 +547,10 @@ test('HYBRID: a bare document PUT plus a transition genesis'
 
     const genesis = await handleRequest(db, req(
         'POST',
-        '/organizations/A/work-orders/' + workOrderId + '/transition',
+        workOrderPath(workOrderId, '/transition'),
         token, {
-            transitionEventId: workOrderId + '-genesis',
-            targetState: 'n-start',
+            transitionEventId: WORKORDERID_GENESIS,
+            targetState: N_START,
             release: null,
             transitionAt: AT,
         },
@@ -530,12 +559,12 @@ test('HYBRID: a bare document PUT plus a transition genesis'
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
-        'PUT', '/organizations/A/work-orders/' + workOrderId +
+        'PUT', workOrderPath(workOrderId) +
             '/claim', token,
         {
-            claimEventId: workOrderId + '-ce1',
+            claimEventId: WORKORDERID_CE1,
             claimAt,
-            expireEventId: workOrderId + '-ee1',
+            expireEventId: WORKORDERID_EE1,
             expireAt: claimAt,
         },
     ));
@@ -546,7 +575,7 @@ test('HYBRID: a bare document PUT plus a transition genesis'
     );
     assert.deepEqual(
         ours.map((row) => row.id),
-        [workOrderId + '-genesis', workOrderId + '-ce1'],
+        [WORKORDERID_GENESIS, WORKORDERID_CE1],
     );
     assert.equal(ours.length, 2);
 });

@@ -1005,7 +1005,7 @@ depends: A
 
 ### Idea Detail (`ideas/detail.html?ideaId=<id>`)
 
-- [ ] **D10** Navigate to `ideas/detail.html?ideaId=<id>` (a real base62 id from the Ideas list). PASS: page loads with idea title, status badge, and "Submitted by [name] @ [date/time]" in the header.
+- [ ] **D10** Navigate to `ideas/detail.html?ideaId=<id>` (a real identifier from the Ideas list). PASS: page loads with idea title, status badge, and "Submitted by [name] @ [date/time]" in the header.
 - [ ] **D11** Page displays one card: Problem & Solution (Problem Statement,
   Target Users, Proposed Solution, Expected
   Outcome, Success Metrics). PASS: all fields populated. No Details or Estimates cards.
@@ -1047,7 +1047,7 @@ depends: A
 
 ### Idea Detail — Approval Actions
 
-- [ ] **D29** Navigate to `ideas/detail.html?ideaId=<id>` for an in_review idea (entity ids are base62 tokens, not sequential integers — copy a real id from the Ideas list). PASS: page loads with idea details and Send Back / Approve buttons in the header next to Edit.
+- [ ] **D29** Navigate to `ideas/detail.html?ideaId=<id>` for an in_review idea (entity ids are identifiers, not sequential integers — copy a real id from the Ideas list). PASS: page loads with idea details and Send Back / Approve buttons in the header next to Edit.
 - [ ] **D30** Click "Approve". PASS: success toast, navigates to ideas list, idea status is now "approved".
 - [ ] **D31** Click "Send Back". PASS: confirm dialog opens. Confirm. PASS: idea status changes to "sent_back", navigates to ideas list.
 - [ ] **D32** Navigate to idea detail for a non-in_review idea. PASS: no Send Back / Approve buttons are shown.
@@ -1091,7 +1091,7 @@ depends: A
 - [ ] **E4** Page loads with project summary
   card (description, dates, progress bar) and
   baseline vs. current metrics. PASS: all cards
-  render with data. Baseline/current metrics
+  render with data. Baseline/XXZruirZyAOoRpNxaDnpSA metrics
   show em dash when values are zero or missing.
 - [ ] **E5** Sidebar shows the Flows section
   (Team card has been retired with the team
@@ -1856,7 +1856,7 @@ depends: A
   rows are `(at, id)` DESC (index 0 = current); each
   non-claim event has the immutable shape `{id, entity_id,
   state, member_id, at, field_values}`, with `state`
-  carrying the target node's base62 id. Live values live
+  carrying the target node's identifier. Live values live
   on the instance head; history `field_values` may be
   empty for new-shape transitions. Verify no app code
   path mutates an existing pair — the message plane is
@@ -2771,7 +2771,7 @@ every other agent, so no write-domain collision.
   or "No instances yet", with a "New instance" control.
   (mutation domain: `records` / instances under the type —
   Agent-F2 exclusive.)
-- [ ] **R17** Click "New instance". PASS: a base62 id is
+- [ ] **R17** Click "New instance". PASS: an identifier is
   minted, PUT creates an empty instance (etag consumed),
   and the section enters edit mode with writable attribute
   inputs (readable non-writable attributes render

@@ -10,8 +10,11 @@ import {
 } from '../api/mock-data.ts';
 import {
     postTestPlanSlices,
+    sliceEntityId,
     type TestPlanSliceReveal,
 } from '../api/test-plan-slices.ts';
+import { buildMembers } from
+    '../api/mock-data/members.ts';
 import type { SqlClient } from
     '../api/postgres-client.ts';
 import { hashPassword } from
@@ -243,9 +246,14 @@ export async function seedEmptyDatabase(
         return {
             identities: slices.map((slice) => ({
                 identityId: slice.section === 'AA'
-                    ? 'current'
-                    : slice.section.toLowerCase()
-                        + '-admin',
+                    ? buildMembers().find(
+                        (m) => m.email
+                            === 'demo@example.com',
+                    )!.id
+                    : sliceEntityId(
+                        slice.section.toLowerCase()
+                            + '-admin',
+                    ),
                 username: slice.adminUsername,
                 password: slice.adminPassword,
             })),

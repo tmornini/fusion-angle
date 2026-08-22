@@ -22,15 +22,16 @@ async function storedPairAt(
 ): Promise<PairEntity> {
     const pair = await formWritePair({
         method,
-        pathname: '/organizations/1/ideas/doc-1',
+        pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'XufQcWIKhZshfJYOVNeUSw',
         routePattern: 'organizations/:id/ideas/:id',
         routeSegments: ['ideas', ':id'],
-        pathSegments: ['ideas', 'doc-1'],
+        pathSegments: ['ideas', 'XufQcWIKhZshfJYOVNeUSw'],
         headerFields: [],
         body: { a: 1 },
-        requesterIdentityId: 'current',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT,
-        organization: '1',
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: status,
         responseBody: undefined,
         operationId: TEST_OPERATION_ID,
@@ -54,7 +55,8 @@ async function storedPairAt(
 // design decision 6: a document-address pair's method decides
 // whether it is a DOCUMENT (PUT/DELETE) or an OPERATION (POST,
 // e.g. a create-shaped genesis pair sharing the document's own
-// address). No-op for organizations/1/ideas/projects today
+// address). No-op for organizations/AjdvjuECVZEgZoFajaIEkg/ideas/projects
+// today
 // (neither ever POSTs at its own document address);
 // load-bearing once a family's create pair shares the
 // document address (flows).
@@ -62,7 +64,7 @@ async function storedPairAt(
 test('2-arg documentPairsAt decodes a PUT pair',
 async () => {
     const pair = await storedPairAt('PUT', 200);
-    const prefix = '/organizations/1/ideas/';
+    const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
     const fromOne = documentPairsAt([pair], prefix);
     assert.equal(fromOne.length, 1);
     assert.equal(fromOne[0]!.method, 'PUT');
@@ -74,7 +76,7 @@ test('documentPairsAt excludes a POST pair at a document'
     const pair = await storedPairAt('POST', 200);
     const pairs = documentPairsAt(
         [pair],
-        '/organizations/1/ideas/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
     assert.equal(pairs.length, 0);
 });
@@ -84,7 +86,7 @@ test('documentPairsAt includes a PUT pair at a document'
     const pair = await storedPairAt('PUT', 200);
     const pairs = documentPairsAt(
         [pair],
-        '/organizations/1/ideas/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
     assert.equal(pairs.length, 1);
     assert.equal(pairs[0]!.method, 'PUT');
@@ -97,7 +99,7 @@ test('documentPairsAt includes a DELETE pair at a document'
     );
     const pairs = documentPairsAt(
         [pair],
-        '/organizations/1/ideas/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
     assert.equal(pairs.length, 1);
     assert.equal(pairs[0]!.method, 'DELETE');
@@ -108,7 +110,7 @@ async () => {
     const pair = await storedPairAt('POST', 200);
     const documents = deriveDocumentsAt(
         [pair],
-        '/organizations/1/ideas/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
     assert.equal(documents.size, 0);
 });

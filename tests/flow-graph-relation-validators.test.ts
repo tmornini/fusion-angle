@@ -7,28 +7,32 @@ import {
     validateFlowNodeAttributeEntity,
 } from '../api/validators.ts';
 import { ValidationError } from '../api/types.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const NODE_1 = generateIdentifier();
+const NODE_2 = generateIdentifier();
 
 const nodeBody = () => ({
-    flow_id: 'f1', name: 'Draft',
+    flow_id: 'ZOousbbnzpqlxJExVAruYQ', name: 'Draft',
     position_x: 12, position_y: 34,
     is_create: true, is_archive: false,
     task_instructions: '', at: AT,
 });
 
 const edgeBody = () => ({
-    flow_id: 'f1', name: 'next',
-    from_node_id: 'n1', to_node_id: 'n2', at: AT,
+    flow_id: 'ZOousbbnzpqlxJExVAruYQ', name: 'next',
+    from_node_id: NODE_1, to_node_id: NODE_2, at: AT,
 });
 
 const memberBody = () => ({
-    flow_node_id: 'n1', member_id: 'm1',
+    flow_node_id: NODE_1, member_id: 'mFNSxZqywTSMXhgUTdTqtA',
     action: 'added', at: AT,
 });
 
 const attrBody = () => ({
-    flow_node_id: 'n1', attribute_id: 'a1',
+    flow_node_id: NODE_1, attribute_id: 'UQTJZvCoKlFjEoDlDUwekw',
     mode: 'editable', is_required: true,
     action: 'added', at: AT,
 });
@@ -37,7 +41,7 @@ const attrBody = () => ({
 
 test('validateFlowNodeEntity accepts a valid body', () => {
     assert.deepEqual(validateFlowNodeEntity(nodeBody()), {
-        flow_id: 'f1', name: 'Draft',
+        flow_id: 'ZOousbbnzpqlxJExVAruYQ', name: 'Draft',
         position_x: 12, position_y: 34,
         is_create: true, is_archive: false,
         task_instructions: '', at: AT,
@@ -62,8 +66,8 @@ test('validateFlowNodeEntity rejects a non-zulu at', () => {
 
 test('validateFlowEdgeEntity accepts a valid body', () => {
     assert.deepEqual(validateFlowEdgeEntity(edgeBody()), {
-        flow_id: 'f1', name: 'next',
-        from_node_id: 'n1', to_node_id: 'n2', at: AT,
+        flow_id: 'ZOousbbnzpqlxJExVAruYQ', name: 'next',
+        from_node_id: NODE_1, to_node_id: NODE_2, at: AT,
     });
 });
 
@@ -81,7 +85,7 @@ test('validateFlowNodeMemberEntity accepts a valid body',
 () => {
     assert.deepEqual(
         validateFlowNodeMemberEntity(memberBody()), {
-            flow_node_id: 'n1', member_id: 'm1',
+            flow_node_id: NODE_1, member_id: 'mFNSxZqywTSMXhgUTdTqtA',
             action: 'added', at: AT,
         });
 });
@@ -100,7 +104,7 @@ test('validateFlowNodeAttributeEntity accepts a valid body',
 () => {
     assert.deepEqual(
         validateFlowNodeAttributeEntity(attrBody()), {
-            flow_node_id: 'n1', attribute_id: 'a1',
+            flow_node_id: NODE_1, attribute_id: 'UQTJZvCoKlFjEoDlDUwekw',
             mode: 'editable', is_required: true,
             action: 'added', at: AT,
         });

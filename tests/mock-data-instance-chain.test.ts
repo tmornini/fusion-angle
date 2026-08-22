@@ -100,11 +100,11 @@ async () => {
         );
     }
     assert.equal(
-        LEGACY_UNION.get('5JZ0LeKdPCa4QMtg1RsF1M'),
+        LEGACY_UNION.get('CPJmMPXRaBIiNdGBofUPVg'),
         'Acme Corp',
     );
     assert.equal(
-        LEGACY_UNION.get('AdQlKf43JV6yrhQbyskDkR'),
+        LEGACY_UNION.get('ElVKgkCreTEHQXJZPBJDKw'),
         'Approved. Strong fit.',
     );
 });
@@ -121,10 +121,11 @@ async () => {
     });
 
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const res = await handleRequest(db, req(
-        'GET', '/organizations/1/work-orders/' + WO01_ID, token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + WO01_ID, token,
     ));
     assert.equal(res.status, 200);
     const body = await res.json() as Record<
@@ -178,7 +179,7 @@ async () => {
 
     // Other WO transition pairs keep the LEGACY fieldValues
     // key (never instance_id/set) — event fidelity.
-    const otherWoId = 'kKtX2W0iVTWFPEoPrJmIHW';
+    const otherWoId = 'krzCXtfVNOLvbGcYnSrhng';
     const otherPrefix =
         '/organizations/' + STARK_ORGANIZATION
         + '/work-orders/' + otherWoId + '/transition/';

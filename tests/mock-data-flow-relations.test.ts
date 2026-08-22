@@ -9,7 +9,7 @@ import { seededMockDb } from './mock-seed.ts';
 // buildFlows() seeds land on Stark (flowSeedBody stamps
 // organization_id: STARK_ORGANIZATION); seed-flow-org2 is a
 // separate postFlowDocumentOp path not covered here.
-const STARK_ORGANIZATION = '1';
+const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 
 // Phase Final Task 2: graph relation ROW halves stripped.
 // The decompose covenant re-homes to the pair plane: every
@@ -67,6 +67,6 @@ test('Fusion Angle Flow keeps its seed id', () => {
     assert.ok(flow, 'Fusion Angle Flow must exist');
     assert.equal(
         flow!.id,
-        'E2BnBlZyrriqsQYkmS4usb',
+        'GgfDbXOJUvvaCekCTcvhuw',
     );
 });

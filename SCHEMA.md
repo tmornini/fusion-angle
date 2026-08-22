@@ -17,10 +17,11 @@ record is the **message plane** — the append-only
 is `pairs` in Postgres
 (`api/schema-postgres.ts`); the memory backend holds the
 same rows in an in-process Map keyed by table name.
-Column types match `PairEntity`: TEXT in the TypeScript
-view; Postgres stores `request` and `response` as BYTEA
-Latin-1. All rows have a text `id` primary key. `method`
-and `operation_id` are TEXT. No `uri_id`-only index.
+Column types match `PairEntity`. TypeScript views `id`
+and `operation_id` as identifier strings; Postgres
+stores those columns as uuid. `method` is TEXT.
+Postgres stores `request` and `response` as BYTEA
+Latin-1. No `uri_id`-only index.
 Document-body composites (arrays and objects —
 `strengths`, `team_dimensions`, `options`,
 `constraints`, `graph`, `graphDelta`, `revivals`,
@@ -80,12 +81,13 @@ zone. History tables and the old `EntityStore` /
 The `states/:id` event-append address is retired with every
 verb on it — router 404.
 
-**The `'system'` member:** `SYSTEM_MEMBER_ID = 'system'`
-in `api/types.ts` is a derived directory entry with
-`type = 'system'` and no human/AI detail, seeded by both
-`postMockDataLoad` and `postBootstrap`. Its corresponding
-identity carries `kind = 'service'` — the platform itself as
-a non-person principal. State events with no specific user
+**The `'system'` member:** `SYSTEM_MEMBER_ID` is
+`NIL_IDENTIFIER` in `api/types.ts`. It is a derived
+directory entry with kind `'system'` and no human/AI
+detail, seeded by both `postMockDataLoad` and
+`postBootstrap`. Its corresponding identity carries
+`kind = 'service'` — the platform itself as a
+non-person principal. State events with no specific user
 actor reference it. It is a pure event-author:
 `getMemberMap` resolves it for authorship display, but the
 `getMembers` roster — and every list, picker, and detail
@@ -118,15 +120,15 @@ only, not a domain timestamp inside the message.
 is not required to equal `request_at`.
 `requester_identity_id` is the identity id of the
 requester. `method` is the HTTP method (`^[A-Z]+$`); the
-ledger stores no GET rows. `operation_id` is a 22-char id
-on the pair. `id` is the pair locator (wire
+ledger stores no GET rows. `operation_id` is an
+identifier on the pair. `id` is the pair locator (wire
 `Response-ID`). No `etag`, `status`, `message_hash`,
 `follows`, or `supersedes` column.
 
 Columns, keys, and indexes live in `SCHEMA.svg`.
 
 Public PUT/PATCH/POST/DELETE send header `Operation-ID`
-(22-char id). Missing or malformed → 400. The server
+(identifier). Missing or malformed → 400. The server
 never mints this header for a public write. GET may
 send it; it is ignored. Seed `formSeedPair` mints one
 id per envelope and copies it onto inner PUTs.
@@ -330,7 +332,7 @@ Domain notes (vocabulary, not storage):
 - **Projects** — the project alphabet in
   `PROJECT_STATES`
 - **Work orders** — open-ended transitions (state =
-  any graph node id, a base62 token) plus the closed
+  any graph node id, an identifier) plus the closed
   claim alphabet (`'claimed'`, `'claim_released'`,
   `'claim_expired'`)
 - **Flow graph** — live graph rides the flow document

@@ -5,7 +5,9 @@ import {
 import assert from 'node:assert/strict';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postBootstrap } from '../api/mock-data.ts';
-import { sharedMockDb } from './mock-seed.ts';
+import {
+    sharedMockDb, testHashPassword,
+} from './mock-seed.ts';
 import { requestMessageHash } from '../api/message-form.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { buildAiMembers } from '../api/mock-data/ai-members.ts';
@@ -23,9 +25,12 @@ import {
     mockFlowRecords,
     mockStateFieldValues,
     buildScoreSeedProjects,
+    ORGANIZATION_TWO_OBJECTIVE,
 } from '../api/mock-data/seed-message-pairs.ts';
-import { humanMemberPoolsByOrganization }
-    from '../api/mock-data/seed-kit.ts';
+import {
+    humanMemberPoolsByOrganization,
+    seedIdentifier,
+} from '../api/mock-data/seed-kit.ts';
 import { buildMembers } from '../api/mock-data/members.ts';
 import { buildSeedScoreRows } from '../api/mock-data/scores.ts';
 import {
@@ -179,7 +184,8 @@ async () => {
         r => r.uri_id === firstIdea.id,
     );
     assert.ok(row, 'no request row for the seeded idea');
-    assert.equal(row!.uri_collection, '/organizations/1/ideas/');
+    assert.equal(row!.uri_collection
+        , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/');
 });
 
 test('a seeded organizations pair sits at the global'
@@ -219,7 +225,7 @@ test('a seeded person identity pair sits at the global'
     const requests = await db.pairs.getAll();
     const row = requests.find(
         r => r.uri_collection === '/identities/'
-            && r.uri_id === 'current',
+            && r.uri_id === 'XXZruirZyAOoRpNxaDnpSA',
     );
     assert.ok(row, 'no request row for the current identity');
     const embedded = pairJsonOf(row!.request) as {
@@ -274,10 +280,11 @@ test('a seeded flow create pair sits at its org-nested'
     const db = await sharedMockDb();
     const requests = await db.pairs.getAll();
     const row = requests.find(
-        r => r.uri_id === 'h5mErVBQhwdMKwi1co30jB',
+        r => r.uri_id === 'esKujtyQFYUJaVSXWwavzA',
     );
     assert.ok(row, 'no request row for the seeded flow');
-    assert.equal(row!.uri_collection, '/organizations/1/flows/');
+    assert.equal(row!.uri_collection
+        , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/');
 });
 
 test('a seeded AI agent pair sits at the global'
@@ -359,7 +366,7 @@ test('a seeded record create pair sits at its org-nested'
     // Task 4: wire family `records` stores at record-types.
     assert.equal(
         row!.uri_collection,
-        '/organizations/1/record-types/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/',
     );
 });
 
@@ -375,7 +382,7 @@ test('a seeded record\'s document pair sits at its'
     const documentRow = requests.find(
         r => r.uri_id === customerProfileRecordId
             && r.uri_collection
-                === '/organizations/1/record-types/'
+                === '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             && r.method === 'PUT',
     );
     assert.ok(
@@ -412,8 +419,8 @@ test('a seeded record attribute\'s document pair sits at'
     );
     assert.equal(
         row!.uri_collection,
-        '/organizations/1/record-types/'
-        + 'rec01CustProfRec0rdAB1/attributes/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+        + 'sJxkGGTrPegHqFbQAkXnjw/attributes/',
     );
     const embedded = pairJsonOf(row!.request) as {
         body: Record<string, unknown>;
@@ -448,7 +455,7 @@ test('a seeded objective create pair sits at its org-nested'
         );
     }
     const org2Rows = requests.filter(
-        r => r.uri_id === 'seed-objective-org2',
+        r => r.uri_id === ORGANIZATION_TWO_OBJECTIVE.id,
     );
     assert.equal(org2Rows.length, 2);
     for (const row of org2Rows) {
@@ -494,7 +501,9 @@ test('a seeded objective\'s revision pair sits at its own'
 + ' keys', async () => {
     const db = await sharedMockDb();
     const starkSeed = OBJECTIVE_SEEDS[0]!;
-    const revisionId = `${starkSeed.id}:${MOCK_SEED_TIMESTAMP}`;
+    const revisionId = seedIdentifier(
+        `${starkSeed.id}:${MOCK_SEED_TIMESTAMP}`,
+    );
     const requests = await db.pairs.getAll();
     const revisionRow = requests.find(
         r => r.uri_id === revisionId
@@ -523,7 +532,8 @@ test('a seeded work-order document pair sits at its org-nested'
         r => r.uri_id === firstWorkOrder.id,
     );
     assert.ok(row, 'no request row for the seeded work order');
-    assert.equal(row!.uri_collection, '/organizations/1/work-orders/');
+    assert.equal(row!.uri_collection
+        , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/');
     // The id-strip covenant (verification finding, lens 4): a
     // spurious `id` key riding the recorded body would drift
     // from wire fidelity with no address-only check catching
@@ -832,8 +842,9 @@ async () => {
     const db = await sharedMockDb();
     const requests = await db.pairs.getAll();
     for (const starkSeed of OBJECTIVE_SEEDS) {
-        const revisionId =
-            `${starkSeed.id}:${MOCK_SEED_TIMESTAMP}`;
+        const revisionId = seedIdentifier(
+            `${starkSeed.id}:${MOCK_SEED_TIMESTAMP}`,
+        );
         const revisionRow = requests.find(
             r => r.uri_id === revisionId
                 && r.uri_collection.includes('/revisions/'),
@@ -870,7 +881,7 @@ test('a seeded credential\'s response body carries the full'
 + ' nondeterministic per reseed, finding 13, so only the'
 + ' key set is falsifiable here)', async () => {
     const db = await sharedMockDb();
-    const id = 'seed-cred-system-client-secret';
+    const id = 'cFiyyRHxbIEVqeVFNPmDnw';
     const requests = await db.pairs.getAll();
     const requestRow = requests.find(r => r.uri_id === id);
     assert.ok(requestRow, 'no request row for ' + id);
@@ -928,12 +939,14 @@ test('a bootstrap seed populates exactly eight balanced,'
 + ' hash-verified pairs for the current identity and the'
 + ' system identity', async () => {
     const db = memoryDbAdapter();
-    await postBootstrap(db);
+    await postBootstrap(db, {
+        hashPassword: testHashPassword,
+    });
     const requests = await db.pairs.getAll();
     assert.equal(requests.length, 8);
     const atIdentity = requests.filter(
         r => r.uri_collection === '/identities/'
-            && r.uri_id === 'current',
+            && r.uri_id === 'XXZruirZyAOoRpNxaDnpSA',
     );
     assert.equal(atIdentity.length, 1);
     const atSystem = requests.filter(
@@ -944,16 +957,16 @@ test('a bootstrap seed populates exactly eight balanced,'
     const atSeat = requests.filter(
         r => r.uri_collection
             === `/organizations/${STARK_ORGANIZATION}/members/`
-            && r.uri_id === 'current',
+            && r.uri_id === 'XXZruirZyAOoRpNxaDnpSA',
     );
     assert.equal(atSeat.length, 1);
     const atPii = requests.filter(
-        r => r.uri_collection === '/identities/current/pii/',
+        r => r.uri_collection === '/identities/XXZruirZyAOoRpNxaDnpSA/pii/',
     );
     assert.equal(atPii.length, 1);
     const atDefaultOrganization = requests.filter(
         r => r.uri_collection
-            === '/identities/current/default-organization/'
+            === '/identities/XXZruirZyAOoRpNxaDnpSA/default-organization/'
             && r.uri_id === '',
     );
     assert.equal(atDefaultOrganization.length, 1);

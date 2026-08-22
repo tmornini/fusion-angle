@@ -66,10 +66,10 @@ test('buildPageUrl appends a single query param', () => {
 test('buildPageUrl appends multiple query params', () => {
     assert.equal(
         buildPageUrl('flow-detail', {
-            id: 'f1',
+            id: 'ZOousbbnzpqlxJExVAruYQ',
             tab: 'graph',
         }),
-        '../flows/detail.html?id=f1&tab=graph',
+        '../flows/detail.html?id=ZOousbbnzpqlxJExVAruYQ&tab=graph',
     );
 });
 
@@ -98,8 +98,8 @@ test('buildPageUrl resolves flow-stats to flows/stats.html', () => {
 
 test('buildPageUrl appends flowId param for flow-stats', () => {
     assert.equal(
-        buildPageUrl('flow-stats', { flowId: 'f1' }),
-        '../flows/stats.html?flowId=f1',
+        buildPageUrl('flow-stats', { flowId: 'ZOousbbnzpqlxJExVAruYQ' }),
+        '../flows/stats.html?flowId=ZOousbbnzpqlxJExVAruYQ',
     );
 });
 

@@ -12,13 +12,15 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // The projects sibling of tests/derive-ideas.test.ts: unit-level
 // lifecycle-reduction guarantees that tests/drift-projects.test.ts
 // (parity-against-old-plane only) does not exercise.
 
 const BASE = 'http://localhost';
-const STARK_ORGANIZATION = '1';
+const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 
 function req(
     method: string,
@@ -68,7 +70,7 @@ function putProject(
     stateEventId: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'PUT', '/organizations/1/projects/' + id, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + id, token,
         projectDocument(title, state, stateAt, stateEventId),
     ));
 }
@@ -85,15 +87,16 @@ test(
     async () => {
         const db = await seededDb();
         const token = await organizationToken();
+        const projectId = generateIdentifier();
         await putProject(
-            db, token, 'project-drv-tomb', 'Genesis Title',
+            db, token, projectId, 'Genesis Title',
             'submitted', '2026-06-01T00:00:00.000000Z',
-            'ev-drv-tomb-genesis',
+            generateIdentifier(),
         );
         const res = await putProject(
-            db, token, 'project-drv-tomb', 'Tomb Title',
+            db, token, projectId, 'Tomb Title',
             'deleted', '2020-01-01T00:00:00.000000Z',
-            'ev-drv-tomb-later',
+            generateIdentifier(),
         );
         assert.equal(res.status, 201);
         const projects = await deriveProjects(
@@ -101,12 +104,12 @@ test(
         );
         assert.equal(
             projects.some(
-                (project) => project.id === 'project-drv-tomb',
+                (project) => project.id === projectId,
             ),
             false,
         );
         const history = await deriveProjectStateHistory(
-            db, STARK_ORGANIZATION, 'project-drv-tomb',
+            db, STARK_ORGANIZATION, projectId,
         );
         assert.deepEqual(
             history.map((entry) => entry.state),

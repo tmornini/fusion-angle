@@ -37,7 +37,7 @@ import {
     getFlowsByProject,
     postFlowCreation,
     subscribeProjectChanges,
-    generateCryptoSafeBase62,
+    generateIdentifier,
     sessionContext,
     type RequestContext,
     getProjectScoring,
@@ -726,8 +726,8 @@ async function handleNewFlowSubmit(
         );
         return;
     }
-    const flowId = generateCryptoSafeBase62();
-    const linkId = generateCryptoSafeBase62();
+    const flowId = generateIdentifier();
+    const linkId = generateIdentifier();
     try {
         await postFlowCreation(
             sessionContext(),

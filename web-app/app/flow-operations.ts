@@ -21,7 +21,7 @@ import {
     enqueueFlowSave,
     notifyFlowChange,
     getFlowGraph,
-    generateCryptoSafeBase62,
+    generateIdentifier,
     nowUtc,
 } from './adapters/index.ts';
 import type {
@@ -229,7 +229,7 @@ export async function performAddEdge(
             'error',
         );
     }
-    const edgeId = generateCryptoSafeBase62();
+    const edgeId = generateIdentifier();
     const newEdges = applyAddEdge(
         snap.edges,
         edgeId,
@@ -301,8 +301,8 @@ export async function performAddNodeAtPosition(
             'error',
         );
     }
-    const nodeId = generateCryptoSafeBase62();
-    const edgeId = generateCryptoSafeBase62();
+    const nodeId = generateIdentifier();
+    const edgeId = generateIdentifier();
     const posX = x - NODE_WIDTH / 2;
     const posY = y - NODE_HEIGHT / 2;
     const newNodes = applyAddNode(
@@ -701,7 +701,7 @@ async function postFlowUndo(
                 organizationItem(ctx, 'flows', flowId)
                     + '/undo',
                 {
-                eventId: generateCryptoSafeBase62(),
+                eventId: generateIdentifier(),
                 at: nowUtc(),
             });
             return;
@@ -745,7 +745,7 @@ export async function performUndo(
     const stagedHistory = appendToRedoStack(
         history,
         {
-            id: generateCryptoSafeBase62(),
+            id: generateIdentifier(),
             flowId: snap.flowId,
             name: snap.flowName,
             isLocked: snap.isLocked,

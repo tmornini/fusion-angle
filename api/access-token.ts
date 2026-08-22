@@ -26,7 +26,7 @@ const SIGNING_KEY_ID = 'dev-co-located';
 
 // The HMAC secret. Mint/verify require
 // JWT_HMAC_SIGNING_KEY. Never log the material.
-function hmacSigningKeyMaterial(): string {
+function fekPpDYfJoFZmvUBauTxHA(): string {
     const runtime = globalThis as {
         process?: {
             env?: Record<string, string | undefined>;
@@ -72,7 +72,7 @@ function signingKey(): Promise<CryptoKey> {
         signingKeyHandle = crypto.subtle.importKey(
             'raw',
             new TextEncoder().encode(
-                hmacSigningKeyMaterial(),
+                fekPpDYfJoFZmvUBauTxHA(),
             ),
             { name: 'HMAC', hash: 'SHA-256' },
             false,

@@ -19,8 +19,8 @@ import {
     postFlowCreation,
 } from '../web-app/app/adapters/flow-mutations.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../shared/identifier.ts';
 import {
     type IdeaEntity,
     type IdeaState,
@@ -34,7 +34,7 @@ function buildIdea(
     id: string,
 ): Omit<IdeaEntity, 'id'> {
     return {
-        organization_id: '1',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 'Idea ' + id,
         position: 1,
         problem_statement: 'p',
@@ -64,7 +64,7 @@ function buildProject(
     overrides?: Partial<ProjectEntity>,
 ): Omit<ProjectEntity, 'id'> {
     const base: Omit<ProjectEntity, 'id'> = {
-        organization_id: '1',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 'Project ' + id,
         description: 'd',
         progress: 0,
@@ -110,8 +110,8 @@ async function seedFlow(
 ): Promise<void> {
     await postFlowCreation(ctx, {
         flowId: id,
-        linkId: id + '-link',
-        projectId: 'p-' + id,
+        linkId: generateIdentifier(),
+        projectId: generateIdentifier(),
         name: 'Flow ' + id,
     });
 }
@@ -130,10 +130,10 @@ async function tombstoneFlow(
     await seedFlow(ctx, id);
     const { body: current, etag } =
         await ctx.GETWithEtag<FlowWithGraph>(
-            'organizations/1/flows/' + id,
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + id,
         );
     await ctx.PUT(
-        'organizations/1/flows/' + id,
+        'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + id,
         {
             name: current.name,
             is_locked: current.is_locked,
@@ -142,7 +142,7 @@ async function tombstoneFlow(
             lock_timeout: current.lock_timeout,
             state: 'deleted',
             state_at: nowUtc(),
-            state_event_id: generateCryptoSafeBase62(),
+            state_event_id: generateIdentifier(),
             graph: current.graph,
             graphDelta: {
                 nodes: [], edges: [], deletions: [],
@@ -184,11 +184,11 @@ test(
     'getDashboardStats counts seeded entities',
     async () => {
         const { ctx } = await adminContext();
-        await seedIdea(ctx, 'i1', 'active');
-        await seedIdea(ctx, 'i2', 'in_review');
-        await seedProject(ctx, 'p1', 'approved');
-        await seedFlow(ctx, 'f1');
-        await seedFlow(ctx, 'f2');
+        await seedIdea(ctx, 'fndCYAsXazdzMUlEGMNIZw', 'active');
+        await seedIdea(ctx, 'fxysGbBPBsnCwJNJsyZnkA', 'in_review');
+        await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'approved');
+        await seedFlow(ctx, generateIdentifier());
+        await seedFlow(ctx, generateIdentifier());
         const stats = await getDashboardStats(ctx);
         assert.deepEqual(
             stats.map(s => s.value),
@@ -201,9 +201,9 @@ test(
     'getDashboardStats excludes archived ideas',
     async () => {
         const { ctx } = await adminContext();
-        await seedIdea(ctx, 'i1', 'active');
-        await seedIdea(ctx, 'i2', 'archived');
-        await seedIdea(ctx, 'i3', 'deleted');
+        await seedIdea(ctx, 'fndCYAsXazdzMUlEGMNIZw', 'active');
+        await seedIdea(ctx, 'fxysGbBPBsnCwJNJsyZnkA', 'archived');
+        await seedIdea(ctx, 'gBbNAWlPwMfXZvevoUPhFQ', 'deleted');
         const stats = await getDashboardStats(ctx);
         const ideas = stats
             .find(s => s.label === 'Ideas');
@@ -215,8 +215,8 @@ test(
     'getDashboardStats excludes deleted projects',
     async () => {
         const { ctx } = await adminContext();
-        await seedProject(ctx, 'p1', 'approved');
-        await seedProject(ctx, 'p2', 'deleted');
+        await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'approved');
+        await seedProject(ctx, 'prBESZPjJDiuXCeZLmbiVw', 'deleted');
         const stats = await getDashboardStats(ctx);
         const projects = stats
             .find(s => s.label === 'Projects');
@@ -228,8 +228,8 @@ test(
     'getDashboardStats counts tombstoned out',
     async () => {
         const { db, ctx } = await adminContext();
-        await seedProject(ctx, 'p1', 'approved');
-        await seedProject(ctx, 'p2', 'approved');
+        await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'approved');
+        await seedProject(ctx, 'prBESZPjJDiuXCeZLmbiVw', 'approved');
         // NAMED re-pin (Phase 3 Task 6, Step 2b): physical row
         // removal has no ledger analogue — the flipped GET
         // derives visibility from the lifecycle trio, not a raw
@@ -240,13 +240,13 @@ test(
         // Phase Final Task 2: projects row half stripped.
         const {
             id: _id, organization_id: _org, ...fields
-        } = await getProjectEntity(ctx, 'p2');
+        } = await getProjectEntity(ctx, 'prBESZPjJDiuXCeZLmbiVw');
         await postProjectStateChange(
-            ctx, 'p2', fields, 'deleted',
+            ctx, 'prBESZPjJDiuXCeZLmbiVw', fields, 'deleted',
         );
         // NAMED re-pin (Phase 4 Task 8): the flows half now
         // flips too — see tombstoneFlow's own comment above.
-        await tombstoneFlow(ctx, 'f1');
+        await tombstoneFlow(ctx, 'ZOousbbnzpqlxJExVAruYQ');
         const stats = await getDashboardStats(ctx);
         const projects = stats
             .find(s => s.label === 'Projects');
@@ -289,16 +289,16 @@ test(
     'getDashboardGauges sums approved projects only',
     async () => {
         const { ctx } = await adminContext();
-        await seedProject(ctx, 'p1', 'approved', {
+        await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'approved', {
             estimated_cost: 1000,
             actual_cost: 400,
         });
-        await seedProject(ctx, 'p2', 'approved', {
+        await seedProject(ctx, 'prBESZPjJDiuXCeZLmbiVw', 'approved', {
             estimated_cost: 2000,
             actual_cost: 600,
         });
         // Not approved: must be ignored.
-        await seedProject(ctx, 'p3', 'submitted', {
+        await seedProject(ctx, 'psEaaErZDHeKCbdAnrwbDQ', 'submitted', {
             estimated_cost: 9000,
             actual_cost: 9000,
         });
@@ -314,7 +314,7 @@ test(
     'getDashboardGauges Time sums the 10-day span',
     async () => {
         const { ctx } = await adminContext();
-        await seedProject(ctx, 'p1', 'approved', {
+        await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'approved', {
             start_date: '2026-01-01',
             target_end_date: '2026-01-11',
         });

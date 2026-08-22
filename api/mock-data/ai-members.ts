@@ -6,7 +6,7 @@ import type { AIMemberEntity } from '../types.ts';
 export function buildAiMembers(): AIMemberEntity[] {
     return [
         {
-            id: 'tuJwPxYtBur2KCLquScShB',
+            id: 'wUkEhqRIJPaecPaeCOKZUg',
             name: 'Claude Opus 4.8',
             description:
                 'Anthropic flagship — long'
@@ -14,10 +14,10 @@ export function buildAiMembers(): AIMemberEntity[] {
             skill_focus:
                 'Long-context analysis and'
                 + ' multi-step reasoning.',
-            model: 'mnte677fU2G1V2B9vJp9z7',
+            model: 'nqNVXnBkUBLoKlenbyPIZQ',
         },
         {
-            id: 'LdoTR1fnyYpS1jPzEs57ek',
+            id: 'MNwbRSuoYKwmVvCyxZCdwA',
             name: 'Claude Sonnet 4.6',
             description:
                 'Anthropic mid-tier — fast'
@@ -25,27 +25,27 @@ export function buildAiMembers(): AIMemberEntity[] {
             skill_focus:
                 'Fast drafting and everyday'
                 + ' task execution.',
-            model: 'VIdXPkkC1H1xjav2aTKW3u',
+            model: 'SPZPLkuAEWHeIabekzLYbg',
         },
         {
-            id: 'Xv89xOCXR6awwoXcPvEY9Y',
+            id: 'TUEVODaACdRpdCoetLSzZg',
             name: 'GPT-5.5',
             description:
                 'OpenAI multimodal flagship.',
             skill_focus:
                 'Multimodal synthesis across'
                 + ' text and images.',
-            model: 'B3yjKd4NnpGhVRrY6plL0o',
+            model: 'EurcZoFcUOmQiKURwJQvJQ',
         },
         {
-            id: '42vHYDCvtkaO3sTnoqg7aJ',
+            id: 'BhdhBLQPyktOCbdJzGsggg',
             name: 'Grok 4.3',
             description:
                 'xAI heavy-compute model.',
             skill_focus:
                 'High-compute exploration of'
                 + ' open-ended problems.',
-            model: 'GI19ucwHLOy7ecnQOtD27v',
+            model: 'HpWUIcbCpXjweboJAeQvpw',
         },
     ];
 }

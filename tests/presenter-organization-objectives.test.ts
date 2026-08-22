@@ -4,14 +4,15 @@ import { OrganizationObjectivesPresenter } from
     '../web-app/app/presenters/organization-objectives.ts';
 
 const activeObjs = [
-    { id: 'o1', position: 0 },
+    { id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 },
     { id: 'o2', position: 1 },
 ];
 const archivedObjs = [
     { id: 'o3', position: 99 },
 ];
 const defs = new Map([
-    ['o1', { name: 'Increase incomes', description: 'd1' }],
+    ['ohqxgUBEaFQwYbXsonRPmg', { name: 'Increase incomes'
+        , description: 'd1' }],
     ['o2', { name: 'Lower expenses', description: 'd2' }],
     ['o3', { name: 'Old Quarterly', description: 'd3' }],
 ]);
@@ -27,7 +28,8 @@ test('renders active section with each active objective',
         const html = p.buildBox().toString();
         assert.ok(html.includes('Increase incomes'));
         assert.ok(html.includes('Lower expenses'));
-        assert.ok(html.includes('data-objective-id="o1"'));
+        assert.ok(html.includes(
+            'data-objective-id="ohqxgUBEaFQwYbXsonRPmg"'));
         assert.ok(html.includes('data-objective-id="o2"'));
     });
 

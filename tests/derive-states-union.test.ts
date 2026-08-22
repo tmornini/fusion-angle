@@ -44,6 +44,8 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Per-family history derives (states-URI elimination C2/C3).
 // A hand-built multi-family fixture drives ONE representative
@@ -58,7 +60,7 @@ const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 // Non-current admins need explicit claim roles — organizationToken
-// only bakes admin for sub === 'current'.
+// only bakes admin for sub === 'XXZruirZyAOoRpNxaDnpSA'.
 async function adminToken(
     sub: string, organization: string,
 ): Promise<string> {
@@ -128,7 +130,7 @@ async function leftoverMemberParent(
     const body = memberDocumentBodyOf('human', {
         state: 'active',
         stateAt: AT,
-        stateEventId: 'seed-member-' + id + '-active',
+        stateEventId: generateIdentifier(),
     });
     const pair = await formWritePair({
         method: 'PUT',
@@ -168,24 +170,34 @@ async function seedMembershipPair(
 // events.test.ts precedent, reused so every write below (ideas,
 // ai-members, work-orders, flows, invitations, memberships) rides
 // through ONE identity per org.
-async function seed(): Promise<MemoryDbAdapter> {
+async function seed(): Promise<{
+    db: MemoryDbAdapter;
+    organizationA: string;
+    organizationB: string;
+    adminA: string;
+    adminB: string;
+}> {
     const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    const organizationB = generateIdentifier();
+    const adminA = generateIdentifier();
+    const adminB = generateIdentifier();
     await db.postSchemaCreation();
     // Real organizations/:id documents (Phase 13 Task 3's fixture
     // prerequisite) — a raw db.organizations.put leaves A/B
     // derivation-invisible to deriveMembershipsForIdentity's own
     // enumerate-then-probe (via deriveOrganizations).
-    await seedOrganizationDocument(db, 'A', 'Acme');
-    await seedOrganizationDocument(db, 'B', 'Beta');
-    await seedMembershipPair(db, 'm-a', {
-        organization_id: 'A', identity_id: 'adminA',
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    await seedOrganizationDocument(db, organizationB, 'Beta');
+    await seedMembershipPair(db, generateIdentifier(), {
+        organization_id: organizationA, identity_id: adminA,
         type: 'admin', at: AT,
     });
-    await seedMembershipPair(db, 'm-b', {
-        organization_id: 'B', identity_id: 'adminB',
+    await seedMembershipPair(db, generateIdentifier(), {
+        organization_id: organizationB, identity_id: adminB,
         type: 'admin', at: AT,
     });
-    return db;
+    return { db, organizationA, organizationB, adminA, adminB };
 }
 
 // Phase 15 gate 6: grantInvitation resolves email via
@@ -251,20 +263,21 @@ function emptyGraph() {
 }
 
 async function createFlowWithNodes(
-    db: MemoryDbAdapter, token: string,
+    db: MemoryDbAdapter, token: string, organizationA: string,
     flowId: string, nodeIds: readonly string[],
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'POST', '/organizations/A/flows/', token,
+        'POST', '/organizations/' + organizationA + '/flows/', token,
         {
             id: flowId,
             flow: flowFields('Flow ' + flowId),
-            projectFlowId: flowId + '-pf',
+            projectFlowId: generateIdentifier(),
             projectFlow: {
-                project_id: 'proj-union', flow_id: flowId, at: AT,
+                project_id: generateIdentifier(),
+                flow_id: flowId, at: AT,
             },
             initialState: 'active',
-            initialStateEventId: flowId + '-ev',
+            initialStateEventId: generateIdentifier(),
             initialStateAt: AT,
             graphDelta: {
                 nodes: nodeIds.map(
@@ -279,13 +292,22 @@ async function createFlowWithNodes(
 }
 
 async function headResponseId(
-    db: MemoryDbAdapter, token: string, flowId: string,
+    db: MemoryDbAdapter, token: string, organizationA: string,
+    flowId: string,
 ): Promise<string> {
     const got = await handleRequest(
-        db, req('GET', '/organizations/A/flows/' + flowId, token),
+        db, req(
+            'GET',
+            '/organizations/' + organizationA + '/flows/' + flowId,
+            token,
+        ),
     );
     const id = got.headers.get('Response-ID');
-    assert.ok(id, 'no Response-ID on GET /organizations/A/flows/' + flowId);
+    assert.ok(
+        id,
+        'no Response-ID on GET /organizations/'
+            + organizationA + '/flows/' + flowId,
+    );
     return id!;
 }
 
@@ -296,18 +318,28 @@ interface GraphSidecar {
 }
 
 async function saveFlowWithSidecars(
-    db: MemoryDbAdapter, token: string, flowId: string,
+    db: MemoryDbAdapter, token: string, organizationA: string,
+    flowId: string,
     deletions: readonly GraphSidecar[],
     revivals: readonly GraphSidecar[],
     stateEventId: string, stateAt: string,
 ): Promise<void> {
     const got = await handleRequest(
-        db, req('GET', '/organizations/A/flows/' + flowId, token),
+        db, req(
+            'GET',
+            '/organizations/' + organizationA + '/flows/' + flowId,
+            token,
+        ),
     );
     const etag = got.headers.get('ETag');
-    assert.ok(etag, 'no ETag on GET /organizations/A/flows/' + flowId);
+    assert.ok(
+        etag,
+        'no ETag on GET /organizations/'
+            + organizationA + '/flows/' + flowId,
+    );
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/A/flows/' + flowId, token,
+        'PUT', '/organizations/' + organizationA + '/flows/' + flowId,
+        token,
         {
             ...flowFields('Flow ' + flowId + ' saved'),
             state: 'active', state_at: stateAt,
@@ -331,7 +363,7 @@ function workOrderBody(
     return {
         id,
         workOrder: {
-            display_id: 'union-' + id,
+            display_id: 'union',
             flow_graph: {
                 name: 'Union Fixture Flow',
                 lockTimeout: 8 * 60 * 60,
@@ -343,27 +375,45 @@ function workOrderBody(
         flowWorkOrder: {
             flow_id: flowId, work_order_id: id, at: ats[0],
         },
-        stateEventIds: [id + '-ev1', id + '-ev2', id + '-ev3'],
+        stateEventIds: [
+            generateIdentifier(),
+            generateIdentifier(),
+            generateIdentifier(),
+        ],
         stateEventAts: ats,
         states: ['n-start', 'n-middle', 'active'],
     };
 }
 
 async function createWorkOrder(
-    db: MemoryDbAdapter, token: string, id: string,
-): Promise<void> {
+    db: MemoryDbAdapter, token: string, organizationA: string,
+    id: string,
+): Promise<{
+    stateEventIds: readonly string[];
+}> {
+    const stateEventIds = [
+        generateIdentifier(),
+        generateIdentifier(),
+        generateIdentifier(),
+    ] as const;
     const res = await handleRequest(db, req(
-        'POST', '/organizations/A/work-orders/', token,
-        workOrderBody(
-            id, id + '-fwo', 'flow-union-wo-placeholder',
-            [
-                '2026-02-01T00:00:00.000000Z',
-                '2026-02-01T00:00:00.000001Z',
-                '2026-02-01T00:00:00.000002Z',
-            ],
-        ),
+        'POST', '/organizations/' + organizationA + '/work-orders/',
+        token,
+        {
+            ...workOrderBody(
+                id, generateIdentifier(),
+                generateIdentifier(),
+                [
+                    '2026-02-01T00:00:00.000000Z',
+                    '2026-02-01T00:00:00.000001Z',
+                    '2026-02-01T00:00:00.000002Z',
+                ],
+            ),
+            stateEventIds: [...stateEventIds],
+        },
     ));
     assert.equal(res.status, 201, 'work order create failed');
+    return { stateEventIds };
 }
 
 async function grantAndAccept(
@@ -399,13 +449,21 @@ async function grantAndAccept(
 
 interface UnionFixture {
     readonly db: MemoryDbAdapter;
+    readonly organizationA: string;
+    readonly organizationB: string;
+    readonly adminA: string;
     readonly ideaId: string;
     readonly objectiveId: string;
     readonly aiMemberId: string;
     readonly workOrderId: string;
+    readonly workOrderEventIds: readonly string[];
     readonly deletedNodeId: string;
     readonly restoredNodeId: string;
+    readonly deletedEventId: string;
+    readonly restoredEventId: string;
     readonly invitationId: string;
+    readonly grantEventId: string;
+    readonly acceptEventId: string;
     readonly foreignIdeaId: string;
 }
 
@@ -413,16 +471,17 @@ interface UnionFixture {
 // foreign-org idea (org B) proving the assembled union still
 // fences per row, not merely per family.
 async function buildUnionFixture(): Promise<UnionFixture> {
-    const db = await seed();
-    const tokenA = await adminToken('adminA', 'A');
-    const tokenB = await adminToken('adminB', 'B');
+    const { db, organizationA, organizationB, adminA, adminB } = await seed();
+    const tokenA = await adminToken(adminA, organizationA);
+    const tokenB = await adminToken(adminB, organizationB);
 
     // (a-idea) an idea's own embedded genesis trio, in org A —
     // plus a FOREIGN idea in org B (never included in A's own
     // union).
-    const ideaId = 'idea-union';
+    const ideaId = generateIdentifier();
     const ideaRes = await handleRequest(db, req(
-        'PUT', '/organizations/A/ideas/' + ideaId, tokenA,
+        'PUT', '/organizations/' + organizationA + '/ideas/' + ideaId,
+        tokenA,
         ideaDocument(
             'Union Idea', ideaId + '-genesis',
             '2026-01-02T00:00:00.000000Z',
@@ -430,11 +489,12 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     ));
     assert.equal(ideaRes.status, 201);
 
-    const foreignIdeaId = 'idea-union-foreign';
+    const foreignIdeaId = generateIdentifier();
     const foreignIdeaRes = await handleRequest(db, req(
-        'PUT', '/organizations/B/ideas/' + foreignIdeaId, tokenB,
+        'PUT', '/organizations/' + organizationB + '/ideas/'
+            + foreignIdeaId, tokenB,
         ideaDocument(
-            'Foreign Idea', foreignIdeaId + '-genesis',
+            'Foreign Idea', generateIdentifier(),
             '2026-01-02T00:00:00.000001Z',
         ),
     ));
@@ -444,9 +504,10 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     // states/:id orphan leg's replacement in the five-source
     // union proof (objectives join ideas, projects,
     // records, flows on the document-trio source).
-    const objectiveId = 'obj-union';
+    const objectiveId = generateIdentifier();
     const objectiveRes = await handleRequest(db, req(
-        'PUT', '/organizations/A/objectives/' + objectiveId, tokenA, {
+        'PUT', '/organizations/' + organizationA + '/objectives/'
+            + objectiveId, tokenA, {
             position: 1,
             state: 'active',
         },
@@ -457,62 +518,74 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     // org A so the fence resolves it there rather than as an
     // orphan (members are GLOBAL plane; ownership rides the
     // membership pair plane).
-    const aiMemberId = 'ai-union';
+    const aiMemberId = generateIdentifier();
     await createAiMember(
         db, tokenA, aiMemberId, 'active',
-        aiMemberId + '-genesis', '2026-01-03T00:00:00.000000Z',
+        generateIdentifier(), '2026-01-03T00:00:00.000000Z',
     );
 
     // (c) a work order's create-op birth (3 events).
-    const workOrderId = 'wo-union';
-    await createWorkOrder(db, tokenA, workOrderId);
+    const workOrderId = generateIdentifier();
+    const wo = await createWorkOrder(
+        db, tokenA, organizationA, workOrderId,
+    );
 
     // (d) a flow with two nodes, then ONE save that deletes one
     // node and restores the other — both sidecar kinds in one
     // write.
-    const flowId = 'flow-union';
-    const deletedNodeId = 'node-union-deleted';
-    const restoredNodeId = 'node-union-restored';
+    const flowId = generateIdentifier();
+    const deletedNodeId = generateIdentifier();
+    const restoredNodeId = generateIdentifier();
+    const deletedEventId = generateIdentifier();
+    const restoredEventId = generateIdentifier();
     await createFlowWithNodes(
-        db, tokenA, flowId, [deletedNodeId, restoredNodeId],
+        db, tokenA, organizationA, flowId,
+        [deletedNodeId, restoredNodeId],
     );
     await saveFlowWithSidecars(
-        db, tokenA, flowId,
+        db, tokenA, organizationA, flowId,
         [{
-            eventId: 'ev-union-deleted',
+            eventId: deletedEventId,
             entityId: deletedNodeId,
             at: '2026-01-04T00:00:00.000000Z',
         }],
         [{
-            eventId: 'ev-union-restored',
+            eventId: restoredEventId,
             entityId: restoredNodeId,
             at: '2026-01-04T00:00:00.000001Z',
         }],
-        'flow-union-saved', '2026-01-04T00:00:00.000002Z',
+        generateIdentifier(), '2026-01-04T00:00:00.000002Z',
     );
 
     // (e) an invitation's grant + accept.
+    const inviteeId = generateIdentifier();
     await person(
-        db, 'invitee-union', 'Union Invitee',
+        db, inviteeId, 'Union Invitee',
         'invitee-union@x.com',
     );
     const inviteeToken = await organizationToken(
-        'invitee-union', 'A',
+        inviteeId, organizationA,
     );
-    const invitationId = 'inv-union';
+    const invitationId = generateIdentifier();
+    const grantEventId = generateIdentifier();
+    const acceptEventId = generateIdentifier();
     await grantAndAccept(
-        db, tokenA, inviteeToken, 'invitee-union',
+        db, tokenA, inviteeToken, inviteeId,
         'invitee-union@x.com',
-        invitationId, 'ev-union-grant',
+        invitationId, grantEventId,
         '2026-01-05T00:00:00.000000Z',
-        'ms-union-accept', 'ev-union-accept',
+        generateIdentifier(), acceptEventId,
         '2026-01-05T00:00:00.000001Z',
-        'A',
+        organizationA,
     );
 
     return {
-        db, ideaId, objectiveId, aiMemberId, workOrderId,
-        deletedNodeId, restoredNodeId, invitationId,
+        db, organizationA, organizationB, adminA, ideaId, objectiveId,
+        aiMemberId, workOrderId,
+        workOrderEventIds: wo.stateEventIds,
+        deletedNodeId, restoredNodeId,
+        deletedEventId, restoredEventId,
+        invitationId, grantEventId, acceptEventId,
         foreignIdeaId,
     };
 }
@@ -523,14 +596,16 @@ test('a leftover /memberships/ pair without a seat'
 + ' does not own the identity',
 async () => {
     const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    const ghost = generateIdentifier();
     await db.postSchemaCreation();
-    await seedOrganizationDocument(db, 'A', 'Acme');
-    await leftoverMembershipPair(db, 'm-leftover', {
-        organization_id: 'A', identity_id: 'ghost',
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    await leftoverMembershipPair(db, generateIdentifier(), {
+        organization_id: organizationA, identity_id: ghost,
         type: 'member', at: AT,
     });
     assert.equal(
-        await resolveOwningOrganization(db, 'ghost', 'A'),
+        await resolveOwningOrganization(db, ghost, organizationA),
         null,
     );
 });
@@ -539,32 +614,34 @@ test('deriveMembers is seats ∩ identities: leftover'
 + ' /members/ and /memberships/ do not join',
 async () => {
     const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    const ghost = generateIdentifier();
     await db.postSchemaCreation();
-    await seedOrganizationDocument(db, 'A', 'Acme');
-    await leftoverMemberParent(db, 'ghost');
-    await leftoverMembershipPair(db, 'm-leftover', {
-        organization_id: 'A', identity_id: 'ghost',
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    await leftoverMemberParent(db, ghost);
+    await leftoverMembershipPair(db, generateIdentifier(), {
+        organization_id: organizationA, identity_id: ghost,
         type: 'member', at: AT,
     });
     assert.equal(
-        (await deriveMembers(db, 'A'))
-            .some((row) => row.id === 'ghost'),
+        (await deriveMembers(db, organizationA))
+            .some((row) => row.id === ghost),
         false,
     );
-    await seedSeat(db, 'A', 'ghost', 'member', AT);
+    await seedSeat(db, organizationA, ghost, 'member', AT);
     assert.equal(
-        (await deriveMembers(db, 'A'))
-            .some((row) => row.id === 'ghost'),
+        (await deriveMembers(db, organizationA))
+            .some((row) => row.id === ghost),
         false,
         'leftover /members/ parent does not join',
     );
-    await seedPersonIdentity(db, 'ghost', {
+    await seedPersonIdentity(db, ghost, {
         name: 'Ghost', email: 'g@x.com',
         phone: '', bio: '',
     });
     assert.equal(
-        (await deriveMembers(db, 'A'))
-            .some((row) => row.id === 'ghost'),
+        (await deriveMembers(db, organizationA))
+            .some((row) => row.id === ghost),
         true,
     );
 });
@@ -575,27 +652,27 @@ async () => {
     const fx = await buildUnionFixture();
     assert.equal(
         await resolveOwningOrganization(
-            fx.db, fx.ideaId, 'A',
+            fx.db, fx.ideaId, fx.organizationA,
         ),
-        'A',
+        fx.organizationA,
     );
     assert.equal(
         await resolveOwningOrganization(
-            fx.db, fx.workOrderId, 'A',
+            fx.db, fx.workOrderId, fx.organizationA,
         ),
-        'A',
+        fx.organizationA,
     );
     assert.equal(
         await resolveOwningOrganization(
-            fx.db, fx.foreignIdeaId, 'A',
+            fx.db, fx.foreignIdeaId, fx.organizationA,
         ),
-        'B',
+        fx.organizationB,
     );
     assert.equal(
         await resolveOwningOrganization(
-            fx.db, fx.foreignIdeaId, 'B',
+            fx.db, fx.foreignIdeaId, fx.organizationB,
         ),
-        'B',
+        fx.organizationB,
     );
 });
 
@@ -606,13 +683,15 @@ async () => {
     const fx = await buildUnionFixture();
 
     assert.deepEqual(
-        (await deriveIdeaStateHistory(fx.db, 'A', fx.ideaId))
+        (await deriveIdeaStateHistory(
+            fx.db, fx.organizationA, fx.ideaId,
+        ))
             .map((row) => row.state),
         ['active'],
     );
     assert.deepEqual(
         (await deriveObjectiveStateHistory(
-            fx.db, 'A', fx.objectiveId,
+            fx.db, fx.organizationA, fx.objectiveId,
         )).map((row) => row.state),
         ['active'],
     );
@@ -620,7 +699,7 @@ async () => {
         fx.db,
         req(
             'GET', '/ai-agents/' + fx.aiMemberId,
-            await organizationToken('adminA', 'A'),
+            await organizationToken(fx.adminA, fx.organizationA),
         ),
     );
     assert.equal(agent.status, 200);
@@ -628,15 +707,12 @@ async () => {
     assert.equal(agentBody.id, fx.aiMemberId);
     assert.deepEqual(
         (await workOrderLifecycleStatesFor(
-            fx.db, 'A', fx.workOrderId,
+            fx.db, fx.organizationA, fx.workOrderId,
         )).map((row) => row.id),
-        [
-            fx.workOrderId + '-ev1', fx.workOrderId + '-ev2',
-            fx.workOrderId + '-ev3',
-        ],
+        [...fx.workOrderEventIds],
     );
     // Graph sidecars on the flow document pairs (C3).
-    const prefix = canonicalUriCollection('A', '/flows/');
+    const prefix = canonicalUriCollection(fx.organizationA, '/flows/');
     const stored = await fx.db.pairs.getAllWhere(
         'uri_collection', prefix,
     );
@@ -683,8 +759,8 @@ async () => {
             }
         }
     }
-    assert.ok(sidecarIds.includes('ev-union-deleted'));
-    assert.ok(sidecarIds.includes('ev-union-restored'));
+    assert.ok(sidecarIds.includes(fx.deletedEventId));
+    assert.ok(sidecarIds.includes(fx.restoredEventId));
     assert.deepEqual(
         (await deriveInvitationStates(fx.db))
             .filter((row) =>
@@ -694,7 +770,7 @@ async () => {
                     : a.id < b.id ? -1
                         : a.id > b.id ? 1 : 0)
             .map((row) => row.id),
-        ['ev-union-grant', 'ev-union-accept'],
+        [fx.grantEventId, fx.acceptEventId],
     );
 });
 
@@ -715,29 +791,35 @@ test('deriveInvitationStates: a duplicate grant on the same'
 + ' pending (organization, invitee) pair derives exactly ONE'
 + ' \'pending\' row, and posts no event on the old plane for'
 + ' the duplicate\'s own id', async () => {
-    const db = await seed();
-    const tokenA = await adminToken('adminA', 'A');
+    const { db, organizationA, adminA } = await seed();
+    const tokenA = await adminToken(adminA, organizationA);
+    const inviteeId = generateIdentifier();
+    const invA = generateIdentifier();
+    const invB = generateIdentifier();
+    const grantA = generateIdentifier();
     await person(
-        db, 'invitee-dup', 'Dup Invitee', 'invitee-dup@x.com',
+        db, inviteeId, 'Dup Invitee', 'invitee-dup@x.com',
     );
 
     const first = await handleRequest(db, req(
-        'POST', '/organizations/A/invitations/', tokenA,
+        'POST', '/organizations/' + organizationA + '/invitations/',
+        tokenA,
         {
             email: 'invitee-dup@x.com',
-            invitationId: 'inv-dup-a',
-            grantEventId: 'ev-dup-grant-a',
+            invitationId: invA,
+            grantEventId: grantA,
             grantAt: '2026-04-01T00:00:00.000000Z',
         },
     ));
     assert.equal(first.status, 200, 'first grant failed');
 
     const second = await handleRequest(db, req(
-        'POST', '/organizations/A/invitations/', tokenA,
+        'POST', '/organizations/' + organizationA + '/invitations/',
+        tokenA,
         {
             email: 'invitee-dup@x.com',
-            invitationId: 'inv-dup-b',
-            grantEventId: 'ev-dup-grant-b',
+            invitationId: invB,
+            grantEventId: generateIdentifier(),
             grantAt: '2026-04-01T00:00:00.000001Z',
         },
     ));
@@ -745,7 +827,7 @@ test('deriveInvitationStates: a duplicate grant on the same'
     const secondBody = await second.json() as { id: string };
     // The duplicate echoes the ORIGINAL invitation id, never its
     // own submitted one.
-    assert.equal(secondBody.id, 'inv-dup-a');
+    assert.equal(secondBody.id, invA);
 
     // The old plane: no event was ever posted for the
     // duplicate's own submitted id — a REAL second pending row
@@ -756,37 +838,42 @@ test('deriveInvitationStates: a duplicate grant on the same'
 
     const rows = await deriveInvitationStates(db);
     const pendingForOriginal = rows.filter(
-        (row) => row.entity_id === 'inv-dup-a'
+        (row) => row.entity_id === invA
             && row.state === 'pending',
     );
     assert.equal(pendingForOriginal.length, 1);
-    assert.equal(pendingForOriginal[0]!.id, 'ev-dup-grant-a');
+    assert.equal(pendingForOriginal[0]!.id, grantA);
 
     // No phantom row was derived for the duplicate's own id.
     assert.equal(
-        rows.some((row) => row.entity_id === 'inv-dup-b'), false,
+        rows.some((row) => row.entity_id === invB), false,
     );
 });
 
 test('deriveInvitationStates: a re-accept (idempotent resend)'
 + ' derives exactly ONE \'accepted\' row, keyed to the FIRST'
 + ' accept\'s own event id', async () => {
-    const db = await seed();
-    const tokenA = await adminToken('adminA', 'A');
+    const { db, organizationA, adminA } = await seed();
+    const tokenA = await adminToken(adminA, organizationA);
+    const inviteeId = 'jLMftvmIlvkHfyyIXYElhQ';
+    const invitationId = 'ientwuGyocqieLhpxdHZNA';
+    const accept1 = generateIdentifier();
+    const accept2 = generateIdentifier();
     await person(
-        db, 'invitee-reaccept', 'Reaccept Invitee',
+        db, inviteeId, 'Reaccept Invitee',
         'invitee-reaccept@x.com',
     );
     const inviteeToken = await organizationToken(
-        'invitee-reaccept', 'A',
+        inviteeId, organizationA,
     );
 
     const grantRes = await handleRequest(db, req(
-        'POST', '/organizations/A/invitations/', tokenA,
+        'POST', '/organizations/' + organizationA + '/invitations/',
+        tokenA,
         {
             email: 'invitee-reaccept@x.com',
-            invitationId: 'inv-reaccept',
-            grantEventId: 'ev-reaccept-grant',
+            invitationId,
+            grantEventId: generateIdentifier(),
             grantAt: '2026-04-02T00:00:00.000000Z',
         },
     ));
@@ -794,12 +881,13 @@ test('deriveInvitationStates: a re-accept (idempotent resend)'
 
     const firstAccept = await handleRequest(db, req(
         'PUT',
-        '/identities/invitee-reaccept/invitations/inv-reaccept',
+        '/identities/' + inviteeId + '/invitations/'
+            + invitationId,
         inviteeToken,
         {
             state: 'accepted',
-            membershipId: 'ms-reaccept-1',
-            eventId: 'ev-reaccept-accept-1',
+            membershipId: generateIdentifier(),
+            eventId: accept1,
             at: '2026-04-02T00:00:00.000001Z',
         },
     ));
@@ -807,12 +895,13 @@ test('deriveInvitationStates: a re-accept (idempotent resend)'
 
     const secondAccept = await handleRequest(db, req(
         'PUT',
-        '/identities/invitee-reaccept/invitations/inv-reaccept',
+        '/identities/' + inviteeId + '/invitations/'
+            + invitationId,
         inviteeToken,
         {
             state: 'accepted',
-            membershipId: 'ms-reaccept-2',
-            eventId: 'ev-reaccept-accept-2',
+            membershipId: generateIdentifier(),
+            eventId: accept2,
             at: '2026-04-02T00:00:00.000002Z',
         },
     ));
@@ -822,13 +911,13 @@ test('deriveInvitationStates: a re-accept (idempotent resend)'
 
     const rows = await deriveInvitationStates(db);
     const accepted = rows.filter(
-        (row) => row.entity_id === 'inv-reaccept'
+        (row) => row.entity_id === invitationId
             && row.state === 'accepted',
     );
     assert.equal(accepted.length, 1);
-    assert.equal(accepted[0]!.id, 'ev-reaccept-accept-1');
+    assert.equal(accepted[0]!.id, accept1);
     assert.equal(
-        rows.some((row) => row.id === 'ev-reaccept-accept-2'),
+        rows.some((row) => row.id === accept2),
         false,
     );
 });
@@ -836,22 +925,27 @@ test('deriveInvitationStates: a re-accept (idempotent resend)'
 test('deriveInvitationStates: a re-decline (idempotent resend)'
 + ' derives exactly ONE \'declined\' row, keyed to the FIRST'
 + ' decline\'s own event id', async () => {
-    const db = await seed();
-    const tokenA = await adminToken('adminA', 'A');
+    const { db, organizationA, adminA } = await seed();
+    const tokenA = await adminToken(adminA, organizationA);
+    const inviteeId = 'jLwvLbZCGaiaFioqVNEetA';
+    const invitationId = generateIdentifier();
+    const decline1 = generateIdentifier();
+    const decline2 = generateIdentifier();
     await person(
-        db, 'invitee-redecline', 'Redecline Invitee',
+        db, inviteeId, 'Redecline Invitee',
         'invitee-redecline@x.com',
     );
     const inviteeToken = await organizationToken(
-        'invitee-redecline', 'A',
+        inviteeId, organizationA,
     );
 
     const grantRes = await handleRequest(db, req(
-        'POST', '/organizations/A/invitations/', tokenA,
+        'POST', '/organizations/' + organizationA + '/invitations/',
+        tokenA,
         {
             email: 'invitee-redecline@x.com',
-            invitationId: 'inv-redecline',
-            grantEventId: 'ev-redecline-grant',
+            invitationId,
+            grantEventId: generateIdentifier(),
             grantAt: '2026-04-03T00:00:00.000000Z',
         },
     ));
@@ -859,12 +953,12 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
 
     const firstDecline = await handleRequest(db, req(
         'PUT',
-        '/identities/invitee-redecline/invitations/'
-            + 'inv-redecline',
+        '/identities/' + inviteeId + '/invitations/'
+            + invitationId,
         inviteeToken,
         {
             state: 'declined',
-            eventId: 'ev-redecline-decline-1',
+            eventId: decline1,
             at: '2026-04-03T00:00:00.000001Z',
         },
     ));
@@ -872,12 +966,12 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
 
     const secondDecline = await handleRequest(db, req(
         'PUT',
-        '/identities/invitee-redecline/invitations/'
-            + 'inv-redecline',
+        '/identities/' + inviteeId + '/invitations/'
+            + invitationId,
         inviteeToken,
         {
             state: 'declined',
-            eventId: 'ev-redecline-decline-2',
+            eventId: decline2,
             at: '2026-04-03T00:00:00.000002Z',
         },
     ));
@@ -888,13 +982,13 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
 
     const rows = await deriveInvitationStates(db);
     const declined = rows.filter(
-        (row) => row.entity_id === 'inv-redecline'
+        (row) => row.entity_id === invitationId
             && row.state === 'declined',
     );
     assert.equal(declined.length, 1);
-    assert.equal(declined[0]!.id, 'ev-redecline-decline-1');
+    assert.equal(declined[0]!.id, decline1);
     assert.equal(
-        rows.some((row) => row.id === 'ev-redecline-decline-2'),
+        rows.some((row) => row.id === decline2),
         false,
     );
 });

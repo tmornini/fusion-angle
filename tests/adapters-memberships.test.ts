@@ -7,14 +7,14 @@ import {
 test('validates a membership body', () => {
     assert.deepEqual(
         validateMembershipEntity({
-            organization_id: '1',
-            identity_id: 'current',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'admin',
             at: '2026-06-04T00:00:00.000000Z',
         }),
         {
-            organization_id: '1',
-            identity_id: 'current',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'admin',
             at: '2026-06-04T00:00:00.000000Z',
         },
@@ -24,8 +24,8 @@ test('validates a membership body', () => {
 test('rejects a membership with an extra key', () => {
     assert.throws(() =>
         validateMembershipEntity({
-            organization_id: '1',
-            identity_id: 'current',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'member',
             at: '2026-06-04T00:00:00.000000Z',
             role: 'admin',
@@ -35,8 +35,8 @@ test('rejects a membership with an extra key', () => {
 test('rejects a membership with a bad timestamp', () => {
     assert.throws(() =>
         validateMembershipEntity({
-            organization_id: '1',
-            identity_id: 'current',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'member',
             at: 'not-a-date',
         }));
@@ -45,8 +45,8 @@ test('rejects a membership with a bad timestamp', () => {
 test('rejects a membership missing type', () => {
     assert.throws(() =>
         validateMembershipEntity({
-            organization_id: '1',
-            identity_id: 'current',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             at: '2026-06-04T00:00:00.000000Z',
         }));
 });

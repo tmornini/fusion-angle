@@ -36,6 +36,18 @@ import {
 import {
     documentPairsAt,
 } from '../api/derive-documents.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+
+const NODE_A = generateIdentifier();
+const NODE_B = generateIdentifier();
+const NODE_C = generateIdentifier();
+const EDGE_AB = generateIdentifier();
+const EDGE_AC = generateIdentifier();
+const ATTR_X = generateIdentifier();
+const ATTR_Y = generateIdentifier();
+const ATTR_Z = generateIdentifier();
+const MEMBER_TWO = generateIdentifier();
 
 // Phase Final Task 2: graph relation ROW halves stripped.
 // Save oracles re-home to pair-plane graph (GET) and to
@@ -47,9 +59,9 @@ async function setupMemDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedHumanMember(db, 'current', 'Demo User');
-    await seedHumanMember(db, 'm1', 'Member One');
-    await seedHumanMember(db, 'm2', 'Member Two');
+    await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
+    await seedHumanMember(db, 'mFNSxZqywTSMXhgUTdTqtA', 'Member One');
+    await seedHumanMember(db, MEMBER_TWO, 'Member Two');
     const ctx = createRequestContext(db, await organizationToken());
     return { db, ctx };
 }
@@ -113,7 +125,7 @@ async function pairPlaneGraph(
     flowId: string,
 ): Promise<StoredGraph> {
     const flow = await ctx.GET<FlowWithGraph>(
-        'organizations/1/flows/' + flowId,
+        'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
     );
     return asStoredGraph(
         flow.graph, 'flow.graph',
@@ -158,7 +170,7 @@ async function pairGraphDeltaEvents(
     const requests = await db.pairs.getAll();
     const responses = await db.pairs.getAll();
     const pairs = documentPairsAt(
-        requests, '/organizations/1/flows/',
+        requests, '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',
     ).filter((p) => p.uriId === flowId);
     const memberEvents: {
         flow_node_id: string;
@@ -211,34 +223,34 @@ async function pairGraphDeltaEvents(
 }
 
 // The known baseline graph save #1 establishes: two nodes
-// (A keeps a member m1 and attribute x in editable mode,
+// (A keeps a member mFNSxZqywTSMXhgUTdTqtA and attribute x in editable mode,
 // plus a soon-to-be-deleted member m2 and attribute y; B is
-// plain) joined by edge e1. Save #2 diffs against THIS.
+// plain) joined by edge YiJPbufDpkyrZcZCYbUJpg. Save #2 diffs against THIS.
 function buildBaselineGraph(): {
     nodes: GraphNode[];
     edges: GraphEdge[];
 } {
-    const a = buildNode('a', {
+    const a = buildNode(NODE_A, {
         isCreate: true,
-        memberIds: ['m1', 'm2'],
+        memberIds: ['mFNSxZqywTSMXhgUTdTqtA', MEMBER_TWO],
         attributes: [
             {
-                attributeId: 'x',
+                attributeId: ATTR_X,
                 mode: 'editable',
                 isRequired: false,
             },
             {
-                attributeId: 'y',
+                attributeId: ATTR_Y,
                 mode: 'readonly',
                 isRequired: true,
             },
         ],
     });
-    const b = buildNode('b', { isArchive: true });
-    const c = buildNode('c');
-    const e1 = buildEdge('e1', 'a', 'b');
-    const e2 = buildEdge('e2', 'a', 'c');
-    return { nodes: [a, b, c], edges: [e1, e2] };
+    const b = buildNode(NODE_B, { isArchive: true });
+    const c = buildNode(NODE_C);
+    const edgeAb = buildEdge(EDGE_AB, NODE_A, NODE_B);
+    const edgeAc = buildEdge(EDGE_AC, NODE_A, NODE_C);
+    return { nodes: [a, b, c], edges: [edgeAb, edgeAc] };
 }
 
 // Save #2 working graph: add member m2→removed and m? ; the
@@ -249,35 +261,35 @@ function buildWorkingGraph(): {
     nodes: GraphNode[];
     edges: GraphEdge[];
 } {
-    const a = buildNode('a', {
+    const a = buildNode(NODE_A, {
         isCreate: true,
         positionX: 999, // moved
         positionY: 888,
-        // m2 removed, m1 kept; nothing added on a
-        memberIds: ['m1'],
+        // MEMBER_TWO removed, mFNSxZqywTSMXhgUTdTqtA kept
+        memberIds: ['mFNSxZqywTSMXhgUTdTqtA'],
         attributes: [
-            // x mode changed editable -> readonly
+            // ATTR_X mode changed editable -> readonly
             {
-                attributeId: 'x',
+                attributeId: ATTR_X,
                 mode: 'readonly',
                 isRequired: false,
             },
-            // y removed; z added
+            // ATTR_Y removed; ATTR_Z added
             {
-                attributeId: 'z',
+                attributeId: ATTR_Z,
                 mode: 'editable',
                 isRequired: true,
             },
         ],
     });
-    // b gains member m2 (add a member)
-    const b = buildNode('b', {
+    // b gains MEMBER_TWO (add a member)
+    const b = buildNode(NODE_B, {
         isArchive: true,
-        memberIds: ['m2'],
+        memberIds: [MEMBER_TWO],
     });
-    // c is deleted; edge e2 (a->c) is deleted with it
-    const e1 = buildEdge('e1', 'a', 'b');
-    return { nodes: [a, b], edges: [e1] };
+    // NODE_C is deleted; EDGE_AC (a->c) is deleted with it
+    const edgeAb = buildEdge(EDGE_AB, NODE_A, NODE_B);
+    return { nodes: [a, b], edges: [edgeAb] };
 }
 
 async function seedKnownBaseline(
@@ -286,8 +298,8 @@ async function seedKnownBaseline(
 ): Promise<void> {
     await postFlowCreation(ctx, {
         flowId,
-        linkId: flowId + '-link',
-        projectId: 'project-1',
+        linkId: generateIdentifier(),
+        projectId: generateIdentifier(),
         name: 'Rel Save Flow',
     });
     const base = buildBaselineGraph();
@@ -299,7 +311,7 @@ test(
     + ' equals the intended saved graph',
     async () => {
         const { ctx } = await setupMemDb();
-        const flowId = 'flow-save-rt';
+        const flowId = generateIdentifier();
         await seedKnownBaseline(ctx, flowId);
 
         const working = buildWorkingGraph();
@@ -312,17 +324,19 @@ test(
         // node c deleted, edge e2 deleted
         const nodeIds = graph.nodes
             .map(n => n.id).sort();
-        assert.deepEqual(nodeIds, ['a', 'b']);
+        assert.deepEqual(
+            nodeIds, [NODE_A, NODE_B].sort(),
+        );
         const edgeIds = graph.edges.map(e => e.id);
-        assert.deepEqual(edgeIds, ['e1']);
+        assert.deepEqual(edgeIds, [EDGE_AB]);
 
         const a = graph.nodes
-            .find(n => n.id === 'a')!;
+            .find(n => n.id === NODE_A)!;
         // node a moved
         assert.equal(a.positionX, 999);
         assert.equal(a.positionY, 888);
-        // member m2 removed from a, m1 kept
-        assert.deepEqual(a.memberIds.sort(), ['m1']);
+        // member m2 removed from a, mFNSxZqywTSMXhgUTdTqtA kept
+        assert.deepEqual(a.memberIds.sort(), ['mFNSxZqywTSMXhgUTdTqtA']);
         // attribute x mode changed, y removed, z added
         const aAttrs = [...a.attributes]
             .sort((p, q) =>
@@ -331,22 +345,23 @@ test(
             aAttrs,
             [
                 {
-                    attributeId: 'x',
+                    attributeId: ATTR_X,
                     mode: 'readonly',
                     isRequired: false,
                 },
                 {
-                    attributeId: 'z',
+                    attributeId: ATTR_Z,
                     mode: 'editable',
                     isRequired: true,
                 },
-            ],
+            ].sort((p, q) =>
+                p.attributeId.localeCompare(q.attributeId)),
         );
 
         const b = graph.nodes
-            .find(n => n.id === 'b')!;
-        // member m2 added to b
-        assert.deepEqual(b.memberIds.sort(), ['m2']);
+            .find(n => n.id === NODE_B)!;
+        // MEMBER_TWO added to b
+        assert.deepEqual(b.memberIds.sort(), [MEMBER_TWO]);
     },
 );
 
@@ -355,7 +370,7 @@ test(
     + 'changed leave new graphDelta events, never splice',
     async () => {
         const { db, ctx } = await setupMemDb();
-        const flowId = 'flow-save-ledger';
+        const flowId = generateIdentifier();
         await seedKnownBaseline(ctx, flowId);
 
         const working = buildWorkingGraph();
@@ -368,8 +383,8 @@ test(
         // m2 on node a: an 'added' (baseline) then a
         // 'removed' (save #2). The 'added' is never spliced.
         const aM2 = memberEvents.filter(
-            row => row.flow_node_id === 'a'
-                && row.member_id === 'm2',
+            row => row.flow_node_id === NODE_A
+                && row.member_id === MEMBER_TWO,
         );
         const aM2Actions = aM2.map(r => r.action).sort();
         assert.deepEqual(
@@ -379,8 +394,8 @@ test(
         );
         // m2 re-added on node b: a NEW 'added' event
         const bM2 = memberEvents.filter(
-            row => row.flow_node_id === 'b'
-                && row.member_id === 'm2',
+            row => row.flow_node_id === NODE_B
+                && row.member_id === MEMBER_TWO,
         );
         assert.equal(bM2.length, 1);
         assert.equal(bM2[0]!.action, 'added');
@@ -388,8 +403,8 @@ test(
         // x on a: baseline 'added' (editable) then a NEW
         // 'added' (readonly) — prior event UNMUTATED.
         const aX = attributeEvents.filter(
-            row => row.flow_node_id === 'a'
-                && row.attribute_id === 'x',
+            row => row.flow_node_id === NODE_A
+                && row.attribute_id === ATTR_X,
         );
         assert.equal(
             aX.length, 2,
@@ -408,8 +423,8 @@ test(
         assert.ok(readonlyRow);
         // y on a removed: an 'added' then a 'removed'
         const aY = attributeEvents.filter(
-            row => row.flow_node_id === 'a'
-                && row.attribute_id === 'y',
+            row => row.flow_node_id === NODE_A
+                && row.attribute_id === ATTR_Y,
         );
         assert.deepEqual(
             aY.map(r => r.action).sort(),
@@ -423,7 +438,7 @@ test(
     + ' body twice leaves pair graph unchanged',
     async () => {
         const { ctx } = await setupMemDb();
-        const flowId = 'flow-save-idem';
+        const flowId = generateIdentifier();
         await seedKnownBaseline(ctx, flowId);
 
         const working = buildWorkingGraph();
@@ -442,7 +457,8 @@ test(
                 headerFields?:
                     readonly (readonly [string, string])[],
             ): Promise<T> => {
-                if (path === 'organizations/1/flows/' + flowId
+                if (path === 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + flowId
                     && captured === null) {
                     captured =
                         body as Record<string, unknown>;
@@ -462,7 +478,8 @@ test(
 
         // Replay the EXACT captured body (and its echo header).
         await origPut(
-            'organizations/1/flows/' + flowId, captured, capturedHeaders,
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, captured
+                , capturedHeaders,
         );
 
         // Derived state identical (byte-identical resend).
@@ -478,7 +495,7 @@ test(
     + ' intended working graph after save',
     async () => {
         const { ctx } = await setupMemDb();
-        const flowId = 'flow-save-dual';
+        const flowId = generateIdentifier();
         await seedKnownBaseline(ctx, flowId);
 
         const working = buildWorkingGraph();
@@ -487,7 +504,7 @@ test(
         ));
 
         const flow = await ctx.GET<FlowWithGraph>(
-            'organizations/1/flows/' + flowId,
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
         );
         const blob = asStoredGraph(
             flow.graph, 'flow.graph',
@@ -505,14 +522,15 @@ test(
     + ' (existing covenant intact)',
     async () => {
         const { ctx } = await setupMemDb();
-        const flowId = 'flow-save-event';
+        const flowId = generateIdentifier();
         await seedKnownBaseline(ctx, flowId);
         const working = buildWorkingGraph();
         await putFlow(ctx, flowId, save(
             working.nodes, working.edges,
         ));
         const events = await ctx.GET<StateEntity[]>(
-            'organizations/1/flows/' + flowId + '/versions/',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
+                + '/versions/',
         );
         // Family history is DESC — current first.
         assert.deepEqual(

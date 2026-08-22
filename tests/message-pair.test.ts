@@ -14,15 +14,15 @@ import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 const INPUT = {
     method: 'PUT',
-    pathname: '/organizations/1/ideas/42',
+    pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/42',
     routePattern: 'organizations/:id/ideas/:id',
     routeSegments: ['ideas', ':id'],
     pathSegments: ['ideas', '42'],
     headerFields: [],
     body: { title: 'T', at: '2026-01-02T03:04:05.000111Z' },
-    requesterIdentityId: 'current',
+    requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
     requestAt: '2026-01-01T00:00:00.000000Z',
-    organization: '1',
+    organization: 'AjdvjuECVZEgZoFajaIEkg',
     responseStatus: 204,
     responseBody: undefined,
     operationId: TEST_OPERATION_ID,
@@ -32,7 +32,7 @@ test('an org-owned pair stores at the org-nested prefix',
 async () => {
     const pair = await formWritePair({ ...INPUT });
     assert.equal(
-        pair.uriCollection, '/organizations/1/ideas/',
+        pair.uriCollection, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
 });
 
@@ -44,7 +44,7 @@ async () => {
         routePattern: 'identities/:id/pii',
         routeSegments: ['identities', ':id', 'pii'],
         pathSegments: ['identities', 'ada', 'pii'],
-        organization: '1',
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         operationId: TEST_OPERATION_ID,
     });
     assert.equal(
@@ -54,11 +54,11 @@ async () => {
 
 test('nested attribute pattern stores under type attributes',
 async () => {
-    const typeId = 'rec01CustProfRec0rdAB1';
+    const typeId = 'sJxkGGTrPegHqFbQAkXnjw';
     const pair = await formWritePair({
         ...INPUT,
-        pathname: '/organizations/1/record-types/'
-            + typeId + '/attributes/ra1',
+        pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + typeId + '/attributes/rWOtgTQUhMrUpjULbVdncg',
         routePattern:
             'organizations/:organization-id/record-types/'
             + ':record-type-id/attributes/:attribute-id',
@@ -68,9 +68,9 @@ async () => {
             'attributes', ':attribute-id',
         ],
         pathSegments: [
-            'organizations', '1',
+            'organizations', 'AjdvjuECVZEgZoFajaIEkg',
             'record-types', typeId,
-            'attributes', 'ra1',
+            'attributes', 'rWOtgTQUhMrUpjULbVdncg',
         ],
         body: {
             name: 'Contact Email',
@@ -83,7 +83,7 @@ async () => {
     });
     assert.equal(
         pair.uriCollection,
-        '/organizations/1/record-types/'
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
         + typeId + '/attributes/',
     );
 });
@@ -92,7 +92,8 @@ test('nested record-type detail stores at type prefix',
 async () => {
     const pair = await formWritePair({
         ...INPUT,
-        pathname: '/organizations/1/record-types/r1',
+        pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'rOEPOcVMQdJiiiMuiiEhlg',
         routePattern:
             'organizations/:organization-id/record-types/'
             + ':record-type-id',
@@ -101,14 +102,14 @@ async () => {
             'record-types', ':record-type-id',
         ],
         pathSegments: [
-            'organizations', '1',
-            'record-types', 'r1',
+            'organizations', 'AjdvjuECVZEgZoFajaIEkg',
+            'record-types', 'rOEPOcVMQdJiiiMuiiEhlg',
         ],
         operationId: TEST_OPERATION_ID,
     });
     assert.equal(
         pair.uriCollection,
-        '/organizations/1/record-types/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/',
     );
 });
 
@@ -116,7 +117,7 @@ test('a formed pair binds request and response by one id',
 async () => {
     const pair = await formWritePair({ ...INPUT });
     assert.equal(
-        pair.uriCollection, '/organizations/1/ideas/',
+        pair.uriCollection, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
     assert.equal(pair.uriId, '42');
     assert.equal(
@@ -169,7 +170,7 @@ test('append then head-read round-trips', async () => {
     );
     assert.equal(
         await headPairIdAt(
-            db, '/organizations/1/ideas/', '42',
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42',
         ),
         pair.id,
     );
@@ -188,7 +189,7 @@ test('a same-hash re-append writes nothing', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const pair = await formWritePair({ ...INPUT });
-    const replay = { ...pair, id: 'other-uuid' };
+    const replay = { ...pair, id: 'other-uuidAAAAAAAAAAAAw' };
     await db.transaction(
         MESSAGE_TABLES,
         async (view) => {

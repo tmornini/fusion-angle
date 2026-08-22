@@ -89,7 +89,8 @@ formation — §5).
    that route. Then, for a write with a handler on a non-
    exempt route: `writeAuthorizerFor` (foreign id → **403**
    before pair formation). Public writes require header
-   `Operation-ID` (22-char); missing or malformed → **400**.
+   `Operation-ID` (identifier); missing or malformed →
+   **400**.
    The server does not mint that header. Inner PUTs copy
    the outer id. GET may send it; it is ignored.
 5. **Shadow-ledger pair formation + idempotency + post-
@@ -173,7 +174,7 @@ Legend for classification:
 
 ### 2.1 Members, seats & agents
 
-Flat `/members`, `/current-member`, `/ai-members`,
+Flat `/members`, `/XeNICvLNKhXddnTKnszfpQ`, `/ai-members`,
 `/human-members`, and `/memberships` are RETIRED
 (router 404). Seats live on the organization nest.
 
@@ -410,7 +411,7 @@ rides the uri prefix; ACL arrays
 per-attribute ACL; full dialect in §5.4.1 / §5.20):
 
 - `GET .../instances` — member; list; read-ACL
-  projection; id-lex ASC; row embeds `etag`
+  projection; identifier order ASC; row embeds `etag`
 - `GET .../instances/:id` — member; project by read ACL;
   **ETag** header
 - `PUT .../instances/:id` — **405** (public PUT
@@ -1118,7 +1119,8 @@ pair and a fence organization — a below-facade caller
   address is NOT fresh — the idea already exists, so
   `headPairIdAt` finds its prior document pair and this one
   records `Supersedes` against it. **This closes the standing
-  'promoted' watch-point** (named at Phase 2/3): before this
+  'promoted' watch-point** (named at Phase BBjWJsjYIDkTRKIIPrzWRw/3): before
+  this
   task, a converted idea's derived state history MISSED its
   'promoted' event, because no pair recorded it.
 - **The N baseline pairs (Phase 7 Task 4)** — one PUT-shaped
@@ -1842,7 +1844,8 @@ itself, below the ledger — with
 user, the singleton org — no Records) and its multi-pair bootstrap set: the
 current-user human-member create bundle (operation + member + detail +
 identity documents), membership, system member, PII, system identity,
-default-org, and organization, plus credentials via `seedHumanCredentials` —
+XmzGzKMbFITEJlKoyPPSww, and organization, plus credentials via
+`seedHumanCredentials` —
 bootstrap absolute **12** (§5.3; `tests/mock-data-pairs.test.ts`). Returns
 `SeededCredentials` on stdout.
 
@@ -2047,7 +2050,7 @@ the fenced token organization else **403**.
 
 The message plane IS the schema of record (Phase Final).
 Every pair-wired write (`PAIR_WIRED_ROUTE_PATTERNS`, plus the
-invitations/default-org side channels and the two
+invitations/XmzGzKMbFITEJlKoyPPSww side channels and the two
 `/authentication` grant routes) appends one row to
 `pairs` — request and response sharing an `id` — as
 the LAST (and only storage) act of its own transaction
@@ -2070,7 +2073,7 @@ carries headers derived from that same row (`wireHeadersFor`):
 - **`Date`** — the row's own `response_at`, rendered
   IMF-fixdate (`new Date(response_at).toUTCString()`).
 - **`Response-ID`** — the row's `id` (pair locator).
-- **`Operation-ID`** — the 22-char id from the request
+- **`Operation-ID`** — the identifier from the request
   (send-time; not stored on the GET-shaped blob).
 - **`ETag`** — quoted 64-hex `documentVersion` of the
   body octets (later writes: body octets || matched
@@ -2158,7 +2161,8 @@ table; no dual-write beside a seeded row):
 
 - The mock-data seed pre-forms **1498** message pairs — one pair per seeded
   row for most families, but each seeded human/AI member folds in an
-  operation/member-document/detail-document triple (11 human-members +
+  operation/member-document/detail-document triple (11 human-members
+  +
   4 ai-members, each × 3 = 45 member-family pairs: 15 ops + 15 member
   documents + 15 detail documents, Phase 8 Task 4's bundle synthesis,
   the objectives-family 1+1+1 precedent generalized to the roster —
@@ -2212,8 +2216,8 @@ table; no dual-write beside a seeded row):
   WO-instance SoT chain pairs (instance genesis + binding +
   Review/Complete new-shape ops each with a revision) + 1
   gate0001 Capture step, PLUS every seeded human member's OWN
-  default-org event forms its OWN identity-keyed
-  `identities/:id/default-org/` pair (11 more) —
+  XmzGzKMbFITEJlKoyPPSww event forms its OWN identity-keyed
+  `identities/:id/XmzGzKMbFITEJlKoyPPSww/` pair (11 more) —
   in a first pass, BEFORE the seed's own big transaction opens
   (formed pre-tx — crypto, hashing, and timers never run
   inside an open transaction (CLAUDE.md § Transaction
@@ -2623,7 +2627,7 @@ client's own organization_id is honest. THE
 LABEL MANDATE: the stray-key 400 body stays byte-identical
 (`unexpected key "..." for MembershipEntity` — matching
 `validateMembershipEntity`'s OWN label, NOT the
-`MembershipDocumentBody` naming convention every other
+`NIjaUmatkDaVBQdIjzUjYg` naming convention every other
 `*DocumentBody` validator uses); the missing-key 400s are the
 SAME `assertOnlyKeys` call on both paths, so they too are
 unchanged.
@@ -2639,7 +2643,7 @@ additionally pins the WHOLE roster surface's verb gaps, both
 dispatch regimes: 19 route-table 405s across the nine roster
 `route()` patterns (`members`, `ai-members`, `ai-members/:id`,
 `human-members`, `human-members/:id`, `memberships`,
-`memberships/:id`, `current-member`, `members/:id`); 18
+`memberships/:id`, `XeNICvLNKhXddnTKnszfpQ`, `members/:id`); 18
 invitations-facade 404s (the side channel never calls
 `matchRoute`) across its five real shapes (`invitations`,
 `invitations/sent`, `invitations/:id/acceptance`,
@@ -3051,7 +3055,7 @@ the wiring landed):
    per-method branch; role-grants, flat identity-providers, and
    their `:id` patterns are retired and assert 404 (not
    matchRoute 405).
-2. The `identities/:id/default-org` side channel regime — 2
+2. The `identities/:id/XmzGzKMbFITEJlKoyPPSww` side channel regime — 2
    combos: this side channel never calls `matchRoute` — a POST or
    DELETE falls through its own if-chain to ITS OWN inline 405
    terminal (`organization-requests.ts`).
@@ -3434,7 +3438,7 @@ itself, are absent from this task's diff.
 reads the SAME identity-keyed address
 `identityDefaultOrganizationRequest` already writes to
 (`api/organization-requests.ts`) —
-`/identities/:id/default-org/`, the eventId riding a FABRICATED
+`/identities/:id/XmzGzKMbFITEJlKoyPPSww/`, the eventId riding a FABRICATED
 trailing `:eventId` path segment no real URL carries (the live
 PUT's `eventId` is a BODY key) — via a TARGETED
 `pairs.getAllWhere('uri_collection', prefix)` pair, never
@@ -3472,13 +3476,14 @@ the SAME reason the invitations side channel forms its own pairs
 directly. 11 mock-data pairs (one per seeded human member, actor =
 the member's OWN id — the route's self-authorship rule, never
 `SYSTEM_MEMBER_ID`) + bootstrap's OWN mirror pair (actor =
-`'current'`). Task-time intermediate re-pins were 1500 → 1506 /
+`'XXZruirZyAOoRpNxaDnpSA'`). Task-time intermediate
+re-pins were 1500 → 1506 /
 bootstrap 12 → 13; standing absolute pins are
 `EXPECTED_PAIR_COUNT = 1498` / bootstrap 12.
 
 **The re-pins (`tests/mock-data-pairs.test.ts`).**
 Task-time: `EXPECTED_PAIR_COUNT` 1500 → 1506 (+11) + breakdown;
-bootstrap 12 → 13 + a new assertion for its default-org pair
+bootstrap 12 → 13 + a new assertion for its XmzGzKMbFITEJlKoyPPSww pair
 address; ONE new address/body-shape spot-check (a seeded default-
 org pair's identity-keyed address, its body carrying the three
 `{organization_id, eventId, at}` keys). Standing absolute pins
@@ -3756,8 +3761,9 @@ transitioned to a terminal node.
 attributes. Sparse PATCH is required for correctness
 with filtered GET. Zero readable attributes still
 yields **200** with empty `values` (existence is
-member-visible). Collection: id-lex ASC; list rows
-embed `etag` string (no per-row response headers).
+member-visible). Collection: identifier order ASC;
+list rows embed `etag` string (no per-row response
+headers).
 Detail GET / PUT / PATCH success carry the strong
 `ETag` header.
 

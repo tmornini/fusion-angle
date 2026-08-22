@@ -10,6 +10,8 @@ import {
 import {
     MEASURE_BOOT_PAGE_INIT,
 } from '../web-app/app/measure-viz-core.ts';
+import { encodeIdentifier } from
+    '../shared/identifier.ts';
 
 test('DEFAULT_PROFILE_PAGES is the four heavy pages', () => {
     assert.deepEqual(
@@ -24,7 +26,10 @@ test('DEFAULT_PROFILE_PAGES is the four heavy pages', () => {
 });
 
 test('canonicalizeResource collapses long id segments', () => {
-    const id = 'a'.repeat(22);
+    const dashBytes = new Uint8Array(16);
+    dashBytes[0] = 62 << 2;
+    const id = encodeIdentifier(dashBytes);
+    assert.ok(id.includes('-') || id.includes('_'));
     assert.equal(
         canonicalizeResource(
             `work-orders/${id}`,
@@ -45,10 +50,18 @@ test('canonicalizeResource collapses long id segments', () => {
         canonicalizeResource('ideas'),
         'ideas',
     );
+    assert.equal(
+        canonicalizeResource(
+            'work-orders/' + 'a'.repeat(21),
+        ),
+        'work-orders/' + 'a'.repeat(21),
+    );
 });
 
 test('summarizeRequestHits counts and sorts', () => {
-    const id = 'b'.repeat(22);
+    const dashBytes = new Uint8Array(16);
+    dashBytes[0] = 62 << 2;
+    const id = encodeIdentifier(dashBytes);
     const summary = summarizeRequestHits([
         { method: 'GET', resource: 'states' },
         { method: 'GET', resource: 'states' },

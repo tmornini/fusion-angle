@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -32,10 +34,10 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
-const ORGANIZATION = '1';
-const TYPE_ID = 'rt-restrict-1';
-const ATTR_ID = 'attr-restrict-1';
-const INSTANCE_ID = 'inst-restrict-1';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
+const TYPE_ID = generateIdentifier();
+const ATTR_ID = generateIdentifier();
+const INSTANCE_ID = generateIdentifier();
 
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
@@ -82,19 +84,19 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, 'm-member1', {
+    await seedMembershipPair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
-        identity_id: 'member1',
+        identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
         at: AT,
     });
     return {
         db,
         adminToken: await organizationToken(
-            'current', ORGANIZATION,
+            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
         ),
         memberToken: await organizationToken(
-            'member1', ORGANIZATION,
+            'nkgaOHZISTQrILTfPThWCA', ORGANIZATION,
         ),
     };
 }

@@ -3,8 +3,8 @@ import {
     nowUtc,
 } from '../../../api/types.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 import {
     activeOrganization,
     type RequestContext,
@@ -147,8 +147,8 @@ export async function postInvitationGrant(
     ctx: RequestContext,
     email: string,
 ): Promise<InvitationGrantOutcome> {
-    const invitationId = generateCryptoSafeBase62();
-    const grantEventId = generateCryptoSafeBase62();
+    const invitationId = generateIdentifier();
+    const grantEventId = generateIdentifier();
     const grantAt = nowUtc();
     try {
         await ctx.POST(
@@ -191,8 +191,8 @@ export async function postInvitationAcceptance(
             + '/invitations/' + id,
         {
             state: 'accepted',
-            membershipId: generateCryptoSafeBase62(),
-            eventId: generateCryptoSafeBase62(),
+            membershipId: generateIdentifier(),
+            eventId: generateIdentifier(),
             at: nowUtc(),
         },
     );
@@ -245,7 +245,7 @@ export async function postInvitationDecline(
             + '/invitations/' + id,
         {
             state: 'declined',
-            eventId: generateCryptoSafeBase62(),
+            eventId: generateIdentifier(),
             at: nowUtc(),
         },
     );
@@ -264,7 +264,7 @@ export async function postInvitationRevocation(
             + '/invitations/' + id,
         {
             state: 'revoked',
-            eventId: generateCryptoSafeBase62(),
+            eventId: generateIdentifier(),
             at: nowUtc(),
         },
     );

@@ -100,7 +100,7 @@ test('validateRecordDocumentBody tolerates a caller-forged'
 + ' organization_id', () => {
     const doc = validateRecordDocumentBody({
         ...recordDocument('Fresh', 'active', AT, 'ev-1'),
-        organization_id: '1',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     });
     assert.equal(doc.entity.name, 'Fresh');
 });
@@ -140,33 +140,37 @@ async () => {
     // required for deriveRecordStateHistory to see genesis.
     const body = {
         ...recordDocument('Fresh', 'active', AT, 'ev-1'),
-        organization_id: '1',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
     const pair = await formWritePair({
-        method: 'PUT', pathname: '/organizations/1/record-types/rec-1',
+        method: 'PUT'
+            , pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'rbfHGatkwQzGZJVXKJEeyw',
         routePattern: RECORD_TYPE_DETAIL_PATTERN,
         routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
-        pathSegments: ['organizations', '1', 'record-types', 'rec-1'],
+        pathSegments: ['organizations', 'AjdvjuECVZEgZoFajaIEkg'
+            , 'record-types', 'rbfHGatkwQzGZJVXKJEeyw'],
         headerFields: [], body,
-        requesterIdentityId: 'current',
-        requestAt: AT, organization: '1',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+        requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
         operationId: TEST_OPERATION_ID,
     });
     const written = await postRecordDocumentOp(
-        db, 'rec-1', body, 'current', pair,
+        db, 'rbfHGatkwQzGZJVXKJEeyw', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
     );
     assert.equal(written.name, 'Fresh');
-    assert.equal(written.organization_id, '1');
+    assert.equal(written.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
     // Phase Final Stage B: records table retired.
-    const events = await deriveRecordStateHistory(db, '1', 'rec-1');
+    const events = await deriveRecordStateHistory(db
+        , 'AjdvjuECVZEgZoFajaIEkg', 'rbfHGatkwQzGZJVXKJEeyw');
     assert.equal(events.length, 1);
     assert.equal(events[0]!.state, 'active');
-    assert.equal(events[0]!.member_id, 'current');
+    assert.equal(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
 // The MEMBER_ID CAVEAT: the head event is authored by
-// 'current'; a DIFFERENT member ('member-b') then edits an
+// 'XXZruirZyAOoRpNxaDnpSA'; a DIFFERENT member ('member-b') then edits an
 // entity field while echoing the SAME trio verbatim. sameEvent
 // (store-state.ts) compares member_id too, so replaying
 // 'member-b' as author would 409 against the already-stored
@@ -186,33 +190,38 @@ async () => {
     const db = await freshDb();
     const firstBody = {
         ...recordDocument('First', 'active', AT, 'ev-2'),
-        organization_id: '1',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
     const firstPair = await formWritePair({
-        method: 'PUT', pathname: '/organizations/1/record-types/rec-2',
+        method: 'PUT'
+            , pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'rcaSzEaORBkezCxyhLhecA',
         routePattern: RECORD_TYPE_DETAIL_PATTERN,
         routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
-        pathSegments: ['organizations', '1', 'record-types', 'rec-2'],
+        pathSegments: ['organizations', 'AjdvjuECVZEgZoFajaIEkg'
+            , 'record-types', 'rcaSzEaORBkezCxyhLhecA'],
         headerFields: [], body: firstBody,
-        requesterIdentityId: 'current',
-        requestAt: AT, organization: '1',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+        requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
         operationId: TEST_OPERATION_ID,
     });
     await postRecordDocumentOp(
-        db, 'rec-2', firstBody, 'current', firstPair,
+        db, 'rcaSzEaORBkezCxyhLhecA', firstBody, 'XXZruirZyAOoRpNxaDnpSA'
+            , firstPair,
     );
     const second = await postRecordDocumentOp(
-        db, 'rec-2',
+        db, 'rcaSzEaORBkezCxyhLhecA',
         {
             ...recordDocument('Second', 'active', AT, 'ev-2'),
-            organization_id: '1',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         },
         'member-b',
     );
-    const events = await deriveRecordStateHistory(db, '1', 'rec-2');
+    const events = await deriveRecordStateHistory(db
+        , 'AjdvjuECVZEgZoFajaIEkg', 'rcaSzEaORBkezCxyhLhecA');
     assert.equal(events.length, 1);
-    assert.equal(events[0]!.member_id, 'current');
+    assert.equal(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
     assert.equal(second.name, 'Second');
     // Phase Final Stage B: records table retired.
 });
@@ -226,50 +235,59 @@ test('postRecordDocumentOp with a fresh trio posts a'
         ...recordDocument(
             'First', 'active', AT, 'ev-3a',
         ),
-        organization_id: '1',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
     const firstPair = await formWritePair({
-        method: 'PUT', pathname: '/organizations/1/record-types/rec-3',
+        method: 'PUT'
+            , pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'rlBnfIvzDVVZeVSjBECxGg',
         routePattern: RECORD_TYPE_DETAIL_PATTERN,
         routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
-        pathSegments: ['organizations', '1', 'record-types', 'rec-3'],
+        pathSegments: ['organizations', 'AjdvjuECVZEgZoFajaIEkg'
+            , 'record-types', 'rlBnfIvzDVVZeVSjBECxGg'],
         headerFields: [], body: firstBody,
-        requesterIdentityId: 'current',
-        requestAt: AT, organization: '1',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+        requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
         operationId: TEST_OPERATION_ID,
     });
     await postRecordDocumentOp(
-        db, 'rec-3', firstBody, 'current', firstPair,
+        db, 'rlBnfIvzDVVZeVSjBECxGg', firstBody, 'XXZruirZyAOoRpNxaDnpSA'
+            , firstPair,
     );
     const secondBody = {
         ...recordDocument(
             'First', 'archived',
             '2026-01-02T00:00:00.000000Z', 'ev-3b',
         ),
-        organization_id: '1',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
     const secondPair = await formWritePair({
-        method: 'PUT', pathname: '/organizations/1/record-types/rec-3',
+        method: 'PUT'
+            , pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'rlBnfIvzDVVZeVSjBECxGg',
         routePattern: RECORD_TYPE_DETAIL_PATTERN,
         routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
-        pathSegments: ['organizations', '1', 'record-types', 'rec-3'],
+        pathSegments: ['organizations', 'AjdvjuECVZEgZoFajaIEkg'
+            , 'record-types', 'rlBnfIvzDVVZeVSjBECxGg'],
         headerFields: [], body: secondBody,
-        requesterIdentityId: 'current',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-02T00:00:00.000000Z',
-        organization: '1',
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
         operationId: TEST_OPERATION_ID,
     });
     await postRecordDocumentOp(
-        db, 'rec-3', secondBody, 'current', secondPair,
+        db, 'rlBnfIvzDVVZeVSjBECxGg', secondBody, 'XXZruirZyAOoRpNxaDnpSA'
+            , secondPair,
     );
-    const events = await deriveRecordStateHistory(db, '1', 'rec-3');
+    const events = await deriveRecordStateHistory(db
+        , 'AjdvjuECVZEgZoFajaIEkg', 'rlBnfIvzDVVZeVSjBECxGg');
     assert.deepEqual(
         events.map(e => e.state).toSorted(),
         ['active', 'archived'],
     );
-    assert.ok(events.every(e => e.member_id === 'current'));
+    assert.ok(events.every(e => e.member_id === 'XXZruirZyAOoRpNxaDnpSA'));
 });
 
 // -- 3. the fast-path sibling pin (added at the fold commit,
@@ -290,18 +308,21 @@ test('a byte-identical resend replays the stored response:'
     await handleRequest(
         db, req(
             'PUT',
-            '/organizations/1/record-types/rec-resend',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'sBdXBQtlujsRkbzspdvfFg',
             token, body,
         ),
     );
     await handleRequest(
         db, req(
             'PUT',
-            '/organizations/1/record-types/rec-resend',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'sBdXBQtlujsRkbzspdvfFg',
             token, body,
         ),
     );
-    const events = await deriveRecordStateHistory(db, '1', 'rec-resend');
+    const events = await deriveRecordStateHistory(db
+        , 'AjdvjuECVZEgZoFajaIEkg', 'sBdXBQtlujsRkbzspdvfFg');
     assert.equal(events.length, 1);
     assert.equal((await db.pairs.getAll()).length, 3);
     assert.equal((await db.pairs.getAll()).length, 3);
@@ -328,15 +349,17 @@ async function storedPairAt(
 ): Promise<PairEntity> {
     const pair = await formWritePair({
         method,
-        pathname: '/organizations/1/record-types/' + uriId,
+        pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + uriId,
         routePattern: RECORD_TYPE_DETAIL_PATTERN,
         routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
-        pathSegments: ['organizations', '1', 'record-types', uriId],
+        pathSegments: ['organizations', 'AjdvjuECVZEgZoFajaIEkg'
+            , 'record-types', uriId],
         headerFields: [],
         body,
-        requesterIdentityId: 'current',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: at,
-        organization: '1',
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: undefined,
         operationId: TEST_OPERATION_ID,
@@ -360,7 +383,7 @@ async function storedPairAt(
 test('documentLifecycleEvents skips a DELETE-method pair,'
 + ' yielding the two PUT trios across a delete-then-recreate'
 + ' history', async () => {
-    const prefix = '/organizations/1/record-types/';
+    const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/';
     const first = await storedPairAt(
         'PUT', 'rec-x', '2026-01-01T00:00:00.000000Z',
         recordDocument('First', 'active', AT, 'ev-x1'),

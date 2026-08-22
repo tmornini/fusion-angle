@@ -31,6 +31,8 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Phase Final Task 2: graph relation ROW halves stripped.
 // Create still seeds graph on the document pair; oracles
@@ -42,7 +44,7 @@ async function setupMemDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedHumanMember(db, 'current', 'Demo User');
+    await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
     const ctx = createRequestContext(db, await organizationToken());
     return { db, ctx };
 }
@@ -52,7 +54,7 @@ async function getFlowGraph(
     flowId: string,
 ): Promise<StoredGraph> {
     const flow = await ctx.GET<FlowWithGraph>(
-        'organizations/1/flows/' + flowId,
+        'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
     );
     return asStoredGraph(
         flow.graph, 'flow.graph',
@@ -64,11 +66,11 @@ test(
     + ' on the pair plane',
     async () => {
         const { ctx } = await setupMemDb();
-        const flowId = 'flow-rel-1';
+        const flowId = generateIdentifier();
         await postFlowCreation(ctx, {
             flowId,
-            linkId: flowId + '-link',
-            projectId: 'project-1',
+            linkId: generateIdentifier(),
+            projectId: generateIdentifier(),
             name: 'Rel Test Flow',
         });
         const graph = await getFlowGraph(ctx, flowId);
@@ -85,11 +87,11 @@ test(
     + ' equals the default graph',
     async () => {
         const { ctx } = await setupMemDb();
-        const flowId = 'flow-rel-2';
+        const flowId = generateIdentifier();
         await postFlowCreation(ctx, {
             flowId,
-            linkId: flowId + '-link',
-            projectId: 'project-1',
+            linkId: generateIdentifier(),
+            projectId: generateIdentifier(),
             name: 'Rel Test Flow 2',
         });
 
@@ -147,15 +149,16 @@ test(
     + ' still lands',
     async () => {
         const { ctx } = await setupMemDb();
-        const flowId = 'flow-rel-3';
+        const flowId = generateIdentifier();
         await postFlowCreation(ctx, {
             flowId,
-            linkId: flowId + '-link',
-            projectId: 'project-1',
+            linkId: generateIdentifier(),
+            projectId: generateIdentifier(),
             name: 'State Event Test Flow',
         });
         const events = await ctx.GET<StateEntity[]>(
-            'organizations/1/flows/' + flowId + '/versions/',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
+                + '/versions/',
         );
         assert.equal(events.length, 1);
         const ev = events[0]!;
@@ -163,7 +166,7 @@ test(
         assert.equal(ev.state, 'active');
         // author is server-derived, not client body
         assert.equal(
-            ev.member_id, 'current',
+            ev.member_id, 'XXZruirZyAOoRpNxaDnpSA',
             'state event must be authored by the verified actor',
         );
     },
@@ -174,11 +177,11 @@ test(
     + ' edges for the default graph',
     async () => {
         const { ctx } = await setupMemDb();
-        const flowId = 'flow-rel-4';
+        const flowId = generateIdentifier();
         await postFlowCreation(ctx, {
             flowId,
-            linkId: flowId + '-link',
-            projectId: 'project-1',
+            linkId: generateIdentifier(),
+            projectId: generateIdentifier(),
             name: 'Edge Test Flow',
         });
         const graph = await getFlowGraph(ctx, flowId);

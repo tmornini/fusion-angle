@@ -29,7 +29,7 @@ export function buildMembers():
     SeedHumanMember[] {
     return [
         {
-            id: 'LhfaUUf4IumVsCSGB4xjdK',
+            id: 'MQFcPtrZPIGjMCRAXtZUnA',
             name: 'Sarah Chen',
             email: 'sarah.chen@company.com',
             title: 'Project Lead',
@@ -53,7 +53,7 @@ export function buildMembers():
                 + ' around strategic goals.',
         },
         {
-            id: 'bLP3X1hb1mSz8gY9neogU3',
+            id: 'VvzFEpfYONDAsCCwNlIFCQ',
             name: 'Mike Thompson',
             email: 'mike.thompson@company.com',
             title: 'ML Engineer',
@@ -77,7 +77,7 @@ export function buildMembers():
                 + ' model deployment.',
         },
         {
-            id: 'zyTbfbjcGEfbpCsNTP0XjX',
+            id: 'zyGBRshxOnKHUfcyFRqowg',
             name: 'Jessica Park',
             email: 'jessica.park@company.com',
             title: 'Data Scientist',
@@ -101,7 +101,7 @@ export function buildMembers():
                 + ' business insights.',
         },
         {
-            id: '6xBfK5If82JKfThXb1wlzS',
+            id: 'DAjUkaBUIZbXSQeoLDZEXQ',
             name: 'David Martinez',
             email: 'david.martinez@company.com',
             title: 'Backend Developer',
@@ -125,7 +125,7 @@ export function buildMembers():
                 + ' database performance.',
         },
         {
-            id: '53J8h9dr76XFqCjYcNVwIR',
+            id: 'CJrglMsNBxOWWfbihHQSeg',
             name: 'Emily Rodriguez',
             email: 'emily.rodriguez@company.com',
             title: 'UX Designer',
@@ -149,7 +149,7 @@ export function buildMembers():
                 + ' user research.',
         },
         {
-            id: 'I5ntELi16X3N3JYCCnxMjZ',
+            id: 'IzdIgJaTTfIZQUudGcmdtA',
             name: 'Alex Kim',
             email: 'alex.kim@company.com',
             title: 'Product Manager',
@@ -173,7 +173,7 @@ export function buildMembers():
                 + ' roadmaps.',
         },
         {
-            id: 'WxQn4LVWb76YkmqK5B0EPp',
+            id: 'SsVAZghfSzMZRZmxNKIizw',
             name: 'Marcus Johnson',
             email: 'marcus@acmecorp.com',
             title: 'manager',
@@ -196,7 +196,7 @@ export function buildMembers():
                 + ' and coaching teams.',
         },
         {
-            id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            id: 'jrMOZzVdWXvLgMpcHoyBTw',
             name: 'David Kim',
             email: 'david.kim@company.com',
             title: 'member',
@@ -220,7 +220,7 @@ export function buildMembers():
                 + ' accessible UI patterns.',
         },
         {
-            id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            id: 'RPzLGrWcstxLaHoBcViPLQ',
             name: 'Lisa Wang',
             email: 'lisa@acmecorp.com',
             title: 'viewer',
@@ -243,7 +243,7 @@ export function buildMembers():
                 + ' consultative selling.',
         },
         {
-            id: 'oU0bIe0eUC33mTbZrxdogC',
+            id: 'ovKCDVqguNMVIiAyjSYeIg',
             name: 'James Miller',
             email: 'james@acmecorp.com',
             title: 'member',
@@ -266,7 +266,7 @@ export function buildMembers():
                 + ' architecture.',
         },
         {
-            id: 'current',
+            id: 'XXZruirZyAOoRpNxaDnpSA',
             name: 'Tony Stark',
             email: 'demo@example.com',
             title: 'Admin',

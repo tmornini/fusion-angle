@@ -21,6 +21,8 @@ import {
     deriveClientRegistration,
     registrationEntityOf,
 } from '../api/derive-identity-spine.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const REGISTRATION = {
     grant_types: 'client_credentials',
@@ -47,8 +49,12 @@ test('unauthenticated registration access is 401,'
 async () => {
     const db = await freshDb();
     await assert.rejects(
-        () => GET(db, 'identities/ghost/registration',
-            'not-a-token'),
+        () => GET(
+            db,
+            'identities/' + generateIdentifier()
+                + '/registration',
+            'not-a-token',
+        ),
         UnauthorizedError,
     );
 });
@@ -56,11 +62,12 @@ async () => {
 test('a member-tier caller is 403 (admin realm)',
 async () => {
     const db = await freshDb();
-    await seedServiceIdentity(db, 'svc-1');
-    await seedOrganizationMember(db, 'peon');
-    const memberToken = await devToken('peon');
+    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
+    const peonId = generateIdentifier();
+    await seedOrganizationMember(db, peonId);
+    const memberToken = await devToken(peonId);
     await assert.rejects(
-        () => PUT(db, 'identities/svc-1/registration',
+        () => PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
             { ...REGISTRATION }, memberToken),
         rejectsWithStatus(403),
     );
@@ -69,20 +76,24 @@ async () => {
 test('an absent identity is 404', async () => {
     const db = await freshDb();
     await assert.rejects(
-        () => PUT(db, 'identities/ghost/registration',
-            { ...REGISTRATION }, DEV_TOKEN),
+        () => PUT(
+            db,
+            'identities/' + generateIdentifier()
+                + '/registration',
+            { ...REGISTRATION }, DEV_TOKEN,
+        ),
         rejectsWithStatus(404),
     );
 });
 
 test("a kind-'person' identity is 400", async () => {
     const db = await freshDb();
-    await seedPersonIdentity(db, 'p-1', {
+    await seedPersonIdentity(db, 'pjQzgITAPDQVyvCVpzpIfQ', {
         name: 'Ada', email: 'ada@example.com',
         phone: '', bio: '',
     });
     await assert.rejects(
-        () => PUT(db, 'identities/p-1/registration',
+        () => PUT(db, 'identities/pjQzgITAPDQVyvCVpzpIfQ/registration',
             { ...REGISTRATION }, DEV_TOKEN),
         rejectsWithStatus(400),
     );
@@ -91,9 +102,9 @@ test("a kind-'person' identity is 400", async () => {
 test('a rogue body key is 400 (validator at the gate)',
 async () => {
     const db = await freshDb();
-    await seedServiceIdentity(db, 'svc-1');
+    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
     await assert.rejects(
-        () => PUT(db, 'identities/svc-1/registration',
+        () => PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
             { ...REGISTRATION, rogue: 'x' }, DEV_TOKEN),
         rejectsWithStatus(400),
     );
@@ -102,23 +113,23 @@ async () => {
 test('PUT registers; GET reads it back; a second PUT'
 + ' overwrites (rotate-JWKS)', async () => {
     const db = await freshDb();
-    await seedServiceIdentity(db, 'svc-1');
+    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
     const put = await PUT<Record<string, unknown>>(
-        db, 'identities/svc-1/registration',
+        db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
         { ...REGISTRATION }, DEV_TOKEN,
     );
-    assert.deepEqual(put, { id: 'svc-1', ...REGISTRATION });
+    assert.deepEqual(put, { id: 'uWzjNIEeEtVWqZoJMLeYpw', ...REGISTRATION });
     const got = await GET<Record<string, unknown>>(
-        db, 'identities/svc-1/registration', DEV_TOKEN,
+        db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration', DEV_TOKEN,
     );
-    assert.deepEqual(got, { id: 'svc-1', ...REGISTRATION });
+    assert.deepEqual(got, { id: 'uWzjNIEeEtVWqZoJMLeYpw', ...REGISTRATION });
     const rotated = {
         ...REGISTRATION, jwks: '{"keys":[{"kty":"EC"}]}',
     };
-    await PUT(db, 'identities/svc-1/registration',
+    await PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
         { ...rotated }, DEV_TOKEN);
     const reread = await GET<{ jwks: string }>(
-        db, 'identities/svc-1/registration', DEV_TOKEN,
+        db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration', DEV_TOKEN,
     );
     assert.equal(reread.jwks, rotated.jwks);
 });
@@ -126,9 +137,9 @@ test('PUT registers; GET reads it back; a second PUT'
 test('GET with no registration yet is 404 (identity'
 + ' exists)', async () => {
     const db = await freshDb();
-    await seedServiceIdentity(db, 'svc-1');
+    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
     await assert.rejects(
-        () => GET(db, 'identities/svc-1/registration',
+        () => GET(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
             DEV_TOKEN),
         rejectsWithStatus(404),
     );
@@ -137,15 +148,15 @@ test('GET with no registration yet is 404 (identity'
 test('DELETE deregisters: a marked tombstone, then 404',
 async () => {
     const db = await freshDb();
-    await seedServiceIdentity(db, 'svc-1');
-    await PUT(db, 'identities/svc-1/registration',
+    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
+    await PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
         { ...REGISTRATION }, DEV_TOKEN);
-    const prefix = '/identities/svc-1/registration/';
+    const prefix = '/identities/uWzjNIEeEtVWqZoJMLeYpw/registration/';
     const afterPut = (await db.pairs.getAll()).filter(
         (row) => row.uri_collection === prefix,
     );
     assert.equal(afterPut.length, 1);
-    await DELETE(db, 'identities/svc-1/registration',
+    await DELETE(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
         DEV_TOKEN);
     const afterDel = (await db.pairs.getAll()).filter(
         (row) => row.uri_collection === prefix,
@@ -163,7 +174,7 @@ async () => {
         1,
     );
     await assert.rejects(
-        () => GET(db, 'identities/svc-1/registration',
+        () => GET(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
             DEV_TOKEN),
         rejectsWithStatus(404),
     );
@@ -173,8 +184,8 @@ async () => {
 test('stored PUT body equals registrationEntityOf',
 async () => {
     const db = await freshDb();
-    await seedServiceIdentity(db, 'svc-1');
-    const id = 'svc-1';
+    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
+    const id = 'uWzjNIEeEtVWqZoJMLeYpw';
     const put = await handleRequest(db, apiRequest({
         method: 'PUT',
         path: '/identities/' + id + '/registration',

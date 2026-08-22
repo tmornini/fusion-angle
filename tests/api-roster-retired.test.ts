@@ -26,7 +26,7 @@ const RETIRED_PATHS: readonly string[] = [
     '/ai-members/x1',
     '/memberships',
     '/memberships/x1',
-    '/current-member',
+    '/XeNICvLNKhXddnTKnszfpQ',
 ];
 
 function req(
@@ -82,7 +82,7 @@ test('seat collection stays live', async () => {
         db,
         req(
             'GET',
-            '/organizations/1/members/',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/members/',
             token,
         ),
     );

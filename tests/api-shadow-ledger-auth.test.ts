@@ -71,12 +71,13 @@ function jsonPost(
 async function seedPasswordUser(
     db: GuardedDbAdapter,
 ): Promise<void> {
-    await seedIdentityPii(db, 'current', {
+    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Demo', email: 'demo@example.com',
         phone: '555-0100', bio: 'demo user',
     });
-    await seedIdentityCredential(db, 'current', 'c1', {
-        identity_id: 'current', kind: 'password',
+    await seedIdentityCredential(db, 'XXZruirZyAOoRpNxaDnpSA'
+        , 'WeXjAaAxGSpLpamfEuvcww', {
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA', kind: 'password',
         status: 'set',
         secret: await testHashPassword(PASSWORD),
         at: '2026-06-03T00:00:00.000000Z',
@@ -237,7 +238,7 @@ test('a full login flow keeps requests/responses balanced,'
     }
     const tokenEventRequest = requests.slice(4).find(
         row => row.uri_collection
-            === '/identities/current/tokens/',
+            === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/',
     );
     assert.ok(tokenEventRequest);
     assert.notEqual(tokenEventRequest!.uri_id, '');
@@ -257,7 +258,7 @@ test('a full login flow keeps requests/responses balanced,'
     }
     const tokenEventResponse = responses.slice(4).find(
         row => row.uri_collection
-            === '/identities/current/tokens/',
+            === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/',
     );
     assert.ok(tokenEventResponse);
     assert.notEqual(tokenEventResponse!.uri_id, '');
@@ -317,7 +318,7 @@ async () => {
         'authentication/token', {
             grant_type: 'authorization_code', code,
             client_id: 'web',
-        }, { [REQUEST_ID_HEADER]: 'replay-attempt' }));
+        }, { [REQUEST_ID_HEADER]: 'replay-attemptAAAAAAAAAw' }));
     assert.equal(replay.status, 401);
     assert.equal((await db.pairs.getAll()).length, before);
     assert.equal(
@@ -405,7 +406,7 @@ test('a token-exchange grant stores its own pair with live'
 + ' secrets', async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
-    const subjectToken = await devToken('current');
+    const subjectToken = await devToken('XXZruirZyAOoRpNxaDnpSA');
     const res = await handleRequest(db, jsonPost(
         'authentication/token', {
             grant_type: 'token-exchange',
@@ -473,19 +474,19 @@ test('a client_credentials grant stores its own pair with live'
 + ' secrets', async () => {
     const db = await dbWithPasswordUser();
     await seedMembershipPair(db, 'm-svc', {
-        organization_id: '1',
-        identity_id: 'svc-client',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'uYaHKbNeVUcsFjuooOjMew',
         type: 'member',
         at: '2020-01-01T00:00:00.000000Z',
     });
     const signer = await makeAssertionSigner('ES256');
     const now = Math.floor(Date.now() / 1000);
     const assertion = await signer.sign({
-        iss: 'svc-client', sub: 'svc-client',
+        iss: 'uYaHKbNeVUcsFjuooOjMew', sub: 'uYaHKbNeVUcsFjuooOjMew',
         aud: 'fusion-angle',
         exp: now + 300, iat: now, jti: 'assert-shadow-1',
     });
-    await seedClientRegistration(db, 'svc-client', {
+    await seedClientRegistration(db, 'uYaHKbNeVUcsFjuooOjMew', {
         grant_types: 'client_credentials',
         redirect_uris: '', jwks: signer.jwks,
         aud: 'fusion-angle', status: 'active',
@@ -493,7 +494,7 @@ test('a client_credentials grant stores its own pair with live'
     const res = await handleRequest(db, jsonPost(
         'authentication/token', {
             grant_type: 'client_credentials',
-            client_id: 'svc-client',
+            client_id: 'uYaHKbNeVUcsFjuooOjMew',
             client_assertion: assertion,
         }));
     assert.equal(res.status, 201);
@@ -548,8 +549,8 @@ test('a successful authentication/token POST posts a scoped'
     // code); the token grant posts the one scoped notification.
     assert.deepEqual(posted, [{
         kind: 'scoped',
-        identityIds: ['current'],
-        organizationIds: ['1'],
+        identityIds: ['XXZruirZyAOoRpNxaDnpSA'],
+        organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
     }]);
 });
 
@@ -617,7 +618,7 @@ test('a reused (already-rotated-away) refresh token grant is a'
         'authentication/token', {
             grant_type: 'refresh',
             refresh_token: first.refresh_token,
-        }, { [REQUEST_ID_HEADER]: 'replay-attempt' }));
+        }, { [REQUEST_ID_HEADER]: 'replay-attemptAAAAAAAAAw' }));
     assert.equal(reused.status, 401);
     const requests = await db.pairs.getAll();
     const responses = await db.pairs.getAll();

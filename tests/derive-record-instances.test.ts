@@ -24,8 +24,8 @@ import { TEST_OPERATION_ID } from './http-fixtures.ts';
 // No fold. revisionValuesOf normalizes genesis {set} and
 // revision {values}. mergeInstanceValues is pure write-side.
 
-const ORGANIZATION = '1';
-const TYPE_ID = 'rt-inst-1';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
+const TYPE_ID = 'sleWPUnGznNnXLzcfFswjg';
 const INST_A = 'inst-a';
 const INST_B = 'inst-b';
 const INST_C = 'inst-c';
@@ -74,7 +74,7 @@ async function appendInstancePair(
         ],
         headerFields: [],
         body: body ?? {},
-        requesterIdentityId: 'current',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt,
         organization: ORGANIZATION,
         responseStatus: method === 'DELETE' ? 204 : 200,
@@ -101,13 +101,13 @@ test(
     () => {
         const values = revisionValuesOf({
             set: [
-                val('a', '1'),
-                val('b', '2'),
+                val('a', 'AjdvjuECVZEgZoFajaIEkg'),
+                val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
             ],
         });
         assert.deepEqual(values, [
-            val('a', '1'),
-            val('b', '2'),
+            val('a', 'AjdvjuECVZEgZoFajaIEkg'),
+            val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
     },
 );
@@ -116,9 +116,9 @@ test(
     'revisionValuesOf reads revision values dialect',
     () => {
         const values = revisionValuesOf({
-            values: [val('a', '1')],
+            values: [val('a', 'AjdvjuECVZEgZoFajaIEkg')],
         });
-        assert.deepEqual(values, [val('a', '1')]);
+        assert.deepEqual(values, [val('a', 'AjdvjuECVZEgZoFajaIEkg')]);
     },
 );
 
@@ -126,10 +126,10 @@ test(
     'revisionValuesOf prefers values over set',
     () => {
         const values = revisionValuesOf({
-            values: [val('a', '1')],
-            set: [val('b', '2')],
+            values: [val('a', 'AjdvjuECVZEgZoFajaIEkg')],
+            set: [val('b', 'BBjWJsjYIDkTRKIIPrzWRw')],
         });
-        assert.deepEqual(values, [val('a', '1')]);
+        assert.deepEqual(values, [val('a', 'AjdvjuECVZEgZoFajaIEkg')]);
     },
 );
 
@@ -139,12 +139,13 @@ test(
     'mergeInstanceValues applies set overwrites',
     () => {
         const merged = mergeInstanceValues(
-            [val('a', '1'), val('b', '2')],
+            [val('a', 'AjdvjuECVZEgZoFajaIEkg'), val('b'
+                , 'BBjWJsjYIDkTRKIIPrzWRw')],
             { set: [val('a', '3')] },
         );
         assert.deepEqual(merged, [
             val('a', '3'),
-            val('b', '2'),
+            val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
     },
 );
@@ -154,7 +155,7 @@ test(
     + ' (ABSENT, not null/empty)',
     () => {
         const merged = mergeInstanceValues(
-            [val('a', '3'), val('b', '2')],
+            [val('a', '3'), val('b', 'BBjWJsjYIDkTRKIIPrzWRw')],
             { clear: ['b'] },
         );
         assert.deepEqual(merged, [val('a', '3')]);
@@ -169,7 +170,7 @@ test(
     'mergeInstanceValues clear of already-absent'
     + ' is a no-op',
     () => {
-        const head = [val('a', '1')];
+        const head = [val('a', 'AjdvjuECVZEgZoFajaIEkg')];
         const merged = mergeInstanceValues(
             head,
             { clear: ['z'] },
@@ -182,7 +183,8 @@ test(
     'mergeInstanceValues emits attribute_id-lex order',
     () => {
         const merged = mergeInstanceValues(
-            [val('z', '1'), val('m', '2')],
+            [val('z', 'AjdvjuECVZEgZoFajaIEkg'), val('m'
+                , 'BBjWJsjYIDkTRKIIPrzWRw')],
             { set: [val('a', '3')] },
         );
         assert.deepEqual(
@@ -196,7 +198,8 @@ test(
     'mergeInstanceValues applies set then clear',
     () => {
         const merged = mergeInstanceValues(
-            [val('a', '1'), val('b', '2')],
+            [val('a', 'AjdvjuECVZEgZoFajaIEkg'), val('b'
+                , 'BBjWJsjYIDkTRKIIPrzWRw')],
             {
                 set: [val('a', '3'), val('c', '9')],
                 clear: ['b', 'c'],
@@ -213,7 +216,8 @@ test(
     () => {
         assert.equal(
             instancesUriPrefix(ORGANIZATION, TYPE_ID),
-            '/organizations/1/record-types/rt-inst-1'
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'sleWPUnGznNnXLzcfFswjg'
             + '/instances/',
         );
     },
@@ -230,8 +234,8 @@ test(
             db, INST_A, 'PUT',
             {
                 set: [
-                    val('a', '1'),
-                    val('b', '2'),
+                    val('a', 'AjdvjuECVZEgZoFajaIEkg'),
+                    val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
                 ],
             },
             '2026-01-01T00:00:00.000000Z',
@@ -243,8 +247,8 @@ test(
             id: INST_A,
             pairId,
             values: [
-                val('a', '1'),
-                val('b', '2'),
+                val('a', 'AjdvjuECVZEgZoFajaIEkg'),
+                val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
             ],
         });
     },
@@ -259,8 +263,8 @@ test(
             db, INST_A, 'PUT',
             {
                 set: [
-                    val('a', '1'),
-                    val('b', '2'),
+                    val('a', 'AjdvjuECVZEgZoFajaIEkg'),
+                    val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
                 ],
             },
             '2026-01-01T00:00:00.000000Z',
@@ -273,7 +277,7 @@ test(
             {
                 values: [
                     val('a', '3'),
-                    val('b', '2'),
+                    val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
                 ],
             },
             '2026-01-01T00:00:01.000000Z',
@@ -287,7 +291,7 @@ test(
             pairId: revisionId,
             values: [
                 val('a', '3'),
-                val('b', '2'),
+                val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
             ],
         });
     },
@@ -300,7 +304,7 @@ test(
         const db = await emptyDb();
         const genesisId = await appendInstancePair(
             db, INST_A, 'PUT',
-            { set: [val('a', '1')] },
+            { set: [val('a', 'AjdvjuECVZEgZoFajaIEkg')] },
             '2026-01-01T00:00:00.000000Z',
         );
         await appendInstancePair(
@@ -376,18 +380,18 @@ test(
             db, INST_A, 'PUT',
             {
                 set: [
-                    val('a', '1'),
-                    val('b', '2'),
+                    val('a', 'AjdvjuECVZEgZoFajaIEkg'),
+                    val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
                 ],
             },
             '2026-01-01T00:00:00.000000Z',
         );
-        const r1 = await appendInstancePair(
+        const rOEPOcVMQdJiiiMuiiEhlg = await appendInstancePair(
             db, INST_A, 'PUT',
             {
                 values: [
                     val('a', '3'),
-                    val('b', '2'),
+                    val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
                 ],
             },
             '2026-01-01T00:00:01.000000Z',
@@ -399,7 +403,7 @@ test(
                 values: [val('a', '3')],
             },
             '2026-01-01T00:00:02.000000Z',
-            r1,
+            rOEPOcVMQdJiiiMuiiEhlg,
         );
         const revisions = await deriveInstanceRevisions(
             db, ORGANIZATION, TYPE_ID, INST_A,
@@ -407,13 +411,13 @@ test(
         assert.equal(revisions.length, 3);
         assert.equal(revisions[0]!.pairId, g0);
         assert.deepEqual(revisions[0]!.values, [
-            val('a', '1'),
-            val('b', '2'),
+            val('a', 'AjdvjuECVZEgZoFajaIEkg'),
+            val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
-        assert.equal(revisions[1]!.pairId, r1);
+        assert.equal(revisions[1]!.pairId, rOEPOcVMQdJiiiMuiiEhlg);
         assert.deepEqual(revisions[1]!.values, [
             val('a', '3'),
-            val('b', '2'),
+            val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
         assert.equal(revisions[2]!.pairId, r2);
         assert.deepEqual(revisions[2]!.values, [
@@ -446,7 +450,7 @@ test(
         const db = await emptyDb();
         const g0 = await appendInstancePair(
             db, INST_A, 'PUT',
-            { set: [val('a', '1')] },
+            { set: [val('a', 'AjdvjuECVZEgZoFajaIEkg')] },
             '2026-01-01T00:00:00.000000Z',
         );
         await appendInstancePair(

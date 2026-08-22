@@ -23,33 +23,35 @@ async function setup() {
 
 test('getIdentity reads kind', async () => {
     const { db, ctx } = await setup();
-    await seedPersonIdentity(db, 'p1', {
-        name: 'P', email: 'p@x.io', phone: '1', bio: 'b',
+    await seedPersonIdentity(db, 'pnXmXrxOWayANgDLdCjuBw', {
+        name: 'P', email: 'p@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
     });
-    const id = await getIdentity(ctx, 'p1');
+    const id = await getIdentity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     assert.equal(id.isPerson(), true);
 });
 
 test('getMemberPii is present, then erased after delete',
 async () => {
     const { db, ctx } = await setup();
-    await seedPersonIdentity(db, 'p1', {
-        name: 'P', email: 'p@x.io', phone: '1', bio: 'b',
+    await seedPersonIdentity(db, 'pnXmXrxOWayANgDLdCjuBw', {
+        name: 'P', email: 'p@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
     });
-    const before = await getMemberPii(ctx, 'p1');
+    const before = await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     assert.equal(before.erased, false);
-    await deleteIdentityPii(ctx, 'p1');
-    const after = await getMemberPii(ctx, 'p1');
+    await deleteIdentityPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+    const after = await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     assert.equal(after.erased, true);
 });
 
 test('erasing PII keeps identity and person kind',
 async () => {
     const { db, ctx } = await setup();
-    await seedPersonIdentity(db, 'p1', {
-        name: 'P', email: 'p@x.io', phone: '1', bio: 'b',
+    await seedPersonIdentity(db, 'pnXmXrxOWayANgDLdCjuBw', {
+        name: 'P', email: 'p@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
     });
-    await deleteIdentityPii(ctx, 'p1');
-    assert.equal((await getMemberPii(ctx, 'p1')).erased, true);
-    assert.equal((await getIdentity(ctx, 'p1')).isPerson(), true);
+    await deleteIdentityPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+    assert.equal((await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw')).erased
+        , true);
+    assert.equal((await getIdentity(ctx
+        , 'pnXmXrxOWayANgDLdCjuBw')).isPerson(), true);
 });

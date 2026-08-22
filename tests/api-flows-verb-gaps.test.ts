@@ -51,7 +51,9 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/organizations/1/flows/f1', token),
+        db, req('DELETE'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ', token),
     );
     assert.equal(res.status, 405);
 });
@@ -62,7 +64,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PATCH', '/organizations/1/flows/f1', token, {},
+        'PATCH', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ', token, {},
     ));
     assert.equal(res.status, 405);
 });
@@ -75,7 +78,9 @@ test('GET organizations/:id/projects/:id/flows/:pfid 405s (no get handler'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('GET', '/organizations/1/projects/p1/flows/pf1', token),
+        db, req('GET'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + 'pnXmXrxOWayANgDLdCjuBw/flows/qXdXbgQMkiANkXUSvLPFiQ', token),
     );
     assert.equal(res.status, 405);
 });
@@ -85,7 +90,9 @@ test('DELETE organizations/:id/flows/:id/work-orders/:woid 405s (no delete'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'DELETE', '/organizations/1/flows/f1/work-orders/wo1', token,
+        'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ/work-orders/yNSSnbrpacodQTzUEcdEVA'
+            , token,
     ));
     assert.equal(res.status, 405);
 });
@@ -95,7 +102,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/f1/undo', token, {},
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ/undo', token, {},
     ));
     assert.equal(res.status, 405);
 });
@@ -111,11 +119,12 @@ test('POST organizations/:id/flows/:id/redo 404s (route retired; redo now'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/f1/redo', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ZOousbbnzpqlxJExVAruYQ/redo', token, {
             version: {
                 id: 'ver-redo',
                 version: {
-                    flow_id: 'f1',
+                    flow_id: 'ZOousbbnzpqlxJExVAruYQ',
                     name: 'redo-snap',
                     is_locked: false,
                     is_auto_layout: false,

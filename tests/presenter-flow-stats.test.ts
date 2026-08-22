@@ -39,7 +39,7 @@ function model(): FlowStatsModel {
                    positionX:400, positionY:0 }),
         ],
         edges: [
-            { id:'e1', name:'',
+            { id:'YiJPbufDpkyrZcZCYbUJpg', name:'',
               fromNodeId:'c', toNodeId:'a' },
             { id:'e2', name:'',
               fromNodeId:'a', toNodeId:'z' },
@@ -125,7 +125,7 @@ test('warning hazard glyph appears when memberHazard is warning',
 
 test('edges carry data-edge-id and no interactive attributes', () => {
     const html = buildStatsGraphSvg(model(), VB, null).toString();
-    assert.match(html, /<g[^>]*data-edge-id="e1"/);
+    assert.match(html, /<g[^>]*data-edge-id="YiJPbufDpkyrZcZCYbUJpg"/);
     assert.match(html, /<g[^>]*data-edge-id="e2"/);
 });
 
@@ -133,14 +133,15 @@ test('highlight set marks on-path and dims off-path nodes/edges',
     () => {
     const highlight = {
         nodeIds: new Set(['c', 'a']),
-        edgeIds: new Set(['e1']),
+        edgeIds: new Set(['YiJPbufDpkyrZcZCYbUJpg']),
     };
     const html =
         buildStatsGraphSvg(model(), VB, highlight).toString();
     assert.match(html, /data-node-id="c"[^>]*data-on-path="true"/);
     assert.match(html, /data-node-id="a"[^>]*data-on-path="true"/);
     assert.match(html, /data-node-id="z"[^>]*data-dim="true"/);
-    assert.match(html, /data-edge-id="e1"[^>]*data-on-path="true"/);
+    assert.match(html
+        , /data-edge-id="YiJPbufDpkyrZcZCYbUJpg"[^>]*data-on-path="true"/);
     assert.match(html, /data-edge-id="e2"[^>]*data-dim="true"/);
 });
 
@@ -165,7 +166,7 @@ test('a back-edge gets data-cycle; forward edges do not', () => {
     assert.match(html,
         /data-edge-id="e3"[^>]*data-cycle="true"/);
     assert.doesNotMatch(html,
-        /data-edge-id="e1"[^>]*data-cycle="true"/);
+        /data-edge-id="YiJPbufDpkyrZcZCYbUJpg"[^>]*data-cycle="true"/);
     assert.doesNotMatch(html,
         /data-edge-id="e2"[^>]*data-cycle="true"/);
 });
@@ -182,7 +183,7 @@ function modelWithPaths(): FlowStatsModel {
                 kind: 'path',
                 path: {
                     nodeIds: ['c', 'a', 'z'],
-                    edgeIds: ['e1', 'e2'],
+                    edgeIds: ['YiJPbufDpkyrZcZCYbUJpg', 'e2'],
                     workOrderCount: 9,
                     sharePct: 75,
                 },
@@ -191,7 +192,7 @@ function modelWithPaths(): FlowStatsModel {
                 kind: 'path',
                 path: {
                     nodeIds: ['c', 'a'],
-                    edgeIds: ['e1'],
+                    edgeIds: ['YiJPbufDpkyrZcZCYbUJpg'],
                     workOrderCount: 2,
                     sharePct: 17,
                 },

@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -28,16 +30,16 @@ import {
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
-const ORGANIZATION = '1';
-const FLOW_ID = 'flow-del-restrict-1';
-const WO_A = 'wo-del-a';
-const WO_B = 'wo-del-b';
-const WO_UNBOUND = 'wo-del-unbound';
-const TYPE_ID = 'rt-del-restrict-1';
-const ATTR_ID = 'attr-del-restrict-1';
-const INSTANCE_ID = 'inst-del-restrict-1';
-const INSTANCE_FRESH = 'inst-del-fresh-1';
-const FR_ID = 'fr-del-restrict-1';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
+const FLOW_ID = generateIdentifier();
+const WO_A = generateIdentifier();
+const WO_B = generateIdentifier();
+const WO_UNBOUND = generateIdentifier();
+const TYPE_ID = generateIdentifier();
+const ATTR_ID = generateIdentifier();
+const INSTANCE_ID = generateIdentifier();
+const INSTANCE_FRESH = generateIdentifier();
+const FR_ID = generateIdentifier();
 
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
@@ -46,9 +48,18 @@ const ATTRS = TYPE_DETAIL + '/attributes/';
 const INSTANCES = TYPE_DETAIL + '/instances/';
 const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
 
-const N_CREATE = 'n-create';
-const N_MID = 'n-mid';
-const N_TERM = 'n-term';
+const N_CREATE = generateIdentifier();
+const N_MID = generateIdentifier();
+const N_TERM = generateIdentifier();
+const E_CREATE_MID = generateIdentifier();
+const E_MID_TERM = generateIdentifier();
+const PROJECT_ID = generateIdentifier();
+const FWO_A = generateIdentifier();
+const FWO_B = generateIdentifier();
+const FWO_UNBOUND = generateIdentifier();
+const TE_A_MID = generateIdentifier();
+const TE_B_TERM = generateIdentifier();
+const TE_A_TERM = generateIdentifier();
 
 function req(
     method: string,
@@ -96,11 +107,11 @@ function flowGraph(): Record<string, unknown> {
         ],
         edges: [
             {
-                id: 'e-create-mid', name: '',
+                id: E_CREATE_MID, name: '',
                 fromNodeId: N_CREATE, toNodeId: N_MID,
             },
             {
-                id: 'e-mid-term', name: '',
+                id: E_MID_TERM, name: '',
                 fromNodeId: N_MID, toNodeId: N_TERM,
             },
         ],
@@ -112,7 +123,7 @@ async function seedFlow(
     token: string,
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token, {
             id: FLOW_ID,
             flow: {
                 name: 'Delete Restrict Flow',
@@ -121,14 +132,14 @@ async function seedFlow(
                 is_auto_fit: false,
                 lock_timeout: DEFAULT_LOCK_TIMEOUT,
             },
-            projectFlowId: FLOW_ID + '-pf',
+            projectFlowId: generateIdentifier(),
             projectFlow: {
-                project_id: 'proj-del-restrict-1',
+                project_id: PROJECT_ID,
                 flow_id: FLOW_ID,
                 at: AT,
             },
             initialState: 'active',
-            initialStateEventId: FLOW_ID + '-ev',
+            initialStateEventId: generateIdentifier(),
             initialStateAt: AT,
             graphDelta: {
                 nodes: [],
@@ -149,7 +160,8 @@ async function seedWorkOrder(
     fwoId: string,
 ): Promise<void> {
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + woId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
+            , token, {
             display_id: 'abcd',
             flow_graph: flowGraph(),
             position: 1,
@@ -158,7 +170,8 @@ async function seedWorkOrder(
     assert.equal(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
-        '/organizations/1/flows/' + FLOW_ID + '/work-orders/' + fwoId,
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
+            + '/work-orders/' + fwoId,
         token,
         {
             flow_id: FLOW_ID,
@@ -227,7 +240,8 @@ async function seedFlowTypeJoin(
 ): Promise<void> {
     const put = await handleRequest(db, req(
         'PUT',
-        '/organizations/1/flows/' + FLOW_ID + '/records/' + FR_ID,
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID + '/records/'
+            + '' + FR_ID,
         token,
         {
             id: FR_ID,
@@ -247,7 +261,8 @@ async function bindInstance(
 ): Promise<void> {
     const res = await handleRequest(db, req(
         'PUT',
-        '/organizations/1/work-orders/' + woId + '/binding',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
+            + '/binding',
         token,
         {
             instance_id: instanceId,
@@ -266,7 +281,8 @@ async function transitionTo(
 ): Promise<void> {
     const res = await handleRequest(db, req(
         'POST',
-        '/organizations/1/work-orders/' + woId + '/transition',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
+            + '/transition',
         token,
         {
             transitionEventId: eventId,
@@ -288,13 +304,13 @@ async function seededInFlightDb(): Promise<{
     await seedAdminSchema(db);
     await seedCurrentMember(db);
     const token = await organizationToken(
-        'current', ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
     );
     await seedFlow(db, token);
-    await seedWorkOrder(db, token, WO_A, 'fwo-del-a');
-    await seedWorkOrder(db, token, WO_B, 'fwo-del-b');
+    await seedWorkOrder(db, token, WO_A, FWO_A);
+    await seedWorkOrder(db, token, WO_B, FWO_B);
     await seedWorkOrder(
-        db, token, WO_UNBOUND, 'fwo-del-unbound',
+        db, token, WO_UNBOUND, FWO_UNBOUND,
     );
     await seedLiveType(db, token);
     await seedAttribute(db, token);
@@ -303,10 +319,10 @@ async function seededInFlightDb(): Promise<{
     await bindInstance(db, token, WO_A);
     await bindInstance(db, token, WO_B);
     await transitionTo(
-        db, token, WO_A, N_MID, 'te-a-mid',
+        db, token, WO_A, N_MID, TE_A_MID,
     );
     await transitionTo(
-        db, token, WO_B, N_TERM, 'te-b-term',
+        db, token, WO_B, N_TERM, TE_B_TERM,
     );
     return { db, token };
 }
@@ -334,7 +350,7 @@ test('transition WO-A to terminal → DELETE → 204'
 async () => {
     const { db, token } = await seededInFlightDb();
     await transitionTo(
-        db, token, WO_A, N_TERM, 'te-a-term',
+        db, token, WO_A, N_TERM, TE_A_TERM,
     );
     const res = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, token,
@@ -360,7 +376,7 @@ test('tombstone-wins replay after terminal DELETE → 204',
 async () => {
     const { db, token } = await seededInFlightDb();
     await transitionTo(
-        db, token, WO_A, N_TERM, 'te-a-term',
+        db, token, WO_A, N_TERM, TE_A_TERM,
     );
     const first = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, token,
@@ -378,7 +394,7 @@ test('bind-after-tombstone naming tombstoned instance'
 async () => {
     const { db, token } = await seededInFlightDb();
     await transitionTo(
-        db, token, WO_A, N_TERM, 'te-a-term',
+        db, token, WO_A, N_TERM, TE_A_TERM,
     );
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, token,
@@ -386,7 +402,8 @@ async () => {
     assert.equal(del.status, 204);
     const bind = await handleRequest(db, req(
         'PUT',
-        '/organizations/1/work-orders/' + WO_UNBOUND + '/binding',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_UNBOUND
+            + '/binding',
         token,
         {
             instance_id: INSTANCE_ID,

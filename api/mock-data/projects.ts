@@ -6,7 +6,7 @@ import { dateOnly } from './seed-kit.ts';
 // events, so it is exported. Fixed data; the composition root
 // assigns organization_id at write time.
 export const l2cProjectId =
-    'L2cP01SalesPip3l1n3L01';
+    'MBITVgcXjXZiQkMeFSivxg';
 
 export function buildProjects():
     Omit<
@@ -18,7 +18,7 @@ export function buildProjects():
     >[] {
     return [
         {
-            id: 'u6YkHhlGc91oDMkr3x0isa',
+            id: 'wqGTTFdYUGnmBxWCppmkOQ',
             title: 'AI-Powered Customer'
                 + ' Segmentation',
             description:
@@ -35,7 +35,7 @@ export function buildProjects():
             position: 1,
         },
         {
-            id: 'jRE2Tj32NHsFGZIeEADp0p',
+            id: 'kAxUZTXdcMCAttuoyCdSYA',
             title: 'Automated Report'
                 + ' Generation',
             description:
@@ -69,7 +69,7 @@ export function buildProjects():
             position: 3,
         },
         {
-            id: 'P04PredMa1ntzyXY010203',
+            id: 'ORXAfsQvNowpmJfBwQAtWg',
             title: 'Predictive Maintenance'
                 + ' System',
             description:
@@ -85,7 +85,7 @@ export function buildProjects():
             position: 4,
         },
         {
-            id: 'P05RtAna1ytcsXY010203Z',
+            id: 'OTmPQEfeyDzqGNOmlFSUMw',
             title: 'Real-time Analytics'
                 + ' Dashboard',
             description:
@@ -101,7 +101,7 @@ export function buildProjects():
             position: 5,
         },
         {
-            id: 'P06SmInvOptZyXY010203A',
+            id: 'OXxlaOFaAWfVofOqOHeTrQ',
             title: 'Smart Inventory'
                 + ' Optimization',
             description:
@@ -117,7 +117,7 @@ export function buildProjects():
             position: 6,
         },
         {
-            id: 'P07Empl0yTrainZyXY00B0',
+            id: 'ObmAspkIgRMWsTRDWpkSUw',
             title: 'Employee Training'
                 + ' Assistant',
             description:
@@ -135,7 +135,7 @@ export function buildProjects():
             position: 7,
         },
         {
-            id: 'P08CustSuppKn0wXY01C0D',
+            id: 'OfgrTrJuepfpmOSjtBhrYA',
             title: 'Customer Support'
                 + ' Knowledge Base',
             description:
@@ -152,7 +152,7 @@ export function buildProjects():
             position: 8,
         },
         {
-            id: 'P09C0mp1AudAut0mXY01E0',
+            id: 'OjDbHdsCibzUBZCSRSqucw',
             title: 'Compliance Audit'
                 + ' Automation',
             description:
@@ -169,7 +169,7 @@ export function buildProjects():
             position: 9,
         },
         {
-            id: 'P10MlRgD1s4stRc1XY01FG',
+            id: 'OmGoTHQFHRevqlrGWPgtKA',
             title: 'Multi-Region Disaster'
                 + ' Recovery',
             description:
@@ -185,7 +185,7 @@ export function buildProjects():
             position: 10,
         },
         {
-            id: 'P11V0iceField0psXY01HJ',
+            id: 'OtSStAjEiIerCMcUwNgMbQ',
             title: 'Voice-Driven Field'
                 + ' Operations',
             description:
@@ -202,7 +202,7 @@ export function buildProjects():
             position: 11,
         },
         {
-            id: 'P12CarbF00tprXY01K0L0M',
+            id: 'OvIEhORMAYZxBcQZKkgkow',
             title: 'Carbon Footprint'
                 + ' Tracking',
             description:
@@ -219,7 +219,7 @@ export function buildProjects():
             position: 12,
         },
         {
-            id: 'P13W0rk4rcF0r3castsXY1',
+            id: 'OvJSmafViYCdfyAIdgzJTQ',
             title: 'Workforce Capacity'
                 + ' Forecasting',
             description:
@@ -235,7 +235,7 @@ export function buildProjects():
             position: 13,
         },
         {
-            id: 'P14SmartD0cumtR0utngX1',
+            id: 'PGtnaoTOuWCcbADPrancjA',
             title: 'Smart Document Routing',
             description:
                 'Classify and route'
@@ -251,7 +251,7 @@ export function buildProjects():
             position: 14,
         },
         {
-            id: 'P15Inv3st0rRep0rtP1Y00',
+            id: 'PIImLccwpnfvbBBMsIKoMA',
             title: 'Investor Reporting'
                 + ' Portal',
             description:
@@ -268,7 +268,7 @@ export function buildProjects():
             position: 15,
         },
         {
-            id: 'P16MktSent1mentXY01020',
+            id: 'PIfhHMLQQxTxKFDdabXbOw',
             title: 'Market Sentiment'
                 + ' Analyzer',
             description:

@@ -29,7 +29,7 @@ test(
 
         const labels = [
             'fusion.dedup.' + 'a'.repeat(64),
-            'fusion.address./organizations/1/ideas/42',
+            'fusion.address./organizations/AjdvjuECVZEgZoFajaIEkg/ideas/42',
         ];
         for (const label of labels) {
             const key = await advisoryKey(label);
@@ -85,8 +85,8 @@ test('notifyPayload emits full when over 8000 bytes',
 () => {
     const small = {
         kind: 'scoped' as const,
-        organizationIds: ['1'],
-        identityIds: ['current'],
+        organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
+        identityIds: ['XXZruirZyAOoRpNxaDnpSA'],
     };
     assert.equal(
         notifyPayload(small),

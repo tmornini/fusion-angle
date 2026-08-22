@@ -20,7 +20,6 @@ import {
 '../web-app/app/adapters/flow-mutations.ts';
 import {
     getMemberMap,
-    generateCryptoSafeBase62,
     getTransitionEventsByWorkOrder,
     getWorkOrder,
     getWorkOrderActiveClaim,
@@ -51,6 +50,13 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+
+const N_START = generateIdentifier();
+const N_MIDDLE = generateIdentifier();
+const N_FINISH = generateIdentifier();
+const E2 = generateIdentifier();
 
 // -- Fixtures ---------------------------------
 
@@ -92,19 +98,19 @@ function buildLinearGraph(): StoredGraph {
     // would mark the flow Not Ready).
     return {
         nodes: [
-            buildNode('n-start', 'Start', {
+            buildNode(N_START, 'Start', {
                 isCreate: true,
             }),
-            buildNode('n-middle', 'Doing work', {
-                memberIds: ['current'],
+            buildNode(N_MIDDLE, 'Doing work', {
+                memberIds: ['XXZruirZyAOoRpNxaDnpSA'],
             }),
-            buildNode('n-finish', 'Done', {
+            buildNode(N_FINISH, 'Done', {
                 isArchive: true,
             }),
         ],
         edges: [
-            buildEdge('e1', 'n-start', 'n-middle'),
-            buildEdge('e2', 'n-middle', 'n-finish'),
+            buildEdge('YiJPbufDpkyrZcZCYbUJpg', N_START, N_MIDDLE),
+            buildEdge(E2, N_MIDDLE, N_FINISH),
         ],
     };
 }
@@ -125,8 +131,8 @@ async function seedFlow(
     const ctx = createRequestContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId,
-        linkId: flowId + '-link',
-        projectId: 'p-' + flowId,
+        linkId: generateIdentifier(),
+        projectId: generateIdentifier(),
         name: 'Test flow',
     });
     await putFlow(ctx, flowId, {
@@ -181,14 +187,14 @@ async function setupOneWorkOrder(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedHumanMember(db, 'current', 'Demo Test');
+    await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test');
     const ctx = createRequestContext(db, await organizationToken());
-    await seedFlow(db, 'f1', buildLinearGraph());
-    const woId = generateCryptoSafeBase62();
+    await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
+    const woId = generateIdentifier();
     await postWorkOrderCreation(ctx, {
         workOrderId: woId,
-        flowLinkId: generateCryptoSafeBase62(),
-        flowId: 'f1',
+        flowLinkId: generateIdentifier(),
+        flowId: 'ZOousbbnzpqlxJExVAruYQ',
     });
     const tables = () => collectTables(db);
     return { db, ctx, woId, tables };
@@ -301,9 +307,10 @@ test(
         // via the named op (states/:id retired). Dated after
         // the create events so the inbox sees a finished WO.
         await ctx.POST(
-            'organizations/1/work-orders/' + woId + '/transition', {
+            'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
+                + '/transition', {
                 transitionEventId: 'extra',
-                targetState: 'n-finish',
+                targetState: N_FINISH,
                 release: null,
                 transitionAt: '2030-01-01T00:00:00.000000Z',
             },
@@ -335,17 +342,17 @@ test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(
-            db, 'current', 'Demo Test',
+            db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
         const ctx = createRequestContext(db, await organizationToken());
-        await seedFlow(db, 'f1', buildLinearGraph());
+        await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
         for (let i = 0; i < 3; i++) {
             await postWorkOrderCreation(ctx, {
                 workOrderId:
-                    generateCryptoSafeBase62(),
+                    generateIdentifier(),
                 flowLinkId:
-                    generateCryptoSafeBase62(),
-                flowId: 'f1',
+                    generateIdentifier(),
+                flowId: 'ZOousbbnzpqlxJExVAruYQ',
             });
         }
         // Mutate to explicit non-creation-order
@@ -408,40 +415,40 @@ test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(
-            db, 'current', 'Demo Test',
+            db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
         const ctx = createRequestContext(db, await organizationToken());
-        await seedFlow(db, 'f1', {
+        await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', {
             nodes: [
-                buildNode('n-start', 'Start', {
+                buildNode(N_START, 'Start', {
                     isCreate: true,
                 }),
                 buildNode(
-                    'n-middle', 'Doing work', {
-                        memberIds: ['current'],
+                    N_MIDDLE, 'Doing work', {
+                        memberIds: ['XXZruirZyAOoRpNxaDnpSA'],
                         taskInstructions:
                             '# Verify totals',
                     },
                 ),
-                buildNode('n-finish', 'Done', {
+                buildNode(N_FINISH, 'Done', {
                     isArchive: true,
                 }),
             ],
             edges: [
                 buildEdge(
-                    'e1', 'n-start', 'n-middle',
+                    'YiJPbufDpkyrZcZCYbUJpg', N_START, N_MIDDLE,
                 ),
                 buildEdge(
-                    'e2', 'n-middle', 'n-finish',
+                    E2, N_MIDDLE, N_FINISH,
                 ),
             ],
         });
         await postWorkOrderCreation(ctx, {
             workOrderId:
-                generateCryptoSafeBase62(),
+                generateIdentifier(),
             flowLinkId:
-                generateCryptoSafeBase62(),
-            flowId: 'f1',
+                generateIdentifier(),
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
         });
         const {
             workOrders, transitionsByWo, memberMap,

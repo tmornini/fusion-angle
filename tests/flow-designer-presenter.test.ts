@@ -15,7 +15,7 @@ import type {
 } from '../web-app/app/flow-interactions.ts';
 
 const emptyGraph = {
-    id: 'flow-1',
+    id: 'aEsGMmBEFaVdWihhHXwCbw',
     name: 'Test Flow',
     isLocked: false,
     isAutoLayout: false,

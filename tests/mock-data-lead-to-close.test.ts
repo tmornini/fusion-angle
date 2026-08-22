@@ -33,7 +33,7 @@ async function seededLeadToClose() {
     const db = await seededMockDb();
     // Phase Final Task 2: flows row half stripped — resolve
     // the seed flow from the pair plane.
-    const flows = await deriveFlows(db, '1');
+    const flows = await deriveFlows(db, 'AjdvjuECVZEgZoFajaIEkg');
     const flow = flows.find(
         f => f.name === FLOW_NAME,
     );

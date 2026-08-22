@@ -22,12 +22,13 @@ import {
 // (1) the route-table regime — 19 combos across the nine
 // roster route() patterns (members, ai-members, ai-members/:id,
 // human-members, human-members/:id, memberships,
-// memberships/:id, current-member, members/:id): a matched
+// memberships/:id, XeNICvLNKhXddnTKnszfpQ, members/:id): a matched
 // pattern with no handler for the request's verb 405s via
 // handleRequest's own per-method branch ("Method X not allowed
 // on <path>"). Every one of these patterns is admin-only for
 // any write verb (authorization.ts's MEMBER_VERBS lists only
-// GET for members/ai-members/human-members/current-member, and
+// GET for members/ai-members/human-members/XeNICvLNKhXddnTKnszfpQ,
+// and
 // omits memberships entirely), so an admin token is required to
 // reach the 405 branch rather than an earlier 403.
 //
@@ -74,7 +75,7 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 }
 
 // Retired roster routes (members / human-members /
-// ai-members / memberships / current-member) 404 after
+// ai-members / memberships / XeNICvLNKhXddnTKnszfpQ) 404 after
 // auth. Pins live in tests/api-roster-retired.test.ts.
 
 // ── regime 2: the invitations-facade 404s ──
@@ -138,7 +139,7 @@ test('GET invitations/:id/acceptance 404s (side channel'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'GET', '/invitations/inv1/acceptance', token,
+        'GET', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/acceptance', token,
     ));
     assert.equal(res.status, 404);
 });
@@ -148,7 +149,7 @@ test('PUT invitations/:id/acceptance 404s (side channel'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/invitations/inv1/acceptance', token, {},
+        'PUT', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/acceptance', token, {},
     ));
     assert.equal(res.status, 404);
 });
@@ -158,7 +159,7 @@ test('DELETE invitations/:id/acceptance 404s (side channel'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'DELETE', '/invitations/inv1/acceptance', token,
+        'DELETE', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/acceptance', token,
     ));
     assert.equal(res.status, 404);
 });
@@ -168,7 +169,7 @@ test('GET invitations/:id/decline 404s (side channel never'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'GET', '/invitations/inv1/decline', token,
+        'GET', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/decline', token,
     ));
     assert.equal(res.status, 404);
 });
@@ -178,7 +179,7 @@ test('PUT invitations/:id/decline 404s (side channel never'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/invitations/inv1/decline', token, {},
+        'PUT', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/decline', token, {},
     ));
     assert.equal(res.status, 404);
 });
@@ -188,7 +189,7 @@ test('DELETE invitations/:id/decline 404s (side channel'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'DELETE', '/invitations/inv1/decline', token,
+        'DELETE', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/decline', token,
     ));
     assert.equal(res.status, 404);
 });
@@ -198,7 +199,7 @@ test('GET invitations/:id/revocation 404s (side channel'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'GET', '/invitations/inv1/revocation', token,
+        'GET', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/revocation', token,
     ));
     assert.equal(res.status, 404);
 });
@@ -208,7 +209,7 @@ test('PUT invitations/:id/revocation 404s (side channel'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/invitations/inv1/revocation', token, {},
+        'PUT', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/revocation', token, {},
     ));
     assert.equal(res.status, 404);
 });
@@ -218,7 +219,7 @@ test('DELETE invitations/:id/revocation 404s (side channel'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'DELETE', '/invitations/inv1/revocation', token,
+        'DELETE', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/revocation', token,
     ));
     assert.equal(res.status, 404);
 });
@@ -232,7 +233,7 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'GET', '/invitations/bogus1', token,
+        'GET', '/invitations/WatGDdZmAxtYsLoAFrOaxA', token,
     ));
     assert.equal(res.status, 404);
 });
@@ -242,7 +243,7 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/invitations/bogus1', token, {},
+        'PUT', '/invitations/WatGDdZmAxtYsLoAFrOaxA', token, {},
     ));
     assert.equal(res.status, 404);
 });
@@ -252,7 +253,7 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/invitations/bogus1', token, {},
+        'POST', '/invitations/WatGDdZmAxtYsLoAFrOaxA', token, {},
     ));
     assert.equal(res.status, 404);
 });
@@ -262,7 +263,7 @@ test('DELETE invitations/:id (bogus path) 404s on every'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'DELETE', '/invitations/bogus1', token,
+        'DELETE', '/invitations/WatGDdZmAxtYsLoAFrOaxA', token,
     ));
     assert.equal(res.status, 404);
 });

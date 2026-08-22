@@ -36,7 +36,7 @@ test(
         const db = await freshDb();
         const token = await organizationToken();
         const put = await handleRequest(db, req(
-            'PUT', '/identities/w1', token, {
+            'PUT', '/identities/xdaJyuuPyHfffCGLhqDrOQ', token, {
                 kind: 'person',
                 title: 'Engineer',
                 department: 'Product',
@@ -45,14 +45,15 @@ test(
             },
         ));
         assert.ok(put.status === 201 || put.status === 200);
-        await PUT(db, 'identities/w1/pii', {
+        await PUT(db, 'identities/xdaJyuuPyHfffCGLhqDrOQ/pii', {
             name: 'Alice',
             email: 'alice@example.com',
             phone: '',
             bio: '',
         }, token);
         const seat = await handleRequest(db, req(
-            'PUT', '/organizations/1/members/w1', token, {
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+                + 'xdaJyuuPyHfffCGLhqDrOQ', token, {
                 type: 'member',
                 at: AT,
             },
@@ -62,13 +63,13 @@ test(
         );
         const row = await GET<{
             kind: string; title: string;
-        }>(db, 'identities/w1', token);
+        }>(db, 'identities/xdaJyuuPyHfffCGLhqDrOQ', token);
         assert.equal(row.kind, 'person');
         assert.equal(row.title, 'Engineer');
         const seats = await GET<{ id: string }[]>(
-            db, 'organizations/1/members/', token,
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', token,
         );
-        assert.ok(seats.some(s => s.id === 'w1'));
+        assert.ok(seats.some(s => s.id === 'xdaJyuuPyHfffCGLhqDrOQ'));
     },
 );
 
@@ -76,7 +77,7 @@ test('POST /human-members is retired 404', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
         'POST', '/human-members', DEV_TOKEN, {
-            id: 'w1',
+            id: 'xdaJyuuPyHfffCGLhqDrOQ',
             detail: {},
         },
     ));

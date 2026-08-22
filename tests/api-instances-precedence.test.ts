@@ -29,6 +29,8 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Task 20 covenant suite — 12-step status ladder (earlier
 // step answers) + If-Match / ETag cross-pins. Each pin is
@@ -37,12 +39,14 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
-const ORGANIZATION = '1';
-const TYPE_ID = 'rt-prec-1';
-const ATTR_ID = 'attr-prec-1';
-const ATTR_NUM = 'attr-prec-num';
-const ATTR_LOCKED = 'attr-prec-locked';
-const INSTANCE_ID = 'inst-prec-1';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
+const TYPE_ID = generateIdentifier();
+const ATTR_ID = generateIdentifier();
+const ATTR_NUM = generateIdentifier();
+const ATTR_LOCKED = generateIdentifier();
+const INSTANCE_ID = generateIdentifier();
+const ORGANIZATION_B = generateIdentifier();
+const ATTR_UNKNOWN = generateIdentifier();
 
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
@@ -51,7 +55,7 @@ const ATTRS = TYPE_DETAIL + '/attributes/';
 const INSTANCES = TYPE_DETAIL + '/instances/';
 const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
 const FOREIGN_TYPE =
-    '/organizations/B/record-types/' + TYPE_ID;
+    '/organizations/' + ORGANIZATION_B + '/record-types/' + TYPE_ID;
 
 function req(
     method: string,
@@ -91,19 +95,19 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, 'm-member1', {
+    await seedMembershipPair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
-        identity_id: 'member1',
+        identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
         at: AT,
     });
     return {
         db,
         adminToken: await organizationToken(
-            'current', ORGANIZATION,
+            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
         ),
         memberToken: await organizationToken(
-            'member1', ORGANIZATION,
+            'nkgaOHZISTQrILTfPThWCA', ORGANIZATION,
         ),
     };
 }
@@ -283,7 +287,7 @@ async () => {
         { attribute_id: ATTR_ID, value: 'A' },
     ]);
     const e0 = put.headers.get('ETag')!;
-    const p1 = await handleRequest(db, req(
+    const pnXmXrxOWayANgDLdCjuBw = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         {
             set: [
@@ -295,7 +299,7 @@ async () => {
         },
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assert.equal(p1.status, 201);
+    assert.equal(pnXmXrxOWayANgDLdCjuBw.status, 201);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { not_a_valid_patch: true },
@@ -356,7 +360,7 @@ async () => {
         {
             set: [
                 {
-                    attribute_id: 'attr-unknown',
+                    attribute_id: ATTR_UNKNOWN,
                     value: 'x',
                 },
             ],
@@ -508,13 +512,13 @@ async () => {
     ));
     assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID')!;
-    const e1 = first.headers.get('ETag')!;
-    assert.notEqual(e1, e0);
+    const YiJPbufDpkyrZcZCYbUJpg = first.headers.get('ETag')!;
+    assert.notEqual(YiJPbufDpkyrZcZCYbUJpg, e0);
     // Same body, fresh If-Match: a NEW message (not a
     // byte-identical replay of first).
     const second = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
-        { [IF_MATCH_HEADER]: e1 },
+        { [IF_MATCH_HEADER]: YiJPbufDpkyrZcZCYbUJpg },
     ));
     assert.equal(second.status, 201);
     assert.notEqual(
@@ -524,7 +528,7 @@ async () => {
     );
     assert.notEqual(
         second.headers.get('ETag'),
-        e1,
+        YiJPbufDpkyrZcZCYbUJpg,
     );
     // Control: byte-identical resend of first still
     // replays (If-Match is in the hash).

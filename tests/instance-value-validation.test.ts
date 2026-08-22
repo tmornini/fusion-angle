@@ -22,7 +22,7 @@ function makeRow(
     constraints: readonly Constraint[] = [],
 ): AttributeSchemaRow {
     return {
-        id: 'a-1',
+        id: 'UQBiHFcwJeCDSnmkPBoYRA',
         name: 'Field',
         attributeType,
         options: [],
@@ -71,12 +71,12 @@ test(
             name: 'Amount',
         });
         assertRejects(
-            [{ attribute_id: 'a-1', value: 'abc' }],
+            [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: 'abc' }],
             byId(row),
             /value for attribute "Amount"/,
         );
         assertRejects(
-            [{ attribute_id: 'a-1', value: 'abc' }],
+            [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: 'abc' }],
             byId(row),
             /number/i,
         );
@@ -87,7 +87,7 @@ test('number finite string passes', () => {
     const row = makeRow('number');
     assert.doesNotThrow(() => {
         validateInstanceValues(
-            [{ attribute_id: 'a-1', value: '42' }],
+            [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: '42' }],
             byId(row),
         );
     });
@@ -103,12 +103,12 @@ test(
             [{ kind: 'range_min', min: '50' }],
         );
         assertRejects(
-            [{ attribute_id: 'a-1', value: '42' }],
+            [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: '42' }],
             byId(row),
             /value for attribute "Count"/,
         );
         assertRejects(
-            [{ attribute_id: 'a-1', value: '42' }],
+            [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: '42' }],
             byId(row),
             /at least 50/,
         );
@@ -124,7 +124,7 @@ test(
         });
         assertRejects(
             [{
-                attribute_id: 'a-1',
+                attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
                 value: '2026-13-99',
             }],
             byId(row),
@@ -133,7 +133,7 @@ test(
         assert.doesNotThrow(() => {
             validateInstanceValues(
                 [{
-                    attribute_id: 'a-1',
+                    attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
                     value: '2026-08-05',
                 }],
                 byId(row),
@@ -152,7 +152,7 @@ test(
         });
         assertRejects(
             [{
-                attribute_id: 'a-1',
+                attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
                 value: 'medium',
             }],
             byId(row),
@@ -161,7 +161,7 @@ test(
         assert.doesNotThrow(() => {
             validateInstanceValues(
                 [{
-                    attribute_id: 'a-1',
+                    attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
                     value: 'high',
                 }],
                 byId(row),
@@ -178,21 +178,21 @@ test(
             name: 'Done',
         });
         assertRejects(
-            [{ attribute_id: 'a-1', value: 'yes' }],
+            [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: 'yes' }],
             byId(row),
             /value for attribute "Done"/,
         );
         assert.doesNotThrow(() => {
             validateInstanceValues(
                 [{
-                    attribute_id: 'a-1',
+                    attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
                     value: 'true',
                 }],
                 byId(row),
             );
             validateInstanceValues(
                 [{
-                    attribute_id: 'a-1',
+                    attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
                     value: 'false',
                 }],
                 byId(row),
@@ -206,14 +206,14 @@ test('text any non-empty string passes', () => {
     assert.doesNotThrow(() => {
         validateInstanceValues(
             [{
-                attribute_id: 'a-1',
+                attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
                 value: 'hello world',
             }],
             byId(row),
         );
         validateInstanceValues(
             [{
-                attribute_id: 'a-1',
+                attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
                 value: '42',
             }],
             byId(row),
@@ -228,7 +228,7 @@ test(
             name: 'Title',
         });
         assertRejects(
-            [{ attribute_id: 'a-1', value: '' }],
+            [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: '' }],
             byId(row),
             /value for attribute "Title"/,
         );
@@ -244,14 +244,14 @@ test(
             options: ['a', 'b'],
         });
         assertRejects(
-            [{ attribute_id: 'a-1', value: 'c' }],
+            [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: 'c' }],
             byId(row),
             /value for attribute "Choice"/,
         );
         assert.doesNotThrow(() => {
             validateInstanceValues(
                 [{
-                    attribute_id: 'a-1',
+                    attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
                     value: 'a',
                 }],
                 byId(row),

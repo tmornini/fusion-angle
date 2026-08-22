@@ -18,7 +18,7 @@ test('a well-formed full event round-trips', () => {
 test('a well-formed scoped event round-trips', () => {
     const event = {
         kind: 'scoped',
-        organizationIds: ['1'],
+        organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
         identityIds: ['ada'],
     };
     assert.deepEqual(
@@ -57,7 +57,7 @@ test('non-string array elements throw', () => {
     assert.throws(
         () => notificationEventFromWire({
             kind: 'scoped',
-            organizationIds: ['1', 7],
+            organizationIds: ['AjdvjuECVZEgZoFajaIEkg', 7],
             identityIds: [],
         }),
         /malformed notification event/,

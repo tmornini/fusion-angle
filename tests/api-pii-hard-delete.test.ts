@@ -17,6 +17,8 @@ import {
     seedAdminSchema,
     organizationRow,
 } from './test-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Phase 10 Task 3: the /pii message-plane HARD-DELETE ZONE — the
 // sanctioned non-append-only exception (gate 4's chainless
@@ -93,12 +95,12 @@ test('PUT-PUT at one address leaves exactly ONE pair (the'
 + ' latest)', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
-        'PUT', '/identities/slot-1/pii', DEV_TOKEN,
+        'PUT', '/identities/tyqfBGunVEufdtzApefuyw/pii', DEV_TOKEN,
         humanPii('Ann'),
     ));
     assert.equal(first.status, 201);
     const second = await handleRequest(db, req(
-        'PUT', '/identities/slot-1/pii', DEV_TOKEN,
+        'PUT', '/identities/tyqfBGunVEufdtzApefuyw/pii', DEV_TOKEN,
         humanPii('Ann Marie'),
     ));
     assert.equal(second.status, 201);
@@ -108,7 +110,7 @@ test('PUT-PUT at one address leaves exactly ONE pair (the'
     assert.equal(second.headers.get('Supersedes'), null);
     const pairs = await db.pairs.getAll();
     const atAddress = pairs.filter(
-        r => r.uri_collection === '/identities/slot-1/pii/',
+        r => r.uri_collection === '/identities/tyqfBGunVEufdtzApefuyw/pii/',
     );
     assert.equal(atAddress.length, 1);
     assert.equal(
@@ -117,7 +119,7 @@ test('PUT-PUT at one address leaves exactly ONE pair (the'
     // Phase Final Task 2: identity_pii ROW half stripped —
     // domain oracle is deriveIdentityPii. G5: PUT-PUT still
     // physically deletes the prior pair (one-role DELETE).
-    const domainRow = await deriveIdentityPii(db, 'slot-1');
+    const domainRow = await deriveIdentityPii(db, 'tyqfBGunVEufdtzApefuyw');
     assert.equal(domainRow.name, 'Ann Marie');
     // Phase Final Stage B: identity spine tables retired.
 });
@@ -129,12 +131,12 @@ test('PUT-DELETE leaves exactly ONE bodyless DELETE pair (the'
 async () => {
     const db = await freshDb();
     const put = await handleRequest(db, req(
-        'PUT', '/identities/slot-2/pii', DEV_TOKEN,
+        'PUT', '/identities/uEYoNLWQrgIToJPFkyvdPw/pii', DEV_TOKEN,
         humanPii('Bob'),
     ));
     assert.equal(put.status, 201);
     const del = await handleRequest(db, req(
-        'DELETE', '/identities/slot-2/pii', DEV_TOKEN,
+        'DELETE', '/identities/uEYoNLWQrgIToJPFkyvdPw/pii', DEV_TOKEN,
     ));
     assert.equal(del.status, 204);
     // Case 7 (the DELETE half): the tombstone carries no
@@ -142,13 +144,14 @@ async () => {
     assert.equal(del.headers.get('Supersedes'), null);
     const pairs = await db.pairs.getAll();
     const atAddress = pairs.filter(
-        r => r.uri_collection === '/identities/slot-2/pii/',
+        r => r.uri_collection === '/identities/uEYoNLWQrgIToJPFkyvdPw/pii/',
     );
     assert.equal(atAddress.length, 1);
     const messages = await allMessages(db);
     assert.ok(!messages.some(m => m.includes('Bob')));
     assert.ok(!messages.some(m => m.includes('bob@example.com')));
-    await assert.rejects(() => deriveIdentityPii(db, 'slot-2'));
+    await assert.rejects(() => deriveIdentityPii(db
+        , 'uEYoNLWQrgIToJPFkyvdPw'));
 });
 
 // ── 3. DELETE-PUT: the slot re-sets (one PUT pair) ──
@@ -157,25 +160,25 @@ test('DELETE-PUT re-sets the slot to exactly one PUT pair',
 async () => {
     const db = await freshDb();
     const del = await handleRequest(db, req(
-        'DELETE', '/identities/slot-3/pii', DEV_TOKEN,
+        'DELETE', '/identities/uFgKFelNjvJcrtefsfZxrA/pii', DEV_TOKEN,
     ));
     assert.equal(del.status, 404);
     assert.equal(del.headers.get('Supersedes'), null);
     const put = await handleRequest(db, req(
-        'PUT', '/identities/slot-3/pii', DEV_TOKEN,
+        'PUT', '/identities/uFgKFelNjvJcrtefsfZxrA/pii', DEV_TOKEN,
         humanPii('Cara'),
     ));
     assert.equal(put.status, 201);
     assert.equal(put.headers.get('Supersedes'), null);
     const pairs = await db.pairs.getAll();
     const atAddress = pairs.filter(
-        r => r.uri_collection === '/identities/slot-3/pii/',
+        r => r.uri_collection === '/identities/uFgKFelNjvJcrtefsfZxrA/pii/',
     );
     assert.equal(atAddress.length, 1);
     assert.equal(
         atAddress[0]!.id, put.headers.get('Response-ID'),
     );
-    const domainRow = await deriveIdentityPii(db, 'slot-3');
+    const domainRow = await deriveIdentityPii(db, 'uFgKFelNjvJcrtefsfZxrA');
     assert.equal(domainRow.name, 'Cara');
 });
 
@@ -185,14 +188,14 @@ test('a byte-identical resend against the LIVE slot replays'
 + ' the stored response and appends nothing', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
-        'PUT', '/identities/slot-4a/pii', DEV_TOKEN,
+        'PUT', '/identities/uKYubOSYwiunzyPztWBtkw/pii', DEV_TOKEN,
         humanPii('Dana'),
     ));
     assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID');
     const countAfterFirst = (await db.pairs.getAll()).length;
     const resend = await handleRequest(db, req(
-        'PUT', '/identities/slot-4a/pii', DEV_TOKEN,
+        'PUT', '/identities/uKYubOSYwiunzyPztWBtkw/pii', DEV_TOKEN,
         humanPii('Dana'),
     ));
     assert.equal(resend.status, 201);
@@ -209,13 +212,13 @@ test('a byte-identical resend AFTER supersession finds no'
 + ' stored hash and appends fresh', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
-        'PUT', '/identities/slot-4b/pii', DEV_TOKEN,
+        'PUT', '/identities/uLUQPJnlVuzeGqXLYqCItA/pii', DEV_TOKEN,
         humanPii('Erin'),
     ));
     assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID');
     const second = await handleRequest(db, req(
-        'PUT', '/identities/slot-4b/pii', DEV_TOKEN,
+        'PUT', '/identities/uLUQPJnlVuzeGqXLYqCItA/pii', DEV_TOKEN,
         humanPii('Erin Marie'),
     ));
     assert.equal(second.status, 201);
@@ -225,7 +228,7 @@ test('a byte-identical resend AFTER supersession finds no'
     // finds no matching hash, so this is a FRESH write, never a
     // replay (Step 0(a): WHOLE-pair absence is tolerated).
     const resend = await handleRequest(db, req(
-        'PUT', '/identities/slot-4b/pii', DEV_TOKEN,
+        'PUT', '/identities/uLUQPJnlVuzeGqXLYqCItA/pii', DEV_TOKEN,
         humanPii('Erin'),
     ));
     assert.equal(resend.status, 201);
@@ -233,7 +236,7 @@ test('a byte-identical resend AFTER supersession finds no'
     assert.notEqual(resend.headers.get('Response-ID'), firstId);
     const pairs = await db.pairs.getAll();
     const atAddress = pairs.filter(
-        r => r.uri_collection === '/identities/slot-4b/pii/',
+        r => r.uri_collection === '/identities/uLUQPJnlVuzeGqXLYqCItA/pii/',
     );
     assert.equal(atAddress.length, 1);
 });
@@ -253,7 +256,7 @@ test('grant -> accept -> human-member create -> edit -> erase'
 + ' leaves ZERO stored-server-plane trace of the erased PII'
 + ' (gate 5, the erasure-completeness theorem)', async () => {
     const db = await freshDb();
-    const id = 'erasee-1';
+    const id = generateIdentifier();
     const create = await handleRequest(db, req(
         'PUT', '/identities/' + id, DEV_TOKEN,
         { kind: 'person', ...humanDetail() },
@@ -268,11 +271,12 @@ test('grant -> accept -> human-member create -> edit -> erase'
     ));
     assert.equal(intake.status, 201);
     const grantRes = await handleRequest(db, req(
-        'POST', '/organizations/1/invitations/',
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/',
         await organizationToken(),
         {
-            email: ERASED_EMAIL, invitationId: 'inv-erasee-1',
-            grantEventId: 'ev-grant-erasee-1', grantAt: AT,
+            email: ERASED_EMAIL,
+            invitationId: generateIdentifier(),
+            grantEventId: generateIdentifier(), grantAt: AT,
         },
     ));
     assert.equal(grantRes.status, 200);
@@ -281,11 +285,11 @@ test('grant -> accept -> human-member create -> edit -> erase'
     const acceptRes = await handleRequest(db, req(
         'PUT',
         '/identities/' + id + '/invitations/' + invitationId,
-        await organizationToken(id, '1'),
+        await organizationToken(id, 'AjdvjuECVZEgZoFajaIEkg'),
         {
             state: 'accepted',
-            membershipId: 'ms-erasee-1',
-            eventId: 'ev-accept-erasee-1', at: AT,
+            membershipId: generateIdentifier(),
+            eventId: generateIdentifier(), at: AT,
         },
     ));
     assert.equal(acceptRes.status, 204);
@@ -329,14 +333,16 @@ test("the zone's confinement: a non-/pii DELETE (a memberships"
 + ' tombstone) still APPENDS — the zone never leaks', async () => {
     const db = await freshDb();
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/1/members/confine-1',
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            + 'XSNEaxodzAorrAiVBegDGw',
         await organizationToken(),
         { type: 'admin', at: AT },
     ));
     assert.equal(put.status, 201);
     const putId = put.headers.get('Response-ID');
     const del = await handleRequest(db, req(
-        'DELETE', '/organizations/1/members/confine-1',
+        'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            + 'XSNEaxodzAorrAiVBegDGw',
         await organizationToken(),
     ));
     assert.equal(del.status, 204);
@@ -345,8 +351,9 @@ test("the zone's confinement: a non-/pii DELETE (a memberships"
     assert.equal(del.headers.get('Supersedes'), null);
     const pairs = await db.pairs.getAll();
     const atAddress = pairs.filter(
-        r => r.uri_collection === '/organizations/1/members/'
-            && r.uri_id === 'confine-1',
+        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'members/'
+            && r.uri_id === 'XSNEaxodzAorrAiVBegDGw',
     );
     assert.equal(atAddress.length, 2);
 });
@@ -355,7 +362,7 @@ test("the zone's confinement: a non-/pii DELETE (a memberships"
 // so this pin writes and reads the caller's own slot.
 test('stored PUT body equals piiEntityOf', async () => {
     const db = await freshDb();
-    const id = 'current';
+    const id = 'XXZruirZyAOoRpNxaDnpSA';
     const fields = humanPii('Gina');
     const put = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii',

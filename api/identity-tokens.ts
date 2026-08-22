@@ -7,6 +7,8 @@ import {
     latestByKey,
     findFirstByKey,
 } from '../shared/ledger-reduction.ts';
+import { compareIdentifiers } from
+    '../shared/identifier.ts';
 
 // Pure reductions over the append-only identity_tokens ledger.
 // The store is a dumb log; current validity is derived here.
@@ -31,7 +33,8 @@ function failClosed(
     const c = ACTION_RANK[candidate.action];
     const i = ACTION_RANK[incumbent.action];
     if (c !== i) return c > i;
-    return candidate.id > incumbent.id;
+    return compareIdentifiers(candidate.id, incumbent.id)
+        > 0;
 }
 
 // The latest lifecycle action for a jti, or null if it has no

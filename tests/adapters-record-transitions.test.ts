@@ -32,6 +32,17 @@ import {
     type NodeAttribute,
     type WorkOrderFlowGraph,
 } from '../api/types.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+
+const CREATE_NODE = generateIdentifier();
+const STEP_NODE = generateIdentifier();
+const TARGET_NODE = generateIdentifier();
+const REAL_NODE = generateIdentifier();
+const GHOST_NODE = generateIdentifier();
+const EDGE_1 = generateIdentifier();
+const EDGE_2 = generateIdentifier();
+const WO_ID = generateIdentifier();
 
 const AT_CREATED = '2026-05-01T10:00:00.000000Z';
 
@@ -108,7 +119,8 @@ async function seedWorkOrder(
     });
     // Genesis transition via the named op (states/:id
     // retired). pure-move instance shape; no claim release.
-    await ctx.POST('organizations/1/work-orders/' + id + '/transition', {
+    await ctx.POST('organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id
+        + '/transition', {
         transitionEventId: 't-create-' + id,
         targetState: currentNodeId,
         release: null,
@@ -130,7 +142,8 @@ async function seedBinding(
 ): Promise<void> {
     const ctx = createRequestContext(db, await organizationToken());
     await ctx.PUT(
-        'organizations/1/flows/' + flowId + '/records/fr-' + flowId,
+        'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
+            + '/records/' + generateIdentifier(),
         {
             flow_id: flowId,
             record_id: recordId,
@@ -158,8 +171,8 @@ async function seedFlowLink(
     const ctx = createRequestContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId,
-        linkId: flowId + '-link',
-        projectId: 'p-' + flowId,
+        linkId: generateIdentifier(),
+        projectId: generateIdentifier(),
         name: flowId,
     });
     // NAMED re-pin (Task 7): getAllFlowWorkOrderEntities reads
@@ -168,7 +181,8 @@ async function seedFlowLink(
     // pair at this address, so the join must land through the
     // SAME wire-reachable PUT the live route serves.
     await ctx.PUT(
-        'organizations/1/flows/' + flowId + '/work-orders/fwo-' + workOrderId,
+        'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
+            + '/work-orders/' + generateIdentifier(),
         {
             flow_id: flowId,
             work_order_id: workOrderId,
@@ -197,7 +211,7 @@ async function seedAttribute(
     );
     try {
         await ctx.GET(
-            'organizations/1/record-types/'
+            'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + recordId,
         );
     } catch {
@@ -213,7 +227,7 @@ async function seedAttribute(
         });
     }
     await ctx.PUT(
-        'organizations/1/record-types/'
+        'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
         + recordId
         + '/attributes/'
         + id,
@@ -237,19 +251,19 @@ test(
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
-                buildNode('n-create', [], {
+                buildNode(CREATE_NODE, [], {
                     isCreate: true,
                 }),
-                buildNode('n-target'),
+                buildNode(TARGET_NODE),
             ],
-            [buildEdge('e-1', 'n-create', 'n-target')],
+            [buildEdge(EDGE_1, CREATE_NODE, TARGET_NODE)],
         );
         await seedWorkOrder(
-            db, 'wo-1', flowGraph, 'n-create',
+            db, WO_ID, flowGraph, CREATE_NODE,
         );
         const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', new Map(), new Map(),
+            ctx, WO_ID, new Map(), new Map(),
         );
         assert.deepEqual(out, []);
     },
@@ -265,35 +279,37 @@ test(
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
-                buildNode('n-create', [], {
+                buildNode(CREATE_NODE, [], {
                     isCreate: true,
                 }),
-                buildNode('n-step', [{
-                    attributeId: 'a-1',
+                buildNode(STEP_NODE, [{
+                    attributeId: 'UQBiHFcwJeCDSnmkPBoYRA',
                     mode: 'editable',
                     isRequired: true,
                 }]),
-                buildNode('n-target'),
+                buildNode(TARGET_NODE),
             ],
             [
-                buildEdge('e-1', 'n-create', 'n-step'),
-                buildEdge('e-2', 'n-step', 'n-target'),
+                buildEdge(EDGE_1, CREATE_NODE, STEP_NODE),
+                buildEdge(EDGE_2, STEP_NODE, TARGET_NODE),
             ],
         );
         // WO sits ON the step that owns the required
         // attr — the form paints current-node fields;
         // the gate must check the same node.
         await seedWorkOrder(
-            db, 'wo-1', flowGraph, 'n-step',
+            db, WO_ID, flowGraph, STEP_NODE,
         );
-        await seedBinding(db, 'flow-1', 'rec-1');
-        await seedFlowLink(db, 'flow-1', 'wo-1');
-        await seedAttribute(db, 'a-1', 'rec-1', {
+        await seedBinding(db, 'aEsGMmBEFaVdWihhHXwCbw'
+            , 'rbfHGatkwQzGZJVXKJEeyw');
+        await seedFlowLink(db, 'aEsGMmBEFaVdWihhHXwCbw', WO_ID);
+        await seedAttribute(db, 'UQBiHFcwJeCDSnmkPBoYRA'
+            , 'rbfHGatkwQzGZJVXKJEeyw', {
             name: 'Email',
         });
         const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', new Map(), new Map(),
+            ctx, WO_ID, new Map(), new Map(),
         );
         assert.equal(out.length, 1);
         assert.equal(out[0]!.kind, 'required');
@@ -312,34 +328,36 @@ test(
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
-                buildNode('n-create', [], {
+                buildNode(CREATE_NODE, [], {
                     isCreate: true,
                 }),
-                buildNode('n-step', [{
-                    attributeId: 'a-1',
+                buildNode(STEP_NODE, [{
+                    attributeId: 'UQBiHFcwJeCDSnmkPBoYRA',
                     mode: 'editable',
                     isRequired: true,
                 }]),
-                buildNode('n-target'),
+                buildNode(TARGET_NODE),
             ],
             [
-                buildEdge('e-1', 'n-create', 'n-step'),
-                buildEdge('e-2', 'n-step', 'n-target'),
+                buildEdge(EDGE_1, CREATE_NODE, STEP_NODE),
+                buildEdge(EDGE_2, STEP_NODE, TARGET_NODE),
             ],
         );
         await seedWorkOrder(
-            db, 'wo-1', flowGraph, 'n-step',
+            db, WO_ID, flowGraph, STEP_NODE,
         );
-        await seedBinding(db, 'flow-1', 'rec-1');
-        await seedFlowLink(db, 'flow-1', 'wo-1');
-        await seedAttribute(db, 'a-1', 'rec-1', {
+        await seedBinding(db, 'aEsGMmBEFaVdWihhHXwCbw'
+            , 'rbfHGatkwQzGZJVXKJEeyw');
+        await seedFlowLink(db, 'aEsGMmBEFaVdWihhHXwCbw', WO_ID);
+        await seedAttribute(db, 'UQBiHFcwJeCDSnmkPBoYRA'
+            , 'rbfHGatkwQzGZJVXKJEeyw', {
             name: 'Email',
         });
         const ctx = createRequestContext(
             db, await organizationToken(),
         );
         const out = await validateRecordTransition(
-            ctx, 'wo-1', new Map(), null,
+            ctx, WO_ID, new Map(), null,
         );
         assert.equal(out.length, 1);
         assert.equal(out[0]!.kind, 'required');
@@ -358,31 +376,33 @@ test(
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
-                buildNode('n-create', [], {
+                buildNode(CREATE_NODE, [], {
                     isCreate: true,
                 }),
-                buildNode('n-target', [{
-                    attributeId: 'a-1',
+                buildNode(TARGET_NODE, [{
+                    attributeId: 'UQBiHFcwJeCDSnmkPBoYRA',
                     mode: 'editable',
                     isRequired: true,
                 }]),
             ],
-            [buildEdge('e-1', 'n-create', 'n-target')],
+            [buildEdge(EDGE_1, CREATE_NODE, TARGET_NODE)],
         );
         // At Create (no attrs). Target requires Email —
         // pre-fix gate would fail; current-node gate
         // must pass so the operator can enter and fill.
         await seedWorkOrder(
-            db, 'wo-1', flowGraph, 'n-create',
+            db, WO_ID, flowGraph, CREATE_NODE,
         );
-        await seedBinding(db, 'flow-1', 'rec-1');
-        await seedFlowLink(db, 'flow-1', 'wo-1');
-        await seedAttribute(db, 'a-1', 'rec-1', {
+        await seedBinding(db, 'aEsGMmBEFaVdWihhHXwCbw'
+            , 'rbfHGatkwQzGZJVXKJEeyw');
+        await seedFlowLink(db, 'aEsGMmBEFaVdWihhHXwCbw', WO_ID);
+        await seedAttribute(db, 'UQBiHFcwJeCDSnmkPBoYRA'
+            , 'rbfHGatkwQzGZJVXKJEeyw', {
             name: 'Email',
         });
         const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', new Map(), new Map(),
+            ctx, WO_ID, new Map(), new Map(),
         );
         assert.deepEqual(out, []);
     },
@@ -398,31 +418,33 @@ test(
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
-                buildNode('n-create', [], {
+                buildNode(CREATE_NODE, [], {
                     isCreate: true,
                 }),
-                buildNode('n-step', [{
-                    attributeId: 'a-1',
+                buildNode(STEP_NODE, [{
+                    attributeId: 'UQBiHFcwJeCDSnmkPBoYRA',
                     mode: 'editable',
                     isRequired: true,
                 }]),
-                buildNode('n-target', [{
-                    attributeId: 'a-1',
+                buildNode(TARGET_NODE, [{
+                    attributeId: 'UQBiHFcwJeCDSnmkPBoYRA',
                     mode: 'readonly',
                     isRequired: true,
                 }]),
             ],
             [
-                buildEdge('e-1', 'n-create', 'n-step'),
-                buildEdge('e-2', 'n-step', 'n-target'),
+                buildEdge(EDGE_1, CREATE_NODE, STEP_NODE),
+                buildEdge(EDGE_2, STEP_NODE, TARGET_NODE),
             ],
         );
         await seedWorkOrder(
-            db, 'wo-1', flowGraph, 'n-step',
+            db, WO_ID, flowGraph, STEP_NODE,
         );
-        await seedBinding(db, 'flow-1', 'rec-1');
-        await seedFlowLink(db, 'flow-1', 'wo-1');
-        await seedAttribute(db, 'a-1', 'rec-1', {
+        await seedBinding(db, 'aEsGMmBEFaVdWihhHXwCbw'
+            , 'rbfHGatkwQzGZJVXKJEeyw');
+        await seedFlowLink(db, 'aEsGMmBEFaVdWihhHXwCbw', WO_ID);
+        await seedAttribute(db, 'UQBiHFcwJeCDSnmkPBoYRA'
+            , 'rbfHGatkwQzGZJVXKJEeyw', {
             name: 'Email',
         });
         const ctx = createRequestContext(
@@ -431,8 +453,8 @@ test(
         // Instance head is the SoT — pass storedValues
         // directly; no history fold.
         const out = await validateRecordTransition(
-            ctx, 'wo-1', new Map(),
-            new Map([['a-1', 'me@example.com']]),
+            ctx, WO_ID, new Map(),
+            new Map([['UQBiHFcwJeCDSnmkPBoYRA', 'me@example.com']]),
         );
         assert.deepEqual(out, []);
     },
@@ -448,33 +470,35 @@ test(
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
-                buildNode('n-create', [], {
+                buildNode(CREATE_NODE, [], {
                     isCreate: true,
                 }),
-                buildNode('n-step', [{
-                    attributeId: 'a-1',
+                buildNode(STEP_NODE, [{
+                    attributeId: 'UQBiHFcwJeCDSnmkPBoYRA',
                     mode: 'editable',
                     isRequired: true,
                 }]),
-                buildNode('n-target'),
+                buildNode(TARGET_NODE),
             ],
             [
-                buildEdge('e-1', 'n-create', 'n-step'),
-                buildEdge('e-2', 'n-step', 'n-target'),
+                buildEdge(EDGE_1, CREATE_NODE, STEP_NODE),
+                buildEdge(EDGE_2, STEP_NODE, TARGET_NODE),
             ],
         );
         await seedWorkOrder(
-            db, 'wo-1', flowGraph, 'n-step',
+            db, WO_ID, flowGraph, STEP_NODE,
         );
-        await seedBinding(db, 'flow-1', 'rec-1');
-        await seedFlowLink(db, 'flow-1', 'wo-1');
-        await seedAttribute(db, 'a-1', 'rec-1', {
+        await seedBinding(db, 'aEsGMmBEFaVdWihhHXwCbw'
+            , 'rbfHGatkwQzGZJVXKJEeyw');
+        await seedFlowLink(db, 'aEsGMmBEFaVdWihhHXwCbw', WO_ID);
+        await seedAttribute(db, 'UQBiHFcwJeCDSnmkPBoYRA'
+            , 'rbfHGatkwQzGZJVXKJEeyw', {
             name: 'Code',
         });
         const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1',
-            new Map([['a-1', 'ABC']]),
+            ctx, WO_ID,
+            new Map([['UQBiHFcwJeCDSnmkPBoYRA', 'ABC']]),
             new Map(),
         );
         assert.deepEqual(out, []);
@@ -490,27 +514,29 @@ test(
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
-                buildNode('n-create', [], {
+                buildNode(CREATE_NODE, [], {
                     isCreate: true,
                 }),
-                buildNode('n-step', [{
-                    attributeId: 'a-1',
+                buildNode(STEP_NODE, [{
+                    attributeId: 'UQBiHFcwJeCDSnmkPBoYRA',
                     mode: 'editable',
                     isRequired: false,
                 }]),
-                buildNode('n-target'),
+                buildNode(TARGET_NODE),
             ],
             [
-                buildEdge('e-1', 'n-create', 'n-step'),
-                buildEdge('e-2', 'n-step', 'n-target'),
+                buildEdge(EDGE_1, CREATE_NODE, STEP_NODE),
+                buildEdge(EDGE_2, STEP_NODE, TARGET_NODE),
             ],
         );
         await seedWorkOrder(
-            db, 'wo-1', flowGraph, 'n-step',
+            db, WO_ID, flowGraph, STEP_NODE,
         );
-        await seedBinding(db, 'flow-1', 'rec-1');
-        await seedFlowLink(db, 'flow-1', 'wo-1');
-        await seedAttribute(db, 'a-1', 'rec-1', {
+        await seedBinding(db, 'aEsGMmBEFaVdWihhHXwCbw'
+            , 'rbfHGatkwQzGZJVXKJEeyw');
+        await seedFlowLink(db, 'aEsGMmBEFaVdWihhHXwCbw', WO_ID);
+        await seedAttribute(db, 'UQBiHFcwJeCDSnmkPBoYRA'
+            , 'rbfHGatkwQzGZJVXKJEeyw', {
             name: 'Email',
             attribute_type: 'text',
             constraints: [{
@@ -521,8 +547,8 @@ test(
         });
         const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1',
-            new Map([['a-1', 'not-an-email']]),
+            ctx, WO_ID,
+            new Map([['UQBiHFcwJeCDSnmkPBoYRA', 'not-an-email']]),
             new Map(),
         );
         assert.equal(out.length, 1);
@@ -540,22 +566,22 @@ test(
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
-                buildNode('n-create', [], {
+                buildNode(CREATE_NODE, [], {
                     isCreate: true,
                 }),
-                buildNode('n-real'),
+                buildNode(REAL_NODE),
             ],
-            [buildEdge('e-1', 'n-create', 'n-real')],
+            [buildEdge(EDGE_1, CREATE_NODE, REAL_NODE)],
         );
         // Ledger points at a node the frozen graph
         // never had — gate must refuse, not coerce.
         await seedWorkOrder(
-            db, 'wo-1', flowGraph, 'n-ghost',
+            db, WO_ID, flowGraph, GHOST_NODE,
         );
         const ctx = createRequestContext(db, await organizationToken());
         await assert.rejects(
             () => validateRecordTransition(
-                ctx, 'wo-1', new Map(), new Map(),
+                ctx, WO_ID, new Map(), new Map(),
             ),
             /current node not found/,
         );

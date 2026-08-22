@@ -149,13 +149,538 @@ function tenantAdminPiiBody(
     };
 }
 
+const SLICE_ENTITY_IDS: Readonly<
+    Record<string, string>
+> = {
+    'aa-org': 'pIkKmoeZHZMquyqxPUpWVQ',
+    'aa-admin': 'dISiDlJnfvFRleEiNkLOpQ',
+    'aa-idea-active': 'TBdNsIpyJsuWXBMweRmzKg',
+    'aa-idea-in_review': 'KYroiFTiZJseQQpiAAJBtQ',
+    'aa-idea-sent_back': 'wzoLqktSxARIsSQPImonRg',
+    'aa-idea-approved': 'oWFMLJNNJfJMPOCMnfvTlw',
+    'aa-project-submitted': 'aPsUeYnGBSNeQDbVryjKoQ',
+    'aa-project-approved': 'BWhZGvswUWKnmAgincYDjw',
+    'aa-project-approved-2': 'pmZPZbiGbAxbJEHBAguCrg',
+    'aa-obj-1': 'MyTPImFQcUPVAGaRnrexjw',
+    'aa-obj-2': 'smsNJAQYuoluqfQfmErCew',
+    'aa-obj-3': 'tkznlrWkXWJpaAJWMbHyLw',
+    'aa-obj-4': 'eLcefwLNZKRanLkxKCvAnA',
+    'aa-record-customer': 'nbVVZabdDBQlDtspwUAVNA',
+    'aa-attr-1': 'cxNzttibtFvlWVOqwNxnYg',
+    'aa-attr-2': 'dSbcrUIZTpJuBJzPxrfrRA',
+    'aa-state-record-customer': 'OlBcqVcxakMASmTOZNWsww',
+    'aa-flow': 'tDRyatMpIeXmrmVGYxRMlg',
+    'aa-node-create': 'YZqteEBJUhWMPcMFkqNjnA',
+    'aa-node-capture': 'IlgKpzslsnZTgUUibNPbgg',
+    'aa-node-review': 'qljWqsVbCUiHsQBHxzGjCg',
+    'aa-node-archive': 'qDFRPwiKvrrQRmZdIuCaWA',
+    'aa-edge-begin': 'odZujHuyLyhTmeVUgGfrPw',
+    'aa-edge-submit': 'GSsZyMVrkszvNCEWqwHqTg',
+    'aa-edge-approve': 'wXtxcGdCrIcxrwLEwbbsDw',
+    'aa-project-flow': 'nWuqOsIANXvmJpCedmkLwA',
+    'aa-state-flow': 'QprvkeEBUSiWJeqROUcLOA',
+    'aa-wo-capture': 'tyOMRHNlYoyflOrtNDZdbQ',
+    'aa-wo-review': 'ybdlQXRNySxElKtQsYCYeA',
+    'aa-wo-archive': 'IDWgaKACflhQBTMjHgPYsA',
+    'aa-wo-capture-move': 'apiWxvgADUZAfTCOSuaSFw',
+    'aa-wo-review-move': 'vywcZuTckgNqaLJzkFGfwg',
+    'aa-wo-archive-move': 'DPVTsvrEBiHvmxJoBISGbQ',
+    'b-org': 'KimZVSllwzsOFQRzABLAFw',
+    'b-admin': 'JbaPyILUCkLRVIVxJlHMSg',
+    'b-idea-active': 'EJrpMfFOlnQtlkfbHlXNcw',
+    'b-idea-in_review': 'xcZupnbDmmWHSpQgsgUrGw',
+    'b-idea-sent_back': 'UEVeFtKRtHcrAwtWGGYUlg',
+    'b-idea-approved': 'eNvPVqZQbbdKNocvJNAXvw',
+    'b-project-submitted': 'QqPqWqJhsqZLUHvcdPdMVw',
+    'b-project-approved': 'sKklgNwPuWAoJFjrjvBvAA',
+    'b-project-approved-2': 'xhqjEvpFbyfpkkPtACdMLA',
+    'b-obj-1': 'wdQEqkyCqEHnqYBydQpsWQ',
+    'b-obj-2': 'kdNYJzVfZGsugBPwAMJAxw',
+    'b-obj-3': 'tFjAryipXWvaviHzfNvhKQ',
+    'b-obj-4': 'ydOOsHHUsUsdcjApodxHwg',
+    'b-record-customer': 'OWijooyTMywZggIbCMRavQ',
+    'b-attr-1': 'tohvoeouiGIhqvElesljyw',
+    'b-attr-2': 'KORdJfuCsHjlpmSQzWpSpw',
+    'b-state-record-customer': 'leLLfdnAzDgxBzwbAjADDA',
+    'b-flow': 'UXOPfjdZZohCcyCLlQWnuQ',
+    'b-node-create': 'lYwUphTKpDrVBapuffNifQ',
+    'b-node-capture': 'GwHcMWpaCSGKdIGFtwASoA',
+    'b-node-review': 'SkkTBYoORudlrknmOWdCyA',
+    'b-node-archive': 'AhXlrhNOVTIlyMvpFdhmXA',
+    'b-edge-begin': 'nQldXetcsRiFhbeSqBgCHg',
+    'b-edge-submit': 'yAeThKEXWIucbhaNLFueGQ',
+    'b-edge-approve': 'tNWMijExGLyYwYdabWoZvA',
+    'b-project-flow': 'uSKBRIGgCzWRMFUzxaOPmg',
+    'b-state-flow': 'RRWnKatGWKoknDbRAmzvOA',
+    'b-wo-capture': 'nrJqCoLdPruUsZlJWYEAaQ',
+    'b-wo-review': 'mEsUypeeKHSiymcygvnUlw',
+    'b-wo-archive': 'tEavUntSfcznMwThZcEdeQ',
+    'b-wo-capture-move': 'qjJTjTtNURgWLNneLmserg',
+    'b-wo-review-move': 'tWwCdFQImzbQWKLOekkkQA',
+    'b-wo-archive-move': 'PInIVGISLvTaCLWWuAOZZw',
+    'c-org': 'UDPqeviQQcaxOUrvpkOejQ',
+    'c-admin': 'rgrOKkoZRGtCKXoZCKwkTw',
+    'c-idea-active': 'mYDXLRNzutXaXCUZkTLiYA',
+    'c-idea-in_review': 'vKAdUjWhMFoLiFqgJGTIdw',
+    'c-idea-sent_back': 'AawuLlRyaxZUYzeKGgMuTw',
+    'c-idea-approved': 'QKfYzzLSHCXWORvqimZeug',
+    'c-project-submitted': 'nQXpeKvMYDSbyVWBbZIJNA',
+    'c-project-approved': 'skPDGElmJJdAdYITVWNHcg',
+    'c-project-approved-2': 'JoYLAWWIeCVSzCQWRGLVww',
+    'c-obj-1': 'pnYrkmIPDIdqxqREMwTuDg',
+    'c-obj-2': 'OGikUXudaQzCfboTTUXONw',
+    'c-obj-3': 'stuiIssRZyaIVHzGyIGCBw',
+    'c-obj-4': 'vYSFlEjXVtzrSBsAEDaIHQ',
+    'c-record-customer': 'NqvEMOSINeuMAtbyQxmskQ',
+    'c-attr-1': 'cKoOBXxadFfRUzFCouUNHQ',
+    'c-attr-2': 'xNXoGMjCgYkFgSHylrrnvQ',
+    'c-state-record-customer': 'rpgPxnrYlfBQcoQsjyKIiQ',
+    'c-flow': 'wGFoZKHuJIhDNkuFtafOVw',
+    'c-node-create': 'VOvZGYNDScsZkzLaIcYeLQ',
+    'c-node-capture': 'zbFAvlwrMvHAZlMRuPHJng',
+    'c-node-review': 'COZlWfLvbhNbTmiNphBSHg',
+    'c-node-archive': 'guXZUMyEOcjvExZguPSMRg',
+    'c-edge-begin': 'arRpRuEYXaLtQqjGAIGqIg',
+    'c-edge-submit': 'rtkLmNmmRWRMqACLAOWYbg',
+    'c-edge-approve': 'oMvhqoZPSaCHeYkVKuWZEA',
+    'c-project-flow': 'hGZNrChuDKomEdNgOpwBTg',
+    'c-state-flow': 'LcUYRIEYOesgVREGVszbXg',
+    'c-wo-capture': 'GEQtfApYgLgwOtjGOsOWQA',
+    'c-wo-review': 'dmQEgqjuWCPhzoIaNhkdZQ',
+    'c-wo-archive': 'BOgLdJDhOSTiiIYTlUojew',
+    'c-wo-capture-move': 'cBJzNvNKLsCYmdqZQTiQTA',
+    'c-wo-review-move': 'VcwmLRLazHybVJcPAxGXig',
+    'c-wo-archive-move': 'PPAaGaCozURziXUgetHzMw',
+    'd-org': 'awIQEalaPzqtPJUXERwTLw',
+    'd-admin': 'PVNrLzrfvTzAwGkxEOvTdw',
+    'd-idea-active': 'JNsKAOqCHVVqcJMLdBCzrg',
+    'd-idea-in_review': 'FQqRjwrXVfCXFrzAdfGGJg',
+    'd-idea-sent_back': 'QZyoamhqqrJUGyKlETHSCA',
+    'd-idea-approved': 'rJVaWbzcBhcYPqEsFpKgOA',
+    'd-project-submitted': 'KNzsXuHnXjbJSXwAEguWfw',
+    'd-project-approved': 'rakYaiIbLJAhvSfhfqQZlQ',
+    'd-project-approved-2': 'SqNxjcBlrbfmmdPbxYimpg',
+    'd-obj-1': 'ERKTwqaOZDMpjoBegKAEyg',
+    'd-obj-2': 'fEMiLSsOHeeroEXvcmlQiQ',
+    'd-obj-3': 'bEkzgDMmknLDbAmgrDXLcw',
+    'd-obj-4': 'fDpTbgeVnTBbgiWgzPGfiw',
+    'd-record-customer': 'ltsneqmKbbbYioiqDMHaMw',
+    'd-attr-1': 'YZzuQVghYsMQpegcjzklIA',
+    'd-attr-2': 'ozydrOWHXZrZPJAQptHwrQ',
+    'd-state-record-customer': 'rlAWvPiEfgBjDtydoXxQDw',
+    'd-flow': 'UgQvGSOzRwAGysXHQfZPCg',
+    'd-node-create': 'vArHIbnQwQmROVYGygqIHA',
+    'd-node-capture': 'ZaApzKSTovzCKivtrHbiEw',
+    'd-node-review': 'ZJlbmGQBfiJOfIOQWRPwKw',
+    'd-node-archive': 'HZbONvLhEUZWYkyXbabDGg',
+    'd-edge-begin': 'CLrlHoCRpAEVUkyuraisLw',
+    'd-edge-submit': 'thpwOjOUrtjnoPOaUhsmGw',
+    'd-edge-approve': 'CdPfPQIpnEisUxonuclHxw',
+    'd-project-flow': 'DZkJPdRBXHnrrXFLxTDeFA',
+    'd-state-flow': 'WXaPxBdEbMDDqOOJSYcSdg',
+    'd-wo-capture': 'MAAPjqIHTSzQSHVukUKcnw',
+    'd-wo-review': 'SbzycBYGIVdcviNBbhovfQ',
+    'd-wo-archive': 'CMaVMfsHDyzHIEDXsYMvuw',
+    'd-wo-capture-move': 'iGUYIVjjpuUrrLotUinDyw',
+    'd-wo-review-move': 'xIbMAlDcgXImQUoBINApFA',
+    'd-wo-archive-move': 'vOpRxbNIfuGXzvafULwEMQ',
+    'e-org': 'IuiEymgiMNesHqWrYzoupg',
+    'e-admin': 'VhtqMAOlJREIqexMYxwZOQ',
+    'e-idea-active': 'BfIALWEgMdeBYpcpfVhzrw',
+    'e-idea-in_review': 'AkXMklIskznhkiLYBrhLHQ',
+    'e-idea-sent_back': 'CRAjZgtoKIofBruaUDWIlQ',
+    'e-idea-approved': 'rWHlwkUZurkxHmbGweYvxw',
+    'e-project-submitted': 'TmkurVxwWDUjGhgjvUnVIA',
+    'e-project-approved': 'oGEBUpeSRIcOArpvKjAfkQ',
+    'e-project-approved-2': 'uUicHreJEefHETeiuWJhcQ',
+    'e-obj-1': 'rENgePZQGzAFrUEJMvnygA',
+    'e-obj-2': 'guVotQNMraqgEDeyUJCWNw',
+    'e-obj-3': 'wwhzNJccxNXjFRaStKKNnw',
+    'e-obj-4': 'SApjXOgJeecxpRVXhMmuGQ',
+    'e-record-customer': 'oltTTJynJVzlvGvUcecWuA',
+    'e-attr-1': 'LsZDxvRffygwenfWxkgCUw',
+    'e-attr-2': 'POolfJPMtENAIloFzGNnvg',
+    'e-state-record-customer': 'PDHSUSnzFoTcdyXZBbxWWQ',
+    'e-flow': 'iaLNFiscTqqcDmAlALPbOw',
+    'e-node-create': 'XjxsYNrgybpgkiWBavvNbQ',
+    'e-node-capture': 'svIbPlhAzRJPGYDMNPlDQA',
+    'e-node-review': 'vhIaJtmJbKJVZFtWeGVasA',
+    'e-node-archive': 'MUebpZrzmTQTMkgHruTJFg',
+    'e-edge-begin': 'DNrKkVAprqBewzuWFMCQqA',
+    'e-edge-submit': 'DbrkiRHhAhUcfgTrxZJCRA',
+    'e-edge-approve': 'ZpLXhibDgjOgCbQpbzBGvQ',
+    'e-project-flow': 'lFVzQiEJsYYCgIuBRAOLLw',
+    'e-state-flow': 'WfIUUyzGpJYxGLEaNAYdUg',
+    'e-wo-capture': 'yZoNxZOGAobIHxEkxytlcQ',
+    'e-wo-review': 'eSsDbRirlIcFupXUCDWjrA',
+    'e-wo-archive': 'RtKotJiYhLfaATzyPLAMqA',
+    'e-wo-capture-move': 'MbhzVgShDqUlpLBULMHRxA',
+    'e-wo-review-move': 'SPyrSrrrKHdouQWLYgiHTw',
+    'e-wo-archive-move': 'HaqUsFjVoSCXfxgtccIXAg',
+    'f-org': 'HnaaDDEIAzvTpTZzDLxwow',
+    'f-admin': 'filDOGmwcxtlYjNqiNTFeg',
+    'f-idea-active': 'LbuxXoZGIBrOiQksRZJBhA',
+    'f-idea-in_review': 'PdJUyRINPYaYvLiqdRlarA',
+    'f-idea-sent_back': 'YbajiKGBHvZgPSnlNPmgqw',
+    'f-idea-approved': 'hlTnSoHDnweVMoHgVnlBaw',
+    'f-project-submitted': 'ApUhMPPylRMGLnVIMunOnQ',
+    'f-project-approved': 'rNCXPDcoUFRptifYcNWYpw',
+    'f-project-approved-2': 'ktwdMAbuSHCcFmDKDwLrDw',
+    'f-obj-1': 'jCHBiugZxpXDDAgbJxDGnA',
+    'f-obj-2': 'mdEaNUwfCxwsJcQWGUnrZQ',
+    'f-obj-3': 'NIbpyCjJpZwgkGFgSWbMTg',
+    'f-obj-4': 'qhWgaotVWzbfWVibuJJRXQ',
+    'f-record-customer': 'KSOBFwEWEAiYDqQPCKSfdA',
+    'f-attr-1': 'azPhzEoiGiuzYOKQGggkgQ',
+    'f-attr-2': 'XzsBTUrqoijPRVPskGmYbA',
+    'f-state-record-customer': 'MfeoyMCsGYmicGSkZuxbew',
+    'f-flow': 'WGrawvQlBCEtOwQaDfNYzg',
+    'f-node-create': 'UlwhAnqPkssQBaKWPOjPHw',
+    'f-node-capture': 'joVDOAiJZVtgnElmOCAyAA',
+    'f-node-review': 'LVryuKRUgVkuTdVeKYqDcw',
+    'f-node-archive': 'vTGKwITZylFuMNKCyFXwYQ',
+    'f-edge-begin': 'GBBcWwzkxjRAjeNPlXcODg',
+    'f-edge-submit': 'IWbtNQySXwOtbJbHKFQSEw',
+    'f-edge-approve': 'DBacZPqqChMYfkjjqSRZog',
+    'f-project-flow': 'LBcldHIXITLfvljfXpefog',
+    'f-state-flow': 'wXEqVCZvISuDsLdNNCWLeQ',
+    'f-wo-capture': 'PrfmrgcRHkNLhzlhPoPVUg',
+    'f-wo-review': 'WOJPFOKFmWASZROqIiiCig',
+    'f-wo-archive': 'VnmXenQTOeGhKheRJEvFQA',
+    'f-wo-capture-move': 'hVrwCPqWKeUHsiBXMmhGcQ',
+    'f-wo-review-move': 'gscDMrbcATQVdzXOXjpDag',
+    'f-wo-archive-move': 'utHKBlWksCwDvedKNAlceQ',
+    'f2-org': 'YbTDlTvOzvkCjjPaIGeQCw',
+    'f2-admin': 'xaLPEsKuiAJXlaNLnHLVkw',
+    'f2-idea-active': 'ROviknftHNANsZMrhRtATQ',
+    'f2-idea-in_review': 'GVFEJpKIBvOGZoNouogjTA',
+    'f2-idea-sent_back': 'KoMJnbZMcAOMJeCVNdesGg',
+    'f2-idea-approved': 'MxXMUsTQREaqpMPHwGAphA',
+    'f2-project-submitted': 'metJwyIStvriygkCQdkTfA',
+    'f2-project-approved': 'hDVAYRpFxiuCsRsiotPWww',
+    'f2-project-approved-2': 'XxATszJyajREePphmJzQxg',
+    'f2-obj-1': 'qWYWPVTzffLmhlRZvfVeeQ',
+    'f2-obj-2': 'ylpwVUqnmahURwRtpjszAQ',
+    'f2-obj-3': 'GJEWXzgtkzGQmJavYYYjFw',
+    'f2-obj-4': 'hxhFEGMmvzDrJpSlkmQdPQ',
+    'f2-record-customer': 'ShEwahhRZEafyzmgXqfciQ',
+    'f2-attr-1': 'YErPUsjpzqQjteXbusYqiQ',
+    'f2-attr-2': 'mxyQyZkqIyMjiQINxMcJpg',
+    'f2-state-record-customer': 'lnyXdDKmWojVxcxTfFnvjg',
+    'f2-flow': 'DccQFYFgizAgqBvhRHkgew',
+    'f2-node-create': 'meDWiMTCzPAPaOykaGdmWQ',
+    'f2-node-capture': 'gERGOBxsTCVinbjnNxFayw',
+    'f2-node-review': 'vzttFjxTEgpNmfyyrKusNw',
+    'f2-node-archive': 'uuuTtohLKSFkfslRCQuPZg',
+    'f2-edge-begin': 'nBTaOvBuUzsCMvOLOWqHrQ',
+    'f2-edge-submit': 'FPkWtsaHGXddJVKpPDaRnA',
+    'f2-edge-approve': 'SEjfnAIqgAgGukqncOiooA',
+    'f2-project-flow': 'DwppKTRaYbyjeAvtIHwbrg',
+    'f2-state-flow': 'wBQxSNLEXSWbbSOpOMflHQ',
+    'f2-wo-capture': 'oLSsqdIHyZrxtdYMwsalPA',
+    'f2-wo-review': 'wqPiLLdRTwAjqWZjvImEpQ',
+    'f2-wo-archive': 'dXOOKlSzOJyFBvDouYHcFA',
+    'f2-wo-capture-move': 'MjmZVNlbEJgbhIjdSheqeA',
+    'f2-wo-review-move': 'QmEQljgzjOljAxWoMQtWyw',
+    'f2-wo-archive-move': 'IoeAvZCClizGdtQHtrcsEQ',
+    'fs-org': 'PaZyGJschXoHklvGOKaSXw',
+    'fs-admin': 'WxXaodvJSfkEjgtLcoIAHw',
+    'fs-idea-active': 'eTUToxRWkZLqzazRknqxyQ',
+    'fs-idea-in_review': 'TBHQuCnGLYRguJVHlcAPmA',
+    'fs-idea-sent_back': 'PsrszcUKKUtEyMAATUjUOA',
+    'fs-idea-approved': 'zYRdPmRsZkzkaYLCOlKTHg',
+    'fs-project-submitted': 'KRJkyBIyhtgslHqtyzETyw',
+    'fs-project-approved': 'LjaFVOqibIJXtkncrlJBlw',
+    'fs-project-approved-2': 'KRRxaqYrtCItTpUHEzzZlQ',
+    'fs-obj-1': 'mZMeEdzmvvVkcyIFmuzOag',
+    'fs-obj-2': 'oOvRnUPmxzmkBakuijPOCg',
+    'fs-obj-3': 'aOcoHMKcHlSXeoNZcYAoGw',
+    'fs-obj-4': 'OSXcitRfJxwOWVJXmhXUmw',
+    'fs-record-customer': 'NraSKZbEBDQvmgbWtWzTjg',
+    'fs-attr-1': 'GoTuKNlmKPmCozkOQqusyg',
+    'fs-attr-2': 'SSzlwaLazYbrbVTxBoEPrg',
+    'fs-state-record-customer': 'bKxhTVKnzuDKMgEwORgacg',
+    'fs-flow': 'zFkTGJvfUppRCCdJvFszcg',
+    'fs-node-create': 'KRUlvITqCzLbngoRcKaTAQ',
+    'fs-node-capture': 'QYypRkKLzMGbSGxotgIxNQ',
+    'fs-node-review': 'jVhhOAhaHKPbIJuhwYjDSg',
+    'fs-node-archive': 'wTmRlODxPuAbOTylkfZDNQ',
+    'fs-edge-begin': 'AdVOtqtQSKfGZGtaYLfdPw',
+    'fs-edge-submit': 'ItZFnpoyOndFMUIYeAOIhg',
+    'fs-edge-approve': 'uCdEHZjvudxpNyqyUtQKtA',
+    'fs-project-flow': 'etPELgkwzjYWnosrKJZWpg',
+    'fs-state-flow': 'MbLBcUlBjgnUYOsLraNUNg',
+    'fs-wo-capture': 'fTsrGwymzlLKIKnTPKvkEQ',
+    'fs-wo-review': 'hdaUcpzJpWFeeYMzuIJSVw',
+    'fs-wo-archive': 'YAmKFSHvzqFEztADuqZqJg',
+    'fs-wo-capture-move': 'UMOMLVPXMmwpVGLPaUrgEA',
+    'fs-wo-review-move': 'PxrsDoRSFVJyvPEUtcihbg',
+    'fs-wo-archive-move': 'yFZJuUZhsLwQdJhyAqxlaw',
+    'g-org': 'wxOovfCwcKNldjMnmAkuCQ',
+    'g-admin': 'kHaSgLhnsobjMXxNLEzpBw',
+    'g-idea-active': 'LHTpPuJQpgwmykSTlDezAg',
+    'g-idea-in_review': 'MGctitcHoekEYcGdDcSUvQ',
+    'g-idea-sent_back': 'mVhTQMpsOwBYEUWrpZLahA',
+    'g-idea-approved': 'aNXrWWjugZpaABsjogeRJw',
+    'g-project-submitted': 'tLUKhztHHdPnykWQIEhtZw',
+    'g-project-approved': 'sGYvynSwYUWCoENhxXwwTA',
+    'g-project-approved-2': 'eyFErnGwPwqXrCwufQCvZg',
+    'g-obj-1': 'GElPCmItNRvYJYvPsDwHkw',
+    'g-obj-2': 'eQPiIXIHVyNmVkJreaqqxw',
+    'g-obj-3': 'LzRSaxBuFPlhxPAUdGzIMg',
+    'g-obj-4': 'pKwNBybsKbPdLjpigrMakA',
+    'g-record-customer': 'fIIVLzRrRqWMuIKsGpTgpQ',
+    'g-attr-1': 'ogmxMGsFyRaRgkYZoBiHbQ',
+    'g-attr-2': 'FnPYpeWfhXoymLRhkBxQCg',
+    'g-state-record-customer': 'PzckmcTqryfhbtVgGKmcsg',
+    'g-flow': 'gEhRUDIhkmdVxrwOPhNBiA',
+    'g-node-create': 'bVErVCQjdmbSGvZybxBjPA',
+    'g-node-capture': 'xkebgRgzyWcncrRESmMULg',
+    'g-node-review': 'AzWRboKLBybtauTdeLlOLQ',
+    'g-node-archive': 'LPlgkxIDhYxYdIbygljfWw',
+    'g-edge-begin': 'nnIODXjeVoFBVysNfxDazw',
+    'g-edge-submit': 'DWazojgdJiAZiXrpYnftEQ',
+    'g-edge-approve': 'UWvGGmcrRwzOCSYMQriueA',
+    'g-project-flow': 'oPQHCMaEWhSKEqyUpvBGmw',
+    'g-state-flow': 'hfbzstxNktHjJRZCJZTenA',
+    'g-wo-capture': 'LEBCOeMgysLkASBbmHMyIA',
+    'g-wo-review': 'YUehbqrUJVEiZTKmFwAYUg',
+    'g-wo-archive': 'outnWONMucepvFuGYFgxxg',
+    'g-wo-capture-move': 'YClMotnhvUyzOKxLVFlRZw',
+    'g-wo-review-move': 'AdhAFAeApOMpawcYjfHsKA',
+    'g-wo-archive-move': 'rJkxGdjBVrvkjaCngfvZpg',
+    'h-org': 'LiWELcsIlmmwrpkHwtITIA',
+    'h-admin': 'PLJUlcSlswqOmpGbwDzwZw',
+    'h-idea-active': 'GehEFaGCqmqkAJYozyykpg',
+    'h-idea-in_review': 'NPdZHZCUKggQQjKPKmeZPQ',
+    'h-idea-sent_back': 'HAsBazcnfsipHxhHnJRShg',
+    'h-idea-approved': 'sTTBWiJomNUZGDjTeSxIjQ',
+    'h-project-submitted': 'aGQkWCzaUWvRDnEBcaZzzw',
+    'h-project-approved': 'iXUEWNjNEXhrSOZCpzGVkA',
+    'h-project-approved-2': 'ceASjkMRvdGADMFoSgGqHw',
+    'h-obj-1': 'feVFgGVDjdjzIUJmFulakg',
+    'h-obj-2': 'IejpeWqOZueoecDjoCbExA',
+    'h-obj-3': 'wLGENTAmQSqpxhczPFRpOQ',
+    'h-obj-4': 'UMHXmuDxaMFwYcsnmszUYw',
+    'h-record-customer': 'WCJrkgUVdmuOOtJougqCrQ',
+    'h-attr-1': 'toKfaSwZHIlDzGlDQbtGdA',
+    'h-attr-2': 'sTStQinOgCyDSqPYkpyHNQ',
+    'h-state-record-customer': 'vonlwGtVAmltTwnAAjpZww',
+    'h-flow': 'KdaUvgreSoKtJChAfEyCpA',
+    'h-node-create': 'jtAYhwimgiNtMdThSlWQAQ',
+    'h-node-capture': 'kAKqMpczBNNJEFwukittTA',
+    'h-node-review': 'rPmPWoxenZVjUicDXDkgkQ',
+    'h-node-archive': 'YqiNHwHjwiSUNSwidvegHA',
+    'h-edge-begin': 'PseICgHWCSHMqrasVMTHwQ',
+    'h-edge-submit': 'KAuqtMNYvJTtroyaDwoHpw',
+    'h-edge-approve': 'pQVbNGYpZTmZVFKVvJUrkw',
+    'h-project-flow': 'rPwfrvhRPAtDQSjmWcFjzw',
+    'h-state-flow': 'jHeXLJySjUwlmzIwLrzuEQ',
+    'h-wo-capture': 'YQqYPnqrhUxrDYUTDaCbhQ',
+    'h-wo-review': 'wLELYXpvCHIeyVRtqGoXVg',
+    'h-wo-archive': 'RqIJHTImCFOnrKDAJOLDJg',
+    'h-wo-capture-move': 'SNOXNUQIZhXSPXURBEOfMw',
+    'h-wo-review-move': 'yxblcmaKhbFxeKLiNwwZOw',
+    'h-wo-archive-move': 'FXBmdAKYnzkaoBAhynZBcA',
+    'i-org': 'MKmTOEpQTLEoKsYLTSFPXQ',
+    'i-admin': 'RlVXjLbPPTsOimpvwqwLsA',
+    'i-idea-active': 'rjlLdGCcBuOpKYZNXhdvMg',
+    'i-idea-in_review': 'UVjxUdANhxHweLHupBNMfQ',
+    'i-idea-sent_back': 'lavJFfVPWUawXNmMybpdGg',
+    'i-idea-approved': 'PxstVVYLDvmwIEAhJAhXwQ',
+    'i-project-submitted': 'WjkquEmLBsSdJUfUnoNXhg',
+    'i-project-approved': 'bmAqrrrKZwJMzPzATiPxQA',
+    'i-project-approved-2': 'zzluLcEOsVDYQCDtbhlVSw',
+    'i-obj-1': 'shtRWUAhKBuYiwBSjXOpUA',
+    'i-obj-2': 'gHaLKrEomVMkGGleEHxwdw',
+    'i-obj-3': 'qVQPguSGjgetfCUBdBLefQ',
+    'i-obj-4': 'paPaiJiCCtCGOkCgZMMWdg',
+    'i-record-customer': 'kKqHbxmKCxHiUOjZBwazNQ',
+    'i-attr-1': 'lXLLZFdJCzdHvMswiRWWQg',
+    'i-attr-2': 'SrMzBeRmSlghsEPGEMvRYw',
+    'i-state-record-customer': 'fpEyAQDqgtCFkuiANGsRGQ',
+    'i-flow': 'XpUsrMfAIMRHwkjGONVPeg',
+    'i-node-create': 'XLbgLyyvHZKwyyLpnmKZuQ',
+    'i-node-capture': 'nZiBvCFSbKbDjfJcztOFCQ',
+    'i-node-review': 'jPqgslrdvTBacBWACuyMOg',
+    'i-node-archive': 'vFZfFQEGWhpJoXItEDeeEQ',
+    'i-edge-begin': 'JAsHYjxlofcuQWJIgXaklw',
+    'i-edge-submit': 'YApJpbxKvpKwycCqoTAbeA',
+    'i-edge-approve': 'mdcITCSWpBiGscTStiDKiw',
+    'i-project-flow': 'qxMrBjLWeEKnFFbLjlaGng',
+    'i-state-flow': 'ayEANMOGHHdOrxTJIFiCwQ',
+    'i-wo-capture': 'KMRsEUwlMEgHAVbcotXTYw',
+    'i-wo-review': 'WzgLRaUoiDIcACiJrDQXtA',
+    'i-wo-archive': 'EIjrPZpcUEGWlfWexBbsBQ',
+    'i-wo-capture-move': 'ysUNddcLoKeOTsVZnVnWjA',
+    'i-wo-review-move': 'rbaGUBLjFcpZfEpLAQsbvQ',
+    'i-wo-archive-move': 'YyLyAqlclXWaNAPULBELAQ',
+    'k-org': 'hiAguMgaZhKsTyVFLFxdig',
+    'k-admin': 'JfHbTXkOyLzJSNWFWFGrMg',
+    'k-idea-active': 'wzSXrKhOSQdIiNKtqxxtHw',
+    'k-idea-in_review': 'zcnjiUCwsijdNtgVJnyxeA',
+    'k-idea-sent_back': 'OmrBjXExMatzWNNJLvfEHA',
+    'k-idea-approved': 'LHxdLOPzEtHwPnNJTqRMGw',
+    'k-project-submitted': 'PUsJipQoPeOXZYbvjrxRYA',
+    'k-project-approved': 'aiuWSWEDxpQtocOmEhREig',
+    'k-project-approved-2': 'MDaWSsFjBtixOMAkPTArgw',
+    'k-obj-1': 'TPvhenONWoZHuenvmDnmRA',
+    'k-obj-2': 'zstobkLDYwgbXzQdpwioFA',
+    'k-obj-3': 'EElVrvvnEMpKqZykKDiuzw',
+    'k-obj-4': 'EfFPOLsanHRxxrRqBtFjQQ',
+    'k-record-customer': 'jJUXauIwMbWUJuJeHXWyhw',
+    'k-attr-1': 'fxMMTgnXVFrCrepmxleQpg',
+    'k-attr-2': 'czuxJBVggLcKkJSPkLbZMQ',
+    'k-state-record-customer': 'PpTgnhjiIgWVPOkfKAcazA',
+    'k-flow': 'KLmPzgUDqnlEfkDSIZnTqg',
+    'k-node-create': 'THtUTDrIWcEdlAwJgjvzyw',
+    'k-node-capture': 'yyIZUPVeYThRDRAhqrpEfQ',
+    'k-node-review': 'icFCNQEmjzyjwhgOJdxYRg',
+    'k-node-archive': 'pGovEGUKVORtfTZCHARMUg',
+    'k-edge-begin': 'eJOkYbhwbldoLCSBEntMQA',
+    'k-edge-submit': 'mgopZOhilKRfFhMNLwUumQ',
+    'k-edge-approve': 'rfToMcWLHpPiidvfzYfUMA',
+    'k-project-flow': 'eQiRXiHFJuMliPCCtDElwg',
+    'k-state-flow': 'XRZCTxzgfGuZsPBxGwiWZQ',
+    'k-wo-capture': 'svGNuEBKCMkjBZWBbXcjng',
+    'k-wo-review': 'jFJXsYkvXVhjwbbNeVmvMQ',
+    'k-wo-archive': 'sfCmmCtuqOAULmDpYmutww',
+    'k-wo-capture-move': 'bRfUDjGueJpLAJuWZzxBRA',
+    'k-wo-review-move': 'JIDiLeIJxlKWmwqAyiKvwg',
+    'k-wo-archive-move': 'quOEWgCEqofdoGcWdbAedg',
+    'r-org': 'BzNcjJwZLCEodbofraIVaA',
+    'r-admin': 'zuIFDMrBwxTWqLJpRrQWog',
+    'r-idea-active': 'xMHKBRmBECZaEmSERjXzMw',
+    'r-idea-in_review': 'gVYYDerOlcyAdyoFJXUVaw',
+    'r-idea-sent_back': 'YiAwBoWYyaiALGKTvokFIg',
+    'r-idea-approved': 'UwVUFzneUubUBqqaXcwNow',
+    'r-project-submitted': 'NPZZkgeCsDHgQvSumUvwyQ',
+    'r-project-approved': 'qUfonSjpXWhaiIdZHjxoaQ',
+    'r-project-approved-2': 'ZUaYUFklHVnRnLMwteKiYQ',
+    'r-obj-1': 'STLnfNyJSKfQZmqQVDgjVA',
+    'r-obj-2': 'XrgWaZvsqfrFuqWwMcGPXg',
+    'r-obj-3': 'jVrJWdqovgipwOfeVfEOrw',
+    'r-obj-4': 'iJVjJKUZfrTwxbxGReVupQ',
+    'r-record-customer': 'NlTUsuvZqqNpXXDvtZORJg',
+    'r-attr-1': 'nIvyKEMWevzIynfqPKHkbA',
+    'r-attr-2': 'dqyTeecJBQmttvQWXErnRg',
+    'r-state-record-customer': 'pAdySOwTblAIOGayXpfKSA',
+    'r-flow': 'woyUPAYCghVYHwkFAUEZEQ',
+    'r-node-create': 'iZmbcpBGnOexjJdnUFtALA',
+    'r-node-capture': 'mUApBGklrQKzvoBaxlRalw',
+    'r-node-review': 'CihiRQzXuHILZTTKOpAgag',
+    'r-node-archive': 'GKCappCPnzygmFaLnhPcOA',
+    'r-edge-begin': 'tjQRCMbGNNeDffOptbtZqw',
+    'r-edge-submit': 'QCQbDtLwCmnITslYwAqmSg',
+    'r-edge-approve': 'sMeRwGHMNFvqIHcAJwRPNA',
+    'r-project-flow': 'jFgJKiCyisocZTmPfcKCPw',
+    'r-state-flow': 'TKfYaPhktGYrZNPAbnAIfQ',
+    'r-wo-capture': 'OHhiyKjotLzPfKIKlTMCOg',
+    'r-wo-review': 'oAlkoPujLPUkLoTVTXNSwg',
+    'r-wo-archive': 'KuTZZjgDftzjmvvCltMkAA',
+    'r-wo-capture-move': 'uWTNopQBCaIMxmJlsFWaJA',
+    'r-wo-review-move': 'LRPrEiOANEzQxSPZcCMSIA',
+    'r-wo-archive-move': 'XVSvgJYmsIZjEEkiSIwFZg',
+    'sv-org': 'gXKZHmZgcbfwQYiYhEQDug',
+    'sv-admin': 'hPrdaZfedPOJYevSaGziHw',
+    'sv-idea-active': 'wmRZaGDtUSWNiHXkRtNEaw',
+    'sv-idea-in_review': 'VYkBekVqLcThVicOYKavxw',
+    'sv-idea-sent_back': 'YSJfpGAURcQSzUriTXoNFQ',
+    'sv-idea-approved': 'wKzUCwbYYMGqXKGBkcPOYQ',
+    'sv-project-submitted': 'cxteqEVfPKIHJbejdMGiKg',
+    'sv-project-approved': 'SYHlqlwIMByzTjdOQtthBg',
+    'sv-project-approved-2': 'QLIfwcxVJKDAKiHKDfnYHg',
+    'sv-obj-1': 'xdBYhCPAWxyDGvAcDqUqRQ',
+    'sv-obj-2': 'hxTcfABePuHwIesNwTaaUw',
+    'sv-obj-3': 'AASFZlHQWfSACqfEYmRdUA',
+    'sv-obj-4': 'WdJUECTNJSqtbnOhCHgkHA',
+    'sv-record-customer': 'tiCTXTJpucfZnFmVhCnxNQ',
+    'sv-attr-1': 'rfjHNZVPxJTXVGqjdUOadw',
+    'sv-attr-2': 'OVhTCkAgqemnHjwuyCzXXQ',
+    'sv-state-record-customer': 'LfJTBBhUomIoYqHovgvGyg',
+    'sv-flow': 'iIJEMvSRyXNRKCGyznqzKg',
+    'sv-node-create': 'ooyusqKcASwwiFdUVSeZDA',
+    'sv-node-capture': 'FOTkmfXreojfFnVFsMVjjQ',
+    'sv-node-review': 'LqFfkqAiIoSsYCvAfoMRzg',
+    'sv-node-archive': 'FtJYuxvWjXELQauJyqccTA',
+    'sv-edge-begin': 'DhkrzvCMWyuRSiFrhLALag',
+    'sv-edge-submit': 'HuHFVmFwIKPFyqXiOOPakw',
+    'sv-edge-approve': 'qmOVFjBxLDHFvAiwNgYsxw',
+    'sv-project-flow': 'sOtmunTjyTxVmXAodhjuiQ',
+    'sv-state-flow': 'BZwnnLBsjRPSSFLzXMoAjQ',
+    'sv-wo-capture': 'MEsFDqNoTJENaBnUGYwuKg',
+    'sv-wo-review': 'TmlpSqmoAHvTRcfXbSxuEQ',
+    'sv-wo-archive': 'XsgMKRoBlSNjQbtWuFoEog',
+    'sv-wo-capture-move': 'mCNFKpGTDVysUSOQMHelDw',
+    'sv-wo-review-move': 'UqWpSqnWTXLnfNEJywaZaQ',
+    'sv-wo-archive-move': 'SUpDapOXlRpurVoHVfnNwA',
+    'g-org-2': 'WlkfISpndVJfICRnWksipQ',
+    'g-ai': 'NAWwhciBiPVcuqxjPhXwYA',
+    'aa-project-submitted-state': 'TmbwzmMOyZTUZlDmxsptLQ',
+    'aa-project-approved-state': 'pESwjYZlpOKtCfLKpGxLSw',
+    'aa-project-approved-2-state': 'lNkxGTHMpZDysWQHzaFLpg',
+    'b-project-submitted-state': 'ocufoWzLvfKNzEYiucdWlQ',
+    'b-project-approved-state': 'HYSWdLUAUWqXbewpKVcLBQ',
+    'b-project-approved-2-state': 'ZHiCwsFHpBhetUJLYbPhgA',
+    'c-project-submitted-state': 'lFeSdSVRYYABtVtxVxVXWA',
+    'c-project-approved-state': 'tmpUrNWAjViGNrBycHNUdw',
+    'c-project-approved-2-state': 'psTaMMjrwPawYPoKVOZrWg',
+    'd-project-submitted-state': 'ssvAAVJbPitNDVWlBVVGXg',
+    'd-project-approved-state': 'BKDkbYJAeAFWwUiQgptGlQ',
+    'd-project-approved-2-state': 'mzOpWXYdUFnalfaYwlDVlA',
+    'e-project-submitted-state': 'xxvsxkSMOocjMRcIKZxNdA',
+    'e-project-approved-state': 'bYSdHQqJMFMGnSxDRxDsIA',
+    'e-project-approved-2-state': 'PpUcbCyWNOZewUxLSgxHyQ',
+    'f-project-submitted-state': 'ZgztRdROQRqNZONLZeMFcg',
+    'f-project-approved-state': 'ymoLkrVjPxObAizwbOJKUQ',
+    'f-project-approved-2-state': 'uTAFrWXkOJimtjJrIEuypw',
+    'f2-project-submitted-state': 'NkkwxHaABLcBYuEIVEXzgQ',
+    'f2-project-approved-state': 'mOUdeMjkrzVOkrGTeyZahg',
+    'f2-project-approved-2-state': 'hmLasBawRWsTYHaVOBOdwg',
+    'fs-project-submitted-state': 'dBFarZGIylbgfJqzGUWzpw',
+    'fs-project-approved-state': 'ZmnazvvKUFjAiHuXCcLayw',
+    'fs-project-approved-2-state': 'yluFZOqUskxIxbDBMNgUlQ',
+    'g-project-submitted-state': 'kTkMIcAOyrcSosYCYmNgdw',
+    'g-project-approved-state': 'cdXozzKWLQMNCetkBTpDDA',
+    'g-project-approved-2-state': 'iUOInITSSnCDlGdhxnbnXQ',
+    'h-project-submitted-state': 'DlniBnzuZKLGUTRrcKhdbw',
+    'h-project-approved-state': 'VFWrxbHsOrDNVxELUbSRhQ',
+    'h-project-approved-2-state': 'uQJIPNXNvzsgkdACjiTtQA',
+    'i-project-submitted-state': 'pFniAMyKkdchaxwOIpTzFQ',
+    'i-project-approved-state': 'FPPXbRAFTvmxxZgrGouUEg',
+    'i-project-approved-2-state': 'ZOpxNxMfXlTZlCTdJbvnGQ',
+    'k-project-submitted-state': 'bIQfXXqfbMpDeBTlDfYDhA',
+    'k-project-approved-state': 'CncNbMCOqKJLVLFddEGjcw',
+    'k-project-approved-2-state': 'yBaQpUcjvckgFFJKVQqMHQ',
+    'r-project-submitted-state': 'iZHMvKifqiulQHmABULFuQ',
+    'r-project-approved-state': 'GOFgsNHVXxTGgyTsjLmLXw',
+    'r-project-approved-2-state': 'FLhvamGQwczgjLSVQNvpDA',
+    'sv-project-submitted-state': 'UgYEsWGUZozEatoKTnjwLg',
+    'sv-project-approved-state': 'ZpvzzOazViNSjrLxSBFkrQ',
+    'sv-project-approved-2-state': 'PUdAQZLiCBAGdLAsCKTWWg'
+};
+
+export function sliceEntityId(
+    composed: string,
+): string {
+    const id = SLICE_ENTITY_IDS[composed];
+    if (id === undefined) {
+        throw new Error(
+            'no slice id for ' + composed,
+        );
+    }
+    return id;
+}
+
 async function formTenantAdminPairs(
     section: ParallelSection,
     requestAt: string,
 ): Promise<TenantAdminPairs> {
     const token = sectionToken(section);
-    const organizationId = token + '-org';
-    const adminId = token + '-admin';
+    const organizationId = sliceEntityId(
+        token + '-org');
+    const adminId = sliceEntityId(
+        token + '-admin');
     const email = token
         + '-admin@test-plan.example';
     const piiBody = tenantAdminPiiBody(
@@ -381,7 +906,7 @@ async function formBExtras(
     requestAt: string,
 ): Promise<ExtraWrites> {
     const identity = await formExtraIdentity(
-        'b-member',
+        'VbxXtvAkgQzhoXQZkbnHVg',
         'B Member',
         'b-member@test-plan.example',
         requestAt,
@@ -394,10 +919,10 @@ async function formBExtras(
     };
     const flowPair = await formSeedPair(
         {
-            key: seedPairKey('flows/:id', 'b-flow'),
+            key: seedPairKey('flows/:id', 'UXOPfjdZZohCcyCLlQWnuQ'),
             routePattern:
                 'organizations/:id/flows/:id',
-            idParams: [organizationId, 'b-flow'],
+            idParams: [organizationId, 'UXOPfjdZZohCcyCLlQWnuQ'],
             organization: organizationId,
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: flowBody,
@@ -407,7 +932,7 @@ async function formBExtras(
     return {
         identities: [identity],
         flow: {
-            id: 'b-flow',
+            id: 'UXOPfjdZZohCcyCLlQWnuQ',
             body: flowBody,
             pair: flowPair,
         },
@@ -419,7 +944,7 @@ async function formGExtras(
     adminId: string,
     requestAt: string,
 ): Promise<ExtraWrites> {
-    const secondOrganizationId = 'g-org-2';
+    const secondOrganizationId = 'WlkfISpndVJfICRnWksipQ';
     const organizationPair = await formSeedPair(
         {
             key: seedPairKey(
@@ -456,13 +981,13 @@ async function formGExtras(
         requestAt,
     );
     const unseated = await formExtraIdentity(
-        'g-unseated',
+        'dtmZgnDBlVcoyjxKzlaKgA',
         'G Unseated',
         'g-unseated@test-plan.example',
         requestAt,
     );
     const member = await formExtraIdentity(
-        'g-member',
+        'dmGzDTZwsyIYCQhhRISXrw',
         'G Member',
         'g-member@test-plan.example',
         requestAt,
@@ -477,9 +1002,9 @@ async function formGExtras(
     };
     const aiPair = await formSeedPair(
         {
-            key: seedPairKey('ai-agents/:id', 'g-ai'),
+            key: seedPairKey('ai-agents/:id', 'NAWwhciBiPVcuqxjPhXwYA'),
             routePattern: 'ai-agents/:id',
-            idParams: ['g-ai'],
+            idParams: ['NAWwhciBiPVcuqxjPhXwYA'],
             organization: undefined,
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: aiBody,
@@ -495,7 +1020,7 @@ async function formGExtras(
             pair: extraAdminSeatPair,
         },
         ai: {
-            id: 'g-ai',
+            id: 'NAWwhciBiPVcuqxjPhXwYA',
             body: aiBody,
             pair: aiPair,
         },
@@ -507,7 +1032,7 @@ async function formSvExtras(
     requestAt: string,
 ): Promise<ExtraWrites> {
     const identity = await formExtraIdentity(
-        'sv-member',
+        'uVgzITlKxKcWZtGSPzmsqA',
         'SV Member',
         'sv-member@test-plan.example',
         requestAt,
@@ -678,7 +1203,7 @@ async function formGarden(
     } = ideaTemplate;
     const ideas: GardenIdea[] = [];
     for (const state of IDEA_GARDEN_STATES) {
-        const id = token + '-idea-' + state;
+        const id = sliceEntityId(token + '-idea-' + state);
         const body: Record<string, unknown> = {
             ...ideaFields,
             title: ideaTitle + ' (' + state + ')',
@@ -703,7 +1228,8 @@ async function formGarden(
     const projects: GardenProject[] = [];
     let projectPosition = 1;
     for (const spec of PROJECT_GARDEN) {
-        const id = token + '-project-' + spec.suffix;
+        const id = sliceEntityId(
+            token + '-project-' + spec.suffix);
         const project = {
             ...projectTemplate,
             id,
@@ -713,7 +1239,8 @@ async function formGarden(
         };
         projectPosition += 1;
         const event: StateEntity = {
-            id: id + '-state',
+            id: sliceEntityId(
+                token + '-project-' + spec.suffix + '-state'),
             entity_id: id,
             member_id: adminId,
             at: requestAt,
@@ -741,7 +1268,8 @@ async function formGarden(
         const source = OBJECTIVE_SEEDS[i]!;
         const seed = {
             ...source,
-            id: token + '-obj-' + (i + 1),
+            id: sliceEntityId(
+            token + '-obj-' + (i + 1)),
         };
         const body = objectiveSeedBody(
             seed, organizationId, adminId,
@@ -811,10 +1339,11 @@ async function formGarden(
         });
     }
     const profile = buildRecords()[0]!;
-    const recordId = token + '-record-customer';
+    const recordId = sliceEntityId(
+        token + '-record-customer');
     const attributeRows = [
         {
-            id: token + '-attr-1',
+            id: sliceEntityId(token + '-attr-1'),
             record_id: recordId,
             organization_id: organizationId,
             name: 'Company Name',
@@ -824,7 +1353,7 @@ async function formGarden(
             constraints: [] as unknown[],
         },
         {
-            id: token + '-attr-2',
+            id: sliceEntityId(token + '-attr-2'),
             record_id: recordId,
             organization_id: organizationId,
             name: 'Contact Email',
@@ -846,7 +1375,8 @@ async function formGarden(
         attributes: attributeRows,
         initialState: 'active',
         initialStateEventId:
-            token + '-state-record-customer',
+            sliceEntityId(
+            token + '-state-record-customer'),
         initialStateAt: requestAt,
     };
     const validatedRecord =
@@ -906,11 +1436,13 @@ async function formGarden(
             requestAt,
         ));
     }
-    const flowId = token + '-flow';
-    const createNodeId = token + '-node-create';
-    const captureNodeId = token + '-node-capture';
-    const reviewNodeId = token + '-node-review';
-    const archiveNodeId = token + '-node-archive';
+    const flowId = sliceEntityId(token + '-flow');
+    const createNodeId = sliceEntityId(token + '-node-create');
+    const captureNodeId = sliceEntityId(
+        token + '-node-capture');
+    const reviewNodeId = sliceEntityId(token + '-node-review');
+    const archiveNodeId = sliceEntityId(
+        token + '-node-archive');
     const graph: Record<string, unknown> = {
         nodes: [
             {
@@ -960,19 +1492,20 @@ async function formGarden(
         ],
         edges: [
             {
-                id: token + '-edge-begin',
+                id: sliceEntityId(token + '-edge-begin'),
                 name: 'begin',
                 fromNodeId: createNodeId,
                 toNodeId: captureNodeId,
             },
             {
-                id: token + '-edge-submit',
+                id: sliceEntityId(token + '-edge-submit'),
                 name: 'submit',
                 fromNodeId: captureNodeId,
                 toNodeId: reviewNodeId,
             },
             {
-                id: token + '-edge-approve',
+                id: sliceEntityId(
+                    token + '-edge-approve'),
                 name: 'approve',
                 fromNodeId: reviewNodeId,
                 toNodeId: archiveNodeId,
@@ -983,8 +1516,10 @@ async function formGarden(
         [{ id: flowId, graph }],
         requestAt,
     );
-    const projectId = token + '-project-approved';
-    const projectFlowId = token + '-project-flow';
+    const projectId = sliceEntityId(
+        token + '-project-approved');
+    const projectFlowId = sliceEntityId(
+        token + '-project-flow');
     const nodeIds = new Set(
         relations.nodes.map((node) => node.id),
     );
@@ -1005,7 +1540,7 @@ async function formGarden(
             at: requestAt,
         },
         initialState: 'active',
-        initialStateEventId: token + '-state-flow',
+        initialStateEventId: sliceEntityId(token + '-state-flow'),
         initialStateAt: requestAt,
         graphDelta: {
             nodes: relations.nodes,
@@ -1080,7 +1615,8 @@ async function formGarden(
     };
     const workOrders: GardenWorkOrder[] = [];
     for (const spec of WORK_ORDER_GARDEN) {
-        const id = token + '-wo-' + spec.suffix;
+        const id = sliceEntityId(
+            token + '-wo-' + spec.suffix);
         const body: Record<string, unknown> = {
             display_id: token + spec.position,
             flow_graph: frozenGraph,
@@ -1128,7 +1664,9 @@ async function formGarden(
         );
         const parkId = parkNodeId[spec.node]!;
         const transitionEventId =
-            token + '-wo-' + spec.suffix + '-move';
+            sliceEntityId(
+                token + '-wo-' + spec.suffix
+                + '-move');
         const transitionBody: Record<string, unknown> = {
             transitionEventId,
             targetState: parkId,
@@ -1339,7 +1877,7 @@ export async function postTestPlanSlices(
         readonly identityId: string;
         readonly email: string;
     }> = [{
-        identityId: 'current',
+        identityId: 'XXZruirZyAOoRpNxaDnpSA',
         email: 'demo@example.com',
     }];
     const reveals: TestPlanSliceReveal[] = [{
@@ -1374,7 +1912,7 @@ export async function postTestPlanSlices(
                 slice.organizationId, requestAt,
             ));
             recipients.push({
-                identityId: 'b-member',
+                identityId: 'VbxXtvAkgQzhoXQZkbnHVg',
                 email:
                     'b-member@test-plan.example',
             });
@@ -1383,7 +1921,7 @@ export async function postTestPlanSlices(
                 seatUsername:
                     'b-member@test-plan.example',
                 seatPassword: '',
-                flowId: 'b-flow',
+                flowId: 'UXOPfjdZZohCcyCLlQWnuQ',
             };
         } else if (section === 'G') {
             extras.push(await formGExtras(
@@ -1392,18 +1930,18 @@ export async function postTestPlanSlices(
                 requestAt,
             ));
             recipients.push({
-                identityId: 'g-unseated',
+                identityId: 'dtmZgnDBlVcoyjxKzlaKgA',
                 email:
                     'g-unseated@test-plan.example',
             });
             recipients.push({
-                identityId: 'g-member',
+                identityId: 'dmGzDTZwsyIYCQhhRISXrw',
                 email:
                     'g-member@test-plan.example',
             });
             reveal = {
                 ...reveal,
-                secondOrganizationId: 'g-org-2',
+                secondOrganizationId: 'WlkfISpndVJfICRnWksipQ',
                 secondOrganizationName:
                     'Wayne Enterprises',
                 unseatedUsername:
@@ -1418,7 +1956,7 @@ export async function postTestPlanSlices(
                 slice.organizationId, requestAt,
             ));
             recipients.push({
-                identityId: 'sv-member',
+                identityId: 'uVgzITlKxKcWZtGSPzmsqA',
                 email:
                     'sv-member@test-plan.example',
             });

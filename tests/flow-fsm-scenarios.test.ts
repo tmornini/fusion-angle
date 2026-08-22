@@ -667,12 +667,12 @@ test(
     () => {
         const firstClick: FsmInput = {
             kind: 'pointer-down-on-edge',
-            edgeId: 'e1',
+            edgeId: 'YiJPbufDpkyrZcZCYbUJpg',
             now: 1000,
         };
         const secondClick: FsmInput = {
             kind: 'pointer-down-on-edge',
-            edgeId: 'e1',
+            edgeId: 'YiJPbufDpkyrZcZCYbUJpg',
             now: 1000 + DBLCLICK_WITHIN_MS,
         };
         const r = drive(buildState(), [
@@ -683,7 +683,7 @@ test(
         );
         if (r.state.selection.kind === 'edge') {
             assert.equal(
-                r.state.selection.edgeId, 'e1',
+                r.state.selection.edgeId, 'YiJPbufDpkyrZcZCYbUJpg',
             );
         }
         const panels = findActions(
@@ -701,7 +701,7 @@ test(
         const r = drive(buildState(), [
             {
                 kind: 'pointer-down-on-edge',
-                edgeId: 'e1',
+                edgeId: 'YiJPbufDpkyrZcZCYbUJpg',
                 now: 1000,
             },
         ]);

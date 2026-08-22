@@ -19,6 +19,13 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+
+const EV_MS_DRIFT_IDENTITY_SARAH_GRANT = generateIdentifier();
+const MS_DRIFT_IDENTITY_SARAH = generateIdentifier();
+const EV_MS_DRIFT_IDENTITY_SARAH_ACCEPT = generateIdentifier();
+const NO_SUCH_IDENTITY = generateIdentifier();
 
 // Phase Final Task 2: memberships dual-write stripped. This
 // file no longer compares derive vs row-plane oracles — the
@@ -55,7 +62,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 }
 
 // Every seeded identity that can hold a seat: the 11
-// seeded humans (buildMembers, 'current' included) and the
+// seeded humans (buildMembers, 'XXZruirZyAOoRpNxaDnpSA' included) and the
 // system actor (holds none — see leg 8). Agents are not
 // identities and are not seated.
 function allSeededIdentityIds(): readonly Id[] {
@@ -114,12 +121,12 @@ async () => {
 
 // -- leg 2: the multi-org identity --------------------------------
 
-test("leg 2: the multi-org identity ('current', STARK +"
+test("leg 2: the multi-org identity ('XXZruirZyAOoRpNxaDnpSA', STARK +"
 + ' ORGANIZATION_TWO) — two membership documents on pair plane',
 async () => {
     const db = await seededDb();
     const derived = sortById(
-        await deriveMembershipsForIdentity(db, 'current'),
+        await deriveMembershipsForIdentity(db, 'XXZruirZyAOoRpNxaDnpSA'),
     );
     assert.equal(derived.length, 2);
     assert.deepEqual(
@@ -132,19 +139,19 @@ async () => {
 //
 // Every seeded membership body carries the SAME domain `at`
 // (MOCK_SEED_TIMESTAMP, api/mock-data/seed-message-pairs.ts's own
-// membershipSeedBody) — so 'current's two rows tie on `at`
+// membershipSeedBody) — so 'XXZruirZyAOoRpNxaDnpSA's two rows tie on `at`
 // exactly, and the id tiebreak alone decides the order. This
 // pins that defined order literally, the drift-organizations.
 // test.ts leg-3b precedent ("pinned against its own literal").
 
 test("leg 3: the ORDER pin — deriveMembershipsForIdentity('at'"
 + ' ASCENDING, id tiebreak) resolves a real equal-`at` tie for'
-+ " 'current', and the resulting organization sequence is the"
++ " 'XXZruirZyAOoRpNxaDnpSA', and the resulting organization sequence is the"
 + ' one subjectOrganizations would fold into the JWT `orgs`'
 + ' claim', async () => {
     const db = await seededDb();
     const derived = await deriveMembershipsForIdentity(
-        db, 'current',
+        db, 'XXZruirZyAOoRpNxaDnpSA',
     );
     assert.equal(derived.length, 2);
     assert.equal(derived[0]!.at, derived[1]!.at);
@@ -162,12 +169,13 @@ test("leg 3: the ORDER pin — deriveMembershipsForIdentity('at'"
 
 test('leg 4: the earliest-join reduction'
 + ' (primaryMembershipOrganization-shape) on derived rows,'
-+ " incl. the equal-`at` lexical tiebreak ('current' resolves"
-+ " to STARK: '1' < '2')", async () => {
++ " incl. the equal-`at` lexical tiebreak ('XXZruirZyAOoRpNxaDnpSA' resolves"
++ " to STARK: 'AjdvjuECVZEgZoFajaIEkg' < 'BBjWJsjYIDkTRKIIPrzWRw')"
+    , async () => {
     const db = await seededDb();
-    const sarahId = 'LhfaUUf4IumVsCSGB4xjdK';
+    const sarahId = 'MQFcPtrZPIGjMCRAXtZUnA';
     const currentRows =
-        await deriveMembershipsForIdentity(db, 'current');
+        await deriveMembershipsForIdentity(db, 'XXZruirZyAOoRpNxaDnpSA');
     assert.equal(
         primaryOrganizationOf(currentRows), STARK_ORGANIZATION,
     );
@@ -191,10 +199,10 @@ test('leg 5: membershipExistsFor — member + non-member parity'
 + ' list)', async () => {
     const db = await seededDb();
     // Mike Thompson: ORGANIZATION_TWO-only.
-    const mikeId = 'bLP3X1hb1mSz8gY9neogU3';
+    const mikeId = 'VvzFEpfYONDAsCCwNlIFCQ';
 
     const memberCheck = await membershipExistsFor(
-        db, STARK_ORGANIZATION, 'current',
+        db, STARK_ORGANIZATION, 'XXZruirZyAOoRpNxaDnpSA',
     );
     const nonMemberCheck = await membershipExistsFor(
         db, STARK_ORGANIZATION, mikeId,
@@ -210,7 +218,7 @@ test('leg 5: membershipExistsFor — member + non-member parity'
     const inTxMemberCheck = await db.transaction(
         grantTxTables,
         (view) => membershipExistsFor(
-            view, STARK_ORGANIZATION, 'current',
+            view, STARK_ORGANIZATION, 'XXZruirZyAOoRpNxaDnpSA',
         ),
     );
     const inTxNonMemberCheck = await db.transaction(
@@ -229,36 +237,36 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
 + ' handleRequest; the new membership derives immediately on'
 + ' both planes', async () => {
     const db = await seededDb();
-    const sarahId = 'LhfaUUf4IumVsCSGB4xjdK';
+    const sarahId = 'MQFcPtrZPIGjMCRAXtZUnA';
 
     const before = await deriveMembershipsForIdentity(db, sarahId);
     assert.equal(before.length, 1);
     assert.equal(before[0]!.organization_id, STARK_ORGANIZATION);
 
     const adminToken = await organizationToken(
-        'current', ORGANIZATION_TWO,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
     const grant = await handleRequest(db, req(
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/invitations/', adminToken, {
             email: 'sarah.chen@company.com',
-            invitationId: 'inv-ms-drift-identity-sarah',
-            grantEventId: 'ev-ms-drift-identity-sarah-grant',
+            invitationId: 'iHfMDzumeGtJONHzPjOjWQ',
+            grantEventId: EV_MS_DRIFT_IDENTITY_SARAH_GRANT,
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
     assert.equal(grant.status, 200);
 
-    const membershipId = 'ms-drift-identity-sarah';
+    const membershipId = MS_DRIFT_IDENTITY_SARAH;
     const accept = await handleRequest(db, req(
         'PUT',
         '/identities/' + sarahId
-            + '/invitations/inv-ms-drift-identity-sarah',
+            + '/invitations/iHfMDzumeGtJONHzPjOjWQ',
         await organizationToken(sarahId, STARK_ORGANIZATION),
         {
             state: 'accepted',
             membershipId,
-            eventId: 'ev-ms-drift-identity-sarah-accept',
+            eventId: EV_MS_DRIFT_IDENTITY_SARAH_ACCEPT,
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
@@ -286,7 +294,7 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
 test('leg 7: REMOVAL — DELETE seat derives ABSENT'
 + ' on the pair plane', async () => {
     const db = await seededDb();
-    const jessicaId = 'zyTbfbjcGEfbpCsNTP0XjX';
+    const jessicaId = 'zyGBRshxOnKHUfcyFRqowg';
     const before = await deriveMembershipsForIdentity(
         db, jessicaId,
     );
@@ -302,7 +310,7 @@ test('leg 7: REMOVAL — DELETE seat derives ABSENT'
         '/organizations/' + target!.organization_id
             + '/members/' + jessicaId,
         await organizationToken(
-            'current', target!.organization_id,
+            'XXZruirZyAOoRpNxaDnpSA', target!.organization_id,
         ),
     ));
     assert.equal(del.status, 204);
@@ -322,10 +330,10 @@ test('leg 8: zero-membership identity — an UNKNOWN identity id'
 async () => {
     const db = await seededDb();
     await assert.doesNotReject(
-        () => deriveMembershipsForIdentity(db, 'no-such-identity'),
+        () => deriveMembershipsForIdentity(db, NO_SUCH_IDENTITY),
     );
     assert.deepEqual(
-        await deriveMembershipsForIdentity(db, 'no-such-identity'),
+        await deriveMembershipsForIdentity(db, NO_SUCH_IDENTITY),
         [],
     );
     assert.deepEqual(
@@ -355,7 +363,7 @@ test('leg 9: an ECHOED id in a live PUT seat body'
 + ' stray id never poisons deriveMembershipsForIdentity',
 async () => {
     const db = await seededDb();
-    const davidId = '6xBfK5If82JKfThXb1wlzS'; // David Martinez
+    const davidId = 'DAjUkaBUIZbXSQeoLDZEXQ'; // David Martinez
     const before = await deriveMembershipsForIdentity(
         db, davidId,
     );
@@ -367,7 +375,7 @@ async () => {
         '/organizations/' + existing!.organization_id
             + '/members/' + davidId,
         await organizationToken(
-            'current', existing!.organization_id,
+            'XXZruirZyAOoRpNxaDnpSA', existing!.organization_id,
         ),
         {
             id: existing!.id,

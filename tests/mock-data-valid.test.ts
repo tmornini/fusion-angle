@@ -174,7 +174,8 @@ for (const [name, getAll, validate] of TABLES) {
 test('mock-data seeds non-empty derived ideas per org',
 async () => {
     const db = await seededDb();
-    for (const organization of ['1', '2']) {
+    for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
+        , 'BBjWJsjYIDkTRKIIPrzWRw']) {
         const ideas = await deriveIdeas(db, organization);
         assert.ok(
             ideas.length > 0,
@@ -235,7 +236,8 @@ async () => {
 test('mock-data seeds non-empty derived projects per org',
 async () => {
     const db = await seededDb();
-    for (const organization of ['1', '2']) {
+    for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
+        , 'BBjWJsjYIDkTRKIIPrzWRw']) {
         const projects = await deriveProjects(
             db, organization,
         );
@@ -272,7 +274,8 @@ test('mock-data derived project_flows pass validator',
 async () => {
     const db = await seededDb();
     let total = 0;
-    for (const organization of ['1', '2']) {
+    for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
+        , 'BBjWJsjYIDkTRKIIPrzWRw']) {
         const projects = await deriveProjects(
             db, organization,
         );
@@ -299,7 +302,8 @@ test('mock-data derived baseline/actual scores pass'
     const db = await seededDb();
     let baselineTotal = 0;
     let actualTotal = 0;
-    for (const organization of ['1', '2']) {
+    for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
+        , 'BBjWJsjYIDkTRKIIPrzWRw']) {
         const projects = await deriveProjects(
             db, organization,
         );
@@ -365,7 +369,8 @@ test('mock-data derived score .at is 6-digit zulu',
 async () => {
     const db = await seededDb();
     let checked = 0;
-    for (const organization of ['1', '2']) {
+    for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
+        , 'BBjWJsjYIDkTRKIIPrzWRw']) {
         const projects = await deriveProjects(
             db, organization,
         );
@@ -403,7 +408,8 @@ async () => {
 test('mock-data derived organization passes the validator',
 async () => {
     const db = await seededDb();
-    const organization = await deriveOrganization(db, '1');
+    const organization = await deriveOrganization(db
+        , 'AjdvjuECVZEgZoFajaIEkg');
     assert.doesNotThrow(
         () => validateOrganizationEntity(
             withoutId(organization),
@@ -417,7 +423,8 @@ async () => {
 test('mock-data seeds non-empty derived flows per org',
 async () => {
     const db = await seededDb();
-    for (const organization of ['1', '2']) {
+    for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
+        , 'BBjWJsjYIDkTRKIIPrzWRw']) {
         const flows = await deriveFlows(db, organization);
         assert.ok(
             flows.length > 0,
@@ -450,7 +457,7 @@ async () => {
     const db = await seededDb();
     const derived = await documentCollectionGetHandler(
         WORK_ORDERS_WIRING,
-    )(db, [], 'current', STARK_ORGANIZATION) as
+    )(db, [], 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION) as
         WorkOrderEntity[];
     assert.ok(derived.length > 0, 'work orders empty');
     for (const wo of derived) {
@@ -465,8 +472,8 @@ test('mock-data derived flow-work-order joins pass validator',
 async () => {
     const db = await seededDb();
     const flowIds = [
-        'h5mErVBQhwdMKwi1co30jB',
-        '7COt7Kf4OaOBg6AjaNO04s',
+        'esKujtyQFYUJaVSXWwavzA',
+        'DDUhYDIRInXtIrRraxcyHQ',
         l2cFlowId,
     ];
     let total = 0;
@@ -543,7 +550,7 @@ test(
         // Phase Final Task 2: WO org from pair plane.
         const workOrders = await documentCollectionGetHandler(
             WORK_ORDERS_WIRING,
-        )(db, [], 'current', STARK_ORGANIZATION) as
+        )(db, [], 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION) as
             WorkOrderEntity[];
         // C3: bulk deriveStates retired — WO lifecycle
         // from the pair-plane work-order derive.

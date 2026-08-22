@@ -42,24 +42,25 @@ async () => {
     }
 });
 
-test("the seeded 'current' default resolves to org 1",
+test("the seeded 'XXZruirZyAOoRpNxaDnpSA' default resolves to org 1",
 async () => {
     const db = await mockSeeded();
     assert.equal(
-        await identityDefaultOrganization(db, 'current'), '1');
+        await identityDefaultOrganization(db, 'XXZruirZyAOoRpNxaDnpSA')
+            , 'AjdvjuECVZEgZoFajaIEkg');
 });
 
-test("bootstrap seeds 'current' a default-organization"
+test("bootstrap seeds 'XXZruirZyAOoRpNxaDnpSA' a default-organization"
 + ' document for organization 1',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postBootstrap(db);
     const defaults = await deriveDefaultOrganization(
-        db, 'current',
+        db, 'XXZruirZyAOoRpNxaDnpSA',
     );
     assert.ok(
-        defaults.some(d => d.organization_id === '1'),
+        defaults.some(d => d.organization_id === 'AjdvjuECVZEgZoFajaIEkg'),
         "current has no default-organization document"
             + ' for organization 1');
 });

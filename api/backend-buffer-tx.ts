@@ -12,6 +12,19 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
+import { compareIdentifiers } from
+    '../shared/identifier.ts';
+
+function compareResponseAtThenId(
+    left: { id: string },
+    right: { id: string },
+    atL: string,
+    atR: string,
+): number {
+    if (atL < atR) return -1;
+    if (atL > atR) return 1;
+    return compareIdentifiers(left.id, right.id);
+}
 
 // Builds a row-granular Tx handle over a pre-loaded buffer
 // of the touched tables. The buffer IS the unit of
@@ -98,17 +111,11 @@ export function bufferTx(
                         Record<string, unknown>;
                     const r = right as
                         Record<string, unknown>;
-                    const atL = String(
-                        l['response_at'] ?? '',
+                    return compareResponseAtThenId(
+                        left, right,
+                        String(l['response_at'] ?? ''),
+                        String(r['response_at'] ?? ''),
                     );
-                    const atR = String(
-                        r['response_at'] ?? '',
-                    );
-                    if (atL < atR) return -1;
-                    if (atL > atR) return 1;
-                    if (left.id < right.id) return -1;
-                    if (left.id > right.id) return 1;
-                    return 0;
                 })
                 .map((row) => ({ ...row })) as T[];
         },
@@ -132,17 +139,11 @@ export function bufferTx(
                         Record<string, unknown>;
                     const r = right as
                         Record<string, unknown>;
-                    const atL = String(
-                        l['response_at'] ?? '',
+                    return compareResponseAtThenId(
+                        left, right,
+                        String(l['response_at'] ?? ''),
+                        String(r['response_at'] ?? ''),
                     );
-                    const atR = String(
-                        r['response_at'] ?? '',
-                    );
-                    if (atL < atR) return -1;
-                    if (atL > atR) return 1;
-                    if (left.id < right.id) return -1;
-                    if (left.id > right.id) return 1;
-                    return 0;
                 })
                 .map((row) => ({ ...row })) as T[];
         },
@@ -178,17 +179,11 @@ export function bufferTx(
                         Record<string, unknown>;
                     const r = right as
                         Record<string, unknown>;
-                    const atL = String(
-                        l['response_at'] ?? '',
+                    return compareResponseAtThenId(
+                        left, right,
+                        String(l['response_at'] ?? ''),
+                        String(r['response_at'] ?? ''),
                     );
-                    const atR = String(
-                        r['response_at'] ?? '',
-                    );
-                    if (atL < atR) return -1;
-                    if (atL > atR) return 1;
-                    if (left.id < right.id) return -1;
-                    if (left.id > right.id) return 1;
-                    return 0;
                 })
                 .map((row) => ({ ...row })) as T[];
         },

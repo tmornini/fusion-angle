@@ -16,7 +16,7 @@ function makeAttribute(
     overrides: Partial<AttributeSchemaRow> = {},
 ): AttributeSchemaRow {
     return {
-        id: 'a-1',
+        id: 'UQBiHFcwJeCDSnmkPBoYRA',
         name: 'Field',
         attributeType,
         options: [],

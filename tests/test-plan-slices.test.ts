@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { memoryDbAdapter } from
     '../api/db-memory.ts';
-import { postTestPlanSlices } from
-    '../api/test-plan-slices.ts';
+import {
+    postTestPlanSlices, sliceEntityId,
+} from '../api/test-plan-slices.ts';
 import { deriveOrganizations } from
     '../api/derive-organizations.ts';
 import { deriveIdeas } from
@@ -64,17 +65,17 @@ async () => {
         (row) => row.section === 'AA',
     );
     assert.ok(aa);
-    assert.equal(aa.organizationId, '1');
+    assert.equal(aa.organizationId, 'AjdvjuECVZEgZoFajaIEkg');
     assert.equal(
         aa.adminUsername, 'demo@example.com',
     );
     const pii = await deriveIdentityPii(
-        db, 'current',
+        db, 'XXZruirZyAOoRpNxaDnpSA',
     );
     assert.equal(pii.name, 'Tony Stark');
     const organizations = await deriveOrganizations(db);
     const stark = organizations.find(
-        (o) => o.id === '1',
+        (o) => o.id === 'AjdvjuECVZEgZoFajaIEkg',
     );
     assert.ok(stark);
     assert.equal(stark.name, 'Stark Industries');
@@ -115,7 +116,7 @@ async () => {
     );
     assert.ok(b);
     const pii = await deriveIdentityPii(
-        db, 'b-admin',
+        db, 'JbaPyILUCkLRVIVxJlHMSg',
     );
     assert.equal(pii.name, 'B Admin');
     assert.equal(
@@ -140,7 +141,9 @@ async () => {
         );
         assert.equal(
             row.organizationId,
-            row.section.toLowerCase() + '-org',
+            sliceEntityId(
+                row.section.toLowerCase() + '-org',
+            ),
         );
     }
 });
@@ -191,17 +194,17 @@ async () => {
     );
     const seats =
         await deriveMembershipsForIdentity(
-            db, 'b-member',
+            db, 'VbxXtvAkgQzhoXQZkbnHVg',
         );
     assert.equal(seats.length, 1);
     assert.equal(seats[0]!.organization_id,
         b.organizationId);
-    assert.equal(b.flowId, 'b-flow');
+    assert.equal(b.flowId, 'UXOPfjdZZohCcyCLlQWnuQ');
     const flows = await deriveFlows(
         db, b.organizationId,
     );
     assert.equal(flows.length, 1);
-    assert.equal(flows[0]!.id, 'b-flow');
+    assert.equal(flows[0]!.id, 'UXOPfjdZZohCcyCLlQWnuQ');
     assert.equal(flows[0]!.name, 'B Return Flow');
 });
 
@@ -212,13 +215,13 @@ async () => {
         (row) => row.section === 'G',
     );
     assert.ok(g);
-    assert.equal(g.secondOrganizationId, 'g-org-2');
+    assert.equal(g.secondOrganizationId, 'WlkfISpndVJfICRnWksipQ');
     assert.equal(
         g.secondOrganizationName, 'Wayne Enterprises',
     );
     const adminSeats =
         await deriveMembershipsForIdentity(
-            db, 'g-admin',
+            db, 'kHaSgLhnsobjMXxNLEzpBw',
         );
     const organizationIds = new Set(
         adminSeats.map(
@@ -226,15 +229,15 @@ async () => {
         ),
     );
     assert.ok(organizationIds.has(g.organizationId));
-    assert.ok(organizationIds.has('g-org-2'));
+    assert.ok(organizationIds.has('WlkfISpndVJfICRnWksipQ'));
     const unseated =
         await deriveMembershipsForIdentity(
-            db, 'g-unseated',
+            db, 'dtmZgnDBlVcoyjxKzlaKgA',
         );
     assert.equal(unseated.length, 0);
     const memberSeats =
         await deriveMembershipsForIdentity(
-            db, 'g-member',
+            db, 'dmGzDTZwsyIYCQhhRISXrw',
         );
     assert.equal(memberSeats.length, 1);
     assert.equal(
@@ -244,7 +247,7 @@ async () => {
     const requests = await db.pairs.getAll();
     const agents = requests.filter((r) =>
         r.uri_collection === '/ai-agents/'
-        && r.uri_id === 'g-ai',
+        && r.uri_id === 'NAWwhciBiPVcuqxjPhXwYA',
     );
     assert.equal(agents.length, 1);
 });
@@ -262,11 +265,11 @@ async () => {
     );
     const adminSeats =
         await deriveMembershipsForIdentity(
-            db, 'sv-admin',
+            db, 'hPrdaZfedPOJYevSaGziHw',
         );
     const memberSeats =
         await deriveMembershipsForIdentity(
-            db, 'sv-member',
+            db, 'uVgzITlKxKcWZtGSPzmsqA',
         );
     assert.equal(adminSeats.length, 1);
     assert.equal(memberSeats.length, 1);

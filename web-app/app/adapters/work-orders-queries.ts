@@ -20,6 +20,8 @@ import {
     organizationCollection,
     organizationItem,
 } from './shared.ts';
+import { compareIdentifiers } from
+    '../../../shared/identifier.ts';
 
 export type {
     WorkOrderEntity,
@@ -234,7 +236,7 @@ export function projectTransitions(
         .toSorted((a, b) => {
             const byAt = a.at.localeCompare(b.at);
             if (byAt !== 0) return byAt;
-            return a.id.localeCompare(b.id);
+            return compareIdentifiers(a.id, b.id);
         });
     const out: TransitionEvent[] = [];
     let prior: Id | null = null;

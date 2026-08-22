@@ -31,41 +31,41 @@ test('an absent registration throws EntityNotFoundError',
 async () => {
     const db = await freshDb();
     await assert.rejects(
-        () => deriveClientRegistration(db, 'svc-1'),
+        () => deriveClientRegistration(db, 'uWzjNIEeEtVWqZoJMLeYpw'),
         (err: unknown) =>
             err instanceof EntityNotFoundError
             && err.table === 'client_registration'
-            && err.id === 'svc-1',
+            && err.id === 'uWzjNIEeEtVWqZoJMLeYpw',
     );
 });
 
 test('a seeded registration derives whole, id-first',
 async () => {
     const db = await freshDb();
-    await seedClientRegistration(db, 'svc-1', REGISTRATION);
+    await seedClientRegistration(db, 'uWzjNIEeEtVWqZoJMLeYpw', REGISTRATION);
     assert.deepEqual(
-        await deriveClientRegistration(db, 'svc-1'),
-        { id: 'svc-1', ...REGISTRATION },
+        await deriveClientRegistration(db, 'uWzjNIEeEtVWqZoJMLeYpw'),
+        { id: 'uWzjNIEeEtVWqZoJMLeYpw', ...REGISTRATION },
     );
 });
 
 test('a re-PUT supersedes: the latest body wins', async () => {
     const db = await freshDb();
-    await seedClientRegistration(db, 'svc-1', REGISTRATION);
-    await seedClientRegistration(db, 'svc-1', {
+    await seedClientRegistration(db, 'uWzjNIEeEtVWqZoJMLeYpw', REGISTRATION);
+    await seedClientRegistration(db, 'uWzjNIEeEtVWqZoJMLeYpw', {
         ...REGISTRATION, jwks: '{"keys":[{"kty":"EC"}]}',
     });
     const derived =
-        await deriveClientRegistration(db, 'svc-1');
+        await deriveClientRegistration(db, 'uWzjNIEeEtVWqZoJMLeYpw');
     assert.equal(derived.jwks, '{"keys":[{"kty":"EC"}]}');
 });
 
 test('a tombstoned registration reads as absent', async () => {
     const db = await freshDb();
-    await seedClientRegistration(db, 'svc-1', REGISTRATION);
-    await seedClientRegistrationTombstone(db, 'svc-1');
+    await seedClientRegistration(db, 'uWzjNIEeEtVWqZoJMLeYpw', REGISTRATION);
+    await seedClientRegistrationTombstone(db, 'uWzjNIEeEtVWqZoJMLeYpw');
     await assert.rejects(
-        () => deriveClientRegistration(db, 'svc-1'),
+        () => deriveClientRegistration(db, 'uWzjNIEeEtVWqZoJMLeYpw'),
         EntityNotFoundError,
     );
 });
@@ -76,13 +76,14 @@ async () => {
     assert.equal(
         await deriveIdentityKind(db, 'ghost'), undefined,
     );
-    await seedPersonIdentity(db, 'p-1', {
+    await seedPersonIdentity(db, 'pjQzgITAPDQVyvCVpzpIfQ', {
         name: 'Ada', email: 'ada@example.com',
         phone: '', bio: '',
     });
-    assert.equal(await deriveIdentityKind(db, 'p-1'), 'person');
-    await seedServiceIdentity(db, 'svc-1');
+    assert.equal(await deriveIdentityKind(db, 'pjQzgITAPDQVyvCVpzpIfQ')
+        , 'person');
+    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
     assert.equal(
-        await deriveIdentityKind(db, 'svc-1'), 'service',
+        await deriveIdentityKind(db, 'uWzjNIEeEtVWqZoJMLeYpw'), 'service',
     );
 });

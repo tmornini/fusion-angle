@@ -22,8 +22,8 @@ import {
     nowUtc,
 } from '../../../api/types.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 import { getFlowEntities } from './flows.ts';
 
 // The flow↔record bindings across EVERY flow the caller's org
@@ -265,7 +265,7 @@ export async function postRecordChange(
     }));
     if (change.kind === 'create') {
         const initialStateEventId =
-            generateCryptoSafeBase62();
+            generateIdentifier();
         await ctx.POST(recordTypesPath(ctx), {
             kind: 'create',
             id,

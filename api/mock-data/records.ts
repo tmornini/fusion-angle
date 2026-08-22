@@ -9,9 +9,9 @@ import type {
 // record state events, so they are exported. Fixed data; the
 // composition root assigns organization_id at write time.
 export const customerProfileRecordId =
-    'rec01CustProfRec0rdAB1';
+    'sJxkGGTrPegHqFbQAkXnjw';
 export const projectBriefRecordId =
-    'rec02Pr0jBriefRec0rd02';
+    'sOAGoeswzdrwFqfFFQdxQg';
 
 export function buildRecords():
     Omit<
@@ -65,7 +65,7 @@ export function buildRecordAttributes():
     Omit<RecordAttributeEntity, 'organization_id'>[] {
     return [
         {
-            id: '5JZ0LeKdPCa4QMtg1RsF1M',
+            id: 'CPJmMPXRaBIiNdGBofUPVg',
             record_id: customerProfileRecordId,
             name: 'Company Name',
             attribute_type: 'text',
@@ -74,7 +74,7 @@ export function buildRecordAttributes():
             constraints: [],
         },
         {
-            id: 'nplTIh0qXNtAyoWSwRaBYe',
+            id: 'oeqelDVElwxHYWkWRVTCYw',
             record_id: customerProfileRecordId,
             name: 'Contact Email',
             attribute_type: 'text',
@@ -83,7 +83,7 @@ export function buildRecordAttributes():
             constraints: emailRegexConstraint,
         },
         {
-            id: 'kzHpMw9f1thq79VoBYeIX3',
+            id: 'kxbdVhmkaEzkJvghWKFzkw',
             record_id: customerProfileRecordId,
             name: 'Contact Phone',
             attribute_type: 'text',
@@ -92,7 +92,7 @@ export function buildRecordAttributes():
             constraints: [],
         },
         {
-            id: 'QsmqiOmPtoMLGpSjHOqdHA',
+            id: 'QHzHnEAmqGSgiEfkXoWMTw',
             record_id: customerProfileRecordId,
             name: 'Industry',
             attribute_type: 'select',
@@ -107,7 +107,7 @@ export function buildRecordAttributes():
             constraints: [],
         },
         {
-            id: '0TyjQRcygn3DIyXTe6x1F6',
+            id: 'AXxvHyKNpNYXYKOorywqRQ',
             record_id: customerProfileRecordId,
             name: 'Annual Revenue',
             attribute_type: 'number',
@@ -116,7 +116,7 @@ export function buildRecordAttributes():
             constraints: revenueRangeMinConstraint,
         },
         {
-            id: '8Z62tcRHBpwCRH1kBffx0G',
+            id: 'DfkwfBiyfyCyRHvsHnDiqQ',
             record_id: customerProfileRecordId,
             name: 'Number of Employees',
             attribute_type: 'number',
@@ -125,7 +125,7 @@ export function buildRecordAttributes():
             constraints: [],
         },
         {
-            id: 'aR8nKpQ9wEzVxL3CmBdYTf',
+            id: 'UflxQeBtbrxfofrceJgVaA',
             record_id: customerProfileRecordId,
             name: 'Founded On',
             attribute_type: 'date',
@@ -134,7 +134,7 @@ export function buildRecordAttributes():
             constraints: foundedOnRangeMaxConstraint,
         },
         {
-            id: 'mBrOOvQtZTTKb5TTnXvzXo',
+            id: 'nHzjBAeemLwpexXjdPBZHQ',
             record_id: customerProfileRecordId,
             name: 'Company Logo',
             attribute_type: 'text',
@@ -143,7 +143,7 @@ export function buildRecordAttributes():
             constraints: [],
         },
         {
-            id: 'y9DiJ5QHNB5ho3K1n9myMc',
+            id: 'zCttybnQPmYzJGmvOxWwBQ',
             record_id: customerProfileRecordId,
             name: 'Supporting Documents',
             attribute_type: 'text',
@@ -152,7 +152,7 @@ export function buildRecordAttributes():
             constraints: [],
         },
         {
-            id: 'AdQlKf43JV6yrhQbyskDkR',
+            id: 'ElVKgkCreTEHQXJZPBJDKw',
             record_id: customerProfileRecordId,
             name: 'Reviewer Notes',
             attribute_type: 'text',
@@ -161,7 +161,7 @@ export function buildRecordAttributes():
             constraints: [],
         },
         {
-            id: 'pBA01Pr0j3ctBr13fNm3T1',
+            id: 'ptlpsUrQssxuTLkouUAnNw',
             record_id: projectBriefRecordId,
             name: 'Project Name',
             attribute_type: 'text',
@@ -170,7 +170,7 @@ export function buildRecordAttributes():
             constraints: [],
         },
         {
-            id: 'pBA02Pr0j3ctBr13fDsc02',
+            id: 'pwQZmLdIOBjDnVpDmmujbw',
             record_id: projectBriefRecordId,
             name: 'Description',
             attribute_type: 'text',
@@ -179,7 +179,7 @@ export function buildRecordAttributes():
             constraints: [],
         },
         {
-            id: 'pBA03Pr0j3ctBr13fPry03',
+            id: 'pwjGSoPQMbsjmEJLDAgbaA',
             record_id: projectBriefRecordId,
             name: 'Priority',
             attribute_type: 'select',
@@ -193,7 +193,7 @@ export function buildRecordAttributes():
             constraints: [],
         },
         {
-            id: 'pBA04Pr0j3ctBr13fApr04',
+            id: 'qDgLYtdgNBjEEoPqCoMATg',
             record_id: projectBriefRecordId,
             name: 'Approved',
             attribute_type: 'checkbox',

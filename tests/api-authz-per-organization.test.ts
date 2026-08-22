@@ -14,6 +14,8 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const BASE = 'http://localhost';
 
@@ -53,33 +55,41 @@ async function seedMembershipPair(
 // `current` is a member of BOTH orgs but admin ONLY in A.
 // Facade exchange re-bakes claim roles from membership type,
 // so admin surfaces in B stay denied while content works.
-async function memberOfBothAdminInA(): Promise<MemoryDbAdapter> {
+async function memberOfBothAdminInA(): Promise<{
+    db: MemoryDbAdapter;
+    organizationA: string;
+    organizationB: string;
+}> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await seedMembershipPair(db, 'm-a', {
-        organization_id: 'A',
-        identity_id: 'current',
+    const organizationA = generateIdentifier();
+    const organizationB = generateIdentifier();
+    await seedMembershipPair(db, generateIdentifier(), {
+        organization_id: organizationA,
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
-    await seedMembershipPair(db, 'm-b', {
-        organization_id: 'B',
-        identity_id: 'current',
+    await seedMembershipPair(db, generateIdentifier(), {
+        organization_id: organizationB,
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'member',
         at: '2026-06-04T00:00:00.000000Z',
     });
-    return db;
+    return { db, organizationA, organizationB };
 }
 
 test('admin type in org A does not authorize admin'
 + ' surfaces in org B', async () => {
-    const db = await memberOfBothAdminInA();
+    const { db, organizationA, organizationB } = await memberOfBothAdminInA();
     // Seat writes stay admin-only; member type in B must 403.
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/B/members/x',
+        'PUT', '/organizations/' + organizationB + '/members/'
+            + generateIdentifier(),
         await claimToken({
-            organizations: ['A', 'B'],
-            roles: ['admin:A', 'member:B'],
+            organization: organizationB,
+            organizations: [organizationA, organizationB],
+            roles: ['admin:' + organizationA, 'member:' + organizationB],
         }),
         {
             type: 'member',
@@ -91,12 +101,14 @@ test('admin type in org A does not authorize admin'
 
 test('the same admin type authorizes within its own org',
 async () => {
-    const db = await memberOfBothAdminInA();
+    const { db, organizationA, organizationB } = await memberOfBothAdminInA();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/A/members/x',
+        'PUT', '/organizations/' + organizationA + '/members/'
+            + generateIdentifier(),
         await claimToken({
-            organizations: ['A', 'B'],
-            roles: ['admin:A', 'member:B'],
+            organization: organizationA,
+            organizations: [organizationA, organizationB],
+            roles: ['admin:' + organizationA, 'member:' + organizationB],
         }),
         {
             type: 'member',
@@ -110,13 +122,14 @@ test('a flat token authorizes via its resolved membership',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await seedMembershipPair(db, 'm', {
-        organization_id: '1',
-        identity_id: 'current',
+    await seedMembershipPair(db, generateIdentifier(), {
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
     const res = await handleRequest(db, req(
-        'GET', '/organizations/1/members/', await devToken('current')));
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , await devToken('XXZruirZyAOoRpNxaDnpSA')));
     assert.equal(res.status, 200);
 });

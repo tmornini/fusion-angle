@@ -1,3 +1,5 @@
+import { compareIdentifiers } from './identifier.ts';
+
 // Pure reduction over an append-only ledger: the WINNING row per
 // key. `keyOf` groups the rows; `compare(candidate, incumbent)`
 // decides when a later-iterated row replaces the one held. The
@@ -21,7 +23,8 @@ export function latestByKey<
         = (candidate, incumbent) =>
             candidate.at > incumbent.at
             || (candidate.at === incumbent.at
-                && candidate.id > incumbent.id),
+                && compareIdentifiers(
+                    candidate.id, incumbent.id) > 0),
 ): Map<K, T> {
     const latest = new Map<K, T>();
     for (const row of rows) {

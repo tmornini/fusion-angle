@@ -20,26 +20,26 @@ interface Row {
 const ROWS: Row[] = [
     {
         id: 'b',
-        uri_collection: '/organizations/1/ideas/',
-        uri_id: '1',
+        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        uri_id: 'AjdvjuECVZEgZoFajaIEkg',
         response_at: '2026-01-01T00:00:00.000002Z',
     },
     {
         id: 'a',
-        uri_collection: '/organizations/1/ideas/',
-        uri_id: '1',
+        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        uri_id: 'AjdvjuECVZEgZoFajaIEkg',
         response_at: '2026-01-01T00:00:00.000001Z',
     },
     {
         id: 'c',
-        uri_collection: '/organizations/1/ideas/',
-        uri_id: '2',
+        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        uri_id: 'BBjWJsjYIDkTRKIIPrzWRw',
         response_at: '2026-01-01T00:00:00.000001Z',
     },
     {
         id: 'd',
-        uri_collection: '/organizations/1/flows/',
-        uri_id: '1',
+        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',
+        uri_id: 'AjdvjuECVZEgZoFajaIEkg',
         response_at: '2026-01-01T00:00:00.000001Z',
     },
 ];
@@ -59,7 +59,8 @@ async () => {
     const got = await backend.transaction(
         ['t'], 'readonly',
         (tx) => tx.getAddress<Row>(
-            't', '/organizations/1/ideas/', '1',
+            't', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                , 'AjdvjuECVZEgZoFajaIEkg',
         ),
     );
     assert.deepEqual(
@@ -78,17 +79,18 @@ async () => {
         (body) => body as Omit<Row, 'id'>,
     );
     await store.put('a', {
-        uri_collection: '/organizations/1/ideas/',
-        uri_id: '1',
+        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        uri_id: 'AjdvjuECVZEgZoFajaIEkg',
         response_at: '2026-01-01T00:00:00.000001Z',
     });
     await store.put('c', {
-        uri_collection: '/organizations/1/ideas/',
-        uri_id: '2',
+        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        uri_id: 'BBjWJsjYIDkTRKIIPrzWRw',
         response_at: '2026-01-01T00:00:00.000001Z',
     });
     const got = await store.getAllAtAddress(
-        '/organizations/1/ideas/', '1',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            , 'AjdvjuECVZEgZoFajaIEkg',
     );
     assert.deepEqual(got.map((row) => row.id), ['a']);
 });
@@ -102,22 +104,25 @@ async () => {
         async (tx) => {
             await tx.put('pairs', {
                 id: 'old',
-                uri_collection: '/organizations/1/ideas/',
-                uri_id: '1',
+                uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                    + '',
+                uri_id: 'AjdvjuECVZEgZoFajaIEkg',
                 response_at: '2026-01-01T00:00:00.000001Z',
                 version: 'aa',
             });
             await tx.put('pairs', {
                 id: 'new',
-                uri_collection: '/organizations/1/ideas/',
-                uri_id: '1',
+                uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                    + '',
+                uri_id: 'AjdvjuECVZEgZoFajaIEkg',
                 response_at: '2026-01-01T00:00:00.000002Z',
                 version: 'aa',
             });
             await tx.put('pairs', {
                 id: 'other',
-                uri_collection: '/organizations/1/ideas/',
-                uri_id: '1',
+                uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                    + '',
+                uri_id: 'AjdvjuECVZEgZoFajaIEkg',
                 response_at: '2026-01-01T00:00:00.000003Z',
                 version: 'bb',
             });
@@ -126,7 +131,8 @@ async () => {
     const got = await backend.transaction(
         ['pairs'], 'readonly',
         (tx) => tx.getAddressVersion(
-            'pairs', '/organizations/1/ideas/', '1', 'aa',
+            'pairs', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                , 'AjdvjuECVZEgZoFajaIEkg', 'aa',
         ),
     );
     assert.deepEqual(
@@ -178,8 +184,9 @@ async () => {
             });
             await tx.put('pairs', {
                 id: 'other',
-                uri_collection: '/organizations/1/ideas/',
-                uri_id: '1',
+                uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                    + '',
+                uri_id: 'AjdvjuECVZEgZoFajaIEkg',
                 response_at: '2026-01-01T00:00:00.000001Z',
                 response: jsonWire({ code: 'abc' }),
             });
@@ -204,7 +211,7 @@ test('memory getWhere refuses uri_id', async () => {
             ['pairs'],
             'readonly',
             (tx) => tx.getWhere(
-                'pairs', 'uri_id', '1',
+                'pairs', 'uri_id', 'AjdvjuECVZEgZoFajaIEkg',
             ),
         ),
         (error: unknown) =>

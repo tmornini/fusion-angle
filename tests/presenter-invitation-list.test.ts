@@ -43,8 +43,8 @@ function record(): {
 }
 
 const PENDING = {
-    id: 'inv1',
-    organizationId: '2',
+    id: 'jEoYCFtPjXFEgZqZNtOcEA',
+    organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
     organizationName: 'Wayne Enterprises',
     invitedByName: 'Tony Stark',
     invitedAt: '2026-01-01T00:00:00.000000Z',
@@ -56,7 +56,7 @@ test('a pending invitation shows the org, inviter, and'
     const rec = record();
     new InvitationListPresenter([PENDING]).render(rec.container);
     const out = rec.html();
-    assert.match(out, /data-invitation-id="inv1"/);
+    assert.match(out, /data-invitation-id="jEoYCFtPjXFEgZqZNtOcEA"/);
     assert.match(out, /Wayne Enterprises/);
     assert.match(out, /Tony Stark/);
     assert.match(out, /data-invitation-action="accept"/);
@@ -80,7 +80,7 @@ test('an absent inviter omits the Invited by line', () => {
     const rec = record();
     new InvitationListPresenter([{
         id: 'inv3',
-        organizationId: '2',
+        organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
         organizationName: 'Wayne Enterprises',
         invitedAt: '2026-01-01T00:00:00.000000Z',
         state: 'pending' as const,
@@ -92,7 +92,7 @@ test('an absent org name renders the absence glyph', () => {
     const rec = record();
     new InvitationListPresenter([{
         id: 'inv4',
-        organizationId: '2',
+        organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
         invitedByName: 'Tony Stark',
         invitedAt: '2026-01-01T00:00:00.000000Z',
         state: 'pending' as const,
@@ -112,8 +112,8 @@ test('a sent invitation shows the invitee email and Revoke',
     new SentInvitationsPresenter([
         {
             id: 'inv2',
-            organizationId: '2',
-            identityId: 'sarah',
+            organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
+            identityId: 'toccYYkLEABmlbpHJalgtQ',
             inviteeEmail: 'sarah@x.com',
             invitedAt: '2026-01-01T00:00:00.000000Z',
             state: 'pending' as const,
@@ -130,8 +130,8 @@ test('an absent invitee email renders the absence glyph',
     const rec = record();
     new SentInvitationsPresenter([{
         id: 'inv5',
-        organizationId: '2',
-        identityId: 'sarah',
+        organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
+        identityId: 'toccYYkLEABmlbpHJalgtQ',
         invitedAt: '2026-01-01T00:00:00.000000Z',
         state: 'pending' as const,
     }]).render(rec.container);

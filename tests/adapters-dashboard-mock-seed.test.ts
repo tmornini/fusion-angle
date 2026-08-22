@@ -41,10 +41,10 @@ test('mock seed produces per-objective baseline means',
         const expected: ReadonlyArray<
             [string, number]
         > = [
-            ['JkW7aEqFdX3nOiPtVhMrCy', 41],
-            ['RgT2mNvKpQ8xLsYwBzHcUe', 39],
-            ['bDf6uStZlA9eGmYjIoNcWq', 56],
-            ['CvH4wRnXkU1pQsBgTyEzMo', 63],
+            ['JobGWBxUTEBusPcVhYEKtA', 41],
+            ['QVZjTYvKwffyfGpYILwkOA', 39],
+            ['VhxqyRIQytSnUArslwxyog', 56],
+            ['GNRUyOMVpjoeEQWrZkRMkQ', 63],
         ];
         for (const [id, mean] of expected) {
             const row = aggs.find(

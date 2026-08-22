@@ -48,7 +48,7 @@ test(
         assert.equal(
             shouldShowMemberHazard(
                 n,
-                [edge('e1', 'n1', 'next')],
+                [edge('YiJPbufDpkyrZcZCYbUJpg', 'n1', 'next')],
             ),
             'danger',
         );
@@ -63,7 +63,7 @@ test(
         assert.equal(
             shouldShowMemberHazard(
                 n,
-                [edge('e1', 'n1', 'next')],
+                [edge('YiJPbufDpkyrZcZCYbUJpg', 'n1', 'next')],
             ),
             'warning',
         );
@@ -80,7 +80,7 @@ test(
         assert.equal(
             shouldShowMemberHazard(
                 n,
-                [edge('e1', 'n1', 'next')],
+                [edge('YiJPbufDpkyrZcZCYbUJpg', 'n1', 'next')],
             ),
             null,
         );

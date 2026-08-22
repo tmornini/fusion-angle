@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -94,18 +96,18 @@ async function createFlow(
     flowId: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'POST', '/organizations/1/flows/', token,
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token,
         {
             id: flowId,
             flow: flowFields('Fresh Flow'),
-            projectFlowId: flowId + '-pf',
+            projectFlowId: generateIdentifier(),
             projectFlow: {
-                project_id: 'proj-1',
+                project_id: 'qfhFObbtDfxUZwEGxySBoQ',
                 flow_id: flowId,
                 at: AT,
             },
             initialState: 'active',
-            initialStateEventId: flowId + '-ev',
+            initialStateEventId: generateIdentifier(),
             initialStateAt: AT,
             graphDelta: emptyDelta(),
         },
@@ -118,10 +120,12 @@ async function headResponseId(
     flowId: string,
 ): Promise<string> {
     const got = await handleRequest(db, req(
-        'GET', '/organizations/1/flows/' + flowId, token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
     const id = got.headers.get('Response-ID');
-    assert.ok(id, 'no Response-ID on GET /organizations/1/flows/' + flowId);
+    assert.ok(id
+        , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+        + '' + flowId);
     return id!;
 }
 
@@ -132,11 +136,13 @@ test('e2e: PUT organizations/:id/flows/:id/tags/:name'
 + ' flow\'s current Response-ID; GET returns it', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    await createFlow(db, token, 'flow-tag-1');
-    const responseId = await headResponseId(db, token, 'flow-tag-1');
+    await createFlow(db, token, 'bsdgjfOvCYtykdqKWBOlWA');
+    const responseId = await headResponseId(db, token
+        , 'bsdgjfOvCYtykdqKWBOlWA');
 
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-tag-1/tags/v1', token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'bsdgjfOvCYtykdqKWBOlWA/tags/xDyDkxEPwtcNmJVknUHDsg', token,
         { flow_response_id: responseId },
     ));
     assert.equal(put.status, 201);
@@ -144,12 +150,13 @@ test('e2e: PUT organizations/:id/flows/:id/tags/:name'
         id: string; flow_id: string; flow_response_id: string;
     };
     assert.deepEqual(putBody, {
-        id: 'v1', flow_id: 'flow-tag-1',
+        id: 'xDyDkxEPwtcNmJVknUHDsg', flow_id: 'bsdgjfOvCYtykdqKWBOlWA',
         flow_response_id: responseId,
     });
 
     const get = await handleRequest(db, req(
-        'GET', '/organizations/1/flows/flow-tag-1/tags/v1', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'bsdgjfOvCYtykdqKWBOlWA/tags/xDyDkxEPwtcNmJVknUHDsg', token,
     ));
     assert.equal(get.status, 200);
     const getBody = await get.json() as {
@@ -161,9 +168,10 @@ test('e2e: PUT organizations/:id/flows/:id/tags/:name'
 test('e2e: GET on a never-written tag name 404s', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    await createFlow(db, token, 'flow-tag-2');
+    await createFlow(db, token, 'cDEpYbTaWaXvRLuYuBSOoA');
     const res = await handleRequest(db, req(
-        'GET', '/organizations/1/flows/flow-tag-2/tags/never', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cDEpYbTaWaXvRLuYuBSOoA/tags/never', token,
     ));
     assert.equal(res.status, 404);
 });
@@ -173,12 +181,14 @@ test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
 + ' chain, a re-tag is a new head, never an edit', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    await createFlow(db, token, 'flow-tag-3');
-    const r1 = await headResponseId(db, token, 'flow-tag-3');
+    await createFlow(db, token, 'cGVtCERtMGxhyNGAsQBBuQ');
+    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, token
+        , 'cGVtCERtMGxhyNGAsQBBuQ');
 
     const first = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-tag-3/tags/v1', token,
-        { flow_response_id: r1 },
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cGVtCERtMGxhyNGAsQBBuQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
+        { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
     ));
     assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID');
@@ -189,20 +199,24 @@ test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
     // pre-tx idempotency fast path and replay the first response
     // unchanged (message-pair.ts), never forming a second pair.
     const saved = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-tag-3', token,
-        documentBody('Second Save', 'flow-tag-3-ev-2'),
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cGVtCERtMGxhyNGAsQBBuQ', token,
+        documentBody('Second Save', generateIdentifier()),
         { 'if-match': (
             await handleRequest(
-                db, req('GET', '/organizations/1/flows/flow-tag-3', token),
+                db, req('GET'
+                    , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + 'cGVtCERtMGxhyNGAsQBBuQ', token),
             )
         ).headers.get('ETag')! },
     ));
     assert.equal(saved.status, 201);
-    const r2 = await headResponseId(db, token, 'flow-tag-3');
-    assert.notEqual(r2, r1);
+    const r2 = await headResponseId(db, token, 'cGVtCERtMGxhyNGAsQBBuQ');
+    assert.notEqual(r2, rOEPOcVMQdJiiiMuiiEhlg);
 
     const second = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-tag-3/tags/v1', token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cGVtCERtMGxhyNGAsQBBuQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
         { flow_response_id: r2 },
     ));
     assert.equal(second.status, 201);
@@ -222,18 +236,21 @@ test('e2e: DELETE marks the tag — GET 404s after, and the'
 + ' physical splice', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    await createFlow(db, token, 'flow-tag-4');
-    const r1 = await headResponseId(db, token, 'flow-tag-4');
+    await createFlow(db, token, 'cKweIyGvtrOHqQULtGJUZQ');
+    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, token
+        , 'cKweIyGvtrOHqQULtGJUZQ');
 
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-tag-4/tags/v1', token,
-        { flow_response_id: r1 },
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cKweIyGvtrOHqQULtGJUZQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
+        { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
     ));
     assert.equal(put.status, 201);
     const putId = put.headers.get('Response-ID');
 
     const del = await handleRequest(db, req(
-        'DELETE', '/organizations/1/flows/flow-tag-4/tags/v1', token,
+        'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cKweIyGvtrOHqQULtGJUZQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
     ));
     assert.equal(del.status, 204);
     const delId = del.headers.get('Response-ID');
@@ -252,7 +269,8 @@ test('e2e: DELETE marks the tag — GET 404s after, and the'
     assert.equal(requests.length > 0, true);
 
     const get = await handleRequest(db, req(
-        'GET', '/organizations/1/flows/flow-tag-4/tags/v1', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cKweIyGvtrOHqQULtGJUZQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
     ));
     assert.equal(get.status, 404);
 });
@@ -261,13 +279,15 @@ test('e2e: a malformed tag body (extra key) 400s and stores'
 + ' nothing', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    await createFlow(db, token, 'flow-tag-5');
-    const r1 = await headResponseId(db, token, 'flow-tag-5');
+    await createFlow(db, token, 'cOOLmJXlyeYuFYrSofTRmw');
+    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, token
+        , 'cOOLmJXlyeYuFYrSofTRmw');
     const before = await db.pairs.getAll();
 
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-tag-5/tags/v1', token,
-        { flow_response_id: r1, extra: 'nope' },
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cOOLmJXlyeYuFYrSofTRmw/tags/xDyDkxEPwtcNmJVknUHDsg', token,
+        { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg, extra: 'nope' },
     ));
     assert.equal(res.status, 400);
     const after = await db.pairs.getAll();
@@ -278,13 +298,18 @@ test('e2e: a malformed tag name (disallowed characters) 400s'
 + ' and stores nothing', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    await createFlow(db, token, 'flow-tag-6');
-    const r1 = await headResponseId(db, token, 'flow-tag-6');
+    const flowId = generateIdentifier();
+    await createFlow(db, token, flowId);
+    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(
+        db, token, flowId,
+    );
     const before = await db.pairs.getAll();
 
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-tag-6/tags/not%20ok', token,
-        { flow_response_id: r1 },
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + flowId + '/tags/'
+            + 'not%20ok', token,
+        { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
     ));
     assert.equal(res.status, 400);
     const after = await db.pairs.getAll();
@@ -295,25 +320,33 @@ test('e2e: a member-role identity (not just admin) can'
 + ' PUT/GET/DELETE a tag — MEMBER_VERBS widens'
 + ' /organizations/:id/flows/:id/tags', async () => {
     const db = await freshDb();
-    await seedOrganizationMember(db, 'sarah');
+    await seedOrganizationMember(db, 'toccYYkLEABmlbpHJalgtQ');
     const adminToken = await organizationToken();
-    const memberToken = await organizationToken('sarah', '1');
-    await createFlow(db, adminToken, 'flow-tag-7');
-    const r1 = await headResponseId(db, adminToken, 'flow-tag-7');
+    const memberToken = await organizationToken('toccYYkLEABmlbpHJalgtQ'
+        , 'AjdvjuECVZEgZoFajaIEkg');
+    await createFlow(db, adminToken, 'cYEjfPMQAquxhDuXSIHlAQ');
+    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, adminToken
+        , 'cYEjfPMQAquxhDuXSIHlAQ');
 
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-tag-7/tags/v1', memberToken,
-        { flow_response_id: r1 },
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cYEjfPMQAquxhDuXSIHlAQ/tags/xDyDkxEPwtcNmJVknUHDsg'
+            , memberToken,
+        { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
     ));
     assert.equal(put.status, 201);
 
     const get = await handleRequest(db, req(
-        'GET', '/organizations/1/flows/flow-tag-7/tags/v1', memberToken,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cYEjfPMQAquxhDuXSIHlAQ/tags/xDyDkxEPwtcNmJVknUHDsg'
+            , memberToken,
     ));
     assert.equal(get.status, 200);
 
     const del = await handleRequest(db, req(
-        'DELETE', '/organizations/1/flows/flow-tag-7/tags/v1', memberToken,
+        'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cYEjfPMQAquxhDuXSIHlAQ/tags/xDyDkxEPwtcNmJVknUHDsg'
+            , memberToken,
     ));
     assert.equal(del.status, 204);
 });
@@ -325,27 +358,32 @@ test('e2e: two different tag names PUT concurrently on one flow'
 + ' both land', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    await createFlow(db, token, 'flow-tag-8');
-    const r1 = await headResponseId(db, token, 'flow-tag-8');
+    await createFlow(db, token, 'cZEsJjunHJduajRIcdmmuw');
+    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, token
+        , 'cZEsJjunHJduajRIcdmmuw');
 
     const [a, b] = await Promise.all([
         handleRequest(db, req(
-            'PUT', '/organizations/1/flows/flow-tag-8/tags/alpha', token,
-            { flow_response_id: r1 },
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'cZEsJjunHJduajRIcdmmuw/tags/alpha', token,
+            { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
         )),
         handleRequest(db, req(
-            'PUT', '/organizations/1/flows/flow-tag-8/tags/beta', token,
-            { flow_response_id: r1 },
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'cZEsJjunHJduajRIcdmmuw/tags/beta', token,
+            { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
         )),
     ]);
     assert.equal(a.status, 201);
     assert.equal(b.status, 201);
 
     const gotAlpha = await handleRequest(db, req(
-        'GET', '/organizations/1/flows/flow-tag-8/tags/alpha', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cZEsJjunHJduajRIcdmmuw/tags/alpha', token,
     ));
     const gotBeta = await handleRequest(db, req(
-        'GET', '/organizations/1/flows/flow-tag-8/tags/beta', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cZEsJjunHJduajRIcdmmuw/tags/beta', token,
     ));
     assert.equal(gotAlpha.status, 200);
     assert.equal(gotBeta.status, 200);
@@ -364,50 +402,57 @@ test('e2e: a tag written once still resolves to the EXACT'
 + ' pin never follows the flow\'s own moving head', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    await createFlow(db, token, 'flow-tag-pin-1');
-    const r1 = await headResponseId(db, token, 'flow-tag-pin-1');
+    await createFlow(db, token, 'cadVHBQlvTvWsTriyDUeTQ');
+    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, token
+        , 'cadVHBQlvTvWsTriyDUeTQ');
 
     const tagged = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-tag-pin-1/tags/v1', token,
-        { flow_response_id: r1 },
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cadVHBQlvTvWsTriyDUeTQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
+        { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
     ));
     assert.equal(tagged.status, 201);
 
     const save2 = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-tag-pin-1', token,
-        documentBody('Second Save', 'flow-tag-pin-1-ev-2'),
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cadVHBQlvTvWsTriyDUeTQ', token,
+        documentBody('Second Save', generateIdentifier()),
         { 'if-match': (
             await handleRequest(
                 db,
-                req('GET', '/organizations/1/flows/flow-tag-pin-1', token),
+                req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + 'cadVHBQlvTvWsTriyDUeTQ', token),
             )
         ).headers.get('ETag')! },
     ));
     assert.equal(save2.status, 201);
-    const r2 = await headResponseId(db, token, 'flow-tag-pin-1');
-    assert.notEqual(r2, r1);
+    const r2 = await headResponseId(db, token, 'cadVHBQlvTvWsTriyDUeTQ');
+    assert.notEqual(r2, rOEPOcVMQdJiiiMuiiEhlg);
 
     const save3 = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-tag-pin-1', token,
-        documentBody('Third Save', 'flow-tag-pin-1-ev-3'),
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cadVHBQlvTvWsTriyDUeTQ', token,
+        documentBody('Third Save', generateIdentifier()),
         { 'if-match': (
             await handleRequest(
                 db,
-                req('GET', '/organizations/1/flows/flow-tag-pin-1', token),
+                req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + 'cadVHBQlvTvWsTriyDUeTQ', token),
             )
         ).headers.get('ETag')! },
     ));
     assert.equal(save3.status, 201);
-    const r3 = await headResponseId(db, token, 'flow-tag-pin-1');
+    const r3 = await headResponseId(db, token, 'cadVHBQlvTvWsTriyDUeTQ');
     assert.notEqual(r3, r2);
 
     const get = await handleRequest(db, req(
-        'GET', '/organizations/1/flows/flow-tag-pin-1/tags/v1', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cadVHBQlvTvWsTriyDUeTQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
     ));
     assert.equal(get.status, 200);
     const body = await get.json() as { flow_response_id: string };
     assert.equal(
-        body.flow_response_id, r1,
+        body.flow_response_id, rOEPOcVMQdJiiiMuiiEhlg,
         'the tag must still name the ORIGINAL pinned response,'
         + ' never the flow\'s current head',
     );

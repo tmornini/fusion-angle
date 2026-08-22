@@ -83,7 +83,7 @@ function makeRecordingContainer(): {
 function personPresenter() {
     return new IdentityDetailPresenter({
         identity: new Identity({
-            id: 'p1', kind: 'person',
+            id: 'pnXmXrxOWayANgDLdCjuBw', kind: 'person',
         }),
         pii: {
             erased: false,
@@ -105,7 +105,7 @@ test(
         const rec = makeRecordingContainer();
         personPresenter().renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, /p1/);
+        assert.match(out, /pnXmXrxOWayANgDLdCjuBw/);
         assert.match(out, /Person/);
         assert.match(out, /Personal Information/);
         assert.match(out, /Ada Lovelace/);
@@ -129,7 +129,7 @@ test(
         const rec = makeRecordingContainer();
         new IdentityDetailPresenter({
             identity: new Identity({
-                id: 'p2', kind: 'person',
+                id: 'prBESZPjJDiuXCeZLmbiVw', kind: 'person',
             }),
             pii: { erased: true },
             service: { named: false },
@@ -151,7 +151,7 @@ test(
         const rec = makeRecordingContainer();
         new IdentityDetailPresenter({
             identity: new Identity({
-                id: 's1', kind: 'service',
+                id: 'syWUUcdBSbBgMwBiCrgbDw', kind: 'service',
             }),
             pii: { erased: true },
             service: {
@@ -186,7 +186,7 @@ test(
         const rec = makeRecordingContainer();
         new IdentityDetailPresenter({
             identity: new Identity({
-                id: '42vHYDCvtkaO3sTnoqg7aJ',
+                id: 'BhdhBLQPyktOCbdJzGsggg',
                 kind: 'service',
             }),
             pii: { erased: true },
@@ -198,7 +198,7 @@ test(
         assert.match(out, new RegExp(UNNAMED_SERVICE_NAME));
         // The id is the subtitle, never the heading.
         assert.doesNotMatch(
-            out, /<h1[^>]*>\s*42vHYDCvtkaO3sTnoqg7aJ/,
+            out, /<h1[^>]*>\s*BhdhBLQPyktOCbdJzGsggg/,
         );
     },
 );
@@ -211,7 +211,7 @@ test(
             makeRecordingContainer();
         new IdentityDetailPresenter({
             identity: new Identity({
-                id: 's1', kind: 'service',
+                id: 'syWUUcdBSbBgMwBiCrgbDw', kind: 'service',
             }),
             pii: { erased: true },
             service: { named: true, name: 'Robo',
@@ -232,7 +232,7 @@ test(
             makeRecordingContainer();
         new IdentityDetailPresenter({
             identity: new Identity({
-                id: 's1', kind: 'service',
+                id: 'syWUUcdBSbBgMwBiCrgbDw', kind: 'service',
             }),
             pii: { erased: true },
             service: { named: true, name: 'Robo',

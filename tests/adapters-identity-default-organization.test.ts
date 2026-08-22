@@ -66,7 +66,7 @@ async function memberOf(organizations: string[]) {
     await db.postSchemaCreation();
     for (const [i, organization] of organizations.entries()) {
         await seedMembershipPair(
-            db, 'm-' + i, organization, 'current',
+            db, 'm-' + i, organization, 'XXZruirZyAOoRpNxaDnpSA',
         );
     }
     return db;
@@ -74,23 +74,24 @@ async function memberOf(organizations: string[]) {
 
 test('putIdentityDefaultOrganization sets the caller default org',
 async () => {
-    const db = await memberOf(['1']);
+    const db = await memberOf(['AjdvjuECVZEgZoFajaIEkg']);
     const ctx = createRequestContext(db, await devToken());
-    await putIdentityDefaultOrganization(ctx, '1');
-    assert.equal(await getIdentityDefaultOrganization(ctx), '1');
+    await putIdentityDefaultOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg');
+    assert.equal(await getIdentityDefaultOrganization(ctx)
+        , 'AjdvjuECVZEgZoFajaIEkg');
 });
 
 test('getIdentityDefaultOrganization is null when never SET',
 async () => {
-    const db = await memberOf(['1']);
+    const db = await memberOf(['AjdvjuECVZEgZoFajaIEkg']);
     const ctx = createRequestContext(db, await devToken());
     assert.equal(await getIdentityDefaultOrganization(ctx), null);
 });
 
 test('putIdentityDefaultOrganization rejects a non-member org',
 async () => {
-    const db = await memberOf(['1']);
+    const db = await memberOf(['AjdvjuECVZEgZoFajaIEkg']);
     const ctx = createRequestContext(db, await devToken());
     await assert.rejects(
-        () => putIdentityDefaultOrganization(ctx, '2'));
+        () => putIdentityDefaultOrganization(ctx, 'BBjWJsjYIDkTRKIIPrzWRw'));
 });

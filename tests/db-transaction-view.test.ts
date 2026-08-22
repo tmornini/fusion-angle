@@ -3,9 +3,9 @@ import { strict as assert } from 'node:assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 
 const aPair = {
-    uri_collection: '/organizations/1/ideas/',
+    uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     uri_id: '42',
-    requester_identity_id: 'current',
+    requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
     method: 'PUT',
     request_at: '2026-01-01T00:00:00.000000Z',
     request_hash: 'a'.repeat(64),
@@ -13,7 +13,7 @@ const aPair = {
     response_at: '2026-01-01T00:00:00.000000Z',
     version: 'e'.repeat(64),
     response: '{"kind":"response"}',
-    operation_id: '0123456789ABCDEFGHIJKL',
+    operation_id: '0123456789ABCDEFGHIJKw',
 };
 
 test(
@@ -24,11 +24,11 @@ test(
         await db.transaction(
             ['pairs'],
             async (view) => {
-                await view.pairs.put('s1', aPair);
+                await view.pairs.put('syWUUcdBSbBgMwBiCrgbDw', aPair);
             },
         );
-        const pair = await db.pairs.getById('s1');
-        assert.equal(pair.id, 's1');
+        const pair = await db.pairs.getById('syWUUcdBSbBgMwBiCrgbDw');
+        assert.equal(pair.id, 'syWUUcdBSbBgMwBiCrgbDw');
     },
 );
 
@@ -41,7 +41,7 @@ test(
             () => db.transaction(
                 ['pairs'],
                 async (view) => {
-                    await view.pairs.put('s1', aPair);
+                    await view.pairs.put('syWUUcdBSbBgMwBiCrgbDw', aPair);
                     throw new Error('boom');
                 },
             ),
@@ -60,14 +60,14 @@ test(
         const seen = await db.transaction(
             ['pairs'],
             async (view) => {
-                await view.pairs.put('s1', aPair);
+                await view.pairs.put('syWUUcdBSbBgMwBiCrgbDw', aPair);
                 // Read back inside the same tx — the put is
                 // visible before commit.
                 return view.pairs.getAll();
             },
         );
         assert.equal(seen.length, 1);
-        assert.equal(seen[0]!.id, 's1');
+        assert.equal(seen[0]!.id, 'syWUUcdBSbBgMwBiCrgbDw');
     },
 );
 
@@ -83,14 +83,14 @@ test(
                     ['pairs'],
                     async (inner) => {
                         await inner.pairs.put(
-                            's1', aPair,
+                            'syWUUcdBSbBgMwBiCrgbDw', aPair,
                         );
                     },
                 );
             },
         );
-        const pair = await db.pairs.getById('s1');
-        assert.equal(pair.id, 's1');
+        const pair = await db.pairs.getById('syWUUcdBSbBgMwBiCrgbDw');
+        assert.equal(pair.id, 'syWUUcdBSbBgMwBiCrgbDw');
     },
 );
 
@@ -107,7 +107,7 @@ test(
                         ['pairs'],
                         async (inner) => {
                             await inner.pairs.put(
-                                's1', aPair,
+                                'syWUUcdBSbBgMwBiCrgbDw', aPair,
                             );
                         },
                     );
@@ -147,13 +147,13 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        await db.pairs.put('s1', aPair);
+        await db.pairs.put('syWUUcdBSbBgMwBiCrgbDw', aPair);
         const seen = await db.readTransaction(
             ['pairs'],
             (view) => view.pairs.getAll(),
         );
         assert.equal(seen.length, 1);
-        assert.equal(seen[0]!.id, 's1');
+        assert.equal(seen[0]!.id, 'syWUUcdBSbBgMwBiCrgbDw');
     },
 );
 
@@ -166,7 +166,7 @@ test(
             () => db.readTransaction(
                 ['pairs'],
                 (view) => view.pairs.put(
-                    's1', aPair,
+                    'syWUUcdBSbBgMwBiCrgbDw', aPair,
                 ),
             ),
             /readonly transaction/,
@@ -185,7 +185,7 @@ test(
         const seen = await db.transaction(
             ['pairs'],
             async (view) => {
-                await view.pairs.put('s1', aPair);
+                await view.pairs.put('syWUUcdBSbBgMwBiCrgbDw', aPair);
                 // Nested read joins the open write tx so the
                 // uncommitted put is visible (read-your-writes).
                 return view.readTransaction(
@@ -195,9 +195,10 @@ test(
             },
         );
         assert.equal(seen.length, 1);
-        assert.equal(seen[0]!.id, 's1');
+        assert.equal(seen[0]!.id, 'syWUUcdBSbBgMwBiCrgbDw');
         assert.equal(
-            (await db.pairs.getById('s1')).id, 's1',
+            (await db.pairs.getById('syWUUcdBSbBgMwBiCrgbDw')).id
+                , 'syWUUcdBSbBgMwBiCrgbDw',
         );
     },
 );

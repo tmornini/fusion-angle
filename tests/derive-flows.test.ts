@@ -13,6 +13,8 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 
 // The flows sibling of tests/derive-ideas.test.ts/derive-
@@ -22,11 +24,12 @@ import {
 // class (Decision 7) — a SECOND PUT to an existing flow is
 // non-genesis and must thread If-Match via a header-
 // capable req helper (echo the first PUT's 64-hex ETag),
-// unlike the bare-req idiom the organizations/1/ideas/projects skew tests
+// unlike the bare-req idiom the
+// organizations/AjdvjuECVZEgZoFajaIEkg/ideas/projects skew tests
 // use.
 
 const BASE = 'http://localhost';
-const STARK_ORGANIZATION = '1';
+const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 function req(
@@ -112,7 +115,7 @@ function putFlow(
     headers?: Record<string, string>,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'PUT', '/organizations/1/flows/' + id, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + id, token,
         flowDocument(name, state, stateAt, stateEventId, graph),
         headers,
     ));
@@ -124,9 +127,11 @@ test(
     async () => {
         const db = await seededDb();
         const token = await organizationToken();
-        const id = 'flow-drv-skew';
+        const id = generateIdentifier();
+        const genesisEventId = generateIdentifier();
+        const laterEventId = generateIdentifier();
         const genesisGraph = graphWithNode(
-            'n-genesis', 'Genesis Node',
+            generateIdentifier(), 'Genesis Node',
         );
 
         // Genesis claims a LATER state_at than the skewed
@@ -134,27 +139,30 @@ test(
         // the (state_at, id) reduction must resist.
         const genesis = await putFlow(
             db, token, id, 'Genesis Title', 'active',
-            '2026-06-01T00:00:00.000000Z', 'ev-drv-skew-genesis',
+            '2026-06-01T00:00:00.000000Z', genesisEventId,
             genesisGraph,
         );
         assert.equal(genesis.status, 201);
         const head = await handleRequest(db, req(
-            'GET', '/organizations/1/flows/' + id, token,
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + id, token,
         ));
         const etag = head.headers.get('ETag');
-        assert.ok(etag, 'no ETag on GET /organizations/1/flows/' + id);
+        assert.ok(etag
+            , 'no ETag on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + id);
 
         // The locked class: this second PUT is non-genesis, so
         // it must echo the current head's ETag rather
-        // than the bare-req idiom the organizations/1/ideas/projects skew
+        // than the bare-req idiom the
+        // organizations/AjdvjuECVZEgZoFajaIEkg/ideas/projects skew
         // tests
         // use — a save with no echo 412s outright.
         const skewedGraph = graphWithNode(
-            'n-skewed', 'Skewed Node',
+            generateIdentifier(), 'Skewed Node',
         );
         const res = await putFlow(
             db, token, id, 'Skewed Title', 'deleted',
-            '2020-01-01T00:00:00.000000Z', 'ev-drv-skew-later',
+            '2020-01-01T00:00:00.000000Z', laterEventId,
             skewedGraph, { 'if-match': etag },
         );
         assert.equal(res.status, 201);
@@ -201,13 +209,13 @@ test(
             })),
             [
                 {
-                    id: 'ev-drv-skew-later',
+                    id: laterEventId,
                     entity_id: id,
                     state: 'deleted',
                     at: '2020-01-01T00:00:00.000000Z',
                 },
                 {
-                    id: 'ev-drv-skew-genesis',
+                    id: genesisEventId,
                     entity_id: id,
                     state: 'active',
                     at: '2026-06-01T00:00:00.000000Z',
@@ -221,12 +229,14 @@ test('ordering is oldest live head (at, id)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ids = [
-        'zz-order-flow', 'aa-order-flow', 'mm-order-flow',
+        generateIdentifier(),
+        generateIdentifier(),
+        generateIdentifier(),
     ];
     for (const id of ids) {
         const res = await putFlow(
             db, token, id, 'Order ' + id, 'active',
-            AT, 'ev-' + id, emptyGraph(),
+            AT, generateIdentifier(), emptyGraph(),
         );
         assert.equal(res.status, 201);
     }

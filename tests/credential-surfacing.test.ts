@@ -15,13 +15,13 @@ import { deriveCredentialsFor } from
 
 function currentReveal(creds: SeededCredentials) {
     return creds.identities.find(
-        c => c.identityId === 'current');
+        c => c.identityId === 'XXZruirZyAOoRpNxaDnpSA');
 }
 
 // Phase Final Task 2: identity_credentials ROW half stripped —
 // admin credential oracle is the pair plane.
 async function adminCredential(db: MemoryDbAdapter) {
-    const rows = await deriveCredentialsFor(db, 'current');
+    const rows = await deriveCredentialsFor(db, 'XXZruirZyAOoRpNxaDnpSA');
     return rows.find(r => r.kind === 'password');
 }
 
@@ -81,7 +81,7 @@ async () => {
     await db.postSchemaCreation();
     const creds = await postBootstrap(db);
     assert.equal(creds.identities.length, 1);
-    assert.equal(creds.identities[0]!.identityId, 'current');
+    assert.equal(creds.identities[0]!.identityId, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
 test('each seed run yields a distinct admin password',

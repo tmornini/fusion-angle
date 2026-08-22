@@ -15,8 +15,8 @@ import type {
     StoredGraph,
 } from '../../../api/types.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 import {
     notifyFlowChange,
     buildSaveEvents,
@@ -42,6 +42,7 @@ import {
 } from './shared.ts';
 import {
     generateMermaid,
+    mermaidIdOf,
 } from '../mermaid-generate.ts';
 import { parseMermaid } from '../mermaid-parse.ts';
 import type {
@@ -86,16 +87,12 @@ interface SidecarEdge {
     name: string;
 }
 
-function sanitizeId(id: string): string {
-    return id.replaceAll('-', '_');
-}
-
 function buildSidecar(
     graph: FlowGraph,
 ): string {
     const nodes: SidecarNode[] =
         graph.nodes.map(n => ({
-            mermaidId: sanitizeId(n.id),
+            mermaidId: mermaidIdOf(n.id),
             name: n.name,
             positionX: n.positionX,
             positionY: n.positionY,
@@ -105,9 +102,9 @@ function buildSidecar(
     const edges: SidecarEdge[] =
         graph.edges.map(e => ({
             mermaidFrom:
-                sanitizeId(e.fromNodeId),
+                mermaidIdOf(e.fromNodeId),
             mermaidTo:
-                sanitizeId(e.toNodeId),
+                mermaidIdOf(e.toNodeId),
             name: e.name,
         }));
     return JSON.stringify({
@@ -508,7 +505,7 @@ export async function postFlowFromBackup(
         const n
             of backup.flow.graph.nodes
     ) {
-        const newId = generateCryptoSafeBase62();
+        const newId = generateIdentifier();
         idMap.set(n.id, newId);
         nodes.push({
             id: newId,
@@ -539,7 +536,7 @@ export async function postFlowFromBackup(
                 );
             }
             return {
-                id: generateCryptoSafeBase62(),
+                id: generateIdentifier(),
                 name: e.name,
                 fromNodeId,
                 toNodeId,
@@ -554,10 +551,10 @@ export async function postFlowFromBackup(
         { nodes: [], edges: [] },
         { nodes, edges },
         flowId,
-        generateCryptoSafeBase62,
+        generateIdentifier,
         now,
     );
-    const linkId = generateCryptoSafeBase62();
+    const linkId = generateIdentifier();
     await ctx.POST(
         organizationCollection(ctx, 'flows'),
         {
@@ -576,7 +573,7 @@ export async function postFlowFromBackup(
             at: now,
         },
         initialState: 'active',
-        initialStateEventId: generateCryptoSafeBase62(),
+        initialStateEventId: generateIdentifier(),
         initialStateAt: nowUtc(),
         graphDelta,
     });
@@ -619,7 +616,7 @@ function remapParsedToDefaults(
             );
             continue;
         }
-        const newId = generateCryptoSafeBase62();
+        const newId = generateIdentifier();
         idMap.set(n.mermaidId, newId);
         intermediates.push({
             parsed: n, newId,
@@ -684,7 +681,7 @@ function buildImportedEdges(
         if (seen.has(key)) continue;
         seen.add(key);
         edges.push({
-            id: generateCryptoSafeBase62(),
+            id: generateIdentifier(),
             name: e.name,
             fromNodeId: fromId,
             toNodeId: toId,
@@ -713,7 +710,7 @@ function autoWireDefaults(
         for (const id of intermediateIds) {
             if (!incoming.has(id)) {
                 extras.push({
-                    id: generateCryptoSafeBase62(),
+                    id: generateIdentifier(),
                     name: '',
                     fromNodeId: startId,
                     toNodeId: id,
@@ -725,7 +722,7 @@ function autoWireDefaults(
         for (const id of intermediateIds) {
             if (!outgoing.has(id)) {
                 extras.push({
-                    id: generateCryptoSafeBase62(),
+                    id: generateIdentifier(),
                     name: '',
                     fromNodeId: id,
                     toNodeId: completeId,
@@ -865,10 +862,10 @@ export async function postFlowFromMermaid(
         { nodes: [], edges: [] },
         graph,
         flowId,
-        generateCryptoSafeBase62,
+        generateIdentifier,
         now,
     );
-    const linkId = generateCryptoSafeBase62();
+    const linkId = generateIdentifier();
     await ctx.POST(
         organizationCollection(ctx, 'flows'),
         {
@@ -887,7 +884,7 @@ export async function postFlowFromMermaid(
             at: now,
         },
         initialState: 'active',
-        initialStateEventId: generateCryptoSafeBase62(),
+        initialStateEventId: generateIdentifier(),
         initialStateAt: nowUtc(),
         graphDelta,
     });
@@ -1213,10 +1210,10 @@ export async function postFlowFromZip(
         { nodes: [], edges: [] },
         graph,
         flowId,
-        generateCryptoSafeBase62,
+        generateIdentifier,
         now,
     );
-    const linkId = generateCryptoSafeBase62();
+    const linkId = generateIdentifier();
     await ctx.POST(
         organizationCollection(ctx, 'flows'),
         {
@@ -1235,7 +1232,7 @@ export async function postFlowFromZip(
             at: now,
         },
         initialState: 'active',
-        initialStateEventId: generateCryptoSafeBase62(),
+        initialStateEventId: generateIdentifier(),
         initialStateAt: nowUtc(),
         graphDelta,
     });

@@ -24,6 +24,8 @@ import {
 import { putProject } from '../web-app/app/adapters/projects.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 test('getBaselineScoresForProject returns project rows',
     async () => {
@@ -31,25 +33,31 @@ test('getBaselineScoresForProject returns project rows',
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await organizationToken());
         await ctx.PUT(
-            'organizations/1/projects/p1/objective-baseline-scores/p1:o1:t1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/'
+                + generateIdentifier(),
             {
-                project_id: 'p1', objective_id: 'o1',
+                project_id: 'pnXmXrxOWayANgDLdCjuBw'
+                    , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
                 score: 50,
-                member_id: 'w1',
+                member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-14T00:00:00.000000Z',
             },
         );
         await ctx.PUT(
-            'organizations/1/projects/p2/objective-baseline-scores/p2:o1:t1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'prBESZPjJDiuXCeZLmbiVw/objective-baseline-scores/'
+                + generateIdentifier(),
             {
-                project_id: 'p2', objective_id: 'o1',
+                project_id: 'prBESZPjJDiuXCeZLmbiVw'
+                    , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
                 score: -20,
-                member_id: 'w1',
+                member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-14T00:00:00.000000Z',
             },
         );
         const rows = await getBaselineScoresForProject(
-            ctx, 'p1',
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );
         assert.equal(rows.length, 1);
         assert.equal(rows[0]!.score, 50);
@@ -61,16 +69,19 @@ test('getActualScoresForProject returns project rows',
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await organizationToken());
         await ctx.PUT(
-            'organizations/1/projects/p1/objective-actual-scores/p1:o1:t1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'pnXmXrxOWayANgDLdCjuBw/objective-actual-scores/'
+                + generateIdentifier(),
             {
-                project_id: 'p1', objective_id: 'o1',
+                project_id: 'pnXmXrxOWayANgDLdCjuBw'
+                    , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
                 score: 33,
-                member_id: 'w1',
+                member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-14T00:00:00.000000Z',
             },
         );
         const rows = await getActualScoresForProject(
-            ctx, 'p1',
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );
         assert.equal(rows.length, 1);
         assert.equal(rows[0]!.score, 33);
@@ -82,24 +93,30 @@ test('getProjectScoring returns both lists',
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await organizationToken());
         await ctx.PUT(
-            'organizations/1/projects/p1/objective-baseline-scores/p1:o1:t1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/'
+                + generateIdentifier(),
             {
-                project_id: 'p1', objective_id: 'o1',
+                project_id: 'pnXmXrxOWayANgDLdCjuBw'
+                    , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
                 score: 50,
-                member_id: 'w1',
+                member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-14T00:00:00.000000Z',
             },
         );
         await ctx.PUT(
-            'organizations/1/projects/p1/objective-actual-scores/p1:o1:t2',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'pnXmXrxOWayANgDLdCjuBw/objective-actual-scores/'
+                + generateIdentifier(),
             {
-                project_id: 'p1', objective_id: 'o1',
+                project_id: 'pnXmXrxOWayANgDLdCjuBw'
+                    , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
                 score: 33,
-                member_id: 'w1',
+                member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-15T00:00:00.000000Z',
             },
         );
-        const r = await getProjectScoring(ctx, 'p1');
+        const r = await getProjectScoring(ctx, 'pnXmXrxOWayANgDLdCjuBw');
         assert.equal(r.baseline.length, 1);
         assert.equal(r.actual.length, 1);
         assert.equal(r.baseline[0]!.score, 50);
@@ -128,40 +145,51 @@ async function seedTwoApprovedProjects(
         target_end_date: '2026-05-14',
         estimated_cost: 0, actual_cost: 0,
     };
-    await putProject(ctx, 'p1', {
+    await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
         ...projectBody,
         title: 't1', position: 0,
         state: 'approved',
     });
-    await putProject(ctx, 'p2', {
+    await putProject(ctx, 'prBESZPjJDiuXCeZLmbiVw', {
         ...projectBody,
         title: 't2', position: 1,
         state: 'approved',
     });
-    await ctx.PUT('organizations/1/objectives/o1', {
+    await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+        + 'ohqxgUBEaFQwYbXsonRPmg', {
         position: 0,
         state: 'active',
     });
-    await ctx.PUT('organizations/1/objectives/o1/revisions/o1:t0', {
-        objective_id: 'o1', name: 'O', description: 'd',
-        member_id: 'w1',
+    await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+        + 'ohqxgUBEaFQwYbXsonRPmg/revisions/'
+        + generateIdentifier(), {
+        objective_id: 'ohqxgUBEaFQwYbXsonRPmg', name: 'O', description: 'd',
+        member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
         at: '2026-05-14T00:00:00.000000Z',
     });
     await ctx.PUT(
-        'organizations/1/projects/p1/objective-baseline-scores/p1:o1:t1',
+        'organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'projects/pnXmXrxOWayANgDLdCjuBw/'
+            + 'objective-baseline-scores/'
+            + generateIdentifier(),
         {
-            project_id: 'p1', objective_id: 'o1',
+            project_id: 'pnXmXrxOWayANgDLdCjuBw'
+                , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
             score: 60,
-            member_id: 'w1',
+            member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
             at: '2026-05-14T00:00:00.000000Z',
         },
     );
     await ctx.PUT(
-        'organizations/1/projects/p2/objective-baseline-scores/p2:o1:t1',
+        'organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'projects/prBESZPjJDiuXCeZLmbiVw/'
+            + 'objective-baseline-scores/'
+            + generateIdentifier(),
         {
-            project_id: 'p2', objective_id: 'o1',
+            project_id: 'prBESZPjJDiuXCeZLmbiVw'
+                , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
             score: -20,
-            member_id: 'w1',
+            member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
             at: '2026-05-14T00:00:00.000000Z',
         },
     );
@@ -188,7 +216,7 @@ test('buildObjectiveAggregates returns per-objective rows',
             await getObjectiveScoringInputs(ctx),
         );
         assert.equal(rows.length, 1);
-        assert.equal(rows[0]!.objectiveId, 'o1');
+        assert.equal(rows[0]!.objectiveId, 'ohqxgUBEaFQwYbXsonRPmg');
         assert.equal(rows[0]!.baselineMean, 20);
         assert.equal(rows[0]!.projectsBaselineScored, 2);
     });
@@ -203,8 +231,8 @@ test('getProjectsScoreColumn returns per-project rollup',
         const byId = new Map(
             rows.map(r => [r.projectId, r]),
         );
-        assert.equal(byId.get('p1')!.baselineAvg, 60);
-        assert.equal(byId.get('p2')!.baselineAvg, -20);
+        assert.equal(byId.get('pnXmXrxOWayANgDLdCjuBw')!.baselineAvg, 60);
+        assert.equal(byId.get('prBESZPjJDiuXCeZLmbiVw')!.baselineAvg, -20);
     });
 
 test(
@@ -215,28 +243,34 @@ test(
         const ctx = createRequestContext(db, await organizationToken());
         await seedTwoApprovedProjects(db, ctx);
         await ctx.PUT(
-            'organizations/1/projects/p1/objective-actual-scores/p1:o1:a1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'pnXmXrxOWayANgDLdCjuBw/objective-actual-scores/'
+                + generateIdentifier(),
             {
-                project_id: 'p1', objective_id: 'o1',
+                project_id: 'pnXmXrxOWayANgDLdCjuBw'
+                    , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
                 score: 40,
-                member_id: 'w1',
+                member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-15T00:00:00.000000Z',
             },
         );
         await ctx.PUT(
-            'organizations/1/projects/p2/objective-actual-scores/p2:o1:a1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'prBESZPjJDiuXCeZLmbiVw/objective-actual-scores/'
+                + generateIdentifier(),
             {
-                project_id: 'p2', objective_id: 'o1',
+                project_id: 'prBESZPjJDiuXCeZLmbiVw'
+                    , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
                 score: 10,
-                member_id: 'w1',
+                member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-16T00:00:00.000000Z',
             },
         );
         const trendlines = buildObjectiveTrendlines(
             await getObjectiveScoringInputs(ctx),
         );
-        const points = trendlines.get('o1');
-        assert.ok(points, 'o1 trendline must exist');
+        const points = trendlines.get('ohqxgUBEaFQwYbXsonRPmg');
+        assert.ok(points, 'ohqxgUBEaFQwYbXsonRPmg trendline must exist');
         assert.deepEqual(
             points.map(p => p.value), [20, 40, 25],
         );
@@ -250,8 +284,9 @@ test(
             points[2]?.at, '2026-05-16T00:00:00.000000Z',
         );
         // baselineMean = (60 + -20) / 2 = 20
-        // after t1 (p1=40 only):        40
-        // after t2 (p1=40, p2=10):      (40 + 10) / 2 = 25
+        // after t1 (pnXmXrxOWayANgDLdCjuBw=40 only):        40
+        // after t2 (pnXmXrxOWayANgDLdCjuBw=40, prBESZPjJDiuXCeZLmbiVw=10):
+        // (40 + 10) / 2 = 25
     },
 );
 
@@ -263,19 +298,22 @@ test(
         const ctx = createRequestContext(db, await organizationToken());
         await seedTwoApprovedProjects(db, ctx);
         await ctx.PUT(
-            'organizations/1/projects/p1/objective-actual-scores/p1:o1:a1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'pnXmXrxOWayANgDLdCjuBw/objective-actual-scores/'
+                + generateIdentifier(),
             {
-                project_id: 'p1', objective_id: 'o1',
+                project_id: 'pnXmXrxOWayANgDLdCjuBw'
+                    , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
                 score: 40,
-                member_id: 'w1',
+                member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-15T00:00:00.000000Z',
             },
         );
         const trendlines = buildObjectiveTrendlines(
             await getObjectiveScoringInputs(ctx),
         );
-        const points = trendlines.get('o1');
-        assert.ok(points, 'o1 trendline must exist');
+        const points = trendlines.get('ohqxgUBEaFQwYbXsonRPmg');
+        assert.ok(points, 'ohqxgUBEaFQwYbXsonRPmg trendline must exist');
         assert.deepEqual(
             points.map(p => p.value), [20, 40],
         );
@@ -293,28 +331,34 @@ test(
         const ctx = createRequestContext(db, await organizationToken());
         await seedTwoApprovedProjects(db, ctx);
         await ctx.PUT(
-            'organizations/1/projects/p1/objective-actual-scores/p1:o1:a1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'pnXmXrxOWayANgDLdCjuBw/objective-actual-scores/'
+                + generateIdentifier(),
             {
-                project_id: 'p1', objective_id: 'o1',
+                project_id: 'pnXmXrxOWayANgDLdCjuBw'
+                    , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
                 score: 40,
-                member_id: 'w1',
+                member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-15T00:00:00.000000Z',
             },
         );
         await ctx.PUT(
-            'organizations/1/projects/p2/objective-actual-scores/p2:o1:a1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + 'prBESZPjJDiuXCeZLmbiVw/objective-actual-scores/'
+                + generateIdentifier(),
             {
-                project_id: 'p2', objective_id: 'o1',
+                project_id: 'prBESZPjJDiuXCeZLmbiVw'
+                    , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
                 score: 10,
-                member_id: 'w1',
+                member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-15T00:00:00.000000Z',
             },
         );
         const trendlines = buildObjectiveTrendlines(
             await getObjectiveScoringInputs(ctx),
         );
-        const points = trendlines.get('o1');
-        assert.ok(points, 'o1 trendline must exist');
+        const points = trendlines.get('ohqxgUBEaFQwYbXsonRPmg');
+        assert.ok(points, 'ohqxgUBEaFQwYbXsonRPmg trendline must exist');
         assert.deepEqual(
             points.map(p => p.value), [20, 25],
         );
@@ -330,20 +374,23 @@ test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await organizationToken());
-        await ctx.PUT('organizations/1/objectives/o1', {
+        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + 'ohqxgUBEaFQwYbXsonRPmg', {
             position: 0,
             state: 'active',
         });
-        await ctx.PUT('organizations/1/objectives/o1/revisions/o1:t0', {
-            objective_id: 'o1',
+        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + 'ohqxgUBEaFQwYbXsonRPmg/revisions/'
+        + generateIdentifier(), {
+            objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
             name: 'O', description: 'd',
-            member_id: 'w1',
+            member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
             at: '2026-05-14T00:00:00.000000Z',
         });
         const trendlines = buildObjectiveTrendlines(
             await getObjectiveScoringInputs(ctx),
         );
-        assert.deepEqual(trendlines.get('o1'), []);
+        assert.deepEqual(trendlines.get('ohqxgUBEaFQwYbXsonRPmg'), []);
     },
 );
 
@@ -351,20 +398,20 @@ test('postProjectBaselineScoring appends via GET scores',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedHumanMember(db, 'current', 'Demo User');
+        await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
         const ctx = createRequestContext(db, await organizationToken());
-        await postProjectBaselineScoring(ctx, 'p1', [
-            { objectiveId: 'o1', score: 50 },
-            { objectiveId: 'o2', score: -30 },
+        await postProjectBaselineScoring(ctx, 'pnXmXrxOWayANgDLdCjuBw', [
+            { objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: 50 },
+            { objectiveId: generateIdentifier(), score: -30 },
         ]);
         // Phase Final Task 2: score row half stripped —
         // adapter read derives from the pair plane.
         const rows = await getBaselineScoresForProject(
-            ctx, 'p1',
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );
         assert.equal(rows.length, 2);
         for (const r of rows) {
-            assert.equal(r.memberId, 'current');
+            assert.equal(r.memberId, 'XXZruirZyAOoRpNxaDnpSA');
         }
     });
 
@@ -378,18 +425,18 @@ test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(
-            db, 'current', 'Demo User',
+            db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User',
         );
         const ctx = createRequestContext(
             db, await organizationToken(),
         );
-        await postProjectBaselineScoring(ctx, 'p1', [
-            { objectiveId: 'o1', score: 10 },
-            { objectiveId: 'o2', score: 20 },
-            { objectiveId: 'o3', score: 30 },
+        await postProjectBaselineScoring(ctx, 'pnXmXrxOWayANgDLdCjuBw', [
+            { objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: 10 },
+            { objectiveId: generateIdentifier(), score: 20 },
+            { objectiveId: generateIdentifier(), score: 30 },
         ]);
         const rows = await getBaselineScoresForProject(
-            ctx, 'p1',
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );
         assert.equal(rows.length, 3);
         const ids = new Set(rows.map(r => r.id));
@@ -403,15 +450,15 @@ test('postProjectActualMeasurement appends via GET scores',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedHumanMember(db, 'current', 'Demo User');
+        await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
         const ctx = createRequestContext(db, await organizationToken());
-        await postProjectActualMeasurement(ctx, 'p1', [
-            { objectiveId: 'o1', score: 33 },
+        await postProjectActualMeasurement(ctx, 'pnXmXrxOWayANgDLdCjuBw', [
+            { objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: 33 },
         ]);
         const rows = await getActualScoresForProject(
-            ctx, 'p1',
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );
         assert.equal(rows.length, 1);
         assert.equal(rows[0]!.score, 33);
-        assert.equal(rows[0]!.memberId, 'current');
+        assert.equal(rows[0]!.memberId, 'XXZruirZyAOoRpNxaDnpSA');
     });

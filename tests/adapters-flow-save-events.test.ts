@@ -10,7 +10,7 @@ import type {
 } from '../api/types.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
-const FLOW_ID = 'flow-1';
+const FLOW_ID = 'aEsGMmBEFaVdWihhHXwCbw';
 
 // Counter-based mint stub for determinism
 function makeMint(): () => string {
@@ -98,7 +98,7 @@ test('add an edge emits one upsert', () => {
         nodes: [baseNode('n1'), baseNode('n2')],
         edges: [
             {
-                id: 'e1',
+                id: 'YiJPbufDpkyrZcZCYbUJpg',
                 name: 'next',
                 fromNodeId: 'n1',
                 toNodeId: 'n2',
@@ -109,7 +109,7 @@ test('add an edge emits one upsert', () => {
         EMPTY, working, FLOW_ID, makeMint(), AT,
     );
     assert.equal(delta.edges.length, 1);
-    assert.equal(delta.edges[0]!.id, 'e1');
+    assert.equal(delta.edges[0]!.id, 'YiJPbufDpkyrZcZCYbUJpg');
     assert.equal(delta.edges[0]!.from_node_id, 'n1');
     assert.equal(delta.edges[0]!.to_node_id, 'n2');
     assert.equal(delta.edges[0]!.flow_id, FLOW_ID);
@@ -121,7 +121,7 @@ test('remove an edge emits a deletion', () => {
         nodes: [baseNode('n1'), baseNode('n2')],
         edges: [
             {
-                id: 'e1',
+                id: 'YiJPbufDpkyrZcZCYbUJpg',
                 name: 'next',
                 fromNodeId: 'n1',
                 toNodeId: 'n2',
@@ -136,7 +136,7 @@ test('remove an edge emits a deletion', () => {
         baseline, working, FLOW_ID, makeMint(), AT,
     );
     assert.equal(delta.deletions.length, 1);
-    assert.equal(delta.deletions[0]!.entityId, 'e1');
+    assert.equal(delta.deletions[0]!.entityId, 'YiJPbufDpkyrZcZCYbUJpg');
 });
 
 // ── member events ─────────────
@@ -147,7 +147,7 @@ test('add a member emits one added event', () => {
         edges: [],
     };
     const working: StoredGraph = {
-        nodes: [baseNode('n1', { memberIds: ['m1'] })],
+        nodes: [baseNode('n1', { memberIds: ['mFNSxZqywTSMXhgUTdTqtA'] })],
         edges: [],
     };
     const delta = buildSaveEvents(
@@ -158,7 +158,7 @@ test('add a member emits one added event', () => {
         delta.memberEvents[0]!.flow_node_id, 'n1',
     );
     assert.equal(
-        delta.memberEvents[0]!.member_id, 'm1',
+        delta.memberEvents[0]!.member_id, 'mFNSxZqywTSMXhgUTdTqtA',
     );
     assert.equal(
         delta.memberEvents[0]!.action, 'added',
@@ -168,7 +168,7 @@ test('add a member emits one added event', () => {
 
 test('remove a member emits one removed event', () => {
     const baseline: StoredGraph = {
-        nodes: [baseNode('n1', { memberIds: ['m1'] })],
+        nodes: [baseNode('n1', { memberIds: ['mFNSxZqywTSMXhgUTdTqtA'] })],
         edges: [],
     };
     const working: StoredGraph = {
@@ -183,7 +183,7 @@ test('remove a member emits one removed event', () => {
         delta.memberEvents[0]!.action, 'removed',
     );
     assert.equal(
-        delta.memberEvents[0]!.member_id, 'm1',
+        delta.memberEvents[0]!.member_id, 'mFNSxZqywTSMXhgUTdTqtA',
     );
 });
 
@@ -205,7 +205,8 @@ test('add an attribute emits one added event', () => {
     const working: StoredGraph = {
         nodes: [
             baseNode('n1', {
-                attributes: [attr('a1', 'editable', true)],
+                attributes: [attr('UQTJZvCoKlFjEoDlDUwekw', 'editable'
+                    , true)],
             }),
         ],
         edges: [],
@@ -218,7 +219,7 @@ test('add an attribute emits one added event', () => {
         delta.attributeEvents[0]!.flow_node_id, 'n1',
     );
     assert.equal(
-        delta.attributeEvents[0]!.attribute_id, 'a1',
+        delta.attributeEvents[0]!.attribute_id, 'UQTJZvCoKlFjEoDlDUwekw',
     );
     assert.equal(
         delta.attributeEvents[0]!.mode, 'editable',
@@ -235,7 +236,7 @@ test('remove an attribute emits one removed event', () => {
     const baseline: StoredGraph = {
         nodes: [
             baseNode('n1', {
-                attributes: [attr('a1')],
+                attributes: [attr('UQTJZvCoKlFjEoDlDUwekw')],
             }),
         ],
         edges: [],
@@ -252,7 +253,7 @@ test('remove an attribute emits one removed event', () => {
         delta.attributeEvents[0]!.action, 'removed',
     );
     assert.equal(
-        delta.attributeEvents[0]!.attribute_id, 'a1',
+        delta.attributeEvents[0]!.attribute_id, 'UQTJZvCoKlFjEoDlDUwekw',
     );
 });
 
@@ -260,7 +261,8 @@ test('remove an attr preserves its baseline mode/isRequired', () => {
     const baseline: StoredGraph = {
         nodes: [
             baseNode('n1', {
-                attributes: [attr('a1', 'readonly', true)],
+                attributes: [attr('UQTJZvCoKlFjEoDlDUwekw', 'readonly'
+                    , true)],
             }),
         ],
         edges: [],
@@ -277,7 +279,7 @@ test('remove an attr preserves its baseline mode/isRequired', () => {
         delta.attributeEvents[0]!.action, 'removed',
     );
     assert.equal(
-        delta.attributeEvents[0]!.attribute_id, 'a1',
+        delta.attributeEvents[0]!.attribute_id, 'UQTJZvCoKlFjEoDlDUwekw',
     );
     assert.equal(
         delta.attributeEvents[0]!.mode, 'readonly',
@@ -291,7 +293,7 @@ test('change mode emits one new added (not removed)', () => {
     const baseline: StoredGraph = {
         nodes: [
             baseNode('n1', {
-                attributes: [attr('a1', 'editable')],
+                attributes: [attr('UQTJZvCoKlFjEoDlDUwekw', 'editable')],
             }),
         ],
         edges: [],
@@ -299,7 +301,7 @@ test('change mode emits one new added (not removed)', () => {
     const working: StoredGraph = {
         nodes: [
             baseNode('n1', {
-                attributes: [attr('a1', 'readonly')],
+                attributes: [attr('UQTJZvCoKlFjEoDlDUwekw', 'readonly')],
             }),
         ],
         edges: [],
@@ -320,7 +322,8 @@ test('change is_required emits one new added', () => {
     const baseline: StoredGraph = {
         nodes: [
             baseNode('n1', {
-                attributes: [attr('a1', 'editable', false)],
+                attributes: [attr('UQTJZvCoKlFjEoDlDUwekw', 'editable'
+                    , false)],
             }),
         ],
         edges: [],
@@ -328,7 +331,8 @@ test('change is_required emits one new added', () => {
     const working: StoredGraph = {
         nodes: [
             baseNode('n1', {
-                attributes: [attr('a1', 'editable', true)],
+                attributes: [attr('UQTJZvCoKlFjEoDlDUwekw', 'editable'
+                    , true)],
             }),
         ],
         edges: [],
@@ -351,8 +355,9 @@ test('identical baseline and working → all arrays empty', () => {
     const graph: StoredGraph = {
         nodes: [
             baseNode('n1', {
-                memberIds: ['m1'],
-                attributes: [attr('a1', 'editable', true)],
+                memberIds: ['mFNSxZqywTSMXhgUTdTqtA'],
+                attributes: [attr('UQTJZvCoKlFjEoDlDUwekw', 'editable'
+                    , true)],
             }),
         ],
         edges: [],

@@ -484,7 +484,7 @@ export function iconArchive(
         '<rect width="20" height="5" x="2"'
         + ' y="3" rx="1"/>'
         + '<path d="M4 8v11a2 2 0 0 0 2 2h12'
-        + 'a2 2 0 0 0 2-2V8"/>'
+        + 'UZgNCkZlSJcSaAmAJuSkcw 2 0 0 0 2-2V8"/>'
         + '<path d="M10 12h4"/>',
         size,
         cssClass,
@@ -605,7 +605,7 @@ export function iconSave(size: IconSize, cssClass: string) {
         + ' 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0'
         + ' 1 2-2z"/>'
         + '<path d="M17 21v-7a1 1 0 0 0-1-1H8'
-        + 'a1 1 0 0 0-1 1v7"/>'
+        + 'UQTJZvCoKlFjEoDlDUwekw 1 0 0 0-1 1v7"/>'
         + '<path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
         size,
         cssClass,

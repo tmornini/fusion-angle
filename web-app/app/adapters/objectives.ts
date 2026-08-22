@@ -20,8 +20,8 @@ import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 import {
     getCurrentHumanMember,
 } from './members.ts';
@@ -278,7 +278,7 @@ export async function postObjectiveCreation(
 ): Promise<void> {
     const at = nowUtc();
     const member = await getCurrentHumanMember(ctx);
-    const revisionId = generateCryptoSafeBase62();
+    const revisionId = generateIdentifier();
     // The objective row and its first revision commit as ONE
     // transaction server-side. The body OMITS organization_id —
     // the org fence stamps it from the verified token. The
@@ -302,7 +302,7 @@ export async function postObjectiveCreation(
             at,
         },
         initialState: 'active',
-        initialStateEventId: generateCryptoSafeBase62(),
+        initialStateEventId: generateIdentifier(),
         initialStateAt: at,
     });
     notifyObjectiveChange();
@@ -316,7 +316,7 @@ export async function postObjectiveRevision(
 ): Promise<void> {
     const at = nowUtc();
     const member = await getCurrentHumanMember(ctx);
-    const revisionId = generateCryptoSafeBase62();
+    const revisionId = generateIdentifier();
     await ctx.PUT(
         organizationItem(ctx, 'objectives', id)
             + '/revisions/' + revisionId,

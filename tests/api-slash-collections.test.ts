@@ -48,7 +48,7 @@ async () => {
     const token = await organizationToken();
     const res = await handleRequest(db,
         new Request(
-            BASE + '/identities/no-such-id/', {
+            BASE + '/identities/oHNDEvvUUwOvzRwyvbnjag/', {
             headers: {
                 Authorization: 'Bearer ' + token,
             },

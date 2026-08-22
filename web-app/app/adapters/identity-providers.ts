@@ -1,7 +1,7 @@
 import {
     type Id,
     type IdentityProviderAction,
-    type IdentityProviderEntity,
+    type JKeRxRPHBGBkzSLrvNpmlg,
 } from '../../../api/types.ts';
 import {
     type RequestContext,
@@ -39,7 +39,7 @@ export async function getProviderEvents(
     ctx: RequestContext,
     identityId: Id,
 ): Promise<ProviderEvent[]> {
-    const rows = await ctx.GET<IdentityProviderEntity[]>(
+    const rows = await ctx.GET<JKeRxRPHBGBkzSLrvNpmlg[]>(
         `identities/${identityId}/providers/`,
     );
     return rows.map(ev => ({
@@ -57,7 +57,7 @@ export async function getProvidersFor(
     ctx: RequestContext,
     identityId: Id,
 ): Promise<string[]> {
-    const rows = await ctx.GET<IdentityProviderEntity[]>(
+    const rows = await ctx.GET<JKeRxRPHBGBkzSLrvNpmlg[]>(
         `identities/${identityId}/providers/`,
     );
     // Latest by `at`, not array order — latestByKey's default

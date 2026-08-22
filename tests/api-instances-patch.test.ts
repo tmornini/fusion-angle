@@ -47,6 +47,8 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Instance PATCH — If-Match + full-state revision (R5).
 // Two pairs per PATCH: wire delta + PUT {values} revision.
@@ -56,13 +58,16 @@ import { seedSeat } from './root-admin-fixture.ts';
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const AT2 = '2026-01-02T00:00:00.000000Z';
-const ORGANIZATION = '1';
-const TYPE_ID = 'rt-patch-1';
-const ATTR_ID = 'attr-patch-1';
-const ATTR_NUM = 'attr-patch-num';
-const ATTR_LOCKED = 'attr-patch-locked';
-const ATTR_SUBMIT = 'attr-patch-submit';
-const INSTANCE_ID = 'inst-patch-1';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
+const TYPE_ID = generateIdentifier();
+const ATTR_ID = generateIdentifier();
+const ATTR_NUM = generateIdentifier();
+const ATTR_LOCKED = generateIdentifier();
+const ATTR_SUBMIT = generateIdentifier();
+const INSTANCE_ID = generateIdentifier();
+const ORGANIZATION_B = generateIdentifier();
+const FOREIGN_TYPE_ID = generateIdentifier();
+const ATTR_UNKNOWN = generateIdentifier();
 
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
@@ -112,19 +117,19 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, 'm-member1', {
+    await seedMembershipPair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
-        identity_id: 'member1',
+        identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
         at: AT,
     });
     return {
         db,
         adminToken: await organizationToken(
-            'current', ORGANIZATION,
+            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
         ),
         memberToken: await organizationToken(
-            'member1', ORGANIZATION,
+            'nkgaOHZISTQrILTfPThWCA', ORGANIZATION,
         ),
     };
 }
@@ -340,13 +345,14 @@ async () => {
         { attribute_id: ATTR_ID, value: 'A' },
     ]);
     const e0 = put.headers.get('ETag')!;
-    const p1 = await handleRequest(db, req(
+    const pnXmXrxOWayANgDLdCjuBw = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [{ attribute_id: ATTR_ID, value: 'B' }] },
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assert.equal(p1.status, 201);
-    const e1 = p1.headers.get('ETag')!;
+    assert.equal(pnXmXrxOWayANgDLdCjuBw.status, 201);
+    const YiJPbufDpkyrZcZCYbUJpg =
+        pnXmXrxOWayANgDLdCjuBw.headers.get('ETag')!;
     const stale = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [{ attribute_id: ATTR_ID, value: 'C' }] },
@@ -364,11 +370,11 @@ async () => {
         'GET', INSTANCE_DETAIL, memberToken,
     ));
     assert.equal(freshGet.status, 200);
-    assert.equal(freshGet.headers.get('ETag'), e1);
+    assert.equal(freshGet.headers.get('ETag'), YiJPbufDpkyrZcZCYbUJpg);
     const retry = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [{ attribute_id: ATTR_ID, value: 'C' }] },
-        { [IF_MATCH_HEADER]: e1 },
+        { [IF_MATCH_HEADER]: YiJPbufDpkyrZcZCYbUJpg },
     ));
     assert.equal(retry.status, 201);
     const head = await deriveInstanceHead(
@@ -481,9 +487,9 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedOrganizationDocument(db, 'B', 'Beta');
+    await seedOrganizationDocument(db, ORGANIZATION_B, 'Beta');
     await appendInstancePair(
-        db, 'B', 'rt-foreign', INSTANCE_ID,
+        db, ORGANIZATION_B, FOREIGN_TYPE_ID, INSTANCE_ID,
         'PUT', {
             set: [
                 {
@@ -624,7 +630,7 @@ async () => {
         {
             set: [
                 {
-                    attribute_id: 'attr-unknown',
+                    attribute_id: ATTR_UNKNOWN,
                     value: 'x',
                 },
             ],
@@ -916,7 +922,7 @@ async () => {
             },
         ],
         body: staleBody,
-        requesterIdentityId: 'member1',
+        requesterIdentityId: 'nkgaOHZISTQrILTfPThWCA',
         requestAt: nowUtc(),
         organization: ORGANIZATION,
         responseStatus: 200,
@@ -958,7 +964,7 @@ async () => {
             db,
             [ORGANIZATION, TYPE_ID, INSTANCE_ID],
             staleBody,
-            'member1',
+            'nkgaOHZISTQrILTfPThWCA',
             stalePair,
             ORGANIZATION,
             ['member'],
@@ -1051,8 +1057,8 @@ async () => {
         { [IF_MATCH_HEADER]: e0 },
     ));
     assert.equal(adminPatch.status, 201);
-    const e1 = adminPatch.headers.get('ETag')!;
-    assert.notEqual(e1, e0);
+    const YiJPbufDpkyrZcZCYbUJpg = adminPatch.headers.get('ETag')!;
+    assert.notEqual(YiJPbufDpkyrZcZCYbUJpg, e0);
     // Member still holding e0 412s.
     const blind = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
@@ -1075,7 +1081,7 @@ async () => {
     assert.equal(reget.status, 200);
     const memberEtag = reget.headers.get('ETag')!;
     assert.notEqual(memberEtag, e0);
-    assert.notEqual(memberEtag, e1);
+    assert.notEqual(memberEtag, YiJPbufDpkyrZcZCYbUJpg);
     assert.equal(
         reget.headers.get(
             'Authorization-Limited-Attributes',

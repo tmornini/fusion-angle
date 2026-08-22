@@ -66,23 +66,15 @@ test('other unique is loud 500', () => {
     );
 });
 
-test('bad JSON at GIN is loud 500', () => {
+test('invalid text representation is loud 500', () => {
     assertWire(
         mapPostgresError({ code: '22P02' }),
         HTTP_INTERNAL_ERROR,
-        'bad JSON at GIN',
+        'invalid text representation',
     );
 });
 
 test('CHECK failed is loud 500', () => {
-    assertWire(
-        mapPostgresError({
-            code: '23514',
-            constraint: 'pairs_id_chk',
-        }),
-        HTTP_INTERNAL_ERROR,
-        'check failed',
-    );
     assertWire(
         mapPostgresError({
             constraint: 'pairs_request_at_chk',

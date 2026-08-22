@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -25,23 +27,27 @@ import {
 // live on organizations/:id/work-orders/:id/binding/ and join at read.
 // History stays /history, not /versions.
 
-const ORGANIZATION = '1';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2026-01-01T00:00:00.000000Z';
-const FLOW_ID = 'flow-class-1';
-const WO_ID = 'wo-class-1';
-const WO_UNBOUND = 'wo-class-unbound';
-const TYPE_ID = 'rt-class-1';
-const ATTR_ID = 'attr-class-1';
-const INSTANCE_ID = 'inst-class-1';
-const FR_ID = 'fr-class-1';
-const FWO_ID = 'fwo-class-1';
+const FLOW_ID = generateIdentifier();
+const WO_ID = generateIdentifier();
+const WO_UNBOUND = generateIdentifier();
+const TYPE_ID = generateIdentifier();
+const ATTR_ID = generateIdentifier();
+const INSTANCE_ID = generateIdentifier();
+const FR_ID = generateIdentifier();
+const FWO_ID = generateIdentifier();
+const FWO_UNBOUND = generateIdentifier();
+const NODE_START = generateIdentifier();
+const NODE_FINISH = generateIdentifier();
 
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
     + '/record-types/' + TYPE_ID;
 const ATTRS = TYPE_DETAIL + '/attributes/';
 const INSTANCES = TYPE_DETAIL + '/instances/';
-const BINDING = '/organizations/1/work-orders/' + WO_ID + '/binding';
+const BINDING = '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+    + WO_ID + '/binding';
 const DOCUMENT_PREFIX =
     '/organizations/' + ORGANIZATION + '/work-orders/';
 
@@ -81,7 +87,7 @@ async function seedFlow(
     token: string,
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token, {
             id: FLOW_ID,
             flow: {
                 name: 'Class Flow',
@@ -90,14 +96,14 @@ async function seedFlow(
                 is_auto_fit: false,
                 lock_timeout: DEFAULT_LOCK_TIMEOUT,
             },
-            projectFlowId: FLOW_ID + '-pf',
+            projectFlowId: generateIdentifier(),
             projectFlow: {
-                project_id: 'proj-class-1',
+                project_id: generateIdentifier(),
                 flow_id: FLOW_ID,
                 at: AT,
             },
             initialState: 'active',
-            initialStateEventId: FLOW_ID + '-ev',
+            initialStateEventId: generateIdentifier(),
             initialStateAt: AT,
             graphDelta: {
                 nodes: [],
@@ -118,7 +124,8 @@ async function seedWorkOrder(
     fwoId: string,
 ): Promise<void> {
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + woId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
+            , token, {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
@@ -127,7 +134,8 @@ async function seedWorkOrder(
     assert.equal(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
-        '/organizations/1/flows/' + FLOW_ID + '/work-orders/' + fwoId,
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
+            + '/work-orders/' + fwoId,
         token,
         {
             flow_id: FLOW_ID,
@@ -195,7 +203,8 @@ async function seedFlowTypeJoin(
 ): Promise<void> {
     const put = await handleRequest(db, req(
         'PUT',
-        '/organizations/1/flows/' + FLOW_ID + '/records/' + FR_ID,
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID + '/records/'
+            + '' + FR_ID,
         token,
         {
             id: FR_ID,
@@ -215,12 +224,12 @@ async function seededDb(): Promise<{
     await seedAdminSchema(db);
     await seedCurrentMember(db);
     const token = await organizationToken(
-        'current', ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
     );
     await seedFlow(db, token);
     await seedWorkOrder(db, token, WO_ID, FWO_ID);
     await seedWorkOrder(
-        db, token, WO_UNBOUND, 'fwo-class-unbound',
+        db, token, WO_UNBOUND, FWO_UNBOUND,
     );
     await seedLiveType(db, token);
     await seedAttribute(db, token);
@@ -253,7 +262,8 @@ async () => {
     );
 
     const detail = await handleRequest(db, req(
-        'GET', '/organizations/1/work-orders/' + WO_ID, token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
+            , token,
     ));
     assert.equal(detail.status, 200);
     const got = await detail.json() as Record<
@@ -283,7 +293,7 @@ async () => {
     }
 
     const list = await handleRequest(db, req(
-        'GET', '/organizations/1/work-orders/', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
     ));
     assert.equal(list.status, 200);
     const rows = await list.json() as Record<
@@ -301,7 +311,8 @@ async () => {
     const { db, token } = await seededDb();
 
     const detail = await handleRequest(db, req(
-        'GET', '/organizations/1/work-orders/' + WO_UNBOUND, token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + WO_UNBOUND, token,
     ));
     assert.equal(detail.status, 200);
     const got = await detail.json() as Record<
@@ -314,7 +325,7 @@ async () => {
     );
 
     const list = await handleRequest(db, req(
-        'GET', '/organizations/1/work-orders/', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
     ));
     assert.equal(list.status, 200);
     const rows = await list.json() as Record<
@@ -343,16 +354,18 @@ function createBody(id: string) {
             flow_graph: graphJson(),
             position: 1,
         },
-        flowWorkOrderId: id + '-fwo',
+        flowWorkOrderId: generateIdentifier(),
         flowWorkOrder: {
-            flow_id: 'f-class-hist',
+            flow_id: generateIdentifier(),
             work_order_id: id,
             at: nowUtc(),
         },
         stateEventIds: [
-            id + '-ev1', id + '-ev2', id + '-ev3',
+            generateIdentifier(),
+            generateIdentifier(),
+            generateIdentifier(),
         ],
-        states: ['n-start', 'n-finish', 'claimed'],
+        states: [NODE_START, NODE_FINISH, 'claimed'],
         stateEventAts: [t0, t1, t2],
     };
 }
@@ -362,26 +375,30 @@ async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken(
-        'current', ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
     );
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/', token, createBody(WO_ID),
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token
+            , createBody(WO_ID),
     ));
     assert.equal(created.status, 201);
 
     const history = await handleRequest(db, req(
-        'GET', '/organizations/1/work-orders/' + WO_ID + '/history', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
+            + '/history', token,
     ));
     assert.equal(history.status, 200);
     assert.ok(Array.isArray(await history.json()));
 
     const versions = await handleRequest(db, req(
-        'GET', '/organizations/1/work-orders/' + WO_ID + '/versions', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
+            + '/versions', token,
     ));
     assert.equal(versions.status, 404);
 
     const bulk = await handleRequest(db, req(
-        'GET', '/organizations/1/work-orders/history', token,
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + generateIdentifier(), token,
     ));
     assert.equal(bulk.status, 404);
 });

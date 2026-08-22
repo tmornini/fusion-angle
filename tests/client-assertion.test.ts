@@ -11,7 +11,7 @@ import {
 } from './client-assertion-fixtures.ts';
 
 const NOW = 1_700_000_000;
-const CLIENT_ID = 'svc-client';
+const CLIENT_ID = 'uYaHKbNeVUcsFjuooOjMew';
 const AUDIENCE = 'fusion-angle';
 
 function clientWith(
@@ -157,8 +157,8 @@ async () => {
     const signer = await makeAssertionSigner('RS256');
     const client = clientWith(signer.jwks);
     for (const wrong of [
-        { iss: 'someone-else' },
-        { sub: 'someone-else' },
+        { iss: 'uTGrEpVpODbNhDhDVdWeqQ' },
+        { sub: 'uTGrEpVpODbNhDhDVdWeqQ' },
         { aud: 'another-origin' },
     ]) {
         const assertion = await signer.sign({

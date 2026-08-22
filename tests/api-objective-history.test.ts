@@ -11,8 +11,8 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
-import { generateCryptoSafeBase62 } from
-    '../shared/crypto-safe-base62.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Bulk GET objectives/versions is deleted. Callers fan-in
 // per-item GET objectives/:id/versions/ (collection-item
@@ -57,7 +57,7 @@ async function putObjective(
     state: string,
     stateAt: string,
     eventSuffix: string,
-    organization = '1',
+    organization = 'AjdvjuECVZEgZoFajaIEkg',
 ): Promise<void> {
     const res = await handleRequest(
         db,
@@ -69,18 +69,19 @@ async function putObjective(
             objectiveBody(
                 state, stateAt, id + '-' + eventSuffix,
             ),
-            generateCryptoSafeBase62(),
+            generateIdentifier(),
         ),
     );
     assert.equal(res.status, 201);
 }
 
 test(
-    'GET organizations/1/objectives/versions is 404',
+    'GET organizations/.../objectives/versions is 400;'
+    + ' trailing slash is 404',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const id = 'obj-coll-hist-1';
+        const id = generateIdentifier();
         await putObjective(
             db, id, DEV_TOKEN, 'active',
             '2026-04-01T00:00:00.000000Z', 'ev1',
@@ -90,17 +91,26 @@ test(
             db,
             req(
                 'GET',
-                '/organizations/1/objectives/versions',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg'
+                    + '/objectives/versions',
                 DEV_TOKEN,
             ),
         );
-        assert.equal(slashless.status, 404);
+        assert.equal(slashless.status, 400);
+        const slashlessBody = await slashless.json() as {
+            error: string;
+        };
+        assert.equal(
+            slashlessBody.error,
+            'id must be a 22-character identifier',
+        );
 
         const slashed = await handleRequest(
             db,
             req(
                 'GET',
-                '/organizations/1/objectives/versions/',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg'
+                    + '/objectives/versions/',
                 DEV_TOKEN,
             ),
         );
@@ -114,7 +124,7 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const id = 'obj-coll-hist-1';
+        const id = generateIdentifier();
 
         await putObjective(
             db, id, DEV_TOKEN, 'active',
@@ -137,7 +147,7 @@ test(
             db,
             req(
                 'GET',
-                '/organizations/1/objectives/' + id
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
                     + '/versions/',
                 DEV_TOKEN,
             ),

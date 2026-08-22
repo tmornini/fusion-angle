@@ -21,6 +21,8 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Task 23: nested record-types is in-table (no facade
 // re-entry). Flat /organizations/:org/records re-enters flat
@@ -44,7 +46,7 @@ function req(
 function editBody(organization: string) {
     return {
         kind: 'edit',
-        id: 'rec-1',
+        id: 'rbfHGatkwQzGZJVXKJEeyw',
         record: {
             organization_id: organization,
             name: 'rec', description: 'd', position: 0,
@@ -74,54 +76,68 @@ async function seedMembershipPair(
 
 }
 
-async function oneOrganization(): Promise<MemoryDbAdapter> {
+async function oneOrganization(): Promise<{
+    db: MemoryDbAdapter;
+    organizationA: string;
+    organizationB: string;
+}> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, 'm-a', {
-        organization_id: 'A', identity_id: 'current',
+    const organizationA = generateIdentifier();
+    const organizationB = generateIdentifier();
+    await seedMembershipPair(db, generateIdentifier(), {
+        organization_id: organizationA,
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
-    return db;
+    return { db, organizationA, organizationB };
 }
 
 test('nested record-types write stamps the bound org'
     + ' over a forged record', async () => {
-    const db = await oneOrganization();
-    const token = await organizationToken('current', 'A');
+    const { db, organizationA, organizationB } = await oneOrganization();
+    const token = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', organizationA,
+    );
     const res = await handleRequest(db, req(
-        'POST', '/organizations/A/record-types/',
+        'POST', '/organizations/' + organizationA + '/record-types/',
         token,
-        editBody('B')));
+        editBody(organizationB)));
     assert.equal(res.status, 201);
     const get = await handleRequest(db, req(
         'GET',
-        '/organizations/A/record-types/rec-1',
+        '/organizations/' + organizationA
+            + '/record-types/rbfHGatkwQzGZJVXKJEeyw',
         token,
     ));
     assert.equal(get.status, 200);
     const stored = await get.json() as {
         organization_id: string;
     };
-    assert.equal(stored.organization_id, 'A');
+    assert.equal(stored.organization_id, organizationA);
 });
 
 test('nested record-types write into a non-member org'
     + ' is 403', async () => {
-    const db = await oneOrganization();
+    const { db, organizationA, organizationB } = await oneOrganization();
     // Token scoped to A cannot use path org B (org-match).
-    const token = await organizationToken('current', 'A');
+    const token = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', organizationA,
+    );
     const res = await handleRequest(db, req(
-        'POST', '/organizations/B/record-types/',
+        'POST', '/organizations/' + organizationB + '/record-types/',
         token,
-        editBody('B')));
+        editBody(organizationB)));
     assert.equal(res.status, 403);
 });
 
 test('authenticated flat GET /records → 404',
 async () => {
-    const db = await oneOrganization();
-    const token = await organizationToken('current', 'A');
+    const { db, organizationA } = await oneOrganization();
+    const token = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', organizationA,
+    );
     const res = await handleRequest(
         db, req('GET', '/records', token),
     );
@@ -130,7 +146,7 @@ async () => {
 
 test('unauthenticated GET /records → 401',
 async () => {
-    const db = await oneOrganization();
+    const { db } = await oneOrganization();
     const res = await handleRequest(
         db,
         new Request(`${BASE}/records`, { method: 'GET' }),

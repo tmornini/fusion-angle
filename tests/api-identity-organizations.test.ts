@@ -70,7 +70,7 @@ test('GET identities/:id/organizations/ is self or'
     const res = await handleRequest(
         db,
         new Request(
-            BASE + '/identities/current/organizations/',
+            BASE + '/identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
             {
                 headers: {
                     Authorization: 'Bearer '
@@ -93,8 +93,12 @@ async () => {
         db,
         'identities/' + identityId + '/organizations/',
         await claimToken({
-            organizations: ['1', '2'],
-            roles: ['admin:1', 'admin:2'],
+            organizations: ['AjdvjuECVZEgZoFajaIEkg'
+                , 'BBjWJsjYIDkTRKIIPrzWRw'],
+            roles: [
+                'admin:AjdvjuECVZEgZoFajaIEkg',
+                'admin:BBjWJsjYIDkTRKIIPrzWRw',
+            ],
         }),
     );
     assert.equal(rows.length, 1);
@@ -106,7 +110,7 @@ test('org-less GET identities/:id/organizations/'
     await db.postSchemaCreation();
     const rows = await GET<OrganizationEntity[]>(
         db,
-        'identities/current/organizations/',
+        'identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
         await devToken(),
     );
     assert.deepEqual(rows, []);

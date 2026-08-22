@@ -1,3 +1,6 @@
+import { NIL_IDENTIFIER } from
+    '../shared/identifier.ts';
+
 export type Id = string;
 
 export type MemberId = Id;
@@ -460,7 +463,7 @@ export interface WorkOrderHistoryEventEntity
     field_values: TransitionFieldValueEntity[];
 }
 
-export const SYSTEM_MEMBER_ID: Id = 'system';
+export const SYSTEM_MEMBER_ID: Id = NIL_IDENTIFIER;
 
 export const SYSTEM_MEMBER_NAME = 'System';
 
@@ -620,7 +623,7 @@ export type IdentityProviderAction = 'linked' | 'unlinked';
 // 'linked'. `provider` names the IdP (e.g. 'google'),
 // `provider_subject` is the identity's id AT that provider. An
 // unlink is a NEW 'unlinked' row, never a splice.
-export interface IdentityProviderEntity {
+export interface JKeRxRPHBGBkzSLrvNpmlg {
     id: Id;
     identity_id: Id;
     provider: string;

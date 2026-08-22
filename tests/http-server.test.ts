@@ -136,14 +136,14 @@ async () => {
     await withServer({}, undefined, async (base, logs) => {
         const res = await fetch(
             base
-            + '/api/organizations/1/ideas?secret=1',
+            + '/api/organizations/AjdvjuECVZEgZoFajaIEkg/ideas?secret=1',
         );
         assert.equal(res.status, HTTP_UNAUTHORIZED);
         const last = logs[logs.length - 1];
         assert.ok(last !== undefined);
         assert.equal(
             last['path'],
-            '/api/organizations/1/ideas',
+            '/api/organizations/AjdvjuECVZEgZoFajaIEkg/ideas',
         );
         assert.equal(last['method'], 'GET');
         assert.equal(last['status'], HTTP_UNAUTHORIZED);

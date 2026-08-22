@@ -66,8 +66,8 @@ async function passwordUserCtx() {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedMembershipPair(db, 'm', {
-        organization_id: '1',
-        identity_id: 'current',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'admin',
         at: '2020-01-01T00:00:00.000000Z',
     });
@@ -75,12 +75,13 @@ async function passwordUserCtx() {
     // grant's pii-by-email lookup and credential check now derive
     // from the message ledger, so a raw row here would go
     // derivation-invisible.
-    await seedIdentityPii(db, 'current', {
+    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Demo', email: 'demo@example.com',
         phone: '555-0100', bio: 'demo user',
     });
-    await seedIdentityCredential(db, 'current', 'c1', {
-        identity_id: 'current', kind: 'password',
+    await seedIdentityCredential(db, 'XXZruirZyAOoRpNxaDnpSA'
+        , 'WeXjAaAxGSpLpamfEuvcww', {
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA', kind: 'password',
         status: 'set',
         secret: await testHashPassword('s3cret'),
         at: '2026-06-03T00:00:00.000000Z',
@@ -97,7 +98,8 @@ async () => {
         ctx, 'demo@example.com', 's3cret');
     assert.ok(creds);
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members/', creds.accessToken)));
+        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , creds.accessToken)));
 });
 
 test('postPasswordLogin issues a 30-day refresh token',

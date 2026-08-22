@@ -10,6 +10,8 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -56,7 +58,7 @@ function graphNode(
     agentIds?: string[],
 ) {
     return {
-        id: 'n-step',
+        id: generateIdentifier(),
         name: 'Step',
         positionX: 0,
         positionY: 0,
@@ -105,7 +107,7 @@ test('PUT /ai-agents/:id writes the four fields; GET'
     const db = await freshDb();
     const body = agentFields('Drafting agent');
     const put = await handleRequest(db, req(
-        'PUT', '/ai-agents/agent-1', DEV_TOKEN, body,
+        'PUT', '/ai-agents/UuvoBhQJUSEsiJwscXPkUg', DEV_TOKEN, body,
     ));
     assert.ok(
         put.status === 201 || put.status === 200,
@@ -118,7 +120,7 @@ test('PUT /ai-agents/:id writes the four fields; GET'
         skill_focus: string;
         model: string;
     };
-    assert.equal(written.id, 'agent-1');
+    assert.equal(written.id, 'UuvoBhQJUSEsiJwscXPkUg');
     assert.equal(written.name, body.name);
     assert.equal(written.description, body.description);
     assert.equal(written.skill_focus, body.skill_focus);
@@ -129,14 +131,15 @@ test('PUT /ai-agents/:id writes the four fields; GET'
         description: string;
         skill_focus: string;
         model: string;
-    }>(db, 'ai-agents/agent-1', DEV_TOKEN);
+    }>(db, 'ai-agents/UuvoBhQJUSEsiJwscXPkUg', DEV_TOKEN);
     assert.deepEqual(got, written);
 });
 
 test('a flow write with an AI member id in memberIds'
 + ' is 400', async () => {
     const db = await freshDb();
-    await PUT(db, 'ai-agents/ai-bot-1', {
+    const agentId = generateIdentifier();
+    await PUT(db, 'ai-agents/' + agentId, {
         name: 'Bot',
         description: '',
         skill_focus: '',
@@ -144,12 +147,13 @@ test('a flow write with an AI member id in memberIds'
     }, DEV_TOKEN);
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-ai-member', token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aMyiZpZbsEboXnIrwnEjNA', token,
         flowDocument(
             'Blocked',
-            'ev-flow-1',
+            generateIdentifier(),
             {
-                nodes: [graphNode(['ai-bot-1'])],
+                nodes: [graphNode([agentId])],
                 edges: [],
             },
         ),
@@ -162,7 +166,7 @@ test('a flow write with agentIds naming a live'
     const db = await freshDb();
     const agent = agentFields('Live agent');
     const minted = await handleRequest(db, req(
-        'PUT', '/ai-agents/agent-live', DEV_TOKEN,
+        'PUT', '/ai-agents/UxpkDaNMmbWLvCTkyrFfGA', DEV_TOKEN,
         agent,
     ));
     assert.ok(
@@ -170,12 +174,13 @@ test('a flow write with agentIds naming a live'
     );
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/flow-agent', token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aJJKPwIzmbFseMhGUrFyFQ', token,
         flowDocument(
             'With agent',
-            'ev-flow-2',
+            generateIdentifier(),
             {
-                nodes: [graphNode([], ['agent-live'])],
+                nodes: [graphNode([], ['UxpkDaNMmbWLvCTkyrFfGA'])],
                 edges: [],
             },
         ),
@@ -188,7 +193,8 @@ test('a flow write with agentIds naming a live'
         graph: {
             nodes: { agentIds?: string[] }[];
         };
-    }>(db, 'organizations/1/flows/flow-agent', token);
+    }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+        + 'aJJKPwIzmbFseMhGUrFyFQ', token);
     const node = flow.graph.nodes[0]!;
-    assert.deepEqual(node.agentIds, ['agent-live']);
+    assert.deepEqual(node.agentIds, ['UxpkDaNMmbWLvCTkyrFfGA']);
 });

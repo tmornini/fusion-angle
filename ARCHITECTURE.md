@@ -191,8 +191,8 @@ resolves via `identityDefaultOrganization`: the identity's
 SET default organization (pair-plane
 `/identities/:id/default-organization` document) if that
 organization is a live seat, else PRIMARY (earliest
-remaining join `at`, lex id on tie), else a 403 — there
-is no global default to fall back on. Both
+remaining join `at`, identifier order on tie), else a
+403 — there is no global default to fall back on. Both
 `memberOrganizations` and `roles` come from access-token
 claims (organizations set + `{type}:{organization_id}`
 roles baked at every mint/refresh/exchange from membership
@@ -508,7 +508,7 @@ backend. Code that crosses the client/server chasm
 lives one level out in `shared/` (a sibling of `api/`
 and `web-app/`): the HTTP wire schema (`http-message/`,
 its own `types.ts`) plus pure cross-chasm utilities
-(`base64url.ts`, `crypto-safe-base62.ts`, `digest.ts`,
+(`base64url.ts`, `identifier.ts`, `secret.ts`, `digest.ts`,
 `password-hash.ts`, `ledger-reduction.ts`,
 `error-helpers.ts`). Both `api/` and `web-app/` import
 `shared/`; `shared/` NEVER imports `api/`.
@@ -669,9 +669,9 @@ the stored PUT start-line stays **200**. DELETE
 never-written → **404**; already-gone → **204**, no
 append. Pair `id` is `Response-ID` only. There is no
 `follows` / `supersedes` / `etag` / `status` column.
-Public writes require header `Operation-ID` (22-char);
-the server does not mint those. Inner PUTs copy the
-outer id. The old STATE-plane 409
+Public writes require header `Operation-ID`
+(identifier); the server does not mint those. Inner
+PUTs copy the outer id. The old STATE-plane 409
 (`stateEventCollisionFromPairs` →
 `LedgerImmutabilityError`) retired with the shared
 event-append address.

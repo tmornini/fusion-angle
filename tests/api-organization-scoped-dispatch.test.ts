@@ -16,10 +16,10 @@ import { ideaBody, seedAdminSchema } from './test-fixtures.ts';
 // carrying claim roles + organizations + an active `org` —
 // what the facade exchange mints under claim-based fencing.
 async function organizationToken(organization: string): Promise<string> {
-    const org = organization || '1';
+    const org = organization || 'AjdvjuECVZEgZoFajaIEkg';
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
-        sub: 'current',
+        sub: 'XXZruirZyAOoRpNxaDnpSA',
         roles: ['admin:' + org],
         name: 'Demo',
         organizations: [org],
@@ -33,16 +33,19 @@ async function organizationToken(organization: string): Promise<string> {
 async function twoOrganizationIdeas(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);   // current = admin (global)
-    // Seeded through the live document PUT so a1's message
+    // Seeded through the live document PUT so UQTJZvCoKlFjEoDlDUwekw's
+    // message
     // pair exists — GET ideas derives from the ledger. No
     // foreign b1 seed: ideas table retired (Phase Final Stage
-    // B); A-only visibility is proven by a1 alone.
+    // B); A-only visibility is proven by UQTJZvCoKlFjEoDlDUwekw alone.
     const { organization_id: _organizationId, ...a1Fields } =
-        ideaBody('1', 'mine');
-    await PUT(db, 'organizations/1/ideas/a1', {
+        ideaBody('AjdvjuECVZEgZoFajaIEkg', 'mine');
+    await PUT(db
+        , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+        + 'UQTJZvCoKlFjEoDlDUwekw', {
         ...a1Fields,
         state: 'active',
-    }, await organizationToken('1'));
+    }, await organizationToken('AjdvjuECVZEgZoFajaIEkg'));
     return db;
 }
 
@@ -50,16 +53,19 @@ test('an org-scoped token fences GET to its tenant',
 async () => {
     const db = await twoOrganizationIdeas();
     const rows = await GET<{ id: string }[]>(
-        db, 'organizations/1/ideas/', await organizationToken('1'));
-    assert.deepEqual(rows.map(r => r.id), ['a1']);
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            , await organizationToken('AjdvjuECVZEgZoFajaIEkg'));
+    assert.deepEqual(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
 });
 
 test('a flat token bridges to the default org',
 async () => {
     const db = await twoOrganizationIdeas();
     const rows = await GET<{ id: string }[]>(
-        db, 'organizations/1/ideas/', await organizationToken(''));
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            , await organizationToken(''));
     // No honest unscoped default since SP-6: the token
-    // resolves to org '1', so the org '7' idea stays hidden.
-    assert.deepEqual(rows.map(r => r.id), ['a1']);
+    // resolves to org 'AjdvjuECVZEgZoFajaIEkg', so the org '7' idea stays
+    // hidden.
+    assert.deepEqual(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
 });

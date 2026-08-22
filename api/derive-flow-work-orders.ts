@@ -17,7 +17,8 @@ import {
 // orders/:woid route, Phase 5 Task 3's create, and Phase 5 Task
 // 4's seed all write — verified by content against a stored
 // :woid pair (tests/api-shadow-ledger-work-orders.test.ts's own
-// '/organizations/1/flows/flow-1/work-orders/' + 'fwo-join'
+// '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/aEsGMmBEFaVdWihhHXwCbw/work-or
+// ders/' + 'fwo-join'
 // address). A join row carries no lifecycle trio of its own — a
 // DELETE tombstones it outright (deriveDocumentsAt's own
 // DELETE-head exclusion mirrors the old plane's physical

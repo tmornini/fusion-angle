@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -39,11 +41,15 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
-const ORGANIZATION = '1';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const COLLECTION =
     '/organizations/' + ORGANIZATION + '/record-types/';
-const TYPE_ID = 'rt-composed-1';
-const ATTR_ID = 'attr-composed-1';
+const TYPE_ID = generateIdentifier();
+const ATTR_ID = generateIdentifier();
+const WORK_ORDER_ID = generateIdentifier();
+const TRANSITION_EVENT_ID = generateIdentifier();
+const FIELD_VALUE_ID = generateIdentifier();
+const FORGED_ORGANIZATION = generateIdentifier();
 const DETAIL = COLLECTION + TYPE_ID;
 const ATTR_DETAIL =
     DETAIL + '/attributes/' + ATTR_ID;
@@ -84,19 +90,19 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, 'm-member1', {
+    await seedMembershipPair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
-        identity_id: 'member1',
+        identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
         at: AT,
     });
     return {
         db,
         adminToken: await organizationToken(
-            'current', ORGANIZATION,
+            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
         ),
         memberToken: await organizationToken(
-            'member1', ORGANIZATION,
+            'nkgaOHZISTQrILTfPThWCA', ORGANIZATION,
         ),
     };
 }
@@ -128,7 +134,7 @@ function createBody(
             },
         ],
         initialState: 'active',
-        initialStateEventId: typeId + '-genesis',
+        initialStateEventId: generateIdentifier(),
         initialStateAt: AT,
     };
 }
@@ -159,7 +165,8 @@ async function seedFieldValueReferrer(
     attributeId: string,
 ): Promise<void> {
     await PUT(
-        db, 'organizations/1/work-orders/wo-restrict-fv', {
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + WORK_ORDER_ID, {
             display_id: 'rfv1',
             flow_graph: {
                 name: 'Restrict FV',
@@ -174,12 +181,12 @@ async function seedFieldValueReferrer(
     // Task 8 CUT: legacy fieldValues is below-gate only
     // (stored SFV referrer for RESTRICT; not the live wire).
     const body: Record<string, unknown> = {
-        transitionEventId: 'te-restrict-1',
-        targetState: 'n-next',
+        transitionEventId: TRANSITION_EVENT_ID,
+        targetState: generateIdentifier(),
         fieldValues: [{
-            id: 'sfv-composed-1',
+            id: FIELD_VALUE_ID,
             fields: {
-                state_event_id: 'te-restrict-1',
+                state_event_id: TRANSITION_EVENT_ID,
                 attribute_id: attributeId,
                 value: 'High',
             },
@@ -189,7 +196,7 @@ async function seedFieldValueReferrer(
     };
     const pathSegments = [
         'organizations', STARK_ORGANIZATION,
-        'work-orders', 'wo-restrict-fv', 'transition',
+        'work-orders', WORK_ORDER_ID, 'transition',
     ];
     const pattern = 'organizations/:id/work-orders/:id/transition';
     const pair = await formWritePair({
@@ -208,7 +215,7 @@ async function seedFieldValueReferrer(
         operationId: TEST_OPERATION_ID,
     });
     await postWorkOrderTransitionOp(
-        db, 'wo-restrict-fv', body, SYSTEM_MEMBER_ID,
+        db, WORK_ORDER_ID, body, SYSTEM_MEMBER_ID,
         undefined, [], pair,
     );
 }
@@ -347,9 +354,9 @@ async () => {
     const { db, adminToken } = await adminDb();
     const body = createBody(TYPE_ID, ATTR_ID, 'Forged');
     (body['record'] as Record<string, unknown>)
-        .organization_id = 'B';
+        .organization_id = FORGED_ORGANIZATION;
     ((body['attributes'] as Record<string, unknown>[])[0]!)
-        .organization_id = 'B';
+        .organization_id = FORGED_ORGANIZATION;
     const post = await handleRequest(db, req(
         'POST', COLLECTION, adminToken, body,
     ));

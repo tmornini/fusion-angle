@@ -20,6 +20,10 @@ import {
     advisoryKey,
     notifyPayload,
 } from './advisory-lock.ts';
+import {
+    decodeIdentifier,
+    encodeIdentifier,
+} from '../shared/identifier.ts';
 
 const DROP_SCHEMA =
     'DROP TABLE IF EXISTS pairs;\n'
@@ -242,7 +246,7 @@ function postgresTx(
         async lockHead(id: string): Promise<void> {
             await sql.query`
                 SELECT id FROM pairs
-                WHERE id = ${id}
+                WHERE id = ${uuidTextOfIdentifier(id)}
                 FOR UPDATE
             `;
         },
@@ -266,7 +270,13 @@ function postgresTx(
                 LIMIT 1
             `;
             const row = rows[0];
-            return row === undefined ? null : row;
+            if (row === undefined) {
+                return null;
+            }
+            return {
+                id: identifierOfUuidText(row.id),
+                method: row.method,
+            };
         },
         async notify(
             event: NotificationEvent,
@@ -322,11 +332,40 @@ function assertIndexedColumn(
     assertGetWhereColumn(table, column);
 }
 
+function uuidTextOfIdentifier(id: string): string {
+    const bytes = decodeIdentifier(id);
+    let hex = '';
+    for (const b of bytes) {
+        hex += b.toString(16).padStart(2, '0');
+    }
+    return (
+        hex.slice(0, 8) + '-'
+        + hex.slice(8, 12) + '-'
+        + hex.slice(12, 16) + '-'
+        + hex.slice(16, 20) + '-'
+        + hex.slice(20)
+    );
+}
+
+function identifierOfUuidText(uuid: string): string {
+    const hex = uuid.replaceAll('-', '');
+    const bytes = new Uint8Array(16);
+    for (let i = 0; i < 16; i++) {
+        bytes[i] = Number.parseInt(
+            hex.slice(i * 2, i * 2 + 2), 16);
+    }
+    return encodeIdentifier(bytes);
+}
+
 function entityOf<T extends { id: string }>(
     row: Record<string, unknown>,
 ): T {
     return {
         ...row,
+        id: identifierOfUuidText(row.id as string),
+        operation_id: identifierOfUuidText(
+            row.operation_id as string,
+        ),
         request: latin1OfBytea(row.request),
         response: latin1OfBytea(row.response),
     } as unknown as T;
@@ -381,7 +420,7 @@ async function selectById(
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
         SELECT * FROM pairs
-        WHERE id = ${id}
+        WHERE id = ${uuidTextOfIdentifier(id)}
     `;
 }
 
@@ -472,7 +511,7 @@ async function deleteById(
 ): Promise<void> {
     await sql.query`
         DELETE FROM pairs
-        WHERE id = ${id}
+        WHERE id = ${uuidTextOfIdentifier(id)}
     `;
 }
 
@@ -488,7 +527,9 @@ async function upsertRow(
     _table: 'pairs',
     row: Record<string, unknown>,
 ): Promise<void> {
-    const id = textField(row, 'id');
+    const id = uuidTextOfIdentifier(
+        textField(row, 'id'),
+    );
     const collection = textField(row, 'uri_collection');
     const uriId = textField(row, 'uri_id');
     const requester = textField(
@@ -501,7 +542,9 @@ async function upsertRow(
     const responseAt = textField(row, 'response_at');
     const version = textField(row, 'version');
     const response = byteaOfWire(row.response);
-    const operationId = textField(row, 'operation_id');
+    const operationId = uuidTextOfIdentifier(
+        textField(row, 'operation_id'),
+    );
     await sql.query`
         INSERT INTO pairs (
             id, uri_collection, uri_id,

@@ -23,6 +23,18 @@ import {
 } from './http-fixtures.ts';
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+
+const N_START = generateIdentifier();
+const N_FINISH = generateIdentifier();
+const INV_REC_1 = generateIdentifier();
+const INV_REC_1_EV = generateIdentifier();
+const INV_REC_1_ATTR = generateIdentifier();
+const INV_CHAIN_1 = generateIdentifier();
+const INV_FLOW_1_EV = generateIdentifier();
+const INV_WO_CREATE_1 = generateIdentifier();
+const INV_WO_CREATE_1_FWO = generateIdentifier();
 
 function pairJsonOf(message: string): {
     readonly body: Record<string, unknown>;
@@ -174,7 +186,7 @@ function workOrderCreateBody(
             'ev-2-' + flowWorkOrderId,
             'ev-3-' + flowWorkOrderId,
         ],
-        states: ['n-start', 'n-finish', 'claimed'],
+        states: [N_START, N_FINISH, 'claimed'],
         stateEventAts: [
             '2026-02-01T00:00:02.000000Z',
             '2026-02-01T00:00:03.000000Z',
@@ -225,21 +237,23 @@ function createRecordBody(
 async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     const db = await seededMockDb();
     const org1Token = await organizationToken(
-        'current', STARK_ORGANIZATION);
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION);
     const org2Token = await organizationToken(
-        'current', ORGANIZATION_TWO);
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO);
 
     // Document PUT, twice — the second mints Supersedes
     // (ideas, org 1).
     const firstIdea = await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/inv-idea-1', org1Token,
-        ideaPutBody('inv-idea-1', 'Invariant Idea'),
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'hwpssRPdIjwzeMdYPAhqrw', org1Token,
+        ideaPutBody('hwpssRPdIjwzeMdYPAhqrw', 'Invariant Idea'),
     ));
     assert.equal(firstIdea.status, 201);
     const firstIdeaId = firstIdea.headers.get('Response-ID');
     const secondIdea = await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/inv-idea-1', org1Token,
-        ideaPutBody('inv-idea-1', 'Invariant Idea Revised'),
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'hwpssRPdIjwzeMdYPAhqrw', org1Token,
+        ideaPutBody('hwpssRPdIjwzeMdYPAhqrw', 'Invariant Idea Revised'),
     ));
     assert.equal(secondIdea.status, 201);
     assert.equal(
@@ -249,7 +263,8 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // Idea state-change trio PUT (states/:id retired) — a
     // second lifecycle stamp on the same document address.
     const stateAppend = await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/inv-idea-1', org1Token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'hwpssRPdIjwzeMdYPAhqrw', org1Token, {
             ...ideaFields('Invariant Idea Reviewed'),
             state: 'in_review',
         },
@@ -264,11 +279,11 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/record-types/', org2Token,
         createRecordBody(
-            'inv-rec-1', 'inv-rec-1-ev', ORGANIZATION_TWO,
+            INV_REC_1, INV_REC_1_EV, ORGANIZATION_TWO,
             [{
-                id: 'inv-rec-1-attr',
+                id: INV_REC_1_ATTR,
                 organization_id: ORGANIZATION_TWO,
-                record_id: 'inv-rec-1',
+                record_id: INV_REC_1,
                 name: 'Field',
                 attribute_type: 'text',
                 sort_order: 0,
@@ -282,15 +297,15 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // DELETE — a fresh PUT then its tombstone (records, org 2).
     const recordPut = await handleRequest(db, req(
         'PUT', '/organizations/' + ORGANIZATION_TWO
-            + '/record-types/inv-rec-2', org2Token,
+            + '/record-types/ilBpwTboUzfhEGOmnoFkiQ', org2Token,
         recordPutBody(
-            'inv-rec-2', 'Invariant Record', ORGANIZATION_TWO,
+            'ilBpwTboUzfhEGOmnoFkiQ', 'Invariant Record', ORGANIZATION_TWO,
         ),
     ));
     assert.equal(recordPut.status, 201);
     const recordDeleted = await handleRequest(db, req(
         'DELETE', '/organizations/' + ORGANIZATION_TWO
-            + '/record-types/inv-rec-2', org2Token,
+            + '/record-types/ilBpwTboUzfhEGOmnoFkiQ', org2Token,
     ));
     assert.equal(recordDeleted.status, 204);
 
@@ -298,7 +313,8 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // shared code but never route-exercised in this mixed batch
     // before now.
     const workOrderPut = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/inv-wo-1', org1Token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'jAzfROfUUwRELEudEFwdGw', org1Token,
         workOrderFields('INV-WO-1', STARK_ORGANIZATION),
     ));
     assert.equal(workOrderPut.status, 201);
@@ -311,16 +327,19 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // the PUT route forms both the row AND its pair, the SAME
     // mechanism a live write uses.
     const tokenRootPut = await handleRequest(db, req(
-        'PUT', '/identities/current/tokens/inv-tok-root',
+        'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
+            + 'iynelXdEDRLXHNzEFQYtqQ',
         org1Token, {
-            jti: 'inv-jti-root', identity_id: 'current',
-            action: 'issued', chain_id: 'inv-chain-1', at: AT,
+            jti: 'hwrugEJrEVicRwurEJxFvw'
+                , identity_id: 'XXZruirZyAOoRpNxaDnpSA',
+            action: 'issued', chain_id: INV_CHAIN_1, at: AT,
         },
     ));
     assert.equal(tokenRootPut.status, 201);
     const revoked = await handleRequest(db, req(
         'POST',
-        '/identities/current/tokens/inv-jti-root/revocation',
+        '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/hwrugEJrEVicRwurEJxFvw/'
+            + 'revocation',
         org1Token, {},
     ));
     assert.equal(revoked.status, 201);
@@ -328,8 +347,9 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // Genesis document PUT (flows, org 1) — a fresh id needs no
     // If-Match under the locked class.
     const flowGenesis = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/inv-flow-1', org1Token,
-        flowDocumentBody('Invariant Flow', 'inv-flow-1-ev'),
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'hoKOMoVEGhFjVEMIIFBbOQ', org1Token,
+        flowDocumentBody('Invariant Flow', INV_FLOW_1_EV),
     ));
     assert.equal(flowGenesis.status, 201);
 
@@ -339,10 +359,11 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // pair), none of them route-exercised in this mixed batch
     // before now.
     const workOrderCreated = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/', org1Token,
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            , org1Token,
         workOrderCreateBody(
-            'inv-wo-create-1', 'inv-wo-create-1-fwo',
-            'inv-flow-1', STARK_ORGANIZATION,
+            INV_WO_CREATE_1, INV_WO_CREATE_1_FWO,
+            'hoKOMoVEGhFjVEMIIFBbOQ', STARK_ORGANIZATION,
         ),
     ));
     assert.equal(workOrderCreated.status, 201);
@@ -352,8 +373,8 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // exists on the claim op but needs a second member with
     // a live prior claim.)
     const failed = await handleRequest(db, req(
-        'PUT', '/no-such-route/x1', org1Token, {
-            entity_id: 'inv-idea-1',
+        'PUT', '/oRAKQvKtOmSHMZEjhEXaRw/x1', org1Token, {
+            entity_id: 'hwpssRPdIjwzeMdYPAhqrw',
             state: 'promoted',
             at: '2026-02-01T00:00:01.000000Z',
         },

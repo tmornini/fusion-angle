@@ -48,10 +48,10 @@ async () => {
     // Phase Final Task 2: identity_token_revocations ROW half
     // stripped — oracle is the pair plane.
     const rows = await deriveTokenRevocationsFor(
-        db, 'current',
+        db, 'XXZruirZyAOoRpNxaDnpSA',
     );
     assert.equal(rows.length, 1);
-    assert.equal(rows[0]!.identity_id, 'current');
+    assert.equal(rows[0]!.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
     // Phase Final Stage B: identity spine tables retired.
     assert.equal(getSessionCredentials(), null);
 });
@@ -65,7 +65,7 @@ async () => {
     });
     // identity is read from the vessel; the server PUT throws.
     const ctx = {
-        identity: { id: 'current' },
+        identity: { id: 'XXZruirZyAOoRpNxaDnpSA' },
         PUT: async () => {
             throw new Error('revoke endpoint down');
         },

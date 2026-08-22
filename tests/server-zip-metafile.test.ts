@@ -13,7 +13,7 @@ const FORBIDDEN_INPUTS = [
 ] as const;
 const FORBIDDEN_SOURCES = [
     'SIGNING_KEY_MATERIAL',
-    'hmacSigningKeyMaterial',
+    'fekPpDYfJoFZmvUBauTxHA',
     'mintAccessToken',
 ] as const;
 
@@ -66,7 +66,7 @@ test('client-graph pin matches mint and deleted names',
         clientGraphHits(input, src),
         [
             'api/access-token.ts:api/access-token.ts',
-            'api/access-token.ts:hmacSigningKeyMaterial',
+            'api/access-token.ts:fekPpDYfJoFZmvUBauTxHA',
             'api/access-token.ts:mintAccessToken',
         ],
     );

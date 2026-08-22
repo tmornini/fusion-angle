@@ -25,7 +25,7 @@ function req(
 test('an in-table nested organizations route matches',
     async () => {
         const probe = route(
-            'organizations/:organization-id/dispatch-probe',
+            'organizations/:organization-id/XpBeHmMjsWMQXipgvzBjqA',
             { get: async () => ({ probed: true }) },
         );
         routes.push(probe);
@@ -34,7 +34,8 @@ test('an in-table nested organizations route matches',
             await seedAdminSchema(db);
             const token = await organizationToken();
             const res = await handleRequest(db, req(
-                'GET', '/organizations/1/dispatch-probe',
+                'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+                    + 'XpBeHmMjsWMQXipgvzBjqA',
                 token,
             ));
             assert.equal(res.status, 200);
@@ -53,7 +54,7 @@ test('unmatched slashless organizations ideas is 404',
         await seedAdminSchema(db);
         const token = await organizationToken();
         const res = await handleRequest(db, req(
-            'GET', '/organizations/1/ideas', token,
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas', token,
         ));
         assert.equal(res.status, 404);
     });
@@ -64,7 +65,7 @@ test('in-table slashed organizations ideas is 200',
         await seedAdminSchema(db);
         const token = await organizationToken();
         const res = await handleRequest(db, req(
-            'GET', '/organizations/1/ideas/', token,
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', token,
         ));
         assert.equal(res.status, 200);
     });
@@ -72,7 +73,7 @@ test('in-table slashed organizations ideas is 200',
 test('unauthenticated in-table nested path answers the '
     + 'gate 401, not the facade 401', async () => {
     const probe = route(
-        'organizations/:organization-id/dispatch-probe',
+        'organizations/:organization-id/XpBeHmMjsWMQXipgvzBjqA',
         { get: async () => ({ probed: true }) },
     );
     routes.push(probe);
@@ -80,7 +81,8 @@ test('unauthenticated in-table nested path answers the '
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const res = await handleRequest(db, req(
-            'GET', '/organizations/1/dispatch-probe',
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+                + 'XpBeHmMjsWMQXipgvzBjqA',
         ));
         assert.equal(res.status, 401);
         const body = await res.json();

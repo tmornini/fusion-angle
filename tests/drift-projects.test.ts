@@ -26,6 +26,22 @@ import {
     storedPutBodyText,
     storedCollectionText,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+
+const PROJECT_DRIFT_Z = generateIdentifier();
+const EV_DRIFT_Z = generateIdentifier();
+const PROJECT_DRIFT_A = generateIdentifier();
+const EV_DRIFT_A = generateIdentifier();
+const PROJECT_DRIFT_M = generateIdentifier();
+const EV_DRIFT_M = generateIdentifier();
+const MEMBER_B = generateIdentifier();
+const PROJECT_DRIFT_AUTHORSHIP_CAVEAT = generateIdentifier();
+const EV_DRIFT_AUTHORSHIP_CAVEAT = generateIdentifier();
+const PROJECT_DRIFT_LIFECYCLE = generateIdentifier();
+const EV_DRIFT_LIFECYCLE_GENESIS = generateIdentifier();
+const PROJECT_DRIFT_CONVERSION = generateIdentifier();
+const EV_DRIFT_CONVERSION_IDEA = generateIdentifier();
 
 // Phase Final Task 2: projects(+project_flows+scores)
 // dual-write stripped. This file no longer compares derive
@@ -33,6 +49,9 @@ import {
 // Coverage re-homes to wire-byte handleRequest assertions
 // and non-lexical live fixtures (byIdAscending must diverge
 // from insertion order; never function-vs-function only).
+const EV_DRIFT_CONVERSION_PROJECT = generateIdentifier();
+const PROJECTID_GENESIS = generateIdentifier();
+const PROJECTID_SKEWED = generateIdentifier();
 
 const BASE = 'http://localhost';
 
@@ -77,7 +96,7 @@ function wireProjectPut(
     id: string,
     title: string,
     position = 1,
-    organization = '1',
+    organization = 'AjdvjuECVZEgZoFajaIEkg',
     overrides: Record<string, unknown> = {},
 ) {
     return {
@@ -105,7 +124,7 @@ function wireProjectGet(
     stateAt: string,
     stateEventId: string,
     position = 1,
-    organization = '1',
+    organization = 'AjdvjuECVZEgZoFajaIEkg',
     overrides: Record<string, unknown> = {},
 ) {
     return {
@@ -141,9 +160,10 @@ const SEEDED_PROJECTS = [
 test('seeded GET /projects wire equals deriveProjects'
 + ' per org', async () => {
     const db = await seededDb();
-    for (const organization of ['1', '2']) {
+    for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
+        , 'BBjWJsjYIDkTRKIIPrzWRw']) {
         const token = await organizationToken(
-            'current', organization,
+            'XXZruirZyAOoRpNxaDnpSA', organization,
         );
         const res = await handleRequest(
             db, req(
@@ -169,7 +189,7 @@ test('per-project GET wire equals deriveProject for'
     const db = await seededDb();
     for (const seed of SEEDED_PROJECTS) {
         const token = await organizationToken(
-            'current', seed.organization,
+            'XXZruirZyAOoRpNxaDnpSA', seed.organization,
         );
         const res = await handleRequest(
             db, req(
@@ -200,13 +220,15 @@ test('a foreign-org project id 404s on GET and on derive',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_PROJECTS.find(
-        (seed) => seed.organization === '1',
+        (seed) => seed.organization === 'AjdvjuECVZEgZoFajaIEkg',
     )!;
-    const token = await organizationToken('current', '2');
+    const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
+        , 'BBjWJsjYIDkTRKIIPrzWRw');
     const res = await handleRequest(
         db, req(
             'GET',
-            '/organizations/2/projects/' + foreign.id, token,
+            '/organizations/BBjWJsjYIDkTRKIIPrzWRw/projects/' + foreign.id
+                , token,
         ),
     );
     assert.equal(res.status, 404);
@@ -216,7 +238,7 @@ async () => {
         'Not found: projects/' + foreign.id,
     );
     await assert.rejects(
-        () => deriveProject(db, '2', foreign.id),
+        () => deriveProject(db, 'BBjWJsjYIDkTRKIIPrzWRw', foreign.id),
         EntityNotFoundError,
     );
 });
@@ -230,27 +252,28 @@ async () => {
     const token = await organizationToken();
     const fixtures = [
         {
-            id: 'project-drift-z',
+            id: PROJECT_DRIFT_Z,
             title: 'Zulu',
             at: '2026-07-01T00:00:00.000000Z',
-            ev: 'ev-drift-z',
+            ev: EV_DRIFT_Z,
         },
         {
-            id: 'project-drift-a',
+            id: PROJECT_DRIFT_A,
             title: 'Alpha',
             at: '2026-07-01T00:00:01.000000Z',
-            ev: 'ev-drift-a',
+            ev: EV_DRIFT_A,
         },
         {
-            id: 'project-drift-m',
+            id: PROJECT_DRIFT_M,
             title: 'Mike',
             at: '2026-07-01T00:00:02.000000Z',
-            ev: 'ev-drift-m',
+            ev: EV_DRIFT_M,
         },
     ];
     for (const f of fixtures) {
         const put = await handleRequest(db, req(
-            'PUT', '/organizations/1/projects/' + f.id, token,
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + f.id
+                , token,
             projectDocument(f.title, 'submitted', f.at, f.ev),
         ));
         assert.equal(put.status, 201);
@@ -262,24 +285,30 @@ async () => {
         );
     }
     const res = await handleRequest(
-        db, req('GET', '/organizations/1/projects/', token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            , token),
     );
     assert.equal(res.status, 200);
     const list = await res.json() as { id: string }[];
     const added = list.filter((row) =>
-        row.id.startsWith('project-drift-'));
+        [
+            PROJECT_DRIFT_Z,
+            PROJECT_DRIFT_A,
+            PROJECT_DRIFT_M,
+        ].includes(row.id));
     assert.deepEqual(
         added.map((row) => row.id),
         [
-            'project-drift-z',
-            'project-drift-a',
-            'project-drift-m',
+            PROJECT_DRIFT_Z,
+            PROJECT_DRIFT_A,
+            PROJECT_DRIFT_M,
         ],
     );
-    const prefix = '/organizations/1/projects/';
+    const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/';
     for (const row of added) {
         const single = await handleRequest(
-            db, req('GET', '/organizations/1/projects/' + row.id, token),
+            db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                + '' + row.id, token),
         );
         assert.equal(single.status, 200);
         assert.equal(
@@ -292,46 +321,49 @@ async () => {
 test('derived history keeps the FIRST arrival\'s authorship'
 + ' on a same-trio resend by a different member', async () => {
     const db = await seededDb();
-    await seedOrganizationMember(db, 'member-b');
-    const tokenA = await organizationToken('current');
-    const tokenB = await organizationToken('member-b');
-    const projectId = 'project-drift-authorship-caveat';
+    await seedOrganizationMember(db, MEMBER_B);
+    const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
+    const tokenB = await organizationToken(MEMBER_B);
+    const projectId = PROJECT_DRIFT_AUTHORSHIP_CAVEAT;
 
     await handleRequest(db, req(
-        'PUT', '/organizations/1/projects/' + projectId, tokenA, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
+            , tokenA, {
             ...projectDocument(
                 'First', 'submitted',
                 '2026-04-01T00:00:00.000000Z',
-                'ev-drift-authorship-caveat',
+                EV_DRIFT_AUTHORSHIP_CAVEAT,
             ),
         },
     ));
     await handleRequest(db, req(
-        'PUT', '/organizations/1/projects/' + projectId, tokenB, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
+            , tokenB, {
             ...projectDocument(
                 'Second', 'submitted',
                 '2026-04-01T00:00:00.000000Z',
-                'ev-drift-authorship-caveat',
+                EV_DRIFT_AUTHORSHIP_CAVEAT,
             ),
         },
     ));
 
     const derived = await deriveProjectStateHistory(
-        db, '1', projectId,
+        db, 'AjdvjuECVZEgZoFajaIEkg', projectId,
     );
     assert.equal(derived.length, 1);
-    assert.equal(derived[0]!.member_id, 'current');
+    assert.equal(derived[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 
     // Wire entity reflects the SECOND title; authorship of the
     // head event stays on member A; GET trio is the one event.
     const getRes = await handleRequest(
-        db, req('GET', '/organizations/1/projects/' + projectId, tokenA),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + projectId, tokenA),
     );
     assert.equal(getRes.status, 200);
     assert.equal(
         await getRes.text(),
         await storedPutBodyText(
-            db, '/organizations/1/projects/', projectId,
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
         ),
     );
 });
@@ -340,19 +372,21 @@ test('live-write case: create + edit + transition + delete',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const projectId = 'project-drift-lifecycle';
+    const projectId = PROJECT_DRIFT_LIFECYCLE;
 
     await handleRequest(db, req(
-        'PUT', '/organizations/1/projects/' + projectId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
+            , token, {
             ...projectDocument(
                 'Lifecycle Project', 'submitted',
                 '2026-03-01T00:00:00.000000Z',
-                'ev-drift-lifecycle-genesis',
+                EV_DRIFT_LIFECYCLE_GENESIS,
             ),
         },
     ));
     await handleRequest(db, req(
-        'PUT', '/organizations/1/projects/' + projectId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
+            , token, {
             title: 'Lifecycle Project Edited',
             description: 'd2',
             progress: 10,
@@ -365,7 +399,8 @@ async () => {
         },
     ));
     await handleRequest(db, req(
-        'PUT', '/organizations/1/projects/' + projectId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
+            , token, {
             title: 'Lifecycle Project Edited',
             description: 'd2',
             progress: 10,
@@ -378,22 +413,24 @@ async () => {
         },
     ));
     const beforeDelete = await handleRequest(
-        db, req('GET', '/organizations/1/projects/' + projectId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + projectId, token),
     );
     assert.equal(beforeDelete.status, 200);
     assert.equal(
         await beforeDelete.text(),
         await storedPutBodyText(
-            db, '/organizations/1/projects/', projectId,
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
         ),
     );
     const derivedBefore = await deriveProject(
-        db, '1', projectId,
+        db, 'AjdvjuECVZEgZoFajaIEkg', projectId,
     );
     assert.equal(derivedBefore.state, 'under_review');
 
     await handleRequest(db, req(
-        'PUT', '/organizations/1/projects/' + projectId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
+            , token, {
             title: 'Lifecycle Project Edited',
             description: 'd2',
             progress: 10,
@@ -407,21 +444,23 @@ async () => {
     ));
 
     const deleted = await handleRequest(
-        db, req('GET', '/organizations/1/projects/' + projectId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + projectId, token),
     );
     assert.equal(deleted.status, 200);
     assert.equal(
         await deleted.text(),
         await storedPutBodyText(
-            db, '/organizations/1/projects/', projectId,
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
         ),
     );
     await assert.rejects(
-        () => deriveProject(db, '1', projectId),
+        () => deriveProject(db, 'AjdvjuECVZEgZoFajaIEkg', projectId),
         EntityNotFoundError,
     );
     const listRes = await handleRequest(
-        db, req('GET', '/organizations/1/projects/', token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            , token),
     );
     const list = await listRes.json() as { id: string }[];
     assert.equal(
@@ -429,7 +468,7 @@ async () => {
     );
 
     const derivedHistory = await deriveProjectStateHistory(
-        db, '1', projectId,
+        db, 'AjdvjuECVZEgZoFajaIEkg', projectId,
     );
     // genesis + under_review + deleted (same-trio edit
     // does not add a second event)
@@ -439,12 +478,13 @@ async () => {
 test('live conversion case: a converted idea\'s project'
 + ' is wire-visible like a PUT-born one', async () => {
     const db = await seededDb();
-    const token = await organizationToken('current');
-    const projectId = 'project-drift-conversion';
+    const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
+    const projectId = PROJECT_DRIFT_CONVERSION;
 
     const conv = await handleRequest(db, req(
         'POST',
-        '/organizations/1/ideas/idea-drift-conversion-source/conversion',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/gnLzxboxuTEQxNBCqOvRRw/'
+            + 'conversion',
         token,
         {
             projectId,
@@ -467,9 +507,9 @@ test('live conversion case: a converted idea\'s project'
                 expected_outcome: 'o',
                 success_metrics: 'm',
             },
-            ideaStateEventId: 'ev-drift-conversion-idea',
+            ideaStateEventId: EV_DRIFT_CONVERSION_IDEA,
             ideaState: 'promoted',
-            projectStateEventId: 'ev-drift-conversion-project',
+            projectStateEventId: EV_DRIFT_CONVERSION_PROJECT,
             projectState: 'submitted',
             ideaStateAt: '2026-05-01T00:00:00.000000Z',
             projectStateAt: '2026-05-01T00:00:01.000000Z',
@@ -479,28 +519,31 @@ test('live conversion case: a converted idea\'s project'
     assert.equal(conv.status, 201);
 
     const getRes = await handleRequest(
-        db, req('GET', '/organizations/1/projects/' + projectId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + projectId, token),
     );
     assert.equal(getRes.status, 200);
     const wireText = await getRes.text();
     const wire = JSON.parse(wireText) as { title: string };
     assert.equal(wire.title, 'Converted Project');
-    const derived = await deriveProject(db, '1', projectId);
+    const derived = await deriveProject(db, 'AjdvjuECVZEgZoFajaIEkg'
+        , projectId);
     assert.equal(
         wireText,
         await storedPutBodyText(
-            db, '/organizations/1/projects/', projectId,
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
         ),
     );
 
     const listRes = await handleRequest(
-        db, req('GET', '/organizations/1/projects/', token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            , token),
     );
     const list = await listRes.json() as { id: string }[];
     assert.ok(list.some((p) => p.id === projectId));
 
     const derivedHistory = await deriveProjectStateHistory(
-        db, '1', projectId,
+        db, 'AjdvjuECVZEgZoFajaIEkg', projectId,
     );
     assert.equal(derivedHistory.length, 1);
     assert.equal(derivedHistory[0]!.state, 'submitted');
@@ -517,14 +560,15 @@ test('GET project trio is lifecycle-current under clock skew'
 + ' (genesis-wins-under-skew, case 7d)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const projectId = 'project-drift-skew-1';
+    const projectId = generateIdentifier();
     const genesisAt = '2026-05-01T00:00:00.000000Z';
-    const genesisEv = projectId + '-genesis';
+    const genesisEv = PROJECTID_GENESIS;
     const skewedAt = '2020-01-01T00:00:00.000000Z';
-    const skewedEv = projectId + '-skewed';
+    const skewedEv = PROJECTID_SKEWED;
 
     const genesis = await handleRequest(db, req(
-        'PUT', '/organizations/1/projects/' + projectId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
+            , token,
         projectDocument(
             'Genesis Title', 'submitted',
             genesisAt, genesisEv,
@@ -534,7 +578,8 @@ test('GET project trio is lifecycle-current under clock skew'
 
     // Later arrival, earlier state_at, different state + title.
     const skewed = await handleRequest(db, req(
-        'PUT', '/organizations/1/projects/' + projectId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
+            , token,
         projectDocument(
             'Skewed Title', 'under_review',
             skewedAt, skewedEv,
@@ -547,18 +592,20 @@ test('GET project trio is lifecycle-current under clock skew'
         genesisAt, genesisEv,
     );
     const getRes = await handleRequest(
-        db, req('GET', '/organizations/1/projects/' + projectId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + projectId, token),
     );
     assert.equal(getRes.status, 200);
     assert.deepEqual(await getRes.json(), expected);
     assert.deepEqual(
         JSON.parse(await storedPutBodyText(
-            db, '/organizations/1/projects/', projectId,
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
         )),
         expected,
     );
 
-    const derived = await deriveProject(db, '1', projectId);
+    const derived = await deriveProject(db, 'AjdvjuECVZEgZoFajaIEkg'
+        , projectId);
     assert.equal(
         JSON.stringify(derived), JSON.stringify(expected),
     );
@@ -566,7 +613,8 @@ test('GET project trio is lifecycle-current under clock skew'
     assert.equal(derived.state, 'under_review');
 
     const listRes = await handleRequest(
-        db, req('GET', '/organizations/1/projects/', token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            , token),
     );
     assert.equal(listRes.status, 200);
     const list = await listRes.json() as { id: string }[];

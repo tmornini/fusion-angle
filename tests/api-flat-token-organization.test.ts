@@ -75,15 +75,17 @@ function putDefaultOrganization(
 test('a flat token resolves its org from the set default',
 async () => {
     const db = await freshDb();
-    await join(db, 'current', '2');
+    await join(db, 'XXZruirZyAOoRpNxaDnpSA', 'BBjWJsjYIDkTRKIIPrzWRw');
     // Claim orgs must include the membership set — fence
     // projects memberships from the token claim, not live.
-    const token = await reachableToken('current', ['2']);
+    const token = await reachableToken('XXZruirZyAOoRpNxaDnpSA'
+        , ['BBjWJsjYIDkTRKIIPrzWRw']);
     const put = await handleRequest(
-        db, putDefaultOrganization(token, 'current', '2'));
+        db, putDefaultOrganization(token, 'XXZruirZyAOoRpNxaDnpSA'
+            , 'BBjWJsjYIDkTRKIIPrzWRw'));
     assert.equal(put.status, 201);
     const res = await handleRequest(
-        db, getSeats(token, '2'),
+        db, getSeats(token, 'BBjWJsjYIDkTRKIIPrzWRw'),
     );
     assert.equal(res.status, 200);
 });
@@ -91,12 +93,13 @@ async () => {
 test('a flat token falls back to its primary membership org',
 async () => {
     const db = await freshDb();
-    await join(db, 'current', '2');
+    await join(db, 'XXZruirZyAOoRpNxaDnpSA', 'BBjWJsjYIDkTRKIIPrzWRw');
     const res = await handleRequest(
         db,
         getSeats(
-            await reachableToken('current', ['2']),
-            '2',
+            await reachableToken('XXZruirZyAOoRpNxaDnpSA'
+                , ['BBjWJsjYIDkTRKIIPrzWRw']),
+            'BBjWJsjYIDkTRKIIPrzWRw',
         ),
     );
     assert.equal(res.status, 200);
@@ -106,7 +109,7 @@ test('a flat token with no org resolution is denied',
 async () => {
     const db = await freshDb();   // role, no member
     const res = await handleRequest(
-        db, getSeats(await devToken(), '1'),
+        db, getSeats(await devToken(), 'AjdvjuECVZEgZoFajaIEkg'),
     );
     assert.equal(res.status, 403);
 });

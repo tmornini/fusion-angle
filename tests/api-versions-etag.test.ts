@@ -24,6 +24,12 @@ import { messageStore } from '../api/message-store.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+
+const ORGANIZATION_A = generateIdentifier();
+const ORGANIZATION_B = generateIdentifier();
+const DAVE = generateIdentifier();
 
 function match(path: string) {
     return matchRoute(
@@ -34,11 +40,13 @@ function match(path: string) {
 test('idea versions list requires a slash',
 () => {
     assert.ok(match(
-        '/organizations/1/ideas/i1/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/fndCYAsXazdzMUlEGMNIZw/'
+            + 'versions/',
     ));
     assert.equal(
         match(
-            '/organizations/1/ideas/i1/versions',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'fndCYAsXazdzMUlEGMNIZw/versions',
         ),
         null,
     );
@@ -47,7 +55,8 @@ test('idea versions list requires a slash',
 test('idea snapshot is :etag not :version',
 () => {
     const row = match(
-        '/organizations/1/ideas/i1/versions/e1',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/fndCYAsXazdzMUlEGMNIZw/'
+            + 'versions/YiJPbufDpkyrZcZCYbUJpg',
     );
     assert.ok(row);
     assert.equal(
@@ -59,11 +68,13 @@ test('idea snapshot is :etag not :version',
 test('work-order per-item history stays /history',
 () => {
     assert.ok(match(
-        '/organizations/1/work-orders/w1/history',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'xdaJyuuPyHfffCGLhqDrOQ/history',
     ));
     assert.equal(
         match(
-            '/organizations/1/work-orders/w1'
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'xdaJyuuPyHfffCGLhqDrOQ'
                 + '/versions/',
         ),
         null,
@@ -88,7 +99,7 @@ test('bulk work-order history is absent', () => {
         false,
     );
     const captured = match(
-        '/organizations/1/work-orders/history',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/history',
     );
     assert.ok(captured);
     assert.equal(captured.route.segments.at(-1), ':id');
@@ -103,11 +114,11 @@ test('bulk objective versions is absent', () => {
         false,
     );
     assert.equal(
-        match('/organizations/1/objectives/versions/'),
+        match('/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/versions/'),
         null,
     );
     const slashless = match(
-        '/organizations/1/objectives/versions',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/versions',
     );
     assert.ok(slashless);
     assert.equal(slashless.route.segments.at(-1), ':id');
@@ -118,29 +129,47 @@ test('registered families offer versions/ and :etag',
 () => {
     const lists = [
         '/identities/abc/versions/',
-        '/ai-agents/a1/versions/',
-        '/organizations/1/members/m1/versions/',
-        '/organizations/1/invitations/i1/versions/',
-        '/identities/abc/invitations/i1/versions/',
-        '/organizations/1/versions/',
-        '/organizations/1/ideas/i1/versions/',
-        '/organizations/1/projects/p1/versions/',
-        '/organizations/1/objectives/o1/versions/',
-        '/organizations/1/record-types/r1/versions/',
-        '/organizations/1/flows/f1/versions/',
+        '/ai-agents/UQTJZvCoKlFjEoDlDUwekw/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'members/mFNSxZqywTSMXhgUTdTqtA/'
+            + 'versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
+            + 'fndCYAsXazdzMUlEGMNIZw/versions/',
+        '/identities/abc/invitations/fndCYAsXazdzMUlEGMNIZw/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/fndCYAsXazdzMUlEGMNIZw/'
+            + 'versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + 'pnXmXrxOWayANgDLdCjuBw/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + 'ohqxgUBEaFQwYbXsonRPmg/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'rOEPOcVMQdJiiiMuiiEhlg/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/ZOousbbnzpqlxJExVAruYQ/'
+            + 'versions/',
     ];
     const snapshots = [
-        '/identities/abc/versions/e1',
-        '/ai-agents/a1/versions/e1',
-        '/organizations/1/members/m1/versions/e1',
-        '/organizations/1/invitations/i1/versions/e1',
-        '/identities/abc/invitations/i1/versions/e1',
-        '/organizations/1/versions/e1',
-        '/organizations/1/ideas/i1/versions/e1',
-        '/organizations/1/projects/p1/versions/e1',
-        '/organizations/1/objectives/o1/versions/e1',
-        '/organizations/1/record-types/r1/versions/e1',
-        '/organizations/1/flows/f1/versions/e1',
+        '/identities/abc/versions/YiJPbufDpkyrZcZCYbUJpg',
+        '/ai-agents/UQTJZvCoKlFjEoDlDUwekw/versions/YiJPbufDpkyrZcZCYbUJpg',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'members/mFNSxZqywTSMXhgUTdTqtA/'
+            + 'versions/YiJPbufDpkyrZcZCYbUJpg',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
+            + 'fndCYAsXazdzMUlEGMNIZw/versions/YiJPbufDpkyrZcZCYbUJpg',
+        '/identities/abc/invitations/fndCYAsXazdzMUlEGMNIZw/versions/'
+            + 'YiJPbufDpkyrZcZCYbUJpg',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/versions/'
+            + 'YiJPbufDpkyrZcZCYbUJpg',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/fndCYAsXazdzMUlEGMNIZw/'
+            + 'versions/YiJPbufDpkyrZcZCYbUJpg',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + 'pnXmXrxOWayANgDLdCjuBw/versions/YiJPbufDpkyrZcZCYbUJpg',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + 'ohqxgUBEaFQwYbXsonRPmg/versions/YiJPbufDpkyrZcZCYbUJpg',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'rOEPOcVMQdJiiiMuiiEhlg/versions/YiJPbufDpkyrZcZCYbUJpg',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/ZOousbbnzpqlxJExVAruYQ/'
+            + 'versions/YiJPbufDpkyrZcZCYbUJpg',
     ];
     for (const path of lists) {
         const row = match(path);
@@ -176,15 +205,21 @@ function req(
 async function seedInviteeWorld(): Promise<DbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await seedOrganizationDocument(db, '1', 'Stark');
-    await seedOrganizationDocument(db, '2', 'Wayne');
-    await seedSeat(db, '1', 'current', 'admin', AT);
-    await seedSeat(db, '2', 'current', 'admin', AT);
-    await seedPersonIdentity(db, 'current', {
+    await seedOrganizationDocument(db, 'AjdvjuECVZEgZoFajaIEkg', 'Stark');
+    await seedOrganizationDocument(db, 'BBjWJsjYIDkTRKIIPrzWRw', 'Wayne');
+    await seedSeat(db, 'AjdvjuECVZEgZoFajaIEkg', 'XXZruirZyAOoRpNxaDnpSA'
+        , 'admin', AT);
+    await seedSeat(db, 'BBjWJsjYIDkTRKIIPrzWRw', 'XXZruirZyAOoRpNxaDnpSA'
+        , 'admin', AT);
+    await seedPersonIdentity(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Tony', email: 'demo@example.com',
         phone: '', bio: '',
     });
-    await seedIdentityPii(db, 'dave', {
+    await seedPersonIdentity(db, DAVE, {
+        name: 'Dave', email: 'dave@x.com',
+        phone: '', bio: '',
+    });
+    await seedIdentityPii(db, DAVE, {
         name: 'Dave', email: 'dave@x.com',
         phone: '', bio: '',
     });
@@ -197,12 +232,13 @@ async function grantDave(
 ): Promise<void> {
     const res = await handleRequest(db, req(
         'POST',
-        '/organizations/2/invitations/',
-        await organizationToken('current', '2'),
+        '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA'
+            , 'BBjWJsjYIDkTRKIIPrzWRw'),
         {
             email: 'dave@x.com',
             invitationId,
-            grantEventId: 'ev-' + invitationId,
+            grantEventId: generateIdentifier(),
             grantAt: AT,
         },
     ));
@@ -212,27 +248,33 @@ async function grantDave(
 async function seedMemberOrganizations(): Promise<DbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await seedOrganizationDocument(db, 'A', 'Acme');
-    await seedOrganizationDocument(db, 'B', 'Wayne');
-    await seedSeat(db, 'A', 'current', 'admin', AT);
-    await seedSeat(db, 'B', 'current', 'admin', AT);
+    await seedOrganizationDocument(db, ORGANIZATION_A, 'Acme');
+    await seedOrganizationDocument(db, ORGANIZATION_B, 'Wayne');
+    await seedSeat(
+        db, ORGANIZATION_A, 'XXZruirZyAOoRpNxaDnpSA', 'admin', AT,
+    );
+    await seedSeat(
+        db, ORGANIZATION_B, 'XXZruirZyAOoRpNxaDnpSA', 'admin', AT,
+    );
     return db;
 }
 
 test('org-less invitee GET identity-nest versions is 200',
 async () => {
     const db = await seedInviteeWorld();
-    await grantDave(db, 'inv-hole');
-    const token = await reachableToken('dave', []);
+    await grantDave(db, 'hvIFfMMXNtqRPYXnChCzug');
+    const token = await reachableToken(DAVE, []);
     const item = await handleRequest(db, req(
         'GET',
-        '/identities/dave/invitations/inv-hole',
+        '/identities/' + DAVE
+            + '/invitations/hvIFfMMXNtqRPYXnChCzug',
         token,
     ));
     assert.equal(item.status, 200);
     const list = await handleRequest(db, req(
         'GET',
-        '/identities/dave/invitations/inv-hole'
+        '/identities/' + DAVE
+            + '/invitations/hvIFfMMXNtqRPYXnChCzug'
             + '/versions/',
         token,
     ));
@@ -241,8 +283,9 @@ async () => {
     assert.ok(rows.length >= 1);
     const snapshot = await handleRequest(db, req(
         'GET',
-        '/identities/dave/invitations/inv-hole'
-            + '/versions/missing-etag',
+        '/identities/' + DAVE
+            + '/invitations/hvIFfMMXNtqRPYXnChCzug'
+            + '/versions/nmPWmjhGfSUcdaEGaCyMZg',
         token,
     ));
     assert.equal(snapshot.status, 404);
@@ -252,32 +295,35 @@ test('member of B GET B versions while fenced to A',
 async () => {
     const db = await seedMemberOrganizations();
     const token = await claimToken({
-        organization: 'A',
-        organizations: ['A', 'B'],
-        roles: ['admin:A', 'admin:B'],
+        organization: ORGANIZATION_A,
+        organizations: [ORGANIZATION_A, ORGANIZATION_B],
+        roles: ['admin:' + ORGANIZATION_A, 'admin:' + ORGANIZATION_B],
     });
     const document = await handleRequest(db, req(
-        'GET', '/organizations/B', token,
+        'GET', '/organizations/' + ORGANIZATION_B, token,
     ));
     assert.equal(document.status, 200);
     const list = await handleRequest(db, req(
-        'GET', '/organizations/B/versions/', token,
+        'GET', '/organizations/' + ORGANIZATION_B + '/versions/',
+        token,
     ));
     assert.equal(list.status, 200);
     const rows = await list.json() as unknown[];
     assert.ok(rows.length >= 1);
     const stored = await messageStore(db).get(
-        '/organizations/', 'B',
+        '/organizations/', ORGANIZATION_B,
     );
     assert.ok(stored);
     const snapshot = await handleRequest(db, req(
         'GET',
-        '/organizations/B/versions/' + stored.version,
+        '/organizations/' + ORGANIZATION_B + '/versions/'
+            + stored.version,
         token,
     ));
     assert.equal(snapshot.status, 200);
     const ideas = await handleRequest(db, req(
-        'GET', '/organizations/B/ideas/', token,
+        'GET', '/organizations/' + ORGANIZATION_B + '/ideas/',
+        token,
     ));
     assert.equal(ideas.status, 403);
 });
@@ -285,18 +331,22 @@ async () => {
 test('non-member GET B versions is 403 like the document',
 async () => {
     const db = await seedMemberOrganizations();
-    const token = await organizationToken('current', 'A');
+    const token = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
+    );
     const document = await handleRequest(db, req(
-        'GET', '/organizations/B', token,
+        'GET', '/organizations/' + ORGANIZATION_B, token,
     ));
     assert.equal(document.status, 403);
     const list = await handleRequest(db, req(
-        'GET', '/organizations/B/versions/', token,
+        'GET', '/organizations/' + ORGANIZATION_B + '/versions/',
+        token,
     ));
     assert.equal(list.status, 403);
     const snapshot = await handleRequest(db, req(
         'GET',
-        '/organizations/B/versions/missing-etag',
+        '/organizations/' + ORGANIZATION_B
+            + '/versions/nmPWmjhGfSUcdaEGaCyMZg',
         token,
     ));
     assert.equal(snapshot.status, 403);
@@ -304,16 +354,19 @@ async () => {
 
 test('absent org versions is 404 not 403', async () => {
     const db = await seedMemberOrganizations();
-    const token = await organizationToken('current', 'A');
+    const token = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
+    );
     const list = await handleRequest(db, req(
         'GET',
-        '/organizations/no-such-org/versions/',
+        '/organizations/oLbQcDdzGHmpcoUKyvlTnQ/versions/',
         token,
     ));
     assert.equal(list.status, 404);
     const snapshot = await handleRequest(db, req(
         'GET',
-        '/organizations/no-such-org/versions/e1',
+        '/organizations/oLbQcDdzGHmpcoUKyvlTnQ/versions/'
+            + 'YiJPbufDpkyrZcZCYbUJpg',
         token,
     ));
     assert.equal(snapshot.status, 404);
@@ -322,12 +375,16 @@ test('absent org versions is 404 not 403', async () => {
 test('identities, members, and identity-nest lists are 200',
 async () => {
     const db = await seedInviteeWorld();
-    await grantDave(db, 'inv-list');
-    const token = await organizationToken('current', '1');
+    await grantDave(db, 'iBSjaSPKkHorkvpwZBBNFg');
+    const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
+        , 'AjdvjuECVZEgZoFajaIEkg');
     const paths = [
-        '/identities/current/versions/',
-        '/organizations/1/members/current/versions/',
-        '/identities/dave/invitations/inv-list/versions/',
+        '/identities/XXZruirZyAOoRpNxaDnpSA/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'members/XXZruirZyAOoRpNxaDnpSA/'
+            + 'versions/',
+        '/identities/' + DAVE
+            + '/invitations/iBSjaSPKkHorkvpwZBBNFg/versions/',
     ];
     for (const path of paths) {
         const res = await handleRequest(

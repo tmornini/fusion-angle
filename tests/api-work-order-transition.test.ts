@@ -31,6 +31,14 @@ import {
     formWritePair,
 } from '../api/message-pair.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+
+const FIELD_VALUE_ID = generateIdentifier();
+const CLAIM_EVENT_ID = generateIdentifier();
+const EXPIRE_EVENT_ID = generateIdentifier();
+const RELEASE_EVENT_ID = generateIdentifier();
+const TRANSITION_EVENT_ID = generateIdentifier();
 
 // POST organizations/:id/work-orders/:id/transition writes the transition
 // state
@@ -60,7 +68,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     await seedAdminSchema(db);
     await seedCurrentMember(db);
     await PUT(
-        db, 'organizations/1/work-orders/wo1', {
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA', {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
@@ -73,7 +82,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 function eventsFor(
     db: MemoryDbAdapter,
 ): Promise<{ state: string; member_id: string; at: string }[]> {
-    return workOrderLifecycleStatesFor(db, '1', 'wo1');
+    return workOrderLifecycleStatesFor(db, 'AjdvjuECVZEgZoFajaIEkg'
+        , 'yNSSnbrpacodQTzUEcdEVA');
 }
 
 // Below-facade legacy append (organization === undefined).
@@ -85,7 +95,7 @@ async function appendLegacyTransition(
 ): Promise<void> {
     const pathSegments = [
         'organizations', STARK_ORGANIZATION,
-        'work-orders', 'wo1', 'transition',
+        'work-orders', 'yNSSnbrpacodQTzUEcdEVA', 'transition',
     ];
     const pair = await formWritePair({
         method: 'POST',
@@ -103,7 +113,7 @@ async function appendLegacyTransition(
         operationId: TEST_OPERATION_ID,
     });
     await postWorkOrderTransitionOp(
-        db, 'wo1', body, SYSTEM_MEMBER_ID,
+        db, 'yNSSnbrpacodQTzUEcdEVA', body, SYSTEM_MEMBER_ID,
         undefined, [], pair,
     );
 }
@@ -114,7 +124,8 @@ test(
     async () => {
         const db = await seededDb();
         await POST(
-            db, 'organizations/1/work-orders/wo1/transition', {
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'yNSSnbrpacodQTzUEcdEVA/transition', {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
                 release: null,
@@ -125,7 +136,7 @@ test(
         const events = await eventsFor(db);
         assert.equal(events.length, 1);
         assert.equal(events[0]!.state, 'n-next');
-        assert.equal(events[0]!.member_id, 'current');
+        assert.equal(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
@@ -140,7 +151,8 @@ test(
         // so the foreign target exists for the read paths.
         // Phase Final Stage B: record_attributes retired.
         await PUT(
-            db, 'organizations/1/record-types/rec-1', {
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'rbfHGatkwQzGZJVXKJEeyw', {
                 name: 'WO Parent', description: '',
                 position: 0,
                 state: 'active',
@@ -148,8 +160,9 @@ test(
             DEV_TOKEN,
         );
         await PUT(
-            db, 'organizations/1/record-types/rec-1'
-            + '/attributes/attr-1', {
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'rbfHGatkwQzGZJVXKJEeyw'
+            + '/attributes/VPckAwjJsTGCEkKaOOGRGw', {
                 name: 'Severity',
                 attribute_type: 'text',
                 sort_order: 0,
@@ -159,14 +172,14 @@ test(
             DEV_TOKEN,
         );
         await appendLegacyTransition(db, {
-            transitionEventId: 'te1',
+            transitionEventId: TRANSITION_EVENT_ID,
             targetState: 'n-next',
             fieldValues: [
                 {
-                    id: 'fv-1',
+                    id: FIELD_VALUE_ID,
                     fields: {
-                        state_event_id: 'te1',
-                        attribute_id: 'attr-1',
+                        state_event_id: TRANSITION_EVENT_ID,
+                        attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
                         value: 'high',
                     },
                 },
@@ -181,15 +194,15 @@ test(
         // transition fold rides work-order history.
         // Phase Final Stage B: state_field_values retired.
         const history = await workOrderHistoryFor(
-            db, STARK_ORGANIZATION, 'wo1',
+            db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
         );
         const transition = history.find(
-            (row) => row.id === 'te1',
+            (row) => row.id === TRANSITION_EVENT_ID,
         );
         assert.ok(transition !== undefined);
         assert.deepEqual(transition!.field_values, [{
-            id: 'fv-1',
-            attribute_id: 'attr-1',
+            id: FIELD_VALUE_ID,
+            attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
             value: 'high',
         }]);
     },
@@ -205,10 +218,11 @@ test(
         // Claim rides the named op (states/:id retired).
         const claimAt = nowUtc();
         await PUT(
-            db, 'organizations/1/work-orders/wo1/claim', {
-                claimEventId: 'cl-1',
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'yNSSnbrpacodQTzUEcdEVA/claim', {
+                claimEventId: CLAIM_EVENT_ID,
                 claimAt,
-                expireEventId: 'cl-1-exp',
+                expireEventId: EXPIRE_EVENT_ID,
                 expireAt: claimAt,
             },
             DEV_TOKEN,
@@ -218,11 +232,12 @@ test(
         const transitionAt = nowUtc();
         const releaseAt = nowUtc();
         await POST(
-            db, 'organizations/1/work-orders/wo1/transition', {
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'yNSSnbrpacodQTzUEcdEVA/transition', {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
                 release: {
-                    id: 'rel-1',
+                    id: RELEASE_EVENT_ID,
                     state: 'claim_released',
                     at: releaseAt,
                 },
@@ -235,9 +250,9 @@ test(
             events.map(ev => ev.state),
             ['claimed', 'n-next', 'claim_released'],
         );
-        assert.equal(events[1]!.member_id, 'current');
+        assert.equal(events[1]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
         assert.equal(events[2]!.state, 'claim_released');
-        assert.equal(events[2]!.member_id, 'current');
+        assert.equal(events[2]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
@@ -246,7 +261,8 @@ test(
     async () => {
         const db = await seededDb();
         await POST(
-            db, 'organizations/1/work-orders/wo1/transition', {
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'yNSSnbrpacodQTzUEcdEVA/transition', {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
                 release: null,
@@ -279,15 +295,15 @@ test(
                 targetState: 'n-next',
                 fieldValues: [
                     {
-                        id: 'fv-1',
+                        id: FIELD_VALUE_ID,
                         fields: {
                             state_event_id: 'te1',
-                            attribute_id: 'attr-1',
+                            attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
                             value: 'high',
                         },
                     },
                     {
-                        id: 'fv-2',
+                        id: generateIdentifier(),
                         fields: {
                             state_event_id: 'te1',
                             value: 'low',
@@ -307,7 +323,7 @@ test(
         // under a ghost event id.
         await assert.rejects(
             () => workOrderHistoryFor(
-                db, STARK_ORGANIZATION, 'wo1',
+                db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
             ),
             EntityNotFoundError,
         );
@@ -320,7 +336,8 @@ test(
         const db = await seededDb();
         await assert.rejects(
             () => POST(
-                db, 'organizations/1/work-orders/wo1/transition', {
+                db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                    + 'yNSSnbrpacodQTzUEcdEVA/transition', {
                     transitionEventId: 'te1',
                     targetState: 'n-next',
                     release: null,
@@ -349,7 +366,8 @@ test(
         const db = await seededDb();
         // Phase Final Stage B: record_attributes retired.
         await PUT(
-            db, 'organizations/1/record-types/rec-1', {
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'rbfHGatkwQzGZJVXKJEeyw', {
                 name: 'WO Parent', description: '',
                 position: 0,
                 state: 'active',
@@ -357,8 +375,9 @@ test(
             DEV_TOKEN,
         );
         await PUT(
-            db, 'organizations/1/record-types/rec-1'
-            + '/attributes/attr-1', {
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'rbfHGatkwQzGZJVXKJEeyw'
+            + '/attributes/VPckAwjJsTGCEkKaOOGRGw', {
                 name: 'Severity',
                 attribute_type: 'text',
                 sort_order: 0,
@@ -373,10 +392,10 @@ test(
                 targetState: 'n-next',
                 fieldValues: [
                     {
-                        id: 'fv-1',
+                        id: FIELD_VALUE_ID,
                         fields: {
                             state_event_id: 'other-event',
-                            attribute_id: 'attr-1',
+                            attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
                             value: 'high',
                         },
                     },
@@ -407,9 +426,9 @@ test(
                 targetState: 'n-next',
                 fieldValues: [
                     {
-                        id: 'fv-1',
+                        id: FIELD_VALUE_ID,
                         fields: {
-                            attribute_id: 'attr-1',
+                            attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
                             value: 'high',
                         },
                     },
@@ -437,7 +456,8 @@ test(
         // from a server-generated nowUtc().
         const callerAt = '2099-01-01T00:00:00.000000Z';
         await POST(
-            db, 'organizations/1/work-orders/wo1/transition', {
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'yNSSnbrpacodQTzUEcdEVA/transition', {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
                 release: null,
@@ -459,10 +479,11 @@ test(
         // Claim rides the named op (states/:id retired).
         const claimAt = nowUtc();
         await PUT(
-            db, 'organizations/1/work-orders/wo1/claim', {
-                claimEventId: 'cl-1',
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'yNSSnbrpacodQTzUEcdEVA/claim', {
+                claimEventId: CLAIM_EVENT_ID,
                 claimAt,
-                expireEventId: 'cl-1-exp',
+                expireEventId: EXPIRE_EVENT_ID,
                 expireAt: claimAt,
             },
             DEV_TOKEN,
@@ -472,11 +493,12 @@ test(
         const transitionAt = '2099-01-01T00:00:00.000000Z';
         const releaseAt = '2099-01-01T00:00:01.000000Z';
         await POST(
-            db, 'organizations/1/work-orders/wo1/transition', {
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'yNSSnbrpacodQTzUEcdEVA/transition', {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
                 release: {
-                    id: 'rel-1',
+                    id: RELEASE_EVENT_ID,
                     state: 'claim_released',
                     at: releaseAt,
                 },

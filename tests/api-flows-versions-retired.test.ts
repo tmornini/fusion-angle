@@ -8,6 +8,8 @@ import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Succession pin: pair-chain GET /organizations/:id/flows/:id/versions is
 // 200/404 by document existence. Old table-backed :vid
@@ -37,7 +39,7 @@ function flowBody() {
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
         state: 'active',
         state_at: '2026-03-01T00:00:00.000000Z',
-        state_event_id: 'flow-ver-1-ev1',
+        state_event_id: generateIdentifier(),
         graph: { nodes: [], edges: [] },
         revivals: [],
         graphDelta: {
@@ -57,13 +59,15 @@ async () => {
     const token = await organizationToken();
     const put = await handleRequest(
         db,
-        req('PUT', '/organizations/1/flows/flow-ver-1', token, flowBody()),
+        req('PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cyLfilTEOVYoZqXJMakKAQ', token, flowBody()),
     );
     assert.equal(put.status, 201);
 
     const index = await handleRequest(
         db,
-        req('GET', '/organizations/1/flows/flow-ver-1/versions/', token),
+        req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cyLfilTEOVYoZqXJMakKAQ/versions/', token),
     );
     assert.equal(index.status, 200);
     const rows = await index.json() as { id: string }[];
@@ -71,14 +75,16 @@ async () => {
 
     const retired = await handleRequest(
         db,
-        req('GET', '/organizations/1/flows/flow-ver-1/history', token),
+        req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'cyLfilTEOVYoZqXJMakKAQ/history', token),
     );
     assert.equal(retired.status, 404);
 
     const tableVid = await handleRequest(
         db,
         req(
-            'GET', '/organizations/1/flows/flow-ver-1/versions/vid-1',
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'cyLfilTEOVYoZqXJMakKAQ/versions/xVVkkaYdwZkmXhefmdtaBw',
             token,
         ),
     );
@@ -86,13 +92,16 @@ async () => {
 
     const missing = await handleRequest(
         db,
-        req('GET', '/organizations/1/flows/missing-flow/versions/', token),
+        req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'nnoFIBfkCuGxgiGxhQpcCQ/versions/', token),
     );
     assert.equal(missing.status, 404);
 
     const writePaths = [
-        '/organizations/1/flows/flow-ver-1/versions/',
-        '/organizations/1/flows/flow-ver-1/versions/vid-1',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/cyLfilTEOVYoZqXJMakKAQ/'
+            + 'versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/cyLfilTEOVYoZqXJMakKAQ/'
+            + 'versions/xVVkkaYdwZkmXhefmdtaBw',
     ];
     for (const path of writePaths) {
         for (const method of ['POST', 'PUT', 'DELETE']) {

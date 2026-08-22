@@ -11,9 +11,11 @@ import { ideaBody, seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const BASE = 'http://localhost';
-const MEMBER = 'walt';
+const MEMBER = generateIdentifier();
 
 function req(
     method: string, path: string, token: string,
@@ -40,16 +42,19 @@ async () => {
     const db = await memberDb();
     const token = await devToken(MEMBER);
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/i1', token, {
-            ...ideaBody('1', 'mine'),
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'fndCYAsXazdzMUlEGMNIZw', token, {
+            ...ideaBody('AjdvjuECVZEgZoFajaIEkg', 'mine'),
             state: 'active',
         }));
     assert.equal(put.status, 201);
     const list = await handleRequest(
-        db, req('GET', '/organizations/1/ideas/', token));
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            , token));
     assert.equal(list.status, 200);
     const roster = await handleRequest(
-        db, req('GET', '/organizations/1/members/', token));
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , token));
     assert.equal(roster.status, 200);
 });
 
@@ -60,8 +65,8 @@ test('a member is denied the admin surfaces', async () => {
     // retired snapshot plane is gone, not probed.
     for (const [method, path] of [
         ['GET', '/identities/'],
-        ['PUT', '/organizations/1'],
-        ['PUT', '/ai-agents/agent-1'],
+        ['PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg'],
+        ['PUT', '/ai-agents/UuvoBhQJUSEsiJwscXPkUg'],
     ] as const) {
         const res = await handleRequest(db, req(
             method, path, token,
@@ -74,7 +79,7 @@ test('a member is denied the admin surfaces', async () => {
     // unauthenticated).
     const grant = await handleRequest(db, req(
         'PUT', '/role-grants/evil', token, {
-            organization_id: '1',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             identity_id: MEMBER, role: 'admin',
             action: 'granted', by_member_id: MEMBER,
             at: '2026-06-10T00:00:00.000000Z',
@@ -106,7 +111,7 @@ test('GET /identities/:id/tokens 403s for a member'
     const db = await memberDb();
     const token = await devToken(MEMBER);
     const res = await handleRequest(
-        db, req('GET', '/identities/current/tokens/', token));
+        db, req('GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/', token));
     assert.equal(res.status, 403);
 });
 
@@ -116,7 +121,8 @@ test('POST /identities/:id/tokens/:jti/rotation 409s for a'
     const token = await devToken(MEMBER);
     const res = await handleRequest(db, req(
         'POST',
-        '/identities/current/tokens/bogus-jti/rotation',
+        '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/WXubsOcLOMVSdMBzlNkAxQ/'
+            + 'rotation',
         token, {},
     ));
     assert.equal(res.status, 409);
@@ -127,7 +133,7 @@ test('POST /identity-tokens/:jti/rotation is retired'
     const db = await memberDb();
     const token = await devToken(MEMBER);
     const res = await handleRequest(db, req(
-        'POST', '/identity-tokens/bogus-jti/rotation',
+        'POST', '/identity-tokens/WXubsOcLOMVSdMBzlNkAxQ/rotation',
         token, {},
     ));
     assert.equal(res.status, 404);
@@ -139,7 +145,7 @@ test('member PUT identities/:id/token-revocations/:rid'
     const token = await devToken(MEMBER);
     const res = await handleRequest(db, req(
         'PUT',
-        '/identities/' + MEMBER + '/token-revocations/m-rev-1',
+        '/identities/' + MEMBER + '/token-revocations/lddMYodFzjKgtHPpQFmezw',
         token,
         { at: '2026-01-01T00:00:00.000000Z' },
     ));
@@ -152,7 +158,8 @@ test('member PUT identities/:id/token-revocations/:rid'
     const token = await devToken(MEMBER);
     const res = await handleRequest(db, req(
         'PUT',
-        '/identities/someone-else/token-revocations/m-rev-2',
+        '/identities/uTGrEpVpODbNhDhDVdWeqQ/token-revocations/'
+            + 'ljtoDNOaHCQRyXRGBBeAZA',
         token,
         { at: '2026-01-01T00:00:00.000000Z' },
     ));
@@ -165,7 +172,7 @@ test('GET identities/:id/token-revocations/:rid 403s for'
     const token = await devToken(MEMBER);
     const res = await handleRequest(db, req(
         'GET',
-        '/identities/' + MEMBER + '/token-revocations/r1',
+        '/identities/' + MEMBER + '/token-revocations/rOEPOcVMQdJiiiMuiiEhlg',
         token,
     ));
     assert.equal(res.status, 403);
@@ -176,7 +183,7 @@ test('GET /identity-token-revocations/:rid is retired'
     const db = await memberDb();
     const token = await devToken(MEMBER);
     const res = await handleRequest(db, req(
-        'GET', '/identity-token-revocations/r1', token,
+        'GET', '/identity-token-revocations/rOEPOcVMQdJiiiMuiiEhlg', token,
     ));
     assert.equal(res.status, 404);
 });
@@ -186,7 +193,7 @@ test('PUT /identity-token-revocations/:rid is retired'
     const db = await memberDb();
     const token = await devToken(MEMBER);
     const res = await handleRequest(db, req(
-        'PUT', '/identity-token-revocations/r1', token,
+        'PUT', '/identity-token-revocations/rOEPOcVMQdJiiiMuiiEhlg', token,
         { at: '2026-01-01T00:00:00.000000Z' },
     ));
     assert.equal(res.status, 404);

@@ -215,7 +215,7 @@ test('serial hasher never overlaps', async () => {
 test('formatSeededCredentials is terminal text', () => {
     const text = formatSeededCredentials({
         identities: [{
-            identityId: 'current',
+            identityId: 'XXZruirZyAOoRpNxaDnpSA',
             username: 'demo@example.com',
             password: 'secret-once',
         }],
@@ -230,14 +230,14 @@ test('formatTestPlanSliceCredentials is TSV',
     const text = formatTestPlanSliceCredentials([
         {
             section: 'AA',
-            organizationId: '1',
+            organizationId: 'AjdvjuECVZEgZoFajaIEkg',
             organizationName: 'Stark Industries',
             adminUsername: 'demo@example.com',
             adminPassword: 'secret-aa',
         },
         {
             section: 'B',
-            organizationId: 'b-org',
+            organizationId: 'VdXgVFTbikqjizucMNlnPA',
             organizationName: 'Stark Industries',
             adminUsername:
                 'b-admin@test-plan.example',
@@ -245,13 +245,13 @@ test('formatTestPlanSliceCredentials is TSV',
             seatUsername:
                 'b-member@test-plan.example',
             seatPassword: 'secret-b-seat',
-            flowId: 'b-flow',
+            flowId: 'UXOPfjdZZohCcyCLlQWnuQ',
         },
         {
             section: 'G',
-            organizationId: 'g-org',
+            organizationId: 'dsvIECNMaMqrLIswWbTVpg',
             organizationName: 'Stark Industries',
-            secondOrganizationId: 'g-org-2',
+            secondOrganizationId: 'WlkfISpndVJfICRnWksipQ',
             secondOrganizationName: 'Wayne Enterprises',
             adminUsername:
                 'g-admin@test-plan.example',
@@ -267,7 +267,7 @@ test('formatTestPlanSliceCredentials is TSV',
     assert.ok(text.includes(SEED_REVEAL_HEADER));
     assert.match(
         text,
-        /^AA\torg_id\t1$/m,
+        /^AA\torg_id\tAjdvjuECVZEgZoFajaIEkg$/m,
     );
     assert.match(
         text,
@@ -283,11 +283,11 @@ test('formatTestPlanSliceCredentials is TSV',
     );
     assert.match(
         text,
-        /^B\tflow_id\tb-flow$/m,
+        /^B\tflow_id\tUXOPfjdZZohCcyCLlQWnuQ$/m,
     );
     assert.match(
         text,
-        /^G\torg2_id\tg-org-2$/m,
+        /^G\torg2_id\tWlkfISpndVJfICRnWksipQ$/m,
     );
     assert.match(
         text,
@@ -490,7 +490,10 @@ async () => {
     assert.ok(
         printed.includes(SEED_REVEAL_HEADER),
     );
-    assert.match(printed, /^AA\torg_id\t1$/m);
+    assert.match(
+        printed,
+        /^AA\torg_id\tAjdvjuECVZEgZoFajaIEkg$/m,
+    );
     assert.match(
         printed,
         /^SV\tadmin_username\tsv-admin@test-plan.example$/m,

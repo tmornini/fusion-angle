@@ -19,6 +19,8 @@ import {
     getRecordAttributesByRecord,
 } from
 '../web-app/app/adapters/record-attributes.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Nested attributes via the flipped adapter (Task 21):
 // getRecordAttributesByRecord GETs the per-type collection;
@@ -69,17 +71,17 @@ test(
     + ' to the camelCase domain shape',
     async () => {
         const { ctx } = await seededCtx();
-        await seedTypeWithAttrs(ctx, 'rec-1', [
-            { id: 'a-1', name: 'A1', sort_order: 3 },
+        await seedTypeWithAttrs(ctx, 'rbfHGatkwQzGZJVXKJEeyw', [
+            { id: 'UQBiHFcwJeCDSnmkPBoYRA', name: 'A1', sort_order: 3 },
         ]);
         const [attr] = await
             getRecordAttributesByRecord(
-                ctx, 'rec-1',
+                ctx, 'rbfHGatkwQzGZJVXKJEeyw',
             );
         assert.deepEqual(attr, {
-            id: 'a-1',
-            organizationId: '1',
-            recordId: 'rec-1',
+            id: 'UQBiHFcwJeCDSnmkPBoYRA',
+            organizationId: 'AjdvjuECVZEgZoFajaIEkg',
+            recordId: 'rbfHGatkwQzGZJVXKJEeyw',
             name: 'A1',
             attributeType: 'text',
             sortOrder: 3,
@@ -96,19 +98,22 @@ test(
     + ' attributes for the given recordId',
     async () => {
         const { ctx } = await seededCtx();
-        await seedTypeWithAttrs(ctx, 'rec-1', [
-            { id: 'a-1', name: 'A1', sort_order: 1 },
-            { id: 'a-2', name: 'A2', sort_order: 2 },
+        const a2 = generateIdentifier();
+        await seedTypeWithAttrs(ctx, 'rbfHGatkwQzGZJVXKJEeyw', [
+            { id: 'UQBiHFcwJeCDSnmkPBoYRA', name: 'A1', sort_order: 1 },
+            { id: a2, name: 'A2', sort_order: 2 },
         ]);
-        await seedTypeWithAttrs(ctx, 'rec-2', [
-            { id: 'b-1', name: 'B1', sort_order: 1 },
+        await seedTypeWithAttrs(ctx, 'rcaSzEaORBkezCxyhLhecA', [
+            { id: generateIdentifier(), name: 'B1', sort_order: 1 },
         ]);
-        const rec1 = await
+        const sRqRSyldQDFbqkDYSObDqw = await
             getRecordAttributesByRecord(
-                ctx, 'rec-1',
+                ctx, 'rbfHGatkwQzGZJVXKJEeyw',
             );
-        const ids = rec1.map(a => a.id).sort();
-        assert.deepEqual(ids, ['a-1', 'a-2']);
+        const ids = sRqRSyldQDFbqkDYSObDqw.map(a => a.id).sort();
+        assert.deepEqual(
+            ids, ['UQBiHFcwJeCDSnmkPBoYRA', a2].sort(),
+        );
     },
 );
 
@@ -117,27 +122,30 @@ test(
     + ' sortOrder ascending',
     async () => {
         const { ctx } = await seededCtx();
-        await seedTypeWithAttrs(ctx, 'rec-1', [
+        const midId = generateIdentifier();
+        const firstId = generateIdentifier();
+        const lastId = generateIdentifier();
+        await seedTypeWithAttrs(ctx, 'rbfHGatkwQzGZJVXKJEeyw', [
             {
-                id: 'a-mid', name: 'middle',
+                id: midId, name: 'middle',
                 sort_order: 5,
             },
             {
-                id: 'a-first', name: 'first',
+                id: firstId, name: 'first',
                 sort_order: 1,
             },
             {
-                id: 'a-last', name: 'last',
+                id: lastId, name: 'last',
                 sort_order: 10,
             },
         ]);
         const rows = await
             getRecordAttributesByRecord(
-                ctx, 'rec-1',
+                ctx, 'rbfHGatkwQzGZJVXKJEeyw',
             );
         assert.deepEqual(
             rows.map(r => r.id),
-            ['a-first', 'a-mid', 'a-last'],
+            [firstId, midId, lastId],
         );
     },
 );

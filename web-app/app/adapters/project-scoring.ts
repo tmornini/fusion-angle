@@ -33,8 +33,8 @@ import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 
 const projectScoreChanges =
     createSubscriptionChannel();
@@ -439,7 +439,7 @@ export async function postProjectBaselineScoring(
         ctx.PUT(
             organizationItem(ctx, 'projects', projectId)
             + '/objective-baseline-scores/'
-            + generateCryptoSafeBase62(),
+            + generateIdentifier(),
             {
                 project_id: projectId,
                 objective_id: s.objectiveId,
@@ -466,7 +466,7 @@ export async function postProjectActualMeasurement(
         ctx.PUT(
             organizationItem(ctx, 'projects', projectId)
             + '/objective-actual-scores/'
-            + generateCryptoSafeBase62(),
+            + generateIdentifier(),
             {
                 project_id: projectId,
                 objective_id: s.objectiveId,

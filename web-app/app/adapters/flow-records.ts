@@ -21,8 +21,8 @@ import {
 } from './work-orders-queries.ts';
 import { getFlowEntities } from './flows.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 import { nowUtc } from '../../../api/types.ts';
 
 export type {
@@ -106,7 +106,7 @@ export async function postFlowRecordBinding(
 ): Promise<void> {
     await putFlowRecord(
         ctx,
-        generateCryptoSafeBase62(),
+        generateIdentifier(),
         {
             flow_id: flowId,
             record_id: recordId,

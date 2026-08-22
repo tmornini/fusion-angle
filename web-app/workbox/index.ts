@@ -30,7 +30,7 @@ import {
     postWorkOrderCreation,
     putWorkOrder,
     sessionContext,
-    generateCryptoSafeBase62,
+    generateIdentifier,
     subscribeWorkOrderChanges,
     type NotReadyFlowEntry,
     type RequestContext,
@@ -381,9 +381,9 @@ async function createWorkOrderForFlow(
     ctx: RequestContext,
 ): Promise<void> {
     const workOrderId =
-        generateCryptoSafeBase62();
+        generateIdentifier();
     const flowLinkId =
-        generateCryptoSafeBase62();
+        generateIdentifier();
     try {
         await postWorkOrderCreation(ctx, {
             workOrderId,

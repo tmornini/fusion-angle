@@ -172,19 +172,19 @@ test(
         const r0 = fitBoxToCanvas(
             box, CANVAS_W, CANVAS_H, 0,
         );
-        const r1 = fitBoxToCanvas(
+        const rOEPOcVMQdJiiiMuiiEhlg = fitBoxToCanvas(
             box, CANVAS_W, CANVAS_H, PANEL,
         );
         assert.ok(r0);
-        assert.ok(r1);
+        assert.ok(rOEPOcVMQdJiiiMuiiEhlg);
         const cx =
             ((-100) + (100 + NODE_WIDTH)) / 2;
         const pixelX0 =
             (cx - r0.viewBox.x)
                 * CANVAS_W / r0.viewBox.w;
         const pixelX1 =
-            (cx - r1.viewBox.x)
-                * CANVAS_W / r1.viewBox.w;
+            (cx - rOEPOcVMQdJiiiMuiiEhlg.viewBox.x)
+                * CANVAS_W / rOEPOcVMQdJiiiMuiiEhlg.viewBox.w;
         assert.ok(
             Math.abs(pixelX0 - CANVAS_W / 2)
                 < 0.5,

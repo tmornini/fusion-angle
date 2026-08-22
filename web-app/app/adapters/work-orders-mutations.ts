@@ -37,8 +37,8 @@ import {
     formatFlowProblem,
 } from './flow-publish.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 import { sha256Bytes } from '../../../shared/digest.ts';
 import {
     nextPosition,
@@ -188,9 +188,9 @@ export async function postWorkOrderCreation(
             at: now,
         },
         stateEventIds: [
-            generateCryptoSafeBase62(),
-            generateCryptoSafeBase62(),
-            generateCryptoSafeBase62(),
+            generateIdentifier(),
+            generateIdentifier(),
+            generateIdentifier(),
         ],
         // Three separate nowUtc() calls — strictly monotonic,
         // so [0] < [1] < [2] is guaranteed; latest-wins on
@@ -350,7 +350,7 @@ export async function postWorkOrderTransition(
     // Mint the transition event id client-side so a
     // retry hits the same row under message_hash.
     const transitionEventId =
-        generateCryptoSafeBase62();
+        generateIdentifier();
 
     // If a live claim exists for the work order, the
     // transition implicitly releases it — carry a
@@ -374,7 +374,7 @@ export async function postWorkOrderTransition(
     const transitionAt = nowUtc();
     const release = hasLiveClaim
         ? {
-            id: generateCryptoSafeBase62(),
+            id: generateIdentifier(),
             state: 'claim_released',
             at: nowUtc(),
         }
@@ -491,9 +491,9 @@ export async function putWorkOrderClaim(
         organizationItem(
             ctx, 'work-orders', workOrderId,
         ) + '/claim', {
-            claimEventId: generateCryptoSafeBase62(),
+            claimEventId: generateIdentifier(),
             claimAt,
-            expireEventId: generateCryptoSafeBase62(),
+            expireEventId: generateIdentifier(),
             expireAt,
             expires_at: expiresAt,
         },

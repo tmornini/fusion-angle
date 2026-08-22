@@ -31,7 +31,7 @@ import {
     getBackupFromZip,
     computeFlowBackupResolution,
     postFlowFromBackup,
-    generateCryptoSafeBase62,
+    generateIdentifier,
     subscribeFlowChanges,
 } from '../app/adapters/index.ts';
 import type {
@@ -369,7 +369,7 @@ async function handleFileSelect(
         flowId: string;
         warnings: string[];
     };
-    const uuid = generateCryptoSafeBase62();
+    const uuid = generateIdentifier();
     if (ext === 'zip') {
         const bytes = new Uint8Array(
             await file.arrayBuffer(),
@@ -599,7 +599,7 @@ async function handleCreateNew(
     try {
         flowId = await postFlowFromBackup(
             sessionContext(),
-            generateCryptoSafeBase62(),
+            generateIdentifier(),
             stRe.backup, projectId,
         );
     } catch (err) {
@@ -635,7 +635,7 @@ async function handleCreate(
     try {
         flowId = await postFlowFromBackup(
             sessionContext(),
-            generateCryptoSafeBase62(),
+            generateIdentifier(),
             stNw.backup, projectId,
         );
     } catch (err) {

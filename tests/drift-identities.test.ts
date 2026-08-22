@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import assert from 'node:assert/strict';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -47,6 +49,8 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+
+const INV_A = generateIdentifier();
 
 // Phase Final Task 2: identity spine dual-write stripped.
 // This file no longer compares derive vs old-table oracles —
@@ -126,7 +130,7 @@ function humanCreateBody(id: string): Record<string, unknown> {
             team_dimensions: {},
         },
         initialState: 'active',
-        initialStateEventId: id + '-genesis',
+        initialStateEventId: generateIdentifier(),
         initialStateAt: nowUtc(),
     };
 }
@@ -165,7 +169,7 @@ const IDENTITIES_TEST_WIRING: DocumentFamilyWiring = {
 // (document-family.ts) merely demands a defined value to dispatch
 // through — the drift-roster.test.ts GLOBAL_PLANE_PLACEHOLDER
 // precedent.
-const READER_ACTOR: Id = 'drift-reader';
+const READER_ACTOR: Id = generateIdentifier();
 const GLOBAL_PLANE_PLACEHOLDER: Id = STARK_ORGANIZATION;
 
 async function derivedIdentities(
@@ -292,7 +296,7 @@ test('identities collection wire equals derive (12 incl.'
     );
     assert.equal(derived.length, 12);
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const res = await handleRequest(
         db, req('GET', '/identities/', token),
@@ -313,7 +317,7 @@ test('identities collection wire equals derive (12 incl.'
         assert.deepEqual(await leaf.json(), one);
     }
 
-    const missingId = 'no-such-identity';
+    const missingId = generateIdentifier();
     const expectedMessage = 'Not found: identities/' + missingId;
     await assert.rejects(
         () => derivedIdentity(
@@ -360,7 +364,7 @@ test('identity-pii derive (11 seeded slots) fenced both'
         const derived = await deriveIdentityPii(db, row.id);
         assert.deepEqual(derived, row);
     }
-    const missingId = 'no-such-pii';
+    const missingId = generateIdentifier();
     const expectedMessage = 'Not found: identity_pii/' + missingId;
     await assert.rejects(
         () => deriveIdentityPii(db, missingId),
@@ -371,13 +375,15 @@ test('identity-pii derive (11 seeded slots) fenced both'
 
     // -- THE THREE-WAY FENCE LEGS (gate 15) --
     const adminToken = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
 
-    // co-member leg: 'current' is a Stark member (seeded) with a
+    // co-member leg: 'XXZruirZyAOoRpNxaDnpSA' is a Stark member (seeded) with
+    // a
     // seeded pii row — visible from STARK on both planes.
     assert.equal(
-        await assertPiiFenceLeg(db, STARK_ORGANIZATION, 'current'),
+        await assertPiiFenceLeg(db, STARK_ORGANIZATION
+            , 'XXZruirZyAOoRpNxaDnpSA'),
         true,
     );
 
@@ -386,7 +392,7 @@ test('identity-pii derive (11 seeded slots) fenced both'
     // must be HIDDEN from STARK (an org-scoped memberships store
     // would instead read as orphan — the leak this fence closes)
     // and VISIBLE from ORGANIZATION_TWO.
-    const foreignId = 'pii-fence-foreign-1';
+    const foreignId = generateIdentifier();
     await handleRequest(db, req(
         'POST', '/identities/', adminToken,
         { id: foreignId, kind: 'person' },
@@ -402,7 +408,7 @@ test('identity-pii derive (11 seeded slots) fenced both'
         'PUT',
         '/organizations/' + ORGANIZATION_TWO
             + '/members/' + foreignId,
-        await organizationToken('current', ORGANIZATION_TWO),
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO),
         { type: 'member', at: nowUtc() },
     ));
     assert.equal(
@@ -420,7 +426,7 @@ test('identity-pii derive (11 seeded slots) fenced both'
 
     // orphan leg: a fresh identity with NO membership anywhere —
     // visible from STARK (and would be from any org).
-    const orphanId = 'pii-fence-orphan-1';
+    const orphanId = generateIdentifier();
     await handleRequest(db, req(
         'POST', '/identities/', adminToken,
         { id: orphanId, kind: 'person' },
@@ -498,7 +504,7 @@ test('credentials per identity + per cid (12 seeded) + the'
     assert.equal(allDerived.length, 12);
 
     const someIdentityId = allDerived[0]!.identity_id;
-    const missingCid = 'no-such-credential';
+    const missingCid = generateIdentifier();
     const expectedMessage =
         'Not found: identity_credentials/' + missingCid;
     await assert.rejects(
@@ -524,10 +530,10 @@ test('credentials fence-input fix: a mismatched write (address'
 + ' of org; the secret never rides either plane', async () => {
     const db = await seededDb();
     const adminToken = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
-    const identityA = 'cred-mismatch-a';
-    const identityB = 'cred-mismatch-b';
+    const identityA = generateIdentifier();
+    const identityB = generateIdentifier();
     for (const id of [identityA, identityB]) {
         await handleRequest(db, req(
             'POST', '/identities/', adminToken,
@@ -548,14 +554,14 @@ test('credentials fence-input fix: a mismatched write (address'
         'PUT',
         '/organizations/' + ORGANIZATION_TWO
             + '/members/' + identityB,
-        await organizationToken('current', ORGANIZATION_TWO),
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO),
         { type: 'member', at: nowUtc() },
     ));
 
     // The mismatched write itself — address under A, body names
     // B — producible only below-facade (no validator ties the
     // path to the body; no live write path can construct this).
-    const cid = 'cred-mismatch-1';
+    const cid = generateIdentifier();
     await seedIdentityCredential(db, identityA, cid, {
         identity_id: identityB, kind: 'password',
         status: 'set', secret: 'mismatch-secret', at: nowUtc(),
@@ -630,7 +636,7 @@ test('invitations enrichment parity: the personName/'
 + ' exception', async () => {
     const db = await seededDb();
     const adminToken = await organizationToken();
-    const eraseeId = 'enrichment-erasee-1';
+    const eraseeId = generateIdentifier();
     await handleRequest(db, req(
         'POST', '/human-members', adminToken,
         humanCreateBody(eraseeId),
@@ -647,7 +653,7 @@ test('invitations enrichment parity: the personName/'
     ));
 
     const invitations = [
-        { id: 'inv-a', identity_id: 'current' },
+        { id: INV_A, identity_id: 'XXZruirZyAOoRpNxaDnpSA' },
         { id: 'inv-b', identity_id: eraseeId },
     ] as const;
 
@@ -694,10 +700,10 @@ test('invitations enrichment parity: the personName/'
     );
     // The present identity's key IS carried.
     assert.notDeepEqual(
-        enrichedByName(derivedRows)[0], { id: 'inv-a' },
+        enrichedByName(derivedRows)[0], { id: INV_A },
     );
     assert.notDeepEqual(
-        enrichedByEmail(derivedRows)[0], { id: 'inv-a' },
+        enrichedByEmail(derivedRows)[0], { id: INV_A },
     );
 });
 

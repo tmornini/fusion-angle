@@ -1,4 +1,6 @@
 import { test, afterEach } from 'node:test';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import assert from 'node:assert/strict';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -55,6 +57,53 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 
+const DRIFT_STATES_FENCE_OWN_IDEA = generateIdentifier();
+const DRIFT_STATES_FENCE_FOREIGN_IDEA = generateIdentifier();
+const DRIFT_STATES_FENCE_FOREIGN_DEL_EV = generateIdentifier();
+const DRIFT_STATES_WO_CHAIN_1 = generateIdentifier();
+const DRIFT_STATES_WO_CHAIN_FLOW_PLACEHOLDER = generateIdentifier();
+const N_START = generateIdentifier();
+const N_MIDDLE = generateIdentifier();
+const N_FINISH = generateIdentifier();
+const DRIFT_STATES_WO_HYBRID_1 = generateIdentifier();
+const DRIFT_STATES_HYBRID = generateIdentifier();
+const DRIFT_STATES_WO_STANDALONE_RELEASE_1 = generateIdentifier();
+const DRIFT_STATES_WO_STANDALONE_RELEASE_FLOW = generateIdentifier();
+const DRIFT_STATES_FLOW_NODE_1 = generateIdentifier();
+const DRIFT_STATES_PROJ_1 = generateIdentifier();
+const DRIFT_STATES_INV_ACCEPT_GRANT = generateIdentifier();
+const DRIFT_STATES_INV_ACCEPT_MS = generateIdentifier();
+const DRIFT_STATES_INV_ACCEPT_ACCEPT = generateIdentifier();
+const DRIFT_STATES_INV_DECLINE_GRANT = generateIdentifier();
+const DRIFT_STATES_INV_DECLINE_DECLINE = generateIdentifier();
+const DRIFT_STATES_INV_REVOKE_REVOKE = generateIdentifier();
+const DRIFT_STATES_IDEA_CHAIN_1 = generateIdentifier();
+const DRIFT_STATES_AI_CHAIN_1 = generateIdentifier();
+const DRIFT_STATES_RECORD_SKEW_1 = generateIdentifier();
+const DRIFT_STATES_TOMBSTONE_FOREIGN_IDEA = generateIdentifier();
+const DRIFT_STATES_TOMBSTONE_INJECTED_EV = generateIdentifier();
+const OWNIDEAID_GENESIS = generateIdentifier();
+const FOREIGNIDEAID_GENESIS = generateIdentifier();
+const WORKORDERID_FWO = generateIdentifier();
+const WORKORDERID_EV1 = generateIdentifier();
+const WORKORDERID_EV2 = generateIdentifier();
+const WORKORDERID_EV3 = generateIdentifier();
+const WORKORDERID_TE1 = generateIdentifier();
+const WORKORDERID_TE2 = generateIdentifier();
+const WORKORDERID_REL1 = generateIdentifier();
+const WORKORDERID_CE1 = generateIdentifier();
+const WORKORDERID_EE1 = generateIdentifier();
+const WORKORDERID_CE2 = generateIdentifier();
+const WORKORDERID_EE2 = generateIdentifier();
+const WORKORDERID_CE3 = generateIdentifier();
+const WORKORDERID_EE3 = generateIdentifier();
+const WORKORDERID_GENESIS = generateIdentifier();
+const FLOWID_DELETE_SAVE = generateIdentifier();
+const FLOWID_NODE_DELETED = generateIdentifier();
+const FLOWID_UNDO_EV = generateIdentifier();
+const IDEAID_GENESIS = generateIdentifier();
+const IDEAID_TRANSITION = generateIdentifier();
+
 // The E10 drift check (Phase 11 Task 6): the per-family parity
 // proof comparing OLD-plane states reads to the message-derived
 // output (api/derive-states.ts), over the FULL seeded dataset
@@ -80,7 +129,7 @@ const AT = '2026-01-01T00:00:00.000000Z';
 // Strictly later than AT: at an EQUAL `at`, latestByKey's
 // (at, id) tiebreak falls to the larger event id, and
 // 'drift-states-fence-foreign-idea-genesis' sorts after
-// 'drift-states-fence-foreign-del-ev' — an equal-`at` delete
+// DRIFT_STATES_FENCE_FOREIGN_DEL_EV — an equal-`at` delete
 // would lose the tiebreak and the foreign idea would never
 // genuinely read as deleted (case 3's deleted-entity leg).
 const LATER = '2026-06-01T00:00:00.000000Z';
@@ -227,10 +276,13 @@ async function headResponseId(
     db: MemoryDbAdapter, token: string, flowId: string,
 ): Promise<string> {
     const got = await handleRequest(
-        db, req('GET', '/organizations/1/flows/' + flowId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + flowId, token),
     );
     const id = got.headers.get('Response-ID');
-    assert.ok(id, 'no Response-ID on GET /organizations/1/flows/' + flowId);
+    assert.ok(id
+        , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+        + '' + flowId);
     return id!;
 }
 
@@ -285,7 +337,7 @@ async () => {
         STARK_ORGANIZATION, ORGANIZATION_TWO,
     ]) {
         const token = await organizationToken(
-            'current', organization,
+            'XXZruirZyAOoRpNxaDnpSA', organization,
         );
         const woBulk = await handleRequest(db, req(
             'GET',
@@ -293,7 +345,9 @@ async () => {
                 + '/work-orders/history',
             token,
         ));
-        assert.equal(woBulk.status, 404);
+        // Retired bulk door matches work-orders/:id with
+        // id "history" — identifier gate 400s, never 200.
+        assert.equal(woBulk.status, 400);
 
         const objBulk = await handleRequest(db, req(
             'GET',
@@ -301,7 +355,7 @@ async () => {
                 + '/objectives/versions',
             token,
         ));
-        assert.equal(objBulk.status, 404);
+        assert.equal(objBulk.status, 400);
 
         const woList = await handleRequest(db, req(
             'GET',
@@ -424,7 +478,7 @@ test('case 2: GET <family>/:id/history parity — one entity'
         // full JSON equality with the bare derive.
         const expected = derived.toReversed();
         const token = await organizationToken(
-            'current', STARK_ORGANIZATION,
+            'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
         );
         const suffix = family === 'work-order'
             ? '/history'
@@ -523,25 +577,26 @@ test('case 3: the fence\'s legs — own-org history visible,'
 async () => {
     const db = await seededDb();
     const tokenStark = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const tokenOrg2 = await organizationToken(
-        'current', ORGANIZATION_TWO,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
 
-    const ownIdeaId = 'drift-states-fence-own-idea';
+    const ownIdeaId = DRIFT_STATES_FENCE_OWN_IDEA;
     await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/' + ownIdeaId, tokenStark,
-        ideaDocument('Own', ownIdeaId + '-genesis', AT),
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ownIdeaId
+            , tokenStark,
+        ideaDocument('Own', OWNIDEAID_GENESIS, AT),
     ));
 
-    const foreignIdeaId = 'drift-states-fence-foreign-idea';
+    const foreignIdeaId = DRIFT_STATES_FENCE_FOREIGN_IDEA;
     const foreignCreated = await handleRequest(db, req(
         'PUT',
         '/organizations/' + ORGANIZATION_TWO
             + '/ideas/' + foreignIdeaId,
         tokenOrg2,
-        ideaDocument('Foreign', foreignIdeaId + '-genesis', AT),
+        ideaDocument('Foreign', FOREIGNIDEAID_GENESIS, AT),
     ));
     assert.equal(foreignCreated.status, 201);
 
@@ -555,7 +610,7 @@ async () => {
         tokenOrg2,
         ideaDocument(
             'Foreign',
-            'drift-states-fence-foreign-del-ev',
+            DRIFT_STATES_FENCE_FOREIGN_DEL_EV,
             LATER,
             'deleted',
         ),
@@ -564,7 +619,7 @@ async () => {
 
     // Own history 200 with genesis.
     const ownRes = await handleRequest(db, req(
-        'GET', '/organizations/1/ideas/' + ownIdeaId +
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ownIdeaId +
             '/versions/', tokenStark,
     ));
     assert.equal(ownRes.status, 200);
@@ -577,7 +632,8 @@ async () => {
     // after tombstone.
     const foreignRes = await handleRequest(db, req(
         'GET',
-        '/organizations/1/ideas/' + foreignIdeaId + '/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + foreignIdeaId
+            + '/versions/',
         tokenStark,
     ));
     assert.equal(foreignRes.status, 404);
@@ -648,27 +704,27 @@ test('case 4b: work-order live-write chain — birth-claimed'
 + ' — re-compared on both planes at every step', async () => {
     const db = await seededDb();
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
-    const workOrderId = 'drift-states-wo-chain-1';
-    const flowWorkOrderId = workOrderId + '-fwo';
-    const flowId = 'drift-states-wo-chain-flow-placeholder';
+    const workOrderId = DRIFT_STATES_WO_CHAIN_1;
+    const flowWorkOrderId = WORKORDERID_FWO;
+    const flowId = DRIFT_STATES_WO_CHAIN_FLOW_PLACEHOLDER;
     const bigLockTimeoutSeconds = 8 * 60 * 60;
     const tinyLockTimeoutSeconds = 1;
 
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/', token,
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
         createWorkOrderBody(
             workOrderId, flowWorkOrderId, flowId,
             workOrderFlowGraph(bigLockTimeoutSeconds),
             {
                 ids: [
-                    workOrderId + '-ev1',
-                    workOrderId + '-ev2',
-                    workOrderId + '-ev3',
+                    WORKORDERID_EV1,
+                    WORKORDERID_EV2,
+                    WORKORDERID_EV3,
                 ],
                 ats: [nowUtc(), nowUtc(), nowUtc()],
-                states: ['n-start', 'n-middle', 'claimed'],
+                states: [N_START, N_MIDDLE, 'claimed'],
             },
             nowUtc(),
         ),
@@ -677,10 +733,11 @@ test('case 4b: work-order live-write chain — birth-claimed'
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     const transition1 = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/' + workOrderId + '/transition',
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId + '/transition',
         token, {
-            transitionEventId: workOrderId + '-te1',
-            targetState: 'n-middle',
+            transitionEventId: WORKORDERID_TE1,
+            targetState: N_MIDDLE,
             release: null,
             transitionAt: nowUtc(),
         },
@@ -691,12 +748,13 @@ test('case 4b: work-order live-write chain — birth-claimed'
     const transition2At = nowUtc();
     const releaseAt = nowUtc();
     const transition2 = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/' + workOrderId + '/transition',
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId + '/transition',
         token, {
-            transitionEventId: workOrderId + '-te2',
-            targetState: 'n-finish',
+            transitionEventId: WORKORDERID_TE2,
+            targetState: N_FINISH,
             release: {
-                id: workOrderId + '-rel1',
+                id: WORKORDERID_REL1,
                 state: 'claim_released',
                 at: releaseAt,
             },
@@ -711,7 +769,8 @@ test('case 4b: work-order live-write chain — birth-claimed'
     // FRESH from the document head as of its own moment, never a
     // single cached value.
     const entityPut = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + workOrderId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId, token, {
             display_id: 'drift-states-' + workOrderId,
             flow_graph: workOrderFlowGraph(tinyLockTimeoutSeconds),
             position: 2,
@@ -722,11 +781,12 @@ test('case 4b: work-order live-write chain — birth-claimed'
 
     const freshClaimAt = nowUtc();
     const freshClaim = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + workOrderId +
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId +
             '/claim', token, {
-            claimEventId: workOrderId + '-ce1',
+            claimEventId: WORKORDERID_CE1,
             claimAt: freshClaimAt,
-            expireEventId: workOrderId + '-ee1',
+            expireEventId: WORKORDERID_EE1,
             expireAt: freshClaimAt,
         },
     ));
@@ -742,11 +802,12 @@ test('case 4b: work-order live-write chain — birth-claimed'
     ).length;
     const repeatClaimAt = nowUtc();
     const repeatClaim = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + workOrderId +
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId +
             '/claim', token, {
-            claimEventId: workOrderId + '-ce2',
+            claimEventId: WORKORDERID_CE2,
             claimAt: repeatClaimAt,
-            expireEventId: workOrderId + '-ee2',
+            expireEventId: WORKORDERID_EE2,
             expireAt: repeatClaimAt,
         },
     ));
@@ -767,11 +828,12 @@ test('case 4b: work-order live-write chain — birth-claimed'
     const takeoverExpireAt = nowUtc();
     const takeoverClaimAt = nowUtc();
     const takeover = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + workOrderId +
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId +
             '/claim', token, {
-            claimEventId: workOrderId + '-ce3',
+            claimEventId: WORKORDERID_CE3,
             claimAt: takeoverClaimAt,
-            expireEventId: workOrderId + '-ee3',
+            expireEventId: WORKORDERID_EE3,
             expireAt: takeoverExpireAt,
         },
     ));
@@ -794,13 +856,14 @@ test('case 4c: HYBRID — a seeded-shape work order (a bare'
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
-    const workOrderId = 'drift-states-wo-hybrid-1';
+    const workOrderId = DRIFT_STATES_WO_HYBRID_1;
 
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + workOrderId, token, {
-            display_id: 'drift-states-hybrid',
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId, token, {
+            display_id: DRIFT_STATES_HYBRID,
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
             position: 1,
         },
@@ -809,10 +872,11 @@ async () => {
 
     const genesis = await handleRequest(db, req(
         'POST',
-        '/organizations/1/work-orders/' + workOrderId + '/transition',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
+            + '/transition',
         token, {
-            transitionEventId: workOrderId + '-genesis',
-            targetState: 'n-start',
+            transitionEventId: WORKORDERID_GENESIS,
+            targetState: N_START,
             release: null,
             transitionAt: AT,
         },
@@ -821,11 +885,12 @@ async () => {
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + workOrderId +
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId +
             '/claim', token, {
-            claimEventId: workOrderId + '-ce1',
+            claimEventId: WORKORDERID_CE1,
             claimAt,
-            expireEventId: workOrderId + '-ee1',
+            expireEventId: WORKORDERID_EE1,
             expireAt: claimAt,
         },
     ));
@@ -837,7 +902,7 @@ async () => {
     assert.equal(derived.length, 2);
     assert.deepEqual(
         derived.map((row) => row.id),
-        [workOrderId + '-genesis', workOrderId + '-ce1'],
+        [WORKORDERID_GENESIS, WORKORDERID_CE1],
     );
 });
 
@@ -852,11 +917,11 @@ test('case 4d: claim, release via POST organizations/:id/work-orders/:id/'
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
-    const workOrderId = 'drift-states-wo-standalone-release-1';
-    const flowWorkOrderId = workOrderId + '-fwo';
-    const flowId = 'drift-states-wo-standalone-release-flow';
+    const workOrderId = DRIFT_STATES_WO_STANDALONE_RELEASE_1;
+    const flowWorkOrderId = WORKORDERID_FWO;
+    const flowId = DRIFT_STATES_WO_STANDALONE_RELEASE_FLOW;
     // A large lock_timeout: if the replay wrongly fell back to
     // the ORIGINAL claim as "prior" (never seeing the named
     // release), that claim would read as still LIVE at the
@@ -866,18 +931,18 @@ async () => {
     const bigLockTimeoutSeconds = 8 * 60 * 60;
 
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/work-orders/', token,
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
         createWorkOrderBody(
             workOrderId, flowWorkOrderId, flowId,
             workOrderFlowGraph(bigLockTimeoutSeconds),
             {
                 ids: [
-                    workOrderId + '-ev1',
-                    workOrderId + '-ev2',
-                    workOrderId + '-ev3',
+                    WORKORDERID_EV1,
+                    WORKORDERID_EV2,
+                    WORKORDERID_EV3,
                 ],
                 ats: [nowUtc(), nowUtc(), nowUtc()],
-                states: ['n-start', 'n-middle', 'n-finish'],
+                states: [N_START, N_MIDDLE, N_FINISH],
             },
             nowUtc(),
         ),
@@ -887,11 +952,12 @@ async () => {
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + workOrderId +
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId +
             '/claim', token, {
-            claimEventId: workOrderId + '-ce1',
+            claimEventId: WORKORDERID_CE1,
             claimAt,
-            expireEventId: workOrderId + '-ee1',
+            expireEventId: WORKORDERID_EE1,
             expireAt: claimAt,
         },
     ));
@@ -901,7 +967,8 @@ async () => {
     // The named release: DELETE organizations/:id/work-orders/:id/claim.
     const released = await handleRequest(db, req(
         'DELETE',
-        '/organizations/1/work-orders/' + workOrderId + '/claim',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
+            + '/claim',
         token,
     ));
     assert.equal(released.status, 204);
@@ -911,7 +978,7 @@ async () => {
     assert.deepEqual(
         afterRelease.map((row) => row.state),
         [
-            'n-start', 'n-middle', 'n-finish',
+            N_START, N_MIDDLE, N_FINISH,
             'claimed', 'claim_released',
         ],
     );
@@ -923,11 +990,12 @@ async () => {
     // claim-vocabulary event).
     const reclaimAt = nowUtc();
     const reclaimed = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/' + workOrderId +
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId +
             '/claim', token, {
-            claimEventId: workOrderId + '-ce2',
+            claimEventId: WORKORDERID_CE2,
             claimAt: reclaimAt,
-            expireEventId: workOrderId + '-ee2',
+            expireEventId: WORKORDERID_EE2,
             expireAt: reclaimAt,
         },
     ));
@@ -945,7 +1013,7 @@ async () => {
     assert.deepEqual(
         derived.map((row) => row.state),
         [
-            'n-start', 'n-middle', 'n-finish',
+            N_START, N_MIDDLE, N_FINISH,
             'claimed', 'claim_released', 'claimed',
         ],
     );
@@ -961,23 +1029,23 @@ test('case 5a: a LIVE flow-node delete + undo — the'
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
-    const flowId = 'drift-states-flow-node-1';
-    const nodeId = 'drift-states-node-1';
+    const flowId = DRIFT_STATES_FLOW_NODE_1;
+    const nodeId = generateIdentifier();
     const genesisAt = '2026-02-01T00:00:00.000000Z';
 
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token, {
             id: flowId,
             flow: flowFields('Drift Node Flow'),
-            projectFlowId: flowId + '-pf',
+            projectFlowId: generateIdentifier(),
             projectFlow: {
-                project_id: 'drift-states-proj-1',
+                project_id: DRIFT_STATES_PROJ_1,
                 flow_id: flowId, at: genesisAt,
             },
             initialState: 'active',
-            initialStateEventId: flowId + '-ev',
+            initialStateEventId: generateIdentifier(),
             initialStateAt: genesisAt,
             graphDelta: {
                 nodes: [nodeRowBody(nodeId, flowId, genesisAt)],
@@ -991,15 +1059,16 @@ async () => {
     const headId = await headResponseId(db, token, flowId);
     const deleteAt = '2026-02-02T00:00:00.000000Z';
     const deleted = await handleRequest(db, req(
-        'PUT', '/organizations/1/flows/' + flowId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
+            , token, {
             ...flowFields('Drift Node Flow Trimmed'),
             state: 'updated', state_at: deleteAt,
-            state_event_id: flowId + '-delete-save',
+            state_event_id: FLOWID_DELETE_SAVE,
             graph: emptyGraph(),
             graphDelta: {
                 ...emptyDelta(),
                 deletions: [{
-                    eventId: flowId + '-node-deleted',
+                    eventId: FLOWID_NODE_DELETED,
                     entityId: nodeId, at: deleteAt,
                 }],
             },
@@ -1007,7 +1076,8 @@ async () => {
         },
         { 'if-match': (
             await handleRequest(
-                db, req('GET', '/organizations/1/flows/' + flowId, token),
+                db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + '' + flowId, token),
             )
         ).headers.get('ETag')! },
     ));
@@ -1015,15 +1085,16 @@ async () => {
 
     const undoAt = '2026-02-03T00:00:00.000000Z';
     const undone = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/' + flowId + '/undo', token, {
-            eventId: flowId + '-undo-ev',
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
+            + '/undo', token, {
+            eventId: FLOWID_UNDO_EV,
             at: undoAt,
         },
     ));
     assert.equal(undone.status, 201);
 
     const prefix = canonicalUriCollection(
-        STARK_ORGANIZATION, '/organizations/1/flows/',
+        STARK_ORGANIZATION, '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',
     );
     const [requests, responses] = await Promise.all([
         db.pairs.getAllWhere('uri_collection', prefix),
@@ -1083,15 +1154,15 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
 + ' — the seed has NONE) — each deepEquals the old plane', async () => {
     const db = await seededDb();
     const adminToken = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
 
     await person(
-        db, 'drift-states-invitee-accept', 'Accept Invitee',
+        db, 'YeQnyZJddPctAdaMBVWEew', 'Accept Invitee',
         'drift-states-invitee-accept@x.com',
     );
     const acceptInviteeToken = await organizationToken(
-        'drift-states-invitee-accept', STARK_ORGANIZATION,
+        'YeQnyZJddPctAdaMBVWEew', STARK_ORGANIZATION,
     );
     const acceptGrant = await handleRequest(db, req(
         'POST',
@@ -1099,26 +1170,26 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             + '/invitations/',
         adminToken, {
             email: 'drift-states-invitee-accept@x.com',
-            invitationId: 'drift-states-inv-accept',
-            grantEventId: 'drift-states-inv-accept-grant',
+            invitationId: 'YUuiirIfYgZZdbyLqxAHmg',
+            grantEventId: DRIFT_STATES_INV_ACCEPT_GRANT,
             grantAt: '2026-03-01T00:00:00.000000Z',
         },
     ));
     assert.equal(acceptGrant.status, 200);
     const accept = await handleRequest(db, req(
         'PUT',
-        '/identities/drift-states-invitee-accept'
-            + '/invitations/drift-states-inv-accept',
+        '/identities/YeQnyZJddPctAdaMBVWEew'
+            + '/invitations/YUuiirIfYgZZdbyLqxAHmg',
         acceptInviteeToken, {
             state: 'accepted',
-            membershipId: 'drift-states-inv-accept-ms',
-            eventId: 'drift-states-inv-accept-accept',
+            membershipId: DRIFT_STATES_INV_ACCEPT_MS,
+            eventId: DRIFT_STATES_INV_ACCEPT_ACCEPT,
             at: '2026-03-01T00:00:00.000001Z',
         },
     ));
     assert.equal(accept.status, 204);
     const acceptDerived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, 'drift-states-inv-accept',
+        db, STARK_ORGANIZATION, 'YUuiirIfYgZZdbyLqxAHmg',
     );
     assert.deepEqual(
         acceptDerived.map((row) => row.state),
@@ -1126,11 +1197,11 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
     );
 
     await person(
-        db, 'drift-states-invitee-decline', 'Decline Invitee',
+        db, 'YfxZQrzQBOaPJmijEVzQOg', 'Decline Invitee',
         'drift-states-invitee-decline@x.com',
     );
     const declineInviteeToken = await organizationToken(
-        'drift-states-invitee-decline', STARK_ORGANIZATION,
+        'YfxZQrzQBOaPJmijEVzQOg', STARK_ORGANIZATION,
     );
     const declineGrant = await handleRequest(db, req(
         'POST',
@@ -1138,25 +1209,25 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             + '/invitations/',
         adminToken, {
             email: 'drift-states-invitee-decline@x.com',
-            invitationId: 'drift-states-inv-decline',
-            grantEventId: 'drift-states-inv-decline-grant',
+            invitationId: 'YXTFXcJwnALAOHAFRMiiPg',
+            grantEventId: DRIFT_STATES_INV_DECLINE_GRANT,
             grantAt: '2026-03-02T00:00:00.000000Z',
         },
     ));
     assert.equal(declineGrant.status, 200);
     const decline = await handleRequest(db, req(
         'PUT',
-        '/identities/drift-states-invitee-decline'
-            + '/invitations/drift-states-inv-decline',
+        '/identities/YfxZQrzQBOaPJmijEVzQOg'
+            + '/invitations/YXTFXcJwnALAOHAFRMiiPg',
         declineInviteeToken, {
             state: 'declined',
-            eventId: 'drift-states-inv-decline-decline',
+            eventId: DRIFT_STATES_INV_DECLINE_DECLINE,
             at: '2026-03-02T00:00:00.000001Z',
         },
     ));
     assert.equal(decline.status, 204);
     const declineDerived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, 'drift-states-inv-decline',
+        db, STARK_ORGANIZATION, 'YXTFXcJwnALAOHAFRMiiPg',
     );
     assert.deepEqual(
         declineDerived.map((row) => row.state),
@@ -1177,7 +1248,7 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             + '/invitations/',
         adminToken, {
             email: 'drift-states-invitee-revoke@x.com',
-            invitationId: 'drift-states-inv-revoke',
+            invitationId: 'YZtAiXGchFrNHaSixyjBsg',
             grantEventId: 'drift-states-inv-revoke-grant',
             grantAt: '2026-03-03T00:00:00.000000Z',
         },
@@ -1186,16 +1257,16 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
     const revoke = await handleRequest(db, req(
         'PUT',
         '/organizations/' + STARK_ORGANIZATION
-            + '/invitations/drift-states-inv-revoke',
+            + '/invitations/YZtAiXGchFrNHaSixyjBsg',
         adminToken, {
             state: 'revoked',
-            eventId: 'drift-states-inv-revoke-revoke',
+            eventId: DRIFT_STATES_INV_REVOKE_REVOKE,
             at: '2026-03-03T00:00:00.000001Z',
         },
     ));
     assert.equal(revoke.status, 204);
     const revokeDerived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, 'drift-states-inv-revoke',
+        db, STARK_ORGANIZATION, 'YZtAiXGchFrNHaSixyjBsg',
     );
     assert.deepEqual(
         revokeDerived.map((row) => row.state),
@@ -1245,14 +1316,14 @@ test('case 7a: live-write chain — create idea, then transition —'
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
-    const ideaId = 'drift-states-idea-chain-1';
+    const ideaId = DRIFT_STATES_IDEA_CHAIN_1;
 
     const created = await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/' + ideaId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
         ideaDocument(
-            'Chain Idea', ideaId + '-genesis',
+            'Chain Idea', IDEAID_GENESIS,
             '2026-04-01T00:00:00.000000Z',
         ),
     ));
@@ -1260,9 +1331,10 @@ async () => {
     await assertHistoryParity(db, STARK_ORGANIZATION, ideaId);
 
     const transitioned = await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/' + ideaId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
+            , token, {
             ...ideaDocument(
-                'Chain Idea', ideaId + '-transition',
+                'Chain Idea', IDEAID_TRANSITION,
                 '2026-04-02T00:00:00.000000Z',
             ),
             state: 'in_review',
@@ -1284,9 +1356,9 @@ test('case 7b: live-write chain — AI agent create then'
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
-    const aiMemberId = 'drift-states-ai-chain-1';
+    const aiMemberId = DRIFT_STATES_AI_CHAIN_1;
 
     const created = await handleRequest(db, req(
         'PUT', '/ai-agents/' + aiMemberId, token,
@@ -1326,7 +1398,7 @@ test('case 7c: live-write chain — objective archive, reactivate'
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const objectiveSeed = OBJECTIVE_SEEDS[0]!;
     const objectiveId = objectiveSeed.id;
@@ -1336,7 +1408,8 @@ async () => {
     // reactivate via the document address — history is
     // [active, archived, active].
     const archived = await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + objectiveId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token, {
             position,
             state: 'archived',
         },
@@ -1351,7 +1424,8 @@ async () => {
     );
 
     const reactivated = await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + objectiveId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token, {
             position,
             state: 'active',
         },
@@ -1372,9 +1446,9 @@ test('case 7d: genesis-wins-under-skew — a clock-skewed'
 + ' old plane', async () => {
     const db = await seededDb();
     const token = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
-    const recordId = 'drift-states-record-skew-1';
+    const recordId = DRIFT_STATES_RECORD_SKEW_1;
 
     const typePath = '/organizations/'
         + STARK_ORGANIZATION + '/record-types/' + recordId;
@@ -1410,16 +1484,16 @@ test('case 8: the tombstone-fix interaction — a FENCED cross-org'
 + ' entity has no injected event', async () => {
     const db = await seededDb();
     const tokenOrg2 = await organizationToken(
-        'current', ORGANIZATION_TWO,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
-    const foreignIdeaId = 'drift-states-tombstone-foreign-idea';
+    const foreignIdeaId = DRIFT_STATES_TOMBSTONE_FOREIGN_IDEA;
     const foreignCreated = await handleRequest(db, req(
         'PUT',
         '/organizations/' + ORGANIZATION_TWO
             + '/ideas/' + foreignIdeaId,
         tokenOrg2,
         ideaDocument(
-            'Foreign', foreignIdeaId + '-genesis',
+            'Foreign', FOREIGNIDEAID_GENESIS,
             '2026-05-02T00:00:00.000000Z',
         ),
     ));
@@ -1433,9 +1507,9 @@ test('case 8: the tombstone-fix interaction — a FENCED cross-org'
     // forgery is pinned separately by
     // api-write-authorizer.test.ts.
     const tokenStark = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
-    const injectedEventId = 'drift-states-tombstone-injected-ev';
+    const injectedEventId = DRIFT_STATES_TOMBSTONE_INJECTED_EV;
     const retiredAppend = ['', 'states', injectedEventId]
         .join('/');
     const injected = await handleRequest(db, req(

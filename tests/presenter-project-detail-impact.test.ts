@@ -88,13 +88,13 @@ function makeProject() {
 }
 
 const objectives: ObjectiveEntity[] = [
-    { id: 'o1', position: 0 },
+    { id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 },
     { id: 'o2', position: 1 },
 ];
 
 const baselineFull = [
     { id: 'b1', projectId: 'pr-1',
-      objectiveId: 'o1',
+      objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
       score: 50, at: '2026-01-02T00:00:00.000000Z' },
     { id: 'b2', projectId: 'pr-1',
       objectiveId: 'o2',
@@ -163,11 +163,11 @@ test(
     'Impact variance renders tone when fully scored',
     () => {
         const actuals = [
-            { id: 'a1', projectId: 'pr-1',
-              objectiveId: 'o1',
+            { id: 'UQTJZvCoKlFjEoDlDUwekw', projectId: 'pr-1',
+              objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
               score: 60,
               at: '2026-02-01T00:00:00.000000Z' },
-            { id: 'a2', projectId: 'pr-1',
+            { id: 'UZgNCkZlSJcSaAmAJuSkcw', projectId: 'pr-1',
               objectiveId: 'o2',
               score: 40,
               at: '2026-02-01T00:00:00.000000Z' },

@@ -66,7 +66,7 @@ async function memberOf(organizations: string[]) {
     await db.postSchemaCreation();
     for (const [i, organization] of organizations.entries()) {
         await seedMembershipPair(
-            db, 'm-' + i, organization, 'current',
+            db, 'm-' + i, organization, 'XXZruirZyAOoRpNxaDnpSA',
         );
     }
     return db;
@@ -75,18 +75,18 @@ async function memberOf(organizations: string[]) {
 test('exchanges a member token for an org-scoped token',
 async () => {
     const db = await memberOf(['A']);
-    const token = await devToken('current');
+    const token = await devToken('XXZruirZyAOoRpNxaDnpSA');
     const ctx = createRequestContext(db, token);
     const scoped = await postOrganizationSessionExchange(
         ctx, token, 'A');
     const principal = principalFromToken(scoped);
     assert.equal(principal.organization, 'A');
-    assert.equal(principal.id, 'current');
+    assert.equal(principal.id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
 test('a non-member org exchange is rejected', async () => {
     const db = await memberOf(['A']);
-    const token = await devToken('current');
+    const token = await devToken('XXZruirZyAOoRpNxaDnpSA');
     const ctx = createRequestContext(db, token);
     await assert.rejects(
         () => postOrganizationSessionExchange(ctx, token, 'B'));
@@ -104,25 +104,35 @@ test('shouldShowOrganizationSwitcher only at two or more orgs', () => {
 test('resolveActiveOrganization prefers a reachable persisted choice',
 () => {
     assert.equal(
-        resolveActiveOrganization(['1', '2'], '2', null), '2');
+        resolveActiveOrganization(['AjdvjuECVZEgZoFajaIEkg'
+            , 'BBjWJsjYIDkTRKIIPrzWRw'], 'BBjWJsjYIDkTRKIIPrzWRw', null)
+            , 'BBjWJsjYIDkTRKIIPrzWRw');
 });
 
 test('resolveActiveOrganization prefers a reachable identity default',
 () => {
     assert.equal(
-        resolveActiveOrganization(['1', '2'], null, '2'), '2');
+        resolveActiveOrganization(['AjdvjuECVZEgZoFajaIEkg'
+            , 'BBjWJsjYIDkTRKIIPrzWRw'], null, 'BBjWJsjYIDkTRKIIPrzWRw')
+            , 'BBjWJsjYIDkTRKIIPrzWRw');
 });
 
 test('resolveActiveOrganization falls back to the first reachable',
 () => {
     assert.equal(
-        resolveActiveOrganization(['1', '2'], null, null), '1');
+        resolveActiveOrganization(['AjdvjuECVZEgZoFajaIEkg'
+            , 'BBjWJsjYIDkTRKIIPrzWRw'], null, null)
+            , 'AjdvjuECVZEgZoFajaIEkg');
     assert.equal(
-        resolveActiveOrganization(['1', '2'], 'stale', '9'), '1');
+        resolveActiveOrganization(['AjdvjuECVZEgZoFajaIEkg'
+            , 'BBjWJsjYIDkTRKIIPrzWRw'], 'stale', '9')
+            , 'AjdvjuECVZEgZoFajaIEkg');
 });
 
 test('resolveActiveOrganization returns a single membership directly',
 () => {
-    assert.equal(resolveActiveOrganization(['2'], null, null), '2');
-    assert.equal(resolveActiveOrganization(['2'], '1', null), '2');
+    assert.equal(resolveActiveOrganization(['BBjWJsjYIDkTRKIIPrzWRw'], null
+        , null), 'BBjWJsjYIDkTRKIIPrzWRw');
+    assert.equal(resolveActiveOrganization(['BBjWJsjYIDkTRKIIPrzWRw']
+        , 'AjdvjuECVZEgZoFajaIEkg', null), 'BBjWJsjYIDkTRKIIPrzWRw');
 });

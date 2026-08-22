@@ -15,8 +15,11 @@ import {
     revokedThroughSeconds,
 } from './access-token.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../shared/crypto-safe-base62.ts';
+    compareIdentifiers,
+    generateIdentifier,
+} from '../shared/identifier.ts';
+import { generateSecret } from
+    '../shared/secret.ts';
 import { sha256Bytes, sha256Hex } from '../shared/digest.ts';
 import { bytesToBase64Url } from '../shared/base64url.ts';
 import {
@@ -310,8 +313,8 @@ export async function identityDefaultOrganization(
 }
 
 // The earliest org an identity joined. Equal join moments
-// tie-break to the lexically lowest org id, so resolution is
-// deterministic.
+// tie-break to the lowest org id by identifier order, so
+// resolution is deterministic.
 async function primaryMembershipOrganization(
     adapter: DbAdapter,
     identityId: Id,
@@ -325,7 +328,9 @@ async function primaryMembershipOrganization(
         if (best === null
             || row.at < best.at
             || (row.at === best.at
-                && row.organization_id < best.organization)) {
+                && compareIdentifiers(
+                    row.organization_id,
+                    best.organization) < 0)) {
             best = { organization: row.organization_id, at: row.at };
         }
     }
@@ -359,7 +364,7 @@ async function mintPair(
         aud: TOKEN_AUDIENCE,
         sub: identityId, roles, name, iat,
         ttlSeconds: ACCESS_TTL_SECONDS,
-        jti: generateCryptoSafeBase62(),
+        jti: generateIdentifier(),
         ...(act ? { act } : {}),
         ...(scope?.organization ? { organization: scope.organization } : {}),
         ...(scope?.organizations && scope.organizations.length > 0
@@ -412,9 +417,9 @@ async function issueTokenPair(
     readonly refreshToken: string;
     readonly pairId: string | undefined;
 }> {
-    const refreshJti = generateCryptoSafeBase62();
-    const rootId = generateCryptoSafeBase62();
-    const chainId = generateCryptoSafeBase62();
+    const refreshJti = generateIdentifier();
+    const rootId = generateIdentifier();
+    const chainId = generateIdentifier();
     const at = nowUtc();
     const organizations =
         await subjectOrganizations(adapter, identityId);
@@ -435,7 +440,7 @@ async function issueTokenPair(
     // exchange has no AUTH pair — mint one id for the
     // event pair alone.
     const operationId = pair?.operationId
-        ?? generateCryptoSafeBase62();
+        ?? generateIdentifier();
     const eventPair = await formTokenEventPair(rootId, {
         jti: refreshJti, identity_id: identityId,
         action: 'issued', chain_id: chainId, at,
@@ -547,7 +552,7 @@ async function formTokenEventWrites(
 ): Promise<TokenEventWrite[]> {
     const writes: TokenEventWrite[] = [];
     for (const event of appends) {
-        const id = generateCryptoSafeBase62();
+        const id = generateIdentifier();
         writes.push({
             event,
             pair: await formTokenEventPair(
@@ -661,7 +666,7 @@ export async function rotateRefreshJti(
     pair?: MessagePair,
 ): Promise<RotationOutcome> {
     const operationId = pair?.operationId
-        ?? generateCryptoSafeBase62();
+        ?? generateIdentifier();
     for (
         let attempt = 0;
         attempt < MAX_TOKEN_WRITE_ATTEMPTS;
@@ -763,7 +768,7 @@ export async function revokeTokenChain(
     pair?: MessagePair,
 ): Promise<void> {
     const operationId = pair?.operationId
-        ?? generateCryptoSafeBase62();
+        ?? generateIdentifier();
     for (
         let attempt = 0;
         attempt < MAX_TOKEN_WRITE_ATTEMPTS;
@@ -849,7 +854,7 @@ async function grantRefresh(
     if (refreshRev !== null) {
         return failure(HTTP_UNAUTHORIZED, refreshRev);
     }
-    const newJti = generateCryptoSafeBase62();
+    const newJti = generateIdentifier();
     const name = await nameFor(adapter, verified.claims.sub);
     const organizations = await subjectOrganizations(
         adapter, verified.claims.sub);
@@ -1043,9 +1048,9 @@ async function grantClientCredentials(
         HTTP_UNAUTHORIZED, 'invalid_grant',
     );
     const name = await nameFor(adapter, clientId);
-    const refreshJti = generateCryptoSafeBase62();
-    const rootId = generateCryptoSafeBase62();
-    const chainId = generateCryptoSafeBase62();
+    const refreshJti = generateIdentifier();
+    const rootId = generateIdentifier();
+    const chainId = generateIdentifier();
     const at = nowUtc();
     const organizations =
         await subjectOrganizations(adapter, clientId);
@@ -1065,15 +1070,15 @@ async function grantClientCredentials(
     const ticketBody = { exp: verdict.exp };
     const ticketPair = await formWritePair({
         method: 'PUT',
-        pathname: '/authentication/assertion-jtis/'
+        pathname: '/authentication/VOoVnUGteBpVZJqRqWZolw/'
             + verdict.jti,
         routePattern:
-            'authentication/assertion-jtis/:jti',
+            'authentication/VOoVnUGteBpVZJqRqWZolw/:jti',
         routeSegments: [
-            'authentication', 'assertion-jtis', ':jti',
+            'authentication', 'VOoVnUGteBpVZJqRqWZolw', ':jti',
         ],
         pathSegments: [
-            'authentication', 'assertion-jtis',
+            'authentication', 'VOoVnUGteBpVZJqRqWZolw',
             verdict.jti,
         ],
         headerFields: [],
@@ -1091,12 +1096,12 @@ async function grantClientCredentials(
             const locks = view.writeLocks;
             if (locks !== undefined) {
                 await locks.lockAddress(
-                    '/authentication/assertion-jtis/',
+                    '/authentication/VOoVnUGteBpVZJqRqWZolw/',
                     verdict.jti,
                 );
             }
             const existing = await messageStore(view).get(
-                '/authentication/assertion-jtis/',
+                '/authentication/VOoVnUGteBpVZJqRqWZolw/',
                 verdict.jti,
             );
             if (existing !== undefined) {
@@ -1312,13 +1317,13 @@ async function grantAuthorizationCode(
     )) {
         return invalid;
     }
-    const refreshJti = generateCryptoSafeBase62();
+    const refreshJti = generateIdentifier();
     // KEY-BY-ANCHOR: the root row's id (and, by construction, its
     // own event pair's uri_id) IS the derived id — see
     // deriveAuthorizationCodeId's own comment for why that
     // collision is the spend guard itself.
     const rootId = derivedId;
-    const chainId = generateCryptoSafeBase62();
+    const chainId = generateIdentifier();
     const at = nowUtc();
     const name = await nameFor(adapter, issuer.identityId);
     const organizations =
@@ -1536,7 +1541,7 @@ async function authorizePassword(
     if (!(await verifyPassword(password, secret))) {
         return denied;
     }
-    const code = generateCryptoSafeBase62();
+    const code = generateSecret();
     const response: AuthorizeResponse = { code };
     const pair = await formAuthPair(
         seed, body, identityId, HTTP_OK, response,
@@ -1544,7 +1549,7 @@ async function authorizePassword(
     let rehashPair: MessagePair | undefined;
     if (secret.startsWith('$pbkdf2-sha256$')) {
         const at = nowUtc();
-        const cid = generateCryptoSafeBase62();
+        const cid = generateIdentifier();
         const hashed = await hashPassword(password);
         const credBody: Record<string, unknown> = {
             identity_id: identityId,

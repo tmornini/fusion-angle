@@ -45,6 +45,8 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Instance DELETE — tombstone posture (Task 18 / R4 / R9).
 // Absent → missedReadError; live OR already-tombstoned →
@@ -52,11 +54,11 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
-const ORGANIZATION = '1';
-const TYPE_ID = 'rt-del-1';
-const ATTR_ID = 'attr-del-1';
-const ATTR_LOCKED = 'attr-del-locked';
-const INSTANCE_ID = 'inst-del-1';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
+const TYPE_ID = generateIdentifier();
+const ATTR_ID = generateIdentifier();
+const ATTR_LOCKED = generateIdentifier();
+const INSTANCE_ID = generateIdentifier();
 
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
@@ -105,19 +107,19 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, 'm-member1', {
+    await seedMembershipPair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
-        identity_id: 'member1',
+        identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
         at: AT,
     });
     return {
         db,
         adminToken: await organizationToken(
-            'current', ORGANIZATION,
+            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
         ),
         memberToken: await organizationToken(
-            'member1', ORGANIZATION,
+            'nkgaOHZISTQrILTfPThWCA', ORGANIZATION,
         ),
     };
 }
@@ -449,7 +451,7 @@ async () => {
             },
         ],
         body: patchBody,
-        requesterIdentityId: 'member1',
+        requesterIdentityId: 'nkgaOHZISTQrILTfPThWCA',
         requestAt: nowUtc(),
         organization: ORGANIZATION,
         responseStatus: 200,
@@ -478,7 +480,7 @@ async () => {
             db,
             [ORGANIZATION, TYPE_ID, INSTANCE_ID],
             patchBody,
-            'member1',
+            'nkgaOHZISTQrILTfPThWCA',
             stalePair,
             ORGANIZATION,
             ['member'],

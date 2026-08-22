@@ -33,6 +33,8 @@ import {
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Members are a lifecycle-trio family (states-address
 // retirement): PUT /members/:id carries {type} plus the trio
@@ -72,7 +74,7 @@ function memberFields(
     type: 'human' | 'ai' | 'system' = 'human',
     state = 'active',
     stateAt = AT,
-    stateEventId = 'ev-1',
+    stateEventId = generateIdentifier(),
 ) {
     return {
         ...memberEntityFields(type),
@@ -104,11 +106,12 @@ function humanMemberFields() {
 
 test('validateMemberDocumentBody accepts type plus the'
 + ' lifecycle trio', () => {
-    const doc = validateMemberDocumentBody(memberFields());
+    const fields = memberFields();
+    const doc = validateMemberDocumentBody(fields);
     assert.deepEqual(doc.entity, memberEntityFields());
     assert.equal(doc.state, 'active');
     assert.equal(doc.state_at, AT);
-    assert.equal(doc.state_event_id, 'ev-1');
+    assert.equal(doc.state_event_id, fields.state_event_id);
 });
 
 test('validateMemberDocumentBody rejects a stray key with the'
@@ -183,7 +186,9 @@ test('validateMemberDocumentBody rejects a state outside'
 + " ['active','pending','archived']", () => {
     assert.throws(
         () => validateMemberDocumentBody(
-            memberFields('human', 'deleted', AT, 'ev-bad'),
+            memberFields(
+                'human', 'deleted', AT, generateIdentifier(),
+            ),
         ),
         ValidationError,
     );
@@ -196,11 +201,11 @@ test('PUT members/:id is retired 404', async () => {
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/members/mem-trio-1', token, {
+        'PUT', '/members/nXdwGKWtevpvniAfAbiPFA', token, {
             type: 'human',
             state: 'active',
             state_at: nowUtc(),
-            state_event_id: 'mem-trio-1-ev1',
+            state_event_id: generateIdentifier(),
         },
     ));
     assert.equal(res.status, 404);
@@ -212,7 +217,7 @@ async () => {
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/members/mem-trio-2', token,
+        'PUT', '/members/nXmQQMgTtocYOzXpxijKBg', token,
         { type: 'human' },
     ));
     assert.equal(res.status, 404);
@@ -224,11 +229,11 @@ async () => {
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/members/mem-trio-3', token, {
+        'PUT', '/members/nkcPXYSSUNrGJnmjSaxYig', token, {
             type: 'human',
             state: 'deleted',
             state_at: nowUtc(),
-            state_event_id: 'mem-trio-3-ev1',
+            state_event_id: generateIdentifier(),
         },
     ));
     assert.equal(res.status, 404);
@@ -299,7 +304,9 @@ test('validateAiMemberDocumentBody rejects each missing key,'
 test('validateAiMemberDocumentBody rejects an unknown model'
 + ' id, byte-identical to validateAIMemberEntity on both'
 + ' paths', () => {
-    const body = { ...aiMemberFields(), model: 'bogus-model' };
+    const body = {
+        ...aiMemberFields(), model: generateIdentifier(),
+    };
     let documentMessage: string | undefined;
     let entityMessage: string | undefined;
     try {
@@ -395,12 +402,12 @@ async () => {
     const body = memberFields();
     const pair = await formWritePair({
         method: 'PUT',
-        pathname: '/members/mem-doc-op-1',
+        pathname: '/members/nVpWUxfKrqvVXWgWENWhbA',
         routePattern: 'members/:id',
         routeSegments: ['members', ':id'],
-        pathSegments: ['members', 'mem-doc-op-1'],
+        pathSegments: ['members', 'nVpWUxfKrqvVXWgWENWhbA'],
         headerFields: [], body,
-        requesterIdentityId: 'current',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
         responseStatus: 200, responseBody: undefined,
@@ -411,7 +418,7 @@ async () => {
     // Mid-stage: body still includes the trio (Task 6 may
     // thin the op return to entity fields alone).
     const written = await postMemberDocumentOp(
-        db, 'mem-doc-op-1', body, 'current', pair,
+        db, 'nVpWUxfKrqvVXWgWENWhbA', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
     );
     assert.deepEqual(written, body);
     // Phase Final Stage B: roster tables retired.
@@ -427,19 +434,19 @@ async () => {
     const body = aiMemberFields();
     const pair = await formWritePair({
         method: 'PUT',
-        pathname: '/ai-members/ai-doc-op-1',
+        pathname: '/ai-members/VLoTvOKjXoNVDjLLBotQXA',
         routePattern: 'ai-members/:id',
         routeSegments: ['ai-members', ':id'],
-        pathSegments: ['ai-members', 'ai-doc-op-1'],
+        pathSegments: ['ai-members', 'VLoTvOKjXoNVDjLLBotQXA'],
         headerFields: [], body,
-        requesterIdentityId: 'current',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
         responseStatus: 200, responseBody: undefined,
         operationId: TEST_OPERATION_ID,
     });
     const written = await postAiMemberDocumentOp(
-        db, 'ai-doc-op-1', body, 'current', pair,
+        db, 'VLoTvOKjXoNVDjLLBotQXA', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
     );
     assert.deepEqual(written, body);
     // Phase Final Stage B: roster tables retired.
@@ -455,19 +462,19 @@ test('postHumanMemberDocumentOp writes exactly the pair and'
     const body = humanMemberFields();
     const pair = await formWritePair({
         method: 'PUT',
-        pathname: '/human-members/hm-doc-op-1',
+        pathname: '/human-members/fVrMeaOxbnDcSKMPwtIEZg',
         routePattern: 'human-members/:id',
         routeSegments: ['human-members', ':id'],
-        pathSegments: ['human-members', 'hm-doc-op-1'],
+        pathSegments: ['human-members', 'fVrMeaOxbnDcSKMPwtIEZg'],
         headerFields: [], body,
-        requesterIdentityId: 'current',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
         responseStatus: 200, responseBody: undefined,
         operationId: TEST_OPERATION_ID,
     });
     const written = await postHumanMemberDocumentOp(
-        db, 'hm-doc-op-1', body, 'current', pair,
+        db, 'fVrMeaOxbnDcSKMPwtIEZg', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
     );
     assert.deepEqual(written, body);
     // Phase Final Stage B: roster tables retired.
@@ -486,7 +493,7 @@ async () => {
     await seedAdminSchema(db);
     await assert.rejects(
         () => PUT(
-            db, 'members/mem-resend-1', memberFields(),
+            db, 'members/' + generateIdentifier(), memberFields(),
             DEV_TOKEN,
         ),
         /Not found/,
@@ -499,7 +506,7 @@ async () => {
     await seedAdminSchema(db);
     await assert.rejects(
         () => PUT(
-            db, 'ai-members/ai-resend-1',
+            db, 'ai-members/' + generateIdentifier(),
             aiMemberFields(), DEV_TOKEN,
         ),
         /Not found/,
@@ -524,9 +531,9 @@ async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken();
-    const id = 'mem-g1-stream';
+    const id = generateIdentifier();
     const at = '2026-01-01T00:00:00.000000Z';
-    const ev = 'ev-g1';
+    const ev = generateIdentifier();
     const body = memberFields('human', 'active', at, ev);
     const put = await handleRequest(
         db, req('PUT', '/members/' + id, token, body),
@@ -539,7 +546,7 @@ test('stored PUT body equals aiMemberDocumentEntityOf'
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const id = 'ai-g3-stream';
+    const id = generateIdentifier();
     const body = aiMemberFields();
     const put = await handleRequest(
         db, req('PUT', '/ai-members/' + id, DEV_TOKEN, body),
@@ -555,7 +562,7 @@ async () => {
         db,
         req(
             'PUT',
-            '/human-members/hm-g3-stream',
+            '/human-members/fWFpBifFNXqlKbbxpCUcDw',
             DEV_TOKEN,
             humanMemberFields(),
         ),

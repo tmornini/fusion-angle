@@ -10,4 +10,6 @@ TZ=UTC node --test --strip-types \
     tests/pg-races.test.ts \
     tests/pg-boot.test.ts \
     tests/pg-seed.test.ts \
-    tests/pg-explain.test.ts
+    tests/pg-explain.test.ts \
+    tests/pg-identifier-order.test.ts \
+    tests/schema-lifecycle.test.ts

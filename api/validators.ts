@@ -14,7 +14,7 @@ import type {
     IdentityDefaultOrganizationEntity,
     IdentityTokenEntity,
     ClientRegistrationEntity,
-    IdentityProviderEntity,
+    JKeRxRPHBGBkzSLrvNpmlg,
     RoleGrantEntity,
     MemberEntity,
     HumanMemberEntity,
@@ -71,6 +71,8 @@ import {
 import { extractErrorMessage } from '../shared/error-helpers.ts';
 import { ValidationError } from './types.ts';
 import { HEX64 } from './message-form.ts';
+import { isIdentifier } from
+    '../shared/identifier.ts';
 
 export function parseOrThrow(
     raw: string,
@@ -228,7 +230,7 @@ function asNodeAttribute(
         );
     }
     return {
-        attributeId: asString(
+        attributeId: asIdentifier(
             obj['attribute_id'],
             label + '.attribute_id',
         ),
@@ -314,33 +316,11 @@ export function asMemberIds(
 ): MemberId[] {
     const arr = asArray(value, label);
     return arr.map((v, i) =>
-        asString(
+        asIdentifier(
             v,
             label + '[' + i + ']',
         ),
     );
-}
-
-// Graph node/edge ids flow into DOM ids and SVG markup, so
-// the gate pins them to the id alphabet — markup-significant
-// characters can never enter storage, killing the stored-XSS
-// class here rather than relying on every render site to
-// escape. Every id producer (designer, importers, seeds)
-// mints base62; _ and - are admitted for legacy snapshots.
-const GRAPH_ID_ALPHABET = /^[A-Za-z0-9_-]+$/;
-
-export function asGraphId(
-    value: unknown,
-    label: string,
-): string {
-    const id = asString(value, label);
-    if (!GRAPH_ID_ALPHABET.test(id)) {
-        throw new ValidationError(
-            label + ' must contain only'
-            + ' [A-Za-z0-9_-], got ' + id,
-        );
-    }
-    return id;
 }
 
 function asGraphNode(
@@ -364,7 +344,7 @@ function asGraphNode(
             label + '.agentIds',
         );
     return {
-        id: asGraphId(
+        id: asIdentifier(
             obj['id'], label + '.id',
         ),
         name: asString(
@@ -410,17 +390,17 @@ function asGraphEdge(
 ): GraphEdge {
     const obj = asObject(value, label);
     return {
-        id: asGraphId(
+        id: asIdentifier(
             obj['id'], label + '.id',
         ),
         name: asString(
             obj['name'], label + '.name',
         ),
-        fromNodeId: asGraphId(
+        fromNodeId: asIdentifier(
             obj['fromNodeId'],
             label + '.fromNodeId',
         ),
-        toNodeId: asGraphId(
+        toNodeId: asIdentifier(
             obj['toNodeId'],
             label + '.toNodeId',
         ),
@@ -533,11 +513,32 @@ export function asWorkOrderFlowGraph(
 // must be a parent path (e.g., label +
 // '.kind'), keep using the as* form.
 
+export function asIdentifier(
+    value: unknown,
+    label: string,
+): string {
+    const text = asString(value, label);
+    if (!isIdentifier(text)) {
+        throw new ValidationError(
+            label
+                + ' must be a 22-character identifier',
+        );
+    }
+    return text;
+}
+
 export function pickString(
     body: Record<string, unknown>,
     key: string,
 ): string {
     return asString(body[key], key);
+}
+
+export function pickIdentifier(
+    body: Record<string, unknown>,
+    key: string,
+): string {
+    return asIdentifier(body[key], key);
 }
 
 export function pickNumber(
@@ -816,7 +817,7 @@ export function validateMemberDocumentBody(
         pickString(body, 'state'),
         'MemberEntity.state',
     );
-    const stateEventId = pickString(body, 'state_event_id');
+    const stateEventId = pickIdentifier(body, 'state_event_id');
     if (stateEventId === '') {
         throw new ValidationError(
             'MemberEntity.state_event_id must be non-empty',
@@ -963,9 +964,7 @@ export function validateIdentityCredentialEntity(
         'credential status', 'IdentityCredentialEntity',
     );
     return {
-        identity_id: pickString(
-            body, 'identity_id',
-        ),
+        identity_id: pickIdentifier(body, 'identity_id'),
         kind,
         status,
         secret: pickString(body, 'secret'),
@@ -991,7 +990,7 @@ validateIdentityTokenRevocationEntity(
         body, 'at', 'IdentityTokenRevocationEntity',
     );
     return {
-        identity_id: pickString(body, 'identity_id'),
+        identity_id: pickIdentifier(body, 'identity_id'),
         at,
     };
 }
@@ -1013,10 +1012,8 @@ export function validateIdentityDefaultOrganizationEntity(
         body, 'at', 'IdentityDefaultOrganizationEntity',
     );
     return {
-        identity_id: pickString(body, 'identity_id'),
-        organization_id: pickString(
-            body, 'organization_id',
-        ),
+        identity_id: pickIdentifier(body, 'identity_id'),
+        organization_id: pickIdentifier(body, 'organization_id'),
         at,
     };
 }
@@ -1040,11 +1037,11 @@ export function validateRoleGrantEntity(
         body, 'at', 'RoleGrantEntity',
     );
     return {
-        organization_id: pickString(body, 'organization_id'),
-        identity_id: pickString(body, 'identity_id'),
+        organization_id: pickIdentifier(body, 'organization_id'),
+        identity_id: pickIdentifier(body, 'identity_id'),
         role: pickString(body, 'role'),
         action,
-        by_member_id: pickString(body, 'by_member_id'),
+        by_member_id: pickIdentifier(body, 'by_member_id'),
         at,
     };
 }
@@ -1068,10 +1065,10 @@ export function validateIdentityTokenEntity(
         body, 'at', 'IdentityTokenEntity',
     );
     return {
-        jti: pickString(body, 'jti'),
-        identity_id: pickString(body, 'identity_id'),
+        jti: pickIdentifier(body, 'jti'),
+        identity_id: pickIdentifier(body, 'identity_id'),
         action,
-        chain_id: pickString(body, 'chain_id'),
+        chain_id: pickIdentifier(body, 'chain_id'),
         at,
     };
 }
@@ -1110,20 +1107,20 @@ const IDENTITY_PROVIDER_BODY_KEYS: readonly string[] = [
 
 export function validateIdentityProviderEntity(
     body: Record<string, unknown>,
-): Omit<IdentityProviderEntity, 'id'> {
+): Omit<JKeRxRPHBGBkzSLrvNpmlg, 'id'> {
     assertOnlyKeys(
         body, IDENTITY_PROVIDER_BODY_KEYS,
-        'IdentityProviderEntity',
+        'JKeRxRPHBGBkzSLrvNpmlg',
     );
     const action = validateEnumField(
         body, 'action', ['linked', 'unlinked'],
-        'provider action', 'IdentityProviderEntity',
+        'provider action', 'JKeRxRPHBGBkzSLrvNpmlg',
     );
     const at = validateTimestampField(
-        body, 'at', 'IdentityProviderEntity',
+        body, 'at', 'JKeRxRPHBGBkzSLrvNpmlg',
     );
     return {
-        identity_id: pickString(body, 'identity_id'),
+        identity_id: pickIdentifier(body, 'identity_id'),
         provider: pickString(body, 'provider'),
         provider_subject:
             pickString(body, 'provider_subject'),
@@ -1240,7 +1237,7 @@ export function validateAIMemberEntity(
         AI_MEMBER_BODY_KEYS,
         'AIMemberEntity',
     );
-    const model = pickString(body, 'model');
+    const model = pickIdentifier(body, 'model');
     if (!isProviderModelId(model)) {
         throw new ValidationError(
             'model must be a known provider'
@@ -1291,7 +1288,7 @@ export function validateAiMemberDocumentBody(
         AI_MEMBER_DOCUMENT_BODY_KEYS,
         'AIMemberEntity',
     );
-    const model = pickString(body, 'model');
+    const model = pickIdentifier(body, 'model');
     if (!isProviderModelId(model)) {
         throw new ValidationError(
             'model must be a known provider'
@@ -1325,7 +1322,7 @@ export function validateAIAgentEntity(
         AI_AGENT_BODY_KEYS,
         'AIAgentEntity',
     );
-    const model = pickString(body, 'model');
+    const model = pickIdentifier(body, 'model');
     if (!isProviderModelId(model)) {
         throw new ValidationError(
             'model must be a known provider'
@@ -1367,7 +1364,7 @@ export function validateAiAgentDocumentBody(
         AI_AGENT_DOCUMENT_BODY_KEYS,
         'AIAgentEntity',
     );
-    const model = pickString(body, 'model');
+    const model = pickIdentifier(body, 'model');
     if (!isProviderModelId(model)) {
         throw new ValidationError(
             'model must be a known provider'
@@ -1409,7 +1406,7 @@ export function validateIdeaEntity(
         body, IDEA_BODY_KEYS, 'IdeaEntity',
     );
     return {
-        organization_id: pickString(body, 'organization_id'),
+        organization_id: pickIdentifier(body, 'organization_id'),
         title: pickString(
             body, 'title',
         ),
@@ -1513,7 +1510,7 @@ export function validateProjectEntity(
         'ProjectEntity',
     );
     return {
-        organization_id: pickString(body, 'organization_id'),
+        organization_id: pickIdentifier(body, 'organization_id'),
         title: pickString(
             body, 'title',
         ),
@@ -1617,7 +1614,7 @@ export function validateFlowEntity(
         body, FLOW_BODY_KEYS, 'FlowEntity',
     );
     return {
-        organization_id: pickString(body, 'organization_id'),
+        organization_id: pickIdentifier(body, 'organization_id'),
         name: pickString(
             body, 'name',
         ),
@@ -1698,7 +1695,7 @@ export function validateFlowDocumentBody(
         pickString(body, 'state'),
         'FlowDocumentBody.state',
     );
-    const stateEventId = pickString(body, 'state_event_id');
+    const stateEventId = pickIdentifier(body, 'state_event_id');
     if (stateEventId === '') {
         throw new ValidationError(
             'FlowDocumentBody.state_event_id must be'
@@ -1749,7 +1746,7 @@ export function validateFlowNodeEntity(
         body, FLOW_NODE_BODY_KEYS, 'FlowNodeEntity',
     );
     return {
-        flow_id: pickString(body, 'flow_id'),
+        flow_id: pickIdentifier(body, 'flow_id'),
         name: pickString(body, 'name'),
         position_x: pickNumber(body, 'position_x'),
         position_y: pickNumber(body, 'position_y'),
@@ -1768,10 +1765,10 @@ const FLOW_EDGE_BODY_KEYS: readonly string[] = [
     'flow_id', 'name', 'from_node_id', 'to_node_id', 'at',
 ];
 
-// from_node_id / to_node_id are canvas node ids that flow into
-// DOM/SVG markup at render, so the gate pins them to the graph
-// id alphabet — the same stored-XSS fence asGraphEdge applied
-// when the edge lived inside the graph blob.
+// from_node_id / to_node_id are canvas node ids that flow
+// into DOM/SVG markup at render, so the gate pins them as
+// identifiers — the same stored-XSS fence asGraphEdge
+// applied when the edge lived inside the graph blob.
 export function validateFlowEdgeEntity(
     body: Record<string, unknown>,
 ): Omit<FlowEdgeEntity, 'id'> {
@@ -1779,13 +1776,13 @@ export function validateFlowEdgeEntity(
         body, FLOW_EDGE_BODY_KEYS, 'FlowEdgeEntity',
     );
     return {
-        flow_id: pickString(body, 'flow_id'),
+        flow_id: pickIdentifier(body, 'flow_id'),
         name: pickString(body, 'name'),
-        from_node_id: asGraphId(
+        from_node_id: asIdentifier(
             body['from_node_id'],
             'FlowEdgeEntity.from_node_id',
         ),
-        to_node_id: asGraphId(
+        to_node_id: asIdentifier(
             body['to_node_id'],
             'FlowEdgeEntity.to_node_id',
         ),
@@ -1811,11 +1808,11 @@ export function validateFlowNodeMemberEntity(
         'relation action', 'FlowNodeMemberEntity',
     );
     return {
-        flow_node_id: asGraphId(
+        flow_node_id: asIdentifier(
             body['flow_node_id'],
             'FlowNodeMemberEntity.flow_node_id',
         ),
-        member_id: pickString(body, 'member_id'),
+        member_id: pickIdentifier(body, 'member_id'),
         action,
         at: validateTimestampField(
             body, 'at', 'FlowNodeMemberEntity',
@@ -1844,11 +1841,11 @@ export function validateFlowNodeAttributeEntity(
         'relation action', 'FlowNodeAttributeEntity',
     );
     return {
-        flow_node_id: asGraphId(
+        flow_node_id: asIdentifier(
             body['flow_node_id'],
             'FlowNodeAttributeEntity.flow_node_id',
         ),
-        attribute_id: pickString(body, 'attribute_id'),
+        attribute_id: pickIdentifier(body, 'attribute_id'),
         mode,
         is_required: pickBoolean(body, 'is_required'),
         action,
@@ -1879,7 +1876,7 @@ export function validateWorkOrderEntity(
         flowGraph, 'WorkOrderEntity.flow_graph',
     );
     return {
-        organization_id: pickString(body, 'organization_id'),
+        organization_id: pickIdentifier(body, 'organization_id'),
         display_id: pickString(
             body, 'display_id',
         ),
@@ -1954,12 +1951,8 @@ export function validateFlowWorkOrderEntity(
         'FlowWorkOrderEntity',
     );
     return {
-        flow_id: pickString(
-            body, 'flow_id',
-        ),
-        work_order_id: pickString(
-            body, 'work_order_id',
-        ),
+        flow_id: pickIdentifier(body, 'flow_id'),
+        work_order_id: pickIdentifier(body, 'work_order_id'),
         at: validateTimestampField(
             body, 'at', 'FlowWorkOrderEntity',
         ),
@@ -1981,12 +1974,8 @@ validateStateFieldValueEntity(
         'StateFieldValueEntity',
     );
     return {
-        state_event_id: pickString(
-            body, 'state_event_id',
-        ),
-        attribute_id: pickString(
-            body, 'attribute_id',
-        ),
+        state_event_id: pickIdentifier(body, 'state_event_id'),
+        attribute_id: pickIdentifier(body, 'attribute_id'),
         value: pickString(
             body, 'value',
         ),
@@ -2051,10 +2040,8 @@ export function validateMembershipEntity(
         body, 'at', 'MembershipEntity',
     );
     return {
-        organization_id: pickString(
-            body, 'organization_id',
-        ),
-        identity_id: pickString(body, 'identity_id'),
+        organization_id: pickIdentifier(body, 'organization_id'),
+        identity_id: pickIdentifier(body, 'identity_id'),
         type,
         at,
     };
@@ -2064,7 +2051,7 @@ const MEMBERSHIP_DOCUMENT_BODY_KEYS: readonly string[] = [
     'organization_id', 'identity_id', 'type', 'at',
 ];
 
-export interface MembershipDocumentBody {
+export interface NIjaUmatkDaVBQdIjzUjYg {
     readonly entity: Omit<MembershipEntity, 'id'>;
 }
 
@@ -2075,7 +2062,7 @@ export interface MembershipDocumentBody {
 // MANDATE (a NAMED byte-parity-over-convention choice, the
 // Phase 7 Objective precedent): the assertOnlyKeys label is
 // 'MembershipEntity', matching validateMembershipEntity
-// byte-for-byte, NOT the 'MembershipDocumentBody' naming
+// byte-for-byte, NOT the 'NIjaUmatkDaVBQdIjzUjYg' naming
 // convention every other *DocumentBody validator uses — the
 // label appears in the wire 400 body ("unexpected key ... for
 // MembershipEntity"), and the convention's label would change
@@ -2086,7 +2073,7 @@ export interface MembershipDocumentBody {
 // paths too.
 export function validateMembershipDocumentBody(
     body: Record<string, unknown>,
-): MembershipDocumentBody {
+): NIjaUmatkDaVBQdIjzUjYg {
     assertOnlyKeys(
         body, MEMBERSHIP_DOCUMENT_BODY_KEYS, 'MembershipEntity',
     );
@@ -2099,10 +2086,8 @@ export function validateMembershipDocumentBody(
     );
     return {
         entity: {
-            organization_id: pickString(
-                body, 'organization_id',
-            ),
-            identity_id: pickString(body, 'identity_id'),
+            organization_id: pickIdentifier(body, 'organization_id'),
+            identity_id: pickIdentifier(body, 'identity_id'),
             type,
             at,
         },
@@ -2152,10 +2137,8 @@ export function validateInvitationEntity(
         body, 'at', 'InvitationEntity',
     );
     return {
-        organization_id: pickString(
-            body, 'organization_id',
-        ),
-        identity_id: pickString(body, 'identity_id'),
+        organization_id: pickIdentifier(body, 'organization_id'),
+        identity_id: pickIdentifier(body, 'identity_id'),
         at,
     };
 }
@@ -2194,7 +2177,7 @@ export function validateInvitationTransitionBody(
         );
     }
     const membershipId = 'membershipId' in body
-        ? pickString(body, 'membershipId')
+        ? pickIdentifier(body, 'membershipId')
         : undefined;
     if (state === 'accepted') {
         if (
@@ -2211,7 +2194,7 @@ export function validateInvitationTransitionBody(
         ...(membershipId !== undefined
             ? { membershipId }
             : {}),
-        eventId: pickString(body, 'eventId'),
+        eventId: pickIdentifier(body, 'eventId'),
         at: validateTimestampField(
             body, 'at',
             'InvitationTransitionBody.at',
@@ -2233,12 +2216,8 @@ export function validateIdeaSubmissionEntity(
         'IdeaSubmissionEntity',
     );
     return {
-        idea_id: pickString(
-            body, 'idea_id',
-        ),
-        member_id: pickString(
-            body, 'member_id',
-        ),
+        idea_id: pickIdentifier(body, 'idea_id'),
+        member_id: pickIdentifier(body, 'member_id'),
         at: validateTimestampField(
             body, 'at', 'IdeaSubmissionEntity',
         ),
@@ -2259,12 +2238,8 @@ export function validateProjectFlowEntity(
         'ProjectFlowEntity',
     );
     return {
-        project_id: pickString(
-            body, 'project_id',
-        ),
-        flow_id: pickString(
-            body, 'flow_id',
-        ),
+        project_id: pickIdentifier(body, 'project_id'),
+        flow_id: pickIdentifier(body, 'flow_id'),
         at: validateTimestampField(
             body, 'at', 'ProjectFlowEntity',
         ),
@@ -2289,7 +2264,7 @@ export function validateObjectiveEntity(
         body, OBJECTIVE_BODY_KEYS, 'Objective',
     );
     return {
-        organization_id: pickString(body, 'organization_id'),
+        organization_id: pickIdentifier(body, 'organization_id'),
         position: pickNumber(body, 'position'),
     };
 }
@@ -2377,9 +2352,7 @@ export function validateObjectiveRevisionEntity(
         description: pickString(
             body, 'description',
         ),
-        member_id: pickString(
-            body, 'member_id',
-        ),
+        member_id: pickIdentifier(body, 'member_id'),
         at: validateTimestampField(
             body, 'at', 'ObjectiveRevision',
         ),
@@ -2401,18 +2374,14 @@ export function validateBaselineScoreEntity(
         'BaselineScore',
     );
     return {
-        project_id: pickString(
-            body, 'project_id',
-        ),
+        project_id: pickIdentifier(body, 'project_id'),
         objective_id: pickString(
             body, 'objective_id',
         ),
         score: asScore(
             body.score, 'BaselineScore.score',
         ),
-        member_id: pickString(
-            body, 'member_id',
-        ),
+        member_id: pickIdentifier(body, 'member_id'),
         at: validateTimestampField(
             body, 'at', 'BaselineScore',
         ),
@@ -2434,18 +2403,14 @@ export function validateActualScoreEntity(
         'ActualScore',
     );
     return {
-        project_id: pickString(
-            body, 'project_id',
-        ),
+        project_id: pickIdentifier(body, 'project_id'),
         objective_id: pickString(
             body, 'objective_id',
         ),
         score: asScore(
             body.score, 'ActualScore.score',
         ),
-        member_id: pickString(
-            body, 'member_id',
-        ),
+        member_id: pickIdentifier(body, 'member_id'),
         at: validateTimestampField(
             body, 'at', 'ActualScore',
         ),
@@ -2458,7 +2423,6 @@ export function validateActualScoreEntity(
 const MESSAGE_HASH = /^[0-9a-f]{64}$/;
 
 const HTTP_METHOD = /^[A-Z]+$/;
-const OPERATION_ID = /^[A-Za-z0-9_-]{22}$/;
 
 const PAIR_BODY_KEYS: readonly string[] = [
     'uri_collection', 'uri_id',
@@ -2505,19 +2469,13 @@ export function validatePairEntity(
             + 'character lowercase hex digest',
         );
     }
-    const operationId = pickString(
+    const operationId = pickIdentifier(
         body, 'operation_id',
     );
-    if (!OPERATION_ID.test(operationId)) {
-        throw new ValidationError(
-            'PairEntity.operation_id must be a 22-'
-            + 'character id',
-        );
-    }
     return {
         uri_collection: uriCollection,
         uri_id: pickString(body, 'uri_id'),
-        requester_identity_id: pickString(
+        requester_identity_id: pickIdentifier(
             body, 'requester_identity_id',
         ),
         method,
@@ -2555,9 +2513,7 @@ export function validateStateEntity(
             body, 'entity_id',
         ),
         state: pickString(body, 'state'),
-        member_id: pickString(
-            body, 'member_id',
-        ),
+        member_id: pickIdentifier(body, 'member_id'),
         at: validateTimestampField(
             body, 'at', 'StateEntity',
         ),
@@ -2592,7 +2548,7 @@ export function validateRecordEntity(
         );
     }
     return {
-        organization_id: pickString(body, 'organization_id'),
+        organization_id: pickIdentifier(body, 'organization_id'),
         name,
         description: pickString(
             body, 'description',
@@ -2666,9 +2622,7 @@ export function validateInstancePutBody(
             ['attribute_id', 'value'],
             label,
         );
-        const attributeId = pickString(
-            entry, 'attribute_id',
-        );
+        const attributeId = pickIdentifier(entry, 'attribute_id');
         if (attributeId === '') {
             throw new ValidationError(
                 label
@@ -2742,9 +2696,7 @@ export function validateValueDelta(
                 ['attribute_id', 'value'],
                 entryLabel,
             );
-            const attributeId = pickString(
-                entry, 'attribute_id',
-            );
+            const attributeId = pickIdentifier(entry, 'attribute_id');
             if (attributeId === '') {
                 throw new ValidationError(
                     entryLabel
@@ -2919,10 +2871,8 @@ export function validateRecordAttributeEntity(
         );
     }
     return {
-        organization_id: pickString(body, 'organization_id'),
-        record_id: pickString(
-            body, 'record_id',
-        ),
+        organization_id: pickIdentifier(body, 'organization_id'),
+        record_id: pickIdentifier(body, 'record_id'),
         name,
         attribute_type: attributeType,
         sort_order: pickNumber(
@@ -3041,7 +2991,7 @@ export function validateRecordAttributeDocumentBody(
         : [...defaultRoles];
     return {
         entity: {
-            record_id: pickString(body, 'record_id'),
+            record_id: pickIdentifier(body, 'record_id'),
             name,
             attribute_type: attributeType,
             sort_order: pickNumber(body, 'sort_order'),
@@ -3210,10 +3160,8 @@ export function validateFlowRecordEntity(
         'FlowRecordEntity',
     );
     return {
-        flow_id: pickString(body, 'flow_id'),
-        record_id: pickString(
-            body, 'record_id',
-        ),
+        flow_id: pickIdentifier(body, 'flow_id'),
+        record_id: pickIdentifier(body, 'record_id'),
         at: validateTimestampField(
             body, 'at', 'FlowRecordEntity',
         ),
@@ -3223,10 +3171,10 @@ export function validateFlowRecordEntity(
 // A flow tag's own NAME is the FIRST user-authored address
 // segment this codebase validates (every prior :id path segment
 // is either server-generated or a client-picked-but-opaque
-// identifier never rendered) — pinned at least as strict as
-// GRAPH_ID_ALPHABET above, plus a length cap, since an address
-// segment has no natural bound the way a body field's own
-// pickString does.
+// identifier never rendered) — pinned to [A-Za-z0-9_-]
+// plus a length cap, since an address segment has no
+// natural bound the way a body field's own pickString
+// does.
 const FLOW_TAG_NAME_MAX_LENGTH = 64;
 const FLOW_TAG_NAME_ALPHABET = /^[A-Za-z0-9_-]+$/;
 
@@ -3257,7 +3205,7 @@ export function validateFlowTagEntity(
     body: Record<string, unknown>,
 ): Omit<FlowTagEntity, 'id' | 'flow_id'> {
     assertOnlyKeys(body, FLOW_TAG_BODY_KEYS, 'FlowTagEntity');
-    const flowResponseId = pickString(body, 'flow_response_id');
+    const flowResponseId = pickIdentifier(body, 'flow_response_id');
     if (flowResponseId === '') {
         throw new ValidationError(
             'FlowTagEntity.flow_response_id must be non-empty',
@@ -3316,7 +3264,7 @@ function validateRecordWriteAttribute(
     label: string,
 ): RecordAttributeEntity {
     const obj = asObject(value, label);
-    const id = asString(obj['id'], label + '.id');
+    const id = asIdentifier(obj['id'], label + '.id');
     const { id: _id, ...rest } = obj;
     const validated =
         validateRecordAttributeEntity(rest);
@@ -3341,7 +3289,7 @@ export function validateRecordWriteBody(
             RECORD_WRITE_CREATE_KEYS,
             'RecordWriteCreateBody',
         );
-        const id = pickString(body, 'id');
+        const id = pickIdentifier(body, 'id');
         const record = validateRecordEntity(
             asObject(
                 body['record'],
@@ -3363,7 +3311,7 @@ export function validateRecordWriteBody(
             pickString(body, 'initialState'),
             'RecordWriteCreateBody.initialState',
         );
-        const initialStateEventId = pickString(
+        const initialStateEventId = pickIdentifier(
             body, 'initialStateEventId',
         );
         const initialStateAt = validateTimestampField(
@@ -3383,7 +3331,7 @@ export function validateRecordWriteBody(
             RECORD_WRITE_EDIT_KEYS,
             'RecordWriteEditBody',
         );
-        const id = pickString(body, 'id');
+        const id = pickIdentifier(body, 'id');
         const record = validateRecordEntity(
             asObject(
                 body['record'],
@@ -3480,7 +3428,7 @@ export function validateIdeaConversionBody(
     assertOnlyKeys(
         body, IDEA_CONVERSION_KEYS, 'IdeaConversionBody',
     );
-    const projectId = pickString(body, 'projectId');
+    const projectId = pickIdentifier(body, 'projectId');
     if (projectId === '') {
         throw new ValidationError(
             'IdeaConversionBody.projectId must be non-empty',
@@ -3539,7 +3487,7 @@ export function validateIdeaConversionBody(
         assertOnlyKeys(
             row, IDEA_CONVERSION_BASELINE_KEYS, label,
         );
-        const id = asString(row['id'], label + '.id');
+        const id = asIdentifier(row['id'], label + '.id');
         if (id === '') {
             throw new ValidationError(
                 label + '.id must be non-empty',
@@ -3583,7 +3531,7 @@ const OBJECTIVE_CREATE_KEYS: readonly string[] = [
 // objective fields are NOT fully validated here: the org-
 // scoped store stamps organization_id from the verified
 // token and re-validates through validateObjectiveEntity
-// AFTER the stamp, so the body OMITS it. The revision sub-
+// AFTER the stamp, so the body OMITS it. The revision uUOcdPLOGxYyIcuyDTzQxA
 // object is re-validated by the objective_revisions store's
 // own validator; its member_id is a row column (who authored
 // the definition), not state authorship.
@@ -3593,7 +3541,7 @@ export function validateObjectiveCreateBody(
     assertOnlyKeys(
         body, OBJECTIVE_CREATE_KEYS, 'ObjectiveCreateBody',
     );
-    const id = pickString(body, 'id');
+    const id = pickIdentifier(body, 'id');
     if (id === '') {
         throw new ValidationError(
             'ObjectiveCreateBody.id must be non-empty',
@@ -3602,7 +3550,7 @@ export function validateObjectiveCreateBody(
     const objective = asObject(
         body['objective'], 'ObjectiveCreateBody.objective',
     );
-    const revisionId = pickString(body, 'revisionId');
+    const revisionId = pickIdentifier(body, 'revisionId');
     if (revisionId === '') {
         throw new ValidationError(
             'ObjectiveCreateBody.revisionId must be non-empty',
@@ -3615,9 +3563,7 @@ export function validateObjectiveCreateBody(
         pickString(body, 'initialState'),
         'ObjectiveCreateBody.initialState',
     );
-    const initialStateEventId = pickString(
-        body, 'initialStateEventId',
-    );
+    const initialStateEventId = pickIdentifier(body, 'initialStateEventId');
     if (initialStateEventId === '') {
         throw new ValidationError(
             'ObjectiveCreateBody.initialStateEventId'
@@ -3674,7 +3620,7 @@ export function validateFlowCreateBody(
     assertOnlyKeys(
         body, FLOW_CREATE_KEYS, 'FlowCreateBody',
     );
-    const id = pickString(body, 'id');
+    const id = pickIdentifier(body, 'id');
     if (id === '') {
         throw new ValidationError(
             'FlowCreateBody.id must be non-empty',
@@ -3683,7 +3629,7 @@ export function validateFlowCreateBody(
     const flow = asObject(
         body['flow'], 'FlowCreateBody.flow',
     );
-    const projectFlowId = pickString(body, 'projectFlowId');
+    const projectFlowId = pickIdentifier(body, 'projectFlowId');
     if (projectFlowId === '') {
         throw new ValidationError(
             'FlowCreateBody.projectFlowId must be non-empty',
@@ -3698,9 +3644,7 @@ export function validateFlowCreateBody(
             'FlowCreateBody.initialState must be non-empty',
         );
     }
-    const initialStateEventId = pickString(
-        body, 'initialStateEventId',
-    );
+    const initialStateEventId = pickIdentifier(body, 'initialStateEventId');
     if (initialStateEventId === '') {
         throw new ValidationError(
             'FlowCreateBody.initialStateEventId'
@@ -3767,7 +3711,7 @@ export function validateFlowUndoBody(
     body: Record<string, unknown>,
 ): FlowUndoBody {
     assertOnlyKeys(body, FLOW_UNDO_KEYS, 'FlowUndoBody');
-    const eventId = pickString(body, 'eventId');
+    const eventId = pickIdentifier(body, 'eventId');
     if (eventId === '') {
         throw new ValidationError(
             'FlowUndoBody.eventId must be non-empty',
@@ -3812,7 +3756,7 @@ export function validateHumanMemberCreateBody(
     assertOnlyKeys(
         body, HUMAN_MEMBER_CREATE_KEYS, 'HumanMemberCreateBody',
     );
-    const id = pickString(body, 'id');
+    const id = pickIdentifier(body, 'id');
     if (id === '') {
         throw new ValidationError(
             'HumanMemberCreateBody.id must be non-empty',
@@ -3825,9 +3769,7 @@ export function validateHumanMemberCreateBody(
         pickString(body, 'initialState'),
         'HumanMemberCreateBody.initialState',
     );
-    const initialStateEventId = pickString(
-        body, 'initialStateEventId',
-    );
+    const initialStateEventId = pickIdentifier(body, 'initialStateEventId');
     if (initialStateEventId === '') {
         throw new ValidationError(
             'HumanMemberCreateBody.initialStateEventId'
@@ -3890,7 +3832,7 @@ export function validateIdentityCreateBody(
         body, 'kind', ['person', 'service'],
         'identity kind', 'IdentityCreateBody',
     );
-    const id = pickString(body, 'id');
+    const id = pickIdentifier(body, 'id');
     if (id === '') {
         throw new ValidationError(
             'IdentityCreateBody.id must be non-empty',
@@ -3953,7 +3895,7 @@ export function validateWorkOrderCreateBody(
     assertOnlyKeys(
         body, WORK_ORDER_CREATE_KEYS, 'WorkOrderCreateBody',
     );
-    const id = pickString(body, 'id');
+    const id = pickIdentifier(body, 'id');
     if (id === '') {
         throw new ValidationError(
             'WorkOrderCreateBody.id must be non-empty',
@@ -3962,7 +3904,7 @@ export function validateWorkOrderCreateBody(
     const workOrder = asObject(
         body['workOrder'], 'WorkOrderCreateBody.workOrder',
     );
-    const flowWorkOrderId = pickString(body, 'flowWorkOrderId');
+    const flowWorkOrderId = pickIdentifier(body, 'flowWorkOrderId');
     if (flowWorkOrderId === '') {
         throw new ValidationError(
             'WorkOrderCreateBody.flowWorkOrderId'
@@ -4111,7 +4053,7 @@ function parseTransitionRelease(
     const label = 'WorkOrderTransitionBody.release';
     const obj = asObject(rawRelease, label);
     assertOnlyKeys(obj, TRANSITION_RELEASE_KEYS, label);
-    const id = asString(obj['id'], label + '.id');
+    const id = asIdentifier(obj['id'], label + '.id');
     if (id === '') {
         throw new ValidationError(
             label + '.id must be non-empty',
@@ -4168,7 +4110,7 @@ function validateWorkOrderLegacyTransitionBody(
         assertOnlyKeys(
             row, TRANSITION_FIELD_VALUE_KEYS, label,
         );
-        const id = asString(row['id'], label + '.id');
+        const id = asIdentifier(row['id'], label + '.id');
         if (id === '') {
             throw new ValidationError(
                 label + '.id must be non-empty',
@@ -4243,11 +4185,13 @@ function validateWorkOrderInstanceTransitionBody(
             + ' must be non-empty',
         );
     }
-    const instanceId =
-        pickOptionalString(
-            body, 'instance_id',
-            'WorkOrderTransitionBody',
-        ) ?? null;
+    const rawInstanceId = pickOptionalString(
+        body, 'instance_id',
+        'WorkOrderTransitionBody',
+    );
+    const instanceId = rawInstanceId === undefined
+        ? null
+        : asIdentifier(rawInstanceId, 'instance_id');
     const recordTypeId =
         pickOptionalString(
             body, 'record_type_id',
@@ -4346,7 +4290,8 @@ const AI_MEMBER_CREATE_KEYS: readonly string[] = [
 // validated here — the ai_members store re-validates its own
 // body (validateAIMemberEntity) when the composing POST puts
 // it. The member parent (type 'ai') is a server-supplied fact
-// the handler pins, so the body carries only the detail sub-
+// the handler pins, so the body carries only the detail
+// uUOcdPLOGxYyIcuyDTzQxA
 // object (name + the AI fields). Authorship of the initial
 // event is stamped from the verified caller in the route,
 // never the body.
@@ -4356,7 +4301,7 @@ export function validateAIMemberCreateBody(
     assertOnlyKeys(
         body, AI_MEMBER_CREATE_KEYS, 'AIMemberCreateBody',
     );
-    const id = pickString(body, 'id');
+    const id = pickIdentifier(body, 'id');
     if (id === '') {
         throw new ValidationError(
             'AIMemberCreateBody.id must be non-empty',
@@ -4369,9 +4314,7 @@ export function validateAIMemberCreateBody(
         pickString(body, 'initialState'),
         'AIMemberCreateBody.initialState',
     );
-    const initialStateEventId = pickString(
-        body, 'initialStateEventId',
-    );
+    const initialStateEventId = pickIdentifier(body, 'initialStateEventId');
     if (initialStateEventId === '') {
         throw new ValidationError(
             'AIMemberCreateBody.initialStateEventId'
@@ -4405,7 +4348,7 @@ export interface WorkOrderClaimBody {
 
 // Gate for PUT /work-orders/:id/claim. The caller mints
 // both event ids and timestamps; the route reads them via
-// this validator and never calls generateCryptoSafeBase62
+// this validator and never calls generateIdentifier
 // for the claim events. Authorship is server-derived
 // (actor for 'claimed', prior.member_id for
 // 'claim_expired') — never supplied by the caller.
@@ -4418,10 +4361,8 @@ export function validateWorkOrderClaimBody(
         body, WORK_ORDER_CLAIM_KEYS, 'WorkOrderClaimBody',
         WORK_ORDER_CLAIM_OPTIONAL,
     );
-    const claimEventId = pickString(body, 'claimEventId');
-    const expireEventId = pickString(
-        body, 'expireEventId',
-    );
+    const claimEventId = pickIdentifier(body, 'claimEventId');
+    const expireEventId = pickIdentifier(body, 'expireEventId');
     if (claimEventId === '' || expireEventId === '') {
         throw new ValidationError(
             'WorkOrderClaimBody ids must be non-empty',
@@ -4469,7 +4410,7 @@ export function validateWorkOrderReleaseBody(
     assertOnlyKeys(
         body, WORK_ORDER_RELEASE_KEYS, 'WorkOrderReleaseBody',
     );
-    const releaseEventId = pickString(body, 'releaseEventId');
+    const releaseEventId = pickIdentifier(body, 'releaseEventId');
     if (releaseEventId === '') {
         throw new ValidationError(
             'WorkOrderReleaseBody.releaseEventId'
@@ -4501,7 +4442,7 @@ export function validateWorkOrderBindingBody(
         body, WORK_ORDER_BINDING_KEYS,
         'WorkOrderBindingBody',
     );
-    const instanceId = pickString(body, 'instance_id');
+    const instanceId = pickIdentifier(body, 'instance_id');
     if (instanceId === '') {
         throw new ValidationError(
             'WorkOrderBindingBody.instance_id'
@@ -4554,7 +4495,7 @@ export function validateAIMemberEditBody(
         pickString(body, 'state'),
         'AIMemberEditBody.state',
     );
-    const stateEventId = pickString(body, 'stateEventId');
+    const stateEventId = pickIdentifier(body, 'stateEventId');
     if (stateEventId === '') {
         throw new ValidationError(
             'AIMemberEditBody.stateEventId must be non-empty',
@@ -4604,7 +4545,7 @@ export function validateHumanMemberEditBody(
         pickString(body, 'state'),
         'HumanMemberEditBody.state',
     );
-    const stateEventId = pickString(body, 'stateEventId');
+    const stateEventId = pickIdentifier(body, 'stateEventId');
     if (stateEventId === '') {
         throw new ValidationError(
             'HumanMemberEditBody.stateEventId'
@@ -4662,8 +4603,8 @@ export interface GraphDeletion {
 // reads when the deletion is reverted.
 export type GraphRevival = GraphDeletion;
 
-// The deletion/revival triple validator — eventId non-empty
-// string, entityId asGraphId, at via validateTimestampField.
+// The deletion/revival triple validator — eventId and
+// entityId as identifiers, at via validateTimestampField.
 // Shared by FlowGraphDelta.deletions and the undo/redo body
 // revivals (same wire shape, same gate).
 function validateGraphTriple(
@@ -4671,13 +4612,13 @@ function validateGraphTriple(
     label: string,
 ): GraphDeletion {
     const obj = asObject(value, label);
-    const eventId = pickString(obj, 'eventId');
+    const eventId = pickIdentifier(obj, 'eventId');
     if (eventId === '') {
         throw new ValidationError(
             label + '.eventId must be non-empty',
         );
     }
-    const entityId = asGraphId(
+    const entityId = asIdentifier(
         obj['entityId'], label + '.entityId',
     );
     const at = validateTimestampField(obj, 'at', label);
@@ -4716,13 +4657,13 @@ const FLOW_GRAPH_DELTA_KEYS: readonly string[] = [
 ];
 
 // Validates an inbound FlowGraphDelta HTTP body.
-// For each node element: splits the `id` (asGraphId) from
-// the row fields and delegates to validateFlowNodeEntity.
-// Same pattern for edges. Member and attribute event ids
-// are minted base62 strings — validated as non-empty strings.
+// For each node element: splits the `id` (asIdentifier)
+// from the row fields and delegates to
+// validateFlowNodeEntity. Same pattern for edges. Member
+// and attribute event ids are minted identifiers.
 // Delegates the rest to the landed row validators.
-// Deletions: eventId non-empty string, entityId asGraphId,
-// at via validateTimestampField.
+// Deletions: eventId and entityId as identifiers, at via
+// validateTimestampField.
 export function validateFlowGraphDelta(
     body: Record<string, unknown>,
 ): FlowGraphDelta {
@@ -4753,7 +4694,7 @@ export function validateFlowGraphDelta(
                 item,
                 'FlowGraphDelta.nodes[' + i + ']',
             );
-            const id = asGraphId(
+            const id = asIdentifier(
                 obj['id'],
                 'FlowGraphDelta.nodes['
                     + i + '].id',
@@ -4770,7 +4711,7 @@ export function validateFlowGraphDelta(
                 item,
                 'FlowGraphDelta.edges[' + i + ']',
             );
-            const id = asGraphId(
+            const id = asIdentifier(
                 obj['id'],
                 'FlowGraphDelta.edges['
                     + i + '].id',
@@ -4795,7 +4736,7 @@ export function validateFlowGraphDelta(
                 'FlowGraphDelta.memberEvents['
                 + i + ']';
             const obj = asObject(item, label);
-            const id = pickString(obj, 'id');
+            const id = pickIdentifier(obj, 'id');
             if (id === '') {
                 throw new ValidationError(
                     label + '.id must be non-empty',
@@ -4816,7 +4757,7 @@ export function validateFlowGraphDelta(
                 'FlowGraphDelta.attributeEvents['
                 + i + ']';
             const obj = asObject(item, label);
-            const id = pickString(obj, 'id');
+            const id = pickIdentifier(obj, 'id');
             if (id === '') {
                 throw new ValidationError(
                     label + '.id must be non-empty',

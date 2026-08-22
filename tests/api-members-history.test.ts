@@ -29,12 +29,12 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedHumanMember(db, 'current', 'Demo');
+        await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo');
         const res = await handleRequest(
             db,
             req(
                 'GET',
-                '/members/current/versions',
+                '/members/XXZruirZyAOoRpNxaDnpSA/versions',
                 DEV_TOKEN,
             ),
         );

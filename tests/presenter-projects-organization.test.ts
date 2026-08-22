@@ -394,7 +394,7 @@ test(
 test(
     'OrganizationPresenter.buildPage renders'
     + ' overview stats and usage bars with'
-    + ' current/limit values',
+    + ' XXZruirZyAOoRpNxaDnpSA/limit values',
     () => {
         const out = new OrganizationPresenter(
             makeOrganization(), makeStats(),

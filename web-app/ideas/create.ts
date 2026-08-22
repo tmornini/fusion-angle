@@ -11,7 +11,7 @@ import {
     getIdeaEntities,
     postIdeaCreation,
     putIdeaSubmission,
-    generateCryptoSafeBase62,
+    generateIdentifier,
 } from '../app/adapters/index.ts';
 import {
     nextPosition,
@@ -133,7 +133,7 @@ export async function init():
                 formState = readFormFromDom();
                 const ctx = sessionContext();
                 const ideaId =
-                    generateCryptoSafeBase62();
+                    generateIdentifier();
                 const existing =
                     await getIdeaEntities(ctx);
                 const position = nextPosition(
@@ -166,7 +166,7 @@ export async function init():
                 );
                 await putIdeaSubmission(
                     ctx,
-                    generateCryptoSafeBase62(),
+                    generateIdentifier(),
                     ideaId,
                 );
                 navigateTo('ideas');

@@ -123,7 +123,8 @@ test('form codec keeps the last value on duplicate keys', () => {
 });
 
 test('form codec encodes an object to urlencoded', () => {
-    const octets = formBodyCodec.encode({ a: '1', b: 'two' });
+    const octets = formBodyCodec.encode({ a: '1'
+        , b: 'two' });
     assert.equal(octets.toLatin1(), 'a=1&b=two');
 });
 
@@ -151,9 +152,9 @@ test('withBody round-trips a form body by field', () => {
         .fromWire('POST /x HTTP/1.1\r\n\r\n')
         .withBody(
             'application/x-www-form-urlencoded',
-            { a: '1', b: 'two' },
+            { a: 'AjdvjuECVZEgZoFajaIEkg', b: 'two' },
         );
-    assert.equal(message.query('body.a').toText(), '1');
+    assert.equal(message.query('body.a').toText(), 'AjdvjuECVZEgZoFajaIEkg');
     assert.equal(message.query('body.b').toText(), 'two');
 });
 

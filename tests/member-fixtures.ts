@@ -115,7 +115,7 @@ export function makeAIMember(
     );
 }
 
-const MEMBER_ORGANIZATION: Id = '1';
+const MEMBER_ORGANIZATION: Id = 'AjdvjuECVZEgZoFajaIEkg';
 
 async function identityDocumentPair(
     id: Id,
@@ -255,5 +255,5 @@ export async function seedAIMember(
 export async function seedCurrentMember(
     db: MemoryDbAdapter,
 ): Promise<void> {
-    await seedHumanMember(db, 'current', 'Demo User');
+    await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
 }

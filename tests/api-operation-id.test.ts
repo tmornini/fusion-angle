@@ -25,7 +25,8 @@ async () => {
     await seedAdminSchema(db);
     const res = await handleRequest(
         db,
-        new Request('http://localhost/organizations/1/ideas/i1', {
+        new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'ideas/fndCYAsXazdzMUlEGMNIZw', {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -45,7 +46,8 @@ async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/organizations/1/ideas/i2',
+            path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'fxysGbBPBsnCwJNJsyZnkA',
             token: DEV_TOKEN,
             body: validIdea,
             operationId: 'too-short',
@@ -54,8 +56,8 @@ async () => {
     assert.equal(res.status, 400);
 });
 
-test('public PUT with dash/underscore Operation-ID'
-+ ' is not 400',
+test('public PUT with non-canonical Operation-ID'
++ ' is 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -63,13 +65,16 @@ async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/organizations/1/ideas/i2',
+            path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'fxysGbBPBsnCwJNJsyZnkA',
             token: DEV_TOKEN,
             body: validIdea,
             operationId: 'AAAAAAAAAAAAAAAAAAAA-B',
         }),
     );
-    assert.notEqual(res.status, 400);
+    assert.equal(res.status, 400);
+    const body = await res.json() as { error: string };
+    assert.match(body.error, /identifier/);
 });
 
 test('GET without Operation-ID is not 400',
@@ -78,7 +83,8 @@ async () => {
     await seedAdminSchema(db);
     const res = await handleRequest(
         db,
-        new Request('http://localhost/organizations/1/ideas/', {
+        new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'ideas/', {
             headers: {
                 Authorization: 'Bearer ' + DEV_TOKEN,
             },
@@ -95,7 +101,8 @@ async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/organizations/1/ideas/i3',
+            path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'gBbNAWlPwMfXZvevoUPhFQ',
             token: DEV_TOKEN,
             body: validIdea,
             operationId: TEST_OPERATION_ID,
@@ -107,7 +114,7 @@ async () => {
         TEST_OPERATION_ID,
     );
     const rows = await db.pairs.getAll();
-    const written = rows.find((r) => r.uri_id === 'i3');
+    const written = rows.find((r) => r.uri_id === 'gBbNAWlPwMfXZvevoUPhFQ');
     assert.ok(written);
     assert.equal(written.method, 'PUT');
     assert.equal(written.operation_id, TEST_OPERATION_ID);
@@ -115,7 +122,7 @@ async () => {
 
 // 22-char id distinct from TEST_OPERATION_ID so the
 // envelope pin cannot pass by accident on fixture ids.
-const ROTATION_OP = 'RotationOpId0000000001';
+const ROTATION_OP = 'RotationOpId000000000w';
 
 test('rotation envelope copies Operation-ID onto every'
 + ' token-event pair',
@@ -126,13 +133,14 @@ async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/identities/current/tokens/t-root',
+            path: '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
+                + 'udpCrXJSdUfkFbImFbBsWw',
             token: DEV_TOKEN,
             body: {
-                jti: 'jti-root',
-                identity_id: 'current',
+                jti: 'kHAXckusBqJjgcJLEuEurg',
+                identity_id: 'XXZruirZyAOoRpNxaDnpSA',
                 action: 'issued',
-                chain_id: 'chain-1',
+                chain_id: 'RotationChainId000000w',
                 at: '2026-01-01T00:00:00.000000Z',
             },
         }),
@@ -145,7 +153,8 @@ async () => {
         db,
         apiRequest({
             method: 'POST',
-            path: '/identities/current/tokens/jti-root/rotation',
+            path: '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
+                + 'kHAXckusBqJjgcJLEuEurg/rotation',
             token: DEV_TOKEN,
             body: {},
             operationId: ROTATION_OP,
@@ -157,7 +166,8 @@ async () => {
     assert.ok(fresh.length > 1);
     const outer = fresh.find((r) =>
         r.uri_collection
-            === '/identities/current/tokens/jti-root/rotation/',
+            === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
+                + 'kHAXckusBqJjgcJLEuEurg/rotation/',
     );
     assert.ok(outer);
     assert.equal(outer.operation_id, ROTATION_OP);
@@ -176,7 +186,8 @@ async () => {
     const res = await handleRequest(
         db,
         new Request(
-            'http://localhost/organizations/1/invitations/',
+            'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+                + 'invitations/',
             {
                 method: 'POST',
                 headers: {

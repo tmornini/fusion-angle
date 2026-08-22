@@ -23,7 +23,7 @@ import type {
 // before this pin (roadmap R3).
 
 const AT = '2026-01-01T00:00:00.000000Z';
-const FLOW_ID = 'flow-parity-1';
+const FLOW_ID = 'biSFoHVEGnaArklDDblCXQ';
 
 function makeMint(): () => string {
     let n = 0;
@@ -93,7 +93,7 @@ test('buildFlowGraphDelta matches buildSaveEvents'
             baseNode('n-gone'),
         ],
         edges: [
-            baseEdge('e1', 'n1', 'n-gone'),
+            baseEdge('YiJPbufDpkyrZcZCYbUJpg', 'n1', 'n-gone'),
             baseEdge('e-gone', 'n-gone', 'n1'),
         ],
     };
@@ -123,7 +123,7 @@ test('buildFlowGraphDelta matches buildSaveEvents'
             baseNode('n-new', { isCreate: true }),
         ],
         edges: [
-            baseEdge('e1', 'n1', 'n-new'),
+            baseEdge('YiJPbufDpkyrZcZCYbUJpg', 'n1', 'n-new'),
             baseEdge('e-new', 'n1', 'n-new'),
         ],
     };
@@ -156,7 +156,7 @@ test('buildFlowGraphRevivals matches buildRevivals'
         ],
     };
 
-    // Client buildRevivals mints via generateCryptoSafeBase62
+    // Client buildRevivals mints via generateIdentifier
     // internally; server twin takes mint. Compare the
     // structural payload (entityId + at), not eventId bytes.
     const client = buildRevivals(current, target, AT);

@@ -4,8 +4,8 @@ import type {
     SessionCredentials,
 } from './session-credentials.ts';
 import { isCookieSession } from './session-credentials.ts';
-import { generateCryptoSafeBase62 } from
-    '../../../shared/crypto-safe-base62.ts';
+import { generateSecret } from
+    '../../../shared/secret.ts';
 import { sha256Bytes } from '../../../shared/digest.ts';
 import { bytesToBase64Url } from
     '../../../shared/base64url.ts';
@@ -30,7 +30,7 @@ export async function postPasswordLogin(
     username: string,
     password: string,
 ): Promise<SessionCredentials | null> {
-    const verifier = generateCryptoSafeBase62();
+    const verifier = generateSecret();
     const challenge = bytesToBase64Url(
         await sha256Bytes(verifier),
     );

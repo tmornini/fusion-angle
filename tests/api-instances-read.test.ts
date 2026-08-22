@@ -35,6 +35,10 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import {
+    compareIdentifiers,
+    generateIdentifier,
+} from '../shared/identifier.ts';
 
 // Instance GET detail + list: read projection by attribute
 // ACL, advertised ETag is documentVersion of the projected
@@ -44,13 +48,15 @@ import { seedSeat } from './root-admin-fixture.ts';
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const AT2 = '2026-01-02T00:00:00.000000Z';
-const ORGANIZATION = '1';
-const TYPE_ID = 'rt-inst-1';
-const ATTR_PUBLIC = 'attr-pub';
-const ATTR_SECRET = 'attr-sec';
-const INSTANCE_A = 'inst-a';
-const INSTANCE_B = 'inst-b';
-const INSTANCE_C = 'inst-c';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
+const TYPE_ID = 'sleWPUnGznNnXLzcfFswjg';
+const ATTR_PUBLIC = generateIdentifier();
+const ATTR_SECRET = generateIdentifier();
+const INSTANCE_A = generateIdentifier();
+const INSTANCE_B = generateIdentifier();
+const INSTANCE_C = generateIdentifier();
+const ORGANIZATION_B = generateIdentifier();
+const FOREIGN_TYPE_ID = generateIdentifier();
 
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
@@ -98,19 +104,19 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, 'm-member1', {
+    await seedMembershipPair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
-        identity_id: 'member1',
+        identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
         at: AT,
     });
     return {
         db,
         adminToken: await organizationToken(
-            'current', ORGANIZATION,
+            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
         ),
         memberToken: await organizationToken(
-            'member1', ORGANIZATION,
+            'nkgaOHZISTQrILTfPThWCA', ORGANIZATION,
         ),
     };
 }
@@ -353,12 +359,13 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
+    const missing = generateIdentifier();
     const res = await handleRequest(db, req(
-        'GET', detailPath('inst-missing'), memberToken,
+        'GET', detailPath(missing), memberToken,
     ));
     assert.equal(res.status, 404);
     assert.deepEqual(await res.json(), {
-        error: 'Not found: record_instances/inst-missing',
+        error: 'Not found: record_instances/' + missing,
     });
 });
 
@@ -402,9 +409,9 @@ async () => {
     // Below-gate pair under org B: resolveGlobalOwner reads
     // uri_collection org segment. Same instance id must not be
     // live under org 1 (head miss → missedReadError probe).
-    await seedOrganizationDocument(db, 'B', 'Beta');
+    await seedOrganizationDocument(db, ORGANIZATION_B, 'Beta');
     await appendInstancePair(
-        db, 'B', 'rt-foreign', INSTANCE_A,
+        db, ORGANIZATION_B, FOREIGN_TYPE_ID, INSTANCE_A,
         'PUT', {
             set: [
                 {
@@ -425,8 +432,8 @@ async () => {
     });
 });
 
-test('GET list → 200 id-lex ASC; tombstones omitted; '
-+ 'row etag == detail ETag sans quotes',
+test('GET list → 200 identifier order ASC; tombstones'
++ ' omitted; row etag == detail ETag sans quotes',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -440,7 +447,7 @@ async () => {
         read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
         write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
     });
-    // Seed out of id-lex order; include a tombstone.
+    // Seed out of identifier order; include a tombstone.
     const putB = await putInstance(
         db, memberToken, INSTANCE_B, [
             {
@@ -483,15 +490,19 @@ async () => {
     assert.equal(list.status, 200);
     const rows = await list.json() as InstanceDetailWire[];
     assert.equal(rows.length, 2);
-    assert.equal(rows[0]!.id, INSTANCE_A);
-    assert.equal(rows[1]!.id, INSTANCE_B);
+    const ordered = [INSTANCE_A, INSTANCE_B]
+        .slice()
+        .sort(compareIdentifiers);
+    assert.equal(rows[0]!.id, ordered[0]);
+    assert.equal(rows[1]!.id, ordered[1]);
     assert.ok(HEX64.test(rows[0]!.etag!));
     assert.ok(HEX64.test(rows[1]!.etag!));
-    const detailA = await handleRequest(db, req(
-        'GET', detailPath(INSTANCE_A), memberToken,
+    const firstId = rows[0]!.id;
+    const detailFirst = await handleRequest(db, req(
+        'GET', detailPath(firstId), memberToken,
     ));
-    assert.equal(detailA.status, 200);
-    const detailEtag = detailA.headers.get('ETag');
+    assert.equal(detailFirst.status, 200);
+    const detailEtag = detailFirst.headers.get('ETag');
     assert.ok(detailEtag !== null);
     assert.equal(
         rows[0]!.etag,
@@ -500,7 +511,7 @@ async () => {
     assert.deepEqual(rows[0]!.values, [
         {
             attribute_id: ATTR_PUBLIC,
-            value: 'A',
+            value: firstId === INSTANCE_A ? 'A' : 'B',
         },
     ]);
 });

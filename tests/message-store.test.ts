@@ -5,15 +5,15 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { MESSAGE_TABLES } from '../api/db.ts';
-import { generateCryptoSafeBase62 } from
-    '../shared/crypto-safe-base62.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import {
     appendMessagePair,
     formWritePair,
 } from '../api/message-pair.ts';
 import { messageStore } from '../api/message-store.ts';
 
-const COLLECTION = '/organizations/1/ideas/';
+const COLLECTION = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 
 let requestSeq = 0;
 
@@ -35,20 +35,21 @@ async function writePair(
     const deleted = input.method === 'DELETE';
     const pair = await formWritePair({
         method: input.method,
-        pathname: '/organizations/1/ideas/' + input.uriId,
+        pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + input.uriId,
         routePattern: 'organizations/:id/ideas/:id',
         routeSegments: ['ideas', ':id'],
         pathSegments: ['ideas', input.uriId],
         headerFields: [],
         body: { title: input.uriId },
-        requesterIdentityId: 'current',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: nextRequestAt(),
-        organization: '1',
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: deleted ? 204 : 200,
         responseBody: deleted
             ? undefined
             : input.responseBody,
-        operationId: generateCryptoSafeBase62(),
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -71,16 +72,16 @@ async () => {
     const db = await freshDb();
     const put = await writePair(db, {
         method: 'PUT',
-        uriId: 'doc-1',
+        uriId: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { n: 1 },
     });
     await writePair(db, {
         method: 'POST',
-        uriId: 'doc-1',
+        uriId: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { n: 2 },
     });
     const got = await messageStore(db).get(
-        COLLECTION, 'doc-1',
+        COLLECTION, 'XufQcWIKhZshfJYOVNeUSw',
     );
     assert.equal(got?.id, put.id);
 });
@@ -90,15 +91,15 @@ async () => {
     const db = await freshDb();
     await writePair(db, {
         method: 'PUT',
-        uriId: 'doc-1',
+        uriId: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { n: 1 },
     });
     await writePair(db, {
         method: 'DELETE',
-        uriId: 'doc-1',
+        uriId: 'XufQcWIKhZshfJYOVNeUSw',
     });
     const got = await messageStore(db).get(
-        COLLECTION, 'doc-1',
+        COLLECTION, 'XufQcWIKhZshfJYOVNeUSw',
     );
     assert.equal(got, undefined);
 });
@@ -130,16 +131,16 @@ async () => {
     const db = await freshDb();
     const first = await writePair(db, {
         method: 'PUT',
-        uriId: 'doc-1',
+        uriId: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { n: 1 },
     });
     await writePair(db, {
         method: 'PUT',
-        uriId: 'doc-1',
+        uriId: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { n: 2 },
     });
     const got = await messageStore(db).getByVersion(
-        COLLECTION, 'doc-1', first.version,
+        COLLECTION, 'XufQcWIKhZshfJYOVNeUSw', first.version,
     );
     assert.equal(got?.id, first.id);
 });
@@ -149,17 +150,17 @@ async () => {
     const db = await freshDb();
     const first = await writePair(db, {
         method: 'PUT',
-        uriId: 'doc-1',
+        uriId: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { n: 1 },
     });
     const second = await writePair(db, {
         method: 'PUT',
-        uriId: 'doc-1',
+        uriId: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { n: 1 },
     });
     assert.equal(first.version, second.version);
     const got = await messageStore(db).getByVersion(
-        COLLECTION, 'doc-1', first.version,
+        COLLECTION, 'XufQcWIKhZshfJYOVNeUSw', first.version,
     );
     assert.equal(got?.id, second.id);
 });
@@ -169,16 +170,16 @@ async () => {
     const db = await freshDb();
     await writePair(db, {
         method: 'PUT',
-        uriId: 'doc-1',
+        uriId: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { code: 'abc', n: 1 },
     });
     await writePair(db, {
         method: 'PUT',
-        uriId: 'doc-2',
+        uriId: 'YHvbnJSZHECuziaHXcsKpw',
         responseBody: { code: 'zzz', n: 2 },
     });
     const hits = await messageStore(db)
         .getAllWhereBody(COLLECTION, { code: 'abc' });
     assert.equal(hits.length, 1);
-    assert.equal(hits[0]!.uri_id, 'doc-1');
+    assert.equal(hits[0]!.uri_id, 'XufQcWIKhZshfJYOVNeUSw');
 });

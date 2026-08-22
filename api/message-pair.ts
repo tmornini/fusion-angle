@@ -4,8 +4,10 @@ import type {
 } from './types.ts';
 import { nowUtc } from './types.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../shared/crypto-safe-base62.ts';
+    compareIdentifiers,
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
 import { messageAddress } from './message-address.ts';
 import { messageStore } from './message-store.ts';
 import {
@@ -175,11 +177,11 @@ export function requireOperationId(
             { status: HTTP_BAD_REQUEST },
         );
     }
-    if (!/^[A-Za-z0-9_-]{22}$/.test(value)) {
+    if (!isIdentifier(value)) {
         return Response.json(
             {
                 error: 'Operation-ID must be a 22-'
-                    + 'character id',
+                    + 'character identifier',
             },
             { status: HTTP_BAD_REQUEST },
         );
@@ -203,12 +205,13 @@ function headerFieldsWithOperationId(
 export async function formWritePair(
     input: WritePairInput,
 ): Promise<MessagePair> {
-    if (!/^[A-Za-z0-9_-]{22}$/.test(input.operationId)) {
+    if (!isIdentifier(input.operationId)) {
         throw new Error(
-            'operationId must be a 22-character id',
+            'operationId must be a 22-character'
+                + ' identifier',
         );
     }
-    const id = generateCryptoSafeBase62();
+    const id = generateIdentifier();
     const address = messageAddress(
         input.routeSegments, input.pathSegments,
     );
@@ -291,7 +294,7 @@ export async function formAuthPair(
         responseBody,
         operationId: operationId
             ?? hoisted
-            ?? generateCryptoSafeBase62(),
+            ?? generateIdentifier(),
     });
 }
 
@@ -396,7 +399,8 @@ export async function documentHeadAt(
         if (
             head === undefined
             || at > head.at
-            || (at === head.at && id > head.id)
+            || (at === head.at
+                && compareIdentifiers(id, head.id) > 0)
         ) {
             head = { at, id, method };
         }
@@ -884,7 +888,7 @@ export function createdEntityUriId(
 
 // The coverage gate: pairs, wire headers, and the idempotency
 // fast-path fire ONLY for wired route patterns. Seeded with the
-// ideas patterns in Task 1; every Task 2/3 family commit
+// ideas patterns in Task 1; every Task BBjWJsjYIDkTRKIIPrzWRw/3 family commit
 // extends it; the Task 6 exit test asserts it covers every
 // write route — so no intermediate commit ever advertises a
 // Response-ID it did not store.

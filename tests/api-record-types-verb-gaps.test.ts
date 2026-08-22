@@ -16,8 +16,8 @@ import {
 // Mirror of tests/api-records-verb-gaps.test.ts phrasing.
 
 const BASE = 'http://localhost';
-const COLLECTION = '/organizations/1/record-types/';
-const DETAIL = COLLECTION + 'rt-1';
+const COLLECTION = '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/';
+const DETAIL = COLLECTION + 'sjWcXwYGlgxxJOHxzMoUow';
 const HISTORY = DETAIL + '/versions/';
 
 function req(
@@ -116,7 +116,7 @@ test('PATCH .../record-types/:id 405s (no patch'
 // PUT/DELETE detail are live (create is PUT).
 
 const ATTRS = DETAIL + '/attributes/';
-const ATTR_DETAIL = ATTRS + 'attr-1';
+const ATTR_DETAIL = ATTRS + 'VPckAwjJsTGCEkKaOOGRGw';
 
 test('POST .../attributes 405s (no create verb — '
 + 'parity with flat family)', async () => {

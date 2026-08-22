@@ -31,6 +31,8 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
@@ -38,7 +40,7 @@ async function setupMemDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedHumanMember(db, 'current', 'Demo User');
+    await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
     const ctx = createRequestContext(db, await organizationToken());
     return { db, ctx };
 }
@@ -102,11 +104,12 @@ function buildEdge(
 async function createBaseFlow(
     ctx: RequestContext,
     flowId: string,
+    projectId = generateIdentifier(),
 ): Promise<void> {
     await postFlowCreation(ctx, {
         flowId,
-        linkId: flowId + '-link',
-        projectId: 'project-1',
+        linkId: generateIdentifier(),
+        projectId,
         name: 'Test Flow',
     });
 }
@@ -115,11 +118,15 @@ test(
     'postFlowCreation creates flow plus link',
     async () => {
         const { ctx } = await setupMemDb();
-        await createBaseFlow(ctx, 'flow-1');
-        const flow = await ctx.GET<FlowWithGraph>(
-            'organizations/1/flows/flow-1',
+        const projectId = generateIdentifier();
+        await createBaseFlow(
+            ctx, 'aEsGMmBEFaVdWihhHXwCbw', projectId,
         );
-        assert.equal(flow.id, 'flow-1');
+        const flow = await ctx.GET<FlowWithGraph>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw',
+        );
+        assert.equal(flow.id, 'aEsGMmBEFaVdWihhHXwCbw');
         assert.equal(flow.name, 'Test Flow');
         assert.equal(
             flow.lock_timeout,
@@ -131,14 +138,15 @@ test(
                 project_id: string;
                 flow_id: string;
             }[]>(
-                'organizations/1/projects/project-1/flows/',
+                'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                    + projectId + '/flows/',
             );
         const link = links.find(
-            l => l.flow_id === 'flow-1',
+            l => l.flow_id === 'aEsGMmBEFaVdWihhHXwCbw',
         );
         assert.ok(link);
         assert.equal(
-            link.project_id, 'project-1',
+            link.project_id, projectId,
         );
     },
 );
@@ -147,14 +155,15 @@ test(
     'postFlowCreation emits an active state event',
     async () => {
         const { ctx } = await setupMemDb();
-        await createBaseFlow(ctx, 'flow-1');
+        await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
         const events =
             await ctx.GET<StateEntity[]>(
-                'organizations/1/flows/flow-1/versions/',
+                'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
             );
         assert.equal(events.length, 1);
         const ev = events[0]!;
-        assert.equal(ev.entity_id, 'flow-1');
+        assert.equal(ev.entity_id, 'aEsGMmBEFaVdWihhHXwCbw');
         assert.equal(ev.state, 'active');
     },
 );
@@ -163,8 +172,8 @@ test(
     'putFlow emits an updated state event',
     async () => {
         const { ctx } = await setupMemDb();
-        await createBaseFlow(ctx, 'flow-1');
-        await putFlow(ctx, 'flow-1', {
+        await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
+        await putFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw', {
             name: 'Edited',
             isLocked: false,
             isAutoLayout: false,
@@ -175,7 +184,8 @@ test(
         });
         const events =
             await ctx.GET<StateEntity[]>(
-                'organizations/1/flows/flow-1/versions/',
+                'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
             );
         assert.equal(events.length, 2);
         // Family history is DESC — current first.
@@ -190,18 +200,22 @@ test(
     'putFlow persists every FlowSaveShape field',
     async () => {
         const { ctx } = await setupMemDb();
-        await createBaseFlow(ctx, 'flow-1');
-        const start = buildNode('start', {
+        await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
+        const startId = generateIdentifier();
+        const endId = generateIdentifier();
+        const midId = generateIdentifier();
+        const edgeId = generateIdentifier();
+        const start = buildNode(startId, {
             isCreate: true,
         });
-        const complete = buildNode('end', {
+        const complete = buildNode(endId, {
             isArchive: true,
         });
-        const middle = buildNode('mid');
+        const middle = buildNode(midId);
         const edge = buildEdge(
-            'e1', 'start', 'mid',
+            edgeId, startId, midId,
         );
-        await putFlow(ctx, 'flow-1', {
+        await putFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw', {
             name: 'Renamed',
             isLocked: true,
             isAutoLayout: true,
@@ -211,7 +225,8 @@ test(
             edges: [edge],
         });
         const flow = await ctx.GET<FlowWithGraph>(
-            'organizations/1/flows/flow-1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw',
         );
         assert.equal(flow.name, 'Renamed');
         assert.equal(flow.is_locked, true);
@@ -223,7 +238,7 @@ test(
         assert.equal(graph.nodes.length, 3);
         assert.equal(graph.edges.length, 1);
         assert.equal(
-            graph.edges[0]!.id, 'e1',
+            graph.edges[0]!.id, edgeId,
         );
     },
 );
@@ -233,12 +248,16 @@ test(
     + ' (no bleed-through from prior writes)',
     async () => {
         const { ctx } = await setupMemDb();
-        await createBaseFlow(ctx, 'flow-1');
-        const a = buildNode('a');
-        const b = buildNode('b');
-        const ab = buildEdge('ab', 'a', 'b');
-        await putFlow(ctx, 'flow-1', {
-            name: 'v1',
+        await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
+        const aId = generateIdentifier();
+        const bId = generateIdentifier();
+        const a = buildNode(aId);
+        const b = buildNode(bId);
+        const ab = buildEdge(
+            generateIdentifier(), aId, bId,
+        );
+        await putFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw', {
+            name: 'xDyDkxEPwtcNmJVknUHDsg',
             isLocked: false,
             isAutoLayout: false,
             isAutoFit: false,
@@ -246,7 +265,7 @@ test(
             nodes: [a, b],
             edges: [ab],
         });
-        await putFlow(ctx, 'flow-1', {
+        await putFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw', {
             name: 'v2',
             isLocked: false,
             isAutoLayout: false,
@@ -256,12 +275,13 @@ test(
             edges: [],
         });
         const flow = await ctx.GET<FlowWithGraph>(
-            'organizations/1/flows/flow-1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw',
         );
         const graph =
             flow.graph as unknown as StoredGraph;
         assert.equal(graph.nodes.length, 1);
-        assert.equal(graph.nodes[0]!.id, 'a');
+        assert.equal(graph.nodes[0]!.id, aId);
         assert.equal(graph.edges.length, 0);
     },
 );
@@ -271,15 +291,17 @@ test(
     + ' across two starting-from-same callers',
     async () => {
         const { ctx } = await setupMemDb();
-        await createBaseFlow(ctx, 'flow-1');
-        const baseNode = buildNode('base');
+        await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
+        const aAdded = generateIdentifier();
+        const bAdded = generateIdentifier();
+        const baseNode = buildNode(generateIdentifier());
         const callerANodes = [
-            baseNode, buildNode('a-added'),
+            baseNode, buildNode(aAdded),
         ];
         const callerBNodes = [
-            baseNode, buildNode('b-added'),
+            baseNode, buildNode(bAdded),
         ];
-        await putFlow(ctx, 'flow-1', {
+        await putFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw', {
             name: 'caller-A',
             isLocked: false,
             isAutoLayout: false,
@@ -288,7 +310,7 @@ test(
             nodes: callerANodes,
             edges: [],
         });
-        await putFlow(ctx, 'flow-1', {
+        await putFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw', {
             name: 'caller-B',
             isLocked: false,
             isAutoLayout: false,
@@ -298,7 +320,8 @@ test(
             edges: [],
         });
         const flow = await ctx.GET<FlowWithGraph>(
-            'organizations/1/flows/flow-1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw',
         );
         assert.equal(flow.name, 'caller-B');
         const graph =
@@ -306,12 +329,12 @@ test(
         assert.equal(graph.nodes.length, 2);
         assert.ok(
             graph.nodes.some(
-                n => n.id === 'b-added',
+                n => n.id === bAdded,
             ),
         );
         assert.ok(
             !graph.nodes.some(
-                n => n.id === 'a-added',
+                n => n.id === aAdded,
             ),
         );
     },
@@ -325,10 +348,11 @@ test(
     + ' as one updated event',
     async () => {
         const { ctx } = await setupMemDb();
-        await createBaseFlow(ctx, 'flow-1');
+        await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
         const { etag } =
             await ctx.GETWithEtag<FlowWithGraph>(
-                'organizations/1/flows/flow-1',
+                'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + 'aEsGMmBEFaVdWihhHXwCbw',
             );
         const body = {
             ...buildFlowBody({
@@ -342,16 +366,19 @@ test(
             }),
             state: 'updated',
             state_at: '2026-01-01T00:00:00.000000Z',
-            state_event_id: 'fixed-ev',
+            state_event_id: generateIdentifier(),
             graph: { nodes: [], edges: [] },
             graphDelta: EMPTY_GRAPH_DELTA,
             revivals: [],
         };
         const headers = ifMatchHeaders(etag);
-        await ctx.PUT('organizations/1/flows/flow-1', body, headers);
-        await ctx.PUT('organizations/1/flows/flow-1', body, headers);
+        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aEsGMmBEFaVdWihhHXwCbw', body, headers);
+        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aEsGMmBEFaVdWihhHXwCbw', body, headers);
         const events = await ctx.GET<StateEntity[]>(
-            'organizations/1/flows/flow-1/versions/',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
         );
         assert.equal(events.length, 2);
     },
@@ -372,8 +399,8 @@ test(
     + ' at the caller time',
     async () => {
         const { ctx } = await setupMemDb();
-        await createBaseFlow(ctx, 'flow-1');
-        await putFlow(ctx, 'flow-1', {
+        await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
+        await putFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw', {
             name: 'edited',
             isLocked: false,
             isAutoLayout: false,
@@ -382,12 +409,14 @@ test(
             nodes: [],
             edges: [],
         });
-        await ctx.POST('organizations/1/flows/flow-1/undo', {
-            eventId: 'undo-ev',
+        await ctx.POST('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aEsGMmBEFaVdWihhHXwCbw/undo', {
+            eventId: generateIdentifier(),
             at: '2099-01-02T00:00:00.000000Z',
         });
         const events = await ctx.GET<StateEntity[]>(
-            'organizations/1/flows/flow-1/versions/',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
         );
         // Family history is DESC — index 0 is current.
         assert.equal(
@@ -402,15 +431,17 @@ test(
     + ' caller time',
     async () => {
         const { ctx } = await setupMemDb();
-        await createBaseFlow(ctx, 'flow-1');
+        await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
         // versions POST RETIRED (Phase 15 Task 7); redo is
         // client-side document PUT only (performRedo).
         const { etag } =
             await ctx.GETWithEtag<FlowWithGraph>(
-                'organizations/1/flows/flow-1',
+                'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + 'aEsGMmBEFaVdWihhHXwCbw',
             );
         await ctx.PUT(
-            'organizations/1/flows/flow-1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw',
             {
                 ...buildFlowBody({
                     name: 'redone',
@@ -423,7 +454,7 @@ test(
                 }),
                 state: 'updated',
                 state_at: '2099-01-03T00:00:00.000000Z',
-                state_event_id: 'redo-ev',
+                state_event_id: generateIdentifier(),
                 graph: { nodes: [], edges: [] },
                 graphDelta: EMPTY_GRAPH_DELTA,
                 revivals: [],
@@ -431,7 +462,8 @@ test(
             ifMatchHeaders(etag),
         );
         const events = await ctx.GET<StateEntity[]>(
-            'organizations/1/flows/flow-1/versions/',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
         );
         // Family history is DESC — index 0 is current.
         assert.equal(
@@ -467,9 +499,10 @@ test(
     + ' revivals list',
     async () => {
         const { ctx } = await setupMemDb();
-        await createBaseFlow(ctx, 'flow-1');
+        await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
         const flow0 = await ctx.GET<FlowWithGraph>(
-            'organizations/1/flows/flow-1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw',
         );
         const baseline0 =
             flow0.graph as unknown as StoredGraph;
@@ -479,10 +512,11 @@ test(
         const complete = baseline0.nodes.find(
             n => n.isArchive,
         )!;
-        const mid = buildNode('mid');
+        const midId = generateIdentifier();
+        const mid = buildNode(midId);
 
         // 'mid' starts alive — an ordinary edit, no race yet.
-        await putFlow(ctx, 'flow-1', {
+        await putFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw', {
             name: 'Test Flow',
             isLocked: false,
             isAutoLayout: false,
@@ -508,10 +542,11 @@ test(
                 headerFields?:
                     readonly (readonly [string, string])[],
             ): Promise<T> => {
-                if (path === 'organizations/1/flows/flow-1') {
+                if (path === 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + 'aEsGMmBEFaVdWihhHXwCbw') {
                     putCalls += 1;
                     if (putCalls === 1) {
-                        await putFlow(ctx, 'flow-1', {
+                        await putFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw', {
                             name: 'Test Flow',
                             isLocked: false,
                             isAutoLayout: false,
@@ -531,7 +566,7 @@ test(
 
         await putFlow(
             racingCtx,
-            'flow-1',
+            'aEsGMmBEFaVdWihhHXwCbw',
             {
                 name: 'Test Flow',
                 isLocked: false,
@@ -555,7 +590,7 @@ test(
             secondBody as Record<string, unknown>
         ).revivals as { entityId: string }[];
         assert.ok(
-            revivals.some(r => r.entityId === 'mid'),
+            revivals.some(r => r.entityId === midId),
             'the recomputed retry restores the node the'
             + ' race just tombstoned — a revivals list'
             + ' captured once (before the race) would'
@@ -564,12 +599,13 @@ test(
 
         // Behavioral confirmation: 'mid' is visible again.
         const flow = await ctx.GET<FlowWithGraph>(
-            'organizations/1/flows/flow-1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw',
         );
         const graph =
             flow.graph as unknown as StoredGraph;
         assert.ok(
-            graph.nodes.some(n => n.id === 'mid'),
+            graph.nodes.some(n => n.id === midId),
             'mid reappears once its restore rides the'
             + ' retry that actually lands',
         );

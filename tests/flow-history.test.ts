@@ -21,7 +21,7 @@ function buildVersion(
 ): FlowVersion {
     return {
         id,
-        flowId: 'flow-1',
+        flowId: 'aEsGMmBEFaVdWihhHXwCbw',
         name: 'name-' + id,
         isLocked: false,
         isAutoLayout: false,
@@ -71,7 +71,7 @@ test(
         const empty = buildFlowHistorySnapshot(true);
         assert.equal(canRedoFlowEdits(empty), false);
         const filled = appendToRedoStack(
-            empty, buildVersion('v1'),
+            empty, buildVersion('xDyDkxEPwtcNmJVknUHDsg'),
         );
         assert.equal(
             canRedoFlowEdits(filled), true,
@@ -95,7 +95,7 @@ test(
     () => {
         const seeded = appendToRedoStack(
             buildFlowHistorySnapshot(true),
-            buildVersion('v1'),
+            buildVersion('xDyDkxEPwtcNmJVknUHDsg'),
         );
         const off = recordUndoHistoryMark(
             seeded, false,
@@ -103,7 +103,7 @@ test(
         assert.notEqual(off, seeded);
         assert.equal(off.hasUndoHistory, false);
         assert.equal(off.redoStack.length, 1);
-        assert.equal(off.redoStack[0]?.id, 'v1');
+        assert.equal(off.redoStack[0]?.id, 'xDyDkxEPwtcNmJVknUHDsg');
         // Input unchanged.
         assert.equal(seeded.hasUndoHistory, true);
     },
@@ -114,11 +114,11 @@ test(
     + ' without mutating original',
     () => {
         const s = buildFlowHistorySnapshot(true);
-        const v = buildVersion('v1');
+        const v = buildVersion('xDyDkxEPwtcNmJVknUHDsg');
         const next = appendToRedoStack(s, v);
         assert.notEqual(next, s);
         assert.equal(next.redoStack.length, 1);
-        assert.equal(next.redoStack[0]?.id, 'v1');
+        assert.equal(next.redoStack[0]?.id, 'xDyDkxEPwtcNmJVknUHDsg');
         assert.equal(next.hasUndoHistory, true);
         // Original snapshot unchanged.
         assert.equal(s.redoStack.length, 0);
@@ -140,11 +140,11 @@ test(
     'removeFromRedoStack pops the last version'
     + ' and shortens the stack',
     () => {
-        const v1 = buildVersion('v1');
+        const xDyDkxEPwtcNmJVknUHDsg = buildVersion('xDyDkxEPwtcNmJVknUHDsg');
         const v2 = buildVersion('v2');
         const seeded = appendToRedoStack(
             appendToRedoStack(
-                buildFlowHistorySnapshot(true), v1,
+                buildFlowHistorySnapshot(true), xDyDkxEPwtcNmJVknUHDsg,
             ),
             v2,
         );
@@ -153,7 +153,7 @@ test(
         assert.equal(r.version?.id, 'v2');
         assert.equal(r.snapshot.redoStack.length, 1);
         assert.equal(
-            r.snapshot.redoStack[0]?.id, 'v1',
+            r.snapshot.redoStack[0]?.id, 'xDyDkxEPwtcNmJVknUHDsg',
         );
         // Input snapshot unchanged.
         assert.equal(seeded.redoStack.length, 2);

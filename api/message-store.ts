@@ -6,6 +6,8 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
+import { compareIdentifiers } from
+    '../shared/identifier.ts';
 
 // Named reads over the message plane. One document
 // is getAllAtAddress (collection + uri_id). A
@@ -129,9 +131,7 @@ function comparePair(
 ): number {
     if (a.response_at < b.response_at) return -1;
     if (a.response_at > b.response_at) return 1;
-    if (a.id < b.id) return -1;
-    if (a.id > b.id) return 1;
-    return 0;
+    return compareIdentifiers(a.id, b.id);
 }
 
 function latestOf(

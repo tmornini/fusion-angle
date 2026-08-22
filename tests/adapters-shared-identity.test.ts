@@ -23,8 +23,8 @@ async function tokenFor(sub: string): Promise<string> {
 
 test('identity is resolved once from the token', async () => {
     const ctx = createRequestContext(
-        memoryDbAdapter(), await tokenFor('current'));
-    assert.equal(ctx.identity.id, 'current');
+        memoryDbAdapter(), await tokenFor('XXZruirZyAOoRpNxaDnpSA'));
+    assert.equal(ctx.identity.id, 'XXZruirZyAOoRpNxaDnpSA');
     assert.equal(ctx.identity, ctx.identity);
 });
 

@@ -12,6 +12,8 @@ import {
 } from './test-fixtures.ts';
 import { deriveRecordTypeStateHistory } from
     '../api/derive-record-types.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -28,20 +30,20 @@ test(
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/1/record-types/', {
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'create',
-            id: 'rec-1',
+            id: 'rbfHGatkwQzGZJVXKJEeyw',
             record: {
-                organization_id: '1',
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'Quarterly Renewals',
                 description: 'Customer pricing',
                 position: 1,
             },
             attributes: [
                 {
-                    id: 'a-1',
-                    organization_id: '1',
-                    record_id: 'rec-1',
+                    id: 'UQBiHFcwJeCDSnmkPBoYRA',
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
                     name: 'Monthly Fee',
                     attribute_type: 'number',
                     sort_order: 0,
@@ -50,25 +52,28 @@ test(
                 },
             ],
             initialState: 'active',
-            initialStateEventId: 'ev-1',
+            initialStateEventId: generateIdentifier(),
             initialStateAt:
                 '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const record = await GET<{
             id: string;
             name: string;
-        }>(db, 'organizations/1/record-types/rec-1', DEV_TOKEN);
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN);
         assert.equal(record.name, 'Quarterly Renewals');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
         // surviving /versions.
         const history = await GET<{
             state: string;
-        }[]>(db, 'organizations/1/record-types/rec-1/versions/', DEV_TOKEN);
+        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'rbfHGatkwQzGZJVXKJEeyw/versions/', DEV_TOKEN);
         assert.equal(history.length, 1);
         assert.equal(history[0]!.state, 'active');
         const attrs = await GET<unknown[]>(
-            db, 'organizations/1/record-types/rec-1/attributes/', DEV_TOKEN,
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN,
         );
         assert.equal(attrs.length, 1);
     },
@@ -81,30 +86,32 @@ test(
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/1/record-types/', {
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'create',
-            id: 'rec-2',
+            id: 'rcaSzEaORBkezCxyhLhecA',
             record: {
-                organization_id: '1',
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'Empty',
                 description: '',
                 position: 2,
             },
             attributes: [],
             initialState: 'active',
-            initialStateEventId: 'ev-2',
+            initialStateEventId: generateIdentifier(),
             initialStateAt:
                 '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const record = await GET<{ name: string }>(
-            db, 'organizations/1/record-types/rec-2', DEV_TOKEN,
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'rcaSzEaORBkezCxyhLhecA', DEV_TOKEN,
         );
         assert.equal(record.name, 'Empty');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7).
         const history = await GET<{
             state: string;
-        }[]>(db, 'organizations/1/record-types/rec-2/versions/', DEV_TOKEN);
+        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'rcaSzEaORBkezCxyhLhecA/versions/', DEV_TOKEN);
         assert.equal(history.length, 1);
         assert.equal(history[0]!.state, 'active');
         assert.equal('member_id' in history[0]!, false);
@@ -119,26 +126,26 @@ test(
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/1/record-types/', {
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'create',
-            id: 'rec-1',
+            id: 'rbfHGatkwQzGZJVXKJEeyw',
             record: {
-                organization_id: '1',
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'Before',
                 description: '',
                 position: 1,
             },
             attributes: [],
             initialState: 'active',
-            initialStateEventId: 'ev-1',
+            initialStateEventId: generateIdentifier(),
             initialStateAt:
                 '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
-        await POST(db, 'organizations/1/record-types/', {
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'edit',
-            id: 'rec-1',
+            id: 'rbfHGatkwQzGZJVXKJEeyw',
             record: {
-                organization_id: '1',
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'After',
                 description: 'updated',
                 position: 1,
@@ -154,13 +161,14 @@ test(
         const record = await GET<{
             name: string;
             description: string;
-        }>(db, 'organizations/1/record-types/rec-1', DEV_TOKEN);
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN);
         assert.equal(record.name, 'After');
         assert.equal(
             record.description, 'updated',
         );
         const events = await deriveRecordTypeStateHistory(
-            db, '1', 'rec-1',
+            db, 'AjdvjuECVZEgZoFajaIEkg', 'rbfHGatkwQzGZJVXKJEeyw',
         );
         assert.equal(
             events.length, 1,
@@ -174,21 +182,23 @@ test(
     + ' attributes by id and adds new ones',
     async () => {
         const db = await freshDb();
+        const oldAttrId = generateIdentifier();
+        const newAttrId = generateIdentifier();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/1/record-types/', {
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'create',
-            id: 'rec-1',
+            id: 'rbfHGatkwQzGZJVXKJEeyw',
             record: {
-                organization_id: '1',
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'R',
                 description: '',
                 position: 1,
             },
             attributes: [
                 {
-                    id: 'a-old',
-                    organization_id: '1',
-                    record_id: 'rec-1',
+                    id: oldAttrId,
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
                     name: 'Old',
                     attribute_type: 'text',
                     sort_order: 0,
@@ -197,24 +207,24 @@ test(
                 },
             ],
             initialState: 'active',
-            initialStateEventId: 'ev-1',
+            initialStateEventId: generateIdentifier(),
             initialStateAt:
                 '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
-        await POST(db, 'organizations/1/record-types/', {
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'edit',
-            id: 'rec-1',
+            id: 'rbfHGatkwQzGZJVXKJEeyw',
             record: {
-                organization_id: '1',
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'R',
                 description: '',
                 position: 1,
             },
             attributes: [
                 {
-                    id: 'a-new',
-                    organization_id: '1',
-                    record_id: 'rec-1',
+                    id: newAttrId,
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
                     name: 'New',
                     attribute_type: 'text',
                     sort_order: 0,
@@ -224,14 +234,15 @@ test(
             ],
             // Echoed from the create's own known head above.
             state: 'active',
-            removedAttributeIds: ['a-old'],
+            removedAttributeIds: [oldAttrId],
         }, DEV_TOKEN);
         const all = await GET<{
             id: string;
             name: string;
-        }[]>(db, 'organizations/1/record-types/rec-1/attributes/', DEV_TOKEN);
+        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN);
         assert.equal(all.length, 1);
-        assert.equal(all[0]!.id, 'a-new');
+        assert.equal(all[0]!.id, newAttrId);
         assert.equal(all[0]!.name, 'New');
     },
 );
@@ -242,19 +253,19 @@ test(
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/1/record-types/', {
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'create',
-            id: 'rec-1',
+            id: 'rbfHGatkwQzGZJVXKJEeyw',
             record: {
-                organization_id: '1',
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'R', description: '',
                 position: 1,
             },
             attributes: [
                 {
-                    id: 'a-1',
-                    organization_id: '1',
-                    record_id: 'rec-1',
+                    id: 'UQBiHFcwJeCDSnmkPBoYRA',
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
                     name: 'Initial',
                     attribute_type: 'text',
                     sort_order: 0,
@@ -263,23 +274,23 @@ test(
                 },
             ],
             initialState: 'active',
-            initialStateEventId: 'ev-1',
+            initialStateEventId: generateIdentifier(),
             initialStateAt:
                 '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
-        await POST(db, 'organizations/1/record-types/', {
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'edit',
-            id: 'rec-1',
+            id: 'rbfHGatkwQzGZJVXKJEeyw',
             record: {
-                organization_id: '1',
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'R', description: '',
                 position: 1,
             },
             attributes: [
                 {
-                    id: 'a-1',
-                    organization_id: '1',
-                    record_id: 'rec-1',
+                    id: 'UQBiHFcwJeCDSnmkPBoYRA',
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
                     name: 'Renamed',
                     attribute_type: 'number',
                     sort_order: 0,
@@ -296,8 +307,9 @@ test(
             attribute_type: string;
         }>(
             db,
-            'organizations/1/record-types/rec-1'
-            + '/attributes/a-1',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'rbfHGatkwQzGZJVXKJEeyw'
+            + '/attributes/UQBiHFcwJeCDSnmkPBoYRA',
             DEV_TOKEN,
         );
         assert.equal(stored.name, 'Renamed');
@@ -316,19 +328,20 @@ test(
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types/', {
+            () => POST(db
+                , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'create',
-                id: 'rec-1',
+                id: 'rbfHGatkwQzGZJVXKJEeyw',
                 record: {
-                    organization_id: '1',
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                     name: 'R', description: '',
                     position: 1,
                 },
                 attributes: [
                     {
-                        id: 'a-1',
-                        organization_id: '1',
-                        record_id: 'rec-1',
+                        id: 'UQBiHFcwJeCDSnmkPBoYRA',
+                        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                        record_id: 'rbfHGatkwQzGZJVXKJEeyw',
                         name: '',
                         attribute_type: 'text',
                         sort_order: 0,
@@ -337,7 +350,7 @@ test(
                     },
                 ],
                 initialState: 'active',
-                initialStateEventId: 'ev-1',
+                initialStateEventId: generateIdentifier(),
                 initialStateAt:
                     '2025-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
@@ -354,19 +367,20 @@ test(
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types/', {
+            () => POST(db
+                , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'create',
-                id: 'rec-1',
+                id: 'rbfHGatkwQzGZJVXKJEeyw',
                 record: {
-                    organization_id: '1',
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                     name: 'R', description: '',
                     position: 1,
                 },
                 attributes: [
                     {
-                        id: 'a-1',
-                        organization_id: '1',
-                        record_id: 'rec-other',
+                        id: 'UQBiHFcwJeCDSnmkPBoYRA',
+                        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                        record_id: generateIdentifier(),
                         name: 'X',
                         attribute_type: 'text',
                         sort_order: 0,
@@ -375,7 +389,7 @@ test(
                     },
                 ],
                 initialState: 'active',
-                initialStateEventId: 'ev-1',
+                initialStateEventId: generateIdentifier(),
                 initialStateAt:
                     '2025-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
@@ -391,11 +405,12 @@ test(
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types/', {
+            () => POST(db
+                , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'destroy',
-                id: 'rec-1',
+                id: 'rbfHGatkwQzGZJVXKJEeyw',
                 record: {
-                    organization_id: '1',
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                     name: 'R', description: '',
                     position: 1,
                 },
@@ -413,17 +428,18 @@ test(
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types/', {
+            () => POST(db
+                , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'create',
-                id: 'rec-1',
+                id: 'rbfHGatkwQzGZJVXKJEeyw',
                 record: {
-                    organization_id: '1',
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                     name: 'R', description: '',
                     position: 1,
                 },
                 attributes: [],
                 initialState: 'pending',
-                initialStateEventId: 'ev-1',
+                initialStateEventId: generateIdentifier(),
                 initialStateAt:
                     '2025-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
@@ -439,17 +455,18 @@ test(
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types/', {
+            () => POST(db
+                , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'create',
-                id: 'rec-1',
+                id: 'rbfHGatkwQzGZJVXKJEeyw',
                 record: {
-                    organization_id: '1',
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                     name: 'R', description: '',
                     position: 1,
                 },
                 attributes: [],
                 initialState: 'active',
-                initialStateEventId: 'ev-1',
+                initialStateEventId: generateIdentifier(),
                 initialStateAt:
                     '2025-01-01T00:00:00.000000Z',
                 extra: 'forbidden',
@@ -466,11 +483,12 @@ test(
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types/', {
+            () => POST(db
+                , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'edit',
-                id: 'rec-1',
+                id: 'rbfHGatkwQzGZJVXKJEeyw',
                 record: {
-                    organization_id: '1',
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                     name: 'R', description: '',
                     position: 1,
                 },
@@ -486,19 +504,20 @@ test(
     + ' initialStateAt to the initial state event',
     async () => {
         const db = await freshDb();
+        const recId = generateIdentifier();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/1/record-types/', {
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'create',
-            id: 'rec-at',
+            id: recId,
             record: {
-                organization_id: '1',
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'Timed Record',
                 description: '',
                 position: 1,
             },
             attributes: [],
             initialState: 'active',
-            initialStateEventId: 'ev-at',
+            initialStateEventId: generateIdentifier(),
             // Far-future timestamp forces a distinct, verifiable
             // at value so the test can confirm the caller's time
             // was threaded to the event — not a server nowUtc().
@@ -510,10 +529,11 @@ test(
         const history = await GET<{
             id: string;
             state: string;
-        }[]>(db, 'organizations/1/record-types/rec-at/versions/', DEV_TOKEN);
+        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + recId + '/versions/', DEV_TOKEN);
         assert.equal(history.length, 1);
         const current = history[0]!;
-        assert.equal(current.id, 'rec-at');
+        assert.equal(current.id, recId);
         assert.equal(current.state, 'active');
         assert.equal('state_at' in current, false);
     },
@@ -528,23 +548,25 @@ test(
         // a raw colliding states row no longer aborts the
         // pair-plane create.
     // Phase Final Stage B: states table retired.
-        await POST(db, 'organizations/1/record-types/', {
+        const recId = generateIdentifier();
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'create',
-            id: 'rec-survives',
+            id: recId,
             record: {
-                organization_id: '1',
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'Survives', description: '',
                 position: 1,
             },
             attributes: [],
             initialState: 'active',
-            initialStateEventId: 'ev-x',
+            initialStateEventId: generateIdentifier(),
             initialStateAt:
                 '2099-07-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const rec = await GET<{ id: string }>(
-            db, 'organizations/1/record-types/rec-survives', DEV_TOKEN,
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + recId, DEV_TOKEN,
         );
-        assert.equal(rec.id, 'rec-survives');
+        assert.equal(rec.id, recId);
     },
 );

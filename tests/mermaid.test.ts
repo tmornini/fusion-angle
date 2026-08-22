@@ -2,13 +2,18 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
     generateMermaid,
+    mermaidIdOf,
 } from '../web-app/app/mermaid-generate.ts';
 import {
     parseMermaid,
 } from '../web-app/app/mermaid-parse.ts';
+import {
+    encodeIdentifier,
+    generateIdentifier,
+} from '../shared/identifier.ts';
 
 const minimalGraph = {
-    id: 'f1',
+    id: 'ZOousbbnzpqlxJExVAruYQ',
     name: 'Flow',
     isLocked: false,
     isAutoLayout: true,
@@ -29,11 +34,12 @@ test('generateMermaid emits flowchart LR header', () => {
 });
 
 test('generateMermaid emits start with stadium brackets', () => {
+    const id = generateIdentifier();
     const result = generateMermaid({
         ...minimalGraph,
         nodes: [
             {
-                id: 'n1',
+                id,
                 name: 'Begin',
                 positionX: 0,
                 positionY: 0,
@@ -44,15 +50,18 @@ test('generateMermaid emits start with stadium brackets', () => {
             },
         ],
     } as never);
-    assert.match(result, /n1\(\[Begin\]\)/);
+    assert.ok(result.includes(
+        mermaidIdOf(id) + '([Begin])',
+    ));
 });
 
 test('generateMermaid emits complete with triple parens', () => {
+    const id = generateIdentifier();
     const result = generateMermaid({
         ...minimalGraph,
         nodes: [
             {
-                id: 'n2',
+                id,
                 name: 'Archive',
                 positionX: 0,
                 positionY: 0,
@@ -63,16 +72,55 @@ test('generateMermaid emits complete with triple parens', () => {
             },
         ],
     } as never);
-    assert.match(result, /n2\(\(\(Archive\)\)\)/);
+    assert.ok(result.includes(
+        mermaidIdOf(id) + '(((Archive)))',
+    ));
 });
 
-test('generateMermaid sanitizes dashes in IDs', () => {
+test('generateMermaid mermaid ids are injective', () => {
+    const dashBytes = new Uint8Array(16);
+    dashBytes[0] = 62 << 2;
+    const underBytes = new Uint8Array(16);
+    underBytes[0] = 63 << 2;
+    const dashId = encodeIdentifier(dashBytes);
+    const underId = encodeIdentifier(underBytes);
+    let diffs = 0;
+    for (let i = 0; i < dashId.length; i++) {
+        if (dashId[i] !== underId[i]) {
+            diffs += 1;
+            assert.equal(dashId[i], '-');
+            assert.equal(underId[i], '_');
+        }
+    }
+    assert.equal(diffs, 1);
+    assert.notEqual(
+        mermaidIdOf(dashId),
+        mermaidIdOf(underId),
+    );
+    assert.match(
+        mermaidIdOf(dashId),
+        /^[0-9a-f]{32}$/,
+    );
+    assert.match(
+        mermaidIdOf(underId),
+        /^[0-9a-f]{32}$/,
+    );
     const result = generateMermaid({
         ...minimalGraph,
         nodes: [
             {
-                id: 'a-b-c',
-                name: 'X',
+                id: dashId,
+                name: 'Dash',
+                positionX: 0,
+                positionY: 0,
+                isCreate: false,
+                isArchive: false,
+                memberIds: [],
+                attributes: [],
+            },
+            {
+                id: underId,
+                name: 'Under',
                 positionX: 0,
                 positionY: 0,
                 isCreate: false,
@@ -82,16 +130,24 @@ test('generateMermaid sanitizes dashes in IDs', () => {
             },
         ],
     } as never);
-    assert.match(result, /a_b_c\[X\]/);
-    assert.doesNotMatch(result, /a-b-c/);
+    const dashHex = mermaidIdOf(dashId);
+    const underHex = mermaidIdOf(underId);
+    assert.ok(result.includes(dashHex + '[Dash]'));
+    assert.ok(
+        result.includes(underHex + '[Under]'),
+    );
+    assert.ok(!result.includes(dashId));
+    assert.ok(!result.includes(underId));
 });
 
 test('generateMermaid emits labeled edges', () => {
+    const fromId = generateIdentifier();
+    const toId = generateIdentifier();
     const result = generateMermaid({
         ...minimalGraph,
         nodes: [
             {
-                id: 'a', name: 'A',
+                id: fromId, name: 'A',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: false,
@@ -99,7 +155,7 @@ test('generateMermaid emits labeled edges', () => {
                 attributes: [],
             },
             {
-                id: 'b', name: 'B',
+                id: toId, name: 'B',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: false,
@@ -109,23 +165,27 @@ test('generateMermaid emits labeled edges', () => {
         ],
         edges: [
             {
-                id: 'e1', fromNodeId: 'a',
-                toNodeId: 'b', name: 'go',
+                id: 'YiJPbufDpkyrZcZCYbUJpg',
+                fromNodeId: fromId,
+                toNodeId: toId, name: 'go',
             },
         ],
     } as never);
-    assert.match(
-        result,
-        /a -->\|go\| b/,
-    );
+    assert.ok(result.includes(
+        mermaidIdOf(fromId)
+            + ' -->|go| '
+            + mermaidIdOf(toId),
+    ));
 });
 
 test('generateMermaid emits unlabeled edges', () => {
+    const fromId = generateIdentifier();
+    const toId = generateIdentifier();
     const result = generateMermaid({
         ...minimalGraph,
         nodes: [
             {
-                id: 'a', name: 'A',
+                id: fromId, name: 'A',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: false,
@@ -133,7 +193,7 @@ test('generateMermaid emits unlabeled edges', () => {
                 attributes: [],
             },
             {
-                id: 'b', name: 'B',
+                id: toId, name: 'B',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: false,
@@ -143,21 +203,27 @@ test('generateMermaid emits unlabeled edges', () => {
         ],
         edges: [
             {
-                id: 'e1', fromNodeId: 'a',
-                toNodeId: 'b', name: '',
+                id: 'YiJPbufDpkyrZcZCYbUJpg',
+                fromNodeId: fromId,
+                toNodeId: toId, name: '',
             },
         ],
     } as never);
-    assert.match(result, /a --> b/);
+    assert.ok(result.includes(
+        mermaidIdOf(fromId)
+            + ' --> '
+            + mermaidIdOf(toId),
+    ));
     assert.doesNotMatch(result, /\|/);
 });
 
 test('generateMermaid quotes labels with special chars', () => {
+    const id = generateIdentifier();
     const result = generateMermaid({
         ...minimalGraph,
         nodes: [
             {
-                id: 'n1',
+                id,
                 name: 'Has [bracket]',
                 positionX: 0, positionY: 0,
                 isCreate: false,
@@ -167,10 +233,10 @@ test('generateMermaid quotes labels with special chars', () => {
             },
         ],
     } as never);
-    assert.match(
-        result,
-        /n1\["Has \[bracket\]"\]/,
-    );
+    assert.ok(result.includes(
+        mermaidIdOf(id)
+            + '["Has [bracket]"]',
+    ));
 });
 
 test('parseMermaid extracts simple flowchart', () => {
@@ -225,11 +291,14 @@ test('parseMermaid extracts labeled edges', () => {
 });
 
 test('mermaid round-trip preserves structure', () => {
+    const startId = generateIdentifier();
+    const midId = generateIdentifier();
+    const endId = generateIdentifier();
     const original = {
         ...minimalGraph,
         nodes: [
             {
-                id: 's', name: 'Create',
+                id: startId, name: 'Create',
                 positionX: 0, positionY: 0,
                 isCreate: true,
                 isArchive: false,
@@ -237,7 +306,7 @@ test('mermaid round-trip preserves structure', () => {
                 attributes: [],
             },
             {
-                id: 'm', name: 'Middle',
+                id: midId, name: 'Middle',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: false,
@@ -245,7 +314,7 @@ test('mermaid round-trip preserves structure', () => {
                 attributes: [],
             },
             {
-                id: 'e', name: 'Archive',
+                id: endId, name: 'Archive',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: true,
@@ -255,12 +324,14 @@ test('mermaid round-trip preserves structure', () => {
         ],
         edges: [
             {
-                id: 'e1', fromNodeId: 's',
-                toNodeId: 'm', name: '',
+                id: 'YiJPbufDpkyrZcZCYbUJpg',
+                fromNodeId: startId,
+                toNodeId: midId, name: '',
             },
             {
-                id: 'e2', fromNodeId: 'm',
-                toNodeId: 'e', name: 'done',
+                id: generateIdentifier(),
+                fromNodeId: midId,
+                toNodeId: endId, name: 'done',
             },
         ],
     } as never;
@@ -285,11 +356,12 @@ test('mermaid round-trip preserves structure', () => {
 // instructions deliberately do NOT round-trip.
 // Pin it so a future reader does not "fix" it.
 test('mermaid drops node task instructions', () => {
+    const id = generateIdentifier();
     const text = generateMermaid({
         ...minimalGraph,
         nodes: [
             {
-                id: 's', name: 'Create',
+                id, name: 'Create',
                 positionX: 0, positionY: 0,
                 isCreate: true,
                 isArchive: false,

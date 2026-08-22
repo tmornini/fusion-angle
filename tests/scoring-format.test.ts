@@ -11,16 +11,19 @@ import type { ObjectiveId } from '../api/types.ts';
 test('latestPerPair keeps the latest by at',
     () => {
         const rows = [
-            { projectId: 'p1', objectiveId: 'o1',
+            { projectId: 'pnXmXrxOWayANgDLdCjuBw'
+                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
               score: 50,
               at: '2026-05-14T00:00:00.000000Z' },
-            { projectId: 'p1', objectiveId: 'o1',
+            { projectId: 'pnXmXrxOWayANgDLdCjuBw'
+                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
               score: 60,
               at: '2026-05-15T00:00:00.000000Z' },
-            { projectId: 'p1', objectiveId: 'o2',
+            { projectId: 'pnXmXrxOWayANgDLdCjuBw', objectiveId: 'o2',
               score: -20,
               at: '2026-05-14T00:00:00.000000Z' },
-            { projectId: 'p2', objectiveId: 'o1',
+            { projectId: 'prBESZPjJDiuXCeZLmbiVw'
+                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
               score: 10,
               at: '2026-05-14T00:00:00.000000Z' },
         ];
@@ -31,9 +34,13 @@ test('latestPerPair keeps the latest by at',
                 [r.projectId + ':'
                     + r.objectiveId, r.score]),
         );
-        assert.equal(byKey.get('p1:o1'), 60);
-        assert.equal(byKey.get('p1:o2'), -20);
-        assert.equal(byKey.get('p2:o1'), 10);
+        assert.equal(byKey.get(
+            'pnXmXrxOWayANgDLdCjuBw:ohqxgUBEaFQwYbXsonRPmg',
+        ), 60);
+        assert.equal(byKey.get('pnXmXrxOWayANgDLdCjuBw:o2'), -20);
+        assert.equal(byKey.get(
+            'prBESZPjJDiuXCeZLmbiVw:ohqxgUBEaFQwYbXsonRPmg',
+        ), 10);
     });
 
 test('formatSigned emits + for positive', () => {
@@ -55,7 +62,7 @@ test('toneForScore maps to canonical tone vocabulary', () => {
 });
 
 const positions = new Map<ObjectiveId, number>([
-    ['o1' as ObjectiveId, 0],
+    ['ohqxgUBEaFQwYbXsonRPmg' as ObjectiveId, 0],
     ['o2' as ObjectiveId, 1],
     ['o3' as ObjectiveId, 2],
 ]);
@@ -75,7 +82,7 @@ test(
     () => {
         assert.equal(
             weightedMeanByPosition(
-                [{ objectiveId: 'o1' as ObjectiveId,
+                [{ objectiveId: 'ohqxgUBEaFQwYbXsonRPmg' as ObjectiveId,
                    score: 42 }],
                 positions,
             ),
@@ -87,13 +94,13 @@ test(
 test(
     'weightedMeanByPosition applies 0.95 decay by position',
     () => {
-        // o1 (pos 0, w=1.0) + o2 (pos 1, w=0.95)
+        // ohqxgUBEaFQwYbXsonRPmg (pos 0, w=1.0) + o2 (pos 1, w=0.95)
         // weightedSum = 60*1.0 + 40*0.95 = 98
         // weightTotal = 1.95
         // mean = 98 / 1.95 = 50.256 → round = 50
         const result = weightedMeanByPosition(
             [
-                { objectiveId: 'o1' as ObjectiveId,
+                { objectiveId: 'ohqxgUBEaFQwYbXsonRPmg' as ObjectiveId,
                   score: 60 },
                 { objectiveId: 'o2' as ObjectiveId,
                   score: 40 },
@@ -113,7 +120,7 @@ test(
             [
                 { objectiveId: 'o2' as ObjectiveId,
                   score: 40 },
-                { objectiveId: 'o1' as ObjectiveId,
+                { objectiveId: 'ohqxgUBEaFQwYbXsonRPmg' as ObjectiveId,
                   score: 60 },
             ],
             positions,

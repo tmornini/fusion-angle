@@ -21,6 +21,8 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { messageStore } from '../api/message-store.ts';
 import { setClockForTest, resetClock } from '../api/types.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 function pairJsonOf(message: string): {
     readonly body: Record<string, unknown>;
@@ -84,7 +86,8 @@ test('a document PUT with a new state writes wire entity'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/doc-1', token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'XufQcWIKhZshfJYOVNeUSw', token,
         ideaDocument('Fresh', 'active'),
     ));
     assert.equal(res.status, 201);
@@ -92,7 +95,9 @@ test('a document PUT with a new state writes wire entity'
     assert.equal(putWire.title, 'Fresh');
     assert.equal(putWire.state, 'active');
     const getRes = await handleRequest(
-        db, req('GET', '/organizations/1/ideas/doc-1', token),
+        db, req('GET'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'XufQcWIKhZshfJYOVNeUSw', token),
     );
     assert.equal(getRes.status, 200);
     const getWire = await getRes.json() as {
@@ -101,10 +106,11 @@ test('a document PUT with a new state writes wire entity'
     };
     assert.equal(getWire.title, 'Fresh');
     assert.equal(getWire.state, 'active');
-    const events = await deriveIdeaStateHistory(db, '1', 'doc-1');
+    const events = await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
+        , 'XufQcWIKhZshfJYOVNeUSw');
     assert.equal(events.length, 1);
     assert.equal(events[0]!.state, 'active');
-    assert.equal(events[0]!.member_id, 'current');
+    assert.equal(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
 test('a state-unchanged edit writes no second event',
@@ -112,18 +118,23 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/doc-2', token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'YHvbnJSZHECuziaHXcsKpw', token,
         ideaDocument('First', 'active'),
     ));
     const edit = await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/doc-2', token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'YHvbnJSZHECuziaHXcsKpw', token,
         ideaDocument('Second', 'active'),
     ));
     assert.equal(edit.status, 201);
-    const events = await deriveIdeaStateHistory(db, '1', 'doc-2');
+    const events = await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
+        , 'YHvbnJSZHECuziaHXcsKpw');
     assert.equal(events.length, 1);
     const getRes = await handleRequest(
-        db, req('GET', '/organizations/1/ideas/doc-2', token),
+        db, req('GET'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'YHvbnJSZHECuziaHXcsKpw', token),
     );
     const wire = await getRes.json() as { title: string };
     assert.equal(wire.title, 'Second');
@@ -135,12 +146,17 @@ test('a byte-identical resend converges: one event,'
     const token = await organizationToken();
     const body = ideaDocument('Idempotent', 'active');
     await handleRequest(
-        db, req('PUT', '/organizations/1/ideas/doc-3', token, body),
+        db, req('PUT'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'YIuEjXvCwXAgrpyvcvLJjg', token, body),
     );
     await handleRequest(
-        db, req('PUT', '/organizations/1/ideas/doc-3', token, body),
+        db, req('PUT'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'YIuEjXvCwXAgrpyvcvLJjg', token, body),
     );
-    const events = await deriveIdeaStateHistory(db, '1', 'doc-3');
+    const events = await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
+        , 'YIuEjXvCwXAgrpyvcvLJjg');
     assert.equal(events.length, 1);
     assert.equal((await db.pairs.getAll()).length, 3);
     assert.equal((await db.pairs.getAll()).length, 3);
@@ -153,21 +169,24 @@ async () => {
     const token = await organizationToken();
     const body = ideaDocument('Same Body', 'active');
     const first = await handleRequest(
-        db, req('PUT', '/organizations/1/ideas/same-1', token, body),
+        db, req('PUT'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'tmPPRaXkMetWxTSisIPFLA', token, body),
     );
     assert.equal(first.status, 201);
     const firstEtag = first.headers.get('ETag');
     assert.ok(firstEtag !== null && firstEtag !== '');
-    const prefix = '/organizations/1/ideas/';
+    const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
     const before = (await db.pairs.getAllWhere(
         'uri_collection', prefix,
-    )).filter((row) => row.uri_id === 'same-1');
+    )).filter((row) => row.uri_id === 'tmPPRaXkMetWxTSisIPFLA');
     assert.equal(before.length, 1);
     // Different hoisted header → different request hash,
     // so this is same-body, not replay.
     const second = await handleRequest(
         db,
-        new Request('http://localhost/organizations/1/ideas/same-1', {
+        new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'ideas/tmPPRaXkMetWxTSisIPFLA', {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -182,7 +201,7 @@ async () => {
     assert.equal(second.headers.get('ETag'), firstEtag);
     const after = (await db.pairs.getAllWhere(
         'uri_collection', prefix,
-    )).filter((row) => row.uri_id === 'same-1');
+    )).filter((row) => row.uri_id === 'tmPPRaXkMetWxTSisIPFLA');
     assert.equal(after.length, 1);
 });
 
@@ -191,11 +210,14 @@ test('the pair request body carries domain state;'
     const db = await freshDb();
     const token = await organizationToken();
     await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/doc-4', token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'YKtyCizelcaUAaHGwetojA', token,
         ideaDocument('Wired', 'in_review'),
     ));
     const getRes = await handleRequest(
-        db, req('GET', '/organizations/1/ideas/doc-4', token),
+        db, req('GET'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'YKtyCizelcaUAaHGwetojA', token),
     );
     const wire = await getRes.json() as {
         title: string;
@@ -231,27 +253,33 @@ test('the pair request body carries domain state;'
 test('a same-state edit by a DIFFERENT member never'
 + ' reattributes the head event\'s authorship', async () => {
     const db = await freshDb();
-    await seedOrganizationMember(db, 'member-b');
-    const tokenA = await organizationToken('current');
-    const tokenB = await organizationToken('member-b');
+    const memberB = generateIdentifier();
+    await seedOrganizationMember(db, memberB);
+    const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
+    const tokenB = await organizationToken(memberB);
     const created = await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/doc-5', tokenA,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'YLbPBVpBLImxPQRqLKPKLw', tokenA,
         ideaDocument('First', 'active'),
     ));
     assert.equal(created.status, 201);
 
     const edited = await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/doc-5', tokenB,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'YLbPBVpBLImxPQRqLKPKLw', tokenB,
         ideaDocument('Second', 'active'),
     ));
     assert.equal(edited.status, 201);
 
-    const events = await deriveIdeaStateHistory(db, '1', 'doc-5');
+    const events = await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
+        , 'YLbPBVpBLImxPQRqLKPKLw');
     assert.equal(events.length, 1);
-    assert.equal(events[0]!.member_id, 'current');
+    assert.equal(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 
     const getRes = await handleRequest(
-        db, req('GET', '/organizations/1/ideas/doc-5', tokenA),
+        db, req('GET'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'YLbPBVpBLImxPQRqLKPKLw', tokenA),
     );
     const wire = await getRes.json() as { title: string };
     assert.equal(wire.title, 'Second');
@@ -270,12 +298,14 @@ test('GET /organizations/:id/ideas/:id body octets equal the live PUT '
             () => Date.parse('2026-06-01T00:00:00Z'),
         );
         const put = await handleRequest(db, req(
-            'PUT', '/organizations/1/ideas/stream-1', token,
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'uTrFecjHJxcgUGbYxyDPfw', token,
             ideaDocument('Streamed', 'active'),
         ));
         assert.equal(put.status, 201);
         const stored = await messageStore(db).get(
-            '/organizations/1/ideas/', 'stream-1',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                , 'uTrFecjHJxcgUGbYxyDPfw',
         );
         assert.ok(stored !== undefined);
         const storedBody = HttpMessage.fromWire(
@@ -286,7 +316,9 @@ test('GET /organizations/:id/ideas/:id body octets equal the live PUT '
             () => Date.parse('2026-06-01T00:00:02Z'),
         );
         const getRes = await handleRequest(
-            db, req('GET', '/organizations/1/ideas/stream-1', token),
+            db, req('GET'
+                , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'uTrFecjHJxcgUGbYxyDPfw', token),
         );
         assert.equal(getRes.status, 200);
         assert.equal(
@@ -309,13 +341,14 @@ test('stored PUT body equals ideaEntityOf of the same chain',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    const id = 'idea-g1-stream';
+    const id = generateIdentifier();
     const body = ideaDocument('Streamed', 'active');
     const put = await handleRequest(
-        db, req('PUT', '/organizations/1/ideas/' + id, token, body),
+        db, req('PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id
+            , token, body),
     );
     assert.equal(put.status, 201);
-    const prefix = '/organizations/1/ideas/';
+    const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
     const stored = JSON.parse(
         await storedPutBodyText(db, prefix, id),
     );
@@ -326,13 +359,14 @@ async () => {
             method: 'PUT',
             body,
         },
-        '1',
+        'AjdvjuECVZEgZoFajaIEkg',
         { state: 'active' },
     );
     assert.deepEqual(stored, expected);
-    assert.deepEqual(stored, await deriveIdea(db, '1', id));
+    assert.deepEqual(stored, await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg'
+        , id));
     const later = await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/' + id, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id, token,
         ideaDocument('Revised', 'in_review'),
     ));
     assert.equal(later.status, 201);
@@ -341,7 +375,7 @@ async () => {
     );
     assert.deepEqual(
         after,
-        await deriveIdea(db, '1', id),
+        await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg', id),
     );
     assert.equal(after.state, 'in_review');
     assert.equal(after.title, 'Revised');

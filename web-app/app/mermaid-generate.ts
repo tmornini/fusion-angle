@@ -2,11 +2,20 @@ import type {
     FlowGraph,
     GraphNode,
 } from './adapters/flows.ts';
+import { decodeIdentifier } from
+    '../../shared/identifier.ts';
 
 const MERMAID_SPECIAL = /[\[\](){}|>]/;
 
-function sanitizeId(id: string): string {
-    return id.replaceAll('-', '_');
+export function mermaidIdOf(
+    identifier: string,
+): string {
+    const bytes = decodeIdentifier(identifier);
+    let hex = '';
+    for (const b of bytes) {
+        hex += b.toString(16).padStart(2, '0');
+    }
+    return hex;
 }
 
 function quoteLabel(name: string): string {
@@ -21,7 +30,7 @@ function quoteLabel(name: string): string {
 function buildNodeLine(
     node: GraphNode,
 ): string {
-    const id = sanitizeId(node.id);
+    const id = mermaidIdOf(node.id);
     const label = quoteLabel(node.name);
     if (node.isCreate) {
         return '  ' + id
@@ -55,9 +64,9 @@ export function generateMermaid(
 
     for (const edge of graph.edges) {
         const from =
-            sanitizeId(edge.fromNodeId);
+            mermaidIdOf(edge.fromNodeId);
         const to =
-            sanitizeId(edge.toNodeId);
+            mermaidIdOf(edge.toNodeId);
         if (edge.name.length > 0) {
             const label =
                 quoteLabel(edge.name);

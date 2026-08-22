@@ -25,27 +25,27 @@ import { buildFlows } from './flows.ts';
 const mockFlows = buildFlows();
 
 const woId =
-    'wg25b0R2gwy5kYPIhQB6cS';
+    'xqcXYHXBJJXcLkRYkRngKA';
 const woFlowGraph =
     mockFlows[0]!.graph;
 const woCreated = daysFromNow(-14, 10, 0);
 const woNodeNew =
-    'lzkYvFNCEHARBQmZ4YHAn4';
+    'laXQcGGyWrbEiExtgkyCcw';
 const woNodeCapture =
-    'KoWNvvHG8d3TLAVN5nrWGX';
+    'KWpWgeKhKyoyBDEymUgcmg';
 const woNodeReview =
-    'wDcQp0cIycrtWXEde6IsB1';
+    'xmghdGZDgLKilxByetrBoA';
 const woNodeComplete =
-    '8jSnGiQ4Hedb2G75Y5aT7O';
+    'DkyhupXfDAcrWBojIzHlRQ';
 const woPersonSarah =
-    'LhfaUUf4IumVsCSGB4xjdK';
+    'MQFcPtrZPIGjMCRAXtZUnA';
 const woPersonEmily =
-    '53J8h9dr76XFqCjYcNVwIR';
+    'CJrglMsNBxOWWfbihHQSeg';
 // Data Capture node members: Marcus and the
 // current user (the in-clan members)
 const woPersonMarcus =
-    'WxQn4LVWb76YkmqK5B0EPp';
-const woPersonCurrent = 'current';
+    'SsVAZghfSzMZRZmxNKIizw';
+const woPersonCurrent = 'XXZruirZyAOoRpNxaDnpSA';
 // Read once so every seeded WO snapshot matches
 // the live flow_graph shape without redundant
 // walks of the native flow graph object.
@@ -83,23 +83,23 @@ function prcGraph(): Record<string, unknown> {
 }
 
 const prcNodeStart =
-    'qfuFbfKwwlpKAewu3Uujb7';
+    'rLwBHMzOGoGQzUcRgYwSMQ';
 const prcNodeDraft =
-    'M3HcytVGj8JNjrFS0AyVfA';
+    'MelwPladvnAMEuMwjUiRfg';
 const prcNodeSubmit =
-    'T6I6dn4MKD50QZXlvxIm9I';
+    'RCkRIKgSrRXeLFJFIIEWvw';
 const prcNodeTriage =
-    'OHPERFEO1EMfDoGZnccF5F';
+    'ODtydttdBiCPLFyxqvJsSg';
 const prcNodeQuickRev =
-    'NHIpcNdKKV4gbT4QOkkXEO';
+    'NlcdFRgrFGDkHirNJrjVXw';
 const prcNodeDecision =
-    'rWdJ5vz4hm9dLVhBYROSoK';
+    'rTMOibpdwsbFUfauowfyPg';
 const prcNodeApproved =
-    '4zi5yzNsiA89SzrcEityhr';
+    'CHekPYKmopdmcKTuHxquaw';
 const prcNodeRevise =
-    '8yXx35sqhjAb3lfkSWbsG2';
+    'DyyunbBYDwJxrTOhvRhYYw';
 const prcNodeArchive =
-    '9r0eSQ4ndyaRoYbKTTDpW2';
+    'EaERqxsxebTdSPoZvihWjg';
 
 export function buildWorkOrders():
     Omit<WorkOrderEntity, 'organization_id'>[] {
@@ -123,133 +123,133 @@ export function buildWorkOrders():
         // with a fat right tail so Data Capture is
         // the hot node in heat stats.
         {
-            id: 'kKtX2W0iVTWFPEoPrJmIHW',
+            id: 'krzCXtfVNOLvbGcYnSrhng',
             display_id: 'b2d4f6a8',
             flow_graph: woGraph(),
             position: 2,
         },
         {
-            id: 'taUp8y0cuMhzf0UOk6Ev8Y',
+            id: 'uxTjfwTdFboxQRRfLQBfjA',
             display_id: 'c3e5g7b9',
             flow_graph: woGraph(),
             position: 3,
         },
         {
-            id: 'KD2WFTEwzJFvxZ6cpCwpvc',
+            id: 'JwjCJbRVYCGojtDDMbFISw',
             display_id: 'd4f6h8c0',
             flow_graph: woGraph(),
             position: 4,
         },
         {
-            id: 'b6YNHrFyi6V9dJNXyCXu1K',
+            id: 'VdkdxziHStBwGlqXMplgzg',
             display_id: 'e5g7i9d1',
             flow_graph: woGraph(),
             position: 5,
         },
         {
-            id: 'V3AXXlSjJwDQAmkNiRA8aP',
+            id: 'SEHtXAFBwzspwfqzUgLOGg',
             display_id: 'f6h8j0e2',
             flow_graph: woGraph(),
             position: 6,
         },
         {
-            id: '9ooK5olzSsEnpgP8ASzBQi',
+            id: 'EXifLeJkIZYAFlniPDbnyw',
             display_id: 'g7i9k1f3',
             flow_graph: woGraph(),
             position: 7,
         },
         {
-            id: 'cnXN4DZx9dUVIZL4OZnyw0',
+            id: 'XNCcLuvJJIMafjqfDQcysA',
             display_id: 'h8j0l2g4',
             flow_graph: woGraph(),
             position: 8,
         },
         {
-            id: 'kKw82RQDHRfgg5xQnw1lPk',
+            id: 'kuHSbxoxnsegYoJpuziaIA',
             display_id: 'i9k1m3h5',
             flow_graph: woGraph(),
             position: 9,
         },
         {
-            id: 'ec0n7Ab6pJYLFDF6H0nyvV',
+            id: 'ZIKwhTVQUmZbzpUElPynGg',
             display_id: 'j0l2n4i6',
             flow_graph: woGraph(),
             position: 10,
         },
         {
-            id: 'gAjJnjirIrIgcFDMJyNsPa',
+            id: 'eGKKhdvQWwAgjMJCmOiWsg',
             display_id: 'k1m3o5j7',
             flow_graph: woGraph(),
             position: 11,
         },
         {
-            id: 'kyWtMAZPazKqAfIwPzACsL',
+            id: 'kwfRAQskBMDhxupBJSXBXg',
             display_id: 'l2n4p6k8',
             flow_graph: woGraph(),
             position: 12,
         },
         {
-            id: 'C41Hni5pMxp8xMQFEGNaib',
+            id: 'FPRJDMIESNrhvDpngiVgAA',
             display_id: 'm3o5q7l9',
             flow_graph: woGraph(),
             position: 13,
         },
         {
-            id: 'FGAZYYwoS9To1tNb24DfLc',
+            id: 'HEEYmJQUuZTwpwZwEvDHIA',
             display_id: 'n4p6r8m0',
             flow_graph: woGraph(),
             position: 14,
         },
         {
-            id: '0zgLwuyPgtreVYjg4TScJR',
+            id: 'AgBUgTINNElBAvqwWMUegw',
             display_id: 'o5q7s9n1',
             flow_graph: woGraph(),
             position: 15,
         },
         {
-            id: 'XGJklKFO4aUtjSAEHEE8Zn',
+            id: 'SwOSfDtxXEdmGGuHaNzXAQ',
             display_id: 'p6r8t0o2',
             flow_graph: woGraph(),
             position: 16,
         },
         {
-            id: 'rtuFD9uWn5zguEHyT3fh8s',
+            id: 'swamOcwhrDmLKzRKlqunFw',
             display_id: 'q7s9u1p3',
             flow_graph: woGraph(),
             position: 17,
         },
         {
-            id: 'XrO05MeyqldO8qm0O4VPdq',
+            id: 'TRzdRYgxAuHFJsJxdGtngw',
             display_id: 'r8t0v2q4',
             flow_graph: woGraph(),
             position: 18,
         },
         {
-            id: 'S74N7CPA2dsMESryJNrFAC',
+            id: 'QfOuwFUXrsWqHFnJgTSDCg',
             display_id: 's9u1w3r5',
             flow_graph: woGraph(),
             position: 19,
         },
         {
-            id: 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
+            id: 'GJyTGedIrFfonBxkniEylA',
             display_id: 't0v2x4s6',
             flow_graph: woGraph(),
             position: 20,
         },
         {
-            id: '4T56gYme7ae4Ya7AMA0hpW',
+            id: 'BqOPvRjANCSRrdRwRGbyUw',
             display_id: 'u1w3y5t7',
             flow_graph: woGraph(),
             position: 21,
         },
         {
-            id: 'aFCyJrvokoJM5iINwO3WCf',
+            id: 'UegjcqnhNlWGJMWYjRMgCQ',
             display_id: 'v2x4z6u8',
             flow_graph: woGraph(),
             position: 22,
         },
         {
-            id: 'Sr4k75y6vuKODCA9zlSUjk',
+            id: 'QtuoBiqabeXfgMIMUgMUaQ',
             display_id: 'w3y5a7v9',
             flow_graph: woGraph(),
             position: 23,
@@ -259,37 +259,37 @@ export function buildWorkOrders():
         // → Review → Archive. Exercises revisit
         // rate and the Review→Capture branch split.
         {
-            id: 'Mm6KUpykGSwjD7YofI6zpb',
+            id: 'NQLhTgeebJflEfLNiIKRbw',
             display_id: 'x4z6b8w0',
             flow_graph: woGraph(),
             position: 24,
         },
         {
-            id: 'BbZ3Z7OZnFmdF5MBgVIYzI',
+            id: 'FEDdQbmpanDFVZdPnUbwWg',
             display_id: 'y5a7c9x1',
             flow_graph: woGraph(),
             position: 25,
         },
         {
-            id: 'NydsTqMmCgEKI7R9xxp36g',
+            id: 'OAvDqHdtlzUeHVxrxlcFgg',
             display_id: 'z6b8d0y2',
             flow_graph: woGraph(),
             position: 26,
         },
         {
-            id: 'x2uQev3HutthrUWRFkXSkH',
+            id: 'yuPIkpaXrJNwIzfKMytkfg',
             display_id: 'a7c9e1z3',
             flow_graph: woGraph(),
             position: 27,
         },
         {
-            id: 'w7XA9UnuYI7e46RTQL1xGW',
+            id: 'xiekvzKePoUXMiQlySGHag',
             display_id: 'b8d0f2a4',
             flow_graph: woGraph(),
             position: 28,
         },
         {
-            id: '3H3XeeNE4rS2wbANs3JvYz',
+            id: 'BRDKCttpdvJSFqPxmPEAxg',
             display_id: 'c9e1g3b5',
             flow_graph: woGraph(),
             position: 29,
@@ -299,31 +299,31 @@ export function buildWorkOrders():
         // Review with no Archive; exercises WIP and
         // incompleteWorkOrderCount.
         {
-            id: 'i7YYgKN3ZUlrkulQ2aWdIE',
+            id: 'gButmqAicxcpsNuiTYQNKA',
             display_id: 'd0f2h4c6',
             flow_graph: woGraph(),
             position: 30,
         },
         {
-            id: '0brjvcoPEVBwMkUQ3tKHWc',
+            id: 'AbRcGuaSMFbUfPAexnegfw',
             display_id: 'e1g3i5d7',
             flow_graph: woGraph(),
             position: 31,
         },
         {
-            id: 'mTdhglHhl7pM0mKt0M2IjF',
+            id: 'nTIlwHvYCLLpcgDPpZfJsw',
             display_id: 'f2h4j6e8',
             flow_graph: woGraph(),
             position: 32,
         },
         {
-            id: 'GMhfH8lMQJXzE4vkjnSH1u',
+            id: 'HxoTWjMKYqZWVZZGzxYjXA',
             display_id: 'g3i5k7f9',
             flow_graph: woGraph(),
             position: 33,
         },
         {
-            id: 'pLxCFGOINXVaXmrS0VG0vC',
+            id: 'qMXousWjIHczNUwqWDGsXg',
             display_id: 'h4j6l8g0',
             flow_graph: woGraph(),
             position: 34,
@@ -334,13 +334,13 @@ export function buildWorkOrders():
         // node's members, so topProducer.inCurrentClan
         // is false.
         {
-            id: 'IyrpZrIl2hbmmnCtiifEGm',
+            id: 'JSKYLSrCcNBvfdHXrPNOWw',
             display_id: 'i5k7m9h1',
             flow_graph: woGraph(),
             position: 35,
         },
         {
-            id: 'zYnDWBV4VP5guzW5fDWtHN',
+            id: 'zvwXWNSafFwBskEQVfnfaw',
             display_id: 'j6l8n0i2',
             flow_graph: woGraph(),
             position: 36,
@@ -350,13 +350,13 @@ export function buildWorkOrders():
         // trailing-90-day stats window — so heat
         // values for their node visits are clipped.
         {
-            id: '7HX7RPwlYopHWfD7I0QAPs',
+            id: 'DELkFWgEyhoqyuyrbnQuEA',
             display_id: 'k7m9o1j3',
             flow_graph: woGraph(),
             position: 37,
         },
         {
-            id: 'EXphSopBU1Is2TH4QZo4nO',
+            id: 'GybPgWucvmsPHNwjNAyOiw',
             display_id: 'l8n0p2k4',
             flow_graph: woGraph(),
             position: 38,
@@ -365,41 +365,41 @@ export function buildWorkOrders():
         // second flow demo -- 4 happy-path, 1
         // revisit, 1 in-flight.
         {
-            id: 'hRPNkjrYBTQqzzFe1t8FH6',
-            display_id: '5tb2nOoHyhRpy3UHlyrJKl',
+            id: 'fCGVSSzsRHDgDLvPXbYkDw',
+            display_id: 'CVEXKOCDSjDmnTqpSknTuw',
             flow_graph: prcGraph(),
             position: 39,
         },
         {
-            id: 'L3UhOvrAGluk4kNnN6J8NT',
-            display_id: 'ZifylnGqzY8uXQ30d1DgeP',
+            id: 'MMbQqbhcKfHVHWhnsjIqnA',
+            display_id: 'ULfkJZlbqdHVlWfVLUijog',
             flow_graph: prcGraph(),
             position: 40,
         },
         {
-            id: 'oTscblsEOjZDkvkW3vs7rU',
-            display_id: 'IoF2qGX8bftkrW4QrLnBwp',
+            id: 'oqpwipJxpRbKzypGkStjjw',
+            display_id: 'JMmkmIRZgKoymnSUsSjnYg',
             flow_graph: prcGraph(),
             position: 41,
         },
         {
-            id: 'Xpw9VGpZ6RyevuInSr8yze',
-            display_id: '3eC66vpxib66qPnv7hdxvJ',
+            id: 'TMRENIJdzgBtLiMyuxUkNg',
+            display_id: 'BUFsyZgBRCNYqZRollYBIw',
             flow_graph: prcGraph(),
             position: 42,
         },
         // prc05: revisit -- Decision sends back
         // to Revise then Draft before completing.
         {
-            id: 'yqPpJb0NoQDgx8DoZ183Nx',
-            display_id: 'tmj4YM3W8H1qgr4sUIpY35',
+            id: 'zOSyhzfDZMJDhZPsOvFwRg',
+            display_id: 'vMvcjAuxIBaZnmGoaRwCrg',
             flow_graph: prcGraph(),
             position: 43,
         },
         // prc06: in-flight -- stuck at Decision.
         {
-            id: 'BUrGEVDMF6FeU35WUHUY5E',
-            display_id: 'Tb52zOWUVGcaSQRFSLDXPV',
+            id: 'FCEBEWzmelSFTOlqcZsbdQ',
+            display_id: 'RPrxMUsXnqqYTxKaHAKdOg',
             flow_graph: prcGraph(),
             position: 44,
         },
@@ -410,7 +410,7 @@ export function buildWorkOrders():
         // Required on the CURRENT node, both null) —
         // the fillable browser-testing case (R13/R14).
         {
-            id: 'gateV101W0rkOrd3rXY0a1',
+            id: 'eOlNZpGQfmCdpSFWXGkzFQ',
             display_id: 'gate0001',
             flow_graph: woGraph(),
             position: 45,
@@ -422,368 +422,368 @@ export function buildFlowWorkOrderJoins():
     FlowWorkOrderEntity[] {
     return [
         {
-            id: 'Cc7LblYXfmmZpg8DLZmhVw',
+            id: 'FgmTGuWPpgNQxeUvjYBjZA',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id: woId,
             at: woCreated,
         },
         // happy-path
         {
-            id: 'l1QwKaS2EYCT8nJCAFXXN0',
+            id: 'lClkJuwXjBuuPHzdpxwSiA',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'kKtX2W0iVTWFPEoPrJmIHW',
+                'krzCXtfVNOLvbGcYnSrhng',
             at: daysFromNow(-88, 9, 0),
         },
         {
-            id: 'FjjhKDthEYLf50lmPrKkaq',
+            id: 'HPVDhAWMQrIhjSRKxuExpg',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'taUp8y0cuMhzf0UOk6Ev8Y',
+                'uxTjfwTdFboxQRRfLQBfjA',
             at: daysFromNow(-82, 10, 0),
         },
         {
-            id: 'vNj3XdrWhDpoFW8qsLsqKg',
+            id: 'xIVUUcUaDfTsDpuLIZgTGQ',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'KD2WFTEwzJFvxZ6cpCwpvc',
+                'JwjCJbRVYCGojtDDMbFISw',
             at: daysFromNow(-76, 8, 30),
         },
         {
-            id: 'hjPgB0KYD5Sesnjejnohf6',
+            id: 'fToUGwGKwMApahWvZBXbKw',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'b6YNHrFyi6V9dJNXyCXu1K',
+                'VdkdxziHStBwGlqXMplgzg',
             at: daysFromNow(-71, 9, 0),
         },
         {
-            id: 'UhSuMtC66uclQH5irfsqd0',
+            id: 'RnplPuxMfADIpOKCKjHfeA',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'V3AXXlSjJwDQAmkNiRA8aP',
+                'SEHtXAFBwzspwfqzUgLOGg',
             at: daysFromNow(-66, 11, 0),
         },
         {
-            id: 'J0GfRrP7J5tNhBDCXDDOPV',
+            id: 'JSVFXhBcjTwteiveLhtUVQ',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                '9ooK5olzSsEnpgP8ASzBQi',
+                'EXifLeJkIZYAFlniPDbnyw',
             at: daysFromNow(-61, 9, 30),
         },
         {
-            id: 'nULvK3MsVfud7QkAlrNGpQ',
+            id: 'oEOCeKNKAMdrXYiqJxzXPw',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'cnXN4DZx9dUVIZL4OZnyw0',
+                'XNCcLuvJJIMafjqfDQcysA',
             at: daysFromNow(-57, 8, 0),
         },
         {
-            id: 'NUnAiiPpzpQ9wKx6utsGwn',
+            id: 'NwARrtRfrfezzUDikJTHWg',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'kKw82RQDHRfgg5xQnw1lPk',
+                'kuHSbxoxnsegYoJpuziaIA',
             at: daysFromNow(-52, 10, 0),
         },
         {
-            id: 'tuqFkKJMD4baNSMgXFWIh3',
+            id: 'wVsjXhLvLnKSzWAkkwRaLg',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'ec0n7Ab6pJYLFDF6H0nyvV',
+                'ZIKwhTVQUmZbzpUElPynGg',
             at: daysFromNow(-48, 9, 0),
         },
         {
-            id: 'G1IeM0YcxnPVe8ZuYnJ9oJ',
+            id: 'HSHPhFFgEboGEDMdceaApA',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'gAjJnjirIrIgcFDMJyNsPa',
+                'eGKKhdvQWwAgjMJCmOiWsg',
             at: daysFromNow(-44, 10, 30),
         },
         {
-            id: '5Ctl6blp1xESHHiQtp0hUU',
+            id: 'CNigXTPkAKmTXkOdXsuwaw',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'kyWtMAZPazKqAfIwPzACsL',
+                'kwfRAQskBMDhxupBJSXBXg',
             at: daysFromNow(-40, 9, 0),
         },
         {
-            id: 'tlNTceD8uVvWlIjXDH0ayW',
+            id: 'vJQxpNbbjeBuDrYrtbwdwA',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'C41Hni5pMxp8xMQFEGNaib',
+                'FPRJDMIESNrhvDpngiVgAA',
             at: daysFromNow(-37, 8, 0),
         },
         {
-            id: 'RUF1gVmAhswD070VXbltZj',
+            id: 'QQnXpdfCDtMRHNhSAZEOOQ',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'FGAZYYwoS9To1tNb24DfLc',
+                'HEEYmJQUuZTwpwZwEvDHIA',
             at: daysFromNow(-33, 9, 30),
         },
         {
-            id: 's8LTGragbMejtSAdAVF1u3',
+            id: 'tBzQNLjCJDUHIJABTDTldQ',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                '0zgLwuyPgtreVYjg4TScJR',
+                'AgBUgTINNElBAvqwWMUegw',
             at: daysFromNow(-29, 10, 0),
         },
         {
-            id: 'IAEG9nJXxCFzya2R3z9Rzy',
+            id: 'JEnNYzzgANXnVwrHDqZbhw',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'XGJklKFO4aUtjSAEHEE8Zn',
+                'SwOSfDtxXEdmGGuHaNzXAQ',
             at: daysFromNow(-26, 9, 0),
         },
         {
-            id: 'c1BsfY0187lX0bv9IMRin6',
+            id: 'WevUhSVPchrwVdWsRPdRJw',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'rtuFD9uWn5zguEHyT3fh8s',
+                'swamOcwhrDmLKzRKlqunFw',
             at: daysFromNow(-23, 8, 30),
         },
         {
-            id: 'HdDAafhVYetmEDZI57F2o9',
+            id: 'IsIdkcItauPhDQBggaYspQ',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'XrO05MeyqldO8qm0O4VPdq',
+                'TRzdRYgxAuHFJsJxdGtngw',
             at: daysFromNow(-20, 10, 0),
         },
         {
-            id: 'yFhQ6jemy8OUls9GCH9sJq',
+            id: 'zHqvuDqtYpXxKxzgazTidg',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'S74N7CPA2dsMESryJNrFAC',
+                'QfOuwFUXrsWqHFnJgTSDCg',
             at: daysFromNow(-17, 9, 0),
         },
         {
-            id: 'C7ASzGoDhS3c9Er43SznuQ',
+            id: 'FVwztFeffcPEAJjVefVccA',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'Cr8KZH5Q2j5n8Q8Yw3qdMw',
+                'GJyTGedIrFfonBxkniEylA',
             at: daysFromNow(-14, 8, 0),
         },
         {
-            id: 'gj9UFVp6N0LY43tiZO7kEH',
+            id: 'ecvGkvQUzvKbfrUaLvGDzA',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                '4T56gYme7ae4Ya7AMA0hpW',
+                'BqOPvRjANCSRrdRwRGbyUw',
             at: daysFromNow(-11, 10, 30),
         },
         {
-            id: 'QXnnDlwCXKN12k4oUPse4B',
+            id: 'QACKgBkYKXEWUSrgcEZCVw',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'aFCyJrvokoJM5iINwO3WCf',
+                'UegjcqnhNlWGJMWYjRMgCQ',
             at: daysFromNow(-9, 9, 0),
         },
         {
-            id: 'hyC8PMVNYng3UIO93yexAR',
+            id: 'fmWjVMGyeJOgNgzEKuelIg',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'Sr4k75y6vuKODCA9zlSUjk',
+                'QtuoBiqabeXfgMIMUgMUaQ',
             at: daysFromNow(-6, 11, 0),
         },
         // needs-revision
         {
-            id: '9lPGvmt7DdS6Uy7RuOYCxZ',
+            id: 'EPEpHkhBlDpiRzubFJiQMw',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'Mm6KUpykGSwjD7YofI6zpb',
+                'NQLhTgeebJflEfLNiIKRbw',
             at: daysFromNow(-77, 9, 0),
         },
         {
-            id: 'w9t0kM5OR9xNz8Qd8YMvWd',
+            id: 'xmUaSYugtrqUaSgiukFmyw',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'BbZ3Z7OZnFmdF5MBgVIYzI',
+                'FEDdQbmpanDFVZdPnUbwWg',
             at: daysFromNow(-63, 10, 0),
         },
         {
-            id: 'OynJa34EkAifV6XvROGJHO',
+            id: 'OJfaPOTlVnyZjgSGvzsrrA',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'NydsTqMmCgEKI7R9xxp36g',
+                'OAvDqHdtlzUeHVxrxlcFgg',
             at: daysFromNow(-50, 8, 30),
         },
         {
-            id: 'hFaKVhqcwwCtiDmjHOhglF',
+            id: 'esNlTnkIkfOZNVsGkyxwPg',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'x2uQev3HutthrUWRFkXSkH',
+                'yuPIkpaXrJNwIzfKMytkfg',
             at: daysFromNow(-38, 9, 0),
         },
         {
-            id: 'lJalI8qDpdF8zng1mr7dkW',
+            id: 'lRrctoxUlJmYWCsMIvbNgA',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'w7XA9UnuYI7e46RTQL1xGW',
+                'xiekvzKePoUXMiQlySGHag',
             at: daysFromNow(-25, 10, 0),
         },
         {
-            id: 'UFSLHfELrPhlOvdaQv8yrC',
+            id: 'RZAWBBdEVxRLHOocJIxBDQ',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                '3H3XeeNE4rS2wbANs3JvYz',
+                'BRDKCttpdvJSFqPxmPEAxg',
             at: daysFromNow(-12, 9, 30),
         },
         // in-flight
         {
-            id: 'U0vPeW2wXXSwUQ1IWSxa2O',
+            id: 'RWdoyBCbuSGdzNkckZlpzw',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'i7YYgKN3ZUlrkulQ2aWdIE',
+                'gButmqAicxcpsNuiTYQNKA',
             at: daysFromNow(-18, 9, 0),
         },
         {
-            id: 'uhMESfwESpe11vhqKvQ2kB',
+            id: 'xCoZbEUSzQHKCtbrdMtQoQ',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                '0brjvcoPEVBwMkUQ3tKHWc',
+                'AbRcGuaSMFbUfPAexnegfw',
             at: daysFromNow(-10, 10, 0),
         },
         {
-            id: 'ZNrxNuiqHTULou4TqYPtXL',
+            id: 'ToooJrtSNmsHBjxZZfXpHA',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'mTdhglHhl7pM0mKt0M2IjF',
+                'nTIlwHvYCLLpcgDPpZfJsw',
             at: daysFromNow(-7, 8, 0),
         },
         {
-            id: '5AsLDAhvbkXZ6OUvvoZhND',
+            id: 'CMXemoQkTKFPukHXFGTEbg',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'GMhfH8lMQJXzE4vkjnSH1u',
+                'HxoTWjMKYqZWVZZGzxYjXA',
             at: daysFromNow(-4, 9, 0),
         },
         {
-            id: 'avduZh1Hyokc9xiUjDQA0F',
+            id: 'VYpghzmuinfbwbUVPLMkqg',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'pLxCFGOINXVaXmrS0VG0vC',
+                'qMXousWjIHczNUwqWDGsXg',
             at: daysFromNow(-2, 11, 0),
         },
         // out-of-clan
         {
-            id: 'XeHGIWNzurFqBqHkQqV6El',
+            id: 'TCtoPFDmdKdsuDCqTXpruA',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'IyrpZrIl2hbmmnCtiifEGm',
+                'JSKYLSrCcNBvfdHXrPNOWw',
             at: daysFromNow(-35, 9, 0),
         },
         {
-            id: 'jxMN634ymWUYVZQK5on62x',
+            id: 'ketMjiPQVTQdVcxaReESiw',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'zYnDWBV4VP5guzW5fDWtHN',
+                'zvwXWNSafFwBskEQVfnfaw',
             at: daysFromNow(-22, 10, 30),
         },
         // old (outside 90-day window)
         {
-            id: 'ChEQk8m36NL0ADf6Nfez5f',
+            id: 'FxkTbbnAnMwyXBBBibhUVw',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                '7HX7RPwlYopHWfD7I0QAPs',
+                'DELkFWgEyhoqyuyrbnQuEA',
             at: daysFromNow(-108, 9, 0),
         },
         {
-            id: 'nycbBiutlHj1MUnI02Pw20',
+            id: 'ogMkyufNfmRfygySDwAvoA',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'EXphSopBU1Is2TH4QZo4nO',
+                'GybPgWucvmsPHNwjNAyOiw',
             at: daysFromNow(-103, 10, 0),
         },
         // prc join rows (Proposal Review Cycle)
         {
-            id: '1MMz7BIQ0qgacH3CCUafKk',
+            id: 'AxlqnbjqzRjDVuqCNVCzUA',
             flow_id:
-                '7COt7Kf4OaOBg6AjaNO04s',
+                'DDUhYDIRInXtIrRraxcyHQ',
             work_order_id:
-                'hRPNkjrYBTQqzzFe1t8FH6',
+                'fCGVSSzsRHDgDLvPXbYkDw',
             at: daysFromNow(-60, 9, 0),
         },
         {
-            id: 'UXIU5zCYBFkQnMnChd1Q6T',
+            id: 'RinCQXfwCkDpvttIAHDBtw',
             flow_id:
-                '7COt7Kf4OaOBg6AjaNO04s',
+                'DDUhYDIRInXtIrRraxcyHQ',
             work_order_id:
-                'L3UhOvrAGluk4kNnN6J8NT',
+                'MMbQqbhcKfHVHWhnsjIqnA',
             at: daysFromNow(-45, 10, 0),
         },
         {
-            id: 'jQUWpOW1y7QcYSS49Cy3dE',
+            id: 'jvdeSMqxLWREtmJfumMbFg',
             flow_id:
-                '7COt7Kf4OaOBg6AjaNO04s',
+                'DDUhYDIRInXtIrRraxcyHQ',
             work_order_id:
-                'oTscblsEOjZDkvkW3vs7rU',
+                'oqpwipJxpRbKzypGkStjjw',
             at: daysFromNow(-30, 8, 0),
         },
         {
-            id: 'y9Aba8YosD7VcSMV2Ncwoc',
+            id: 'zCiaNHEWgIZYwOQDBvcsLg',
             flow_id:
-                '7COt7Kf4OaOBg6AjaNO04s',
+                'DDUhYDIRInXtIrRraxcyHQ',
             work_order_id:
-                'Xpw9VGpZ6RyevuInSr8yze',
+                'TMRENIJdzgBtLiMyuxUkNg',
             at: daysFromNow(-20, 11, 0),
         },
         {
-            id: 'RKSovIx9Jb03ZHsLWpI1EC',
+            id: 'QNmZLarcGDlooTuoqinhGw',
             flow_id:
-                '7COt7Kf4OaOBg6AjaNO04s',
+                'DDUhYDIRInXtIrRraxcyHQ',
             work_order_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             at: daysFromNow(-15, 9, 0),
         },
         {
-            id: 'XAQNINxgYd6Ngjv06NztQh',
+            id: 'SsYNhPswNLVertgvlOSnnA',
             flow_id:
-                '7COt7Kf4OaOBg6AjaNO04s',
+                'DDUhYDIRInXtIrRraxcyHQ',
             work_order_id:
-                'BUrGEVDMF6FeU35WUHUY5E',
+                'FCEBEWzmelSFTOlqcZsbdQ',
             at: daysFromNow(-5, 10, 0),
         },
         {
-            id: 'gvFW01gateV101CustOnb1',
+            id: 'edhtIsASZohHjSlxxNAyXw',
             flow_id:
-                'h5mErVBQhwdMKwi1co30jB',
+                'esKujtyQFYUJaVSXWwavzA',
             work_order_id:
-                'gateV101W0rkOrd3rXY0a1',
+                'eOlNZpGQfmCdpSFWXGkzFQ',
             at: daysFromNow(-1, 9, 0),
         },
     ];
@@ -793,7 +793,7 @@ export function buildWorkOrderStateEvents():
     StateEntity[] {
     return [
         {
-            id: '9nP0K7FVlCFps3eqMnbnMU',
+            id: 'EQwiLkgNoMrWVsUZZOlJSg',
             entity_id: woId,
             state: woNodeNew,
             member_id: woPersonSarah,
@@ -801,7 +801,7 @@ export function buildWorkOrderStateEvents():
                 woCreated,
         },
         {
-            id: 'MbiHcJxVA5Tde3oBh3Ka8p',
+            id: 'MvMOuqIfTHLyUnlPdOROQA',
             entity_id: woId,
             state: woNodeCapture,
             member_id: woPersonSarah,
@@ -809,7 +809,7 @@ export function buildWorkOrderStateEvents():
                 woCreated,
         },
         {
-            id: 'eJEybxfXaf3sjwFilZnunU',
+            id: 'YiTfnydHjXVkotLACabXeQ',
             entity_id: woId,
             state: woNodeReview,
             member_id: woPersonEmily,
@@ -817,7 +817,7 @@ export function buildWorkOrderStateEvents():
                 daysFromNow(-13, 14, 30),
         },
         {
-            id: 'C2xb2bbjyHD11WfLayh8Om',
+            id: 'FIGqMByLITfUxFFGaBEePw',
             entity_id: woId,
             state:
                 woNodeComplete,
@@ -827,726 +827,726 @@ export function buildWorkOrderStateEvents():
         },
         // happy-path WO02: Data Capture sojourn 1 day
         {
-            id: '6eT1jG5MoR9A5PvRvgCUBq',
+            id: 'CnXVzvYLAbdwczlbRQXgtA',
             entity_id:
-                'kKtX2W0iVTWFPEoPrJmIHW',
+                'krzCXtfVNOLvbGcYnSrhng',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-88, 9, 0),
         },
         {
-            id: 'MEsinaVfIifb90ByaJBjrp',
+            id: 'MnpsajBZOFPCDxgQWPdAdA',
             entity_id:
-                'kKtX2W0iVTWFPEoPrJmIHW',
+                'krzCXtfVNOLvbGcYnSrhng',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-88, 9, 5),
         },
         {
-            id: 'xI5NDQXN8Ns5oe0XeEPX2o',
+            id: 'yxNUpxnkqPxMECsztcaXvQ',
             entity_id:
-                'kKtX2W0iVTWFPEoPrJmIHW',
+                'krzCXtfVNOLvbGcYnSrhng',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-87, 10, 0),
         },
         {
-            id: 'k4yValdb0nLdwsZdgvuwtq',
+            id: 'kjaNrBXWvEwYaBXtmAWcgw',
             entity_id:
-                'kKtX2W0iVTWFPEoPrJmIHW',
+                'krzCXtfVNOLvbGcYnSrhng',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-85, 14, 0),
         },
         // happy-path WO03: Data Capture sojourn 2 days
         {
-            id: 'rAnt2MH37Zm1uvaDdJQIU7',
+            id: 'rOyKxWiRjidfLfhZufAlVw',
             entity_id:
-                'taUp8y0cuMhzf0UOk6Ev8Y',
+                'uxTjfwTdFboxQRRfLQBfjA',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-82, 10, 0),
         },
         {
-            id: 'VwD21aMsYlSZ91oOeKoQv3',
+            id: 'SgwqdaKApHkOjDQHdgKgig',
             entity_id:
-                'taUp8y0cuMhzf0UOk6Ev8Y',
+                'uxTjfwTdFboxQRRfLQBfjA',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-82, 10, 8),
         },
         {
-            id: 'lntXIDCTtC6uXtkanv5XYm',
+            id: 'lSKeXxRhQibFNpfCDykgfA',
             entity_id:
-                'taUp8y0cuMhzf0UOk6Ev8Y',
+                'uxTjfwTdFboxQRRfLQBfjA',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-80, 11, 0),
         },
         {
-            id: 'oSOuQpIKaTo9TU70OtfU8P',
+            id: 'olpknntQdGrbHhdExRLTOQ',
             entity_id:
-                'taUp8y0cuMhzf0UOk6Ev8Y',
+                'uxTjfwTdFboxQRRfLQBfjA',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-79, 9, 0),
         },
         // happy-path WO04: Data Capture sojourn 3 days
         {
-            id: 'ggJA4BZvTpqxEPkgbiNnyt',
+            id: 'eXhbeZTMmlxUcepingLliw',
             entity_id:
-                'KD2WFTEwzJFvxZ6cpCwpvc',
+                'JwjCJbRVYCGojtDDMbFISw',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-76, 8, 30),
         },
         {
-            id: 'LzLQkGqfrjFNaQIQNVp2yt',
+            id: 'MdDDCkqXNHWPKAvgATTPsw',
             entity_id:
-                'KD2WFTEwzJFvxZ6cpCwpvc',
+                'JwjCJbRVYCGojtDDMbFISw',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-76, 8, 40),
         },
         {
-            id: 'ZpwjIdExxdeZP7m5YDH5Qt',
+            id: 'ULgwVBfUvaeVExQTAoHERQ',
             entity_id:
-                'KD2WFTEwzJFvxZ6cpCwpvc',
+                'JwjCJbRVYCGojtDDMbFISw',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-73, 10, 0),
         },
         {
-            id: 'ZdoF8Ka2fa6xFFdzWi3odO',
+            id: 'ULFkmKLiuKjfDhbPGXTLsg',
             entity_id:
-                'KD2WFTEwzJFvxZ6cpCwpvc',
+                'JwjCJbRVYCGojtDDMbFISw',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-71, 15, 0),
         },
         // happy-path WO05: Data Capture sojourn 1 day
         {
-            id: 'IJKj026ouhbUQv7w4y7V7o',
+            id: 'JIowmwUWysqrxYhZjiplEA',
             entity_id:
-                'b6YNHrFyi6V9dJNXyCXu1K',
+                'VdkdxziHStBwGlqXMplgzg',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-71, 9, 0),
         },
         {
-            id: 'g4q1KxVqvyS8ZxOIDnu4MG',
+            id: 'dwdVDTQzgagUxhlJqGBgJA',
             entity_id:
-                'b6YNHrFyi6V9dJNXyCXu1K',
+                'VdkdxziHStBwGlqXMplgzg',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-71, 9, 10),
         },
         {
-            id: '6kwY7EJsL4khehGbJmS9YV',
+            id: 'CqvpBypopvgawRrJPhwIkQ',
             entity_id:
-                'b6YNHrFyi6V9dJNXyCXu1K',
+                'VdkdxziHStBwGlqXMplgzg',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-70, 14, 0),
         },
         {
-            id: 'zK2ywEqCxPE75HKfGdGtEY',
+            id: 'zlzzbgtXhinQZJwjWaDDcg',
             entity_id:
-                'b6YNHrFyi6V9dJNXyCXu1K',
+                'VdkdxziHStBwGlqXMplgzg',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-68, 10, 0),
         },
         // happy-path WO06: Data Capture sojourn 5 days
         {
-            id: '3lD2Yf5csm1zBR9vdGnnh2',
+            id: 'BZqkqoBmDKqbxkAdQeUQlw',
             entity_id:
-                'V3AXXlSjJwDQAmkNiRA8aP',
+                'SEHtXAFBwzspwfqzUgLOGg',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-66, 11, 0),
         },
         {
-            id: 'Kqw1IND5JwmUemrbWDKSg1',
+            id: 'KYgLfKElRCLeWMhdBvERqg',
             entity_id:
-                'V3AXXlSjJwDQAmkNiRA8aP',
+                'SEHtXAFBwzspwfqzUgLOGg',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-66, 11, 12),
         },
         {
-            id: '8fuCWUtGDYOCBszoGuYhNZ',
+            id: 'DjfRHBBYSleQfcNpnlftUA',
             entity_id:
-                'V3AXXlSjJwDQAmkNiRA8aP',
+                'SEHtXAFBwzspwfqzUgLOGg',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-61, 9, 0),
         },
         {
-            id: 'vqxo8lToEgDdEItcJg8GMI',
+            id: 'xbcOIqiSXJiTDzaJhbRdAw',
             entity_id:
-                'V3AXXlSjJwDQAmkNiRA8aP',
+                'SEHtXAFBwzspwfqzUgLOGg',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-59, 14, 0),
         },
         // happy-path WO07: Data Capture sojourn 2 days
         {
-            id: 'DkCRDYtzbHbaGZY45hrIrB',
+            id: 'GcSByIlbPGJkDZwXWpUxXg',
             entity_id:
-                '9ooK5olzSsEnpgP8ASzBQi',
+                'EXifLeJkIZYAFlniPDbnyw',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-61, 9, 30),
         },
         {
-            id: 'g7Fnaud4XIGM4bceFOFtim',
+            id: 'dxvhKxegvVXVXrxyaspXRA',
             entity_id:
-                '9ooK5olzSsEnpgP8ASzBQi',
+                'EXifLeJkIZYAFlniPDbnyw',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-61, 9, 45),
         },
         {
-            id: 'gdnClJs1LLxrx2fvZ3vQQ4',
+            id: 'eUxClfluLIwRHKnlgfiDFg',
             entity_id:
-                '9ooK5olzSsEnpgP8ASzBQi',
+                'EXifLeJkIZYAFlniPDbnyw',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-59, 11, 0),
         },
         {
-            id: 'WT4tD5XUmDdh40hI5Ny17B',
+            id: 'SqPstPODRgLNJaHykUFUow',
             entity_id:
-                '9ooK5olzSsEnpgP8ASzBQi',
+                'EXifLeJkIZYAFlniPDbnyw',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-58, 9, 0),
         },
         // happy-path WO08: Data Capture sojourn 4 days
         {
-            id: 'hKpS4YMC7r7PivyHgc2Swa',
+            id: 'ezeltcCpBxlEcprdJGJplQ',
             entity_id:
-                'cnXN4DZx9dUVIZL4OZnyw0',
+                'XNCcLuvJJIMafjqfDQcysA',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-57, 8, 0),
         },
         {
-            id: 'hhTvFksUIDQyQA401xmNXg',
+            id: 'fHWxIrxpkFqthNeweZMcuQ',
             entity_id:
-                'cnXN4DZx9dUVIZL4OZnyw0',
+                'XNCcLuvJJIMafjqfDQcysA',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-57, 8, 15),
         },
         {
-            id: 'mAOQLPzk3Ud64ndZnbjMPB',
+            id: 'mwFAiCDvpWXcBRYUMfSRbA',
             entity_id:
-                'cnXN4DZx9dUVIZL4OZnyw0',
+                'XNCcLuvJJIMafjqfDQcysA',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-53, 10, 0),
         },
         {
-            id: 'qMAn5oFts3CEnMsqbNYPA8',
+            id: 'rBMHuGkQThlvTVKzyqLNdg',
             entity_id:
-                'cnXN4DZx9dUVIZL4OZnyw0',
+                'XNCcLuvJJIMafjqfDQcysA',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-51, 14, 0),
         },
         // happy-path WO09: Data Capture sojourn 7 days (fat tail)
         {
-            id: 'KcxCc7AQLnNZddDwJ8YMOu',
+            id: 'KKkVlPeCccbxGRGKxPflqw',
             entity_id:
-                'kKw82RQDHRfgg5xQnw1lPk',
+                'kuHSbxoxnsegYoJpuziaIA',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-52, 10, 0),
         },
         {
-            id: 'HM3YTTlopkJetDhpXglt3l',
+            id: 'IeCOcQDJiWaycceGCZWTHg',
             entity_id:
-                'kKw82RQDHRfgg5xQnw1lPk',
+                'kuHSbxoxnsegYoJpuziaIA',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-52, 10, 20),
         },
         {
-            id: 'ZXc0n8qwamt9gjeXFZYPYQ',
+            id: 'TsXAmNdOXDEGfGTUQrvEIQ',
             entity_id:
-                'kKw82RQDHRfgg5xQnw1lPk',
+                'kuHSbxoxnsegYoJpuziaIA',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-45, 9, 0),
         },
         {
-            id: 'h4s2ZGnlkiHKTB41nfKXzR',
+            id: 'elrCErstjZAnfVfZoSlzfQ',
             entity_id:
-                'kKw82RQDHRfgg5xQnw1lPk',
+                'kuHSbxoxnsegYoJpuziaIA',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-43, 11, 0),
         },
         // happy-path WO10: Data Capture sojourn 3 days
         {
-            id: 'i13zOn0NJF0wZANpm9qtz8',
+            id: 'fpuLcBvZAHCVORaJJEFrjA',
             entity_id:
-                'ec0n7Ab6pJYLFDF6H0nyvV',
+                'ZIKwhTVQUmZbzpUElPynGg',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-48, 9, 0),
         },
         {
-            id: 'hSuu3PNyZ6vzzQRse3MT2y',
+            id: 'fEIbWOJXRvkwCTZugteBVQ',
             entity_id:
-                'ec0n7Ab6pJYLFDF6H0nyvV',
+                'ZIKwhTVQUmZbzpUElPynGg',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-48, 9, 10),
         },
         {
-            id: 'f78pCgCBuvzSIHNSiksOY3',
+            id: 'ZYPnpoVUPJKoePxYWowmpQ',
             entity_id:
-                'ec0n7Ab6pJYLFDF6H0nyvV',
+                'ZIKwhTVQUmZbzpUElPynGg',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-45, 14, 0),
         },
         {
-            id: 'FHTXZEVfwmd8eXb3Kc4iyn',
+            id: 'HEbfxuJcOlnNgxhyYZDJKA',
             entity_id:
-                'ec0n7Ab6pJYLFDF6H0nyvV',
+                'ZIKwhTVQUmZbzpUElPynGg',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-43, 10, 0),
         },
         // happy-path WO11: Data Capture sojourn 2 days
         {
-            id: '4tXtqSAncDHgMSfj292vLB',
+            id: 'CDkmgfbWxEvTPZrepfKQTg',
             entity_id:
-                'gAjJnjirIrIgcFDMJyNsPa',
+                'eGKKhdvQWwAgjMJCmOiWsg',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-44, 10, 30),
         },
         {
-            id: 'EuTRGmhwi9ZKpu4bICyIAA',
+            id: 'HCPAhCdwLJzPYMpnFvXcxQ',
             entity_id:
-                'gAjJnjirIrIgcFDMJyNsPa',
+                'eGKKhdvQWwAgjMJCmOiWsg',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-44, 10, 45),
         },
         {
-            id: 'SShq2HjeSjOa2tDzITkJHj',
+            id: 'QmtfovxqQSjDrxjmVRmDrA',
             entity_id:
-                'gAjJnjirIrIgcFDMJyNsPa',
+                'eGKKhdvQWwAgjMJCmOiWsg',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-42, 11, 0),
         },
         {
-            id: 'CgSA6m6TcjUwqAgugKt4U2',
+            id: 'FiuYsNYixHoKtKRQPpjpbA',
             entity_id:
-                'gAjJnjirIrIgcFDMJyNsPa',
+                'eGKKhdvQWwAgjMJCmOiWsg',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-41, 14, 0),
         },
         // happy-path WO12: Data Capture sojourn 6 days (fat tail)
         {
-            id: 'YIZ38Dgl4BXjhVyOlXnevi',
+            id: 'TUKybDGVSlxDfFgIzCMvTQ',
             entity_id:
-                'kyWtMAZPazKqAfIwPzACsL',
+                'kwfRAQskBMDhxupBJSXBXg',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-40, 9, 0),
         },
         {
-            id: 'lx7EAKYYTwDEsOA0CTRXbz',
+            id: 'lZEXAzXaqtyJftrGOniGzg',
             entity_id:
-                'kyWtMAZPazKqAfIwPzACsL',
+                'kwfRAQskBMDhxupBJSXBXg',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-40, 9, 15),
         },
         {
-            id: '47p7RbBeyj6gq7UoglbTLQ',
+            id: 'BiTcCiqmejTVheNqthmQMg',
             entity_id:
-                'kyWtMAZPazKqAfIwPzACsL',
+                'kwfRAQskBMDhxupBJSXBXg',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-34, 10, 0),
         },
         {
-            id: 'TMBYhhOKzYesHHiHsNXfMH',
+            id: 'RKhVdmyOJAQYOZJXnZSpxQ',
             entity_id:
-                'kyWtMAZPazKqAfIwPzACsL',
+                'kwfRAQskBMDhxupBJSXBXg',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-32, 9, 0),
         },
         // happy-path WO13: Data Capture sojourn 1 day
         {
-            id: 'VZsA9htg9Km4qLsfhRGETg',
+            id: 'SSyghiMAKJjcFPvADpiuhA',
             entity_id:
-                'C41Hni5pMxp8xMQFEGNaib',
+                'FPRJDMIESNrhvDpngiVgAA',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-37, 8, 0),
         },
         {
-            id: 'Er9sQyVEvd6rSbmH2tC6zc',
+            id: 'GznZBXicDDcjFYKvFDASJA',
             entity_id:
-                'C41Hni5pMxp8xMQFEGNaib',
+                'FPRJDMIESNrhvDpngiVgAA',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-37, 8, 10),
         },
         {
-            id: 'QGs5QdbV9ANQf2reuiemRd',
+            id: 'PufXSlMpdPLhlulheqGFcw',
             entity_id:
-                'C41Hni5pMxp8xMQFEGNaib',
+                'FPRJDMIESNrhvDpngiVgAA',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-36, 11, 0),
         },
         {
-            id: 'nx5ooiuS68Mvj63uuuFpQN',
+            id: 'ofTIoBNHocPFxHUBRuqPKQ',
             entity_id:
-                'C41Hni5pMxp8xMQFEGNaib',
+                'FPRJDMIESNrhvDpngiVgAA',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-35, 14, 0),
         },
         // happy-path WO14: Data Capture sojourn 9 days (fat tail)
         {
-            id: 'f2v27lmnpRGtYQxQ9omyeZ',
+            id: 'ZRdvKbDFphjYjLjNMaFJuQ',
             entity_id:
-                'FGAZYYwoS9To1tNb24DfLc',
+                'HEEYmJQUuZTwpwZwEvDHIA',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-33, 9, 30),
         },
         {
-            id: 'GIJUAabpi1KGevTrAzXirD',
+            id: 'HpjwNgQRIhPSdkuatCkaKQ',
             entity_id:
-                'FGAZYYwoS9To1tNb24DfLc',
+                'HEEYmJQUuZTwpwZwEvDHIA',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-33, 9, 45),
         },
         {
-            id: '6r9REsvwOdW8DqriF2g76f',
+            id: 'CzclCbhcaKMSiMmdOnXSAQ',
             entity_id:
-                'FGAZYYwoS9To1tNb24DfLc',
+                'HEEYmJQUuZTwpwZwEvDHIA',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-24, 10, 0),
         },
         {
-            id: 'Q56P9URSLJfpKaSMBejDla',
+            id: 'PpBrLtywKfMkdErgGMKvKA',
             entity_id:
-                'FGAZYYwoS9To1tNb24DfLc',
+                'HEEYmJQUuZTwpwZwEvDHIA',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-22, 9, 0),
         },
         // happy-path WO15: Data Capture sojourn 2 days
         {
-            id: '7Qg7wrpNWmoTHlSPoXJrMm',
+            id: 'DIVbJGivgldNjYwJypCNaw',
             entity_id:
-                '0zgLwuyPgtreVYjg4TScJR',
+                'AgBUgTINNElBAvqwWMUegw',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-29, 10, 0),
         },
         {
-            id: 'TFj780SI0g7CP9d1nO1mjy',
+            id: 'RHRtHidcdIsYRvsDzfATMg',
             entity_id:
-                '0zgLwuyPgtreVYjg4TScJR',
+                'AgBUgTINNElBAvqwWMUegw',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-29, 10, 15),
         },
         {
-            id: 'Ly9CvZo9IA5JS77ETKKtRj',
+            id: 'MURxoGiDVXnyPCUaDpiYZw',
             entity_id:
-                '0zgLwuyPgtreVYjg4TScJR',
+                'AgBUgTINNElBAvqwWMUegw',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-27, 14, 0),
         },
         {
-            id: 'aWPQp3IBWqWnaqr45BhMba',
+            id: 'UplvQrMBcjyXXTxnhBjQxg',
             entity_id:
-                '0zgLwuyPgtreVYjg4TScJR',
+                'AgBUgTINNElBAvqwWMUegw',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-25, 10, 0),
         },
         // happy-path WO16: Data Capture sojourn 3 days
         {
-            id: 'BKqz7auwaCm7bYitQ1V0yG',
+            id: 'EwiUDlUsTeVEyPEsqZEfvg',
             entity_id:
-                'XGJklKFO4aUtjSAEHEE8Zn',
+                'SwOSfDtxXEdmGGuHaNzXAQ',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-26, 9, 0),
         },
         {
-            id: 'eReG7OzD6HyZ2ywVP6K7Ac',
+            id: 'YuxXiNRxRswjlELFiJTzTg',
             entity_id:
-                'XGJklKFO4aUtjSAEHEE8Zn',
+                'SwOSfDtxXEdmGGuHaNzXAQ',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-26, 9, 12),
         },
         {
-            id: 'f1bm18FOcYixT5prK2pCcV',
+            id: 'ZPrwjrjJiUJsCJRLbAkrvQ',
             entity_id:
-                'XGJklKFO4aUtjSAEHEE8Zn',
+                'SwOSfDtxXEdmGGuHaNzXAQ',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-23, 11, 0),
         },
         {
-            id: 'MqxWBCMVJOc0RfEXCEUiEo',
+            id: 'NRaLXOFRnhnAeIkhfaLEFQ',
             entity_id:
-                'XGJklKFO4aUtjSAEHEE8Zn',
+                'SwOSfDtxXEdmGGuHaNzXAQ',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-21, 14, 0),
         },
         // happy-path WO17: Data Capture sojourn 1 day
         {
-            id: 'G83ZLOMIsgg486X9QDNXvC',
+            id: 'HfzzgGalemBtHxEbeBWJCg',
             entity_id:
-                'rtuFD9uWn5zguEHyT3fh8s',
+                'swamOcwhrDmLKzRKlqunFw',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-23, 8, 30),
         },
         {
-            id: '6FaR1TmuHJgxw7KW1g8sbf',
+            id: 'CdKebsnVyshEabiZqILqYQ',
             entity_id:
-                'rtuFD9uWn5zguEHyT3fh8s',
+                'swamOcwhrDmLKzRKlqunFw',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-23, 8, 42),
         },
         {
-            id: 'qsNwh43wdaGqGjeKeaAeh4',
+            id: 'rNSWTRlVLCZXqKEeUsZjDg',
             entity_id:
-                'rtuFD9uWn5zguEHyT3fh8s',
+                'swamOcwhrDmLKzRKlqunFw',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-22, 10, 0),
         },
         {
-            id: '7j8VyPb3kuq8TNVz0iPP9M',
+            id: 'DQxPEamSQhhpNCmIqiaJfQ',
             entity_id:
-                'rtuFD9uWn5zguEHyT3fh8s',
+                'swamOcwhrDmLKzRKlqunFw',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-21, 9, 0),
         },
         // happy-path WO18: Data Capture sojourn 4 days
         {
-            id: 'cEd2hUuCY4EOandCCx6bQX',
+            id: 'WihjfhDYDyxzxjsgRnOGMQ',
             entity_id:
-                'XrO05MeyqldO8qm0O4VPdq',
+                'TRzdRYgxAuHFJsJxdGtngw',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-20, 10, 0),
         },
         {
-            id: 'ZywDPM0MCJeweinimZA6wH',
+            id: 'UMdoEhLTVCJZpsNVZkrLOg',
             entity_id:
-                'XrO05MeyqldO8qm0O4VPdq',
+                'TRzdRYgxAuHFJsJxdGtngw',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-20, 10, 18),
         },
         {
-            id: 'G5LYG1yT8213GM9zfqqKmU',
+            id: 'HTmCLvLKELmjqcbfYWhfUQ',
             entity_id:
-                'XrO05MeyqldO8qm0O4VPdq',
+                'TRzdRYgxAuHFJsJxdGtngw',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-16, 9, 0),
         },
         {
-            id: 'GUjeLpcj82NtxqFH0gcjtB',
+            id: 'IBXcqqAlIjQCHshaLhdVvw',
             entity_id:
-                'XrO05MeyqldO8qm0O4VPdq',
+                'TRzdRYgxAuHFJsJxdGtngw',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-14, 14, 0),
         },
         // happy-path WO19: Data Capture sojourn 8 days (fat tail)
         {
-            id: '8woeY7cfbuSKMFI4wMrQZH',
+            id: 'DuDIopZiMzfiZcqbMPnBqg',
             entity_id:
-                'S74N7CPA2dsMESryJNrFAC',
+                'QfOuwFUXrsWqHFnJgTSDCg',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-17, 9, 0),
         },
         {
-            id: 'OJ5bx5CPsfeb8A1ieKyeQ7',
+            id: 'OHoUzoIRxZcsmsovbmYKBg',
             entity_id:
-                'S74N7CPA2dsMESryJNrFAC',
+                'QfOuwFUXrsWqHFnJgTSDCg',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-17, 9, 20),
         },
         {
-            id: 'uQQcXyLLxrVFiydl7FCGOZ',
+            id: 'wsTzFxKosAnjyOxDaVKVNQ',
             entity_id:
-                'S74N7CPA2dsMESryJNrFAC',
+                'QfOuwFUXrsWqHFnJgTSDCg',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-9, 10, 0),
         },
         {
-            id: 'L1hWSVRmSjhvzoQUPDDhMc',
+            id: 'KfszMqUWqYzIluVyBthfVQ',
             entity_id:
-                'S74N7CPA2dsMESryJNrFAC',
+                'QfOuwFUXrsWqHFnJgTSDCg',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-7, 14, 0),
         },
         // happy-path WO20: Data Capture sojourn 2 days
         {
-            id: 'ZNE2sS8KyRpIzMAq7lR4uA',
+            id: 'TmDHuRYWHXOTuPFNOjlZNw',
             entity_id:
-                'Cr8KZH5Q2j5n8Q8Yw3qdMw',
+                'GJyTGedIrFfonBxkniEylA',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-14, 8, 0),
         },
         {
-            id: 'ahjiruKeA9qdnMDO4TZf39',
+            id: 'VGaYNVtPfEqTaBIUxUasFA',
             entity_id:
-                'Cr8KZH5Q2j5n8Q8Yw3qdMw',
+                'GJyTGedIrFfonBxkniEylA',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-14, 8, 15),
         },
         {
-            id: '7ZtemWfFZOqf9SuQVzUwp6',
+            id: 'DNhzHZHqCXHlDAfKkqPtKQ',
             entity_id:
-                'Cr8KZH5Q2j5n8Q8Yw3qdMw',
+                'GJyTGedIrFfonBxkniEylA',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-12, 11, 0),
         },
         {
-            id: 'w36jEVysbnbIdaPhjIcvDI',
+            id: 'xhGnCfysbbkiciNwpLYXqw',
             entity_id:
-                'Cr8KZH5Q2j5n8Q8Yw3qdMw',
+                'GJyTGedIrFfonBxkniEylA',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-10, 9, 0),
         },
         // happy-path WO21: Data Capture sojourn 3 days
         {
-            id: 'SSLVclkfoa6nJhoffBS2Zm',
+            id: 'QhsseOzoIElOrMAiwLSdHw',
             entity_id:
-                '4T56gYme7ae4Ya7AMA0hpW',
+                'BqOPvRjANCSRrdRwRGbyUw',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-11, 10, 30),
         },
         {
-            id: 'mSCE3Z6y5RpTb74TEW62ky',
+            id: 'nRNVbFfOnNHiYOlyKxhmFg',
             entity_id:
-                '4T56gYme7ae4Ya7AMA0hpW',
+                'BqOPvRjANCSRrdRwRGbyUw',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-11, 10, 48),
         },
         {
-            id: 'smCeF7cSnQQaysWwJPsiTu',
+            id: 'uLgLODCAzubtcKuRaVuzcA',
             entity_id:
-                '4T56gYme7ae4Ya7AMA0hpW',
+                'BqOPvRjANCSRrdRwRGbyUw',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-8, 14, 0),
         },
         {
-            id: 'KFrDOkEJ3SiUVB3OR29ntN',
+            id: 'KAnRxHFrRtMCEtCqXIltgw',
             entity_id:
-                '4T56gYme7ae4Ya7AMA0hpW',
+                'BqOPvRjANCSRrdRwRGbyUw',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-6, 10, 0),
         },
         // happy-path WO22: Data Capture sojourn 1 day
         {
-            id: 'fwVQwEUQ8xG4McvCnNVFIV',
+            id: 'dRQPLUPyeWHegZWFDAIEAQ',
             entity_id:
-                'aFCyJrvokoJM5iINwO3WCf',
+                'UegjcqnhNlWGJMWYjRMgCQ',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-9, 9, 0),
         },
         {
-            id: 'UlPzcQK7dJWr6sLiV7qvfh',
+            id: 'RscUpaDwIlBuotEcjXyYDw',
             entity_id:
-                'aFCyJrvokoJM5iINwO3WCf',
+                'UegjcqnhNlWGJMWYjRMgCQ',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-9, 9, 10),
         },
         {
-            id: 'aicMwA0QmZUEzeUtlmQOOS',
+            id: 'VOOKxeUGusEVAFLObSceSQ',
             entity_id:
-                'aFCyJrvokoJM5iINwO3WCf',
+                'UegjcqnhNlWGJMWYjRMgCQ',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-8, 10, 0),
         },
         {
-            id: 'ADeYyyUb4p3eknFC5v6nW2',
+            id: 'EjhHLnfMCvfiBHQpSidSaw',
             entity_id:
-                'aFCyJrvokoJM5iINwO3WCf',
+                'UegjcqnhNlWGJMWYjRMgCQ',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-7, 9, 0),
         },
         // happy-path WO23: Data Capture sojourn 2 days
         {
-            id: 'DANvBctxus8NEMcTOUy1hi',
+            id: 'GUGFEyniJcLDsiSVaTMrvg',
             entity_id:
-                'Sr4k75y6vuKODCA9zlSUjk',
+                'QtuoBiqabeXfgMIMUgMUaQ',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-6, 11, 0),
         },
         {
-            id: '3EOMPhhyYNW6pY6LnIegUt',
+            id: 'BQrScZBZhlQbnNPmtummUg',
             entity_id:
-                'Sr4k75y6vuKODCA9zlSUjk',
+                'QtuoBiqabeXfgMIMUgMUaQ',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-6, 11, 15),
         },
         {
-            id: 'CYglhrk5PKScZSwHQX65Ss',
+            id: 'FbzkWxNGQEuuYcbhQuUwQQ',
             entity_id:
-                'Sr4k75y6vuKODCA9zlSUjk',
+                'QtuoBiqabeXfgMIMUgMUaQ',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-4, 9, 0),
         },
         {
-            id: 'hVa7HADjYHSSsW2qxPPzTw',
+            id: 'fGujkgenNIGGYrPrjpUuIg',
             entity_id:
-                'Sr4k75y6vuKODCA9zlSUjk',
+                'QtuoBiqabeXfgMIMUgMUaQ',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-2, 14, 0),
@@ -1554,411 +1554,411 @@ export function buildWorkOrderStateEvents():
         // needs-revision WO24: double loop Data Capture->Review->Data Capture
         // twice, creating a 3rd distinct completed path
         {
-            id: 'jNY1G5bpJ6aXd9s8hgqRtN',
+            id: 'jszwOAGGFTIjuXZdXeYUhQ',
             entity_id:
-                'Mm6KUpykGSwjD7YofI6zpb',
+                'NQLhTgeebJflEfLNiIKRbw',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-77, 9, 0),
         },
         {
-            id: 'dHUzDlpmED6x7Hv24kR2nB',
+            id: 'XljSBFUBifeXWHKGMuHUrA',
             entity_id:
-                'Mm6KUpykGSwjD7YofI6zpb',
+                'NQLhTgeebJflEfLNiIKRbw',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-77, 9, 10),
         },
         {
-            id: '0LxzRUVeucbfu95bWGkq75',
+            id: 'ANgLnHCWQqPvveMyOTtXmA',
             entity_id:
-                'Mm6KUpykGSwjD7YofI6zpb',
+                'NQLhTgeebJflEfLNiIKRbw',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-75, 11, 0),
         },
         {
-            id: 'CiXBfp5CJ8ZAWNahki1Cu8',
+            id: 'GHPibfvmNzEWQqXkCtlXiQ',
             entity_id:
-                'Mm6KUpykGSwjD7YofI6zpb',
+                'NQLhTgeebJflEfLNiIKRbw',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-74, 14, 0),
         },
         {
-            id: 'wGVP4JjVdAS6FtQrhTGrC7',
+            id: 'xoXWfZPFyraxWIqzRJPWeQ',
             entity_id:
-                'Mm6KUpykGSwjD7YofI6zpb',
+                'NQLhTgeebJflEfLNiIKRbw',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-73, 10, 0),
         },
         {
-            id: 'caS4tLtoEUOaPLr2VUxScZ',
+            id: 'WuqXIcqRuBrMDShLhrAQsg',
             entity_id:
-                'Mm6KUpykGSwjD7YofI6zpb',
+                'NQLhTgeebJflEfLNiIKRbw',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-72, 14, 0),
         },
         {
-            id: 'bQsLuRYpBTppyQtdZqtR5L',
+            id: 'WLvjRnJzlJEYwrIJkhJBUg',
             entity_id:
-                'Mm6KUpykGSwjD7YofI6zpb',
+                'NQLhTgeebJflEfLNiIKRbw',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-71, 10, 0),
         },
         {
-            id: 'eKFDk2YAO7K93hcrnIveru',
+            id: 'YmUkiZmssLYqeNQzSLNyGw',
             entity_id:
-                'Mm6KUpykGSwjD7YofI6zpb',
+                'NQLhTgeebJflEfLNiIKRbw',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-70, 9, 0),
         },
         // needs-revision WO25: loops Data Capture->Review->Data Capture
         {
-            id: '0Zmtiyp7rFFameCdQwawr7',
+            id: 'AaOLlTDEKfngNsWhywpNNQ',
             entity_id:
-                'BbZ3Z7OZnFmdF5MBgVIYzI',
+                'FEDdQbmpanDFVZdPnUbwWg',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-63, 10, 0),
         },
         {
-            id: 'lvvaw4Yx5lJnHZoLB3fQqI',
+            id: 'lWgGVqfAVqbRazPWtEwywQ',
             entity_id:
-                'BbZ3Z7OZnFmdF5MBgVIYzI',
+                'FEDdQbmpanDFVZdPnUbwWg',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-63, 10, 15),
         },
         {
-            id: 'NkrcEkNWD9bu9ntBee8JnO',
+            id: 'NxuOgnmOWIJTFYsSQNFujQ',
             entity_id:
-                'BbZ3Z7OZnFmdF5MBgVIYzI',
+                'FEDdQbmpanDFVZdPnUbwWg',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-61, 14, 0),
         },
         {
-            id: 'H7PRtRrjeAoPlty7IxnTTF',
+            id: 'IRhgszfqLSrHPfXBFpuVnQ',
             entity_id:
-                'BbZ3Z7OZnFmdF5MBgVIYzI',
+                'FEDdQbmpanDFVZdPnUbwWg',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-60, 22, 0),
         },
         {
-            id: 'Xjy85N6xcsUc0dCe49kC1h',
+            id: 'TEiNWovKOjsCrSbaghoVZA',
             entity_id:
-                'BbZ3Z7OZnFmdF5MBgVIYzI',
+                'FEDdQbmpanDFVZdPnUbwWg',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-59, 14, 0),
         },
         {
-            id: '3IwmCFVLZn4y18iTwydMpO',
+            id: 'BRltKffGkkXGGeOOxrOaHg',
             entity_id:
-                'BbZ3Z7OZnFmdF5MBgVIYzI',
+                'FEDdQbmpanDFVZdPnUbwWg',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-58, 9, 0),
         },
         // needs-revision WO26: loops Data Capture->Review->Data Capture
         {
-            id: '993Ka1UzsvcerLiBQkW8nn',
+            id: 'DzCPjdsLkNYnwXlZjIdLDw',
             entity_id:
-                'NydsTqMmCgEKI7R9xxp36g',
+                'OAvDqHdtlzUeHVxrxlcFgg',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-50, 8, 30),
         },
         {
-            id: 'EIo4tqqUH9XBmTxLKQa3wY',
+            id: 'GuCHrCuEiuEwtCkCqdCVoQ',
             entity_id:
-                'NydsTqMmCgEKI7R9xxp36g',
+                'OAvDqHdtlzUeHVxrxlcFgg',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-50, 8, 45),
         },
         {
-            id: 'Q05vkdZMSIHF8dFhFdu2T9',
+            id: 'PessBxPWWbtSMmTsecpkhQ',
             entity_id:
-                'NydsTqMmCgEKI7R9xxp36g',
+                'OAvDqHdtlzUeHVxrxlcFgg',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-48, 11, 0),
         },
         {
-            id: 'f4raRzWhac1d0qfMW4bHCo',
+            id: 'ZYHUifFdnUCEmjYPNCgtJg',
             entity_id:
-                'NydsTqMmCgEKI7R9xxp36g',
+                'OAvDqHdtlzUeHVxrxlcFgg',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-47, 14, 0),
         },
         {
-            id: '8lTjUXAaJGsmi28M5VvnEs',
+            id: 'DnSiAExkNIgNzwwpkiwpFg',
             entity_id:
-                'NydsTqMmCgEKI7R9xxp36g',
+                'OAvDqHdtlzUeHVxrxlcFgg',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-46, 10, 0),
         },
         {
-            id: 'GNbLd7I9sqHDpu4xKbBdjV',
+            id: 'IAOKkDenqgFLGMiIduogFg',
             entity_id:
-                'NydsTqMmCgEKI7R9xxp36g',
+                'OAvDqHdtlzUeHVxrxlcFgg',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-44, 14, 0),
         },
         // needs-revision WO27: loops Data Capture->Review->Data Capture
         {
-            id: 'CXA7kHHLRi4K7kuhFrrzpa',
+            id: 'FbsEcnJdROcXFMskXDubzg',
             entity_id:
-                'x2uQev3HutthrUWRFkXSkH',
+                'yuPIkpaXrJNwIzfKMytkfg',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-38, 9, 0),
         },
         {
-            id: 't1qnertaXJmzaaELr6IsYU',
+            id: 'ukpybQjAZhILKPusSZDuRQ',
             entity_id:
-                'x2uQev3HutthrUWRFkXSkH',
+                'yuPIkpaXrJNwIzfKMytkfg',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-38, 9, 18),
         },
         {
-            id: 'h59lAwdhgMdefl9RisCCj7',
+            id: 'erIoBEMVMiEJyKHjDFcrkg',
             entity_id:
-                'x2uQev3HutthrUWRFkXSkH',
+                'yuPIkpaXrJNwIzfKMytkfg',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-36, 14, 0),
         },
         {
-            id: 'c7ikZyOjtqlGuoz9zODuHy',
+            id: 'WhZHbmJzHSEMjeKdPOcelg',
             entity_id:
-                'x2uQev3HutthrUWRFkXSkH',
+                'yuPIkpaXrJNwIzfKMytkfg',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-35, 22, 0),
         },
         {
-            id: 'eKSPOrAHWb6CNNMhRQTYKt',
+            id: 'YqtKQBuAkbPwbXfXmcTzZQ',
             entity_id:
-                'x2uQev3HutthrUWRFkXSkH',
+                'yuPIkpaXrJNwIzfKMytkfg',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-34, 14, 0),
         },
         {
-            id: 'zGJlSHo6fbztITB52k1vuP',
+            id: 'zhqQwBLVsfiMViBJzlEnWw',
             entity_id:
-                'x2uQev3HutthrUWRFkXSkH',
+                'yuPIkpaXrJNwIzfKMytkfg',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-33, 9, 0),
         },
         // needs-revision WO28: loops Data Capture->Review->Data Capture
         {
-            id: 'ZHtYaVGAAmYCcJYUbDsEZl',
+            id: 'TkqUOVXGSilwwiDGBvbntQ',
             entity_id:
-                'w7XA9UnuYI7e46RTQL1xGW',
+                'xiekvzKePoUXMiQlySGHag',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-25, 10, 0),
         },
         {
-            id: '9SqVX67zSGRvJr6LzgLoqA',
+            id: 'EBXMTskBkSzzvXlpOhCRpA',
             entity_id:
-                'w7XA9UnuYI7e46RTQL1xGW',
+                'xiekvzKePoUXMiQlySGHag',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-25, 10, 20),
         },
         {
-            id: 'tgkwKH3qWOdn2BcWaazkdN',
+            id: 'vEKSYEhEMttQUEPmJMuAyQ',
             entity_id:
-                'w7XA9UnuYI7e46RTQL1xGW',
+                'xiekvzKePoUXMiQlySGHag',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-23, 14, 0),
         },
         {
-            id: 'IGUf2HrDyAJCpT1OrdBEdb',
+            id: 'JHYjuMTMjcMcThANDwkvqw',
             entity_id:
-                'w7XA9UnuYI7e46RTQL1xGW',
+                'xiekvzKePoUXMiQlySGHag',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-22, 14, 0),
         },
         {
-            id: 'PxLFPaM23m2rQXIzeJIywN',
+            id: 'PZyZSbqHsXiBXwMGATiIng',
             entity_id:
-                'w7XA9UnuYI7e46RTQL1xGW',
+                'xiekvzKePoUXMiQlySGHag',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-21, 10, 0),
         },
         {
-            id: '01Xeks1usn4PgpxH0QwyHi',
+            id: 'ACidLoZxRKhJmqiJFWUaIg',
             entity_id:
-                'w7XA9UnuYI7e46RTQL1xGW',
+                'xiekvzKePoUXMiQlySGHag',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-19, 14, 0),
         },
         // needs-revision WO29: loops Data Capture->Review->Data Capture
         {
-            id: 'UsCm8zcTD7V2b5csEp7Mcr',
+            id: 'SDXwOHgmcrYMieJfaAGMVA',
             entity_id:
-                '3H3XeeNE4rS2wbANs3JvYz',
+                'BRDKCttpdvJSFqPxmPEAxg',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-12, 9, 30),
         },
         {
-            id: 'eRBpgQtP1g4IrauEEkfOCl',
+            id: 'YtCHkOMRhsvMTgAWDnVONA',
             entity_id:
-                '3H3XeeNE4rS2wbANs3JvYz',
+                'BRDKCttpdvJSFqPxmPEAxg',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-12, 9, 45),
         },
         {
-            id: 'vfWjLYPYadU0NFA6mk7yRl',
+            id: 'xUgJxInrSZPMBVlWHXaWbA',
             entity_id:
-                '3H3XeeNE4rS2wbANs3JvYz',
+                'BRDKCttpdvJSFqPxmPEAxg',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-11, 11, 0),
         },
         {
-            id: 'G2eaGEcEP0s7q8ThefRKze',
+            id: 'HSUIzdptmTmWQcKZqSVDdw',
             entity_id:
-                '3H3XeeNE4rS2wbANs3JvYz',
+                'BRDKCttpdvJSFqPxmPEAxg',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-10, 14, 0),
         },
         {
-            id: 'ZstKsrHfLjCwfx2qFso2ZR',
+            id: 'UMYZXlrklHLWYUzcbnOAdw',
             entity_id:
-                '3H3XeeNE4rS2wbANs3JvYz',
+                'BRDKCttpdvJSFqPxmPEAxg',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-9, 11, 0),
         },
         {
-            id: 'BZ2RDP2rbCFKJvqqERE7eE',
+            id: 'FDJrBcFNSbyWinrQSjTzBg',
             entity_id:
-                '3H3XeeNE4rS2wbANs3JvYz',
+                'BRDKCttpdvJSFqPxmPEAxg',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-8, 9, 0),
         },
         // in-flight WO30: sitting in Data Capture
         {
-            id: '6DutgmmGcJ1gqIvJgAcUHc',
+            id: 'CWyWrDbOtPSFahuPjNLejA',
             entity_id:
-                'i7YYgKN3ZUlrkulQ2aWdIE',
+                'gButmqAicxcpsNuiTYQNKA',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-18, 9, 0),
         },
         {
-            id: '8IEmMehaWoNrxS2NNocSNE',
+            id: 'DZOiOTrIHXnLUYumNoKKVw',
             entity_id:
-                'i7YYgKN3ZUlrkulQ2aWdIE',
+                'gButmqAicxcpsNuiTYQNKA',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-18, 9, 15),
         },
         // in-flight WO31: sitting in Data Capture
         {
-            id: 'y0Mx6OUCbfA0HXgyqArpcv',
+            id: 'zBPBCVRZtQEaXcAMNEldgA',
             entity_id:
-                '0brjvcoPEVBwMkUQ3tKHWc',
+                'AbRcGuaSMFbUfPAexnegfw',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-10, 10, 0),
         },
         {
-            id: 'xPBiF7zri62itn9FCXWtUE',
+            id: 'yyuhnsKqelsFXUuCEPoVqw',
             entity_id:
-                '0brjvcoPEVBwMkUQ3tKHWc',
+                'AbRcGuaSMFbUfPAexnegfw',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-10, 10, 20),
         },
         // in-flight WO32: sitting in Data Capture
         {
-            id: 'vX4jtsFFLGpU3CXPRpdCrv',
+            id: 'xMIJlqLkLMvYjDCOwTWtlA',
             entity_id:
-                'mTdhglHhl7pM0mKt0M2IjF',
+                'nTIlwHvYCLLpcgDPpZfJsw',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-7, 8, 0),
         },
         {
-            id: 'du3liNmXeejdDA0OMRfibW',
+            id: 'YgtDgAQudiEXaWgyCtDtPw',
             entity_id:
-                'mTdhglHhl7pM0mKt0M2IjF',
+                'nTIlwHvYCLLpcgDPpZfJsw',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-7, 8, 12),
         },
         // in-flight WO33: sitting in Review
         {
-            id: 'YhSbU5pZG78ab0G4SepE3j',
+            id: 'TUWiOEDnDdGsgaBmhbqkVA',
             entity_id:
-                'GMhfH8lMQJXzE4vkjnSH1u',
+                'HxoTWjMKYqZWVZZGzxYjXA',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-4, 9, 0),
         },
         {
-            id: 'oapOBSYlGiuRXZDQoODFj7',
+            id: 'pLYIXgijTBXVlqnsrRsKGA',
             entity_id:
-                'GMhfH8lMQJXzE4vkjnSH1u',
+                'HxoTWjMKYqZWVZZGzxYjXA',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-4, 9, 18),
         },
         {
-            id: '4GQOHCMoSVszRiPyPIEJFj',
+            id: 'BkoiOAhFCSoksMCBQXJDew',
             entity_id:
-                'GMhfH8lMQJXzE4vkjnSH1u',
+                'HxoTWjMKYqZWVZZGzxYjXA',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-3, 14, 0),
         },
         // in-flight WO34: sitting in Review
         {
-            id: 'W1A4TYQHkFgG0ijSUUQPR1',
+            id: 'SoExfAJWFJvSkEvdAlavzg',
             entity_id:
-                'pLxCFGOINXVaXmrS0VG0vC',
+                'qMXousWjIHczNUwqWDGsXg',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-2, 11, 0),
         },
         {
-            id: 'IUWLLWpuMM5EHbpESuAG13',
+            id: 'JJmsqLBRpVPUsQKmpXUFQw',
             entity_id:
-                'pLxCFGOINXVaXmrS0VG0vC',
+                'qMXousWjIHczNUwqWDGsXg',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-2, 11, 20),
         },
         {
-            id: 'IvGW6Yw71dy7s5wmMEYxDr',
+            id: 'JPkRnOESHXeNbkFeDKhncg',
             entity_id:
-                'pLxCFGOINXVaXmrS0VG0vC',
+                'qMXousWjIHczNUwqWDGsXg',
             state: woNodeReview,
             member_id: woPersonCurrent,
             at: daysFromNow(-1, 10, 0),
@@ -1966,33 +1966,33 @@ export function buildWorkOrderStateEvents():
         // out-of-clan WO35: Sarah (not in Data Capture members)
         // transitions Data Capture out
         {
-            id: 'uGXz0fPBwWaBQcviQP5ZsV',
+            id: 'wsJQfjRZjxLdLFtGfZaIIg',
             entity_id:
-                'IyrpZrIl2hbmmnCtiifEGm',
+                'JSKYLSrCcNBvfdHXrPNOWw',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-35, 9, 0),
         },
         {
-            id: 'cEFDawHdIHfIaZQYGhH5xu',
+            id: 'WhZnHQlZrZcwRhRLKRowAA',
             entity_id:
-                'IyrpZrIl2hbmmnCtiifEGm',
+                'JSKYLSrCcNBvfdHXrPNOWw',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-35, 9, 12),
         },
         {
-            id: 'MGhDId9jZaFJZ5fBhnrGem',
+            id: 'MohzKGMYchMbUtzTvYVIgw',
             entity_id:
-                'IyrpZrIl2hbmmnCtiifEGm',
+                'JSKYLSrCcNBvfdHXrPNOWw',
             state: woNodeReview,
             member_id: woPersonSarah,
             at: daysFromNow(-33, 10, 0),
         },
         {
-            id: 'Zch8By7ZpKFDwCNMEPI62h',
+            id: 'UHcVNXorYBCZdHRYrvdWKw',
             entity_id:
-                'IyrpZrIl2hbmmnCtiifEGm',
+                'JSKYLSrCcNBvfdHXrPNOWw',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-31, 14, 0),
@@ -2000,33 +2000,33 @@ export function buildWorkOrderStateEvents():
         // out-of-clan WO36: Mike (not in Data Capture members)
         // transitions Data Capture out
         {
-            id: 'VrxyiUJqWcdd3hBdMyoTBt',
+            id: 'SZUGyWzCDrpNXAgnsvKfZA',
             entity_id:
-                'zYnDWBV4VP5guzW5fDWtHN',
+                'zvwXWNSafFwBskEQVfnfaw',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-22, 10, 30),
         },
         {
-            id: 'yikZQBGGjkiZXksUJM3gkS',
+            id: 'zMJBZCfQMmBsAIwRYUgDLw',
             entity_id:
-                'zYnDWBV4VP5guzW5fDWtHN',
+                'zvwXWNSafFwBskEQVfnfaw',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-22, 10, 45),
         },
         {
-            id: '0J4UMtQY7x8cfN8FNXaToL',
+            id: 'AJaWgLPFJUCxxgxcPcibLA',
             entity_id:
-                'zYnDWBV4VP5guzW5fDWtHN',
+                'zvwXWNSafFwBskEQVfnfaw',
             state: woNodeReview,
             member_id: woPersonEmily,
             at: daysFromNow(-20, 11, 0),
         },
         {
-            id: 'XqSDgqjNZLihLPd2MX8fRR',
+            id: 'TQpDuIFeOaXlYYtwlcTOmQ',
             entity_id:
-                'zYnDWBV4VP5guzW5fDWtHN',
+                'zvwXWNSafFwBskEQVfnfaw',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-18, 14, 0),
@@ -2036,33 +2036,33 @@ export function buildWorkOrderStateEvents():
         // only the in-window ~82 days of Data Capture sojourn
         // count toward heat (exercises window clipping)
         {
-            id: 'QsV9mE5GIUpMXGh3SVTCB7',
+            id: 'QAqUhtlDTALiQzGcLRmpyg',
             entity_id:
-                '7HX7RPwlYopHWfD7I0QAPs',
+                'DELkFWgEyhoqyuyrbnQuEA',
             state: woNodeNew,
             member_id: woPersonEmily,
             at: daysFromNow(-108, 9, 0),
         },
         {
-            id: 'pq0sBjRnF8XBooRpIPhsQp',
+            id: 'qbGbvckdgCnVxzutqDWwqg',
             entity_id:
-                '7HX7RPwlYopHWfD7I0QAPs',
+                'DELkFWgEyhoqyuyrbnQuEA',
             state: woNodeCapture,
             member_id: woPersonEmily,
             at: daysFromNow(-108, 9, 15),
         },
         {
-            id: 'BNbXMdM5RReniv5obnnHF8',
+            id: 'FBPrUWKModSPRzPsZIRANQ',
             entity_id:
-                '7HX7RPwlYopHWfD7I0QAPs',
+                'DELkFWgEyhoqyuyrbnQuEA',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-8, 10, 0),
         },
         {
-            id: 'txMcs1q11W87MhhBuR83vx',
+            id: 'wkeFsioEJvKtIiBtCUWUGw',
             entity_id:
-                '7HX7RPwlYopHWfD7I0QAPs',
+                'DELkFWgEyhoqyuyrbnQuEA',
             state: woNodeComplete,
             member_id: woPersonSarah,
             at: daysFromNow(-5, 14, 0),
@@ -2071,293 +2071,293 @@ export function buildWorkOrderStateEvents():
         // entirely outside the 90-day window; contributes
         // ~0 to heat stats
         {
-            id: 'jobf5lBzIn2MPw34grYi2d',
+            id: 'kDCqOMmilvSejYwQAWEBUg',
             entity_id:
-                'EXphSopBU1Is2TH4QZo4nO',
+                'GybPgWucvmsPHNwjNAyOiw',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-103, 10, 0),
         },
         {
-            id: 'o97Okl09WcFIc5EHkfBNL0',
+            id: 'okOhvCGymAvYXcPOGoVsYw',
             entity_id:
-                'EXphSopBU1Is2TH4QZo4nO',
+                'GybPgWucvmsPHNwjNAyOiw',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-103, 10, 18),
         },
         {
-            id: '783y3zl2CZTp98AaqPhggs',
+            id: 'DBjtSdkjwzpiNPbDFawWEw',
             entity_id:
-                'EXphSopBU1Is2TH4QZo4nO',
+                'GybPgWucvmsPHNwjNAyOiw',
             state: woNodeReview,
             member_id: woPersonMarcus,
             at: daysFromNow(-101, 11, 0),
         },
         {
-            id: 'HXbhOvQZXx6DnrRB0T3mve',
+            id: 'ImrJHLBYoYWoPqhyXafsog',
             entity_id:
-                'EXphSopBU1Is2TH4QZo4nO',
+                'GybPgWucvmsPHNwjNAyOiw',
             state: woNodeComplete,
             member_id: woPersonEmily,
             at: daysFromNow(-100, 9, 0),
         },
         // prc01: happy path, ~3 day draft sojourn
         {
-            id: 'fGWA9Dk2EKdOzT2DDU9XOC',
+            id: 'ZemYVenMYqXVtwixCifLIw',
             entity_id:
-                'hRPNkjrYBTQqzzFe1t8FH6',
+                'fCGVSSzsRHDgDLvPXbYkDw',
             state: prcNodeStart,
             member_id: woPersonSarah,
             at: daysFromNow(-60, 9, 0),
         },
         {
-            id: '3ksjRuCLxe6hNXR0dNzxWQ',
+            id: 'BXWhjnXeDZrJcPbnRMcLkw',
             entity_id:
-                'hRPNkjrYBTQqzzFe1t8FH6',
+                'fCGVSSzsRHDgDLvPXbYkDw',
             state: prcNodeDraft,
             member_id: woPersonSarah,
             at: daysFromNow(-60, 9, 5),
         },
         {
-            id: 'uWiv67EN75R9nQ1njZxhuv',
+            id: 'wuQKEuZjDETDIucLBSebbg',
             entity_id:
-                'hRPNkjrYBTQqzzFe1t8FH6',
+                'fCGVSSzsRHDgDLvPXbYkDw',
             state: prcNodeSubmit,
             member_id: woPersonEmily,
             at: daysFromNow(-57, 10, 0),
         },
         {
-            id: 'odxDZFFHmZwFy1FmpUuxU5',
+            id: 'pXsPnBRiysHozpxkucURcA',
             entity_id:
-                'hRPNkjrYBTQqzzFe1t8FH6',
+                'fCGVSSzsRHDgDLvPXbYkDw',
             state: prcNodeTriage,
             member_id: woPersonEmily,
             at: daysFromNow(-57, 10, 30),
         },
         {
-            id: 'AC5WlYdwXBnnE58qHaHmIo',
+            id: 'EdMYkqIYSsSpdpDaXQLyBA',
             entity_id:
-                'hRPNkjrYBTQqzzFe1t8FH6',
+                'fCGVSSzsRHDgDLvPXbYkDw',
             state: prcNodeQuickRev,
             member_id: woPersonMarcus,
             at: daysFromNow(-57, 11, 0),
         },
         {
-            id: 'RgZgN0b8utwKl61fc4TzZP',
+            id: 'QXIbGmksamdOgBInyLbAyQ',
             entity_id:
-                'hRPNkjrYBTQqzzFe1t8FH6',
+                'fCGVSSzsRHDgDLvPXbYkDw',
             state: prcNodeDecision,
             member_id: woPersonMarcus,
             at: daysFromNow(-56, 14, 0),
         },
         {
-            id: 'z6hNmYbEWvegszxhwcJ61f',
+            id: 'zWQidPMQhYExijLhbFKzEQ',
             entity_id:
-                'hRPNkjrYBTQqzzFe1t8FH6',
+                'fCGVSSzsRHDgDLvPXbYkDw',
             state: prcNodeApproved,
             member_id: woPersonSarah,
             at: daysFromNow(-56, 15, 0),
         },
         {
-            id: 'XdBVq4IIUbuiefP1w0g0yu',
+            id: 'TAyTGQCzsOeaDIrCHUsYbA',
             entity_id:
-                'hRPNkjrYBTQqzzFe1t8FH6',
+                'fCGVSSzsRHDgDLvPXbYkDw',
             state: prcNodeArchive,
             member_id: woPersonSarah,
             at: daysFromNow(-55, 9, 0),
         },
         // prc02: happy path, ~2 day draft sojourn
         {
-            id: 'Voznw9q5B5mGSoQek1jAHs',
+            id: 'STJKVVzNoEwHtjKZjVEuRQ',
             entity_id:
-                'L3UhOvrAGluk4kNnN6J8NT',
+                'MMbQqbhcKfHVHWhnsjIqnA',
             state: prcNodeStart,
             member_id: woPersonEmily,
             at: daysFromNow(-45, 10, 0),
         },
         {
-            id: 'm0nfsE2rTHaRbAWuxmum9d',
+            id: 'lxkqXoMBizUyrzohJRFlAQ',
             entity_id:
-                'L3UhOvrAGluk4kNnN6J8NT',
+                'MMbQqbhcKfHVHWhnsjIqnA',
             state: prcNodeDraft,
             member_id: woPersonEmily,
             at: daysFromNow(-45, 10, 10),
         },
         {
-            id: 'yxbLBIMHtHgVjO74NsrNgX',
+            id: 'zVmSaCNopLRhOabSiRZCrQ',
             entity_id:
-                'L3UhOvrAGluk4kNnN6J8NT',
+                'MMbQqbhcKfHVHWhnsjIqnA',
             state: prcNodeSubmit,
             member_id: woPersonEmily,
             at: daysFromNow(-43, 9, 0),
         },
         {
-            id: 'z9NN5xeQ6CMu9DChJ16m1V',
+            id: 'zhPRrjDRHiwiqRJoVELdrQ',
             entity_id:
-                'L3UhOvrAGluk4kNnN6J8NT',
+                'MMbQqbhcKfHVHWhnsjIqnA',
             state: prcNodeTriage,
             member_id: woPersonMarcus,
             at: daysFromNow(-43, 9, 20),
         },
         {
-            id: 'UAO4qYna7zIzLSJwM8iIoh',
+            id: 'RWhKHdWJQyLFcUMTBTzJww',
             entity_id:
-                'L3UhOvrAGluk4kNnN6J8NT',
+                'MMbQqbhcKfHVHWhnsjIqnA',
             state: prcNodeQuickRev,
             member_id: woPersonMarcus,
             at: daysFromNow(-43, 10, 0),
         },
         {
-            id: 'UrbW8eFstKcsHbh99uRUds',
+            id: 'SBxlcCYahQxxTwvpkXblyA',
             entity_id:
-                'L3UhOvrAGluk4kNnN6J8NT',
+                'MMbQqbhcKfHVHWhnsjIqnA',
             state: prcNodeDecision,
             member_id: woPersonSarah,
             at: daysFromNow(-42, 14, 0),
         },
         {
-            id: 'KW7NkVunQCIEUzL9R78DpF',
+            id: 'KDrhGYJfZiyVjPIJkLCUyw',
             entity_id:
-                'L3UhOvrAGluk4kNnN6J8NT',
+                'MMbQqbhcKfHVHWhnsjIqnA',
             state: prcNodeApproved,
             member_id: woPersonSarah,
             at: daysFromNow(-42, 15, 0),
         },
         {
-            id: 'wVgv2i4c1o7t11tIrmngjN',
+            id: 'xojxWLlEHQoZXDpIcKNTLQ',
             entity_id:
-                'L3UhOvrAGluk4kNnN6J8NT',
+                'MMbQqbhcKfHVHWhnsjIqnA',
             state: prcNodeArchive,
             member_id: woPersonEmily,
             at: daysFromNow(-41, 10, 0),
         },
         // prc03: happy path, ~1 day draft sojourn
         {
-            id: 'jMUHUNKZX9A0LJOuoDt3UQ',
+            id: 'jskXMycZSXTUxLoulczPdw',
             entity_id:
-                'oTscblsEOjZDkvkW3vs7rU',
+                'oqpwipJxpRbKzypGkStjjw',
             state: prcNodeStart,
             member_id: woPersonSarah,
             at: daysFromNow(-30, 8, 0),
         },
         {
-            id: '5opUgNKNUIWnlm3MnpGX9F',
+            id: 'CQMvFVuxNsLxWpckOjWAGA',
             entity_id:
-                'oTscblsEOjZDkvkW3vs7rU',
+                'oqpwipJxpRbKzypGkStjjw',
             state: prcNodeDraft,
             member_id: woPersonSarah,
             at: daysFromNow(-30, 8, 10),
         },
         {
-            id: '0XabGfXLVpJqRrrA8Tmo4S',
+            id: 'AZTcvXsYIHNuByrHIOQzSA',
             entity_id:
-                'oTscblsEOjZDkvkW3vs7rU',
+                'oqpwipJxpRbKzypGkStjjw',
             state: prcNodeSubmit,
             member_id: woPersonCurrent,
             at: daysFromNow(-29, 9, 0),
         },
         {
-            id: 'sbPLHxmfJUpk3tfXZ7ShRX',
+            id: 'txhdZVxNenthRlAuzvMcmw',
             entity_id:
-                'oTscblsEOjZDkvkW3vs7rU',
+                'oqpwipJxpRbKzypGkStjjw',
             state: prcNodeTriage,
             member_id: woPersonCurrent,
             at: daysFromNow(-29, 9, 15),
         },
         {
-            id: 'CEUHkraKtR9HC4heDL8OaZ',
+            id: 'FWZkhAQDNVjazMhPIkksIQ',
             entity_id:
-                'oTscblsEOjZDkvkW3vs7rU',
+                'oqpwipJxpRbKzypGkStjjw',
             state: prcNodeQuickRev,
             member_id: woPersonMarcus,
             at: daysFromNow(-29, 10, 0),
         },
         {
-            id: 'EqVBgaYCFKRwp9uIHOyVle',
+            id: 'GzKolhAcuEOPaQaEPsitmg',
             entity_id:
-                'oTscblsEOjZDkvkW3vs7rU',
+                'oqpwipJxpRbKzypGkStjjw',
             state: prcNodeDecision,
             member_id: woPersonMarcus,
             at: daysFromNow(-28, 15, 0),
         },
         {
-            id: '1DfCm0yI6ycGmVNPcudsOU',
+            id: 'AooEudoIbAWyNQVHzSZZHQ',
             entity_id:
-                'oTscblsEOjZDkvkW3vs7rU',
+                'oqpwipJxpRbKzypGkStjjw',
             state: prcNodeApproved,
             member_id: woPersonEmily,
             at: daysFromNow(-28, 16, 0),
         },
         {
-            id: 'lAOOAfrD4ZO0rKWfQFI8Px',
+            id: 'lLqTwPUUFzImRzcWgJILsQ',
             entity_id:
-                'oTscblsEOjZDkvkW3vs7rU',
+                'oqpwipJxpRbKzypGkStjjw',
             state: prcNodeArchive,
             member_id: woPersonEmily,
             at: daysFromNow(-27, 9, 0),
         },
         // prc04: happy path, ~4 day draft sojourn
         {
-            id: 'JOz3BgXyTUkvWLmmNGszc7',
+            id: 'JZfpspQWxBrFaUplMgjGuw',
             entity_id:
-                'Xpw9VGpZ6RyevuInSr8yze',
+                'TMRENIJdzgBtLiMyuxUkNg',
             state: prcNodeStart,
             member_id: woPersonEmily,
             at: daysFromNow(-20, 11, 0),
         },
         {
-            id: 'JpSsbb9JNMnGteG4RBWrZB',
+            id: 'JstBEwxjMxVGHDidQFyOpg',
             entity_id:
-                'Xpw9VGpZ6RyevuInSr8yze',
+                'TMRENIJdzgBtLiMyuxUkNg',
             state: prcNodeDraft,
             member_id: woPersonEmily,
             at: daysFromNow(-20, 11, 5),
         },
         {
-            id: 'dn32O6s5Ibe5aDOByr87J7',
+            id: 'XpGnIJXHvNHhYSabIfPOeQ',
             entity_id:
-                'Xpw9VGpZ6RyevuInSr8yze',
+                'TMRENIJdzgBtLiMyuxUkNg',
             state: prcNodeSubmit,
             member_id: woPersonMarcus,
             at: daysFromNow(-16, 10, 0),
         },
         {
-            id: 'nFGAxCNAthhvb9m4walDUe',
+            id: 'nsnhVBrMIHspcOtrhjMQKQ',
             entity_id:
-                'Xpw9VGpZ6RyevuInSr8yze',
+                'TMRENIJdzgBtLiMyuxUkNg',
             state: prcNodeTriage,
             member_id: woPersonSarah,
             at: daysFromNow(-16, 10, 20),
         },
         {
-            id: 'fjM70dtNCzEFNoQ6cjJCWO',
+            id: 'ZmbHLiTHFvIdlpfDBYEIkg',
             entity_id:
-                'Xpw9VGpZ6RyevuInSr8yze',
+                'TMRENIJdzgBtLiMyuxUkNg',
             state: prcNodeQuickRev,
             member_id: woPersonSarah,
             at: daysFromNow(-16, 11, 0),
         },
         {
-            id: '12eJcjUwJ7G1iqPAU6cSx0',
+            id: 'AnZRVJgyiYVPLQoOXjTPvg',
             entity_id:
-                'Xpw9VGpZ6RyevuInSr8yze',
+                'TMRENIJdzgBtLiMyuxUkNg',
             state: prcNodeDecision,
             member_id: woPersonSarah,
             at: daysFromNow(-15, 14, 0),
         },
         {
-            id: 'eM38EYOkl4REWI8y8IhCzA',
+            id: 'YrMLohhvZQOEIVwlZajqGQ',
             entity_id:
-                'Xpw9VGpZ6RyevuInSr8yze',
+                'TMRENIJdzgBtLiMyuxUkNg',
             state: prcNodeApproved,
             member_id: woPersonEmily,
             at: daysFromNow(-15, 15, 30),
         },
         {
-            id: 'Vx8TlX4GIyRQPYS6oocHhd',
+            id: 'SlEUdTQHKAXSWLrSAKJLIQ',
             entity_id:
-                'Xpw9VGpZ6RyevuInSr8yze',
+                'TMRENIJdzgBtLiMyuxUkNg',
             state: prcNodeArchive,
             member_id: woPersonEmily,
             at: daysFromNow(-14, 9, 0),
@@ -2365,164 +2365,164 @@ export function buildWorkOrderStateEvents():
         // prc05: revisit -- Decision sends to
         // Revise, then Draft again, then completes
         {
-            id: '4PaHruvvvyktmxiaGvTjM2',
+            id: 'BolIYNVHOhLtJJiTlMSGLw',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeStart,
             member_id: woPersonSarah,
             at: daysFromNow(-15, 9, 0),
         },
         {
-            id: 'WMNTfIbJPW1m39FOKqMZhH',
+            id: 'SpAFPKuZEvZnHdvSaDbKeA',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeDraft,
             member_id: woPersonSarah,
             at: daysFromNow(-15, 9, 10),
         },
         {
-            id: 'tMWEwY6qb3ICXZtz6P28Ut',
+            id: 'uuvfYyHqllqlVuBfbPFsOA',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeSubmit,
             member_id: woPersonEmily,
             at: daysFromNow(-14, 10, 0),
         },
         {
-            id: 'gOUPiWUJiZa99BUOQTrYjh',
+            id: 'eJwvtVsGSaRMQiILfYKpRA',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeTriage,
             member_id: woPersonEmily,
             at: daysFromNow(-14, 10, 15),
         },
         {
-            id: 'zQbr7dr0N8gG14HJT8hCop',
+            id: 'zofOJaZdwlzoBwoVUHySTg',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeQuickRev,
             member_id: woPersonMarcus,
             at: daysFromNow(-14, 11, 0),
         },
         {
-            id: 'c1O3BtoItm3bp1owvVmVWY',
+            id: 'WhAFbtmVPHQRHLuhYmlvEQ',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeDecision,
             member_id: woPersonMarcus,
             at: daysFromNow(-13, 14, 0),
         },
         // Decision routes to Revise (revisit)
         {
-            id: '3g2Tomp04bLGvwNRss9zCi',
+            id: 'BVZUcDcZUzNegtWdPgfWUA',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeRevise,
             member_id: woPersonCurrent,
             at: daysFromNow(-13, 15, 0),
         },
         // Revise sends back to Draft
         {
-            id: 'clXy8qWTzs8eNo3YaNi3Q5',
+            id: 'XJPhRRMvRMBdhmFjbQJHcA',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeDraft,
             member_id: woPersonSarah,
             at: daysFromNow(-12, 9, 0),
         },
         {
-            id: 'T0hms37kIuFsjCmKKnt5Je',
+            id: 'QvyahNFGFVmWfbgRfMLpDA',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeSubmit,
             member_id: woPersonSarah,
             at: daysFromNow(-11, 10, 0),
         },
         {
-            id: 'GnfjTPti69qF7OyWRdJTQV',
+            id: 'IOnbsxppJztYFQimEPjvcA',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeTriage,
             member_id: woPersonEmily,
             at: daysFromNow(-11, 10, 20),
         },
         {
-            id: 'QnMQPkZbvU0IPt6XODVj2K',
+            id: 'QANQObhucYYsFlnPjIdLug',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeQuickRev,
             member_id: woPersonEmily,
             at: daysFromNow(-11, 11, 0),
         },
         {
-            id: 'boVwgdzs2FbJ3lV2BK6rFe',
+            id: 'WVDvagzaHvQhsPvQrEZyTQ',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeDecision,
             member_id: woPersonMarcus,
             at: daysFromNow(-10, 14, 0),
         },
         {
-            id: 'JeIgVixuJXQgtsLJ2jVEV6',
+            id: 'JdnYAaRcRbiVGZfVlvcqLg',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeApproved,
             member_id: woPersonMarcus,
             at: daysFromNow(-10, 15, 0),
         },
         {
-            id: 'N09pFEf67fHMeaf5d9Hmud',
+            id: 'NSfnyTzHVDijYUyOgvzrvA',
             entity_id:
-                'yqPpJb0NoQDgx8DoZ183Nx',
+                'zOSyhzfDZMJDhZPsOvFwRg',
             state: prcNodeArchive,
             member_id: woPersonSarah,
             at: daysFromNow(-9, 9, 0),
         },
         // prc06: in-flight -- stuck at Decision
         {
-            id: 'iGftzPJwYdoaZr4Hm5MlsE',
+            id: 'gGzFilaLFJxgWoYptwGcGA',
             entity_id:
-                'BUrGEVDMF6FeU35WUHUY5E',
+                'FCEBEWzmelSFTOlqcZsbdQ',
             state: prcNodeStart,
             member_id: woPersonEmily,
             at: daysFromNow(-5, 10, 0),
         },
         {
-            id: 'sCPs7p4WtQgm0VuR81yMyy',
+            id: 'tFAPylGYdEAvUfBfZjIVPQ',
             entity_id:
-                'BUrGEVDMF6FeU35WUHUY5E',
+                'FCEBEWzmelSFTOlqcZsbdQ',
             state: prcNodeDraft,
             member_id: woPersonEmily,
             at: daysFromNow(-5, 10, 8),
         },
         {
-            id: 'bHOxRfjKzqHi2DH8w3I8Xg',
+            id: 'VsTwqXXDgmLuycgPSVmQog',
             entity_id:
-                'BUrGEVDMF6FeU35WUHUY5E',
+                'FCEBEWzmelSFTOlqcZsbdQ',
             state: prcNodeSubmit,
             member_id: woPersonCurrent,
             at: daysFromNow(-4, 11, 0),
         },
         {
-            id: 'LlXYA4dYJtau7GSAu2549Z',
+            id: 'MSfXTLMzreVoxZNyECaXhQ',
             entity_id:
-                'BUrGEVDMF6FeU35WUHUY5E',
+                'FCEBEWzmelSFTOlqcZsbdQ',
             state: prcNodeTriage,
             member_id: woPersonSarah,
             at: daysFromNow(-4, 11, 20),
         },
         {
-            id: 'pojq7QRvrUQorLUztKWUW5',
+            id: 'qZEoVCbLmdSyqbFOYCsDrg',
             entity_id:
-                'BUrGEVDMF6FeU35WUHUY5E',
+                'FCEBEWzmelSFTOlqcZsbdQ',
             state: prcNodeQuickRev,
             member_id: woPersonSarah,
             at: daysFromNow(-4, 12, 0),
         },
         {
-            id: 'C4i8pmiwfwvwRFk19mjOa8',
+            id: 'FVjTCQpDpCOMoDzxzQzaoA',
             entity_id:
-                'BUrGEVDMF6FeU35WUHUY5E',
+                'FCEBEWzmelSFTOlqcZsbdQ',
             state: prcNodeDecision,
             member_id: woPersonMarcus,
             at: daysFromNow(-3, 14, 0),
@@ -2533,17 +2533,17 @@ export function buildWorkOrderStateEvents():
         // Capture trips the gate on Company Name +
         // Email (current-node required attrs).
         {
-            id: 'gvSe01CreateGateV101AB',
+            id: 'egrICXlEtLydujpUXmZaJQ',
             entity_id:
-                'gateV101W0rkOrd3rXY0a1',
+                'eOlNZpGQfmCdpSFWXGkzFQ',
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-1, 9, 0),
         },
         {
-            id: 'gvSe02CaptureGateV101C',
+            id: 'ehNUMEvGcoVHjrWbxonitg',
             entity_id:
-                'gateV101W0rkOrd3rXY0a1',
+                'eOlNZpGQfmCdpSFWXGkzFQ',
             state: woNodeCapture,
             member_id: woPersonSarah,
             at: daysFromNow(-1, 10, 0),

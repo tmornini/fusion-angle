@@ -34,6 +34,8 @@ import type {
     GraphNode,
     StoredGraph,
 } from '../api/types.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 function buildNode(
     id: string,
@@ -74,7 +76,7 @@ function buildFlowEntity(
 ): FlowWithGraph {
     return {
         id,
-        organization_id: '1',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         name: 'Flow ' + id,
         is_locked: false,
         is_auto_layout: true,
@@ -102,8 +104,8 @@ async function seedFlowWithRelations(
     );
     await postFlowCreation(ctx, {
         flowId: flow.id,
-        linkId: flow.id + '-link',
-        projectId: 'p-' + flow.id,
+        linkId: generateIdentifier(),
+        projectId: generateIdentifier(),
         name: flow.name,
     });
     await putFlow(ctx, flow.id, {
@@ -120,19 +122,25 @@ async function seedFlowWithRelations(
 // Node/edge ids are globally-unique canvas ids (the flow_nodes
 // keyPath), so seeding two flows demands distinct ids — the
 // optional prefix namespaces them per flow.
-function readyGraph(prefix = ''): StoredGraph {
-    const n = (id: string) => prefix + id;
+function readyGraph(memberId: string): StoredGraph {
+    const start = generateIdentifier();
+    const mid = generateIdentifier();
+    const done = generateIdentifier();
     return {
         nodes: [
-            buildNode(n('start'), { isCreate: true }),
-            buildNode(n('mid'), {
-                memberIds: ['hw_1'],
+            buildNode(start, { isCreate: true }),
+            buildNode(mid, {
+                memberIds: [memberId],
             }),
-            buildNode(n('done'), { isArchive: true }),
+            buildNode(done, { isArchive: true }),
         ],
         edges: [
-            buildEdge(n('e1'), n('start'), n('mid')),
-            buildEdge(n('e2'), n('mid'), n('done')),
+            buildEdge(
+                generateIdentifier(), start, mid,
+            ),
+            buildEdge(
+                generateIdentifier(), mid, done,
+            ),
         ],
     };
 }
@@ -143,7 +151,8 @@ test(
     + ' outgoing edge',
     () => {
         const flow = buildFlowEntity(
-            'f1', readyGraph(),
+            generateIdentifier(),
+            readyGraph(generateIdentifier()),
         );
         const r = validateFlowForCreation(flow);
         assert.equal(r.ready, true);
@@ -155,22 +164,31 @@ test(
     'validateFlowForCreation flags zero_members'
     + ' on regular nodes with empty memberIds',
     () => {
+        const start = generateIdentifier();
+        const mid = generateIdentifier();
+        const done = generateIdentifier();
         const graph: StoredGraph = {
             nodes: [
-                buildNode('start', {
+                buildNode(start, {
                     isCreate: true,
                 }),
-                buildNode('mid'),
-                buildNode('done', {
+                buildNode(mid),
+                buildNode(done, {
                     isArchive: true,
                 }),
             ],
             edges: [
-                buildEdge('e1', 'start', 'mid'),
-                buildEdge('e2', 'mid', 'done'),
+                buildEdge(
+                    generateIdentifier(), start, mid,
+                ),
+                buildEdge(
+                    generateIdentifier(), mid, done,
+                ),
             ],
         };
-        const flow = buildFlowEntity('f1', graph);
+        const flow = buildFlowEntity(
+            generateIdentifier(), graph,
+        );
         const r = validateFlowForCreation(flow);
         assert.equal(r.ready, false);
         assert.equal(r.problems.length, 1);
@@ -178,7 +196,7 @@ test(
             r.problems[0]!.kind, 'zero_members',
         );
         assert.equal(
-            r.problems[0]!.nodeId, 'mid',
+            r.problems[0]!.nodeId, mid,
         );
     },
 );
@@ -187,32 +205,43 @@ test(
     'validateFlowForCreation flags dead_end on'
     + ' a non-End node with zero outgoing edges',
     () => {
+        const start = generateIdentifier();
+        const mid = generateIdentifier();
+        const orphan = generateIdentifier();
+        const done = generateIdentifier();
+        const memberId = generateIdentifier();
         const graph: StoredGraph = {
             nodes: [
-                buildNode('start', {
+                buildNode(start, {
                     isCreate: true,
                 }),
-                buildNode('mid', {
-                    memberIds: ['hw_1'],
+                buildNode(mid, {
+                    memberIds: [memberId],
                 }),
-                buildNode('orphan', {
-                    memberIds: ['hw_1'],
+                buildNode(orphan, {
+                    memberIds: [memberId],
                 }),
-                buildNode('done', {
+                buildNode(done, {
                     isArchive: true,
                 }),
             ],
             // orphan has no outgoing edge
             edges: [
-                buildEdge('e1', 'start', 'mid'),
-                buildEdge('e2', 'mid', 'done'),
+                buildEdge(
+                    generateIdentifier(), start, mid,
+                ),
+                buildEdge(
+                    generateIdentifier(), mid, done,
+                ),
             ],
         };
-        const flow = buildFlowEntity('f1', graph);
+        const flow = buildFlowEntity(
+            generateIdentifier(), graph,
+        );
         const r = validateFlowForCreation(flow);
         assert.equal(r.ready, false);
         const problem = r.problems.find(
-            p => p.nodeId === 'orphan',
+            p => p.nodeId === orphan,
         );
         assert.ok(problem);
         assert.equal(problem!.kind, 'dead_end');
@@ -223,26 +252,35 @@ test(
     'validateFlowForCreation ignores start and'
     + ' complete nodes (they never hazard)',
     () => {
+        const start = generateIdentifier();
+        const mid = generateIdentifier();
+        const done = generateIdentifier();
         const graph: StoredGraph = {
             nodes: [
-                buildNode('start', {
+                buildNode(start, {
                     isCreate: true,
                     // intentionally empty
                 }),
-                buildNode('mid', {
-                    memberIds: ['hw_1'],
+                buildNode(mid, {
+                    memberIds: [generateIdentifier()],
                 }),
-                buildNode('done', {
+                buildNode(done, {
                     isArchive: true,
                     // intentionally empty
                 }),
             ],
             edges: [
-                buildEdge('e1', 'start', 'mid'),
-                buildEdge('e2', 'mid', 'done'),
+                buildEdge(
+                    generateIdentifier(), start, mid,
+                ),
+                buildEdge(
+                    generateIdentifier(), mid, done,
+                ),
             ],
         };
-        const flow = buildFlowEntity('f1', graph);
+        const flow = buildFlowEntity(
+            generateIdentifier(), graph,
+        );
         const r = validateFlowForCreation(flow);
         assert.equal(r.ready, true);
     },
@@ -255,36 +293,49 @@ test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await organizationToken());
-        const goodGraph = readyGraph('good-');
+        const goodId = generateIdentifier();
+        const badId = generateIdentifier();
+        const goodGraph = readyGraph(
+            generateIdentifier(),
+        );
+        const badStart = generateIdentifier();
+        const badMid = generateIdentifier();
+        const badDone = generateIdentifier();
         const badGraph: StoredGraph = {
             nodes: [
-                buildNode('bad-start', {
+                buildNode(badStart, {
                     isCreate: true,
                 }),
-                buildNode('bad-mid'),
-                buildNode('bad-done', {
+                buildNode(badMid),
+                buildNode(badDone, {
                     isArchive: true,
                 }),
             ],
             edges: [
-                buildEdge('bad-e1', 'bad-start', 'bad-mid'),
-                buildEdge('bad-e2', 'bad-mid', 'bad-done'),
+                buildEdge(
+                    generateIdentifier(),
+                    badStart, badMid,
+                ),
+                buildEdge(
+                    generateIdentifier(),
+                    badMid, badDone,
+                ),
             ],
         };
         await seedFlowWithRelations(
-            ctx, buildFlowEntity('good', goodGraph),
+            ctx, buildFlowEntity(goodId, goodGraph),
         );
         await seedFlowWithRelations(
-            ctx, buildFlowEntity('bad', badGraph),
+            ctx, buildFlowEntity(badId, badGraph),
         );
         const result = await getFlowsForCreation(
             ctx,
         );
         assert.equal(result.ready.length, 1);
-        assert.equal(result.ready[0]!.id, 'good');
+        assert.equal(result.ready[0]!.id, goodId);
         assert.equal(result.notReady.length, 1);
         assert.equal(
-            result.notReady[0]!.id, 'bad',
+            result.notReady[0]!.id, badId,
         );
         assert.equal(
             result.notReady[0]!.problemCount, 1,
@@ -299,17 +350,20 @@ test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await organizationToken());
+        const lockedId = generateIdentifier();
+        const openId = generateIdentifier();
+        const memberId = generateIdentifier();
         await seedFlowWithRelations(
             ctx,
             buildFlowEntity(
-                'locked-ready', readyGraph('locked-'),
+                lockedId, readyGraph(memberId),
                 { is_locked: true },
             ),
         );
         await seedFlowWithRelations(
             ctx,
             buildFlowEntity(
-                'open-ready', readyGraph('open-'),
+                openId, readyGraph(memberId),
             ),
         );
         const result = await getFlowsForCreation(
@@ -317,7 +371,7 @@ test(
         );
         assert.equal(result.ready.length, 1);
         assert.equal(
-            result.ready[0]!.id, 'open-ready',
+            result.ready[0]!.id, openId,
         );
         assert.equal(result.notReady.length, 0);
     },

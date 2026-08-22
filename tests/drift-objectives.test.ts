@@ -1,4 +1,8 @@
 import { test } from 'node:test';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+import { seedIdentifier } from
+    '../api/mock-data/seed-kit.ts';
 import assert from 'node:assert/strict';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -47,6 +51,15 @@ import {
     storedPutBodyText,
     storedCollectionText,
 } from './http-fixtures.ts';
+
+const IDEA_DRIFT_CHAIN_1_PROMOTED = generateIdentifier();
+const PROJ_DRIFT_CHAIN_1_INIT = generateIdentifier();
+const OBJ_DRIFT_METHOD_FILTER_1 = generateIdentifier();
+const OBJ_DRIFT_Z = generateIdentifier();
+const OBJ_DRIFT_A = generateIdentifier();
+const OBJ_DRIFT_M = generateIdentifier();
+const OBJ_DRIFT_SKEW_1_GENESIS = generateIdentifier();
+const OBJ_DRIFT_SKEW_1_SKEWED = generateIdentifier();
 
 // Phase Final Task 2: objectives(+objective_revisions)
 // dual-write stripped. This file no longer compares derive
@@ -104,7 +117,12 @@ const OBJECTIVES_TEST_WIRING: DocumentFamilyWiring = {
     }),
 };
 
-const READER_ACTOR: Id = 'drift-reader';
+const READER_ACTOR: Id = generateIdentifier();
+const ID_ACTIVE = generateIdentifier();
+const OBJECTIVEID_REV_1 = generateIdentifier();
+const OBJECTIVEID_ACTIVE = generateIdentifier();
+const OBJECTIVEID_REV_2 = generateIdentifier();
+const OBJECTIVEID_REV_3 = generateIdentifier();
 
 async function derivedObjectives(
     db: MemoryDbAdapter, organization: Id,
@@ -166,7 +184,7 @@ function wireSeededObjective(
         position,
         'active',
         '2026-01-01T00:00:00.000000Z',
-        'seed-objective-' + id + '-active',
+        'seed-objective-' + ID_ACTIVE,
         organization,
     );
 }
@@ -205,10 +223,10 @@ function objectiveCreateBody(
         revisionId,
         revision: {
             objective_id: id, name, description: 'd',
-            member_id: 'current', at,
+            member_id: 'XXZruirZyAOoRpNxaDnpSA', at,
         },
         initialState: 'active',
-        initialStateEventId: id + '-active',
+        initialStateEventId: generateIdentifier(),
         initialStateAt: at,
     };
 }
@@ -216,15 +234,16 @@ function objectiveCreateBody(
 // -- 1. seeded collection wire equals derive -------------------
 
 test('seeded GET /objectives wire equals derive, both orgs'
-+ ' (the 4/1 split), plus the empty-collection leg',
++ ' (the 4/AjdvjuECVZEgZoFajaIEkg split), plus the empty-collection leg',
 async () => {
     const db = await seededDb();
 
     const tokenStark = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const resStark = await handleRequest(
-        db, req('GET', '/organizations/1/objectives/', tokenStark),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            , tokenStark),
     );
     assert.equal(resStark.status, 200);
     const starkPrefix = '/organizations/'
@@ -243,7 +262,7 @@ async () => {
     );
 
     const tokenTwo = await organizationToken(
-        'current', ORGANIZATION_TWO,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
     const resTwo = await handleRequest(
         db, req(
@@ -296,7 +315,7 @@ async () => {
     assert.equal(targets.length, 5);
     for (const t of targets) {
         const token = await organizationToken(
-            'current', t.organization,
+            'XXZruirZyAOoRpNxaDnpSA', t.organization,
         );
         const res = await handleRequest(
             db, req(
@@ -324,7 +343,7 @@ async () => {
     const expectedMessage =
         'Not found: objectives/' + foreignId;
     const tokenTwo = await organizationToken(
-        'current', ORGANIZATION_TWO,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
     const foreignRes = await handleRequest(
         db, req(
@@ -363,7 +382,7 @@ async () => {
     ];
     for (const { id, organization } of targets) {
         const token = await organizationToken(
-            'current', organization,
+            'XXZruirZyAOoRpNxaDnpSA', organization,
         );
         const path = '/organizations/' + organization
             + '/objectives/' + id + '/revisions/';
@@ -381,7 +400,7 @@ async () => {
 
     const foreignId = OBJECTIVE_SEEDS[0]!.id;
     const tokenTwo = await organizationToken(
-        'current', ORGANIZATION_TWO,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
     const foreignRes = await handleRequest(db, req(
         'GET',
@@ -410,18 +429,20 @@ test('score collection wire equals derive per project: an'
 + ' baselines / 92 actuals); foreign-parent empty', async () => {
     const db = await seededDb();
     const tokenStark = await organizationToken(
-        'current', STARK_ORGANIZATION,
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const tokenTwo = await organizationToken(
-        'current', ORGANIZATION_TWO,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
 
-    const fullCoverageProjectId = 'u6YkHhlGc91oDMkr3x0isa';
+    const fullCoverageProjectId = 'wqGTTFdYUGnmBxWCppmkOQ';
     const fullBasePath =
-        '/organizations/1/projects/' + fullCoverageProjectId
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + fullCoverageProjectId
         + '/objective-baseline-scores/';
     const fullActPath =
-        '/organizations/1/projects/' + fullCoverageProjectId
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + fullCoverageProjectId
         + '/objective-actual-scores/';
     const fullBaseRes = await handleRequest(
         db, req('GET', fullBasePath, tokenStark),
@@ -449,10 +470,10 @@ test('score collection wire equals derive per project: an'
     );
     assert.equal(derivedFullActuals.length, 5);
 
-    const partialProjectId = 'P04PredMa1ntzyXY010203';
+    const partialProjectId = 'ORXAfsQvNowpmJfBwQAtWg';
     const partialBaseRes = await handleRequest(db, req(
         'GET',
-        '/organizations/1/projects/' + partialProjectId
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + partialProjectId
         + '/objective-baseline-scores/',
         tokenStark,
     ));
@@ -472,7 +493,7 @@ test('score collection wire equals derive per project: an'
         [],
     );
 
-    const submittedProjectId = 'P16MktSent1mentXY01020';
+    const submittedProjectId = 'PIfhHMLQQxTxKFDdabXbOw';
     assert.deepEqual(
         await deriveBaselineScores(
             db, STARK_ORGANIZATION, submittedProjectId,
@@ -486,7 +507,9 @@ test('score collection wire equals derive per project: an'
         [],
     );
 
-    const org2ProjectId = 'seed-project-org2';
+    const org2ProjectId = seedIdentifier(
+        'seed-project-org2',
+    );
     assert.deepEqual(
         await deriveBaselineScores(
             db, ORGANIZATION_TWO, org2ProjectId,
@@ -544,13 +567,13 @@ test('live-write chain: create, reposition, revision edit,'
 + ' wire equals derive at every step', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const objectiveId = 'obj-drift-chain-1';
+    const objectiveId = generateIdentifier();
 
     const beforeCreate = (await db.pairs.getAll()).length;
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/objectives/', token,
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/', token,
         objectiveCreateBody(
-            objectiveId, 50, objectiveId + '-rev-1',
+            objectiveId, 50, OBJECTIVEID_REV_1,
             'Chain Objective', '2026-06-01T00:00:00.000000Z',
         ),
     ));
@@ -560,7 +583,8 @@ test('live-write chain: create, reposition, revision edit,'
     );
     {
         const getRes = await handleRequest(
-            db, req('GET', '/organizations/1/objectives/' +
+            db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + '' +
                 objectiveId, token),
         );
         assert.equal(getRes.status, 200);
@@ -580,7 +604,8 @@ test('live-write chain: create, reposition, revision edit,'
         assert.equal(derived.state, 'active');
         const revRes = await handleRequest(db, req(
             'GET',
-            '/organizations/1/objectives/' + objectiveId + '/revisions/',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + objectiveId + '/revisions/',
             token,
         ));
         const revs = await deriveObjectiveRevisions(
@@ -595,7 +620,8 @@ test('live-write chain: create, reposition, revision edit,'
     // Position PUT echoes the genesis trio (putObjectivePosition
     // shape) — same state_event_id so echo-dedup mints no event.
     const reposition = await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + objectiveId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token,
         {
             position: 77,
             state: 'active',
@@ -608,7 +634,8 @@ test('live-write chain: create, reposition, revision edit,'
     assert.equal(reposition.headers.get('Supersedes'), null);
     {
         const getRes = await handleRequest(
-            db, req('GET', '/organizations/1/objectives/' +
+            db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + '' +
                 objectiveId, token),
         );
         const derived = await derivedObjective(
@@ -630,21 +657,22 @@ test('live-write chain: create, reposition, revision edit,'
             wireObjectiveGet(
                 objectiveId, 77, 'active',
                 '2026-06-01T00:00:00.000000Z',
-                objectiveId + '-active',
+                OBJECTIVEID_ACTIVE,
             ),
         );
     }
 
-    const revisionId2 = objectiveId + '-rev-2';
+    const revisionId2 = OBJECTIVEID_REV_2;
     const revEdit = await handleRequest(db, req(
         'PUT',
-        '/organizations/1/objectives/' + objectiveId + '/revisions/'
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + objectiveId
+            + '/revisions/'
             + revisionId2,
         token,
         {
             objective_id: objectiveId,
             name: 'Chain Objective v2',
-            description: 'd2', member_id: 'current',
+            description: 'd2', member_id: 'XXZruirZyAOoRpNxaDnpSA',
             at: '2026-06-02T00:00:00.000000Z',
         },
     ));
@@ -664,7 +692,8 @@ test('live-write chain: create, reposition, revision edit,'
     // (trio families exclude only 'deleted'; archived is a
     // live objective state).
     const archived = await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + objectiveId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token,
         {
             position: 50,
             state: 'archived',
@@ -673,7 +702,8 @@ test('live-write chain: create, reposition, revision edit,'
     assert.equal(archived.status, 201);
     {
         const listRes = await handleRequest(
-            db, req('GET', '/organizations/1/objectives/', token),
+            db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + '', token),
         );
         const list = await listRes.json() as { id: string }[];
         assert.equal(
@@ -688,7 +718,8 @@ test('live-write chain: create, reposition, revision edit,'
     }
 
     const reactivated = await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + objectiveId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token,
         {
             position: 50,
             state: 'active',
@@ -700,7 +731,8 @@ test('live-write chain: create, reposition, revision edit,'
     assert.ok(reactivatedResponseId);
     {
         const getRes = await handleRequest(
-            db, req('GET', '/organizations/1/objectives/' +
+            db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + '' +
                 objectiveId, token),
         );
         assert.equal(getRes.status, 200);
@@ -708,9 +740,10 @@ test('live-write chain: create, reposition, revision edit,'
 
     // Conversion with 2 baselines — idea seeded via document
     // PUT (ideas row half already stripped).
-    const ideaId = 'idea-drift-chain-1';
+    const ideaId = generateIdentifier();
     await handleRequest(db, req(
-        'PUT', '/organizations/1/ideas/' + ideaId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
+            , token, {
             title: 'Chain Idea', position: 1,
             problem_statement: 'p', target_users: 't',
             proposed_solution: 's', expected_outcome: 'o',
@@ -718,13 +751,14 @@ test('live-write chain: create, reposition, revision edit,'
             state: 'approved',
         },
     ));
-    const projectId = 'proj-drift-chain-1';
-    const baselineIdA = 'bl-drift-chain-1-a';
-    const baselineIdB = 'bl-drift-chain-1-b';
+    const projectId = generateIdentifier();
+    const baselineIdA = generateIdentifier();
+    const baselineIdB = generateIdentifier();
     const secondObjectiveId = OBJECTIVE_SEEDS[0]!.id;
     const beforeConversion = (await db.pairs.getAll()).length;
     const conversion = await handleRequest(db, req(
-        'POST', '/organizations/1/ideas/' + ideaId + '/conversion', token, {
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
+            + '/conversion', token, {
             projectId,
             project: {
                 title: 'Chain Project', description: 'd',
@@ -738,9 +772,9 @@ test('live-write chain: create, reposition, revision edit,'
                 proposed_solution: 's', expected_outcome: 'o',
                 success_metrics: 'm',
             },
-            ideaStateEventId: 'idea-drift-chain-1-promoted',
+            ideaStateEventId: IDEA_DRIFT_CHAIN_1_PROMOTED,
             ideaState: 'promoted',
-            projectStateEventId: 'proj-drift-chain-1-init',
+            projectStateEventId: PROJ_DRIFT_CHAIN_1_INIT,
             projectState: 'submitted',
             ideaStateAt: '2026-06-05T00:00:00.000000Z',
             projectStateAt: '2026-06-05T00:00:01.000000Z',
@@ -750,7 +784,7 @@ test('live-write chain: create, reposition, revision edit,'
                     fields: {
                         project_id: projectId,
                         objective_id: objectiveId, score: 10,
-                        member_id: 'current',
+                        member_id: 'XXZruirZyAOoRpNxaDnpSA',
                         at: '2026-06-05T00:00:02.000000Z',
                     },
                 },
@@ -759,7 +793,7 @@ test('live-write chain: create, reposition, revision edit,'
                     fields: {
                         project_id: projectId,
                         objective_id: secondObjectiveId,
-                        score: -10, member_id: 'current',
+                        score: -10, member_id: 'XXZruirZyAOoRpNxaDnpSA',
                         at: '2026-06-05T00:00:03.000000Z',
                     },
                 },
@@ -772,7 +806,7 @@ test('live-write chain: create, reposition, revision edit,'
         beforeConversion + 5,
     );
     const basePath =
-        '/organizations/1/projects/' + projectId
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
         + '/objective-baseline-scores/';
     const baseRes = await handleRequest(
         db, req('GET', basePath, token),
@@ -788,26 +822,26 @@ test('live-write chain: create, reposition, revision edit,'
     );
     assert.equal(derivedBaselinesAfterConversion.length, 2);
 
-    const baselineIdC = 'bl-drift-chain-1-c';
+    const baselineIdC = generateIdentifier();
     const standaloneBaseline = await handleRequest(db, req(
         'PUT',
-        '/organizations/1/projects/' + projectId
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
         + '/objective-baseline-scores/' + baselineIdC,
         token, {
             project_id: projectId, objective_id: objectiveId,
-            score: 20, member_id: 'current',
+            score: 20, member_id: 'XXZruirZyAOoRpNxaDnpSA',
             at: '2026-06-06T00:00:00.000000Z',
         },
     ));
     assert.equal(standaloneBaseline.status, 201);
-    const actualIdA = 'as-drift-chain-1-a';
+    const actualIdA = generateIdentifier();
     const standaloneActual = await handleRequest(db, req(
         'PUT',
-        '/organizations/1/projects/' + projectId
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
         + '/objective-actual-scores/' + actualIdA,
         token, {
             project_id: projectId, objective_id: objectiveId,
-            score: 30, member_id: 'current',
+            score: 30, member_id: 'XXZruirZyAOoRpNxaDnpSA',
             at: '2026-06-06T00:00:01.000000Z',
         },
     ));
@@ -826,7 +860,7 @@ test('live-write chain: create, reposition, revision edit,'
     assert.equal(derivedBaselinesFinal.length, 3);
 
     const actPath =
-        '/organizations/1/projects/' + projectId
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
         + '/objective-actual-scores/';
     const actFinalRes = await handleRequest(
         db, req('GET', actPath, token),
@@ -845,9 +879,10 @@ test('live-write chain: create, reposition, revision edit,'
     // reposition + archive + reactivate = 5 (archive/reactivate
     // ride PUT /organizations/:id/objectives/:id after states-address
     // retirement).
-    const revisionId3 = objectiveId + '-rev-3';
+    const revisionId3 = OBJECTIVEID_REV_3;
     const objectivesPrefix = canonicalUriCollection(
-        STARK_ORGANIZATION, '/organizations/1/objectives/',
+        STARK_ORGANIZATION
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
     );
     const beforeDuplicateIds = new Set(
         (
@@ -860,7 +895,7 @@ test('live-write chain: create, reposition, revision edit,'
     assert.equal(beforeDuplicateIds.size, 5);
 
     const duplicate = await handleRequest(db, req(
-        'POST', '/organizations/1/objectives/', token,
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/', token,
         objectiveCreateBody(
             objectiveId, 88, revisionId3,
             'Chain Objective v3', '2026-06-07T00:00:00.000000Z',
@@ -905,7 +940,8 @@ test('live-write chain: create, reposition, revision edit,'
     );
 
     const finalGet = await handleRequest(
-        db, req('GET', '/organizations/1/objectives/' + objectiveId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token),
     );
     const finalObjective = await derivedObjective(
         db, STARK_ORGANIZATION, objectiveId,
@@ -930,19 +966,20 @@ test('the create-op POST pair is not read as a document pair —'
 + ' after create', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const objectiveId = 'obj-drift-method-filter-1';
+    const objectiveId = OBJ_DRIFT_METHOD_FILTER_1;
 
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/objectives/', token,
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/', token,
         objectiveCreateBody(
-            objectiveId, 1, objectiveId + '-rev-1', 'n',
+            objectiveId, 1, OBJECTIVEID_REV_1, 'n',
             '2026-06-10T00:00:00.000000Z',
         ),
     ));
     assert.equal(created.status, 201);
 
     const prefix = canonicalUriCollection(
-        STARK_ORGANIZATION, '/organizations/1/objectives/',
+        STARK_ORGANIZATION
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
     );
     const [requests, responses] = await Promise.all([
         db.pairs.getAllWhere('uri_collection', prefix),
@@ -982,12 +1019,12 @@ test('resend idempotency: a byte-identical position-PUT resend'
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const objectiveId = 'obj-drift-resend-1';
+    const objectiveId = generateIdentifier();
 
     await handleRequest(db, req(
-        'POST', '/organizations/1/objectives/', token,
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/', token,
         objectiveCreateBody(
-            objectiveId, 5, objectiveId + '-rev-1', 'n',
+            objectiveId, 5, OBJECTIVEID_REV_1, 'n',
             '2026-06-11T00:00:00.000000Z',
         ),
     ));
@@ -1000,7 +1037,8 @@ async () => {
     };
     const beforeReposition = (await db.pairs.getAll()).length;
     const first = await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + objectiveId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token,
         positionBody,
     ));
     assert.equal(first.status, 201);
@@ -1008,7 +1046,8 @@ async () => {
     assert.equal(afterFirst, beforeReposition + 1);
 
     const second = await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + objectiveId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token,
         positionBody,
     ));
     assert.equal(second.status, 201);
@@ -1020,7 +1059,8 @@ async () => {
     );
 
     const getRes = await handleRequest(
-        db, req('GET', '/organizations/1/objectives/' + objectiveId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token),
     );
     const derived = await derivedObjective(
         db, STARK_ORGANIZATION, objectiveId,
@@ -1046,17 +1086,18 @@ test('THE ARCHIVED-INCLUSION PIN: an objective with a live'
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const objectiveId = 'obj-drift-archived-1';
+    const objectiveId = generateIdentifier();
 
     await handleRequest(db, req(
-        'POST', '/organizations/1/objectives/', token,
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/', token,
         objectiveCreateBody(
-            objectiveId, 1, objectiveId + '-rev-1', 'n',
+            objectiveId, 1, OBJECTIVEID_REV_1, 'n',
             '2026-06-12T00:00:00.000000Z',
         ),
     ));
     const archived = await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + objectiveId, token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token,
         {
             position: 1,
             state: 'archived',
@@ -1065,7 +1106,8 @@ async () => {
     assert.equal(archived.status, 201);
 
     const listRes = await handleRequest(
-        db, req('GET', '/organizations/1/objectives/', token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            , token),
     );
     assert.equal(listRes.status, 200);
     const listText = await listRes.text();
@@ -1086,7 +1128,8 @@ async () => {
     );
 
     const getRes = await handleRequest(
-        db, req('GET', '/organizations/1/objectives/' + objectiveId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token),
     );
     assert.equal(getRes.status, 200);
     const derivedById = await derivedObjective(
@@ -1112,13 +1155,14 @@ async () => {
     const token = await organizationToken();
     // Insert z, then a, then m — collection is that order.
     const fixtures = [
-        { id: 'obj-drift-z', position: 30 },
-        { id: 'obj-drift-a', position: 10 },
-        { id: 'obj-drift-m', position: 20 },
+        { id: OBJ_DRIFT_Z, position: 30 },
+        { id: OBJ_DRIFT_A, position: 10 },
+        { id: OBJ_DRIFT_M, position: 20 },
     ];
     for (const f of fixtures) {
         const put = await handleRequest(db, req(
-            'PUT', '/organizations/1/objectives/' + f.id, token,
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + f.id, token,
             {
                 position: f.position,
                 state: 'active',
@@ -1130,26 +1174,30 @@ async () => {
             wireObjectiveGet(
                 f.id, f.position, 'active',
                 '2026-06-13T00:00:00.000000Z',
-                f.id + '-active',
+                f.ID_ACTIVE,
             ),
         );
     }
     const res = await handleRequest(
-        db, req('GET', '/organizations/1/objectives/', token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            , token),
     );
     assert.equal(res.status, 200);
     const list = await res.json() as { id: string }[];
     const added = list.filter((row) =>
-        row.id.startsWith('obj-drift-'));
+        [
+            OBJ_DRIFT_Z, OBJ_DRIFT_A, OBJ_DRIFT_M,
+        ].includes(row.id));
     assert.deepEqual(
         added.map((row) => row.id),
-        ['obj-drift-z', 'obj-drift-a', 'obj-drift-m'],
+        [OBJ_DRIFT_Z, OBJ_DRIFT_A, OBJ_DRIFT_M],
     );
     const prefix = '/organizations/'
         + STARK_ORGANIZATION + '/objectives/';
     for (const row of added) {
         const single = await handleRequest(
-            db, req('GET', '/organizations/1/objectives/' + row.id, token),
+            db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                + '' + row.id, token),
         );
         assert.equal(single.status, 200);
         assert.equal(
@@ -1170,14 +1218,15 @@ test('GET objective trio is lifecycle-current under clock skew'
 + ' (genesis-wins-under-skew, case 7d)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const objectiveId = 'obj-drift-skew-1';
+    const objectiveId = generateIdentifier();
     const genesisAt = '2026-06-01T00:00:00.000000Z';
-    const genesisEv = 'obj-drift-skew-1-genesis';
+    const genesisEv = OBJ_DRIFT_SKEW_1_GENESIS;
     const skewedAt = '2020-01-01T00:00:00.000000Z';
-    const skewedEv = 'obj-drift-skew-1-skewed';
+    const skewedEv = OBJ_DRIFT_SKEW_1_SKEWED;
 
     const genesis = await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + objectiveId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token, {
             position: 1,
             state: 'active',
         },
@@ -1189,7 +1238,8 @@ test('GET objective trio is lifecycle-current under clock skew'
     // it won as current the GET trio would flip; genesis-
     // wins keeps the objective active.
     const skewed = await handleRequest(db, req(
-        'PUT', '/organizations/1/objectives/' + objectiveId, token, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token, {
             position: 99,
             state: 'archived',
         },
@@ -1202,7 +1252,8 @@ test('GET objective trio is lifecycle-current under clock skew'
     );
 
     const res = await handleRequest(
-        db, req('GET', '/organizations/1/objectives/' + objectiveId, token),
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+            + objectiveId, token),
     );
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), expected);
@@ -1238,25 +1289,26 @@ test('revision PUT wire body matches collection derive entry',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
-    const objectiveId = 'obj-drift-rev-wire-1';
+    const objectiveId = generateIdentifier();
     await handleRequest(db, req(
-        'POST', '/organizations/1/objectives/', token,
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/', token,
         objectiveCreateBody(
-            objectiveId, 1, objectiveId + '-rev-1', 'n',
+            objectiveId, 1, OBJECTIVEID_REV_1, 'n',
             '2026-06-13T00:00:00.000000Z',
         ),
     ));
-    const revisionId = objectiveId + '-rev-2';
+    const revisionId = OBJECTIVEID_REV_2;
     const body = {
         objective_id: objectiveId,
         name: 'Wire Name',
         description: 'wd',
-        member_id: 'current',
+        member_id: 'XXZruirZyAOoRpNxaDnpSA',
         at: '2026-06-13T00:00:01.000000Z',
     };
     const putRes = await handleRequest(db, req(
         'PUT',
-        '/organizations/1/objectives/' + objectiveId + '/revisions/'
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + objectiveId
+            + '/revisions/'
             + revisionId,
         token, body,
     ));

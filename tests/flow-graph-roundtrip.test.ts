@@ -10,6 +10,8 @@ import {
     asStoredGraph,
     asWorkOrderFlowGraph,
 } from '../api/validators.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // The graph storage seam, pinned: stored JSON that crosses
 // the parse half (validators.ts) and comes back out the
@@ -18,10 +20,17 @@ import {
 // shape; existing rows and exported backups carry it, so
 // a domain-type change must never leak into storage keys.
 
+const NODE_CREATE = generateIdentifier();
+const NODE_STEP = generateIdentifier();
+const MEMBER_1 = generateIdentifier();
+const MEMBER_2 = generateIdentifier();
+const ATTR_2 = generateIdentifier();
+const EDGE_1 = generateIdentifier();
+
 const STORED_FLOW_GRAPH = {
     nodes: [
         {
-            id: 'n-create',
+            id: NODE_CREATE,
             name: 'Create',
             positionX: 40,
             positionY: 30,
@@ -32,21 +41,21 @@ const STORED_FLOW_GRAPH = {
             taskInstructions: '',
         },
         {
-            id: 'n-step',
+            id: NODE_STEP,
             name: 'Step',
             positionX: 260,
             positionY: 140,
             isCreate: false,
             isArchive: false,
-            memberIds: ['m-1', 'm-2'],
+            memberIds: [MEMBER_1, MEMBER_2],
             attributes: [
                 {
-                    attribute_id: 'a-1',
+                    attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
                     mode: 'editable',
                     isRequired: true,
                 },
                 {
-                    attribute_id: 'a-2',
+                    attribute_id: ATTR_2,
                     mode: 'readonly',
                     isRequired: false,
                 },
@@ -56,10 +65,10 @@ const STORED_FLOW_GRAPH = {
     ],
     edges: [
         {
-            id: 'e-1',
+            id: EDGE_1,
             name: 'go',
-            fromNodeId: 'n-create',
-            toNodeId: 'n-step',
+            fromNodeId: NODE_CREATE,
+            toNodeId: NODE_STEP,
         },
     ],
 };
@@ -107,7 +116,7 @@ test(
             STORED_FLOW_GRAPH, 'graph',
         );
         const ref = parsed.nodes[1]!.attributes[0]!;
-        assert.equal(ref.attributeId, 'a-1');
+        assert.equal(ref.attributeId, 'UQBiHFcwJeCDSnmkPBoYRA');
         assert.equal('attribute_id' in ref, false);
     },
 );

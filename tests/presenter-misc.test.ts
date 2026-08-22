@@ -109,7 +109,7 @@ function makeFlowSummary(
     over: Partial<FlowSummary> = {},
 ): FlowSummary {
     return {
-        id: 'flow-1',
+        id: 'aEsGMmBEFaVdWihhHXwCbw',
         name: 'Onboarding',
         nodeCount: 3,
         edgeCount: 2,
@@ -466,7 +466,7 @@ test(
             makeFlowSummary(), undefined,
         ).render().toString();
         assert.match(out, /Onboarding/);
-        assert.match(out, /data-flow-card="flow-1"/);
+        assert.match(out, /data-flow-card="aEsGMmBEFaVdWihhHXwCbw"/);
         noUnknownMagic(out);
     },
 );

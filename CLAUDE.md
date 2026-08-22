@@ -357,11 +357,11 @@ Every page is a standalone HTML file served by
   default organization (pair-plane
   `/identities/:id/default-organization` document) if
   that organization is a live seat, else PRIMARY
-  (earliest remaining join `at`, lex id on tie), else a
-  403 — there is no global default. Membership and
-  roles come from access-token claims (baked at mint
-  from membership `type`; gate projects for the
-  fenced org). NAMED
+  (earliest remaining join `at`, identifier order on
+  tie), else a 403 — there is no global default.
+  Membership and roles come from access-token claims
+  (baked at mint from membership `type`; gate projects
+  for the fenced org). NAMED
   COVENANT: de-membership / demotion / revocation bite at
   next mint/refresh/exchange or access TTL (≤ 15 min), not
   the very next request. Ownership fences stay pair-plane.
@@ -542,7 +542,7 @@ derives (`derive-identity-spine.ts`,
 `shared/` — code that crosses the client/server chasm, imported
 by both `api/` and `web-app/`: the HTTP wire schema
 (`http-message/`, with its own `types.ts`) plus pure cross-chasm
-utilities (`base64url.ts`, `crypto-safe-base62.ts`,
+utilities (`base64url.ts`, `identifier.ts`, `secret.ts`,
 `digest.ts`, `password-hash.ts`, `ledger-reduction.ts`,
 `error-helpers.ts`).
 The dependency is one-way: `shared/` NEVER imports `api/`.

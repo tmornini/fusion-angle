@@ -45,15 +45,15 @@ test('renders a card per chain with each jti event', () => {
     const rec = record();
     new IdentityTokensPresenter([
         {
-            chainId: 'c1',
+            chainId: 'WeXjAaAxGSpLpamfEuvcww',
             events: [
                 {
-                    jti: 'j1',
+                    jti: 'jmvogLnzTmiQlAkVvDHrvQ',
                     action: 'issued',
                     at: '2026-01-01T00:00:00.000000Z',
                 },
                 {
-                    jti: 'j2', parentJti: 'j1',
+                    jti: 'j2', parentJti: 'jmvogLnzTmiQlAkVvDHrvQ',
                     action: 'rotated',
                     at: '2026-01-02T00:00:00.000000Z',
                 },
@@ -61,8 +61,8 @@ test('renders a card per chain with each jti event', () => {
         },
     ]).render(rec.container);
     const out = rec.html();
-    assert.match(out, /c1/);
-    assert.match(out, /j1/);
+    assert.match(out, /WeXjAaAxGSpLpamfEuvcww/);
+    assert.match(out, /jmvogLnzTmiQlAkVvDHrvQ/);
     assert.match(out, /j2/);
     assert.match(out, /issued/);
     assert.match(out, /rotated/);

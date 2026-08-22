@@ -21,6 +21,16 @@ import { devToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+import { seedOrganizationDocument } from
+    './test-fixtures.ts';
+
+const USER_1 = generateIdentifier();
+const USER_2 = generateIdentifier();
+const ORGANIZATION_A = generateIdentifier();
+const LIVE_JTI = generateIdentifier();
+const LIVE_TOKEN_ID = generateIdentifier();
 
 // A revoked-but-unexpired token must not be launderable into a
 // fresh valid pair by the token-exchange or refresh grants —
@@ -33,7 +43,7 @@ async function tokenFor(sub: string): Promise<string> {
         aud: TOKEN_AUDIENCE,
         sub, roles: [], name: 'X',
         iat: now, ttlSeconds: 900,
-        jti: 'jti-' + sub + '-' + now,
+        jti: generateIdentifier(),
     });
 }
 
@@ -52,7 +62,7 @@ async function seedMembershipPair(
     const body = {
         organization_id: organization,
         identity_id: identityId,
-        type: identityId === 'current' ? 'admin' : 'member',
+        type: identityId === 'XXZruirZyAOoRpNxaDnpSA' ? 'admin' : 'member',
         at,
     };
     await seedSeat(
@@ -72,7 +82,7 @@ async function seedMembershipPair(
 // revocation invisible to deriveTokenRevocationsFor once the
 // coarse gate reads it, silently admitting a signed-out
 // session. Nested PUT is admin-or-self (ROUTE_POLICY +
-// Region B); the writer is seedRootAdmin's 'current'.
+// Region B); the writer is seedRootAdmin's 'XXZruirZyAOoRpNxaDnpSA'.
 async function seedTokenRevocationPair(
     db: MemoryDbAdapter,
     id: string,
@@ -91,23 +101,28 @@ async function revokedDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedRootAdmin(db);
+    await seedOrganizationDocument(db, ORGANIZATION_A, 'Acme');
     await seedMembershipPair(
-        db, 'm', 'A', 'u1', '2020-01-01T00:00:00.000000Z',
+        db, generateIdentifier(), ORGANIZATION_A, USER_1,
+        '2020-01-01T00:00:00.000000Z',
     );
-    // logout-everywhere as of now: every u1 token minted
+    // logout-everywhere as of now: every USER_1 token minted
     // before this stamp is dead.
-    await seedTokenRevocationPair(db, 'r1', 'u1', nowUtc());
+    await seedTokenRevocationPair(
+        db, 'rOEPOcVMQdJiiiMuiiEhlg', USER_1
+        , nowUtc(),
+    );
     return db;
 }
 
 test('token-exchange rejects a logged-out subject token',
 async () => {
     const db = await revokedDb();
-    const token = await tokenFor('u1');
+    const token = await tokenFor(USER_1);
     const res = await postToken(db, {
         grant_type: 'token-exchange',
         subject_token: token, actor_token: token,
-        organization: 'A',
+        organization: ORGANIZATION_A,
     });
     assert.equal(res.ok, false);
     if (!res.ok) assert.equal(res.status, 401);
@@ -120,14 +135,15 @@ async () => {
     // logged-out actor. The subject passes every check,
     // so only the actor-revocation check can reject.
     await seedMembershipPair(
-        db, 'm2', 'A', 'u2', '2020-01-01T00:00:00.000000Z',
+        db, generateIdentifier(), ORGANIZATION_A, USER_2,
+        '2020-01-01T00:00:00.000000Z',
     );
-    const subject = await tokenFor('u2');
-    const actor = await tokenFor('u1');
+    const subject = await tokenFor(USER_2);
+    const actor = await tokenFor(USER_1);
     const res = await postToken(db, {
         grant_type: 'token-exchange',
         subject_token: subject, actor_token: actor,
-        organization: 'A',
+        organization: ORGANIZATION_A,
     });
     assert.equal(res.ok, false);
     if (!res.ok) assert.equal(res.status, 401);
@@ -135,7 +151,7 @@ async () => {
 
 test('refresh rejects a logged-out token', async () => {
     const db = await revokedDb();
-    const token = await tokenFor('u1');
+    const token = await tokenFor(USER_1);
     const res = await postToken(db, {
         grant_type: 'refresh', refresh_token: token,
     });
@@ -152,18 +168,20 @@ test('refresh on a logged-out but live jti is the'
     // branch — pinning that branch, not the reuse path. Seeded
     // via the PUT route (not a raw store write, Phase 13 Task 9:
     // the row plane no longer receives writes at all) — revokedDb
-    // already grants 'current' admin, the role this route needs.
-    await PUT(db, 'identities/u1/tokens/t-live', {
-        jti: 'live-jti', identity_id: 'u1',
-        action: 'issued', chain_id: 'c1',
+    // already grants 'XXZruirZyAOoRpNxaDnpSA' admin, the role this route
+    // needs.
+    await PUT(db, 'identities/' + USER_1
+        + '/tokens/' + LIVE_TOKEN_ID, {
+        jti: LIVE_JTI, identity_id: USER_1,
+        action: 'issued', chain_id: 'WeXjAaAxGSpLpamfEuvcww',
         at: '2019-01-01T00:00:00.000000Z',
     }, await devToken());
     const iat = Math.floor(
         Date.parse('2019-01-01T00:00:00.000000Z') / 1000);
     const token = await mintAccessToken({
         aud: TOKEN_AUDIENCE,
-        sub: 'u1', roles: [], name: 'X',
-        iat, ttlSeconds: 10_000_000_000, jti: 'live-jti',
+        sub: USER_1, roles: [], name: 'X',
+        iat, ttlSeconds: 10_000_000_000, jti: LIVE_JTI,
     });
     const res = await postToken(db, {
         grant_type: 'refresh', refresh_token: token,

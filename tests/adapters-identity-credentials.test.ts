@@ -27,43 +27,45 @@ async function setup() {
 test('ledger retains set, rotate, revoke; latest wins',
 async () => {
     const { db, ctx } = await setup();
-    await seedIdentityCredential(db, 'p1', 'c1', {
-        identity_id: 'p1',
+    await seedIdentityCredential(db, 'pnXmXrxOWayANgDLdCjuBw'
+        , 'WeXjAaAxGSpLpamfEuvcww', {
+        identity_id: 'pnXmXrxOWayANgDLdCjuBw',
         kind: 'password',
         status: 'set',
         secret: 'phc-v1',
         at: '2026-01-01T00:00:00.000000Z',
     });
-    await seedIdentityCredential(db, 'p1', 'c2', {
-        identity_id: 'p1',
+    await seedIdentityCredential(db, 'pnXmXrxOWayANgDLdCjuBw', 'c2', {
+        identity_id: 'pnXmXrxOWayANgDLdCjuBw',
         kind: 'password',
         status: 'rotated',
         secret: 'phc-v2',
         at: '2026-01-02T00:00:00.000000Z',
     });
     await postIdentityCredentialRevocation(
-        ctx, 'p1', 'password',
+        ctx, 'pnXmXrxOWayANgDLdCjuBw', 'password',
     );
-    const events = await deriveCredentialsFor(db, 'p1');
+    const events = await deriveCredentialsFor(db, 'pnXmXrxOWayANgDLdCjuBw');
     assert.equal(events.length, 3);   // retained
     // Phase Final Stage B: identity spine tables retired.
     const state =
-        await getIdentityCredentialState(ctx, 'p1');
+        await getIdentityCredentialState(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     assert.equal(state.active.length, 0); // revoked
 });
 
 test('the secret never leaves the state adapter',
 async () => {
     const { db, ctx } = await setup();
-    await seedIdentityCredential(db, 'p1', 'c1', {
-        identity_id: 'p1',
+    await seedIdentityCredential(db, 'pnXmXrxOWayANgDLdCjuBw'
+        , 'WeXjAaAxGSpLpamfEuvcww', {
+        identity_id: 'pnXmXrxOWayANgDLdCjuBw',
         kind: 'password',
         status: 'set',
         secret: 'super-secret',
         at: '2026-01-01T00:00:00.000000Z',
     });
     const state =
-        await getIdentityCredentialState(ctx, 'p1');
+        await getIdentityCredentialState(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     assert.equal('secret' in state, false);
     assert.equal(
         JSON.stringify(state)
@@ -78,21 +80,22 @@ async () => {
     // Appended in REVERSE chronological order: the later
     // 'set' precedes the earlier 'revoked' in the array,
     // so array-order "last wins" would wrongly revoke.
-    await seedIdentityCredential(db, 'p1', 'c1', {
-        identity_id: 'p1',
+    await seedIdentityCredential(db, 'pnXmXrxOWayANgDLdCjuBw'
+        , 'WeXjAaAxGSpLpamfEuvcww', {
+        identity_id: 'pnXmXrxOWayANgDLdCjuBw',
         kind: 'password',
         status: 'set',
         secret: '',
         at: '2026-02-01T00:00:00.000000Z',
     });
-    await seedIdentityCredential(db, 'p1', 'c2', {
-        identity_id: 'p1',
+    await seedIdentityCredential(db, 'pnXmXrxOWayANgDLdCjuBw', 'c2', {
+        identity_id: 'pnXmXrxOWayANgDLdCjuBw',
         kind: 'password',
         status: 'revoked',
         secret: '',
         at: '2026-01-01T00:00:00.000000Z',
     });
     const state =
-        await getIdentityCredentialState(ctx, 'p1');
+        await getIdentityCredentialState(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     assert.deepEqual(state.active, ['password']);
 });

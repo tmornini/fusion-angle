@@ -37,6 +37,8 @@ import {
     deterministicScore,
     pickHumanMember,
 } from './seed-kit.ts';
+import { seedHashKey } from
+    './seed-hash-preimage.ts';
 import { OBJECTIVE_SEEDS } from './objectives.ts';
 
 // The one project shape the scoring loop needs — narrower than
@@ -88,7 +90,7 @@ export function buildSeedScoreRows(
             || p.state === 'archived'
                 ? OBJECTIVE_SEEDS.length
                 : deterministicScore(
-                    p.id + ':coverage',
+                    seedHashKey(p.id) + ':coverage',
                     0,
                     OBJECTIVE_SEEDS.length - 1,
                 );
@@ -108,7 +110,9 @@ export function buildSeedScoreRows(
         for (let i = 0; i < baselineCoverage; i++) {
             const obj = OBJECTIVE_SEEDS[i]!;
             const score = deterministicScore(
-                `${p.id}:${obj.id}:baseline`,
+                seedHashKey(p.id) + ':'
+                    + seedHashKey(obj.id)
+                    + ':baseline',
                 baselineMin,
                 100,
             );
@@ -123,7 +127,9 @@ export function buildSeedScoreRows(
                     score,
                     member_id: pickHumanMember(
                         pools, p.organization_id,
-                        `${p.id}:${obj.id}:baseline`,
+                        seedHashKey(p.id) + ':'
+                            + seedHashKey(obj.id)
+                            + ':baseline',
                     ),
                     at: scoredAt,
                 },
@@ -144,13 +150,17 @@ export function buildSeedScoreRows(
                 const nActuals =
                     minActuals
                     + deterministicScore(
-                        `${p.id}:${obj.id}:nactual`,
+                        seedHashKey(p.id) + ':'
+                            + seedHashKey(obj.id)
+                            + ':nactual',
                         0,
                         2,
                     );
                 for (let k = 0; k < nActuals; k++) {
                     const score = deterministicScore(
-                        `${p.id}:${obj.id}:actual:${k}`,
+                        seedHashKey(p.id) + ':'
+                            + seedHashKey(obj.id)
+                            + ':actual:' + k,
                         -100,
                         100,
                     );
@@ -166,7 +176,9 @@ export function buildSeedScoreRows(
                             score,
                             member_id: pickHumanMember(
                                 pools, p.organization_id,
-                                `${p.id}:${obj.id}:actual:${k}`,
+                                seedHashKey(p.id) + ':'
+                                    + seedHashKey(obj.id)
+                                    + ':actual:' + k,
                             ),
                             at: scoredAt,
                         },

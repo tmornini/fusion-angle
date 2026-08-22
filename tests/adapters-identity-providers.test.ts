@@ -28,6 +28,8 @@ import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import {
     apiRequest, TEST_OPERATION_ID, storedPutBodyText,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 async function adminCtx() {
     const db = memoryDbAdapter();
@@ -38,7 +40,7 @@ async function adminCtx() {
 }
 
 const goodRow = {
-    identity_id: 'current',
+    identity_id: 'XXZruirZyAOoRpNxaDnpSA',
     provider: 'google',
     provider_subject: 'sub-123',
     action: 'linked',
@@ -73,7 +75,8 @@ async () => {
     await db.postSchemaCreation();
     const anon = createRequestContext(
         db, await devToken('anonymous'));
-    await assert.rejects(() => getProvidersFor(anon, 'p2'));
+    await assert.rejects(() => getProvidersFor(anon
+        , 'prBESZPjJDiuXCeZLmbiVw'));
 });
 
 test('linked providers are latest by at, not array order',
@@ -84,16 +87,18 @@ async () => {
     // array-order "last wins" would wrongly drop it.
     //
     // getProvidersFor reads GET /identities/:id/providers.
-    await seedIdentityProvider(db, 'p2', 'pl', {
-        ...goodRow, identity_id: 'p2', action: 'linked',
+    await seedIdentityProvider(
+        db, 'prBESZPjJDiuXCeZLmbiVw', generateIdentifier(), {
+        ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw', action: 'linked',
         at: '2026-02-01T00:00:00.000000Z',
     });
-    await seedIdentityProvider(db, 'p2', 'pe', {
-        ...goodRow, identity_id: 'p2', action: 'unlinked',
+    await seedIdentityProvider(
+        db, 'prBESZPjJDiuXCeZLmbiVw', generateIdentifier(), {
+        ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw', action: 'unlinked',
         at: '2026-01-01T00:00:00.000000Z',
     });
     assert.deepEqual(
-        await getProvidersFor(ctx, 'p2'), ['google']);
+        await getProvidersFor(ctx, 'prBESZPjJDiuXCeZLmbiVw'), ['google']);
 });
 
 // G4: stored PUT = identityProviderEntityOf (GET derive).
@@ -101,10 +106,10 @@ test('stored PUT body equals identityProviderEntityOf',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const id = 'ip-g4';
+    const id = generateIdentifier();
     const put = await handleRequest(db, apiRequest({
         method: 'PUT',
-        path: '/identities/current/providers/' + id,
+        path: '/identities/XXZruirZyAOoRpNxaDnpSA/providers/' + id,
         token: DEV_TOKEN,
         body: goodRow,
         operationId: TEST_OPERATION_ID,
@@ -112,7 +117,7 @@ async () => {
     assert.equal(put.status, 201);
     const stored = JSON.parse(
         await storedPutBodyText(
-            db, '/identities/current/providers/', id,
+            db, '/identities/XXZruirZyAOoRpNxaDnpSA/providers/', id,
         ),
     );
     const expected = identityProviderEntityOf({
@@ -124,7 +129,8 @@ async () => {
     assert.equal(Object.keys(expected)[0], 'id');
     assert.deepEqual(stored, expected);
     assert.deepEqual(
-        stored, await deriveIdentityProvider(db, 'current', id),
+        stored, await deriveIdentityProvider(db, 'XXZruirZyAOoRpNxaDnpSA'
+            , id),
     );
     assert.deepEqual(stored, await put.json());
 });
@@ -133,7 +139,7 @@ test('GET stamps identity_id from the path when PUT omits it',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const id = 'ip-omit';
+    const id = generateIdentifier();
     const withoutIdentity = {
         provider: goodRow.provider,
         provider_subject: goodRow.provider_subject,
@@ -142,7 +148,7 @@ async () => {
     };
     const put = await handleRequest(db, apiRequest({
         method: 'PUT',
-        path: '/identities/current/providers/' + id,
+        path: '/identities/XXZruirZyAOoRpNxaDnpSA/providers/' + id,
         token: DEV_TOKEN,
         body: withoutIdentity,
         operationId: TEST_OPERATION_ID,
@@ -150,7 +156,7 @@ async () => {
     assert.ok(put.status === 200 || put.status === 201);
     const list = await handleRequest(db, apiRequest({
         method: 'GET',
-        path: '/identities/current/providers/',
+        path: '/identities/XXZruirZyAOoRpNxaDnpSA/providers/',
         token: DEV_TOKEN,
         operationId: TEST_OPERATION_ID,
     }));
@@ -161,10 +167,10 @@ async () => {
     }[];
     const row = rows.find(r => r.id === id);
     assert.ok(row, 'omitted-id event is in the collection');
-    assert.equal(row.identity_id, 'current');
+    assert.equal(row.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
     const leaf = await handleRequest(db, apiRequest({
         method: 'GET',
-        path: '/identities/current/providers/' + id,
+        path: '/identities/XXZruirZyAOoRpNxaDnpSA/providers/' + id,
         token: DEV_TOKEN,
         operationId: TEST_OPERATION_ID,
     }));
@@ -172,7 +178,7 @@ async () => {
     const one = await leaf.json() as {
         readonly identity_id: string;
     };
-    assert.equal(one.identity_id, 'current');
+    assert.equal(one.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
 test('PUT 400s when identity_id disagrees with the path',
@@ -181,9 +187,13 @@ async () => {
     await seedAdminSchema(db);
     const res = await handleRequest(db, apiRequest({
         method: 'PUT',
-        path: '/identities/current/providers/ip-bad',
+        path: '/identities/XXZruirZyAOoRpNxaDnpSA/providers/'
+            + 'jMOAEoFPMIDxqTAtmGvVIg',
         token: DEV_TOKEN,
-        body: { ...goodRow, identity_id: 'other' },
+        body: {
+            ...goodRow,
+            identity_id: generateIdentifier(),
+        },
         operationId: TEST_OPERATION_ID,
     }));
     assert.equal(res.status, 400);
@@ -193,8 +203,8 @@ test('derive dual-reads leftover flat provider pairs',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const id = 'old-flat-1';
-    const body = { ...goodRow, identity_id: 'p2' };
+    const id = generateIdentifier();
+    const body = { ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw' };
     const pair = await formWritePair({
         method: 'PUT',
         pathname: '/identity-providers/' + id,
@@ -221,12 +231,13 @@ async () => {
             await appendMessagePair(view, pair);
         },
     );
-    const rows = await deriveIdentityProvidersFor(db, 'p2');
+    const rows = await deriveIdentityProvidersFor(db
+        , 'prBESZPjJDiuXCeZLmbiVw');
     assert.equal(rows.length, 1);
     assert.equal(rows[0]!.id, id);
     assert.deepEqual(
         rows[0],
-        await deriveIdentityProvider(db, 'p2', id),
+        await deriveIdentityProvider(db, 'prBESZPjJDiuXCeZLmbiVw', id),
     );
 });
 
@@ -234,9 +245,9 @@ test('same event id on both planes — nested wins',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const id = 'same-eid';
+    const id = generateIdentifier();
     const flatBody = {
-        ...goodRow, identity_id: 'p2',
+        ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw',
         provider: 'flat-google',
     };
     const flatPair = await formWritePair({
@@ -265,15 +276,17 @@ async () => {
             await appendMessagePair(view, flatPair);
         },
     );
-    await seedIdentityProvider(db, 'p2', id, {
-        ...goodRow, identity_id: 'p2',
+    await seedIdentityProvider(db, 'prBESZPjJDiuXCeZLmbiVw', id, {
+        ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw',
         provider: 'nested-github',
     });
-    const rows = await deriveIdentityProvidersFor(db, 'p2');
+    const rows = await deriveIdentityProvidersFor(db
+        , 'prBESZPjJDiuXCeZLmbiVw');
     assert.equal(rows.length, 1);
     assert.equal(rows[0]!.provider, 'nested-github');
     assert.equal(
-        (await deriveIdentityProvider(db, 'p2', id)).provider,
+        (await deriveIdentityProvider(db, 'prBESZPjJDiuXCeZLmbiVw'
+            , id)).provider,
         'nested-github',
     );
 });

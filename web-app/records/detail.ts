@@ -21,7 +21,7 @@ import {
     putRecord,
     postRecordChange,
     subscribeRecordChanges,
-    generateCryptoSafeBase62,
+    generateIdentifier,
     getRecordInstances,
     getRecordInstance,
     putRecordInstance,
@@ -515,7 +515,7 @@ async function handleNewInstance(
     if (pageState.kind !== 'reading') return;
     if (saveInProgress) return;
     const ctx = sessionContext();
-    const instanceId = generateCryptoSafeBase62();
+    const instanceId = generateIdentifier();
     saveInProgress = true;
     try {
         const created = await putRecordInstance(
@@ -878,7 +878,7 @@ function commitPendingAttribute(): void {
         pageState.pendingAttributeName.trim();
     if (name === '') return;
     pageState.draft.attributes.push({
-        id: generateCryptoSafeBase62(),
+        id: generateIdentifier(),
         name,
         attributeType: 'text',
         sortOrder:

@@ -310,7 +310,7 @@ function buildRatioGaugeSvg(
                             + '--primary))'
                         }"
                         stop-opacity="${
-                            '1'
+                            'AjdvjuECVZEgZoFajaIEkg'
                         }"/>
                 </linearGradient>
                 <linearGradient
@@ -327,7 +327,7 @@ function buildRatioGaugeSvg(
                     <stop offset="100%"
                         stop-color="${stop1}"
                         stop-opacity="${
-                            '1'
+                            'AjdvjuECVZEgZoFajaIEkg'
                         }"/>
                 </linearGradient>
             </defs>

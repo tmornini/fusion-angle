@@ -73,7 +73,7 @@ async function allRecords(
             ...await documentCollectionGetHandler(
                 RECORDS_WIRING,
             )(
-                db, [], 'current', organization,
+                db, [], 'XXZruirZyAOoRpNxaDnpSA', organization,
             ) as RecordEntity[],
         );
     }
@@ -89,7 +89,7 @@ async function allAttributes(
         STARK_ORGANIZATION, ORGANIZATION_TWO,
     ]) {
         const token = await organizationToken(
-            'current', organization,
+            'XXZruirZyAOoRpNxaDnpSA', organization,
         );
         const typesRes = await handleRequest(
             db,
@@ -247,13 +247,14 @@ test(
     + ' with a null stored value',
     async () => {
         const db = await seeded();
-        const woId = 'gateV101W0rkOrd3rXY0a1';
+        const woId = 'eOlNZpGQfmCdpSFWXGkzFQ';
         // Phase Final Task 2: WO + SFV on the pair plane.
         const token = await organizationToken();
         const woRes = await handleRequest(
             db,
             new Request(
-                'http://localhost/organizations/1/work-orders/' + woId,
+                'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+                    + 'work-orders/' + woId,
                 {
                     headers: {
                         Authorization: 'Bearer ' + token,
@@ -271,7 +272,8 @@ test(
                 'wo.flow_graph',
             );
 
-        const events = await workOrderLifecycleStatesFor(db, '1', woId);
+        const events = await workOrderLifecycleStatesFor(db
+            , 'AjdvjuECVZEgZoFajaIEkg', woId);
         const transitions = events.filter(
             e => e.state !== 'claimed'
                 && e.state !== 'claim_released'
@@ -415,7 +417,7 @@ test(
         );
         await assertGraphShape(
             await organizationToken(
-                'current', ORGANIZATION_TWO,
+                'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
             ),
             ORGANIZATION_TWO,
         );

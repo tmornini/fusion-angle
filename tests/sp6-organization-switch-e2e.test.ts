@@ -20,8 +20,9 @@ import { seededMockDb } from './mock-seed.ts';
 // End-to-end of the boot-scope + org-switch flow the browser
 // drives: enumerate reachable orgs, exchange a scoped token,
 // and read org-fenced data — without the DOM. Proves switching
-// re-scopes the roster and ideas, and that org '1' data is
-// hidden from org '2'.
+// re-scopes the roster and ideas, and that org 'AjdvjuECVZEgZoFajaIEkg' data
+// is
+// hidden from org 'BBjWJsjYIDkTRKIIPrzWRw'.
 
 async function seeded(): Promise<MemoryDbAdapter> {
     return seededMockDb();
@@ -35,31 +36,38 @@ async () => {
     const db = await seeded();
     // Claim orgs are the enumerate source (mint-time snapshot).
     // A multi-org admin token carries both demo orgs.
-    const flat = await reachableToken('current', ['1', '2']);
+    const flat = await reachableToken('XXZruirZyAOoRpNxaDnpSA'
+        , ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw']);
     const ctx = createRequestContext(db, flat);
     const organizations = await getOrganizations(ctx);
     assert.deepEqual(
-        [...organizations.map(o => o.id)].sort(), ['1', '2']);
+        [...organizations.map(o => o.id)].sort(), ['AjdvjuECVZEgZoFajaIEkg'
+            , 'BBjWJsjYIDkTRKIIPrzWRw']);
 });
 
 test('switching the active org re-scopes members and ideas',
 async () => {
     const db = await seeded();
-    const flat = await reachableToken('current', ['1', '2']);
+    const flat = await reachableToken('XXZruirZyAOoRpNxaDnpSA'
+        , ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw']);
     const ctx = createRequestContext(db, flat);
-    const tokA = await postOrganizationSessionExchange(ctx, flat, '1');
-    const tokB = await postOrganizationSessionExchange(ctx, flat, '2');
+    const tokA = await postOrganizationSessionExchange(ctx, flat
+        , 'AjdvjuECVZEgZoFajaIEkg');
+    const tokB = await postOrganizationSessionExchange(ctx, flat
+        , 'BBjWJsjYIDkTRKIIPrzWRw');
 
     const membersA = idsOf(
         await GET<{ id: string }[]>(
-            db, 'organizations/1/members/', tokA));
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tokA));
     const membersB = idsOf(
         await GET<{ id: string }[]>(
-            db, 'organizations/2/members/', tokB));
+            db, 'organizations/BBjWJsjYIDkTRKIIPrzWRw/members/', tokB));
     const ideasA = idsOf(
-        await GET<{ id: string }[]>(db, 'organizations/1/ideas/', tokA));
+        await GET<{ id: string }[]>(db
+            , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', tokA));
     const ideasB = idsOf(
-        await GET<{ id: string }[]>(db, 'organizations/2/ideas/', tokB));
+        await GET<{ id: string }[]>(db
+            , 'organizations/BBjWJsjYIDkTRKIIPrzWRw/ideas/', tokB));
 
     assert.ok(
         membersA.length > 0 && membersB.length > 0,
@@ -81,13 +89,17 @@ async () => {
 test('a flat boot token resolves to the default org view',
 async () => {
     const db = await seeded();
-    const flat = await devToken('current');
+    const flat = await devToken('XXZruirZyAOoRpNxaDnpSA');
     const flatIdeas = idsOf(
-        await GET<{ id: string }[]>(db, 'organizations/1/ideas/', flat));
+        await GET<{ id: string }[]>(db
+            , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', flat));
     const ctx = createRequestContext(db, flat);
-    const tokA = await postOrganizationSessionExchange(ctx, flat, '1');
+    const tokA = await postOrganizationSessionExchange(ctx, flat
+        , 'AjdvjuECVZEgZoFajaIEkg');
     const organization1Ideas = idsOf(
-        await GET<{ id: string }[]>(db, 'organizations/1/ideas/', tokA));
-    // a flat token resolves to its primary org '1' (same view)
+        await GET<{ id: string }[]>(db
+            , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', tokA));
+    // a flat token resolves to its primary org 'AjdvjuECVZEgZoFajaIEkg' (same
+    // view)
     assert.deepEqual(flatIdeas, organization1Ideas);
 });

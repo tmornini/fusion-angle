@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import assert from 'node:assert/strict';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -38,7 +40,19 @@ import {
 // missedReadError → 404 miss at this address / 404 absent.
 
 const BASE = 'http://localhost';
-const WORK_ORDER_ID = 'wo-hist-1';
+const WORK_ORDER_ID = generateIdentifier();
+const NODE_START = generateIdentifier();
+const NODE_MIDDLE = generateIdentifier();
+const NODE_FINISH = generateIdentifier();
+const FLOW_ID = generateIdentifier();
+const EDGE_2 = generateIdentifier();
+const ATTR_SEVERITY = generateIdentifier();
+const FIELD_VALUE_ID = generateIdentifier();
+const TRANSITION_EVENT_ID = generateIdentifier();
+const FWO_ID = generateIdentifier();
+const EV_1 = generateIdentifier();
+const EV_2 = generateIdentifier();
+const EV_3 = generateIdentifier();
 
 function req(
     method: string,
@@ -61,21 +75,21 @@ function flowGraph(): Record<string, unknown> {
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
         nodes: [
             {
-                id: 'n-start', name: 'Start',
+                id: NODE_START, name: 'Start',
                 positionX: 0, positionY: 0,
                 isCreate: true, isArchive: false,
                 memberIds: [], attributes: [],
                 taskInstructions: '',
             },
             {
-                id: 'n-middle', name: 'Middle',
+                id: NODE_MIDDLE, name: 'Middle',
                 positionX: 0, positionY: 0,
                 isCreate: false, isArchive: false,
                 memberIds: [], attributes: [],
                 taskInstructions: '',
             },
             {
-                id: 'n-finish', name: 'Finish',
+                id: NODE_FINISH, name: 'Finish',
                 positionX: 0, positionY: 0,
                 isCreate: false, isArchive: true,
                 memberIds: [], attributes: [],
@@ -84,12 +98,12 @@ function flowGraph(): Record<string, unknown> {
         ],
         edges: [
             {
-                id: 'e1', name: '',
-                fromNodeId: 'n-start', toNodeId: 'n-middle',
+                id: 'YiJPbufDpkyrZcZCYbUJpg', name: '',
+                fromNodeId: NODE_START, toNodeId: NODE_MIDDLE,
             },
             {
-                id: 'e2', name: '',
-                fromNodeId: 'n-middle', toNodeId: 'n-finish',
+                id: EDGE_2, name: '',
+                fromNodeId: NODE_MIDDLE, toNodeId: NODE_FINISH,
             },
         ],
     };
@@ -110,18 +124,14 @@ function createBody() {
             flow_graph: flowGraph(),
             position: 1,
         },
-        flowWorkOrderId: WORK_ORDER_ID + '-fwo',
+        flowWorkOrderId: FWO_ID,
         flowWorkOrder: {
-            flow_id: 'f-hist',
+            flow_id: FLOW_ID,
             work_order_id: WORK_ORDER_ID,
             at: nowUtc(),
         },
-        stateEventIds: [
-            WORK_ORDER_ID + '-ev1',
-            WORK_ORDER_ID + '-ev2',
-            WORK_ORDER_ID + '-ev3',
-        ],
-        states: ['n-start', 'n-middle', 'claimed'],
+        stateEventIds: [EV_1, EV_2, EV_3],
+        states: [NODE_START, NODE_MIDDLE, 'claimed'],
         stateEventAts: [t0, t1, t2],
     };
 }
@@ -148,22 +158,23 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
 
     const created = await handleRequest(
         db,
-        req('POST', '/organizations/1/work-orders/', DEV_TOKEN, createBody()),
+        req('POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            , DEV_TOKEN, createBody()),
     );
     assert.equal(created.status, 201);
 
     // Task 8 CUT: legacy fieldValues fold is below-gate
     // stored-data seed (live wire rejects the key).
     const transitionBody: Record<string, unknown> = {
-        transitionEventId: WORK_ORDER_ID + '-te1',
-        targetState: 'n-middle',
+        transitionEventId: TRANSITION_EVENT_ID,
+        targetState: NODE_MIDDLE,
         fieldValues: [
             {
-                id: WORK_ORDER_ID + '-fv1',
+                id: FIELD_VALUE_ID,
                 fields: {
                     state_event_id:
-                        WORK_ORDER_ID + '-te1',
-                    attribute_id: 'attr-severity',
+                        TRANSITION_EVENT_ID,
+                    attribute_id: ATTR_SEVERITY,
                     value: 'high',
                 },
             },
@@ -184,7 +195,7 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
         pathSegments,
         headerFields: [],
         body: transitionBody,
-        requesterIdentityId: 'current',
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: nowUtc(),
         organization: STARK_ORGANIZATION,
         responseStatus: 204,
@@ -193,14 +204,15 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
     });
     await postWorkOrderTransitionOp(
         db, WORK_ORDER_ID, transitionBody,
-        'current', undefined, [], pair,
+        'XXZruirZyAOoRpNxaDnpSA', undefined, [], pair,
     );
 
     const release = await handleRequest(
         db,
         req(
             'DELETE',
-            '/organizations/1/work-orders/' + WORK_ORDER_ID + '/claim',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + WORK_ORDER_ID + '/claim',
             DEV_TOKEN,
         ),
     );
@@ -219,7 +231,8 @@ test(
             db,
             req(
                 'GET',
-                '/organizations/1/work-orders/' + WORK_ORDER_ID + '/history',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                    + WORK_ORDER_ID + '/history',
                 DEV_TOKEN,
             ),
         );
@@ -234,26 +247,26 @@ test(
         assert.deepEqual(rows[0]!.field_values, []);
 
         // Earliest birth is last.
-        assert.equal(rows[4]!.id, WORK_ORDER_ID + '-ev1');
-        assert.equal(rows[4]!.state, 'n-start');
+        assert.equal(rows[4]!.id, EV_1);
+        assert.equal(rows[4]!.state, NODE_START);
 
         // Transition row carries folded field values.
         const transition = rows.find(
-            (row) => row.id === WORK_ORDER_ID + '-te1',
+            (row) => row.id === TRANSITION_EVENT_ID,
         );
         assert.ok(transition !== undefined);
-        assert.equal(transition!.state, 'n-middle');
+        assert.equal(transition!.state, NODE_MIDDLE);
         assert.deepEqual(transition!.field_values, [
             {
-                id: WORK_ORDER_ID + '-fv1',
-                attribute_id: 'attr-severity',
+                id: FIELD_VALUE_ID,
+                attribute_id: ATTR_SEVERITY,
                 value: 'high',
             },
         ]);
 
         // Birth claim row carries [] (no transition fold).
         const claimed = rows.find(
-            (row) => row.id === WORK_ORDER_ID + '-ev3',
+            (row) => row.id === EV_3,
         );
         assert.ok(claimed !== undefined);
         assert.equal(claimed!.state, 'claimed');
@@ -262,7 +275,7 @@ test(
         // Every row names this work order.
         for (const row of rows) {
             assert.equal(row.entity_id, WORK_ORDER_ID);
-            assert.equal(row.member_id, 'current');
+            assert.equal(row.member_id, 'XXZruirZyAOoRpNxaDnpSA');
             assert.ok(Array.isArray(row.field_values));
         }
 
@@ -287,7 +300,7 @@ test(
         const db = await seededMockDb();
         const foreignId = buildWorkOrders()[0]!.id;
         const tokenTwo = await organizationToken(
-            'current', ORGANIZATION_TWO,
+            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
         );
         const res = await handleRequest(
             db,
@@ -317,12 +330,13 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const missingId = 'no-such-work-order';
+        const missingId = 'oYnbiWXzroVnyolOhmkBIQ';
         const res = await handleRequest(
             db,
             req(
                 'GET',
-                '/organizations/1/work-orders/' + missingId + '/history',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                    + missingId + '/history',
                 DEV_TOKEN,
             ),
         );
@@ -344,7 +358,8 @@ test(
             db,
             req(
                 'GET',
-                '/organizations/1/work-orders/' + WORK_ORDER_ID + '/history',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                    + WORK_ORDER_ID + '/history',
             ),
         );
         assert.equal(res.status, 401);
@@ -357,14 +372,15 @@ test(
 // per-item GET work-orders/:id/history.
 
 test(
-    'GET organizations/1/work-orders/history is 404',
+    'GET organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/history is 404',
     async () => {
         const db = await seededChainDb();
         const collection = await handleRequest(
             db,
             req(
                 'GET',
-                '/organizations/1/work-orders/history',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                    + generateIdentifier(),
                 DEV_TOKEN,
             ),
         );
@@ -376,7 +392,8 @@ test(
             emptyDb,
             req(
                 'GET',
-                '/organizations/1/work-orders/history',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                    + generateIdentifier(),
                 DEV_TOKEN,
             ),
         );

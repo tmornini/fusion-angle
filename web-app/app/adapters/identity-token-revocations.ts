@@ -1,6 +1,6 @@
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../../../shared/identifier.ts';
 import {
     nowUtc,
     type Id,
@@ -11,7 +11,7 @@ export async function postIdentityLogoutEverywhere(
     ctx: RequestContext,
     identityId: Id,
 ): Promise<void> {
-    const id = generateCryptoSafeBase62();
+    const id = generateIdentifier();
     await ctx.PUT(
         `identities/${identityId}/token-revocations/${id}`,
         { at: nowUtc() },

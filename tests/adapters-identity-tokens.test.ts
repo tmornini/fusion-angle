@@ -12,6 +12,8 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     TokenReuseError,
 } from '../web-app/app/adapters/identity-tokens.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 async function adminCtx() {
     const db = memoryDbAdapter();
@@ -22,10 +24,10 @@ async function adminCtx() {
 }
 
 const goodRow = {
-    jti: 'jti-1',
-    identity_id: 'current',
+    jti: generateIdentifier(),
+    identity_id: 'XXZruirZyAOoRpNxaDnpSA',
     action: 'issued',
-    chain_id: 'chain-1',
+    chain_id: generateIdentifier(),
     at: '2026-06-03T00:00:00.000000Z',
 };
 
@@ -37,7 +39,7 @@ test('validates an issued token event', () => {
 test('rejects the retired parent_jti key', () => {
     assert.throws(() =>
         validateIdentityTokenEntity({
-            ...goodRow, parent_jti: 'jti-0',
+            ...goodRow, parent_jti: generateIdentifier(),
         }));
 });
 

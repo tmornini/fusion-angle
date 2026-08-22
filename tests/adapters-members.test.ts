@@ -41,7 +41,7 @@ test(
 
         await postHumanMemberCreation(
             ctx,
-            'w1',
+            'xdaJyuuPyHfffCGLhqDrOQ',
             buildHumanMember('Alice'),
             'active',
         );
@@ -50,15 +50,16 @@ test(
         // halves stripped — parent via pair-plane GET.
         const row = await ctx.GET<{
             id: string; kind: string; title: string;
-        }>('identities/w1');
+        }>('identities/xdaJyuuPyHfffCGLhqDrOQ');
         assert.equal(row.kind, 'person');
         assert.equal(row.title, 'Engineer');
-        const pii = await deriveIdentityPii(db, 'w1');
+        const pii = await deriveIdentityPii(db, 'xdaJyuuPyHfffCGLhqDrOQ');
         assert.equal(pii.name, 'Alice');
         const seat = await ctx.GET<{
             identity_id: string; type: string;
-        }>('organizations/1/members/w1');
-        assert.equal(seat.identity_id, 'w1');
+        }>('organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            + 'xdaJyuuPyHfffCGLhqDrOQ');
+        assert.equal(seat.identity_id, 'xdaJyuuPyHfffCGLhqDrOQ');
         assert.equal(seat.type, 'member');
     },
 );
@@ -68,12 +69,12 @@ test(
     async () => {
         const { db, ctx } = await adminContext();
         await seedCurrentMember(db);
-        await seedHumanMember(db, 'w1', 'Original Name');
+        await seedHumanMember(db, 'xdaJyuuPyHfffCGLhqDrOQ', 'Original Name');
         const { putHumanMember } = await import(
             '../web-app/app/adapters/members.ts'
         );
         await putHumanMember(
-            ctx, 'w1', {
+            ctx, 'xdaJyuuPyHfffCGLhqDrOQ', {
                 title: 'Lead',
                 department: 'Product',
                 strengths: [],
@@ -86,7 +87,7 @@ test(
         );
         const after = await ctx.GET<{
             id: string; title: string;
-        }>('identities/w1');
+        }>('identities/xdaJyuuPyHfffCGLhqDrOQ');
         assert.equal(after.title, 'Lead');
     },
 );

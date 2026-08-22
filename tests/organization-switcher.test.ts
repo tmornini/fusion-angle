@@ -5,8 +5,8 @@ import {
 } from '../web-app/app/organization-switcher.ts';
 
 const TWO = [
-    { id: '1', name: 'Stark' },
-    { id: '2', name: 'Wayne' },
+    { id: 'AjdvjuECVZEgZoFajaIEkg', name: 'Stark' },
+    { id: 'BBjWJsjYIDkTRKIIPrzWRw', name: 'Wayne' },
 ];
 
 test('organizationSwitcherHtml renders a set-as-default control', () => {
@@ -17,13 +17,14 @@ test('organizationSwitcherHtml renders a set-as-default control', () => {
 
 test('organizationSwitcherHtml renders an option per org', () => {
     const out = organizationSwitcherHtml(TWO).toString();
-    assert.match(out, /value="1"/);
-    assert.match(out, /value="2"/);
+    assert.match(out, /value="AjdvjuECVZEgZoFajaIEkg"/);
+    assert.match(out, /value="BBjWJsjYIDkTRKIIPrzWRw"/);
 });
 
 test('organizationSwitcherHtml is empty below two orgs', () => {
     assert.equal(
-        organizationSwitcherHtml([{ id: '1', name: 'Stark' }])
+        organizationSwitcherHtml([{ id: 'AjdvjuECVZEgZoFajaIEkg'
+            , name: 'Stark' }])
             .toString(),
         '');
 });

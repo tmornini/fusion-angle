@@ -27,7 +27,7 @@ async function deleteMembership(
 ): Promise<void> {
     const res = await handleRequest(
         db, new Request(
-            `${BASE}/organizations/1/members/${id}`, {
+            `${BASE}/organizations/AjdvjuECVZEgZoFajaIEkg/members/${id}`, {
             method: 'DELETE',
             headers: {
                 'Authorization': 'Bearer '
@@ -67,23 +67,24 @@ test('a live member passes the membership fence',
 async () => {
     const db = await adminDb();
     const res = await handleRequest(
-        db, req('/organizations/1/members/', await organizationToken()));
+        db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , await organizationToken()));
     assert.equal(res.status, 200);
 });
 
 test('a revoked membership does not stop access mid-token',
 async () => {
     const db = await adminDb();
-    const token = await organizationToken();   // org '1' claim
+    const token = await organizationToken();
     const before = await handleRequest(
-        db, req('/organizations/1/members/', token));
+        db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/', token));
     assert.equal(before.status, 200);
     // Claim-based fence: de-membership lands on the pair plane
     // but the existing token's organizations claim still holds
     // until mint/refresh/exchange or exp.
-    await deleteMembership(db, 'current');
+    await deleteMembership(db, 'XXZruirZyAOoRpNxaDnpSA');
     const after = await handleRequest(
-        db, req('/organizations/1/members/', token));
+        db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/', token));
     assert.equal(after.status, 200);
 });
 
@@ -95,11 +96,12 @@ async () => {
     // seat. After revoke of the only remaining join,
     // a flat token has no organization to resolve.
     const pin = await handleRequest(db, putDefaultOrganization(
-        await devToken(), 'current', '1',
+        await devToken(), 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
     ));
     assert.equal(pin.status, 201);
-    await deleteMembership(db, 'current');
+    await deleteMembership(db, 'XXZruirZyAOoRpNxaDnpSA');
     const res = await handleRequest(
-        db, req('/organizations/1/members/', await devToken()));
+        db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , await devToken()));
     assert.equal(res.status, 403);
 });

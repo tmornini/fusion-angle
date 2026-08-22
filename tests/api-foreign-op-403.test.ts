@@ -12,8 +12,8 @@ import {
 } from './test-fixtures.ts';
 import { nowUtc } from '../api/types.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../shared/crypto-safe-base62.ts';
+    generateIdentifier,
+} from '../shared/identifier.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
@@ -24,8 +24,7 @@ import { seedSeat } from './root-admin-fixture.ts';
 // POSTs; a miss at this address is 404.
 
 const BASE = 'http://localhost';
-const ORGANIZATION_A = '1';
-const ORGANIZATION_B = 'B';
+const ORGANIZATION_A = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2020-01-01T00:00:00.000000Z';
 
 function req(
@@ -45,13 +44,17 @@ function req(
     });
 }
 
-async function twoOrganizationDb(): Promise<MemoryDbAdapter> {
+async function twoOrganizationDb(): Promise<{
+    db: MemoryDbAdapter;
+    organizationB: string;
+}> {
     const db = memoryDbAdapter();
+    const organizationB = generateIdentifier();
     await seedAdminSchema(db);
-    await seedOrganizationDocument(db, ORGANIZATION_B, 'Beta');
+    await seedOrganizationDocument(db, organizationB, 'Beta');
     const memBody = {
-        organization_id: ORGANIZATION_B,
-        identity_id: 'current',
+        organization_id: organizationB,
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'admin',
         at: AT,
     };
@@ -63,7 +66,7 @@ async function twoOrganizationDb(): Promise<MemoryDbAdapter> {
         String(memBody['at'] ?? memBody.at),
     );
 
-    return db;
+    return { db, organizationB };
 }
 
 function graphJson(): Record<string, unknown> {
@@ -76,15 +79,16 @@ function graphJson(): Record<string, unknown> {
 }
 
 test('foreign-org work-order claim is 404', async () => {
-    const db = await twoOrganizationDb();
+    const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken(
-        'current', ORGANIZATION_A,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
     );
     const tokenB = await organizationToken(
-        'current', ORGANIZATION_B,
+        'XXZruirZyAOoRpNxaDnpSA', organizationB,
     );
     const created = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/wo-foreign-claim', tokenA, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yCFjxREVDLjycQDxFIsqIg', tokenA, {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
@@ -95,31 +99,33 @@ test('foreign-org work-order claim is 404', async () => {
     const claimAt = nowUtc();
     const foreign = await handleRequest(db, req(
         'PUT',
-        '/organizations/B/work-orders/wo-foreign-claim/claim',
+        '/organizations/' + organizationB
+            + '/work-orders/yCFjxREVDLjycQDxFIsqIg/claim',
         tokenB, {
-            claimEventId: generateCryptoSafeBase62(),
+            claimEventId: generateIdentifier(),
             claimAt,
-            expireEventId: generateCryptoSafeBase62(),
+            expireEventId: generateIdentifier(),
             expireAt: claimAt,
         },
     ));
     assert.equal(foreign.status, 404);
     assert.deepEqual(await foreign.json(), {
         error:
-            'Not found: work_orders/wo-foreign-claim',
+            'Not found: work_orders/yCFjxREVDLjycQDxFIsqIg',
     });
 });
 
 test('foreign-org work-order release is 404', async () => {
-    const db = await twoOrganizationDb();
+    const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken(
-        'current', ORGANIZATION_A,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
     );
     const tokenB = await organizationToken(
-        'current', ORGANIZATION_B,
+        'XXZruirZyAOoRpNxaDnpSA', organizationB,
     );
     const created = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/wo-foreign-rel', tokenA, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yDEYnDEKhTTMRnyKdusvCw', tokenA, {
             display_id: 'efgh',
             flow_graph: graphJson(),
             position: 2,
@@ -129,22 +135,24 @@ test('foreign-org work-order release is 404', async () => {
 
     const foreign = await handleRequest(db, req(
         'DELETE',
-        '/organizations/B/work-orders/wo-foreign-rel/claim',
+        '/organizations/' + organizationB
+            + '/work-orders/yDEYnDEKhTTMRnyKdusvCw/claim',
         tokenB,
     ));
     assert.equal(foreign.status, 404);
 });
 
 test('foreign-org work-order transition is 404', async () => {
-    const db = await twoOrganizationDb();
+    const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken(
-        'current', ORGANIZATION_A,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
     );
     const tokenB = await organizationToken(
-        'current', ORGANIZATION_B,
+        'XXZruirZyAOoRpNxaDnpSA', organizationB,
     );
     const created = await handleRequest(db, req(
-        'PUT', '/organizations/1/work-orders/wo-foreign-tx', tokenA, {
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yHJmosJCPJCTxoRaPwKdQA', tokenA, {
             display_id: 'ijkl',
             flow_graph: graphJson(),
             position: 3,
@@ -154,10 +162,11 @@ test('foreign-org work-order transition is 404', async () => {
 
     const foreign = await handleRequest(db, req(
         'POST',
-        '/organizations/B/work-orders/wo-foreign-tx/transition',
+        '/organizations/' + organizationB
+            + '/work-orders/yHJmosJCPJCTxoRaPwKdQA/transition',
         tokenB,
         {
-            transitionEventId: generateCryptoSafeBase62(),
+            transitionEventId: generateIdentifier(),
             targetState: 'n-next',
             release: null,
             transitionAt: nowUtc(),
@@ -166,21 +175,21 @@ test('foreign-org work-order transition is 404', async () => {
     assert.equal(foreign.status, 404);
     assert.deepEqual(await foreign.json(), {
         error:
-            'Not found: work_orders/wo-foreign-tx',
+            'Not found: work_orders/yHJmosJCPJCTxoRaPwKdQA',
     });
 });
 
 test('foreign-org flow undo is 404', async () => {
-    const db = await twoOrganizationDb();
+    const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken(
-        'current', ORGANIZATION_A,
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
     );
     const tokenB = await organizationToken(
-        'current', ORGANIZATION_B,
+        'XXZruirZyAOoRpNxaDnpSA', organizationB,
     );
     const created = await handleRequest(db, req(
-        'POST', '/organizations/1/flows/', tokenA, {
-            id: 'flow-foreign-undo',
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', tokenA, {
+            id: 'aRKhwTupsfXtczSCmaJMGQ',
             flow: {
                 name: 'Foreign Undo',
                 is_locked: false,
@@ -188,14 +197,14 @@ test('foreign-org flow undo is 404', async () => {
                 is_auto_fit: false,
                 lock_timeout: 300,
             },
-            projectFlowId: 'pf-foreign-undo',
+            projectFlowId: generateIdentifier(),
             projectFlow: {
-                project_id: 'proj-foreign-undo',
-                flow_id: 'flow-foreign-undo',
+                project_id: generateIdentifier(),
+                flow_id: 'aRKhwTupsfXtczSCmaJMGQ',
                 at: AT,
             },
             initialState: 'active',
-            initialStateEventId: 'flow-foreign-undo-ev',
+            initialStateEventId: generateIdentifier(),
             initialStateAt: AT,
             graphDelta: {
                 nodes: [], edges: [], deletions: [],
@@ -210,15 +219,16 @@ test('foreign-org flow undo is 404', async () => {
 
     const foreign = await handleRequest(db, req(
         'POST',
-        '/organizations/B/flows/flow-foreign-undo/undo',
+        '/organizations/' + organizationB
+            + '/flows/aRKhwTupsfXtczSCmaJMGQ/undo',
         tokenB, {
-            eventId: 'flow-foreign-undo-undo-ev',
+            eventId: generateIdentifier(),
             at: AT,
         },
     ));
     assert.equal(foreign.status, 404);
     assert.deepEqual(await foreign.json(), {
-        error: 'Not found: flows/flow-foreign-undo',
+        error: 'Not found: flows/aRKhwTupsfXtczSCmaJMGQ',
     });
 });
 

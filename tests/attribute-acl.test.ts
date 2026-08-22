@@ -22,7 +22,7 @@ function makeRow(
     overrides: Partial<AttributeSchemaRow> = {},
 ): AttributeSchemaRow {
     return {
-        id: 'a-1',
+        id: 'UQBiHFcwJeCDSnmkPBoYRA',
         name: 'Field',
         attributeType: 'text',
         options: [],
@@ -237,7 +237,7 @@ test(
     + ' every id is writable',
     () => {
         const a = makeRow({
-            id: 'a-1',
+            id: 'UQBiHFcwJeCDSnmkPBoYRA',
             writeRoles: ['member'],
         });
         const b = makeRow({
@@ -246,7 +246,7 @@ test(
         });
         assert.doesNotThrow(
             () => assertWritableAttributeIds(
-                ['a-1', 'a-2'],
+                ['UQBiHFcwJeCDSnmkPBoYRA', 'a-2'],
                 byId(a, b),
                 ['member'],
             ),

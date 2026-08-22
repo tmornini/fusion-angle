@@ -134,7 +134,8 @@ test('approved projects have full baseline coverage',
         // global set. Phase Final Task 2: objectives + scores
         // from the pair plane.
         const organizationByProject = new Map<string, string>();
-        for (const organization of ['1', '2']) {
+        for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
+            , 'BBjWJsjYIDkTRKIIPrzWRw']) {
             for (const p of await deriveProjects(
                 db, organization,
             )) {
@@ -258,13 +259,13 @@ test('a seeded baseline score\'s author matches the pinned'
     const db = await sharedMockDb();
     const ctx = createRequestContext(db, await organizationToken());
     const baselines = await getBaselineScoresForProject(
-        ctx, 'u6YkHhlGc91oDMkr3x0isa',
+        ctx, 'wqGTTFdYUGnmBxWCppmkOQ',
     );
     const row = baselines.find(
-        b => b.objectiveId === 'JkW7aEqFdX3nOiPtVhMrCy',
+        b => b.objectiveId === 'JobGWBxUTEBusPcVhYEKtA',
     );
     assert.ok(row, 'no baseline row for the pinned pair');
-    assert.equal(row!.memberId, 'current');
+    assert.equal(row!.memberId, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
 test('a seeded actual-score triple\'s per-index authors match'
@@ -272,20 +273,20 @@ test('a seeded actual-score triple\'s per-index authors match'
     const db = await sharedMockDb();
     const ctx = createRequestContext(db, await organizationToken());
     const actuals = await getActualScoresForProject(
-        ctx, 'jRE2Tj32NHsFGZIeEADp0p',
+        ctx, 'kAxUZTXdcMCAttuoyCdSYA',
     );
     const rows = actuals
         .filter(
-            a => a.objectiveId === 'RgT2mNvKpQ8xLsYwBzHcUe',
+            a => a.objectiveId === 'QVZjTYvKwffyfGpYILwkOA',
         )
         .sort((a, b) => a.at.localeCompare(b.at));
     assert.equal(rows.length, 3);
     assert.deepEqual(
         rows.map(r => r.memberId),
         [
-            '53J8h9dr76XFqCjYcNVwIR',
-            'WxQn4LVWb76YkmqK5B0EPp',
-            'Trf1Up2jMsPhEnjbW4Ji1n',
+            'CJrglMsNBxOWWfbihHQSeg',
+            'SsVAZghfSzMZRZmxNKIizw',
+            'RPzLGrWcstxLaHoBcViPLQ',
         ],
     );
 });

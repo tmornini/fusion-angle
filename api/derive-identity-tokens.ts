@@ -46,7 +46,7 @@ import {
 // identityTokenEntityOf.
 //
 // EVENT-APPEND, not document-class (api/routes.ts's own route
-// comment): every row id is a fresh generateCryptoSafeBase62()
+// comment): every row id is a fresh generateIdentifier()
 // mint, so in practice no address is ever revisited — but
 // deriveDocumentsAt's latest-per-uriId head resolution still
 // applies uniformly (the role_grants precedent), never assumed.

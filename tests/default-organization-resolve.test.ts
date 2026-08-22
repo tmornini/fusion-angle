@@ -27,7 +27,7 @@ function ev(
 test(
     'currentDefaultOrganizationFor is null with no event for the identity',
     () => {
-        const rows = [ev('d1', 'other', '1', AT1)];
+        const rows = [ev('d1', 'other', 'AjdvjuECVZEgZoFajaIEkg', AT1)];
         assert.equal(currentDefaultOrganizationFor(rows, 'me'), null);
     },
 );
@@ -36,10 +36,11 @@ test(
     'currentDefaultOrganizationFor returns the latest event org',
     () => {
         const rows = [
-            ev('d1', 'me', '1', AT1),
-            ev('d2', 'me', '2', AT2),
+            ev('d1', 'me', 'AjdvjuECVZEgZoFajaIEkg', AT1),
+            ev('d2', 'me', 'BBjWJsjYIDkTRKIIPrzWRw', AT2),
         ];
-        assert.equal(currentDefaultOrganizationFor(rows, 'me'), '2');
+        assert.equal(currentDefaultOrganizationFor(rows, 'me')
+            , 'BBjWJsjYIDkTRKIIPrzWRw');
     },
 );
 
@@ -47,7 +48,7 @@ test(
     'currentDefaultOrganizationFor breaks an at-tie toward later row',
     () => {
         const rows = [
-            ev('d1', 'me', '1', AT1),
+            ev('d1', 'me', 'AjdvjuECVZEgZoFajaIEkg', AT1),
             ev('d2', 'me', '3', AT1),
         ];
         assert.equal(currentDefaultOrganizationFor(rows, 'me'), '3');
@@ -58,9 +59,10 @@ test(
     'currentDefaultOrganizationFor ignores other identities',
     () => {
         const rows = [
-            ev('d1', 'me', '1', AT1),
-            ev('d2', 'other', '2', AT2),
+            ev('d1', 'me', 'AjdvjuECVZEgZoFajaIEkg', AT1),
+            ev('d2', 'other', 'BBjWJsjYIDkTRKIIPrzWRw', AT2),
         ];
-        assert.equal(currentDefaultOrganizationFor(rows, 'me'), '1');
+        assert.equal(currentDefaultOrganizationFor(rows, 'me')
+            , 'AjdvjuECVZEgZoFajaIEkg');
     },
 );

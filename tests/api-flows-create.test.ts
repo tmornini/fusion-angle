@@ -15,6 +15,8 @@ import {
 import type {
     StateEntity,
 } from '../api/types.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -40,22 +42,22 @@ const CREATE_AT = '2025-01-01T00:00:00.000000Z';
 
 function createBody() {
     return {
-        id: 'flow-1',
+        id: 'aEsGMmBEFaVdWihhHXwCbw',
         flow: flowFields(),
-        projectFlowId: 'pf-1',
+        projectFlowId: generateIdentifier(),
         projectFlow: {
-            project_id: 'p1',
-            flow_id: 'flow-1',
+            project_id: 'pnXmXrxOWayANgDLdCjuBw',
+            flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
             at: CREATE_AT,
         },
         initialState: 'active',
-        initialStateEventId: 'ev-1',
+        initialStateEventId: generateIdentifier(),
         initialStateAt: CREATE_AT,
         graphDelta: {
             nodes: [
                 {
-                    id: 'n-start',
-                    flow_id: 'flow-1',
+                    id: generateIdentifier(),
+                    flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
                     name: 'Start',
                     position_x: 0,
                     position_y: 0,
@@ -65,8 +67,8 @@ function createBody() {
                     at: CREATE_AT,
                 },
                 {
-                    id: 'n-finish',
-                    flow_id: 'flow-1',
+                    id: generateIdentifier(),
+                    flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
                     name: 'Done',
                     position_x: 0,
                     position_y: 0,
@@ -89,16 +91,19 @@ test(
     + " 'active' state event in one operation",
     async () => {
         const db = await freshDb();
-        await POST(db, 'organizations/1/flows/', createBody(), DEV_TOKEN);
+        const body = createBody();
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            , body, DEV_TOKEN);
 
         const flow = await GET<{
             id: string;
             name: string;
             organization_id: string;
-        }>(db, 'organizations/1/flows/flow-1', DEV_TOKEN);
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aEsGMmBEFaVdWihhHXwCbw', DEV_TOKEN);
         assert.equal(flow.name, 'My Flow');
         // The fence stamped the bound org — never the body.
-        assert.equal(flow.organization_id, '1');
+        assert.equal(flow.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
 
         // Phase Final Task 2: project_flows row half stripped —
         // join derives from the pair plane.
@@ -106,21 +111,23 @@ test(
             id: string;
             project_id: string;
             flow_id: string;
-        }[]>(db, 'organizations/1/projects/p1/flows/', DEV_TOKEN);
+        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + 'pnXmXrxOWayANgDLdCjuBw/flows/', DEV_TOKEN);
         assert.equal(links.length, 1);
-        assert.equal(links[0]!.id, 'pf-1');
-        assert.equal(links[0]!.project_id, 'p1');
-        assert.equal(links[0]!.flow_id, 'flow-1');
+        assert.equal(links[0]!.id, body.projectFlowId);
+        assert.equal(links[0]!.project_id, 'pnXmXrxOWayANgDLdCjuBw');
+        assert.equal(links[0]!.flow_id, 'aEsGMmBEFaVdWihhHXwCbw');
 
-        const events = await deriveFlowStateHistory(db, '1', 'flow-1');
+        const events = await deriveFlowStateHistory(db
+            , 'AjdvjuECVZEgZoFajaIEkg', 'aEsGMmBEFaVdWihhHXwCbw');
         // Phase Final Stage B: states table retired.
         assert.equal(events.length, 1);
         const ev = events[0]! as StateEntity;
-        assert.equal(ev.id, 'ev-1');
+        assert.equal(ev.id, body.initialStateEventId);
         assert.equal(ev.state, 'active');
         // The event is authored by the verified caller, never
         // the body.
-        assert.equal(ev.member_id, 'current');
+        assert.equal(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
@@ -134,13 +141,15 @@ test(
         // pair-plane create (immutability is pair-plane only
         // on states/:id PUT).
     // Phase Final Stage B: states table retired.
-        await POST(db, 'organizations/1/flows/', createBody(), DEV_TOKEN);
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            , createBody(), DEV_TOKEN);
         const flow = await GET<{ id: string }>(
-            db, 'organizations/1/flows/flow-1', DEV_TOKEN,
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw', DEV_TOKEN,
         );
-        assert.equal(flow.id, 'flow-1');
+        assert.equal(flow.id, 'aEsGMmBEFaVdWihhHXwCbw');
         const flowEvents = await deriveFlowStateHistory(
-            db, '1', 'flow-1',
+            db, 'AjdvjuECVZEgZoFajaIEkg', 'aEsGMmBEFaVdWihhHXwCbw',
         );
         assert.equal(flowEvents.length, 1);
         assert.equal(flowEvents[0]!.state, 'active');
@@ -156,14 +165,15 @@ test(
         // index-independent if prior tests grow the fixture.
         const AT = '2099-06-17T12:00:00.000000Z';
         const db = await freshDb();
-        await POST(db, 'organizations/1/flows/', {
+        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/', {
             ...createBody(),
             initialStateAt: AT,
         }, DEV_TOKEN);
 
         const events = await GET<StateEntity[]>(
             db,
-            'organizations/1/flows/flow-1/versions/',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
             DEV_TOKEN,
         );
         assert.equal(events.length, 1);

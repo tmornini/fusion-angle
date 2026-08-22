@@ -21,7 +21,7 @@ async function token(over: Partial<{
 }> = {}): Promise<string> {
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
-        sub: over.sub ?? 'current',
+        sub: over.sub ?? 'XXZruirZyAOoRpNxaDnpSA',
         roles: [],
         name: 'Demo',
         iat: over.iat ?? 1_700_000_000,
@@ -36,7 +36,7 @@ test('verifies a well-formed unexpired token', async () => {
     const r = await verifyAccessToken(
         await token(), 1_700_000_100);
     assert.equal(r.valid, true);
-    assert.equal(r.valid && r.claims.sub, 'current');
+    assert.equal(r.valid && r.claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
 test('rejects an expired token', async () => {
@@ -71,7 +71,7 @@ async () => {
     const cut = t.lastIndexOf('.') + 1;
     const unsigned = t.slice(0, cut) + 'XXXX';
     const claims = decodeAccessToken(unsigned);
-    assert.equal(claims.sub, 'current');
+    assert.equal(claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
     const r = await verifyAccessToken(
         unsigned, 1_700_000_100);
     assert.equal(r.valid, false);
@@ -101,7 +101,7 @@ test('rejects a token minted for a different audience', async () => {
     const header = base64UrlEncode(JSON.stringify(
         { alg: 'HS256', typ: 'JWT', kid: 'dev-co-located' }));
     const claims = base64UrlEncode(JSON.stringify({
-        sub: 'current', roles: [], name: 'Demo',
+        sub: 'XXZruirZyAOoRpNxaDnpSA', roles: [], name: 'Demo',
         aud: 'evil-site', iat: 1_700_000_000,
         nbf: 1_700_000_000, exp: 9_999_999_999,
         jti: 'x',
@@ -116,7 +116,7 @@ test('rejects a token minted for a different audience', async () => {
 test('a real-signed token for a foreign audience is rejected'
     + ' at the audience gate', async () => {
     const t = await mintAccessToken({
-        sub: 'current', roles: [], name: 'Demo',
+        sub: 'XXZruirZyAOoRpNxaDnpSA', roles: [], name: 'Demo',
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: 'jti-test', aud: 'evil-site',
     });
@@ -127,7 +127,7 @@ test('a real-signed token for a foreign audience is rejected'
 
 test('principalFromToken reads sub/roles/name', async () => {
     const p = principalFromToken(await token());
-    assert.equal(p.id, 'current');
+    assert.equal(p.id, 'XXZruirZyAOoRpNxaDnpSA');
     assert.deepEqual(p.roles, []);
 });
 
@@ -157,7 +157,7 @@ async () => {
 
 test('decodeAccessToken rejects a non-string org claim', () => {
     const body = base64UrlEncode(JSON.stringify({
-        sub: 'current', roles: [], name: 'Demo',
+        sub: 'XXZruirZyAOoRpNxaDnpSA', roles: [], name: 'Demo',
         aud: 'fusion-angle', organization: 7, iat: 1_700_000_000,
         nbf: 1_700_000_000, exp: 9_999_999_999, jti: 'x',
     }));
@@ -169,15 +169,17 @@ test('decodeAccessToken rejects a non-string org claim', () => {
 
 test('mints and verifies an orgs-list token', async () => {
     const r = await verifyAccessToken(
-        await token({ organizations: ['1', '7'] }), 1_700_000_100);
+        await token({ organizations: ['AjdvjuECVZEgZoFajaIEkg', '7'] })
+            , 1_700_000_100);
     assert.equal(r.valid, true);
-    assert.deepEqual(r.valid && r.claims.organizations, ['1', '7']);
+    assert.deepEqual(r.valid && r.claims.organizations
+        , ['AjdvjuECVZEgZoFajaIEkg', '7']);
 });
 
 test('principalFromToken reads the orgs list', async () => {
     const p = principalFromToken(
-        await token({ organizations: ['1', '7'] }));
-    assert.deepEqual(p.organizations, ['1', '7']);
+        await token({ organizations: ['AjdvjuECVZEgZoFajaIEkg', '7'] }));
+    assert.deepEqual(p.organizations, ['AjdvjuECVZEgZoFajaIEkg', '7']);
 });
 
 test('a flat token carries no orgs list', async () => {
@@ -190,8 +192,9 @@ test('principalFromClaims matches principalFromToken on the'
     const variants = [
         await token(),
         await token({ organization: '7' }),
-        await token({ organizations: ['1', '7'] }),
-        await token({ organization: '7', organizations: ['1', '7'] }),
+        await token({ organizations: ['AjdvjuECVZEgZoFajaIEkg', '7'] }),
+        await token({ organization: '7'
+            , organizations: ['AjdvjuECVZEgZoFajaIEkg', '7'] }),
     ];
     for (const t of variants) {
         const r = await verifyAccessToken(t, 1_700_000_100);
@@ -206,7 +209,7 @@ test('principalFromClaims matches principalFromToken on the'
 test('decodeAccessToken rejects a non-array orgs claim',
 () => {
     const body = base64UrlEncode(JSON.stringify({
-        sub: 'current', roles: [], name: 'Demo',
+        sub: 'XXZruirZyAOoRpNxaDnpSA', roles: [], name: 'Demo',
         aud: 'fusion-angle', organizations: 'nope',
         iat: 1_700_000_000, nbf: 1_700_000_000,
         exp: 9_999_999_999, jti: 'x',
@@ -220,8 +223,8 @@ test('decodeAccessToken rejects a non-array orgs claim',
 test('decodeAccessToken rejects non-string orgs elements',
 () => {
     const body = base64UrlEncode(JSON.stringify({
-        sub: 'current', roles: [], name: 'Demo',
-        aud: 'fusion-angle', organizations: ['1', 7],
+        sub: 'XXZruirZyAOoRpNxaDnpSA', roles: [], name: 'Demo',
+        aud: 'fusion-angle', organizations: ['AjdvjuECVZEgZoFajaIEkg', 7],
         iat: 1_700_000_000, nbf: 1_700_000_000,
         exp: 9_999_999_999, jti: 'x',
     }));
@@ -234,7 +237,7 @@ test('decodeAccessToken rejects non-string orgs elements',
 test('decodeAccessToken rejects non-string roles elements',
 () => {
     const body = base64UrlEncode(JSON.stringify({
-        sub: 'current', roles: ['admin', 7], name: 'Demo',
+        sub: 'XXZruirZyAOoRpNxaDnpSA', roles: ['admin', 7], name: 'Demo',
         aud: 'fusion-angle', iat: 1_700_000_000,
         nbf: 1_700_000_000, exp: 9_999_999_999, jti: 'x',
     }));

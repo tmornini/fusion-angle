@@ -28,7 +28,8 @@ test('buildQueryString encodes a single param', () => {
 
 test('buildQueryString joins multiple params', () => {
     assert.equal(
-        buildQueryString({ a: '1', b: '2' }),
+        buildQueryString({ a: '1'
+            , b: '2' }),
         'a=1&b=2',
     );
 });

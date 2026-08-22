@@ -1,3 +1,4 @@
+import './hmac-test-key.ts';
 import { test, afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -86,12 +87,13 @@ async function noStoredAuthorizeResponse(
 async function dbWithPasswordUser(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await seedIdentityPii(db, 'current', {
+    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Demo', email: 'demo@example.com',
         phone: '555-0100', bio: 'demo user',
     });
-    await seedIdentityCredential(db, 'current', 'c1', {
-        identity_id: 'current', kind: 'password',
+    await seedIdentityCredential(db, 'XXZruirZyAOoRpNxaDnpSA'
+        , 'WeXjAaAxGSpLpamfEuvcww', {
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA', kind: 'password',
         status: 'set',
         secret: await testHashPassword('s3cret'),
         at: '2026-06-03T00:00:00.000000Z',
@@ -102,7 +104,7 @@ async function dbWithPasswordUser(): Promise<MemoryDbAdapter> {
 test('password login issues a code exchangeable for a token',
 async () => {
     const db = await dbWithPasswordUser();
-    await seedRootAdmin(db);   // 'current' is admin
+    await seedRootAdmin(db);   // 'XXZruirZyAOoRpNxaDnpSA' is admin
     const pkce = await s256Fields();
     const res = await handleRequest(db, authorize({
         method: 'password', username: 'demo@example.com',
@@ -121,7 +123,8 @@ async () => {
     assert.equal(tok.status, 201);
     const body = await tok.json() as { access_token: string };
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members/', body.access_token)));
+        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , body.access_token)));
 });
 
 // authorization_code TTL: a code older than
@@ -197,12 +200,13 @@ test('a revoked password credential is the same 401',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await seedIdentityPii(db, 'current', {
+    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Demo', email: 'demo@example.com',
         phone: '555-0100', bio: 'demo user',
     });
-    await seedIdentityCredential(db, 'current', 'c1', {
-        identity_id: 'current', kind: 'password',
+    await seedIdentityCredential(db, 'XXZruirZyAOoRpNxaDnpSA'
+        , 'WeXjAaAxGSpLpamfEuvcww', {
+        identity_id: 'XXZruirZyAOoRpNxaDnpSA', kind: 'password',
         status: 'revoked',
         secret: await testHashPassword('s3cret'),
         at: '2026-06-03T00:00:00.000000Z',
@@ -285,7 +289,7 @@ async () => {
         code_challenge_method: 'S256',
     }));
     assert.equal(res.status, 201);
-    const rows = await deriveCredentialsFor(db, 'current');
+    const rows = await deriveCredentialsFor(db, 'XXZruirZyAOoRpNxaDnpSA');
     const passwords = rows.filter(
         row => row.kind === 'password',
     );

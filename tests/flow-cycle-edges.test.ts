@@ -21,7 +21,7 @@ function e(
 test('a linear flow has no cycle edges', () => {
     const ids = findCycleEdgeIds(
         [n('start', true), n('a'), n('done')],
-        [e('e1', 'start', 'a'), e('e2', 'a', 'done')],
+        [e('YiJPbufDpkyrZcZCYbUJpg', 'start', 'a'), e('e2', 'a', 'done')],
     );
     assert.deepEqual([...ids], []);
 });
@@ -29,7 +29,7 @@ test('a linear flow has no cycle edges', () => {
 test('a self-loop edge is a cycle edge', () => {
     const ids = findCycleEdgeIds(
         [n('start', true), n('a')],
-        [e('e1', 'start', 'a'), e('loop', 'a', 'a')],
+        [e('YiJPbufDpkyrZcZCYbUJpg', 'start', 'a'), e('loop', 'a', 'a')],
     );
     assert.deepEqual([...ids], ['loop']);
 });
@@ -40,7 +40,7 @@ test(
         const ids = findCycleEdgeIds(
             [n('start', true), n('a'), n('b')],
             [
-                e('e1', 'start', 'a'),
+                e('YiJPbufDpkyrZcZCYbUJpg', 'start', 'a'),
                 e('e2', 'a', 'b'),
                 e('back', 'b', 'a'),
             ],
@@ -55,7 +55,7 @@ test(
         const ids = findCycleEdgeIds(
             [n('start', true), n('a'), n('b'), n('c')],
             [
-                e('e1', 'start', 'a'),
+                e('YiJPbufDpkyrZcZCYbUJpg', 'start', 'a'),
                 e('e2', 'start', 'b'),
                 e('e3', 'a', 'c'),
                 e('e4', 'b', 'c'),
@@ -72,7 +72,7 @@ test(
         const ids = findCycleEdgeIds(
             [n('start', true), n('a'), n('b')],
             [
-                e('e1', 'start', 'a'),
+                e('YiJPbufDpkyrZcZCYbUJpg', 'start', 'a'),
                 e('e2a', 'a', 'b'),
                 e('e2b', 'a', 'b'),
             ],
@@ -92,7 +92,7 @@ test(
         const ids = findCycleEdgeIds(
             [n('a'), n('start', true), n('b')],
             [
-                e('e1', 'start', 'a'),
+                e('YiJPbufDpkyrZcZCYbUJpg', 'start', 'a'),
                 e('e2', 'a', 'b'),
                 e('e3', 'b', 'start'),
             ],
@@ -108,7 +108,7 @@ test(
         const ids = findCycleEdgeIds(
             [n('start', true), n('a')],
             [
-                e('e1', 'start', 'a'),
+                e('YiJPbufDpkyrZcZCYbUJpg', 'start', 'a'),
                 e('ghost', 'missing', 'a'),
             ],
         );

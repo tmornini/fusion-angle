@@ -106,7 +106,7 @@ test(
         const html = htmlOf(
             [
                 makeHuman('self', 'Demo'),
-                makeHuman('w1', 'Alice'),
+                makeHuman('xdaJyuuPyHfffCGLhqDrOQ', 'Alice'),
                 makeAI('ai1', 'Claude'),
             ],
             'self',
@@ -135,7 +135,7 @@ test(
         const html = htmlOf(
             [
                 makeHuman('self', 'Demo'),
-                makeHuman('w1', 'Alice'),
+                makeHuman('xdaJyuuPyHfffCGLhqDrOQ', 'Alice'),
             ],
             'self',
         );
@@ -160,7 +160,7 @@ test(
         const html = htmlOf(
             [
                 makeHuman('self', 'Demo'),
-                makeHuman('w1', 'Alice'),
+                makeHuman('xdaJyuuPyHfffCGLhqDrOQ', 'Alice'),
             ],
             'self',
         );
@@ -186,7 +186,7 @@ test(
         const html = htmlOf(
             [
                 makeHuman('self', 'Demo'),
-                makeHuman('w1', 'Alice'),
+                makeHuman('xdaJyuuPyHfffCGLhqDrOQ', 'Alice'),
             ],
             'self',
         );
@@ -209,7 +209,7 @@ test(
         const html = htmlOf(
             [
                 makeHuman('self', 'Demo'),
-                makeHuman('w1', 'Alice'),
+                makeHuman('xdaJyuuPyHfffCGLhqDrOQ', 'Alice'),
                 makeAI('ai1', 'Claude'),
             ],
             'self',
@@ -263,7 +263,7 @@ test(
         const html = htmlOf(
             [
                 makeHuman('self', 'Zelda'),
-                makeHuman('w1', 'Alice'),
+                makeHuman('xdaJyuuPyHfffCGLhqDrOQ', 'Alice'),
                 makeAI('ai1', 'Claude'),
             ],
             'self',

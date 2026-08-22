@@ -13,23 +13,25 @@ function fixtureRoles(
     sub: string,
     organization: string,
 ): string[] {
-    const type = sub === 'current' ? 'admin' : 'member';
+    const type = sub === 'XXZruirZyAOoRpNxaDnpSA' ? 'admin' : 'member';
     return [type + ':' + organization];
 }
 
-// A deterministic, always-valid 'current' token: a fixed iat
+// A deterministic, always-valid 'XXZruirZyAOoRpNxaDnpSA' token: a fixed iat
 // with an enormous TTL puts exp far in the future, so it
 // verifies against any wall clock without a clock seam.
 // Carries claim roles + organizations (gate reads claims,
 // not live role-grants / memberships). Async because minting
 // now signs via WebCrypto (HMAC-SHA256).
-export async function devToken(sub = 'current'): Promise<string> {
+export async function devToken(
+    sub = 'XXZruirZyAOoRpNxaDnpSA',
+): Promise<string> {
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
         sub,
-        roles: fixtureRoles(sub, '1'),
+        roles: fixtureRoles(sub, 'AjdvjuECVZEgZoFajaIEkg'),
         name: 'Demo',
-        organizations: ['1'],
+        organizations: ['AjdvjuECVZEgZoFajaIEkg'],
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: 'dev-' + sub,
     });
@@ -37,9 +39,9 @@ export async function devToken(sub = 'current'): Promise<string> {
 
 // An org-scoped dev token: the org-exchanged session a web-app
 // adapter sees post-boot, carrying the `org` claim activeOrganization
-// reads. Defaults to `current` in org '1'.
+// reads. Defaults to `current` in org 'AjdvjuECVZEgZoFajaIEkg'.
 export async function organizationToken(
-    sub = 'current', organization = '1',
+    sub = 'XXZruirZyAOoRpNxaDnpSA', organization = 'AjdvjuECVZEgZoFajaIEkg',
 ): Promise<string> {
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
@@ -59,7 +61,8 @@ export async function organizationToken(
 // an org-scoped session. Defaults to one reachable org; pass []
 // for the zero-membership identity.
 export async function reachableToken(
-    sub = 'current', organizations: readonly string[] = ['1'],
+    sub = 'XXZruirZyAOoRpNxaDnpSA'
+        , organizations: readonly string[] = ['AjdvjuECVZEgZoFajaIEkg'],
 ): Promise<string> {
     const roles = organizations.flatMap(
         org => fixtureRoles(sub, org),
@@ -85,7 +88,7 @@ export async function claimToken(opts: {
     roles: readonly string[];
     jti?: string;
 }): Promise<string> {
-    const sub = opts.sub ?? 'current';
+    const sub = opts.sub ?? 'XXZruirZyAOoRpNxaDnpSA';
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
         sub,
@@ -98,31 +101,35 @@ export async function claimToken(opts: {
     });
 }
 
-export async function expiredToken(sub = 'current'): Promise<string> {
+export async function expiredToken(
+    sub = 'XXZruirZyAOoRpNxaDnpSA',
+): Promise<string> {
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
         sub,
-        roles: fixtureRoles(sub, '1'),
+        roles: fixtureRoles(sub, 'AjdvjuECVZEgZoFajaIEkg'),
         name: 'Demo',
-        organizations: ['1'],
+        organizations: ['AjdvjuECVZEgZoFajaIEkg'],
         iat: 1_600_000_000, ttlSeconds: 1,
         jti: 'exp-' + sub,
     });
 }
 
-export async function notYetValidToken(sub = 'current'): Promise<string> {
+export async function notYetValidToken(
+    sub = 'XXZruirZyAOoRpNxaDnpSA',
+): Promise<string> {
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
         sub,
-        roles: fixtureRoles(sub, '1'),
+        roles: fixtureRoles(sub, 'AjdvjuECVZEgZoFajaIEkg'),
         name: 'Demo',
-        organizations: ['1'],
+        organizations: ['AjdvjuECVZEgZoFajaIEkg'],
         iat: 4_000_000_000, ttlSeconds: 10_000_000_000,
         jti: 'nbf-' + sub,
     });
 }
 
-// Pre-minted 'current' org-scoped token for the common case.
+// Pre-minted 'XXZruirZyAOoRpNxaDnpSA' org-scoped token for the common case.
 // Minting is async now, but organizationToken() is
 // deterministic, so one value equals every call. Tests that
 // need the token as a plain string — e.g. inside a
