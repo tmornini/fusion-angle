@@ -1689,7 +1689,7 @@ export async function workOrderHistoryFor(
 // order op-pair replay, over INDEXED entity-scoped reads
 // workOrderClaimSourcesFor already performs, rather than
 // deriveStatesFor's own whole-plane getAll (forbidden inside
-// a write-gate transaction — CLAUDE.md's tx-body gotcha:
+// a write-gate transaction — AGENTS.md's tx-body gotcha:
 // entity-scoped in-tx reads only, never a whole-plane getAll of
 // pairs). With the states/:id address retired this
 // is the sole claim-history source — create/claim/transition/

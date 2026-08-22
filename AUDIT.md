@@ -10,7 +10,7 @@ harness announces itself in-session, and absent that
 announcement you stop and ask — never improvise a different
 engine.
 
-The audit follows the codebase scroll policy (CLAUDE.md
+The audit follows the codebase scroll policy (AGENTS.md
 § Subagents): its orchestrator conducts as master and goes
 Full (`Go to Church!`), enumerating the scripture's sections;
 its hunters and refuters fan out as subagents and go Medium
@@ -81,7 +81,7 @@ is the verdict delivered without reading the code.
    Exemplars land unrefuted — credit, not claims.
 3b. **Challenge kills-by-contract (parallel).** A refuter may
    kill a finding by citing a contract of record
-   (ARCHITECTURE.md, API.md, CLAUDE.md, SCHEMA.md). Each such
+   (ARCHITECTURE.md, API.md, AGENTS.md, SCHEMA.md). Each such
    REFUTED verdict draws ONE narrow adjudicator asking a single
    question: does the cited contract address THIS charge, or a
    neighbor of it? A doc that blesses shape X does not refute a
@@ -89,13 +89,13 @@ is the verdict delivered without reading the code.
    it restores the finding to CONFIRMED or upholds the kill.
    Triggers only on killed-by-contract verdicts.
 4. **Report (serial).** Write `AUDIT-REPORT.md` once, wrapped
-   to pass the root-`.md` lint (CLAUDE.md § Validate
+   to pass the root-`.md` lint (AGENTS.md § Validate
    semantics); snippet lines may be truncated to fit, marked
    explicitly — fidelity lives at the cited `file:line`.
 
 ## The hunter's prompt
 
-Compose per CLAUDE.md § Subagents — the `Go to Medium Church!`
+Compose per AGENTS.md § Subagents — the `Go to Medium Church!`
 opener and the codebase push-down are mandated there — with the
 repository's absolute path and HEAD SHA, then add:
 
@@ -286,4 +286,4 @@ contradicts itself.
 Report-only is the default; remediation is opt-in after the
 report is read. One commit per finding, safest-first;
 `./validate` green before each commit. The Office of the Commit
-and CLAUDE.md govern the rest.
+and AGENTS.md govern the rest.

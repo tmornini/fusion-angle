@@ -26,7 +26,7 @@ import { appendMessagePair } from './message-pair.ts';
 // `MESSAGE_TABLES` (Phase Final Task 2 stripped the
 // identity_pii ROW half). Formed pre-tx — crypto, hashing,
 // and timers never run inside an open transaction
-// (CLAUDE.md § Transaction bodies await only row ops) —
+// (AGENTS.md § Transaction bodies await only row ops) —
 // `pair` arrives fully formed, all crypto done pre-tx
 // (message-pair.ts).
 //

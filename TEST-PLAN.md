@@ -58,12 +58,12 @@ Every hunter the master dispatches MUST begin its
 turn by invoking the `church-of-code:church-of-code`
 skill and reading `CHURCH-OF-CODE-medium-context.md`
 in full. Subagents inherit no scripture and read no
-CLAUDE.md by default (see CLAUDE.md § Subagents).
+AGENTS.md by default (see AGENTS.md § Subagents).
 The first line of every hunter prompt is
 `Go to Medium Church!`.
 
 After the scripture, the hunter reads
-`/Users/tmornini/code/fusion-angle/CLAUDE.md` in
+`/Users/tmornini/code/fusion-angle/AGENTS.md` in
 full, then **only** its assigned `##` section body
 (G includes V1–V9; F2 includes WB* and AA-WB-SETUP;
 K omits K8). It does not read other sections. It
@@ -92,8 +92,8 @@ Hunter prompt:
 ```
 Go to Medium Church!
 
-Then read CLAUDE.md at
-/Users/tmornini/code/fusion-angle/CLAUDE.md
+Then read AGENTS.md at
+/Users/tmornini/code/fusion-angle/AGENTS.md
 in full.
 
 You are the {SECTION} hunter for the
@@ -131,7 +131,7 @@ the **automated test suite** (`./validate` runs them; the suite
 also runs standalone via `./test`, which pins `TZ=UTC` on
 `tests/*.test.ts` then `TZ=Pacific/Honolulu` on
 `tests/tz/*.test.ts`).
-See `CLAUDE.md` section `## Testing` for the inventory of
+See `AGENTS.md` section `## Testing` for the inventory of
 automated test files and what each covers.
 
 This UI plan therefore focuses on what automated tests cannot
@@ -772,7 +772,7 @@ in order.
   drag gesture itself per the MCP pointer-capture
   limitation; if the gesture cannot be driven,
   validate end-state via direct JSON injection per
-  the CLAUDE.md workaround.)
+  the AGENTS.md workaround.)
 - [ ] **AA28** Double-click the new blue-bordered
   node. PASS: properties panel appears with a
   "State Properties" title and close button on
@@ -807,7 +807,7 @@ in order.
   This browser case remains BLOCKED for the port-
   drag gesture per the MCP pointer-capture
   limitation — validate end-state via JSON
-  injection per the CLAUDE.md workaround.)
+  injection per the AGENTS.md workaround.)
 - [ ] **AA32** Hold Shift and drag from "Review"
   onto "Data Capture". PASS: during the drag the
   preview redraws as a dashed-orange curved

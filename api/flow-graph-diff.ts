@@ -16,7 +16,7 @@ import type {
 // buildRevivals, byte-identical in semantics. `api/` cannot
 // import from `web-app/` (backwards layering — a server module
 // depending on client code) and `shared/` cannot import from
-// `api/` either (CLAUDE.md: the dependency is one-way), so
+// `api/` either (AGENTS.md: the dependency is one-way), so
 // hoisting these two pure functions into `shared/` would force
 // moving FlowGraphDelta/GraphRevival/etc. off api/validators.ts
 // too — a far larger refactor than Task 8's Step 0 authorizes.

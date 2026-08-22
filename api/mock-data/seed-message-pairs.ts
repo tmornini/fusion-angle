@@ -3,7 +3,7 @@
 // async crypto and cannot run inside the seed's one big
 // TABLE_NAMES transaction. Formed pre-tx — crypto, hashing,
 // and timers never run inside an open transaction
-// (CLAUDE.md § Transaction bodies await only row ops). So
+// (AGENTS.md § Transaction bodies await only row ops). So
 // the seed becomes two
 // passes: every op-invocation's pair is formed HERE, before any
 // transaction opens (pass 1); the seed's existing single
@@ -2050,7 +2050,7 @@ export async function formSeedPair(
         // The seed carries no real HTTP request — no bearer to
         // redact, no content-type to hoist. Honest about the
         // below-gate carve-out rather than synthesizing a fake
-        // bearer (CLAUDE.md's named carve-out).
+        // bearer (AGENTS.md's named carve-out).
         headerFields: [
             {
                 name: OPERATION_ID_HEADER,

@@ -49,7 +49,7 @@ importer) — the named exception. The unzipped artifact
 needs no `npm install`.
 
 Everything operational — build, test, conventions — lives
-in [CLAUDE.md](CLAUDE.md); the manual browser regression plan
+in [AGENTS.md](AGENTS.md); the manual browser regression plan
 is [TEST-PLAN.md](TEST-PLAN.md). Architecture, schema, and
 design system: [ARCHITECTURE.md](ARCHITECTURE.md) (with
 [FLOW-CANVAS.md](FLOW-CANVAS.md)), [SCHEMA.md](SCHEMA.md),
@@ -86,5 +86,5 @@ claude --effort max 'Go to Church!'
 
 Full reasoning effort, doctrine loaded first, then work. The
 master reads the Full scroll; dispatched subagents read the
-Medium scroll (`Go to Medium Church!`) — see CLAUDE.md
+Medium scroll (`Go to Medium Church!`) — see AGENTS.md
 § Subagents.

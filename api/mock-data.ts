@@ -162,7 +162,7 @@ export interface SeededCredentials {
 // discarded, never revealed. Both seed paths call this AFTER
 // the entity seed commits, NEVER inside it: PBKDF2 hashing is
 // async crypto. Formed pre-tx — crypto, hashing, and timers
-// never run inside an open transaction (CLAUDE.md §
+// never run inside an open transaction (AGENTS.md §
 // Transaction bodies await only row ops). So every hash is
 // computed up front, then the credential rows land together in
 // one transaction of pure row ops. Phase 10 Task 6: each
@@ -340,7 +340,7 @@ export async function postMockDataLoad(
     // Pass 1 (no tx): every pair-wired op-invocation's message
     // pair, formed up front — formWritePair's hashing is async
     // crypto. Formed pre-tx — crypto, hashing, and timers
-    // never run inside an open transaction (CLAUDE.md §
+    // never run inside an open transaction (AGENTS.md §
     // Transaction bodies await only row ops). requestAt is
     // minted once, the seed's own arrival moment, and shared
     // by every pair.
@@ -1040,7 +1040,7 @@ export async function postBootstrap(
     // Pass 1 (no tx): the lone 'XXZruirZyAOoRpNxaDnpSA' human-member create's
     // bundle, formed up front — see postMockDataLoad's pass 1
     // for why. Formed pre-tx — crypto, hashing, and timers
-    // never run inside an open transaction (CLAUDE.md §
+    // never run inside an open transaction (AGENTS.md §
     // Transaction bodies await only row ops). Bootstrap's
     // body embeds nowUtc() (there is
     // no fixed seed timestamp here), so it is minted ONCE inside

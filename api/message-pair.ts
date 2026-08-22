@@ -41,7 +41,7 @@ import type { NotificationEvent } from
 
 // The shadow-ledger message pair: one `pairs` put. Formed
 // pre-tx — crypto, hashing, and timers never run
-// inside an open transaction (CLAUDE.md § Transaction
+// inside an open transaction (AGENTS.md § Transaction
 // bodies await only row ops). Then appended as the LAST
 // act of the domain write's own transaction.
 export interface MessagePair {
@@ -319,7 +319,7 @@ const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
 // (identityTokenEntityOf: jti, identity_id, action, chain_id,
 // at, id — GET wins). Formed PRE-TX like every other pair
 // (formed pre-tx — crypto, hashing, and timers never run
-// inside an open transaction (CLAUDE.md § Transaction
+// inside an open transaction (AGENTS.md § Transaction
 // bodies await only row ops)). EVENT-APPEND, like
 // every identity_tokens row: identities/:id/tokens/:tid
 // carries no DOCUMENT_CLASS_ROUTE_PATTERNS entry — no

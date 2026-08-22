@@ -527,7 +527,7 @@ async function readTokenChainFromLedger(
 // formTokenEventPair mints a fresh id per event and addresses the
 // pair by it (Phase 13 Task 5). Formed pre-tx — crypto,
 // hashing, and timers never run inside an open
-// transaction (CLAUDE.md § Transaction bodies await only
+// transaction (AGENTS.md § Transaction bodies await only
 // row ops).
 interface TokenEventWrite {
     readonly event: Omit<IdentityTokenEntity, 'id'>;
@@ -1114,7 +1114,7 @@ async function grantClientCredentials(
 // GATE 3 — KEY-BY-ANCHOR (Phase 13 Task 7): the presented code's
 // sha256 digest, pre-tx always — formed pre-tx — crypto,
 // hashing, and timers never run inside an open transaction
-// (CLAUDE.md § Transaction bodies await only row ops). It
+// (AGENTS.md § Transaction bodies await only row ops). It
 // keys
 // the issued root's row id (and, by construction, that row's own
 // event pair's uri_id — formTokenEventPair derives uriId from the

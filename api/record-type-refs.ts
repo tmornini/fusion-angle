@@ -32,7 +32,7 @@ function instancesUriPrefix(
 
 // Referrers for one record type. `view` is the open
 // transaction view; every await is a row op on that view
-// (CLAUDE.md § Transaction bodies await only row ops —
+// (AGENTS.md § Transaction bodies await only row ops —
 // same posture as collectAttributeReferrers).
 export async function collectRecordTypeReferrers(
     view: DbAdapter,

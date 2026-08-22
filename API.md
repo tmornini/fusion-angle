@@ -1161,7 +1161,7 @@ Undo no longer requires a `flow_versions` row to consume —
 `flow_versions` is not in this route's transaction at all any
 more. The restore target is resolved SERVER-SIDE, formed
 pre-tx — crypto, hashing, and timers never run inside an
-open transaction (CLAUDE.md § Transaction bodies await
+open transaction (AGENTS.md § Transaction bodies await
 only row ops), by walking this flow's OWN `flows/:id`
 document-pair history and this flow's OWN `flows/:id/undo`
 operation-pair history together
@@ -1911,7 +1911,7 @@ This is forced, not stylistic:
   would open a second transaction and split the unit
   (Commandment X), so a handler holding a transaction
   composes store primitives and awaits row ops only
-  (CLAUDE.md § Transaction bodies await only row ops).
+  (AGENTS.md § Transaction bodies await only row ops).
 - **The client makes one call.** The web-app adapters call the §1.3
   facade once per method; the fan-out is entirely server-side, within
   the handler's transaction.
@@ -2098,7 +2098,7 @@ table; no dual-write beside a seeded row):
   `identities/:id/XmzGzKMbFITEJlKoyPPSww/` pair (11 more) —
   in a first pass, BEFORE the seed's own big transaction opens
   (formed pre-tx — crypto, hashing, and timers never run
-  inside an open transaction (CLAUDE.md § Transaction
+  inside an open transaction (AGENTS.md § Transaction
   bodies await only row ops)); a second pass then appends
   each pre-formed pair in one `MESSAGE_TABLES` transaction
   (pair-plane only —
@@ -3109,7 +3109,7 @@ BEFORE the transaction opens
 (`formSeedCredentialPairs`,
 `api/mock-data/seed-message-pairs.ts`) — a credential's body is
 unknown until PBKDF2 resolves, and crypto never runs in-tx
-(CLAUDE.md § Transaction bodies await only row ops), so this
+(AGENTS.md § Transaction bodies await only row ops), so this
 credential batch runs its OWN local pass-1/pass-2 split rather
 than joining `formMockDataMessagePairs` /
 `formBootstrapMessagePair` (both already ran, before
@@ -3315,7 +3315,7 @@ changes nothing the reducer would resolve.
 
 **Why the fence fallback is safe to flip categorically.** It
 runs PRE-DISPATCH in `fenceRequest` — never inside a
-transaction (CLAUDE.md § Transaction bodies await only row
+transaction (AGENTS.md § Transaction bodies await only row
 ops) — and is LATENT-hot: ordinary traffic
 carries an org-scoped token (`ctx.principal.organization` already
 set), so the fallback read fires only for a flat, un-exchanged

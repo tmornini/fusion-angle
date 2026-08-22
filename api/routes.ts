@@ -4475,7 +4475,7 @@ export const routes: Route[] = [
     // minted FRESH per conversion, so these are genesis like
     // the project pair above, never Supersedes. All 3+N formed
     // PRE-TX — formed pre-tx — crypto, hashing, and timers
-    // never run inside an open transaction (CLAUDE.md §
+    // never run inside an open transaction (AGENTS.md §
     // Transaction bodies await only row ops) — then
     // appended as the tx's LAST acts, beside the operation
     // pair. Formed ONLY when the gate supplied both a pair and
@@ -5150,7 +5150,7 @@ export const routes: Route[] = [
             ),
         // Admin DELETE with NET-NEW type RESTRICT. RESTRICT
         // check and tombstone append share one tx; referrer
-        // scan awaits only row ops on the view (CLAUDE.md §
+        // scan awaits only row ops on the view (AGENTS.md §
         // Transaction bodies await only row ops). Path org
         // is already gate-matched to
         // the token org; DeleteHandler has no fence arg.

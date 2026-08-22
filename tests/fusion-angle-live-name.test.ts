@@ -14,6 +14,7 @@ const SKIP_DIRS = new Set([
 
 const ROOT_FILES = [
     'README.md',
+    'AGENTS.md',
     'CLAUDE.md',
     'TEST-PLAN.md',
     'ARCHITECTURE.md',
