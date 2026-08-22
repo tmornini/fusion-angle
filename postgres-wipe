@@ -9,7 +9,9 @@ usage() {
 Usage: ./postgres-wipe --postgres render TOKEN
        ./postgres-wipe --postgres local
 
-Drop Postgres schema objects. --postgres is
+Drop the pair plane (pairs), retired leftovers
+(responses, requests), schema_marker, and
+message_body. Does not seed. --postgres is
 required and has no default. --postgres render
 needs TOKEN (the confirmation). --postgres local
 uses POSTGRES_URL (loopback only); it takes no
@@ -99,8 +101,9 @@ fi
 
 if [ "$POSTGRES_TARGET" = "local" ]; then
     assert_loopback_postgres_url
-    bash -c "$WIPE_START"
-    exit 0
+    ROOT="$(cd "$(dirname "$0")" && pwd)"
+    exec node --strip-types \
+        "$ROOT/server/postgres-wipe.ts"
 fi
 
 if ! command -v curl >/dev/null; then
@@ -120,6 +123,10 @@ trap cleanup EXIT
 
 discover_render_ids
 
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+WIPE_START=$(node --strip-types \
+    "$ROOT/server/postgres-wipe.ts" \
+    --print-start-command)
 write_job_body "$TMP/wipe-job.json" "$WIPE_START"
 http_json POST \
     "/services/${SERVICE_ID}/jobs" \

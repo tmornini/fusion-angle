@@ -694,6 +694,14 @@ apply to it (RED is the audit's first finding).
   on an empty database and prints credentials once on
   stdout. It stamps `schema_marker` last so a failed
   seed reads as empty. There is no HTTP dump/restore.
+- **Operator wipe drops the pair plane.**
+  `./postgres-wipe` (`--postgres local` or
+  `--postgres render TOKEN`) runs
+  `POSTGRES_DROP_SCHEMA`: `pairs` first, then
+  retired `responses` / `requests`, then
+  `schema_marker`, then `message_body(bytea)`.
+  It does not seed. Seed still refuses a
+  non-empty database.
 - **HTTP only.** Page URLs use relative paths.
   Pages are `/ideas/` or `/ideas/index.html`.
   The API is `/api/…`. The product is

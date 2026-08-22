@@ -8,23 +8,6 @@ POLL_SEC=5
 REVEAL_HEADER='Save your demo sign-ins — shown once; copy them now.'
 DASHBOARD_KEYS='https://dashboard.render.com/u/settings?add-api-key'
 
-WIPE_START="node --input-type=module -e \"
-import postgres from 'postgres';
-const url = process.env.POSTGRES_URL;
-if (!url) throw new Error('missing POSTGRES_URL');
-const sql = postgres(url, { max: 1 });
-await sql.unsafe('DROP TABLE IF EXISTS responses');
-await sql.unsafe('DROP TABLE IF EXISTS requests');
-await sql.unsafe('DROP TABLE IF EXISTS schema_marker');
-await sql.unsafe(
-    'DROP FUNCTION IF EXISTS message_body(bytea)',
-);
-await sql.end();
-\""
-
-# Collapse the source to one startCommand line.
-WIPE_START=$(printf '%s' "$WIPE_START" | tr '\n' ' ')
-
 fail_http() {
     local code="$1"
     local file="$2"

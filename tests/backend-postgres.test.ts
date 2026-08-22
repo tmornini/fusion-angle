@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
-import { PostgresBackend } from
-    '../api/backend-postgres.ts';
+import {
+    POSTGRES_DROP_SCHEMA,
+    PostgresBackend,
+} from '../api/backend-postgres.ts';
 import type { SqlClient } from
     '../api/postgres-client.ts';
 import { POSTGRES_SCHEMA } from
@@ -130,6 +132,17 @@ async () => {
     assert.match(
         text,
         /DROP FUNCTION IF EXISTS message_body\(bytea\)/,
+    );
+});
+
+test('POSTGRES_DROP_SCHEMA drops pairs first', () => {
+    assert.equal(
+        POSTGRES_DROP_SCHEMA,
+        'DROP TABLE IF EXISTS pairs;\n'
+        + 'DROP TABLE IF EXISTS responses;\n'
+        + 'DROP TABLE IF EXISTS requests;\n'
+        + 'DROP TABLE IF EXISTS schema_marker;\n'
+        + 'DROP FUNCTION IF EXISTS message_body(bytea);',
     );
 });
 

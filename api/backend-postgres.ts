@@ -25,7 +25,7 @@ import {
     encodeIdentifier,
 } from '../shared/identifier.ts';
 
-const DROP_SCHEMA =
+export const POSTGRES_DROP_SCHEMA =
     'DROP TABLE IF EXISTS pairs;\n'
     + 'DROP TABLE IF EXISTS responses;\n'
     + 'DROP TABLE IF EXISTS requests;\n'
@@ -115,7 +115,7 @@ export class PostgresBackend implements StorageBackend {
 
     async deleteSchema(): Promise<void> {
         try {
-            await this.#sql.unsafe(DROP_SCHEMA);
+            await this.#sql.unsafe(POSTGRES_DROP_SCHEMA);
         } catch (error) {
             throw mapPostgresError(error);
         }

@@ -13,10 +13,12 @@ session:
 2. Executes **AT** as a fail-fast gate. Any AT
    failure aborts before A1.
 3. Executes A1–A5. Parallel A3 is
+   `./postgres-wipe --postgres local` then
    `./postgres-seed --postgres local
    --test-plan-slices` then `node server.mjs`
    (14 disjoint slices, stdout credential
    map). Serial (`--serial`) A3 is
+   `./postgres-wipe --postgres local` then
    `./postgres-seed --postgres local
    --mock-data` then `node server.mjs` (SV1).
 4. Grants Chrome origin `http://localhost` **before**
@@ -163,15 +165,17 @@ ride the parent hunter. K8 is a process-lock case, not
 a K-hunter case on the parallel path.
 
 - **Serial (`--serial`)**: A1 `./build` → ZIP; A2 unzip
-  or `./build --no-zip`; A3 `./postgres-seed
+  or `./build --no-zip`; A3 `./postgres-wipe
+  --postgres local` then `./postgres-seed
   --postgres local --mock-data` then
-  `node server.mjs` on an empty database (this
-  pin **is** SV1). One process, one mock tenant,
-  one cookie jar. Walk document order including
-  K8 inside K, then J. Headers are not
-  consulted. Case text is unchanged.
+  `node server.mjs` (this pin **is** SV1). One
+  process, one mock tenant, one cookie jar. Walk
+  document order including K8 inside K, then J.
+  Headers are not consulted. Case text is
+  unchanged.
 - **Parallel (default)**: the same A1–A2. Grant Chrome
   origin `http://localhost` before anything else. A3
+  `./postgres-wipe --postgres local` then
   `./postgres-seed --postgres local
   --test-plan-slices` then `node server.mjs`.
   Capture the stdout credential map. Spawn one
@@ -319,8 +323,8 @@ edges the master follows now.
 Still true, and already stated in Protocol:
 
 - Cookie jar = Chrome `isolatedContext`.
-- Operator seed wipes the whole database (why K8
-  is `global_lock: process`).
+- Operator wipe replaces the shared database (why
+  K8 is `global_lock: process`). Seed never wipes.
 - MCP limitation list (gestures, `resize_window`,
   file I/O, sandbox EPERM, tab-group volatility,
   CSP-blocked `await`, list paint 5–14s,
@@ -414,12 +418,14 @@ agent mutates:
 before A1.
 
 **Parallel (default):** A1–A2 → grant
-`http://localhost` → A3 `./postgres-seed
+`http://localhost` → A3 `./postgres-wipe
+--postgres local` then `./postgres-seed
 --postgres local --test-plan-slices` then
 `node server.mjs` → 14 hunters → join in
 document order → K8 → J → summary.
 
 **Serial (`--serial`):** A1–A2 → A3
+`./postgres-wipe --postgres local` then
 `./postgres-seed --postgres local --mock-data`
 then `node server.mjs` → A → AA → B → C → D →
 E → F → F2 → FS → G → H → I → K (including K8
@@ -518,10 +524,15 @@ depends: AT
 - [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
 - [ ] **A3** With `POSTGRES_URL`,
   `JWT_HMAC_SIGNING_KEY`, and
-  `HTTP_SERVER_PORT` set against an
-  **empty** Postgres. Seed from the
-  checkout, then start `node server.mjs`
-  from the A2 directory:
+  `HTTP_SERVER_PORT` set. Wipe, then seed
+  from the checkout, then start
+  `node server.mjs` from the A2 directory.
+  Empty is the wipe step, not a human
+  prerequisite:
+
+  `./postgres-wipe --postgres local`
+
+  then the mode seed below, then listen.
 
   - **Serial (`--serial`):**
     `./postgres-seed --postgres local
@@ -2826,7 +2837,8 @@ Operator prerequisites:
 - `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and
   `HTTP_SERVER_PORT` set (required; no defaults; never
   logged)
-- Empty database; seed serial A3 with
+- Wipe then seed: `./postgres-wipe --postgres
+  local`, then serial A3 with
   `./postgres-seed --postgres local --mock-data`
   then `node server.mjs`, and parallel A3 with
   `./postgres-seed --postgres local
