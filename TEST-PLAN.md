@@ -23,11 +23,21 @@ session:
    --mock-data` then `node server.mjs` (SV1).
 4. Grants Chrome origin `http://localhost` **before**
    dispatch.
-5. Parallel: one hunter per `parallel: yes` section
-   (14), each with that section's `##` body only,
-   that slice's credentials, and `isolatedContext` =
-   section id. Serial: one tenant, document order,
-   headers not consulted.
+5. Parallel: this MCP has no isolated
+   contexts — one Chrome profile, one
+   cookie jar, one selected page. One
+   hunter per `parallel: yes` section
+   (14), each with that section's `##`
+   body only and that slice's
+   credentials. The master dispatches
+   them **one at a time**, joining each
+   before the next. Each hunter begins
+   by deleting site data for the origin
+   so the shared jar carries no previous
+   hunter's refresh cookie. The CLI belt
+   is the parallel layer. Serial: one
+   tenant, document order, headers not
+   consulted.
 6. Joins in document order. Then K8 (process lock),
    then J. Then the canonical `## Summary Format` plus
    one mitigation-spec path per FAIL cluster. The
@@ -59,10 +69,11 @@ full, then **only** its assigned `##` section body
 K omits K8). It does not read other sections. It
 does not re-seed.
 
-Sign in as that slice's admin from the credential
-map. Isolated context name = section id. Tab-scoped
-MCP tools only (navigate, find, evaluate, snapshot,
-form fill). Coordinate clicks and screenshots are
+Delete site data for the origin, then sign
+in as that slice's admin from the credential
+map. Tab-scoped MCP tools only (navigate,
+find, evaluate, snapshot, form fill).
+Coordinate clicks and screenshots are
 display-global and collide.
 
 Return per-case PASS / FAIL / BLOCKED / DEFERRED /
@@ -89,7 +100,6 @@ You are the {SECTION} hunter for the
 Fusion Angle TEST-PLAN parallel run.
 
 Origin: http://localhost:{PORT}
-isolatedContext name: {SECTION}
 Admin: {admin_username} / {admin_password}
 Org id: {org_id}
 {extra credential-map fields}
@@ -101,9 +111,11 @@ case list. Do not read other
 sections. Do not re-seed. Do not
 patch FAILs.
 
-Sign in as the admin above. Run the
-cases in document order. For K: skip
-K8; run K7 last after K30.
+Delete site data for the origin
+before sign-in. Sign in as the
+admin above. Run the cases in
+document order. For K: skip K8;
+run K7 last after K30.
 
 Return one line per case:
 ID PASS|FAIL|BLOCKED|DEFERRED|DRIFT
@@ -179,7 +191,13 @@ a K-hunter case on the parallel path.
   `./postgres-seed --postgres local
   --test-plan-slices` then `node server.mjs`.
   Capture the stdout credential map. Spawn one
-  hunter per `parallel: yes` section. Join.
+  hunter per `parallel: yes` section, join that
+  hunter, then spawn the next — never two
+  hunters at once. This MCP has no isolated
+  contexts (one Chrome profile, one cookie
+  jar, one selected page). Each hunter
+  deletes site data for the origin first.
+  The CLI belt is the parallel layer.
   Then K8 (wipe/reseed of the shared DB; no
   hunter still running). Then J. Then summary
   + mitigation paths.
@@ -319,10 +337,14 @@ edges the master follows now.
 - Sign-out last inside Agent-B; I exclusive after
   join; K split across G / E / CH / Phase 4; K7
   waiting on Agent-G's K3 rename.
+- Cookie jar = Chrome `isolatedContext` (named
+  in the hunter contract). The 2026-08-22
+  parallel hunters shared one Chrome profile —
+  one cookie jar, one selected page. This MCP
+  has no isolated contexts.
 
 Still true, and already stated in Protocol:
 
-- Cookie jar = Chrome `isolatedContext`.
 - Operator wipe replaces the shared database (why
   K8 is `global_lock: process`). Seed never wipes.
 - MCP limitation list (gestures, `resize_window`,
@@ -451,12 +473,12 @@ run by the master after join.
 | FS. Flow Statistics | 9 |
 | G. Admin Pages | 38 |
 | H. Reference & System | 2 |
-| I. Cross-Cutting Concerns | 29 |
+| I. Cross-Cutting Concerns | 30 |
 | J. Teardown | 3 |
 | K. Objectives & Scoring | 30 |
 | R. Records | 25 |
 | SV. Server (Node + Postgres) | 10 |
-| **Total** | **397** |
+| **Total** | **398** |
 
 ### Combined Totals (CLI + Browser)
 
@@ -466,8 +488,8 @@ only. Combined with the CLI automated suite:
 | Layer                  | Cases    |
 |------------------------|---------:|
 | CLI automated tests    |     3321 |
-| Browser regression     |      397 |
-| **Combined TOTAL**     | **3718** |
+| Browser regression     |      398 |
+| **Combined TOTAL**     | **3719** |
 
 CLI count = most recent `./validate` (AT2) report — the main
 `tests/*.test.ts` suite plus the `tests/tz/*.test.ts` timezone
@@ -491,8 +513,8 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = 3718, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
-where the six status counts sum to **Combined TOTAL** (3718).
+`PASS = 3719, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
+where the six status counts sum to **Combined TOTAL** (3719).
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
 regression.
 
@@ -567,7 +589,8 @@ depends: AT
     rows covering all 14 parallel
     sections (AA's admin is
     `demo@example.com`; B names
-    `seat_*` and `flow_id`; G names
+    `seat_*` and `flow_id`; F2 names
+    `flow_id`; G names
     `org2_*`, `unseated_*`,
     `member_*`; SV names `seat_*`);
     listen stdout has no passwords;
@@ -653,9 +676,11 @@ in order.
   Skill Focus row; there is no Auth Token row.
 - [ ] **AA9** From the human member detail, click Edit,
   change Phone and Bio, toggle one strength on and one
-  off, click Save. PASS: toast "Member saved" appears.
-  Navigate away and return to detail. PASS: edited
-  Phone, Bio, and strengths persist.
+  off (`.strength-chip` buttons with `data-strength`,
+  toggled by click — not checkboxes), click Save. PASS:
+  toast "Member saved" appears. Navigate away and
+  return to detail. PASS: edited Phone, Bio, and
+  strengths persist.
 - [ ] **AA9a** From an AI member detail, click Edit,
   change Description and Skill Focus, and pick a
   different Model from the pulldown (grouped by
@@ -1686,7 +1711,7 @@ depends: A
 
 ### AA13. Workbox Source Flow
 
-- [ ] **AA-WB-SETUP** Create one Workbox-only flow named `WB Test Flow` with three nodes: Create → Capture (text + select attributes) → Archive (`isArchive: true`). This flow is mutated only by Agent-F2. Agent-F2's WO creation reads from this flow, not from any Agent-F flow.
+- [ ] **AA-WB-SETUP** Verify the seeded Workbox-only flow named `WB Test Flow` (A3 reveal `flow_id`) is READY in Create Work Order: three nodes Create → Capture (text + select attributes) → Archive (`isArchive: true`). Open Workbox, click "+ Create Work Order", and confirm `WB Test Flow` sits in the `READY` section (clickable, `data-flow-id` = reveal `flow_id`). Do not build or rewire the graph. This flow is mutated only by Agent-F2. Agent-F2's WO creation reads from this flow, not from any Agent-F flow.
 
 ### Workbox Inbox (`workbox/`)
 
@@ -2161,14 +2186,17 @@ depends: A
 > `web-app/app/invitations-indicator.ts`.
 
 - [ ] **V1 — Invite by email grants a pending invitation** On
-  `members/index.html` as an org admin (Tony Stark on Stark
-  Industries after A3 mock-data), click `+ Invite member` (`#invite-
-  member-btn`, mail icon). PASS: the `invite-member` dialog
+  `members/index.html` as an org admin, click `+ Invite member` (`#invite-
+  member-btn`, mail icon). Serial: Tony Stark on Stark
+  Industries after A3 mock-data. Parallel: this hunter's
+  G admin. PASS: the `invite-member` dialog
   opens with a single Email input (`#invite-email`), helper
   text "Invite an existing person to this organization", a
   Cancel and a "Send invitation" submit (`#invite-member-
   submit`). Enter the email of an EXISTING identity who is NOT
-  yet a Stark member (e.g. a Wayne-only seeded human's email).
+  yet a member of the inviting org. Serial: a Wayne-only
+  seeded human's email. Parallel: `unseated_username`
+  (`g-unseated@test-plan.example`).
   Click "Send invitation". PASS: an "Invitation sent" toast
   fires, the dialog closes, and the email field is cleared.
   The grant is idempotent — sending the same email again while
@@ -2310,11 +2338,11 @@ depends: A
 
 ### Identities (list & detail) (`identities/`, `identities/detail.html`)
 
-- [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar plus "Service account" + "—" (agents are not identities), then a "Service" badge. With mock data seeded and the demo admin's active organization (Stark), the nested PII fence (viaMembership, need-to-know) hides the five org-2-only persons: the list renders 6 named person rows (Emily Rodriguez, Sarah Chen, Lisa Wang, Marcus Johnson, Tony Stark, Jessica Park), 5 "Identity without PII" person rows (the org-2-only members: David Martinez, Alex Kim, Mike Thompson, David Kim, James), and 1 service row (the system service identity). An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
+- [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar plus "Service account" + "—" (agents are not identities), then a "Service" badge. Serial (A3 `--mock-data`, demo admin's active organization Stark): the nested PII fence (viaMembership, need-to-know) hides the five org-2-only persons: the list renders 6 named person rows (Emily Rodriguez, Sarah Chen, Lisa Wang, Marcus Johnson, Tony Stark, Jessica Park), 5 "Identity without PII" person rows (the org-2-only members: David Martinez, Alex Kim, Mike Thompson, David Kim, James), and 1 service row (the system service identity). Parallel (A3 `--test-plan-slices`): `identities/` is global (`organizationNested: false`) and the seed is one DB for all 14 slices, so the hunter sees bootstrap current + the system service identity + every slice admin + the B/G/SV extras — not a five-name closed G roster. `getIdentityRoster` GETs identities only — the G extras AI agent is `ai-agents/:id`, not an identity row, so no agent appears on the list. Named G people: G admin, `G Member`, `G Unseated`, plus the system service identity; other-slice people often render as "Identity without PII" (PII 403). An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
 - [ ] **G44** Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → two sequential requests (POST `identities` `{id, kind}`, then PUT `identities/:id/pii` carrying the PII fields), an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email); a second-hop failure toasts a partial-state message naming the PII-less identity rather than a blanket create failure. Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
 - [ ] **G45** From the roster, click a person row (`.card[data-identity-id]`). PASS: navigates to `identities/detail.html?identityId=<id>`, which renders the back button (`#identity-back-btn`), the name + a kind badge + the id, a "Personal Information" card (Name/Email/Phone/Bio — each empty field rendered as "—" via `DISPLAY_ABSENT`), a "Connections" card (Identity Providers / Tokens buttons), and — for a person — an "Erase PII" button (`#identity-erase-btn`). A service identity instead shows a "Credentials" card and NO erase button (only persons carry erasable PII). Source: `web-app/identities/index.ts` (`onListClick`), `web-app/identities/detail.ts`, `web-app/app/presenters/identity-detail.ts`.
-- [ ] **G46** On a person's detail page, click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The erasure is ledger-deep: the erased name/email/phone/bio values now appear in zero stored `pairs` messages and zero `identity_pii` rows — `/pii` is the message plane's single-slot hard-delete zone, where supersession and erasure alike physically remove prior pairs, and the surviving pair at the address is the bodyless DELETE tombstone. Named residuals outside this guarantee: pre-phase pairs in existing databases, exported snapshots, the caller's own access token, held in memory for its lifetime (≤ 15 min), and replay resurrection of a retained pre-erasure PUT. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
-- [ ] **G47** On a kind-'service' identity's detail page (admin session), a "Client registration" card renders before Credentials showing "Not registered." and a "Register client" button (`data-identity-action="registration"`). Click it → the `client-registration-dialog` opens; fill Grant types `client_credentials`, Audience `fusion-angle`, JWKS `{"keys":[]}`, leave Status Active, Save (`#client-registration-submit`) → "Client registration saved" toast, dialog closes, the card shows an `active` pill (`data-tone="success"`) plus Grant types / Redirect URIs / Audience / JWKS fields, and the button reads "Manage registration". Re-open, change JWKS, Save → the card reflects the new JWKS (rotate = same PUT-overwrite). Re-open, set Status Disabled, Save → `disabled` pill (`data-tone="warning"`). Re-open → a "Deregister" button (`#client-registration-deregister`, hidden while unregistered) is visible; click it → "Client registration removed" toast and the card returns to "Not registered." Empty Grant types / Audience / JWKS shows "Grant types, audience, and JWKS are required" and keeps the dialog open. Cancel (`data-dialog-cancel="client-registration"`) discards edits. Source: `web-app/identities/detail.ts` (`saveRegistration` / `deregisterClient`), `web-app/app/presenters/identity-detail.ts` (`buildRegistrationCard`). Wire: PUT|GET|DELETE `identities/:id/registration` (admin realm; kind gate 404/400).
+- [ ] **G46** On `G Member`'s identity detail (parallel — never the G admin; serial: any person row that is not the signed-in admin), click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The erasure is ledger-deep: the erased name/email/phone/bio values now appear in zero stored `pairs` messages and zero `identity_pii` rows — `/pii` is the message plane's single-slot hard-delete zone, where supersession and erasure alike physically remove prior pairs, and the surviving pair at the address is the bodyless DELETE tombstone. Named residuals outside this guarantee: pre-phase pairs in existing databases, exported snapshots, the caller's own access token, held in memory for its lifetime (≤ 15 min), and replay resurrection of a retained pre-erasure PUT. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
+- [ ] **G47** On the system service identity's detail page (admin session), a "Client registration" card renders before Credentials showing "Not registered." and a "Register client" button (`data-identity-action="registration"`). Click it → the `client-registration-dialog` opens; fill Grant types `client_credentials`, Audience `fusion-angle`, JWKS `{"keys":[]}`, leave Status Active, Save (`#client-registration-submit`) → "Client registration saved" toast, dialog closes, the card shows an `active` pill (`data-tone="success"`) plus Grant types / Redirect URIs / Audience / JWKS fields, and the button reads "Manage registration". Re-open, change JWKS, Save → the card reflects the new JWKS (rotate = same PUT-overwrite). Re-open, set Status Disabled, Save → `disabled` pill (`data-tone="warning"`). Re-open → a "Deregister" button (`#client-registration-deregister`, hidden while unregistered) is visible; click it → "Client registration removed" toast and the card returns to "Not registered." Empty Grant types / Audience / JWKS shows "Grant types, audience, and JWKS are required" and keeps the dialog open. Cancel (`data-dialog-cancel="client-registration"`) discards edits. Source: `web-app/identities/detail.ts` (`saveRegistration` / `deregisterClient`), `web-app/app/presenters/identity-detail.ts` (`buildRegistrationCard`). Wire: PUT|GET|DELETE `identities/:id/registration` (admin realm; kind gate 404/400).
 
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
 
@@ -2444,6 +2472,12 @@ depends: A
 
 ### General
 
+- [ ] **I26** Confirm Snapshots is gone: sidebar
+  has no Snapshots item; `snapshots/` is not a
+  PAGE_REGISTRY page (unsigned load is the
+  not-found page, not a restore UI). Historical
+  I26 (download → wipe → upload) retired with
+  the snapshots page.
 - [ ] **I27** Check DevTools Console after navigating through 5+ different pages. PASS: no unhandled JavaScript errors (warnings and info messages from browser extensions are acceptable).
 
 ### Sidebar Cross-Tab Sync
@@ -2906,13 +2940,14 @@ Mode: parallel-agents | serial
 - AT1 tsc: PASS (0 diagnostics)
 - AT2 ./test: PASS (N/N, 0 fail, Xs)
 - AT3 ./validate: PASS (lint clean)
+- AT4 ./test-postgres: PASS (0 fail)
 
 ## Manual Browser Regression
 Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 
 | Section | Cases | Pass | Blocked | Fail |
 |---------|------:|-----:|--------:|-----:|
-| AT | 3 | | | |
+| AT | 4 | | | |
 | A | 5 | | | |
 | AA | 46 | | | |
 | B | 31 | | | |
@@ -2924,7 +2959,7 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 | FS | 9 | | | |
 | G | 38 | | | |
 | H | 2 | | | |
-| I | 29 | | | |
+| I | 30 | | | |
 | K | 29 (skip K8) | | | |
 | R | 25 | | | |
 | SV | 9 (A3=SV1) | | | |

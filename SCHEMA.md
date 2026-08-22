@@ -318,7 +318,7 @@ address, per-entity current-state alias, nested
 field-values collection/write, and flat
 `/records` / `/record-attributes` are RETIRED (router
 404). Lifecycle writes ride document-trio PUTs
-(ideas/projects/record-types/flows/objectives/members)
+(ideas/projects/record-types/flows/objectives)
 and named ops (work-order create / claim PUT /
 transition POST / bind PUT, invitations). Release
 is DELETE on the claim address. Instance public

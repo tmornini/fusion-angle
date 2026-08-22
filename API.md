@@ -515,13 +515,14 @@ work-order transition fold only. No
 op pairs, not bare leaf pairs (§5.16 / §5.19).
 
 Lifecycle **writes** ride document-trio PUTs
-(ideas / projects / record-types / flows / objectives /
-members) and named ops (work-order create / claim /
-transition / bind, invitations) — never a shared
-event-append address. Instance public PUT is **405**;
-value writes ride PATCH (creates + updates, If-Match
-on a live head) / DELETE tombstone (§5.20) — not
-lifecycle-trio PUTs.
+(ideas / projects / record-types / flows /
+objectives) and named ops (work-order create /
+claim / transition / bind, invitations) — never
+a shared event-append address. Instance public
+PUT is **405**; value writes ride PATCH (creates
++ updates, If-Match on a live head) / DELETE
+tombstone (§5.20) — not lifecycle-trio PUTs.
+Member seats are not a trio family.
 
 Org-scoped document PUT/DELETE hit the write authorizer
 (`api/write-authorizer.ts` → `resolveGlobalOwner` →
@@ -613,50 +614,35 @@ marked tombstone pair at `DELETE /x/:id`. The retired
 `post_state_event` ≈ shared event-append mapping is GONE
 with the address.
 
-### 3.1 `POST /ai-members` — create AI member
+### 3.1 `POST /ai-members` — retired
 
-`postAiMemberCreationOp` (`api/routes.ts`).
+Flat `/ai-members` is router 404.
+`postAiMemberCreationOp` and the member-document
+mint via `memberDocumentBodyOf` with the initial
+lifecycle trio are gone. Agents are
+`PUT /ai-agents/:id`. There is no member-state
+change on this path.
 
-- tx: `MESSAGE_TABLES`
-- actual: three `appendMessagePair` calls when the gate
-  supplied the bundle — operation, member document (body
-  via `memberDocumentBodyOf` with the initial lifecycle
-  trio), detail document.
-- doctrinal: `post_op` + `put_member` + `put_ai_member`
-  composed as `post_create_ai_member` (lifecycle on the
-  member document body, not a separate states append).
-- props: atomic; admin-only; `validateAIMemberCreateBody` at the gate;
-  actor server-stamped.
+### 3.2 `POST /ai-members/:id` — retired
 
-### 3.2 `POST /ai-members/:id` — edit AI member
+Flat `/ai-members/:id` is router 404.
+`postAiMemberEditOp` and the echoed-trio member
+document write are gone. Agent edit is
+`PUT /ai-agents/:id`. There is no member-state
+change on this path.
 
-`postAiMemberEditOp` (`api/routes.ts`) — extracted from an anonymous
-closure this same task, the FIRST composed-EDIT synthesis (below).
+### 3.3 `POST /human-members` — retired
 
-- tx: `MESSAGE_TABLES`
-- actual: three `appendMessagePair` calls — operation,
-  member document (echoed trio), detail document.
-- doctrinal: `post_op` + `put_member` + `put_ai_member` as
-  `post_edit_ai_member`.
-- props: atomic; **no lifecycle move** (edit echoes the
-  current trio); admin-only; `validateAIMemberEditBody`.
-
-### 3.3 `POST /human-members` — create human member
-
-`postHumanMemberCreationOp` (`api/routes.ts`). PII no longer
-lands here (Phase 10 Task 2's intake decomposition, prose
-below) — it enters via a second, separate hop.
-
-- tx: `MESSAGE_TABLES`
-- actual: FOUR `appendMessagePair` calls when the gate
-  supplied the bundle — operation, member document (initial
-  trio folded in), detail document, identities document.
-- doctrinal: `post_op` + `put_member` + `put_human_member` +
-  `put_identity` as `post_create_human_member` (lifecycle
-  on the member document body).
-- props: atomic; admin-only; `validateHumanMemberCreateBody`
-  (`['id', 'detail', 'initialState', 'initialStateEventId',
-  'initialStateAt']` — `pii` retired from this key set).
+Flat `/human-members` is router 404.
+`postHumanMemberCreationOp` and the initial
+lifecycle trio (`initialState` /
+`initialStateEventId` / `initialStateAt`) are
+gone. Human create is `PUT /identities/:id`
+(org profile), then `PUT /identities/:id/pii`,
+then
+`PUT /organizations/:organization-id/members/:identity-id`
+(seat). Seat GET returns `{ id,
+organization_id, identity_id, type, at }`.
 
 ### 3.4 `POST /human-members/:id` — retired
 
@@ -670,115 +656,53 @@ no member-state change on this path. Seat GET
 returns `{ id, organization_id, identity_id, type,
 at }`.
 
-**The member write-pair bundle (Phase 8 Task 4), the
-records/objectives-bundle sibling (§3.20/§3.21) — and the
-migration's FIRST composed-EDIT synthesis: not only the two
-CREATEs above (3.1, 3.3) but ALSO the two EDITs (3.2, 3.4) now
-pre-form extra pairs beside the gate's own operation pair, ONLY
-when the gate supplied both a pair and a fence organization — a
-below-facade caller (`api/mock-data.ts`) skips all three, exactly
-like every prior bundle.**
+**The member write-pair bundle (Phase 8 Task 4)
+is RETIRED.** Live EDITs at §3.2 / §3.4,
+`memberDocumentBodyOf(type, trio)` → `{type,
+state, state_at, state_event_id}`, and echoed
+head trios are gone. The four flat member POSTs
+are router 404. Seed no longer forms that
+member-document trio. Seat GET is `{ id,
+organization_id, identity_id, type, at }`.
 
-- **The operation pair** — the gate's own. For a create, the SAME
-  address a live genesis `PUT /ai-members/:id` (or
-  `/human-members/:id`) would use: the family's own
-  `createBodyIdField` override collapses the bare
-  `POST /ai-members` (or `/human-members`) onto the entity
-  address's own (uriCollection, uriId) — the flows/objectives
-  precedent (§3.12/§3.21). For an edit, the address IS the entity
-  address already — `POST /ai-members/:id` / `/human-members/:id`
-  were already pair-wired there.
-- **The member document pair** — PUT-shaped, at the ONE shared
-  `members/:id` address every member kind writes through
-  regardless of family, body `memberDocumentBodyOf(type,
-  trio)` → `{type, state, state_at, state_event_id}` — the
-  exact live `PUT /members/:id` wire body — validated through
-  `validateMemberDocumentBody`. The member kind is a
-  server-supplied fact (never read off the request body); the
-  lifecycle trio is the create's initial trio or the edit's
-  echoed head trio — see the fold note below.
-- **The detail document pair** — PUT-shaped, at the family's own
-  `ai-members/:id` or `human-members/:id` address (the SAME
-  address the operation pair uses), body `aiMemberDetailBodyOf` /
-  `humanMemberDetailBodyOf` (the create/edit body's `detail`
-  sub-object VERBATIM), validated through
-  `validateAiMemberDocumentBody` / `validateHumanMemberDocumentBody`
-  — byte-indistinguishable from a live `PUT /ai-members/:id`.
-  `human-members/:id` carries NO live PUT of its own (Task 3's own
-  comment, §5.10), so this is the ONLY writer its wiring row's
-  `documentOp`/`entityOf` ever serves besides the seed;
-  `WRITE_RESPONSE_SPECS['human-members/:id']` becomes a
-  `PerVerbWriteResponseSpec` this task for exactly that reason —
-  its `put` slot serves this synthesized bundle and the seed alone,
-  never a real client PUT.
-- **The identities document pair (Phase 10 Task 5) — human-only,
-  a fourth member appended LAST.** PUT-shaped, at the identity's
-  own `identities/:id` address (its OWN address, distinct from
-  `members/:id` and the family's own detail address), body
-  `identityDocumentBodyOf('person')` → `{kind:'person'}` alone —
-  the exact live `PUT /identities/:id` wire body — validated
-  through `validateIdentityDocumentBody`. An AI member carries
-  none: it has no identity row of its own (finding 10), so
-  `postAiMemberCreationOp`/`postAiMemberEditOp` never receive one
-  and their bundle stays the ORIGINAL three (§5.14 has the full
-  writeup — the discriminated-union rationale, the fold, and the
-  seed's own extension).
+**The PII facet is NEVER synthesized.**
+`identity_pii` stays on its own document
+address (`identities/:id/pii`, §2.2), never
+folded into a member-write bundle.
 
-The shared BODY builders (`memberDocumentBodyOf`,
-`aiMemberDetailBodyOf`, `humanMemberDetailBodyOf`,
-`identityDocumentBodyOf`) feed `formDocumentPairFor`
-(`api/routes.ts`), the shared pair-FORMER the four routes above
-now call directly (Phase 9 Task 2 retired their own route-inline
-formation). The seed's own invocation construction
-(`api/mock-data/seed-message-pairs.ts`) still forms its pairs
-independently — a different pipeline by design, with no
-dispatched route to resolve a fence organization or response spec
-from.
+**The PII intake decomposition (Phase 10 Task 2)
+— the phase's NAMED browser-visible change.**
+The `pii{}` carriers close prospectively: the
+person branch of `POST /identities` (§3.5)
+narrows to `{id, kind}`; `POST /human-members`
+(§3.3) and `POST /human-members/:id` (§3.4)
+are retired (router 404). PII enters ONLY
+through `PUT identities/:id/pii` (§2.2, §5.1)
+— the client adapters
+(`web-app/app/adapters/identities.ts`'s
+`postIdentityCreation`,
+`web-app/app/adapters/members.ts`'s
+`postHumanMemberCreation` and `putHumanMember`)
+gain a sequential hop after the create/edit
+succeeds and BEFORE the change notification
+fires:
 
-Every pair in the bundle shares ONE `requestAt` yet strictly-later
-response `at` stamps, so each address's LAST-appended pair becomes
-its head: the member document is `members/:id`'s first-ever pair
-on a member's first write and its new (superseding) head on every
-later write; the detail document shares the operation pair's own
-address and becomes THAT address's new head, appended after it;
-the identities document (human-only) sits at its OWN address and
-becomes THAT address's new head, appended last. A mid-write
-failure (an invalid AI model id or a malformed human
-`strengths` array / `team_dimensions` object — composites
-are native nested JSON, never JSON-encoded strings —
-caught by the pre-tx document-body check or by the op's
-own re-validating store put) leaves zero of the bundle,
-exactly like every other atomic write in this catalog.
-
-**The PII facet is NEVER synthesized.** `identity_pii` stays
-old-plane on BOTH the human create and edit — its own document
-address (`identities/:id/pii`, §2.2) already exists and carries
-its own message pair independently, never folded into the
-bundle above.
-
-**The PII intake decomposition (Phase 10 Task 2) — the phase's
-NAMED browser-visible change.** The three `pii{}` carriers close
-prospectively: the person branch of `POST /identities` (§3.5)
-narrows to `{id, kind}`; `POST /human-members` (§3.3) narrows to
-`{id, detail, initialState, initialStateEventId,
-initialStateAt}`; `POST /human-members/:id` (§3.4) is
-retired (router 404). PII enters ONLY through `PUT
-identities/:id/pii` (§2.2, §5.1) — the client adapters
-(`web-app/app/adapters/identities.ts`'s `postIdentityCreation`,
-`web-app/app/adapters/members.ts`'s `postHumanMemberCreation` and
-`putHumanMember`) gain a SECOND, sequential hop after the
-create/edit succeeds and BEFORE the change notification fires:
-
-- `postIdentityCreation` (person branch): `POST /identities`
-  (bare), then `PUT identities/:id/pii`, then `notify()`.
-- `postHumanMemberCreation`: `POST /human-members` (pii-free),
-  then `PUT identities/:id/pii`, then `notify()` — this hop is
-  UNCONDITIONAL, since a freshly created member always supplies
-  its initial contact facet.
-- `putHumanMember`: `PUT /identities/:id` (org profile),
-  then `PUT identities/:id/pii` IFF the caller supplies a `pii`
-  argument — the ONLY conditional hop of the three, decided by
-  the dirty check below.
+- `postIdentityCreation` (person branch):
+  `POST /identities` (bare), then `PUT
+  identities/:id/pii`, then `notify()`.
+- `postHumanMemberCreation`: `PUT
+  /identities/:id` (org profile), then `PUT
+  identities/:id/pii`, then `PUT
+  /organizations/:organization-id/members/:identity-id`
+  (seat), then `notify()` — the PII hop is
+  UNCONDITIONAL, since a freshly created
+  member always supplies its initial contact
+  facet.
+- `putHumanMember`: `PUT /identities/:id`
+  (org profile), then `PUT identities/:id/pii`
+  IFF the caller supplies a `pii` argument —
+  the ONLY conditional hop of the three,
+  decided by the dirty check below.
 
 **The dirty check (`web-app/members/detail.ts`'s
 `humanMemberPiiPatchIfDirty`, a pure function).** The detail
@@ -833,38 +757,17 @@ stay byte-identical too — the op path writes the SAME
 `identity_pii` ids/content, just through a second request instead
 of folded into the first.
 
-**The member-document fold (the E6 note, made concrete).** A
-member's `type` is a server-pinned fact, and an edit that does
-not move lifecycle **echoes** the current
-`state`/`state_at`/`state_event_id` byte-for-byte, so
-`memberDocumentBodyOf(type, trio)`'s body —
-`{type, state, state_at, state_event_id}` — is byte-identical
-to the head when the edit is a no-op transition.
-`appendMessagePair`'s global by-hash fold therefore skips the
-member-document pair on every such edit — a genuine fold when
-the echoed trio matches, not type alone. The identities
-document (Phase 10 Task 5) folds the SAME way, for the SAME
-reason: a human member's identity `kind` is ALSO a server-pinned
-fact ('person', always), so `identityDocumentBodyOf('person')`'s
-body is byte-identical across create and every edit — a second,
-independent PERMANENT fold at a DIFFERENT address. The detail
-document and the operation pair carry the write's actual changes,
-so they fold only when a caller resends byte-identical field
-values (the general E6 hazard every bundle shares).
-
-`tests/api-shadow-ledger-members-identities.test.ts`'s create and
-composed-edit cases (balance re-pinned 1 → 3 per write at Phase 8
-Task 4; human create re-pinned again, 3 → 4, at Phase 10 Task 5 —
-AI stays 3, finding 10; the human edit gains the identities
-document but folds it; address and key-set assertions for every
-synthesized document, including the identities document's
-`{kind}` alone; a failed-create/failed-edit-appends-nothing pair
-for both families) are the bundle's proof.
-`tests/mock-data-pairs.test.ts`'s `EXPECTED_PAIR_COUNT` (§5.3) and
-its member-document/detail-document/identities-document address
-spot-checks extend the SAME proof to the seed. §5.14 has the
-identity-create bundle's own proof (person 1 → 2, service
-1 → 3) and the bundle-or-nothing case.
+**The member-document fold is RETIRED.**
+`memberDocumentBodyOf(type, trio)` and the echoed
+`{type, state, state_at, state_event_id}` body
+are gone. Seat GET is `{ id, organization_id,
+identity_id, type, at }`. A human identity
+`kind` is still a server-pinned `'person'`, so
+`identityDocumentBodyOf('person')` still folds
+on a byte-identical PUT. §5.14 has the
+identity-create bundle's own proof (person
+1 → 2, service 1 → 3) and the
+bundle-or-nothing case.
 
 ### 3.5 `POST /identities` — create identity
 
@@ -1865,35 +1768,17 @@ the new position. There is no shared `states` log
   other document validator uses), so the 400 body text this route
   raises is unchanged.
 
-### 3.30 `PUT /members/:id` — edit a member directory row (not a POST)
+### 3.30 `PUT /members/:id` — retired
 
-The ninth family, and the FIRST `organizationNested:false` one
-(§5.10). `PUT` now dispatches through
-`documentPutHandler(MEMBERS_WIRING)`, replacing the hand-written
-stand-in this section used to describe (in place of the
-earlier-retired `makeIdRoute` factory) — the wire is UNCHANGED:
-same GLOBAL plane (no organization stamping — the `members` row
-carries no `organization_id`), same `{id, type}` response.
-Registered since before Phase 1 but, as of this task, uncalled by
-any web-app adapter: member edits go through the composed
-`POST /human-members/:id` / `POST /ai-members/:id` operations
-(§3.2, §3.4) instead, which already touch this same `members` row
-as one of their own facet puts.
-
-- tx: `MESSAGE_TABLES`
-- actual: `validateMemberDocumentBody(body)` →
-  `appendMessagePair(pair)` (pair-plane only).
-- props: atomic; document-class (a repeat PUT records
-  `Supersedes`, §5.1); `validateMemberDocumentBody`'s
-  `assertOnlyKeys` label is `'MemberEntity'` — matching
-  `validateMemberEntity`'s own label byte-for-byte (a NAMED
-  divergence from the `*DocumentBody` naming convention every
-  other document validator uses), so the 400 body text this route
-  raises is unchanged; `documentWriteResponseSpec`'s
-  registration-first consult (§5.10) omits the `organization_id`
-  stamp for this family, so the 200 body stays `{id, type}` —
-  byte-identical to what `validateMemberEntity` reconstructed
-  before this task.
+Flat `/members/:id` is router 404.
+`documentPutHandler(MEMBERS_WIRING)` and the
+member-directory parent document are gone.
+Human edit is `PUT /identities/:id` plus
+optional `PUT /identities/:id/pii` (§3.4).
+Seat write is
+`PUT /organizations/:organization-id/members/:identity-id`
+(§2.1 / §5.10). Seat GET is `{ id,
+organization_id, identity_id, type, at }`.
 
 ### 3.31 table-backed `flows/:id/versions/:vid` writes
 ### — RETIRED (Phase 15 Task 7)
@@ -2158,7 +2043,8 @@ table; no dual-write beside a seeded row):
   4 ai-members, each × 3 = 45 member-family pairs: 15 ops + 15 member
   documents + 15 detail documents, Phase 8 Task 4's bundle synthesis,
   the objectives-family 1+1+1 precedent generalized to the roster —
-  see §3.1–§3.4), PLUS each seeded human ALSO folds in its OWN
+  that member-document trio is RETIRED, §3.1–§3.4), PLUS each
+  seeded human ALSO folds in its OWN
   `identities/:id/pii` document pair (11 more — Phase 10 Task 2's
   intake decomposition, prose at §3.4: `postIdentityPiiDocumentOp`
   nested in the SAME transaction as the member-facet writes, ordered
@@ -2580,11 +2466,14 @@ trigger for a type-level fork (Commandment IX: three is
 pattern), read at the time as the next family author's binding
 expectation. The roster phase settles it instead: a FOURTH
 distinct rationale (memberships', above) arrived with no fork
-needed, and the roster's remaining families (`MEMBERS_WIRING`,
-Task 3 onward) share the SAME `states` log WITH a genesis event
-— a FIFTH bucket, still no fork. `'stateless'` stays ONE type
-covering every one of them; the §5.8 comment's "type-level
-fork" claim now reads as history, not standing doctrine.
+needed, and the roster's remaining families
+(`MEMBERS_WIRING`, Task 3 onward) once shared the
+SAME `states` log WITH a genesis event — a FIFTH
+bucket, still no fork. That member genesis log
+is RETIRED (§5.10). `'stateless'` stays ONE type
+covering every one of them; the §5.8 comment's
+"type-level fork" claim now reads as history,
+not standing doctrine.
 
 - **`notFoundTable` is `'memberships'`** — its storage table
   name matches its family name, like ideas/projects/flows/
@@ -2645,22 +2534,20 @@ combos, 15 patterns total.
 
 ### 5.10 The member directory: the first global-plane families
 
-Task 3 (Phase 8) registers `members`, `ai-members`, and
-`human-members` as the ninth, tenth, and eleventh
-`DocumentFamilyWiring` rows (`MEMBERS_WIRING`,
-`AI_MEMBERS_WIRING`, `HUMAN_MEMBERS_WIRING` in `api/routes.ts`)
-— the FIRST `organizationNested:false` ("global-plane")
-registrations of any wiring row. **Split lifecycle class:**
-`MEMBERS_WIRING` is `lifecycle: 'trio'` (document-address
-lifecycle on `members/:id` — genesis at create;
-archive/reactivate via a later PUT carrying a new trio).
-`AI_MEMBERS_WIRING` and `HUMAN_MEMBERS_WIRING` remain
-`'stateless'` **detail facets** (no independent lifecycle —
-they do not carry a trio of their own). States-address
-retirement retired the dual-plane / FREEZE-at-genesis story:
-lifecycle lives only on the members parent document. History
-reads live on `GET members/:id/versions` (§2.10); the members
-GET row embeds the lifecycle trio for head state.
+Task 3 (Phase 8) registered `members`, `ai-members`,
+and `human-members` as the ninth, tenth, and
+eleventh `DocumentFamilyWiring` rows
+(`MEMBERS_WIRING`, `AI_MEMBERS_WIRING`,
+`HUMAN_MEMBERS_WIRING` in `api/routes.ts`) — the
+FIRST `organizationNested:false` ("global-plane")
+registrations of any wiring row. **That parent
+trio is RETIRED.** `MEMBERS_WIRING`
+(`lifecycle: 'trio'`), `GET members/:id/versions`,
+and the members GET lifecycle-trio embed are gone
+(router 404). Seat GET is `{ id, organization_id,
+identity_id, type, at }` (§2.1). Agents are
+`/ai-agents`. Human roster is seats ∩ person
+identities.
 
 **The blocking fix (`api/document-family.ts`).**
 `documentWriteResponseSpec` unconditionally stamped
@@ -2687,26 +2574,22 @@ green, unmodified, through every commit of this task.
   family/route names, the SAME divergence work-orders/
   record-attributes established; `'members'` matches its family
   name.
-- **`human-members/:id` gains NO live PUT.** Its wiring row
-  registers (`documentOp`/`entityOf` fully shaped) but serves no
-  route — the FIRST registered family without a live document
-  PUT. `PUT /human-members/:id` still 405s (the Task 2 verb-gap
-  pin, `tests/api-roster-verb-gaps.test.ts`, proves it survives
-  untouched); the row exists for a future synthesis/seed caller
-  only.
-- **GET is FLIPPED (Task 8)** for all three onto
-  `documentGetHandler` / `documentCollectionGetHandler` of
-  each wiring row — same flip as memberships (§5.9).
+- **`human-members/:id` is RETIRED.** Flat
+  `/human-members` is router 404 (not 405). Seat
+  write is
+  `PUT /organizations/:organization-id/members/:identity-id`.
+- **GET of the parent `members` / `ai-members` /
+  `human-members` documents is RETIRED.** Seat
+  GET is `{ id, organization_id, identity_id,
+  type, at }` (§2.1).
 
-**PUT /members/:id** and **PUT /ai-members/:id** now dispatch
-through `documentPutHandler(MEMBERS_WIRING)` /
-`documentPutHandler(AI_MEMBERS_WIRING)`, and
-`WRITE_RESPONSE_SPECS['members/:id']` /
-the `'ai-members/:id'` `PerVerbWriteResponseSpec`'s `put` arm
-are each `documentWriteResponseSpec(...)` of the matching row —
-the SAME `'simple'` concurrency class every document family but
-flows rides (§5.4). The `'ai-members/:id'` `post` arm (the
-composed edit) is untouched.
+**PUT /members/:id** and **PUT /ai-members/:id**
+are RETIRED (router 404).
+`documentPutHandler(MEMBERS_WIRING)` /
+`documentPutHandler(AI_MEMBERS_WIRING)` no longer
+serve a live route. Seat write is
+`PUT /organizations/:organization-id/members/:identity-id`.
+Agent write is `PUT /ai-agents/:id`.
 
 **The wire covenant, precisely scoped.** ZERO deltas in request
 shapes, response key sets + values, statuses, headers, and hop
@@ -2723,17 +2606,11 @@ calls on both paths, so all stay unchanged.
 mandate (`'HumanMemberEntity'`) though no live route raises it
 yet.
 
-`tests/api-member-documents.test.ts` (the validator accept/
-reject cases for all three families, the below-gate op pins,
-the E6 byte-identical-resend pin for the two LIVE routes, and
-the PUT-chain-derives-the-head / DELETE-derives-absent cases
-against all three REAL registered wiring rows) plus the
-untouched existing suite
-(`tests/api-shadow-ledger-members-identities.test.ts`'s
-`Supersedes`/resend/wire-body-matches-domain-read assertions,
-and `tests/api-roster-verb-gaps.test.ts`'s full 37-combo pin,
-including `human-members/:id`'s surviving 405) are the
-absorption's proof.
+`tests/api-member-documents.test.ts` pins the
+three retired-404 cases (`PUT members/:id` and
+kin). Flat member POSTs and parent-document
+PUTs are router 404. Seat GET is `{ id,
+organization_id, identity_id, type, at }`.
 
 ### 5.11 The invitation document plane: grant + accept synthesis
 
@@ -2949,18 +2826,16 @@ inline handlers (Task 23 retired their flat wiring);
 organizations is registry-only (no wiring row). The
 identities registry row sets `organizationNested: false`
 ("global-plane"), `concurrency: 'simple'`, `createBodyIdField:
-'id'`. It joins `MEMBERS_WIRING`'s shared-log-with-genesis
-`'stateless'` bucket as the FOURTH member (§5.10): the shared id
-(`member.id === identity.id`, always) already receives a genesis
-lifecycle event at create and archive/reactivate via the
-`members/:id` document-trio PUT, so the identities document
-plane carries NO lifecycle of its own — a trio here would
-FREEZE that lifecycle at genesis forever. The stateless arm's
-ONLY tombstone signal is a DELETE-method head, already
-404-absent via `deriveDocumentsAt` with no further walk needed
-(`document-family.ts`'s `derivedDocumentEntity`) — the SAME
-deleted-filter escape hatch every `'stateless'` family before
-it accepted.
+'id'`. Identities stay `'stateless'` (§5.10): the
+retired `MEMBERS_WIRING` trio no longer shares an
+id with a member-parent lifecycle. Seat GET is
+`{ id, organization_id, identity_id, type, at }`.
+The stateless arm's ONLY tombstone signal is a
+DELETE-method head, already 404-absent via
+`deriveDocumentsAt` with no further walk needed
+(`document-family.ts`'s `derivedDocumentEntity`) —
+the SAME deleted-filter escape hatch every
+`'stateless'` family before it accepted.
 
 **The slot is LIVE, not inert.** Unlike the projects/members-
 family inert-`createBodyIdField` precedent, `POST /identities` IS
@@ -3134,27 +3009,18 @@ bundle inline pre-tx:
   client-hashed, so no crypto runs here) — at the credential's
   OWN `identities/:id/credentials/:cid` address.
 
-**`MemberWritePairs` gains `identityDocument?: MessagePair`
-(human create/edit 3 → 4; AI stays 3, finding 10).** The human
-create/edit routes (§3.3/§3.4) form + append it LAST, after
-`detailDocument`; the AI routes (§3.1/§3.2) never do —
-`postAiMemberCreationOp` writes no `identities` row (an AI member
-has no identity of its own), so `postAiMemberCreationOp`/
-`postAiMemberEditOp` always receive it `undefined`. The field
-stays on this ONE shared type rather than forking a person-only
-sibling — every consuming op already honors it uniformly via the
-SAME `!== undefined` guard `memberDocument`/`detailDocument` use,
-so the AI ops' own bundle-forming code is untouched by this task.
+**`MemberWritePairs` (human create/edit 3 → 4;
+AI stays 3) is RETIRED.** The human create/edit
+routes (§3.3/§3.4) and `postAiMemberCreationOp`
+/ `postAiMemberEditOp` are gone. Seat GET is
+`{ id, organization_id, identity_id, type,
+at }`.
 
-**The fold (the E6 fold, the member-document fold's own
-precedent — §3.3/§3.4's prose).** A human member's identity
-`kind` is a server-pinned fact, always `'person'`, so
-`identityDocumentBodyOf('person')`'s body is byte-identical
-across a create and every later edit of the SAME member.
-`appendMessagePair`'s global by-hash fold therefore skips the
-identities-document pair on every edit following the member's
-first write — a genuinely PERMANENT fold, at a DIFFERENT address
-than the member-document fold, for the SAME structural reason.
+**The member-document fold's precedent
+(§3.3/§3.4) is RETIRED.** A human identity
+`kind` is still a server-pinned `'person'`, so
+`identityDocumentBodyOf('person')` still folds
+on a byte-identical PUT at `identities/:id`.
 
 **The seed (`api/mock-data/seed-message-pairs.ts` +
 `api/mock-data.ts`, the SAME commit as the member-op widening —
@@ -3626,7 +3492,9 @@ and **no** bulk `GET objectives/versions`:
    (flat `records/:id/history` RETIRED → router 404)
 4. `GET flows/:id/versions`
 5. `GET objectives/:id/versions`
-6. `GET members/:id/versions` (global; absent → 404)
+6. `GET members/:id/versions` —
+   RETIRED (router 404). Seat GET is
+   `{ id, organization_id, identity_id, type, at }`
 7. `GET work-orders/:id/history` (inline `field_values`)
 8. (value-history, not lifecycle)
     `GET .../record-types/:type/instances/:id/versions`
@@ -3644,10 +3512,11 @@ public collection.
 The four families (ideas, projects, record-types,
 objectives) keep domain `state` on GET rows and do
 **not** embed `state_at` / `state_event_id`. Members
-GET still embeds the lifecycle trio. Flows keep
-`StateEntity[]` on the versions list (deferred).
-Work-orders stay stateless; instances carry `values`,
-not trio.
+GET is the seat row `{ id, organization_id,
+identity_id, type, at }` — no lifecycle trio.
+Flows keep `StateEntity[]` on the versions list
+(deferred). Work-orders stay stateless; instances
+carry `values`, not trio.
 
 `flow_versions` table and table-backed write routes
 are GONE (Phase 15 retired writes; Phase Final

@@ -160,30 +160,18 @@ const AUTHORIZATION_CODE_TTL_SECONDS = 10 * 60;
 const REFRESH_COOKIE_NAME = 'refresh_token';
 const REFRESH_COOKIE_PATH = '/api/authentication';
 
-// Secure follows the public URL. Off only when that origin
-// is http://localhost (local HTTP exception).
-function refreshCookieIsSecure(request: Request): boolean {
-    const url = new URL(request.url);
-    return !(
-        url.protocol === 'http:'
-        && url.hostname === 'localhost'
-    );
-}
-
 function refreshCookieAttributes(
     request: Request,
     extra: readonly string[],
 ): string {
-    const parts = [
+    void request;
+    return [
         'HttpOnly',
         'SameSite=Strict',
         'Path=' + REFRESH_COOKIE_PATH,
         ...extra,
-    ];
-    if (refreshCookieIsSecure(request)) {
-        parts.push('Secure');
-    }
-    return parts.join('; ');
+        'Secure',
+    ].join('; ');
 }
 
 export function refreshSetCookie(
