@@ -36,7 +36,6 @@ const HUMAN_DRAFT = {
     phone: '555-0100',
     bio: 'Builds things.',
     strengths: ['Leadership'],
-    state: 'active' as const,
 };
 
 test(

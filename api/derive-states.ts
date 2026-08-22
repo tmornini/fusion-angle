@@ -19,8 +19,6 @@ import { canonicalUriCollection } from './message-pair.ts';
 import {
     documentPairsAt,
     deriveDocumentsAt,
-    documentLifecycleEvents,
-    stateHistoryFrom,
     byIdAscending,
     type DocumentPair,
 } from './derive-documents.ts';
@@ -45,7 +43,9 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 //       in their own family modules (ideas/projects/records/
 //       flows/objectives); write paths use family
 //       currentDocumentState / row-stamped trios.
-//   (b) deriveMemberStates — members/:id document trio history.
+//   (b) deriveMemberStates RETIRED (C4) — leftover
+//       /members/ document-trio history; nothing reads
+//       that collection.
 //   (c) deriveWorkOrderLifecycle / workOrderLifecycleStatesFor /
 //       workOrderHistoryFor — the work-order op-pair replay
 //       (gate 5d).
@@ -1850,49 +1850,8 @@ export async function workOrderDocumentHeadFor(
     };
 }
 
-// ---- deriveMemberStates — the members document-trio reader -
-// ---- (gate 5c) ---------------------------------------------
-
-// Source (c) of the states-log union. The members-trio
-// derivation (states-address retirement): REPLACES
-// deriveMemberGenesis in the same global-plane union slot.
-// Genesis and every later state change ride the members/:id
-// document trio now — the create op folds initialState* into
-// that document pair, so the op-body echo this replaced reader
-// used to scan is no longer a derive source (it remains on the
-// op body for the op-born visibility scan alone). Global-scoped
-// like the reader it replaces — the per-org trioFamiliesFor
-// machinery is NOT bent to fit (members are
-// organizationNested: false).
-const MEMBERS_DOCUMENT_PREFIX =
-    canonicalUriCollection(undefined, '/members/');
-
-export async function deriveMemberStates(
-    db: DbAdapter,
-): Promise<StateEntity[]> {
-    return db.readTransaction(
-        MESSAGE_TABLES,
-        async (view) => {
-            const stored = await view.pairs.getAllWhere(
-                'uri_collection', MEMBERS_DOCUMENT_PREFIX,
-            );
-            const pairs = documentPairsAt(
-                stored, MEMBERS_DOCUMENT_PREFIX,
-            );
-            const byMember = Map.groupBy(
-                pairs, (pair) => pair.uriId,
-            );
-            const rows: StateEntity[] = [];
-            for (const [memberId, memberPairs] of byMember) {
-                rows.push(...stateHistoryFrom(
-                    documentLifecycleEvents(memberPairs),
-                    memberId,
-                ));
-            }
-            return rows.sort(byIdAscending);
-        },
-    );
-}
+// deriveMemberStates / MEMBERS_DOCUMENT_PREFIX RETIRED
+// (C4) — leftover /members/ document-trio history.
 
 // deriveFlowGraphStates RETIRED with the bulk lifecycle
 // collection (states-URI elimination C3). Graph node/edge
@@ -2109,5 +2068,4 @@ export async function invitationLifecycleStatesFor(
 // RETIRED with C5 (write paths use family currentDocumentState).
 // Per-entity history lives on GET <family>/:id/history and
 // family-scoped derives (derive*StateHistory,
-// workOrderLifecycleStatesFor, deriveMemberStates filter,
-// invitation sources).
+// workOrderLifecycleStatesFor, invitation sources).

@@ -20,7 +20,6 @@ import {
     type ProjectEntity, type IdeaEntity,
     type IdeaState,
     type ProjectState,
-    type MemberState,
 } from '../api/types.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import {
@@ -118,10 +117,10 @@ async function seedIdea(
 
 async function seedMember(
     db: MemoryDbAdapter,
-    id: string, state: MemberState,
+    id: string,
 ): Promise<void> {
     await seedHumanMember(
-        db, id, 'Member ' + id, state,
+        db, id, 'Member ' + id,
     );
 }
 
@@ -175,7 +174,7 @@ test(
     async () => {
         const { db, ctx } = await adminContext();
         const submitter = generateIdentifier();
-        await seedMember(db, submitter, 'active');
+        await seedMember(db, submitter);
         await seedIdea(
             ctx, generateIdentifier(), 'active', submitter,
         );
@@ -205,10 +204,10 @@ test(
     + ' human members',
     async () => {
         const { db, ctx } = await adminContext();
-        await seedMember(db, generateIdentifier(), 'active');
-        await seedMember(db, generateIdentifier(), 'active');
-        await seedMember(db, generateIdentifier(), 'pending');
-        await seedMember(db, generateIdentifier(), 'archived');
+        await seedMember(db, generateIdentifier());
+        await seedMember(db, generateIdentifier());
+        await seedMember(db, generateIdentifier());
+        await seedMember(db, generateIdentifier());
         const stats =
             await getOrganizationStats(ctx);
         assert.equal(stats.activePeopleCount, 5);
@@ -223,7 +222,7 @@ test(
         const submitter = generateIdentifier();
         const projectId = generateIdentifier();
         const ideaId = generateIdentifier();
-        await seedMember(db, submitter, 'active');
+        await seedMember(db, submitter);
         await seedProject(ctx, projectId, 'approved');
         await seedIdea(
             ctx, ideaId, 'active', submitter,

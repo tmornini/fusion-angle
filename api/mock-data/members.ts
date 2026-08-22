@@ -1,6 +1,5 @@
 import type {
     HumanMemberEntity,
-    MemberState,
 } from '../types.ts';
 
 export type SeedHumanMember = Omit<
@@ -18,11 +17,6 @@ export type SeedHumanMember = Omit<
     team_dimensions: Record<
         string, number
     >;
-    // The initial member state seeded into the
-    // states log alongside the row. Lives on the
-    // seed (not the entity) because the entity
-    // carries no state column.
-    state: MemberState;
 };
 
 export function buildMembers():
@@ -34,7 +28,6 @@ export function buildMembers():
             email: 'sarah.chen@company.com',
             title: 'Project Lead',
             department: 'Operations',
-            state: 'active',
             strengths: [
                 'Strategic Planning',
                 'Team Leadership',
@@ -58,7 +51,6 @@ export function buildMembers():
             email: 'mike.thompson@company.com',
             title: 'ML Engineer',
             department: 'Engineering',
-            state: 'active',
             strengths: [
                 'Machine Learning',
                 'Python',
@@ -82,7 +74,6 @@ export function buildMembers():
             email: 'jessica.park@company.com',
             title: 'Data Scientist',
             department: 'Analytics',
-            state: 'active',
             strengths: [
                 'Statistical Analysis',
                 'Visualization',
@@ -106,7 +97,6 @@ export function buildMembers():
             email: 'david.martinez@company.com',
             title: 'Backend Developer',
             department: 'Engineering',
-            state: 'active',
             strengths: [
                 'API Development',
                 'Database Design',
@@ -130,7 +120,6 @@ export function buildMembers():
             email: 'emily.rodriguez@company.com',
             title: 'UX Designer',
             department: 'Design',
-            state: 'pending',
             strengths: [
                 'User Research',
                 'Prototyping',
@@ -154,7 +143,6 @@ export function buildMembers():
             email: 'alex.kim@company.com',
             title: 'Product Manager',
             department: 'Product',
-            state: 'active',
             strengths: [
                 'Roadmap Planning',
                 'Stakeholder Management',
@@ -178,7 +166,6 @@ export function buildMembers():
             email: 'marcus@acmecorp.com',
             title: 'manager',
             department: 'Product',
-            state: 'active',
             strengths: [
                 'Product Strategy',
                 'Team Management',
@@ -201,7 +188,6 @@ export function buildMembers():
             email: 'david.kim@company.com',
             title: 'member',
             department: 'Engineering',
-            state: 'active',
             strengths: [
                 'Frontend Development',
                 'React',
@@ -225,7 +211,6 @@ export function buildMembers():
             email: 'lisa@acmecorp.com',
             title: 'viewer',
             department: 'Sales',
-            state: 'active',
             strengths: [
                 'Sales Strategy',
                 'Client Relations',
@@ -248,7 +233,6 @@ export function buildMembers():
             email: 'james@acmecorp.com',
             title: 'member',
             department: 'Engineering',
-            state: 'archived',
             strengths: [
                 'Backend Development',
                 'Python',
@@ -271,7 +255,6 @@ export function buildMembers():
             email: 'demo@example.com',
             title: 'Admin',
             department: 'Product',
-            state: 'active',
             strengths: [
                 'Strategic Planning',
                 'Data Analysis',

@@ -674,10 +674,15 @@ async function acceptInvitation(
         },
     );
     let conflict = false;
+    let committed = false;
     await db.transaction(
         MESSAGE_TABLES,
         async (view) => {
             const state = await currentInvitationState(view, id);
+            // Already accepted: no-op. Declined/revoked: 409.
+            if (state === 'accepted') {
+                return;
+            }
             if (state !== 'pending') {
                 conflict = true;
                 return;
@@ -688,11 +693,15 @@ async function acceptInvitation(
                 await appendMessagePair(view, seatDocument);
             }
             await appendMessagePair(view, pair);
+            committed = true;
         },
     );
     if (conflict) {
         throw new ApiError(
             'invitation is not pending', HTTP_CONFLICT);
+    }
+    if (!committed) {
+        return undefined;
     }
     db.postNotification({
         kind: 'scoped',
@@ -746,20 +755,29 @@ async function declineInvitation(
         return undefined;
     }
     let conflict = false;
+    let committed = false;
     await db.transaction(
         MESSAGE_TABLES,
         async (view) => {
             const state = await currentInvitationState(view, id);
+            // Already declined: no-op. Accepted/revoked: 409.
+            if (state === 'declined') {
+                return;
+            }
             if (state !== 'pending') {
                 conflict = true;
                 return;
             }
             await appendMessagePair(view, pair);
+            committed = true;
         },
     );
     if (conflict) {
         throw new ApiError(
             'invitation is not pending', HTTP_CONFLICT);
+    }
+    if (!committed) {
+        return undefined;
     }
     db.postNotification({
         kind: 'scoped',

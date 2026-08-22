@@ -3,42 +3,22 @@ import {
 } from '../safe-html.ts';
 import { initials } from '../format.ts';
 import {
-    type IconSize,
     ICON_SIZE,
-    iconCheckCircle2,
-    iconClock,
-    iconPersonX,
     iconBrain,
 } from '../icons.ts';
 import {
     HumanMember,
     AIMember,
     type Member,
-    type MemberState,
     isHumanMember,
     isAIMember,
     MEMBER_WITHOUT_PII_NAME,
 } from '../adapters/index.ts';
-import {
-    MEMBER_STATE_CONFIG,
-} from './state-display.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import { buildPageUrl } from '../navigation.ts';
 import {
     findProviderModel,
 } from '../../../api/provider-models.ts';
-
-const STATE_ICONS: Record<
-    MemberState,
-    (
-        size: IconSize,
-        cssClass: string,
-    ) => SafeHtml
-> = {
-    active: iconCheckCircle2,
-    pending: iconClock,
-    archived: iconPersonX,
-};
 
 export type MemberKindFilter =
     | 'all'
@@ -74,8 +54,6 @@ export class HumanMemberRowPresenter {
         <div class="${
             'card card-hover p-4 cursor-pointer'
             + ' flex items-center gap-4'
-            + (this.#member.isArchived()
-                ? ' opacity-50' : '')
         }"
             data-self="${
                 isSelf ? 'true' : 'false'
@@ -125,29 +103,7 @@ export class HumanMemberRowPresenter {
                     </span>
                 </div>
             </div>
-            <div class="${
-                'flex flex-col items-end gap-2'
-                + ' ml-6'
-            }">
-                ${this.#buildStatusBadge()}
-            </div>
         </div>`;
-    }
-
-    #buildStatusBadge(): SafeHtml {
-        const cfg = MEMBER_STATE_CONFIG[
-            this.#member.stateValue()
-        ];
-        return html`<span
-            class="${
-                'badge '
-                + cfg.className
-                + ' text-xs'
-            }">${
-            STATE_ICONS[
-                this.#member.stateValue()
-            ]!(14, '')
-        } ${cfg.label}</span>`;
     }
 
     #buildTitleBadge(): SafeHtml {

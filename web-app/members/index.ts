@@ -458,7 +458,6 @@ async function submitHumanForm(): Promise<void> {
                 phone,
                 bio,
             }),
-            'active',
         );
     } catch (err) {
         if (err instanceof HumanMemberPiiIntakeFailedError) {

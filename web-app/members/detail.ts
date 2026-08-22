@@ -36,16 +36,13 @@ import {
     getHumanMember,
     getHumanMemberEntity,
     putHumanMember,
-    postHumanMemberStateChange,
     subscribeHumanMemberChanges,
     getAIMember,
     getAIMemberEntity,
     putAIMember,
-    postAIMemberStateChange,
     subscribeAIMemberChanges,
     HumanMember,
     AIMember,
-    type MemberState,
     type MemberPii,
     type IdentityPiiEntity,
 } from '../app/adapters/index.ts';
@@ -370,18 +367,6 @@ function onInput(e: Event): void {
     );
     if (state.variant === 'human') {
         if (!isHumanMemberFieldKey(field)) return;
-        if (field === 'state') {
-            state = {
-                ...state,
-                draft: {
-                    ...state.draft,
-                    state:
-                        target.value as
-                            MemberState,
-                },
-            };
-            return;
-        }
         state = {
             ...state,
             draft: {
@@ -392,18 +377,6 @@ function onInput(e: Event): void {
         return;
     }
     if (!isAIMemberFieldKey(field)) return;
-    if (field === 'state') {
-        state = {
-            ...state,
-            draft: {
-                ...state.draft,
-                state:
-                    target.value as
-                        MemberState,
-            },
-        };
-        return;
-    }
     state = {
         ...state,
         draft: {
@@ -504,40 +477,15 @@ async function saveHumanMember(
     const piiPatch = humanMemberPiiPatchIfDirty(
         { name, email, phone, bio }, s.member.pii(),
     );
-    const stateChanged =
-        s.draft.state !== s.member.stateValue();
     try {
         await putHumanMember(
-            ctx, memberId, nextDetail, {
-                state: s.member.stateValue(),
-                stateAt: s.member.stateAtValue(),
-                stateEventId:
-                    s.member.stateEventIdValue(),
-            }, piiPatch,
+            ctx, memberId, nextDetail, piiPatch,
         );
     } catch (err) {
         reportFault(
             ctx, 'Failed to save member', err,
         );
         return;
-    }
-    // Detail is now patched. If the lifecycle hop
-    // fails, the entity carries new fields with a
-    // stale state — name the half-state explicitly.
-    if (stateChanged) {
-        try {
-            await postHumanMemberStateChange(
-                ctx, memberId, s.draft.state,
-            );
-        } catch (err) {
-            reportFault(
-                ctx,
-                'Member details saved, but state'
-                + ' change failed',
-                err,
-            );
-            return;
-        }
     }
     showToast('Member saved', 'success');
 }
@@ -570,18 +518,10 @@ async function saveAIMember(
         aiMemberPatchFromDraft(s.draft),
     );
     const { id: _id, ...rest } = row;
-    const stateChanged =
-        s.draft.state !== s.member.stateValue();
     try {
         await putAIMember(
             ctx, memberId,
             { ...rest, ...patch },
-            {
-                state: s.member.stateValue(),
-                stateAt: s.member.stateAtValue(),
-                stateEventId:
-                    s.member.stateEventIdValue(),
-            },
         );
     } catch (err) {
         reportFault(
@@ -590,24 +530,6 @@ async function saveAIMember(
             err,
         );
         return;
-    }
-    // Detail is now patched. If the lifecycle hop
-    // fails, the entity carries new fields with a
-    // stale state — name the half-state explicitly.
-    if (stateChanged) {
-        try {
-            await postAIMemberStateChange(
-                ctx, memberId, s.draft.state,
-            );
-        } catch (err) {
-            reportFault(
-                ctx,
-                'AI member details saved, but'
-                + ' state change failed',
-                err,
-            );
-            return;
-        }
     }
     showToast(
         'AI member saved', 'success',

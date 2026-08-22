@@ -13,8 +13,8 @@ live in [SCHEMA.md](SCHEMA.md).
 
 Domain classes wrap entity + state: `Idea(entity, state)`
 and `Project(entity, state)`; the member classes compose
-parent + detail rows: `HumanMember(parent, detail, pii,
-state)` and `AIMember(parent, detail, state)`. All expose
+parent + detail rows: `HumanMember(parent, detail, pii)`
+and `AIMember(parent, detail)`. Idea and Project expose
 `stateValue()` — the
 lifecycle stage is part of the domain object, not a
 separate fetch the presenter has to reconcile. How a state
@@ -34,12 +34,6 @@ not stored in the states log; `Idea.readinessValue()` /
 `Idea.isReady()` derive per call.
 `canBeSubmittedForReview()` gates on lifecycle
 (`active` or `sent_back`) AND `isReady()`.
-
-The terminal state for both human and AI members is
-`'archived'`. Both kinds change lifecycle through the
-member-detail State select, which records the chosen
-state via `postHumanMemberStateChange` /
-`postAIMemberStateChange` — one voice across kinds.
 
 ## Flow Canvas
 

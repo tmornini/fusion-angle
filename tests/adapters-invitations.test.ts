@@ -725,9 +725,7 @@ test('a repeated accept posts no notification', async () => {
         , 'AjdvjuECVZEgZoFajaIEkg');
     await postInvitationAcceptance(toccYYkLEABmlbpHJalgtQ, inv.id);
     assert.equal(posted.length, 2);   // grant, accept
-    await assert.rejects(
-        () => postInvitationAcceptance(toccYYkLEABmlbpHJalgtQ, inv.id),
-    );
+    await postInvitationAcceptance(toccYYkLEABmlbpHJalgtQ, inv.id);
     assert.equal(posted.length, 2);
 });
 
@@ -743,9 +741,7 @@ test('a repeated decline posts no notification', async () => {
     const dave = await ctxOn(db, daveId, 'AjdvjuECVZEgZoFajaIEkg');
     await postInvitationDecline(dave, inv.id);
     assert.equal(posted.length, 2);   // grant, decline
-    await assert.rejects(
-        () => postInvitationDecline(dave, inv.id),
-    );
+    await postInvitationDecline(dave, inv.id);
     assert.equal(posted.length, 2);
 });
 

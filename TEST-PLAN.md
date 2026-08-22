@@ -439,7 +439,7 @@ run by the master after join.
 
 | Section | Tests |
 |---|--:|
-| AT. Automated Test Suite | 3 |
+| AT. Automated Test Suite | 4 |
 | A. Build & Setup | 5 |
 | AA. Data Entry Workflow | 46 |
 | B. Entry Pages | 31 |
@@ -456,7 +456,7 @@ run by the master after join.
 | K. Objectives & Scoring | 30 |
 | R. Records | 25 |
 | SV. Server (Node + Postgres) | 10 |
-| **Total** | **396** |
+| **Total** | **397** |
 
 ### Combined Totals (CLI + Browser)
 
@@ -466,15 +466,17 @@ only. Combined with the CLI automated suite:
 | Layer                  | Cases    |
 |------------------------|---------:|
 | CLI automated tests    |     3321 |
-| Browser regression     |      396 |
-| **Combined TOTAL**     | **3717** |
+| Browser regression     |      397 |
+| **Combined TOTAL**     | **3718** |
 
 CLI count = most recent `./validate` (AT2) report — the main
 `tests/*.test.ts` suite plus the `tests/tz/*.test.ts` timezone
-suite (3313 main + 8 tz, including 5 skipped);
-the number grows as tests land in either glob. Browser count =
-the per-section table above. Update both numbers when either
-side changes.
+suite (3313 main + 8 tz). AT2 without
+`POSTGRES_URL` skips the seven `pg-*.test.ts` /
+`schema-lifecycle.test.ts` stubs; after AT4 those
+seven run. The number grows as tests land in either
+glob. Browser count = the per-section table above.
+Update both numbers when either side changes.
 
 Outcome categories used by run summaries (see `## Summary
 Format` at the bottom of this file):
@@ -489,8 +491,8 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = 3717, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
-where the six status counts sum to **Combined TOTAL** (3717).
+`PASS = 3718, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
+where the six status counts sum to **Combined TOTAL** (3718).
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
 regression.
 
@@ -504,12 +506,20 @@ global_lock: none
 depends: —
 
 The automated layer is the gate. Any AT failure aborts the
-run before A1's build. The single canonical invocation is
-`./validate`, which composes all three sub-steps.
+run before A1's build. AT1–AT3 stay the `./validate`
+gate. AT4 is additional, Postgres-gated, still
+before A1. The automated layer is four cases.
+Abort on any AT red.
 
 - [ ] **AT1** Run `npx tsc --noEmit -p web-app/app/tsconfig.json`. PASS: exits 0; no diagnostics emitted.
 - [ ] **AT2** Run `./test` (delegates to `TZ=UTC node --test --strip-types tests/*.test.ts` for the main suite, then `TZ=Pacific/Honolulu node --test --strip-types tests/tz/*.test.ts` for the timezone suite). PASS: exits 0; the runner's final summary reports `pass N` with `fail 0` for both suites.
 - [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, the root `.md` files except `TEST-PLAN.md`, and the root scripts `build`, `serve`, `test`, `test-postgres`, `validate`, `generate-schema-svg`, `generate-api-documentation`, `measure`, `postgres-wipe`, `postgres-lib`, and `postgres-seed`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
+- [ ] **AT4** With `POSTGRES_URL` set (A3
+  requires it), run `./test-postgres`. The
+  suite creates and drops its own
+  `fusion_test_*` schema, so it runs against
+  A3's database before A1. PASS: exits 0,
+  `fail 0`. `./validate` stays Postgres-free.
 
 ---
 
@@ -609,9 +619,9 @@ in order.
   the active organization (`PUT organizations/:id/members/:identity-id`);
   the person appears in the seat-derived roster.
 - [ ] **AA6** Repeat for all 10 humans: Sarah Chen, Mike
-  Thompson, Jessica Park, David Martinez, Emily Rodriguez
-  (pending), Alex Kim, Marcus Johnson, David Kim, Lisa
-  Wang, James Miller (archived). PASS: all 10 are written
+  Thompson, Jessica Park, David Martinez, Emily Rodriguez,
+  Alex Kim, Marcus Johnson, David Kim, Lisa
+  Wang, James Miller. PASS: all 10 are written
   as identity + PII + seat and appear in the seat-derived
   roster.
 - [ ] **AA7** Reload the Members page. PASS: the roster
@@ -632,7 +642,7 @@ in order.
 
 - [ ] **AA8** On Members, click the current user's row.
   PASS: navigates to `member-detail` for that human. Read
-  mode shows avatar, name, status badge, title •
+  mode shows avatar, name, title •
   department subtitle, Personal Information card (Name,
   Email, Phone, Title, Department, Bio),
   Working Styles card, and Strengths card.
@@ -2098,8 +2108,7 @@ depends: A
   Humans / AIs, with All pressed by default). The list
   table groups members under HUMANS first then AIs, each
   group showing avatar/name, title (humans) or the
-  model name (AIs), department (humans only), and a
-  status badge (humans only).
+  model name (AIs), and department (humans only).
 - [ ] **G12** Click the sidebar member chip (lower-left:
   name/avatar in the sidebar footer). PASS: navigates to
   the current human member's `member-detail` page
@@ -2255,7 +2264,7 @@ depends: A
 
 - [ ] **G19** From `members/index.html`, click any human
   member's row. PASS: navigates to `member-detail`. Read
-  mode shows avatar (initials), name + status badge,
+  mode shows avatar (initials), name,
   title • department subtitle, Personal Information card
   (Name, Email, Phone, Title, Department,
   Bio), Working Styles card (4-axis dimensions surfaced
@@ -2265,16 +2274,13 @@ depends: A
 - [ ] **G20** Click Edit. PASS: header swaps Edit for
   Cancel/Save; Personal Information card switches to
   inputs (Name text, Email email-input, Phone
-  text, Title text, Department select, State select with
-  HTML id `member-state` per the `MEMBER_STATES`
-  alphabet, Bio textarea); Strengths card switches to a
-  tag picker. Working Styles card stays read-only.
+  text, Title text, Department select, Bio textarea);
+  Strengths card switches to a tag picker. Working
+  Styles card stays read-only.
 - [ ] **G21** Edit Phone and Bio, toggle one strength on
-  and one off, change State from Active to Pending,
-  click Save. PASS: toast "Member saved" appears. Navigate
-  away (e.g. to Dashboard) and return. PASS: all edits
-  persist; the row on `members/index.html` reflects the new
-  state badge.
+  and one off, click Save. PASS: toast "Member saved"
+  appears. Navigate away (e.g. to Dashboard) and return.
+  PASS: all edits persist.
 - [ ] **G22** Click Edit, change a field, press `Escape`.
   PASS: edits discarded, view returns to read mode.
 - [ ] **G23** Click Edit, change a text field, press
@@ -2293,8 +2299,8 @@ depends: A
 - [ ] **G24a** Click Edit. PASS: identity fields become
   inputs (Name text, Model pulldown grouped by provider
   with the current model pre-selected, Description
-  textarea, State select `#ai-state` over MEMBER_STATES,
-  Skill Focus textarea); there is no Auth Token field.
+  textarea, Skill Focus textarea); there is no Auth
+  Token field.
   Change Description and Skill Focus, click Save. PASS:
   toast "AI member saved"; on reopen the edits persist.
 - [ ] **G24b** Click Edit again, pick a different Model

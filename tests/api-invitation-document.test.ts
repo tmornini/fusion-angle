@@ -309,7 +309,7 @@ async () => {
         db, INV_DOC_4, MS_DOC_4B, EV_ACC_4B,
         '2026-01-01T00:00:02.000000Z',
     );
-    assert.equal(second.status, 409);
+    assert.equal(second.status, 204);
     const documents = (await db.pairs.getAll()).filter(
         r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'members/'

@@ -454,12 +454,6 @@ async function postMockDataLoadIn(
         // bakes claim roles from those memberships.
     ]);
 
-    // System-member genesis rides the members/:id document
-    // trio above (states-address retirement Task 8) — no bare
-    // states/:id append. Every OTHER seeded member — human or
-    // AI — gets its own initial event folded into its create
-    // op's document trio below.
-
     const ideas = buildIdeas();
 
     // Each seeded idea's sole state event doubles as its
@@ -1052,30 +1046,20 @@ export async function postBootstrap(
     // no fixed seed timestamp here), so it is minted ONCE inside
     // formBootstrapMessagePair and reused verbatim by pass 2
     // below — never a second, independently timestamped body.
-    // Task 4: the bundle grows from one pair to three (operation,
-    // member document, detail document), the SAME triple every
-    // other seeded human-member create forms. Task 5: ALSO forms
-    // bootstrap's own membership pair and the system member's own
-    // members/:id document pair — the last two raw bootstrap
-    // writes, now closed the SAME way postMockDataLoad's own
-    // memberships/system-member sites are. Phase 10 Task 2: ALSO
-    // forms the current member's PII document pair, closing the
-    // intake decomposition's bootstrap side. Task 6: ALSO forms
-    // the system member's own identities/:id document pair and
-    // its own role-grant pair — bootstrap's last two raw writes,
-    // closed the SAME way postMockDataLoad's own system-identity/
-    // role-grant sites are. The credential pairs are NOT here —
-    // seedHumanCredentials forms those itself, below, since their
-    // content is unknown until PBKDF2 resolves. States-address
-    // retirement Task 8: system-member genesis folds into the
-    // members/:id document trio — systemStateEventAt is minted
-    // ONCE inside formBootstrapMessagePair and reused verbatim
-    // by pass 2 below, the SAME discipline currentMemberBody's
-    // own nowUtc() already follows. Phase 11 Task 8: ALSO forms
-    // bootstrap's own default-organization document pair —
-    // the mock-data
-    // seed's own per-member precedent, mirrored here for
-    // bootstrap's lone identity.
+    // Task 5: ALSO forms
+    // bootstrap's own membership pair — closed the SAME way
+    // postMockDataLoad's own membership sites are. Phase 10
+    // Task 2: ALSO forms the current member's PII document
+    // pair, closing the intake decomposition's bootstrap
+    // side. Task 6: ALSO forms the system member's own
+    // identities/:id document pair — closed the SAME way
+    // postMockDataLoad's own system-identity site is. The
+    // credential pairs are NOT here — seedHumanCredentials
+    // forms those itself, below, since their content is
+    // unknown until PBKDF2 resolves. Phase 11 Task 8: ALSO
+    // forms bootstrap's own default-organization document
+    // pair — the mock-data seed's own per-member precedent,
+    // mirrored here for bootstrap's lone identity.
     const {
         identityPair,
         seatPair,

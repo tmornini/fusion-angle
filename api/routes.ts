@@ -41,8 +41,6 @@ import type {
     WorkOrderEntity,
     WorkOrderFlowGraph,
     MemberEntity,
-    MemberKind,
-    MemberState,
     AttributeType,
     Constraint,
 } from './types.ts';
@@ -53,12 +51,8 @@ import {
 import { hashPassword } from
     '../shared/password-hash.ts';
 import {
-    validateAIMemberCreateBody,
-    validateAIMemberEditBody,
     validateAiAgentDocumentBody,
     assertFlowGraphWriteLaw,
-    validateHumanMemberCreateBody,
-    validateHumanMemberEditBody,
     validateFlowCreateBody,
     validateFlowDocumentBody,
     validateFlowWorkOrderEntity,
@@ -1722,85 +1716,13 @@ export async function postObjectiveDocumentOp(
     );
 }
 
-// The three pairs a live POST /ai-members or /human-members
-// create, or a live POST /ai-members/:id or /human-members/:id
-// edit, forms (Task 4, the migration's FIRST composed-EDIT
-// synthesis): the gate's own operation pair (the create's 204
-// at the bare family address, or the edit's 204 at the entity
-// address — both already pair-wired), the synthesized member
-// document pair (members/:id — the ONE shared roster row every
-// member kind writes through), and the synthesized detail
-// document pair (ai-members/:id or human-members/:id — the
-// kind-specific facet). All three share ONE requestAt (the
-// write's own origination) yet strictly-later RESPONSE `at`
-// stamps (appendMessagePair's nowUtc() is monotonic). members/:id
-// never hosts the operation pair (a wholly separate address), so
-// memberDocument is that address's first-ever pair on create and
-// its new head on every edit. detailDocument shares the
-// OPERATION pair's own address — the flows create-address-
-// collapse precedent (a bare create-POST's createBodyIdField
-// override and an edit-POST's path-derived uriId both land on
-// the SAME (uriCollection, uriId) as a live PUT there would) — so it
-// becomes THAT address's new head, appended after the operation
-// pair.
-//
-// identityDocument (Task 5) widens this SAME bundle for the
-// human CREATE route alone: the synthesized identities/:id
-// document pair, byte-indistinguishable from a live PUT there
-// ({kind:'person'}), appended LAST — after detailDocument. The
-// human EDIT route does not form it — a later {kind} head
-// would drop a folded person profile. The AI routes never
-// populate it (finding 10: postAiMemberCreationOp writes no
-// identities row — an AI member has no identity of its own),
-// so postAiMemberCreationOp/postAiMemberEditOp always receive
-// it undefined; the field stays on this ONE shared type
-// rather than forking a person-only sibling, since every
-// consuming op already honors it uniformly via the SAME
-// `!== undefined` guard the other two fields use.
-export interface MemberWritePairs {
-    readonly operation: MessagePair;
-    readonly memberDocument: MessagePair;
-    readonly detailDocument: MessagePair;
-    readonly identityDocument?: MessagePair;
-}
-
-// The shared BODY builders — the ONE-voice seam both the live
-// route-inline formation (the four routes below) and the seed's
-// invocation construction (api/mock-data/seed-message-pairs.ts)
-// consume — the objectiveDocumentBodyOf/objectiveRevisionBodyOf
-// precedent.
-
-// The wire body a live PUT members/:id would carry for this
-// SAME write: `type` plus the lifecycle trio. The member kind
-// is a server-supplied fact the caller pins; the trio is the
-// caller's own — initialState* mapped on create, the echoed
-// (or freshly minted) trio on edit/state-change. The ONE
-// builder all ai/human create/edit sites share.
-export function memberDocumentBodyOf(
-    type: MemberKind,
-    trio: {
-        readonly state: MemberState;
-        readonly stateAt: string;
-        readonly stateEventId: string;
-    },
-): Record<string, unknown> {
-    return {
-        type,
-        state: trio.state,
-        state_at: trio.stateAt,
-        state_event_id: trio.stateEventId,
-    };
-}
-
 // The wire body a synthesized PUT identities/:id carries:
 // `kind` alone. A live PUT may also fold a person profile;
 // this builder is the create/seed path, where a person
-// without a profile is valid. Same rationale as
-// memberDocumentBodyOf: the identity kind is a server-supplied
-// fact the caller pins, never read off a request body — the
-// ONE builder both the identity-create route and the human
-// create route share (the latter always passes 'person',
-// the sole kind a member's own identity ever takes).
+// without a profile is valid. The identity kind is a
+// server-supplied fact the caller pins, never read off a
+// request body — the ONE builder the identity-create route
+// and the seed share.
 export function identityDocumentBodyOf(
     kind: IdentityKind,
     profile?: {
@@ -1814,181 +1736,6 @@ export function identityDocumentBodyOf(
         return { kind };
     }
     return { kind, ...profile };
-}
-
-// The wire body a live PUT ai-members/:id would carry for this
-// SAME write: the create/edit body's detail sub-object VERBATIM
-// — already the exact {name, description, model, skill_focus}
-// shape validateAiMemberDocumentBody admits, so no stripping or
-// re-shaping is needed. Accepts either AIMemberCreateBody or
-// AIMemberEditBody (both carry a `.detail` field of this SAME
-// shape) — the loose Record<string, unknown> parameter is the
-// one seam serving both call sites, the SAME reason
-// objectiveRevisionBodyOf needs no per-field picking.
-export function aiMemberDetailBodyOf(
-    body: Record<string, unknown>,
-): Record<string, unknown> {
-    return body.detail as Record<string, unknown>;
-}
-
-// The wire body a synthesized PUT human-members/:id would carry
-// for this SAME write: the create/edit body's detail sub-object
-// VERBATIM — the aiMemberDetailBodyOf precedent, for the sibling
-// facet that carries no live PUT of its own (HUMAN_MEMBERS_
-// WIRING's own comment: the first registered family without
-// one).
-export function humanMemberDetailBodyOf(
-    body: Record<string, unknown>,
-): Record<string, unknown> {
-    return body.detail as Record<string, unknown>;
-}
-
-// AI-member creation: operation + member document + detail
-// document pairs and the initial state event commit as ONE
-// transaction. Phase Final Task 2: members + ai_members ROW
-// halves stripped — pure pair-plane write; states.postEvent
-// stays until the states-trace group. The initial event is
-// authored by the verified caller (actor), never the body.
-// Exported so the seed can drive AI-member creation through
-// the same gate the route uses (Decision 6's below-facade
-// carve-out). `pairs` is optional so the seed's below-facade
-// shape keeps compiling; the route always supplies the
-// bundle, since 'ai-members' is pair-wired and never
-// bearer-exempt. Create appends THREE pairs — operation,
-// member document, detail document — in that order, LAST.
-export async function postAiMemberCreationOp(
-    db: DbAdapter,
-    body: Record<string, unknown>,
-    _actor: Id,
-    pairs?: MemberWritePairs,
-): Promise<void> {
-    validateAIMemberCreateBody(body);
-    return db.transaction(
-        // Phase Final Task 2: members + ai_members ROW
-        // halves stripped; states stays until states-trace.
-        MESSAGE_TABLES,
-        async (view) => {
-            if (pairs !== undefined) {
-                await appendMessagePair(view, pairs.operation);
-                await appendMessagePair(
-                    view, pairs.memberDocument,
-                );
-                await appendMessagePair(
-                    view, pairs.detailDocument,
-                );
-            }
-        },
-    );
-}
-
-// Human-member creation: initial state event and the
-// document-pair bundle commit as ONE transaction. Phase Final
-// Task 2: members + human_members + identities ROW halves
-// stripped; states ROW half stripped (pair plane only). PII
-// enters via PUT identities/:id/pii. The initial event is
-// authored by the verified caller (actor), never the body.
-// Exported so the seed can drive human-member creation
-// through the same gate the route uses. `pairs` is optional
-// so the seed's below-facade shape keeps compiling; the route
-// always supplies the bundle. Create appends THREE pairs
-// (operation, member document, detail document), plus a
-// FOURTH identities/:id document IFF supplied.
-export async function postHumanMemberCreationOp(
-    db: DbAdapter,
-    body: Record<string, unknown>,
-    _actor: Id,
-    pairs?: MemberWritePairs,
-): Promise<void> {
-    validateHumanMemberCreateBody(body);
-    return db.transaction(
-        // Phase Final Task 2: members + human_members +
-        // identities ROW halves stripped; states stays.
-        MESSAGE_TABLES,
-        async (view) => {
-            if (pairs !== undefined) {
-                await appendMessagePair(view, pairs.operation);
-                await appendMessagePair(
-                    view, pairs.memberDocument,
-                );
-                await appendMessagePair(
-                    view, pairs.detailDocument,
-                );
-                if (pairs.identityDocument !== undefined) {
-                    await appendMessagePair(
-                        view, pairs.identityDocument,
-                    );
-                }
-            }
-        },
-    );
-}
-
-// AI-member edit: Phase Final Task 2 strips members +
-// ai_members ROW halves — pure pair-plane write (no states
-// interaction; genesis/archive ride PUT states/:id). Exported
-// so the route can call it after forming the bundle inline;
-// `pairs` is optional so a below-facade caller keeps
-// compiling. Edit appends THREE pairs, the SAME order as
-// create.
-export async function postAiMemberEditOp(
-    db: DbAdapter,
-    _id: Id,
-    body: Record<string, unknown>,
-    pairs?: MemberWritePairs,
-): Promise<void> {
-    validateAIMemberEditBody(body);
-    return db.transaction(
-        // Phase Final Task 2: members + ai_members ROW
-        // halves stripped.
-        MESSAGE_TABLES,
-        async (view) => {
-            if (pairs !== undefined) {
-                await appendMessagePair(view, pairs.operation);
-                await appendMessagePair(
-                    view, pairs.memberDocument,
-                );
-                await appendMessagePair(
-                    view, pairs.detailDocument,
-                );
-            }
-        },
-    );
-}
-
-// Human-member edit: Phase Final Task 2 strips members +
-// human_members + identities ROW halves — pure pair-plane
-// write. No states interaction. PII changes ONLY via PUT
-// identities/:id/pii. The route does not form an
-// identities/:id pair — rewriting {kind} would drop a
-// folded person profile.
-export async function postHumanMemberEditOp(
-    db: DbAdapter,
-    _id: Id,
-    body: Record<string, unknown>,
-    pairs?: MemberWritePairs,
-): Promise<void> {
-    validateHumanMemberEditBody(body);
-    return db.transaction(
-        // Phase Final Task 2: members + human_members +
-        // identities ROW halves stripped.
-        MESSAGE_TABLES,
-        async (view) => {
-            if (pairs !== undefined) {
-                await appendMessagePair(view, pairs.operation);
-                await appendMessagePair(
-                    view, pairs.memberDocument,
-                );
-                await appendMessagePair(
-                    view, pairs.detailDocument,
-                );
-                if (pairs.identityDocument !== undefined) {
-                    await appendMessagePair(
-                        view, pairs.identityDocument,
-                    );
-                }
-            }
-        },
-    );
 }
 
 // Identity creation: Phase Final Task 2 strips the
@@ -3483,12 +3230,6 @@ export const WRITE_RESPONSE_SPECS:
             });
         },
     },
-    // The generic document-form builder (api/document-family.ts)
-    // absorbs the hand-written successBody — see the ideas/:id
-    // entry above for the shared rationale. members/:id is the
-    // FIRST organizationNested:false family this builder serves
-    // — G1 emits memberDocumentEntityOf (id first, no
-    // organization_id, trio last as GET does).
     'identities/': { status: HTTP_NO_CONTENT },
     // G3: identities/:id emits identityDocumentEntityOf
     // (GET derive). Creation and the human-member half share
@@ -4139,8 +3880,8 @@ export const routes: Route[] = [
         // ROUTE_POLICY. Task 5: forms the identities/:id
         // document pair (+ the credential-document pair for a
         // service) INLINE PRE-TX, beside the gate's own operation
-        // pair — the human-members precedent above. See
-        // postIdentityCreationOp for the transaction shape.
+        // pair. See postIdentityCreationOp for the transaction
+        // shape.
         post: async (
             db, _p, body, actor, pair, organization,
         ) => {

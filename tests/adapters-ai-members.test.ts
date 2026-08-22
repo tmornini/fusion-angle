@@ -65,11 +65,6 @@ test(
         await putAIMember(
             ctx, agentId,
             { ...aiDraft('Renamed'), skill_focus: 'qa' },
-            {
-                state: 'active',
-                stateAt: '2026-01-01T00:00:00.000000Z',
-                stateEventId: generateIdentifier(),
-            },
         );
 
         const detail = await getAIMemberEntity(ctx, agentId);

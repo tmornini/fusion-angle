@@ -1,5 +1,4 @@
 import type {
-    MemberState,
     IdeaState,
     RecordState,
     ProjectState,
@@ -15,24 +14,6 @@ export interface StatusDisplay {
     label: string;
     className: string;
 }
-
-export const MEMBER_STATE_CONFIG: Record<
-    MemberState,
-    StatusDisplay
-> = {
-    active: {
-        label: 'Active',
-        className: 'badge-success',
-    },
-    pending: {
-        label: 'Pending',
-        className: 'badge-warning',
-    },
-    archived: {
-        label: 'Archived',
-        className: 'badge-default',
-    },
-};
 
 export const IDEA_STATE_CONFIG: Record<
     IdeaState,

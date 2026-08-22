@@ -12,8 +12,6 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import { ValidationError, nowUtc } from '../api/types.ts';
 import {
-    validateMemberDocumentBody,
-    validateMemberEntity,
     validateAiMemberDocumentBody,
     validateAIMemberEntity,
     validateHumanMemberDocumentBody,
@@ -102,99 +100,7 @@ function humanMemberFields() {
     };
 }
 
-// -- 1. validators: accept + the label mandate + missing keys --
-
-test('validateMemberDocumentBody accepts type plus the'
-+ ' lifecycle trio', () => {
-    const fields = memberFields();
-    const doc = validateMemberDocumentBody(fields);
-    assert.deepEqual(doc.entity, memberEntityFields());
-    assert.equal(doc.state, 'active');
-    assert.equal(doc.state_at, AT);
-    assert.equal(doc.state_event_id, fields.state_event_id);
-});
-
-test('validateMemberDocumentBody rejects a stray key with the'
-+ ' byte-identical message validateMemberEntity produces for'
-+ ' the SAME violation (the label mandate)', () => {
-    // Entity path only knows `type`; document path admits the
-    // trio. Both reject an unknown key under the SAME
-    // 'MemberEntity' label — compare the stray-key message
-    // shape, each on a body that is otherwise valid for its
-    // path.
-    let documentMessage: string | undefined;
-    let entityMessage: string | undefined;
-    try {
-        validateMemberDocumentBody({
-            ...memberFields(), bogus: 'nope',
-        });
-    } catch (e) {
-        assert.ok(e instanceof ValidationError);
-        documentMessage = (e as ValidationError).message;
-    }
-    try {
-        validateMemberEntity({
-            ...memberEntityFields(), bogus: 'nope',
-        });
-    } catch (e) {
-        assert.ok(e instanceof ValidationError);
-        entityMessage = (e as ValidationError).message;
-    }
-    assert.equal(
-        documentMessage,
-        'unexpected key "bogus" for MemberEntity',
-    );
-    assert.equal(documentMessage, entityMessage);
-});
-
-test('validateMemberDocumentBody rejects the missing type key,'
-+ ' byte-identical to validateMemberEntity on both paths',
-() => {
-    const body: Record<string, unknown> = {};
-    let documentMessage: string | undefined;
-    let entityMessage: string | undefined;
-    try {
-        validateMemberDocumentBody(body);
-    } catch (e) {
-        assert.ok(e instanceof ValidationError);
-        documentMessage = (e as ValidationError).message;
-    }
-    try {
-        validateMemberEntity(body);
-    } catch (e) {
-        assert.ok(e instanceof ValidationError);
-        entityMessage = (e as ValidationError).message;
-    }
-    assert.equal(
-        documentMessage,
-        'missing required key "type" for MemberEntity',
-    );
-    assert.equal(documentMessage, entityMessage);
-});
-
-test('validateMemberDocumentBody rejects a body missing the'
-+ ' lifecycle trio', () => {
-    assert.throws(
-        () => validateMemberDocumentBody(
-            memberEntityFields(),
-        ),
-        ValidationError,
-    );
-});
-
-test('validateMemberDocumentBody rejects a state outside'
-+ " ['active','pending','archived']", () => {
-    assert.throws(
-        () => validateMemberDocumentBody(
-            memberFields(
-                'human', 'deleted', AT, generateIdentifier(),
-            ),
-        ),
-        ValidationError,
-    );
-});
-
-// -- 1b. PUT members/:id wire trio ---------------------------
+// -- 1. PUT members/:id is retired ---------------------------
 
 test('PUT members/:id is retired 404', async () => {
     const db = memoryDbAdapter();

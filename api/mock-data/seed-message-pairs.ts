@@ -45,22 +45,19 @@
 // The human-members/ai-members create-time bundle grows from one
 // pair to three (Phase 8 Task 4, the objectives-family
 // precedent generalized to the roster): the existing operation
-// invocation stays, and the SAME per-pair-key discipline adds a
-// member-document invocation (the shared members/:id address
-// every member kind writes through) and a detail-document
-// invocation (ai-members/:id or human-members/:id) per seeded
+// invocation stays, and the SAME per-pair-key discipline adds
+// an identity-document invocation and a detail-document
+// invocation (identities/:id, then PII) per seeded
 // member. Bootstrap's lone 'XXZruirZyAOoRpNxaDnpSA' human-member create forms
-// this SAME triple via formBootstrapMessagePair. Memberships
+// this SAME identity path via formBootstrapMessagePair. Memberships
 // closed the LAST whole-slice seed deferral (Phase 8 Task 5):
 // each seeded membership row (16 — 11 human-member-organization
 // rows, `current` counted twice for its two-organization
 // membership, + 4 ai-member rows) now folds in its OWN document
-// pair, closed through postMembershipDocumentOp, and the system
-// member's own members/:id document forms ONE more pair, closed
-// through postMemberDocumentOp — the SAME per-pair-key
-// discipline every prior family already established. Bootstrap's
-// membership and system-member rows form this SAME pair of
-// invocations via formBootstrapMessagePair. NO whole-slice seed
+// pair, closed through postMembershipDocumentOp. Leftover
+// members/:id parent documents are gone from the seed.
+// Bootstrap's membership forms this SAME pair via
+// formBootstrapMessagePair. NO whole-slice seed
 // deferral remains; the work-order historical traces stay the
 // one NAMED direct-write carve-out above. The human-member
 // create-time bundle widens once more, human-only (Phase 10 Task
@@ -97,9 +94,8 @@
 // work-orders/:id/transition op-shaped pairs (op: true),
 // folding the 7 mockStateFieldValues into the parent
 // transition bodies' fieldValues — no bare states/:id or
-// states/:id/field-values/:fvid seed pairs remain. The system
-// member's genesis folds into its members/:id document trio
-// (states-address retirement Task 8).
+// states/:id/field-values/:fvid seed pairs remain. Leftover
+// members/:id genesis pairs are gone from the seed.
 //
 // Phase 12 Task 3 onboards a NEW family — organizations, the
 // THIRTEENTH and last unflipped in-scope one
@@ -675,33 +671,9 @@ export function organizationSeedBody(
     };
 }
 
-export function humanMemberSeedBody(
-    member: SeedHumanMember,
-): Record<string, unknown> {
-    const {
-        id: _id, state, name: _name,
-        email: _email, phone: _phone, bio: _bio,
-        strengths, team_dimensions,
-        ...detail
-    } = member;
-    return {
-        id: member.id,
-        detail: {
-            ...detail,
-            strengths,
-            team_dimensions,
-        },
-        initialState: state,
-        initialStateEventId: seedIdentifier(
-            `seed-member-${member.id}-${state}`,
-        ),
-        initialStateAt: MOCK_SEED_TIMESTAMP,
-    };
-}
-
 // The PII facet a human seed's separate PUT identities/:id/pii
 // carries (Phase 10 Task 2's intake decomposition) — the SAME
-// four fields humanMemberSeedBody once embedded in its own
+// four fields the human seed once embedded in its own
 // `pii` key, now split into their own document write. The ONE
 // construction both pass 1 (this file's invocation body) and
 // pass 2 (mock-data.ts's postIdentityPiiDocumentOp call) share.
@@ -1109,7 +1081,7 @@ export function aiMemberSeedBody(
 // shape every seeded membership row (human, AI, bootstrap)
 // shares. Hoisted so pass 1 (this file) and pass 2
 // (mock-data.ts) share the SAME construction — the
-// humanMemberSeedBody/aiMemberSeedBody precedent, generalized
+// aiMemberSeedBody precedent, generalized
 // to the roster membership entity. `type` is required: writers
 // pass it explicitly (no schema default).
 export function membershipSeedBody(
@@ -1266,7 +1238,7 @@ interface ObjectiveSeed {
 // folds onto the document pair via objectiveDocumentBodyOf
 // (states-address retirement); pair count is unchanged —
 // only body bytes grow. Genesis event id mirrors
-// humanMemberSeedBody's seed-member-${id}-${state} pattern.
+// aiMemberSeedBody's seed-member-${id}-active pattern.
 export function objectiveSeedBody(
     seed: ObjectiveSeed,
     organization: Id,
@@ -1318,15 +1290,6 @@ export const bootstrapMembershipId = 'bootstrap-membership-current';
 // bootstrapMembershipId precedent above, for the admin grant
 // Task 6 re-points onto postRoleGrantDocumentOp.
 export const bootstrapRoleGrantId = 'bootstrap-role-current-admin';
-
-// Bootstrap's own system-member genesis event id — the SAME
-// bootstrapMembershipId precedent above. States-address
-// retirement Task 8 folds this id onto the system member's
-// members/:id document trio (state_event_id); the bare
-// states/:id genesis pair is retired.
-export const bootstrapSystemStateEventId = 'bootstrap-system-active';
-
-
 
 // Every member's PRIMARY organization: 'XXZruirZyAOoRpNxaDnpSA' orders Stark
 // first (alongside org Two, in postMockDataLoadIn's own
@@ -2516,32 +2479,20 @@ export async function formSeedCredentialPairs(
 // alongside the bundle it was hashed from — postBootstrapIn
 // (pass 2) writes this SAME body, never a second nowUtc() call,
 // so no stored pair ever drifts from what was actually written.
-// Task 4: forms the SAME 1+1+1 bundle the mock-data seed's own
-// human-members loop forms per member — operation, member
-// document, detail document — sharing this ONE requestAt. Task
-// 5: ALSO forms bootstrap's own membership pair (its lone
-// 'XXZruirZyAOoRpNxaDnpSA' membership) and the system member's own
-// members/:id
-// document pair — the SAME two families postMockDataLoad's own
-// invocation list now covers, closing bootstrap's last two raw
-// writes (Path A, Phase 8 Task 5). Phase 10 Task 2: ALSO forms
-// the current member's PII document pair (identities/:id/pii),
-// the SAME facet-split every other seeded human now carries.
-// Phase 10 Task 5: the human-member bundle grows from 1+1+1 to
-// 1+1+1+1 — the current member's own identities/:id document
-// pair, the SAME fourth invocation the mock-data seed's own
-// human-members loop now forms per member. Phase 10 Task 6: ALSO
-// forms the system member's OWN identities/:id document pair and
-// its OWN role-grant pair — the SAME two mock-data-seed families
-// (system identity, admin role grant) closing bootstrap's last
-// two raw writes. The credential pairs stay OUTSIDE this
-// function — seedHumanCredentials' own local pass-1/pass-2 split
-// (formSeedCredentialPairs) forms them, for both seed paths.
-// States-address retirement Task 8: system-member genesis
-// folds into the members/:id document trio — systemStateEventAt
-// is minted ONCE here (bootstrap has no fixed seed timestamp)
-// and rides state_at on that pair; pass 2 reuses the SAME value
-// so the body never drifts from what the pair was hashed from.
+// Task 5: ALSO forms bootstrap's own membership pair (its lone
+// 'XXZruirZyAOoRpNxaDnpSA' membership). Phase 10 Task 2: ALSO
+// forms the current member's PII document pair
+// (identities/:id/pii), the SAME facet-split every other
+// seeded human now carries. Phase 10 Task 5: the
+// human-member bundle grows from 1+1+1 to 1+1+1+1 — the
+// current member's own identities/:id document pair, the
+// SAME fourth invocation the mock-data seed's own
+// human-members loop now forms per member. Phase 10 Task 6:
+// ALSO forms the system member's OWN identities/:id
+// document pair. The credential pairs stay OUTSIDE this
+// function — seedHumanCredentials' own local
+// pass-1/pass-2 split (formSeedCredentialPairs) forms
+// them, for both seed paths.
 export async function formBootstrapMessagePair(
     requestAt: string,
 ): Promise<{

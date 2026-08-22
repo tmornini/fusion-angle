@@ -720,7 +720,7 @@ test('a removed member who re-accepts gets a no-op — not a'
             eventId: EV_ACC_AGAIN,
             at: '2026-01-01T00:00:02.000000Z',
         }));
-    assert.equal(reaccept.status, 409);
+    assert.equal(reaccept.status, 204);
     const sarahInWayne = (await allMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ'
             && m.organization_id === 'BBjWJsjYIDkTRKIIPrzWRw');

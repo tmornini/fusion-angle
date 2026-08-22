@@ -70,12 +70,11 @@ function pairJsonOf(message: string): {
 // an operation/member-document/detail-document triple — the
 // objectives-family 1+1+1 precedent generalized to the roster —
 // 15 ops + 15 member documents + 15 detail documents) +
-// 17 membership-family pairs (Phase 8 Task 5: 16 membership
+// 16 membership-family pairs (Phase 8 Task 5: 16 membership
 // documents — 11 human-member-organization rows (`current`
 // counted twice for its two-organization membership) + 4
-// ai-member rows — plus the system member's own members/:id
-// document, closed through postMembershipDocumentOp /
-// postMemberDocumentOp, the LAST whole-slice seed deferral) +
+// ai-member rows, closed through postMembershipDocumentOp,
+// the LAST whole-slice seed deferral) +
 // 11 ideas +
 // 2 organizations documents (Phase 12 Task 3: the tenant root's
 // own family onboards — Stark Industries + Wayne Enterprises,

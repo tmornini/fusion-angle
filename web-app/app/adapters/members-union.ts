@@ -34,11 +34,7 @@ function getSystemMembers(): SystemMember[] {
             {
                 id: SYSTEM_MEMBER_ID,
                 type: 'system',
-                state: 'active',
-                state_at: '',
-                state_event_id: SYSTEM_MEMBER_ID,
             },
-            'active',
         ),
     ];
 }
@@ -83,10 +79,6 @@ export async function fillHumanMemberPii(
             {
                 id: member.idForLink(),
                 type: 'human',
-                state: member.stateValue(),
-                state_at: member.stateAtValue(),
-                state_event_id:
-                    member.stateEventIdValue(),
             },
             {
                 id: member.idForLink(),
@@ -98,12 +90,6 @@ export async function fillHumanMemberPii(
                 },
             },
             pii,
-            {
-                state: member.stateValue(),
-                stateAt: member.stateAtValue(),
-                stateEventId:
-                    member.stateEventIdValue(),
-            },
         );
     }));
 }

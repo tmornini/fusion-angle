@@ -20,13 +20,8 @@ import {
     iconCheckCircle2,
 } from '../icons.ts';
 import {
-    MEMBER_STATE_CONFIG,
-} from './state-display.ts';
-import {
     HumanMember,
-    type MemberState,
     type HumanMemberDraft,
-    isMemberState,
     MEMBER_WITHOUT_PII_NAME,
 } from '../adapters/index.ts';
 import {
@@ -62,7 +57,6 @@ export interface HumanMemberDraftFields {
     phone: string;
     title: string;
     department: string;
-    state: MemberState;
     bio: string;
     strengths: readonly string[];
 }
@@ -73,7 +67,6 @@ export type HumanMemberFieldKey =
     | 'phone'
     | 'title'
     | 'department'
-    | 'state'
     | 'bio';
 
 const FIELD_KEYS:
@@ -81,7 +74,7 @@ const FIELD_KEYS:
     new Set([
         'name', 'email',
         'phone', 'title', 'department',
-        'state', 'bio',
+        'bio',
     ]);
 
 export const isHumanMemberFieldKey =
@@ -97,7 +90,6 @@ export function humanMemberDraftFromMember(
         phone: pii.erased ? '' : pii.phone,
         title: member.titleLabel(),
         department: member.departmentLabel(),
-        state: member.stateValue(),
         bio: pii.erased ? '' : pii.bio,
         strengths: [...member.strengths()],
     };
@@ -169,7 +161,6 @@ function buildAvatar(
 function buildReadonlyTitleSection(
     member: HumanMember,
 ): SafeHtml {
-    const cfg = MEMBER_STATE_CONFIG[member.stateValue()];
     const pii = member.pii();
     const name = pii.erased
         ? MEMBER_WITHOUT_PII_NAME
@@ -186,13 +177,6 @@ function buildReadonlyTitleSection(
             }">
                 ${name}
             </h1>
-            <span class="${
-                'badge '
-                + cfg.className
-                + ' text-xs'
-            }">
-                ${cfg.label}
-            </span>
         </div>
         <p class="text-sm text-muted">
             ${member.titleLabel()}
@@ -205,7 +189,6 @@ function buildEditableTitleSection(
     member: HumanMember,
     draft: HumanMemberDraftFields,
 ): SafeHtml {
-    const cfg = MEMBER_STATE_CONFIG[member.stateValue()];
     const pii = member.pii();
     const name = pii.erased
         ? MEMBER_WITHOUT_PII_NAME
@@ -222,13 +205,6 @@ function buildEditableTitleSection(
             }">
                 ${name}
             </h1>
-            <span class="${
-                'badge '
-                + cfg.className
-                + ' text-xs'
-            }">
-                ${cfg.label}
-            </span>
         </div>
         <p class="text-sm text-muted">
             ${draft.title}
@@ -281,38 +257,6 @@ function buildEditableDepartment(
                             : '',
                     )}
                 >${d}</option>`)
-            }</select>
-        </div>`;
-}
-
-function buildEditableState(
-    value: MemberState,
-): SafeHtml {
-    const options = (
-        Object.keys(
-            MEMBER_STATE_CONFIG,
-        ) as MemberState[]
-    ).filter(isMemberState);
-    return html`
-        <div>
-            <label class="${
-                'label mb-2 block'
-            }" for="member-state"
-            >State</label>
-            <select class="input"
-                id="member-state"
-                data-member-field="state"
-            >${options.map(s =>
-                html`<option
-                    value="${s}"
-                    ${trusted(
-                        value === s
-                            ? 'selected'
-                            : '',
-                    )}
-                >${
-                    MEMBER_STATE_CONFIG[s].label
-                }</option>`)
             }</select>
         </div>`;
 }
@@ -473,11 +417,6 @@ function buildEditablePersonalInfoBody(
             ${buildEditableDepartment(
                 draft.department,
             )}
-        </div>
-        <div class="${
-            'grid grid-cols-2 gap-4 mb-4'
-        }">
-            ${buildEditableState(draft.state)}
         </div>
         ${buildEditableBio(draft.bio)}`;
 }

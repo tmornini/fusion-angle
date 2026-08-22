@@ -15,13 +15,8 @@ import {
     iconBrain,
 } from '../icons.ts';
 import {
-    MEMBER_STATE_CONFIG,
-} from './state-display.ts';
-import {
     AIMember,
-    isMemberState,
     type AIMemberDraft,
-    type MemberState,
 } from '../adapters/index.ts';
 import {
     findProviderModel,
@@ -34,20 +29,18 @@ export interface AIMemberDraftFields {
     description: string;
     skillFocus: string;
     model: string;
-    state: MemberState;
 }
 
 export type AIMemberFieldKey =
     | 'name'
     | 'description'
     | 'skillFocus'
-    | 'model'
-    | 'state';
+    | 'model';
 
 const FIELD_KEYS: ReadonlySet<AIMemberFieldKey> =
     new Set([
         'name', 'description', 'skillFocus',
-        'model', 'state',
+        'model',
     ]);
 
 export const isAIMemberFieldKey =
@@ -61,7 +54,6 @@ export function aiMemberDraftFromMember(
         description: member.descriptionText(),
         skillFocus: member.skillFocusText(),
         model: member.modelId(),
-        state: member.stateValue(),
     };
 }
 
@@ -123,7 +115,6 @@ function buildAvatar(): SafeHtml {
 function buildReadonlyTitleSection(
     member: AIMember,
 ): SafeHtml {
-    const cfg = MEMBER_STATE_CONFIG[member.stateValue()];
     return html`
         <div class="${
             'flex flex-wrap items-center'
@@ -140,13 +131,6 @@ function buildReadonlyTitleSection(
                 'badge badge-default'
                 + ' text-xs'
             }">AI</span>
-            <span class="${
-                'badge '
-                + cfg.className
-                + ' text-xs'
-            }">
-                ${cfg.label}
-            </span>
         </div>
         <p class="text-sm text-muted">
             ${findProviderModel(
@@ -159,7 +143,6 @@ function buildEditableTitleSection(
     member: AIMember,
     draft: AIMemberDraftFields,
 ): SafeHtml {
-    const cfg = MEMBER_STATE_CONFIG[member.stateValue()];
     return html`
         <div class="${
             'flex flex-wrap items-center'
@@ -176,13 +159,6 @@ function buildEditableTitleSection(
                 'badge badge-default'
                 + ' text-xs'
             }">AI</span>
-            <span class="${
-                'badge '
-                + cfg.className
-                + ' text-xs'
-            }">
-                ${cfg.label}
-            </span>
         </div>
         <p class="text-sm text-muted">
             ${findProviderModel(
@@ -243,38 +219,6 @@ function buildEditableDescription(
                 id="ai-description"
                 data-member-field="description"
             >${value}</textarea>
-        </div>`;
-}
-
-function buildEditableState(
-    value: MemberState,
-): SafeHtml {
-    const options = (
-        Object.keys(
-            MEMBER_STATE_CONFIG,
-        ) as MemberState[]
-    ).filter(isMemberState);
-    return html`
-        <div>
-            <label class="${
-                'label mb-2 block'
-            }" for="ai-state"
-            >State</label>
-            <select class="input"
-                id="ai-state"
-                data-member-field="state"
-            >${options.map(s =>
-                html`<option
-                    value="${s}"
-                    ${trusted(
-                        value === s
-                            ? 'selected'
-                            : '',
-                    )}
-                >${
-                    MEMBER_STATE_CONFIG[s].label
-                }</option>`)
-            }</select>
         </div>`;
 }
 
@@ -432,11 +376,6 @@ function buildEditableIdentityBody(
             ${buildEditableDescription(
                 draft.description,
             )}
-        </div>
-        <div class="${
-            'grid grid-cols-2 gap-4 mb-4'
-        }">
-            ${buildEditableState(draft.state)}
         </div>
         ${buildEditableSkillFocus(
             draft.skillFocus,

@@ -5,7 +5,6 @@ import {
     SYSTEM_MEMBER_ID,
     nowUtc,
     type Id,
-    type MemberState,
 } from '../api/types.ts';
 import {
     getModelsByProvider,
@@ -53,43 +52,19 @@ function aiDetail() {
     };
 }
 
-// Default trio for in-memory domain fixtures — mirrors the
-// seed's initialState* so a make*Member and a seed*Member
-// for the same id share event id / at when a test cares.
-function memberStateDetailOf(
-    id: string,
-    state: MemberState,
-) {
-    return {
-        state,
-        stateAt: '2026-01-01T00:00:00.000000Z',
-        stateEventId: `st-${id}`,
-    };
-}
-
 function memberParentEntity(
     id: string,
     type: 'human' | 'ai',
-    state: MemberState,
 ) {
-    const detail = memberStateDetailOf(id, state);
-    return {
-        id,
-        type,
-        state: detail.state,
-        state_at: detail.stateAt,
-        state_event_id: detail.stateEventId,
-    };
+    return { id, type };
 }
 
 export function makeHumanMember(
     id: string,
     name: string,
-    state: MemberState = 'active',
 ): HumanMember {
-    const stateDetail = memberStateDetailOf(id, state);
     return new HumanMember(
-        memberParentEntity(id, 'human', state),
+        memberParentEntity(id, 'human'),
         { id, ...humanDetail() },
         {
             erased: false,
@@ -98,20 +73,16 @@ export function makeHumanMember(
             phone: '',
             bio: '',
         },
-        stateDetail,
     );
 }
 
 export function makeAIMember(
     id: string,
     name: string,
-    state: MemberState = 'active',
 ): AIMember {
-    const stateDetail = memberStateDetailOf(id, state);
     return new AIMember(
-        memberParentEntity(id, 'ai', state),
+        memberParentEntity(id, 'ai'),
         { id, name, ...aiDetail() },
-        stateDetail,
     );
 }
 
@@ -212,7 +183,6 @@ export async function seedHumanMember(
     db: MemoryDbAdapter,
     id: string,
     name: string,
-    _state: MemberState = 'active',
 ): Promise<void> {
     const requestAt = nowUtc();
     const detail = humanDetail();
@@ -242,7 +212,6 @@ export async function seedAIMember(
     db: MemoryDbAdapter,
     id: string,
     name: string,
-    _state: MemberState = 'active',
 ): Promise<void> {
     const requestAt = nowUtc();
     const body = { name, ...aiDetail() };

@@ -14,7 +14,6 @@ import {
 } from '../api/types.ts';
 import {
     deriveWorkOrderLifecycle,
-    deriveMemberStates,
     deriveInvitationStates,
     workOrderLifecycleStatesFor,
     workOrderHistoryFor,
@@ -171,8 +170,7 @@ async function entityHistory(
 ): Promise<StateEntity[]> {
     const [
         ideaRows, projectRows, recordRows, flowRows,
-        objectiveRows, memberRows, workOrderRows,
-        invitationRows,
+        objectiveRows, workOrderRows, invitationRows,
     ] = await Promise.all([
         deriveIdeaStateHistory(db, organization, entityId),
         deriveProjectStateHistory(db, organization, entityId),
@@ -181,8 +179,6 @@ async function entityHistory(
         deriveObjectiveStateHistory(
             db, organization, entityId,
         ),
-        deriveMemberStates(db).then((rows) =>
-            rows.filter((r) => r.entity_id === entityId)),
         workOrderLifecycleStatesFor(
             db, organization, entityId,
         ),
@@ -191,7 +187,7 @@ async function entityHistory(
     ]);
     return [
         ...ideaRows, ...projectRows, ...recordRows,
-        ...flowRows, ...objectiveRows, ...memberRows,
+        ...flowRows, ...objectiveRows,
         ...workOrderRows, ...invitationRows,
     ].sort((a, b) =>
         a.at < b.at ? -1 : a.at > b.at ? 1

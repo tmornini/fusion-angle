@@ -45,7 +45,7 @@ async function seeded() {
     return { db, reveal };
 }
 
-const EXPECTED_SLICE_PAIRS = 350;
+const EXPECTED_SLICE_PAIRS = 380;
 
 test('slices stamp schema last and reveal 14',
 async () => {
@@ -314,6 +314,35 @@ async () => {
         assert.ok(
             states.has('approved'), section,
         );
+    }
+});
+
+test('garden ideas each have one submission',
+async () => {
+    const { db, reveal } = await seeded();
+    const requests = await db.pairs.getAll();
+    for (const section of GARDEN) {
+        const row = reveal.find(
+            (s) => s.section === section,
+        );
+        assert.ok(row, section);
+        const ideas = await deriveIdeas(
+            db, row.organizationId,
+        );
+        assert.equal(ideas.length, 4, section);
+        for (const idea of ideas) {
+            const submissions = deriveDocumentsAt(
+                requests,
+                canonicalUriCollection(
+                    row.organizationId,
+                    '/ideas/' + idea.id
+                        + '/submissions/',
+                ),
+            );
+            assert.equal(
+                submissions.size, 1, idea.id,
+            );
+        }
     }
 });
 

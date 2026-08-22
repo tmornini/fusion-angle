@@ -658,23 +658,17 @@ below) — it enters via a second, separate hop.
   (`['id', 'detail', 'initialState', 'initialStateEventId',
   'initialStateAt']` — `pii` retired from this key set).
 
-### 3.4 `POST /human-members/:id` — edit human member
+### 3.4 `POST /human-members/:id` — retired
 
-`postHumanMemberEditOp` (`api/routes.ts`) — the postAiMemberEditOp
-precedent above, for the sibling facet. PII no longer lands here
-either — it changes ONLY via the separate hop, fired IFF the
-client's dirty check finds it changed.
-
-- tx: `MESSAGE_TABLES`
-- actual: FOUR `appendMessagePair` calls — operation, member
-  document (echoed trio), detail document, identities document
-  (the last FOLDS by request_hash when byte-identical to create).
-- doctrinal: `post_op` + three document puts as
-  `post_edit_human_member`.
-- props: atomic; **no lifecycle move**; admin-only;
-  `validateHumanMemberEditBody` (`['detail', 'state',
-  'stateAt', 'stateEventId']` — trio echo required; `pii`
-  retired from this key set).
+Flat `/human-members/:id` is router 404.
+`postHumanMemberEditOp` and the edit-lifecycle trio
+(`state` / `stateAt` / `stateEventId`) are gone.
+Human edit is `PUT /identities/:id` (org profile)
+plus optional `PUT /identities/:id/pii` when the
+dirty check finds contact fields changed. There is
+no member-state change on this path. Seat GET
+returns `{ id, organization_id, identity_id, type,
+at }`.
 
 **The member write-pair bundle (Phase 8 Task 4), the
 records/objectives-bundle sibling (§3.20/§3.21) — and the
@@ -767,9 +761,8 @@ NAMED browser-visible change.** The three `pii{}` carriers close
 prospectively: the person branch of `POST /identities` (§3.5)
 narrows to `{id, kind}`; `POST /human-members` (§3.3) narrows to
 `{id, detail, initialState, initialStateEventId,
-initialStateAt}`; `POST /human-members/:id` (§3.4) narrows to
-`{detail, state, stateAt, stateEventId}` (detail + echoed
-lifecycle trio; `pii` retired only). PII enters ONLY through `PUT
+initialStateAt}`; `POST /human-members/:id` (§3.4) is
+retired (router 404). PII enters ONLY through `PUT
 identities/:id/pii` (§2.2, §5.1) — the client adapters
 (`web-app/app/adapters/identities.ts`'s `postIdentityCreation`,
 `web-app/app/adapters/members.ts`'s `postHumanMemberCreation` and
@@ -782,8 +775,7 @@ create/edit succeeds and BEFORE the change notification fires:
   then `PUT identities/:id/pii`, then `notify()` — this hop is
   UNCONDITIONAL, since a freshly created member always supplies
   its initial contact facet.
-- `putHumanMember`: `POST /human-members/:id` (detail +
-  echoed lifecycle trio),
+- `putHumanMember`: `PUT /identities/:id` (org profile),
   then `PUT identities/:id/pii` IFF the caller supplies a `pii`
   argument — the ONLY conditional hop of the three, decided by
   the dirty check below.
@@ -3355,16 +3347,18 @@ rows (`mockStateFieldValues`) each formed their OWN leaf pair
 at a nested field-values address — idParams
 `[stateEventId, fvId]` — authored by the PARENT event's OWN
 `member_id`, looked up off the SAME trace-event map, never a
-second, independently-picked author. The system member's OWN
-genesis event formed its OWN pair too (2 —
-`memberStateEvents` in the mock-data seed,
+second, independently-picked author. The system member's
+OWN genesis event was a member-state pair
+(`memberStateEvents` in the mock-data seed,
 `bootstrapSystemStateEventId` in `formBootstrapMessagePair`'s
-own SEPARATE mirror for bootstrap), organization `undefined`
-— the system member is the org-less global actor, the SAME
-choice its `members/:id` and `identities/:id` pairs already
-make. Post-retirement the work-order slice is transition ops
-and the member genesis rides the members document trio
-(§2.10 / §5.10).
+own SEPARATE mirror for bootstrap), organization
+`undefined` — the system member is the org-less global
+actor. That member-state genesis is RETIRED with
+`deriveMemberStates`; the system member remains a derived
+directory entry, not a lifecycle-trio document.
+Post-retirement the work-order slice is transition ops
+(§2.10 / §5.10). Seat GET is
+`{ id, organization_id, identity_id, type, at }`.
 
 **The body shape (a sharp edge the task brief named).** Every
 trace/genesis pair's body is `{entity_id, state, at}` —

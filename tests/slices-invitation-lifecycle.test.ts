@@ -29,15 +29,15 @@ async function seeded() {
     await postTestPlanSlices(
         db, { hashPassword: testHashPassword },
     );
-    const gOrg = sliceEntityId('g-org');
+    const gOrganization = sliceEntityId('g-org');
     const gAdmin = sliceEntityId('g-admin');
     const gCtx = createRequestContext(
         db,
         await claimToken({
             sub: gAdmin,
-            organization: gOrg,
-            organizations: [gOrg],
-            roles: ['admin:' + gOrg],
+            organization: gOrganization,
+            organizations: [gOrganization],
+            roles: ['admin:' + gOrganization],
         }),
     );
     const wayneCtx = createRequestContext(
@@ -53,7 +53,7 @@ async function seeded() {
         db,
         await reachableToken(UNSEATED, []),
     );
-    return { db, gOrg, gCtx, wayneCtx, unseatedCtx };
+    return { db, gOrganization, gCtx, wayneCtx, unseatedCtx };
 }
 
 test('G grant to unseated is sent', async () => {
@@ -69,7 +69,7 @@ test('G grant to unseated is sent', async () => {
 
 test('unseated sees one pending for g-org',
 async () => {
-    const { gCtx, gOrg, unseatedCtx } =
+    const { gCtx, gOrganization, unseatedCtx } =
         await seeded();
     await postInvitationGrant(
         gCtx, 'g-unseated@test-plan.example',
@@ -79,14 +79,14 @@ async () => {
     );
     assert.equal(pending.length, 1);
     assert.equal(
-        pending[0]!.organizationId, gOrg,
+        pending[0]!.organizationId, gOrganization,
     );
     assert.equal(pending[0]!.state, 'pending');
 });
 
 test('unseated accept seats g-org; re-accept no-op',
 async () => {
-    const { gCtx, gOrg, unseatedCtx } =
+    const { gCtx, gOrganization, unseatedCtx } =
         await seeded();
     await postInvitationGrant(
         gCtx, 'g-unseated@test-plan.example',
@@ -102,7 +102,7 @@ async () => {
         unseatedCtx,
     );
     assert.ok(
-        organizations.some((o) => o.id === gOrg),
+        organizations.some((o) => o.id === gOrganization),
     );
     await postInvitationAcceptance(
         unseatedCtx, inv.id,
@@ -111,7 +111,7 @@ async () => {
 
 test('seated grant already-member; Wayne decline no-op',
 async () => {
-    const { gCtx, gOrg, wayneCtx, unseatedCtx } =
+    const { gCtx, gOrganization, wayneCtx, unseatedCtx } =
         await seeded();
     await postInvitationGrant(
         gCtx, 'g-unseated@test-plan.example',
@@ -162,7 +162,7 @@ async () => {
         before.map((o) => o.id).sort(),
     );
     assert.ok(
-        after.some((o) => o.id === gOrg),
+        after.some((o) => o.id === gOrganization),
     );
     await postInvitationDecline(
         unseatedCtx, wayneInv.id,

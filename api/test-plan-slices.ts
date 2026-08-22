@@ -21,6 +21,7 @@ import {
     postFlowDocumentOp,
     postAiAgentDocumentOp,
     postIdeaDocumentOp,
+    postIdeaSubmissionOp,
     postProjectDocumentOp,
     postRecordWriteOp,
     postObjectiveCreationOp,
@@ -224,6 +225,10 @@ const SLICE_ENTITY_IDS: Readonly<
     'c-idea-in_review': 'vKAdUjWhMFoLiFqgJGTIdw',
     'c-idea-sent_back': 'AawuLlRyaxZUYzeKGgMuTw',
     'c-idea-approved': 'QKfYzzLSHCXWORvqimZeug',
+    'c-idea-active-submission': 'wOBTZC-Vn7GRNJ_y-VodQQ',
+    'c-idea-in_review-submission': 'H3OKnysC1p66onTEKNdJ-g',
+    'c-idea-sent_back-submission': 'zj2NKyW7yhGeXzyVM_lIvQ',
+    'c-idea-approved-submission': '6aBI2B6YGddcsus2Lfhvdg',
     'c-project-submitted': 'nQXpeKvMYDSbyVWBbZIJNA',
     'c-project-approved': 'skPDGElmJJdAdYITVWNHcg',
     'c-project-approved-2': 'JoYLAWWIeCVSzCQWRGLVww',
@@ -257,6 +262,10 @@ const SLICE_ENTITY_IDS: Readonly<
     'd-idea-in_review': 'FQqRjwrXVfCXFrzAdfGGJg',
     'd-idea-sent_back': 'QZyoamhqqrJUGyKlETHSCA',
     'd-idea-approved': 'rJVaWbzcBhcYPqEsFpKgOA',
+    'd-idea-active-submission': 'BuxlcYyfIkXk6ZWYmobvww',
+    'd-idea-in_review-submission': 'cK6oLgyjN_yX87fh4Odr3g',
+    'd-idea-sent_back-submission': '2-iBj4cvvJD0DIOeUkQyEw',
+    'd-idea-approved-submission': 'WpglrEJPmlj2NpO4Qh3pDw',
     'd-project-submitted': 'KNzsXuHnXjbJSXwAEguWfw',
     'd-project-approved': 'rakYaiIbLJAhvSfhfqQZlQ',
     'd-project-approved-2': 'SqNxjcBlrbfmmdPbxYimpg',
@@ -290,6 +299,10 @@ const SLICE_ENTITY_IDS: Readonly<
     'e-idea-in_review': 'AkXMklIskznhkiLYBrhLHQ',
     'e-idea-sent_back': 'CRAjZgtoKIofBruaUDWIlQ',
     'e-idea-approved': 'rWHlwkUZurkxHmbGweYvxw',
+    'e-idea-active-submission': 'efje7lqI_mFsIvtcfbUF9A',
+    'e-idea-in_review-submission': 'Ufigs3kAv6TuXQ3ip-cOFA',
+    'e-idea-sent_back-submission': '_Cq1L999C3A4bORu1TmSZg',
+    'e-idea-approved-submission': 'MpE2m39VpzVLSB2ITqEDuQ',
     'e-project-submitted': 'TmkurVxwWDUjGhgjvUnVIA',
     'e-project-approved': 'oGEBUpeSRIcOArpvKjAfkQ',
     'e-project-approved-2': 'uUicHreJEefHETeiuWJhcQ',
@@ -323,6 +336,10 @@ const SLICE_ENTITY_IDS: Readonly<
     'f-idea-in_review': 'PdJUyRINPYaYvLiqdRlarA',
     'f-idea-sent_back': 'YbajiKGBHvZgPSnlNPmgqw',
     'f-idea-approved': 'hlTnSoHDnweVMoHgVnlBaw',
+    'f-idea-active-submission': 'zeyns2rTOIERuvyYqi93rQ',
+    'f-idea-in_review-submission': 'ePnd30rnnRkhsrENpk-6gA',
+    'f-idea-sent_back-submission': 'T-c8PAUI0szvWznxShaMVA',
+    'f-idea-approved-submission': 'BzoTuEUck3mfl5PGmlysKQ',
     'f-project-submitted': 'ApUhMPPylRMGLnVIMunOnQ',
     'f-project-approved': 'rNCXPDcoUFRptifYcNWYpw',
     'f-project-approved-2': 'ktwdMAbuSHCcFmDKDwLrDw',
@@ -375,6 +392,9 @@ const SLICE_ENTITY_IDS: Readonly<
     'f2-edge-begin': 'nBTaOvBuUzsCMvOLOWqHrQ',
     'f2-edge-submit': 'FPkWtsaHGXddJVKpPDaRnA',
     'f2-edge-approve': 'SEjfnAIqgAgGukqncOiooA',
+    'f2-node-capture-attr-text': 'dL4p4z_U-8XNsYJp-H94xw',
+    'f2-node-capture-attr-select': 'o1yYjA882AU1i4TyB3a40A',
+    'f2-edge-capture-archive': 'KmbpGLs7xhDmJhwwqtEtKQ',
     'f2-project-flow': 'DwppKTRaYbyjeAvtIHwbrg',
     'f2-state-flow': 'wBQxSNLEXSWbbSOpOMflHQ',
     'f2-wo-capture': 'oLSsqdIHyZrxtdYMwsalPA',
@@ -389,6 +409,10 @@ const SLICE_ENTITY_IDS: Readonly<
     'fs-idea-in_review': 'TBHQuCnGLYRguJVHlcAPmA',
     'fs-idea-sent_back': 'PsrszcUKKUtEyMAATUjUOA',
     'fs-idea-approved': 'zYRdPmRsZkzkaYLCOlKTHg',
+    'fs-idea-active-submission': 'G1IWGr0vBKSfjzZ34rrLgw',
+    'fs-idea-in_review-submission': 'ui76pIWMxXFVgRRR2LQuDA',
+    'fs-idea-sent_back-submission': 'TrD8X5aq7BvciVgOV04BrA',
+    'fs-idea-approved-submission': 'FNGZGUXcTWh1bKEuvWD7LQ',
     'fs-project-submitted': 'KRJkyBIyhtgslHqtyzETyw',
     'fs-project-approved': 'LjaFVOqibIJXtkncrlJBlw',
     'fs-project-approved-2': 'KRRxaqYrtCItTpUHEzzZlQ',
@@ -521,6 +545,10 @@ const SLICE_ENTITY_IDS: Readonly<
     'k-idea-in_review': 'zcnjiUCwsijdNtgVJnyxeA',
     'k-idea-sent_back': 'OmrBjXExMatzWNNJLvfEHA',
     'k-idea-approved': 'LHxdLOPzEtHwPnNJTqRMGw',
+    'k-idea-active-submission': '-lkidKwbns-b8iacRpNWZg',
+    'k-idea-in_review-submission': 'EYMK3ZEX4Ue5YVvpcsXX4w',
+    'k-idea-sent_back-submission': 'kMEtwfnnQl3JLG4am2xoqA',
+    'k-idea-approved-submission': 'sRC-nTKUbtMbVqm8OR04JA',
     'k-project-submitted': 'PUsJipQoPeOXZYbvjrxRYA',
     'k-project-approved': 'aiuWSWEDxpQtocOmEhREig',
     'k-project-approved-2': 'MDaWSsFjBtixOMAkPTArgw',
@@ -554,6 +582,10 @@ const SLICE_ENTITY_IDS: Readonly<
     'r-idea-in_review': 'gVYYDerOlcyAdyoFJXUVaw',
     'r-idea-sent_back': 'YiAwBoWYyaiALGKTvokFIg',
     'r-idea-approved': 'UwVUFzneUubUBqqaXcwNow',
+    'r-idea-active-submission': 'fImPHFkwz6F4e6vVj4jbUg',
+    'r-idea-in_review-submission': '8LA31IvKumaVpLfxo4Y38w',
+    'r-idea-sent_back-submission': 'UhfWKRJtf9YNgTQ4z-jBQw',
+    'r-idea-approved-submission': 'UXH2RjJ6C9IYaD1S65Hckw',
     'r-project-submitted': 'NPZZkgeCsDHgQvSumUvwyQ',
     'r-project-approved': 'qUfonSjpXWhaiIdZHjxoaQ',
     'r-project-approved-2': 'ZUaYUFklHVnRnLMwteKiYQ',
@@ -1041,6 +1073,182 @@ async function formSvExtras(
     return { identities: [identity] };
 }
 
+type F2FlowWrites = {
+    readonly flowId: string;
+    readonly body: Record<string, unknown>;
+    readonly operation: MessagePair;
+    readonly document: MessagePair;
+};
+
+async function formF2Extras(
+    organizationId: string,
+    adminId: string,
+    requestAt: string,
+): Promise<F2FlowWrites> {
+    const token = 'f2';
+    const flowId = sliceEntityId(token + '-flow');
+    const createNodeId = sliceEntityId(
+        token + '-node-create',
+    );
+    const captureNodeId = sliceEntityId(
+        token + '-node-capture',
+    );
+    const archiveNodeId = sliceEntityId(
+        token + '-node-archive',
+    );
+    const graph: Record<string, unknown> = {
+        nodes: [
+            {
+                id: createNodeId,
+                name: 'Create',
+                positionX: 40,
+                positionY: 30,
+                isCreate: true,
+                isArchive: false,
+                taskInstructions: '',
+                memberIds: [],
+                attributes: [],
+            },
+            {
+                id: captureNodeId,
+                name: 'Capture',
+                positionX: 260,
+                positionY: 140,
+                isCreate: false,
+                isArchive: false,
+                taskInstructions: '',
+                memberIds: [adminId],
+                attributes: [
+                    {
+                        attribute_id: sliceEntityId(
+                            'f2-node-capture-attr-text',
+                        ),
+                        mode: 'editable',
+                        isRequired: true,
+                    },
+                    {
+                        attribute_id: sliceEntityId(
+                            'f2-node-capture-attr-select',
+                        ),
+                        mode: 'editable',
+                        isRequired: true,
+                    },
+                ],
+            },
+            {
+                id: archiveNodeId,
+                name: 'Archive',
+                positionX: 480,
+                positionY: 250,
+                isCreate: false,
+                isArchive: true,
+                taskInstructions: '',
+                memberIds: [],
+                attributes: [],
+            },
+        ],
+        edges: [
+            {
+                id: sliceEntityId(
+                    token + '-edge-begin',
+                ),
+                name: 'begin',
+                fromNodeId: createNodeId,
+                toNodeId: captureNodeId,
+            },
+            {
+                id: sliceEntityId(
+                    'f2-edge-capture-archive',
+                ),
+                name: 'archive',
+                fromNodeId: captureNodeId,
+                toNodeId: archiveNodeId,
+            },
+        ],
+    };
+    const relations = buildFlowGraphRelations(
+        [{ id: flowId, graph }],
+        requestAt,
+    );
+    const nodeIds = new Set(
+        relations.nodes.map((n) => n.id),
+    );
+    const flowBody: Record<string, unknown> = {
+        id: flowId,
+        flow: {
+            organization_id: organizationId,
+            name: 'WB Test Flow',
+            is_locked: false,
+            is_auto_layout: true,
+            is_auto_fit: true,
+            lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        },
+        projectFlowId: sliceEntityId(
+            token + '-project-flow',
+        ),
+        projectFlow: {
+            project_id: sliceEntityId(
+                token + '-project-approved',
+            ),
+            flow_id: flowId,
+            at: requestAt,
+        },
+        initialState: 'active',
+        initialStateEventId: sliceEntityId(
+            token + '-state-flow',
+        ),
+        initialStateAt: requestAt,
+        graphDelta: {
+            nodes: relations.nodes,
+            edges: relations.edges,
+            deletions: [],
+            memberEvents: relations.members.filter(
+                (row) => nodeIds.has(
+                    row.flow_node_id,
+                ),
+            ),
+            attributeEvents:
+                relations.attributes.filter(
+                    (row) => nodeIds.has(
+                        row.flow_node_id,
+                    ),
+                ),
+        },
+    };
+    const validated =
+        validateFlowCreateBody(flowBody);
+    const operation = await formSeedPair(
+        {
+            key: seedPairKey('flows', flowId),
+            routePattern:
+                'organizations/:id/flows/',
+            idParams: [organizationId],
+            op: true,
+            organization: organizationId,
+            requesterIdentityId: adminId,
+            body: flowBody,
+        },
+        requestAt,
+    );
+    const document = await formSeedPair(
+        {
+            key: seedPairKey('flows/:id', flowId),
+            routePattern:
+                'organizations/:id/flows/:id',
+            idParams: [organizationId, flowId],
+            organization: organizationId,
+            requesterIdentityId: adminId,
+            body: flowCreateDocumentBody(
+                validated,
+            ),
+        },
+        requestAt,
+    );
+    return {
+        flowId, body: flowBody, operation, document,
+    };
+}
+
 async function writeExtraIdentity(
     adapter: DbAdapter,
     formed: ExtraIdentity,
@@ -1146,6 +1354,10 @@ type GardenIdea = {
     readonly id: string;
     readonly body: Record<string, unknown>;
     readonly pair: MessagePair;
+    readonly submissionId: string;
+    readonly submissionBody:
+        Record<string, unknown>;
+    readonly submissionPair: MessagePair;
 };
 
 type GardenProject = {
@@ -1222,7 +1434,36 @@ async function formGarden(
             },
             requestAt,
         );
-        ideas.push({ id, body, pair });
+        const submissionId = sliceEntityId(
+            token + '-idea-' + state + '-submission',
+        );
+        const submissionBody = {
+            idea_id: id,
+            member_id: adminId,
+            at: requestAt,
+        };
+        const submissionPair = await formSeedPair(
+            {
+                key: seedPairKey(
+                    'idea-submissions', submissionId,
+                ),
+                routePattern:
+                    'organizations/:id/ideas/:id'
+                    + '/submissions/:sid',
+                idParams: [
+                    organizationId, id, submissionId,
+                ],
+                organization: organizationId,
+                requesterIdentityId: adminId,
+                body: submissionBody,
+            },
+            requestAt,
+        );
+        ideas.push({
+            id, body, pair,
+            submissionId, submissionBody,
+            submissionPair,
+        });
     }
     const projectTemplate = buildProjects()[0]!;
     const projects: GardenProject[] = [];
@@ -1741,6 +1982,14 @@ async function writeGarden(
                 idea.pair,
             ),
         ),
+        ...garden.ideas.map((idea) =>
+            postIdeaSubmissionOp(
+                adapter,
+                idea.submissionId,
+                idea.submissionBody,
+                idea.submissionPair,
+            ),
+        ),
         ...garden.projects.map((project) =>
             postProjectDocumentOp(
                 adapter,
@@ -1890,6 +2139,7 @@ export async function postTestPlanSlices(
     const formed: TenantAdminPairs[] = [];
     const extras: ExtraWrites[] = [];
     const gardens: GardenWrites[] = [];
+    const f2Flows: F2FlowWrites[] = [];
     for (const section of PARALLEL_SECTIONS) {
         if (section === 'AA') continue;
         const slice = await formTenantAdminPairs(
@@ -1966,6 +2216,17 @@ export async function postTestPlanSlices(
                     'sv-member@test-plan.example',
                 seatPassword: '',
             };
+        } else if (section === 'F2') {
+            const extra = await formF2Extras(
+                slice.organizationId,
+                slice.adminId,
+                requestAt,
+            );
+            f2Flows.push(extra);
+            reveal = {
+                ...reveal,
+                flowId: extra.flowId,
+            };
         }
         if ((GARDEN_SECTIONS as readonly string[])
             .includes(section)) {
@@ -2005,6 +2266,14 @@ export async function postTestPlanSlices(
                     writeGarden(view, garden),
                 ),
             );
+            for (const extra of f2Flows) {
+                await appendMessagePair(
+                    view, extra.operation,
+                );
+                await appendMessagePair(
+                    view, extra.document,
+                );
+            }
         },
     );
     const creds = await seedHumanCredentials(

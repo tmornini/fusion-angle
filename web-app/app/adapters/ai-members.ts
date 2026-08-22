@@ -2,24 +2,18 @@ import type {
     MemberId,
     MemberEntity,
     AIAgentEntity,
-    MemberState,
-    MemberStateDetail,
 } from '../../../api/types.ts';
 import { AIMember } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
-import {
-    memberStateDetailFromRow,
-} from './members.ts';
 
 export {
     AIMember,
 } from '../../../api/types.ts';
 export type {
     AIMemberEntity,
-    MemberStateDetail,
 } from '../../../api/types.ts';
 
 const aiMemberChanges =
@@ -35,21 +29,7 @@ export type AIMemberDraft =
     Omit<AIAgentEntity, 'id'>;
 
 function agentParent(id: MemberId): MemberEntity {
-    return {
-        id,
-        type: 'ai',
-        state: 'active',
-        state_at: '',
-        state_event_id: id,
-    };
-}
-
-function agentState(): MemberStateDetail {
-    return {
-        state: 'active',
-        stateAt: '',
-        stateEventId: '',
-    };
+    return { id, type: 'ai' };
 }
 
 export function buildAIMemberMap(
@@ -78,7 +58,6 @@ export function buildAIMemberMap(
                     skill_focus: detail.skill_focus,
                     model: detail.model,
                 },
-                memberStateDetailFromRow(parent),
             ),
         );
     }
@@ -101,7 +80,6 @@ export function buildAIAgentMap(
                     skill_focus: agent.skill_focus,
                     model: agent.model,
                 },
-                agentState(),
             ),
         );
     }
@@ -140,7 +118,6 @@ export async function getAIMember(
             skill_focus: agent.skill_focus,
             model: agent.model,
         },
-        agentState(),
     );
 }
 
@@ -157,7 +134,6 @@ export async function putAIMember(
     ctx: RequestContext,
     id: MemberId,
     input: AIMemberDraft,
-    _stateEcho: MemberStateDetail,
 ): Promise<void> {
     await ctx.PUT(`ai-agents/${id}`, {
         name: input.name,
@@ -179,13 +155,5 @@ export async function postAIMemberCreation(
         skill_focus: input.skill_focus,
         model: input.model,
     });
-    aiMemberChanges.notify();
-}
-
-export async function postAIMemberStateChange(
-    _ctx: RequestContext,
-    _id: MemberId,
-    _state: MemberState,
-): Promise<void> {
     aiMemberChanges.notify();
 }

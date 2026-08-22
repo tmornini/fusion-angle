@@ -43,7 +43,6 @@ test(
             ctx,
             'xdaJyuuPyHfffCGLhqDrOQ',
             buildHumanMember('Alice'),
-            'active',
         );
 
         // Phase Final Task 2: members/human_members ROW
@@ -79,10 +78,6 @@ test(
                 department: 'Product',
                 strengths: [],
                 team_dimensions: {},
-            }, {
-                state: 'active',
-                stateAt: '2026-01-01T00:00:00.000000Z',
-                stateEventId: 'st-w1',
             },
         );
         const after = await ctx.GET<{

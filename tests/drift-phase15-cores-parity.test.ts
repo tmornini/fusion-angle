@@ -16,7 +16,6 @@ import {
     stateEventVisibilityFor,
     resolveOwningOrganization,
     deriveWorkOrderLifecycle,
-    deriveMemberStates,
 } from '../api/derive-states.ts';
 import {
     appendLegacyTransition,
@@ -401,7 +400,6 @@ test('stateEventVisibilityFor: tier (i) event-append pairs'
     // surviving family lifecycle derives.
     const sampleRows = [
         ...await deriveWorkOrderLifecycle(db),
-        ...await deriveMemberStates(db),
         ...await deriveIdeaStateHistory(
             db, STARK_ORGANIZATION, buildIdeas()[0]!.id,
         ),

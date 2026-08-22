@@ -30,6 +30,8 @@ const {
 
 const {
     HumanMemberDetailPresenter,
+    HumanMemberDetailEditPresenter,
+    humanMemberDraftFromMember,
 } = await import(
     '../web-app/app/presenters/human-member-detail.ts'
 );
@@ -98,9 +100,6 @@ function makeHumanMember() {
         {
             id: 'hw_1',
             type: 'human',
-            state: 'active',
-            state_at: '2026-01-01T00:00:00.000000Z',
-            state_event_id: 'st-hw_1',
         },
         {
             id: 'hw_1',
@@ -119,11 +118,6 @@ function makeHumanMember() {
             phone: '555-0100',
             bio: 'Builds things.',
         },
-        {
-            state: 'active',
-            stateAt: '2026-01-01T00:00:00.000000Z',
-            stateEventId: 'st-hw_1',
-        },
     );
 }
 
@@ -132,9 +126,6 @@ function makeAIMember() {
         {
             id: 'ai_1',
             type: 'ai',
-            state: 'active',
-            state_at: '2026-01-01T00:00:00.000000Z',
-            state_event_id: 'st-ai_1',
         },
         {
             id: 'ai_1',
@@ -144,11 +135,6 @@ function makeAIMember() {
             skill_focus:
                 'Deep reasoning over long docs.',
             model: firstProviderModel().id,
-        },
-        {
-            state: 'active',
-            stateAt: '2026-01-01T00:00:00.000000Z',
-            stateEventId: 'st-ai_1',
         },
     );
 }
@@ -177,6 +163,8 @@ test(
         assert.equal(
             out.includes('Unknown'), false,
         );
+        // No lifecycle state badge.
+        assert.equal(out.includes('Active'), false);
     },
 );
 
@@ -202,15 +190,40 @@ test(
         assert.equal(
             out.includes('Auth Token'), false,
         );
-        // The lifecycle state badge surfaces.
-        assert.match(out, /Active/);
+        // No lifecycle state badge.
+        assert.equal(out.includes('Active'), false);
     },
 );
 
 test(
-    'AIMemberDetailEditPresenter renders a State'
-    + ' select hooked to the member-field, with the'
-    + ' current state pre-selected',
+    'HumanMemberDetailEditPresenter renders no'
+    + ' State select',
+    () => {
+        const rec = makeRecordingContainer();
+        const member = makeHumanMember();
+        new HumanMemberDetailEditPresenter(
+            member,
+            humanMemberDraftFromMember(member),
+        ).renderShell(rec.container);
+        const out = rec.allHtml();
+        assert.equal(
+            out.includes('id="member-state"'),
+            false,
+        );
+        assert.equal(
+            out.includes('data-member-field="state"'),
+            false,
+        );
+        assert.equal(out.includes('Active'), false);
+        assert.match(
+            out, /data-member-action="save"/,
+        );
+    },
+);
+
+test(
+    'AIMemberDetailEditPresenter renders no State'
+    + ' select',
     () => {
         const rec = makeRecordingContainer();
         const member = makeAIMember();
@@ -219,12 +232,18 @@ test(
             aiMemberDraftFromMember(member),
         ).renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, /id="ai-state"/);
-        assert.match(
-            out, /data-member-field="state"/,
+        assert.equal(
+            out.includes('id="ai-state"'), false,
         );
-        assert.match(
-            out, /value="active"[\s\S]*?selected/,
+        assert.equal(
+            out.includes('data-member-field="state"'),
+            false,
+        );
+        assert.equal(
+            /value="active"[\s\S]*?selected/.test(
+                out,
+            ),
+            false,
         );
         // Save affordance present in edit mode.
         assert.match(

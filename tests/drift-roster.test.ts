@@ -6,7 +6,6 @@ import { EntityNotFoundError } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type {
     Id,
-    MemberEntity,
     MembershipEntity,
     AIMemberEntity,
     HumanMemberEntity,
@@ -21,23 +20,16 @@ import {
     type DocumentFamilyWiring,
 } from '../api/document-family.ts';
 import {
-    validateMemberDocumentBody,
     validateMembershipDocumentBody,
     validateAiMemberDocumentBody,
     validateHumanMemberDocumentBody,
 } from '../api/validators.ts';
 import {
-    postMemberDocumentOp,
     postMembershipDocumentOp,
     postAiMemberDocumentOp,
     postHumanMemberDocumentOp,
     postIdentityCreationOp,
 } from '../api/routes.ts';
-import {
-    deriveMemberParents,
-    deriveMemberParent,
-    deriveMembers,
-} from '../api/derive-members.ts';
 import {
     deriveOrganizationMemberSeat,
     deriveOrganizationMemberSeats,
@@ -90,7 +82,7 @@ const HUMAN_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 // ai-members/human-members (the two kind-specific facets) —
 // plus invitations, whose grant/accept/decline/revoke side
 // channel this file also covers (deriveInvitations). Hand-
-// builds FOUR *_TEST_WIRING mirrors of routes.ts's private
+// builds THREE *_TEST_WIRING mirrors of routes.ts's private
 // wiring rows so generic-handler cases exercise the ACTUAL
 // documentCollectionGetHandler/documentGetHandler.
 //
@@ -103,9 +95,9 @@ const HUMAN_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 // deleted-filter is otherwise VACUOUS for
 // every roster family across this entire file (finding 15 as
 // corrected) — no shipped route ever posts a 'deleted' state for
-// a member/membership/ai_member/human_member id (MEMBER_STATES is
-// ['active', 'pending', 'archived'] — 'deleted' is not even in
-// the alphabet), so old-plane and derived-plane parity holds
+// a member/membership/ai_member/human_member id — 'deleted'
+// is not a member lifecycle value — so old-plane and
+// derived-plane parity holds
 // throughout every case below.
 
 const BASE = 'http://localhost';
@@ -138,24 +130,6 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 
 // -- test-side wiring mirrors (routes.ts's private rows, by ----
 // -- content — every family's wiring row is module-private) -----
-
-const MEMBERS_TEST_WIRING: DocumentFamilyWiring = {
-    family: 'members',
-    httpNest: 'organization',
-    lifecycle: 'trio',
-    notFoundTable: 'members',
-    validateDocument: validateMemberDocumentBody,
-    documentOp: postMemberDocumentOp,
-    // Mirror routes.ts memberDocumentEntityOf: stamp trio
-    // from lifecycle-current (required on trio path).
-    entityOf: (document, _organization, current) => ({
-        id: document.uriId,
-        type: document.body['type'],
-        state: current!.state,
-        state_at: current!.at,
-        state_event_id: current!.id,
-    }),
-};
 
 const MEMBERSHIPS_TEST_WIRING: DocumentFamilyWiring = {
     family: 'memberships',
@@ -207,14 +181,6 @@ const READER_ACTOR: Id = generateIdentifier();
 // bearing; requireOrganization (document-family.ts) merely
 // demands a defined value to dispatch through.
 const GLOBAL_PLANE_PLACEHOLDER: Id = STARK_ORGANIZATION;
-
-async function derivedMembersDirect(
-    db: DbAdapter, organization: Id,
-): Promise<MemberEntity[]> {
-    return documentCollectionGetHandler(MEMBERS_TEST_WIRING)(
-        db, [], READER_ACTOR, organization,
-    ) as Promise<MemberEntity[]>;
-}
 
 async function derivedMemberships(
     db: DbAdapter, organization: Id,
@@ -285,44 +251,6 @@ function decodeRequestMessage(message: string): {
 
 // -- shared live-write body builders -----------------------------
 
-function aiMemberCreateBody(
-    id: string,
-    name: string,
-    stateEventId: string,
-    stateAt: string,
-): Record<string, unknown> {
-    return {
-        id,
-        detail: {
-            name,
-            description: 'd',
-            skill_focus: 'sf',
-            model: 'nqNVXnBkUBLoKlenbyPIZQ',
-        },
-        initialState: 'active',
-        initialStateEventId: stateEventId,
-        initialStateAt: stateAt,
-    };
-}
-
-function aiMemberEditBody(
-    name: string,
-    stateEventId: string,
-    stateAt: string,
-): Record<string, unknown> {
-    return {
-        detail: {
-            name,
-            description: 'd2',
-            skill_focus: 'sf2',
-            model: 'nqNVXnBkUBLoKlenbyPIZQ',
-        },
-        state: 'active',
-        stateAt,
-        stateEventId,
-    };
-}
-
 function aiMemberDocumentBody(
     name: string,
 ): Record<string, unknown> {
@@ -331,47 +259,6 @@ function aiMemberDocumentBody(
         description: 'd3',
         skill_focus: 'sf3',
         model: 'nqNVXnBkUBLoKlenbyPIZQ',
-    };
-}
-
-// PII no longer rides the create body (Phase 10 Task 2's intake
-// decomposition) — `name` stays a parameter so callers keep one
-// literal call shape even though this builder no longer uses it.
-function humanMemberCreateBody(
-    id: string,
-    _name: string,
-    stateEventId: string,
-    stateAt: string,
-): Record<string, unknown> {
-    return {
-        id,
-        detail: {
-            title: 't', department: 'd',
-            strengths: [],
-            team_dimensions: {},
-        },
-        initialState: 'active',
-        initialStateEventId: stateEventId,
-        initialStateAt: stateAt,
-    };
-}
-
-// PII no longer rides the edit body (Phase 10 Task 2's intake
-// decomposition) — it changes ONLY via a separate PUT
-// identities/:id/pii, which this drift chain does not exercise.
-function humanMemberEditBody(
-    stateEventId: string,
-    stateAt: string,
-): Record<string, unknown> {
-    return {
-        detail: {
-            title: 't2', department: 'd2',
-            strengths: [],
-            team_dimensions: {},
-        },
-        state: 'active',
-        stateAt,
-        stateEventId,
     };
 }
 
@@ -960,7 +847,7 @@ async () => {
         EV_ROSTER_JESSICA_REACCEPT,
         '2026-06-01T00:00:08.000000Z',
     );
-    assert.equal(jessicaReaccept.status, 409);
+    assert.equal(jessicaReaccept.status, 204);
     assert.equal(
         0 /* states table retired */,
         statesBefore,

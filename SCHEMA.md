@@ -262,8 +262,8 @@ acting client on authorization_code redemption.
 Lifecycle vocabularies live on the **derive layer**, not a
 `states` table (retired at Phase Final Stage B). The
 conceptual alphabets remain in `api/types.ts`
-(`MEMBER_STATES`, `IDEA_STATES`, `PROJECT_STATES`, …) and
-are asserted by validators and derive cores.
+(`IDEA_STATES`, `PROJECT_STATES`, …) and are
+asserted by validators and derive cores.
 
 ### History read map (seven lifecycle + one value-history)
 
@@ -285,8 +285,9 @@ API.md §2.10 for full fence and wire detail.
    `entityOf` snapshots (domain `state`); empty →
    403 foreign / 404 absent
 6. `GET members/:id/versions` —
-   `deriveMemberStates` filter → `StateEntity[]`;
-   global miss → 404
+   RETIRED (router 404). `deriveMemberStates` is gone.
+   Seat GET is
+   `{ id, organization_id, identity_id, type, at }`
 7. `GET organizations/:id/work-orders/:id/history` —
    `workOrderHistoryFor` → WO history + inline
    `field_values`; empty → 403 / 404
@@ -296,7 +297,6 @@ API.md §2.10 for full fence and wire detail.
 
 Org-nested per-id empty → `missedReadError` (foreign
 403 / absent 404 via `resolveOwningOrganization`).
-Members are global (`EntityNotFoundError` → 404).
 Work-order `field_values` fold inline from transition
 pair bodies (`TransitionFieldValueEntity {id,
 attribute_id, value}`); claim/birth/release rows carry
@@ -307,11 +307,11 @@ uses `stateFieldValuesFrom` /
 
 **Head-state trio.** Ideas / projects / record-types /
 objectives GET rows keep domain `state` and do not
-embed `state_at` / `state_event_id`. Members GET
-rows still embed the lifecycle trio. Flows keep
-`StateEntity[]` on the versions list; work-orders
-stay `'stateless'`; instances carry full-state
-`values`.
+embed `state_at` / `state_event_id`. Member seats
+GET `{ id, organization_id, identity_id, type, at }`.
+Flows keep `StateEntity[]` on the versions list;
+work-orders stay `'stateless'`; instances carry
+full-state `values`.
 
 The bulk lifecycle collection, bare event-append
 address, per-entity current-state alias, nested
@@ -326,7 +326,6 @@ PUT is 405; values ride PATCH / DELETE tombstone.
 
 Domain notes (vocabulary, not storage):
 
-- **Members** — `'active' | 'pending' | 'archived'`
 - **Ideas** — `'active' | 'in_review' | 'approved' |
   'promoted' | 'sent_back' | 'archived' | 'deleted'`
 - **Projects** — the project alphabet in

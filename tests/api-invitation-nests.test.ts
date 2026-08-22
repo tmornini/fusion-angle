@@ -339,7 +339,7 @@ test('admin PUT accepted is 403', async () => {
     assert.equal(res.status, 403);
 });
 
-test('PUT from accepted is 409', async () => {
+test('PUT from accepted is a no-op', async () => {
     const db = await seedWorld();
     await grantWayne(db, 'sarah@x.com', 'hXEuekgeiwIxOSyjdOQYQg');
     const first = await handleRequest(db, req(
@@ -369,7 +369,7 @@ test('PUT from accepted is 409', async () => {
             at: '2026-01-01T00:00:02.000000Z',
         },
     ));
-    assert.equal(second.status, 409);
+    assert.equal(second.status, 204);
 });
 
 test('org-less invitee reaches identity nest',

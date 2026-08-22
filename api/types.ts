@@ -57,14 +57,6 @@ export interface NodeAttribute {
     isRequired: boolean;
 }
 
-export const MEMBER_STATES = [
-    'active',
-    'pending',
-    'archived',
-] as const;
-
-export type MemberState = typeof MEMBER_STATES[number];
-
 export const IDEA_STATES = [
     'active',
     'in_review',
@@ -261,21 +253,6 @@ export function assertIdeaState(
 ): IdeaState {
     return assertInAlphabet(
         IDEA_STATES, 'IdeaState', v, label,
-    );
-}
-
-export function isMemberState(
-    v: string,
-): v is MemberState {
-    return includes(MEMBER_STATES, v);
-}
-
-export function assertMemberState(
-    v: string,
-    label: string,
-): MemberState {
-    return assertInAlphabet(
-        MEMBER_STATES, 'MemberState', v, label,
     );
 }
 
@@ -678,15 +655,9 @@ export class Identity {
 // SYSTEM_MEMBER_NAME constant. Kind-specific detail lives in
 // human_members / ai_members keyed by the same id. A
 // 'system' member is a parent row with no detail row.
-// Lifecycle-current event trio is a GET stamp only — not the
-// head PUT body's fields. state ← event.state, state_at ←
-// event.at, state_event_id ← event.id.
 export interface MemberEntity {
     id: MemberId;
     type: MemberKind;
-    state: string;
-    state_at: string;
-    state_event_id: string;
 }
 
 // human_members detail row, keyed by the shared member id.
@@ -706,9 +677,6 @@ export class HumanMember {
     readonly #pii: MemberPii;
     readonly #title: string;
     readonly #department: string;
-    readonly #state: MemberState;
-    readonly #stateAt: string;
-    readonly #stateEventId: string;
     readonly #strengths: readonly string[];
     readonly #teamDimensions:
         Readonly<Record<string, number>>;
@@ -717,17 +685,12 @@ export class HumanMember {
         parent: MemberEntity,
         detail: HumanMemberEntity,
         pii: MemberPii,
-        state: MemberStateDetail,
     ) {
         this.#id = parent.id;
         this.#pii = pii;
         this.#title = detail.title;
         this.#department =
             detail.department;
-        this.#state = state.state;
-        this.#stateAt = state.stateAt;
-        this.#stateEventId =
-            state.stateEventId;
         this.#strengths =
             detail.strengths;
         this.#teamDimensions =
@@ -750,36 +713,12 @@ export class HumanMember {
         return this.#department;
     }
 
-    isActive(): boolean {
-        return this.#state === 'active';
-    }
-
-    isPending(): boolean {
-        return this.#state === 'pending';
-    }
-
-    isArchived(): boolean {
-        return this.#state === 'archived';
-    }
-
     department():
         | { present: true; label: string }
         | { present: false } {
         return this.#department !== ''
             ? { present: true, label: this.#department }
             : { present: false };
-    }
-
-    stateValue(): MemberState {
-        return this.#state;
-    }
-
-    stateAtValue(): string {
-        return this.#stateAt;
-    }
-
-    stateEventIdValue(): string {
-        return this.#stateEventId;
     }
 
     strengths(): readonly string[] {
@@ -837,14 +776,10 @@ export class AIMember {
     readonly #description: string;
     readonly #skillFocus: string;
     readonly #model: ModelId;
-    readonly #state: MemberState;
-    readonly #stateAt: string;
-    readonly #stateEventId: string;
 
     constructor(
         parent: MemberEntity,
         detail: AIMemberEntity,
-        state: MemberStateDetail,
     ) {
         this.#id = parent.id;
         this.#name = detail.name;
@@ -853,10 +788,6 @@ export class AIMember {
         this.#skillFocus =
             detail.skill_focus;
         this.#model = detail.model;
-        this.#state = state.state;
-        this.#stateAt = state.stateAt;
-        this.#stateEventId =
-            state.stateEventId;
     }
 
     idForLink(): string {
@@ -883,30 +814,6 @@ export class AIMember {
         return this.#model;
     }
 
-    isActive(): boolean {
-        return this.#state === 'active';
-    }
-
-    isPending(): boolean {
-        return this.#state === 'pending';
-    }
-
-    isArchived(): boolean {
-        return this.#state === 'archived';
-    }
-
-    stateValue(): MemberState {
-        return this.#state;
-    }
-
-    stateAtValue(): string {
-        return this.#stateAt;
-    }
-
-    stateEventIdValue(): string {
-        return this.#stateEventId;
-    }
-
     matchesSearch(term: string): boolean {
         const lowerTerm = term.toLowerCase();
         return (
@@ -924,20 +831,17 @@ export class AIMember {
 // platform itself as the author of seed-time state
 // events. Exactly one exists; it has a parent row
 // (type 'system') and no detail row, and no lifecycle
-// a user manages, so it carries only identity + state.
+// a user manages, so it carries only identity.
 export class SystemMember {
     readonly kind = 'system' as const;
     readonly #id: MemberId;
     readonly #name: string;
-    readonly #state: MemberState;
 
     constructor(
         parent: MemberEntity,
-        state: MemberState,
     ) {
         this.#id = parent.id;
         this.#name = SYSTEM_MEMBER_NAME;
-        this.#state = state;
     }
 
     idForLink(): string {
@@ -946,10 +850,6 @@ export class SystemMember {
 
     name(): string {
         return this.#name;
-    }
-
-    stateValue(): MemberState {
-        return this.#state;
     }
 
     matchesSearch(term: string): boolean {
@@ -1436,18 +1336,6 @@ export interface ProjectFlowEntity {
 // on the pair / etag / versions list.
 export interface IdeaStateDetail {
     readonly state: IdeaState;
-}
-
-// The lifecycle trio Decision 7 folds into the member
-// document: current state plus its creator-minted `at` and
-// the (transitional — retires with the states log) event id.
-// A bare MemberState alone no longer carries enough to
-// round-trip a document PUT, so every reader that feeds a
-// HumanMember / AIMember gains this shape.
-export interface MemberStateDetail {
-    readonly state: MemberState;
-    readonly stateAt: string;
-    readonly stateEventId: string;
 }
 
 // Domain lifecycle state for an objective. Ledger facts

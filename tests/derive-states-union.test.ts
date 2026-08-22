@@ -33,7 +33,6 @@ import {
 import {
     postMembershipDocumentOp,
     postMemberDocumentOp,
-    memberDocumentBodyOf,
 } from '../api/routes.ts';
 import { deriveMembers } from '../api/derive-members.ts';
 import {
@@ -127,11 +126,12 @@ async function leftoverMemberParent(
     db: MemoryDbAdapter,
     id: string,
 ): Promise<void> {
-    const body = memberDocumentBodyOf('human', {
+    const body = {
+        type: 'human',
         state: 'active',
-        stateAt: AT,
-        stateEventId: generateIdentifier(),
-    });
+        state_at: AT,
+        state_event_id: generateIdentifier(),
+    };
     const pair = await formWritePair({
         method: 'PUT',
         pathname: '/members/' + id,
@@ -906,7 +906,7 @@ test('deriveInvitationStates: a re-accept (idempotent resend)'
         },
     ));
     assert.equal(
-        secondAccept.status, 409, 're-accept is not pending',
+        secondAccept.status, 204, 're-accept is a no-op',
     );
 
     const rows = await deriveInvitationStates(db);
@@ -976,8 +976,8 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
         },
     ));
     assert.equal(
-        secondDecline.status, 409,
-        're-decline is not pending',
+        secondDecline.status, 204,
+        're-decline is a no-op',
     );
 
     const rows = await deriveInvitationStates(db);

@@ -3,8 +3,6 @@ import { strict as assert } from 'node:assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
-import { deriveMemberParents } from
-    '../api/derive-members.ts';
 import { deriveDocumentsAt } from
     '../api/derive-documents.ts';
 import {
@@ -55,7 +53,6 @@ import { deriveFlowWorkOrders } from
     '../api/derive-flow-work-orders.ts';
 import {
     deriveWorkOrderLifecycle,
-    deriveMemberStates,
     deriveInvitationStates,
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
@@ -73,8 +70,10 @@ import {
 } from '../api/mock-data/lead-to-close-flow.ts';
 import { l2cFlowId } from
     '../api/mock-data/lead-to-close-flow.ts';
-import type { WorkOrderEntity } from
-    '../api/types.ts';
+import {
+    SYSTEM_MEMBER_ID,
+    type WorkOrderEntity,
+} from '../api/types.ts';
 import { seededMockDb } from './mock-seed.ts';
 
 // Entity validators take Omit<T, 'id'> and reject an extra
@@ -126,7 +125,6 @@ async () => {
     const db = await seededDb();
     const rows = [
         ...await deriveWorkOrderLifecycle(db),
-        ...await deriveMemberStates(db),
         ...await deriveInvitationStates(db),
         ...await deriveIdeaStateHistory(
             db, STARK_ORGANIZATION, buildIdeas()[0]!.id,
@@ -354,7 +352,6 @@ async () => {
     const db = await seededDb();
     const rows = [
         ...await deriveWorkOrderLifecycle(db),
-        ...await deriveMemberStates(db),
     ];
     assert.ok(rows.length > 0, 'derived lifecycle empty');
     for (const row of rows) {
@@ -576,12 +573,6 @@ test(
                 new Set(rows.map(m => m.organization_id)),
             );
         }
-        const parents = await deriveMemberParents(db);
-        const systemMembers = new Set(
-            parents
-                .filter(m => m.type === 'system')
-                .map(m => m.id),
-        );
         const [agentRequests, agentResponses] =
             await Promise.all([
                 db.pairs.getAllWhere(
@@ -599,7 +590,7 @@ test(
             const woOrganization =
                 organizationByWo.get(s.entity_id);
             if (woOrganization === undefined) continue;
-            if (systemMembers.has(s.member_id)) continue;
+            if (s.member_id === SYSTEM_MEMBER_ID) continue;
             if (agentIds.has(s.member_id)) continue;
             const organizations =
                 organizationsByMember.get(s.member_id);
