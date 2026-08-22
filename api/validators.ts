@@ -2458,7 +2458,7 @@ export function validateActualScoreEntity(
 const MESSAGE_HASH = /^[0-9a-f]{64}$/;
 
 const HTTP_METHOD = /^[A-Z]+$/;
-const OPERATION_ID = /^[0-9A-Za-z]{22}$/;
+const OPERATION_ID = /^[A-Za-z0-9_-]{22}$/;
 
 const PAIR_BODY_KEYS: readonly string[] = [
     'uri_collection', 'uri_id',

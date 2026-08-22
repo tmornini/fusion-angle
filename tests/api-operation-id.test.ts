@@ -54,6 +54,24 @@ async () => {
     assert.equal(res.status, 400);
 });
 
+test('public PUT with dash/underscore Operation-ID'
++ ' is not 400',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const res = await handleRequest(
+        db,
+        apiRequest({
+            method: 'PUT',
+            path: '/organizations/1/ideas/i2',
+            token: DEV_TOKEN,
+            body: validIdea,
+            operationId: 'AAAAAAAAAAAAAAAAAAAA-B',
+        }),
+    );
+    assert.notEqual(res.status, 400);
+});
+
 test('GET without Operation-ID is not 400',
 async () => {
     const db = memoryDbAdapter();

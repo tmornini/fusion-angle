@@ -175,7 +175,7 @@ export function requireOperationId(
             { status: HTTP_BAD_REQUEST },
         );
     }
-    if (!/^[0-9A-Za-z]{22}$/.test(value)) {
+    if (!/^[A-Za-z0-9_-]{22}$/.test(value)) {
         return Response.json(
             {
                 error: 'Operation-ID must be a 22-'
@@ -203,7 +203,7 @@ function headerFieldsWithOperationId(
 export async function formWritePair(
     input: WritePairInput,
 ): Promise<MessagePair> {
-    if (!/^[0-9A-Za-z]{22}$/.test(input.operationId)) {
+    if (!/^[A-Za-z0-9_-]{22}$/.test(input.operationId)) {
         throw new Error(
             'operationId must be a 22-character id',
         );

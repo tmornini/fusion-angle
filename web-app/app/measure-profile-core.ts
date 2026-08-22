@@ -48,7 +48,7 @@ export function canonicalizeResource(
 
 // Crypto-safe base62 ids are length 22 (shared/).
 function isOpaqueIdSegment(seg: string): boolean {
-    return /^[A-Za-z0-9]{16,}$/.test(seg);
+    return /^[A-Za-z0-9_-]{22}$/.test(seg);
 }
 
 export function summarizeRequestHits(

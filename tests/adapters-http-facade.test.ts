@@ -12,7 +12,7 @@ import { UnauthorizedError } from
     '../api/http-errors.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 
-const OPERATION_ID = /^[0-9A-Za-z]{22}$/;
+const OPERATION_ID = /^[A-Za-z0-9_-]{22}$/;
 
 async function withMockFetch(
     handler: typeof fetch,

@@ -5,7 +5,7 @@ export const POSTGRES_PAIRS_TABLE =
     String.raw`CREATE TABLE IF NOT EXISTS pairs (
     id text COLLATE "C" PRIMARY KEY
         CONSTRAINT pairs_id_chk
-        CHECK (id ~ '^[0-9A-Za-z]{22}$'),
+        CHECK (id ~ '^[A-Za-z0-9_-]{22}$'),
     uri_collection text COLLATE "C" NOT NULL
         CONSTRAINT pairs_collection_chk
         CHECK (left(uri_collection, 1) = '/'
@@ -33,7 +33,7 @@ export const POSTGRES_PAIRS_TABLE =
     response bytea NOT NULL,
     operation_id text COLLATE "C" NOT NULL
         CONSTRAINT pairs_operation_chk
-        CHECK (operation_id ~ '^[0-9A-Za-z]{22}$')
+        CHECK (operation_id ~ '^[A-Za-z0-9_-]{22}$')
 );`;
 
 export const POSTGRES_SCHEMA_MARKER_TABLE =
