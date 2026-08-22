@@ -8,8 +8,7 @@ When the user says "run the test plan", the master
 session:
 
 1. Reads this document's `### Protocol` — required
-   context. Default is the section DAG below. The
-   Historical note is not scheduler law.
+   context. Default is the section DAG below.
 2. Executes **AT** as a fail-fast gate. Any AT
    failure aborts before A1.
 3. Executes A1–A5. Parallel A3 is
@@ -124,45 +123,16 @@ ID PASS|FAIL|BLOCKED|DEFERRED|DRIFT
 
 ### Scope
 
-This plan covers **UI behavior** — anything that requires a browser
-DOM, CSS, gestures, or visual rendering. Pure transitions,
-adapter behavior, and HTTP-style API routing are now covered by
-the **automated test suite** (`./validate` runs them; the suite
-also runs standalone via `./test`, which pins `TZ=UTC` on
-`tests/*.test.ts` then `TZ=Pacific/Honolulu` on
-`tests/tz/*.test.ts`).
-See `AGENTS.md` section `## Testing` for the inventory of
-automated test files and what each covers.
-
-This UI plan therefore focuses on what automated tests cannot
-verify: layout, gestures, navigation, drag-and-drop, dialog
-behavior, and end-to-end user flows through the rendered DOM.
-Section **SV** is the default origin (A3 **is** SV1):
-two cookie jars, two identities, one Postgres, a shared
-refresh cookie in the same jar, and the named
-stale-until-navigation residual (SV6–SV10).
-
-The fast suite (`./test` / `./validate`) now also covers:
-flow-edit business logic and the connection-validation rules
-(`tests/flow-operations.test.ts` — `performAddEdge` /
-`performAddNodeAtPosition` / `performDeleteSelected*` /
-`performAddAttributeRef` / `performRemoveAttributeRef` / `performUndo` /
-`performRedo`, including no-edge-to-a-start-node, none-from-an-
-end-node, no-duplicate-edge, start-node-single-outgoing, and the
-lock/noop/commit-error branches); the flow publish/readiness and query
-adapters (`tests/adapters-flow-publish.test.ts`,
-`tests/adapters-flow-queries.test.ts`); the workbox inbox
-aggregation (`tests/workbox-inbox.test.ts`); the mermaid round-trip
-(`tests/mermaid.test.ts`); the in-browser ZIP (`tests/zip-guards.test.ts`);
-every data adapter
-(`tests/adapters-*.test.ts`); navigation
-(`tests/navigation.test.ts`); mock-data validity
-(`tests/mock-data-valid.test.ts`); and the SafeHtml output of the
-presenters (`tests/presenter-*.test.ts`). So the manual cases in
-those areas can focus on the DOM/visual/gesture affordance rather
-than re-deriving the logic. Where a case below is the browser
-counterpart of one of those automated areas it carries an inline
-note pointing at the test file.
+UI behavior: DOM, CSS, gestures, visual
+rendering. Pure transitions, adapters, and
+HTTP routing live in `./test` / `./validate`.
+Section **SV** is the default origin (A3
+**is** SV1): two cookie jars, two identities,
+one Postgres. Leftover `≥ N` in a case body
+is doc debt, not protocol. Where a case is
+the browser counterpart of an automated area
+it carries an inline pointer at the test
+file.
 
 ### Protocol
 
@@ -208,7 +178,7 @@ DAG edges only:
 - `A` → every `parallel: yes` section
 - those → `global_lock: process` (K8, then J)
 
-No Phase-1 UI rebuild. Hunters do not create tenants
+No UI rebuild. Hunters do not create tenants
 and do not re-seed. Sign-out, org-switch, theme,
 sidebar, command palette, and SV two-jar stay inside
 the hunter's tenant and jar. Assertions inside a job
@@ -268,8 +238,8 @@ Master never re-dispatches a hunter to retry.
 - **`kill` syscall against the background HTTP server**: the
   Claude Code sandbox rejects `kill -TERM` and `kill -9`
   against PIDs of long-running background tasks started via
-  the Bash tool's `run_in_background: true` (EPERM). Phase 5
-  teardown's **J1** ("Stop `server.mjs`") cannot terminate
+  the Bash tool's `run_in_background: true` (EPERM).
+  Teardown's **J1** ("Stop `server.mjs`") cannot terminate
   the process from within the sandbox; mark J1 BLOCKED with
   the reason "sandbox EPERM on kill". The server is cleaned
   up at session end. Workaround: the user terminates manually
@@ -316,123 +286,6 @@ Master never re-dispatches a hunter to retry.
 
 Document order on one mock tenant. A3 **is** SV1.
 SV6–SV10 run before J as today.
-
-### Historical note (not the scheduler)
-
-The following described the 2026 shared-garden
-parallel run. They are facts about that recipe, not
-edges the master follows now.
-
-- Six-phase protocol: Phase 0 preflight, Phase 1 AA
-  UI rebuild from `--seed-bootstrap`, seven Phase 2
-  agents (B, CH, D, E, F, F2, G) on URI-family
-  ownership, Phase 3 I exclusive, Phase 4 K8,
-  Phase 5 J.
-- Entity mutation-domain table (Agent-B signup,
-  Agent-D ideas, Agent-E projects, Agent-F flows,
-  Agent-F2 work-orders + private flow, Agent-G
-  roster/invitations, Agent-CH read-only).
-- `≥ N` as the default assertion style because
-  siblings appended to one tenant.
-- Sign-out last inside Agent-B; I exclusive after
-  join; K split across G / E / CH / Phase 4; K7
-  waiting on Agent-G's K3 rename.
-- Cookie jar = Chrome `isolatedContext` (named
-  in the hunter contract). The 2026-08-22
-  parallel hunters shared one Chrome profile —
-  one cookie jar, one selected page. This MCP
-  has no isolated contexts.
-
-Still true, and already stated in Protocol:
-
-- Operator wipe replaces the shared database (why
-  K8 is `global_lock: process`). Seed never wipes.
-- MCP limitation list (gestures, `resize_window`,
-  file I/O, sandbox EPERM, tab-group volatility,
-  CSP-blocked `await`, list paint 5–14s,
-  first-click-focus).
-
-#### Six-phase parallel protocol
-
-> SUPERSEDED by the shared-origin recipe below — see
-> "Shared-origin parallel run — operational recipe."
-> Kept as the phase / agent map only. Phase 2 agents
-> share one Postgres message plane; the mutation-
-> domain table still applies.
-
-The shared-origin recipe named in the blockquote is
-also historical; the scheduler is now `### Protocol`.
-
-Agents execute the plan in six phases to fit within
-context and time budgets while keeping per-entity
-mutation domains disjoint:
-
-1. **Phase 0 — Preflight** (main): `./validate`,
-   `./build` to produce `fusion-angle-server-${SHA}.zip`,
-   unzip or `--no-zip` so `server.mjs` is on disk,
-   start `node server.mjs --seed-mock-data` (A3 /
-   SV1). Covers A1–A5.
-2. **Phase 1 — Data setup** (one agent, serial):
-   AA3–AA42 in tab 0. Rebuilds from a
-   bootstrap-only database, members (humans +
-   AIs), ideas, projects, one flow. Populates
-   the shared database that Phase 2 verifies.
-   A3 already mock-seeded; Phase 1 stops that
-   process and restarts with
-   `--seed-bootstrap`, then rebuilds through
-   the UI.
-3. **Phase 2 — Parallel verification** (7 agents
-   concurrent, each in its own `isolatedContext`, no
-   shared tabs):
-   - Agent-B — Entry pages (EXCLUDING Sidebar
-     Sign-out, which is identity-wide on the server —
-     deferred per "Parallel session & connection
-     isolation")
-   - Agent-CH — Dashboard + Reference (read-only)
-   - Agent-D — Ideas
-   - Agent-E — Projects
-   - Agent-F — Flows (includes hazard severity,
-     flow-publish gate)
-   - Agent-F2 — Workbox (includes Create-Work-Order
-     picker READY / NOT READY split) + Records
-     (section R) + Flow Statistics (FS1–FS9,
-     read-only)
-   - Agent-G — Admin (Members page, Member detail
-     (human + AI), Identities (list + detail +
-     providers + tokens), Organization,
-     Billing). The retired Teams / Roles / Crews /
-     Activity Feed pages have no cases.
-4. **Phase 3 — Cross-cutting** (one agent, alone):
-   I1–I30. Mutates global UI state (theme, sidebar,
-   command palette) — no concurrent agents.
-5. **Phase 4 — Operator re-seed** (one agent,
-   alone): K8. Replaces the shared database via
-   process restart (`--seed-bootstrap`, then
-   restore `--seed-mock-data`) — strictly last
-   before teardown.
-6. **Phase 5 — Teardown** (main): stop `server.mjs`
-   (J1), remove the build directory, verify the
-   distribution ZIP remains, aggregate results.
-
-#### Entity mutation domain scoping
-
-Phase 2 agents share one Postgres (`message_pairs`);
-every product write appends pairs only. There
-is no per-agent private ledger.
-Agents own **disjoint pair-address families**
-(URI prefixes), not entity tables — the historical
-table names below name the ADDRESS family each
-agent mutates:
-
-| Agent | Mutation domain (pair-address families) |
-|---|---|
-| Agent-B | creates one human member via signup (identity + PII + seat at `organizations/:id/members`) |
-| Agent-D | `ideas` document + idea lifecycle state pairs |
-| Agent-E | `projects` document message pairs (plus one flow via the project-detail New Flow path) |
-| Agent-F | `flows` document + undo operation message pairs (graphDelta/revivals live in the flow document body) |
-| Agent-F2 | `work-orders` (claim/transition ops), work-order state pairs, field-values folded into transitions, plus its own private flow document message pairs |
-| Agent-G | roster + identity spine + tenancy addresses: seats (`organizations/:id/members`), `ai-agents`, `invitations`, `organizations`, `identities` (+ credentials / pii / registration / token-revocations / default-organization). All GETs derive from the message ledger; invitation accept writes a seat; WP8 self-revoke still inside this agent |
-| Agent-CH | none (read-only) |
 
 ### Execution Order
 
@@ -2047,15 +1900,6 @@ tenant: required
 parallel: yes
 global_lock: none
 depends: A
-
-### Retired pages
-
-> The standalone Teams, People, Roles, Crews, Profile,
-> Company, and Activity Feed pages have all been removed.
-> Member administration (humans + AI members) now lives on
-> the unified Members page — see G11 onward. Cases G1–G8,
-> G15–G18, G27–G29 and the former K/L sections (Roles,
-> Crews) are no longer part of the plan.
 
 ### Organization (`organization/index.html`)
 

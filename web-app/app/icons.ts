@@ -1,7 +1,8 @@
 import { SafeHtml } from './safe-html.ts';
 
 // Icon pixel sizes, named by the same tier scale as the
-// --text-* typography tokens (DESIGN-SYSTEM.md § 9). The
+// --text-* typography tokens
+// (DESIGN-SYSTEM.md § Iconography). The
 // IconFn size argument is typed to these eleven values, so
 // off-vocabulary numeral fails the type-check at the call.
 export const ICON_SIZE = {

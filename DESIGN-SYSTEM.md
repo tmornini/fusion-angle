@@ -1,266 +1,75 @@
-# Fusion Angle Design System
+# Design System
 
-A production-ready design system for enterprise applications
-prioritizing clarity, trust, focus, and calm decision-making.
+This file is the visual contract. Token values live in
+`web-app/app/styles/tokens.css` and render at
+`/design-system/`. This file does not restate the scale
+tables.
 
-## 1. Brand & Visual Foundation
+## Tokens
 
-### Primary Colors
+Colors are `hsl(var(--token))` — never hex. Semantic
+roles:
 
-Reference values only — never inline the hex, use the
-matching token from `tokens.css`:
+- **primary** / **primary-foreground** — brand actions
+- **secondary** / **secondary-foreground** — quieter
+  chrome
+- **muted** / **muted-foreground** — de-emphasis
+- **accent** / **accent-foreground** — gold highlight
+- **destructive** / **destructive-foreground** — delete
+- **success**, **warning**, **error**, **info** — each
+  with `-soft`, `-border`, `-text` (and `-foreground`
+  where a solid fill carries type)
+- **danger** — solid escalation above warning
+- **background** / **foreground** / **card** /
+  **border** / **input** / **ring**
 
-- **Primary Blue**: `hsl(217 36% 46%)`
-- **Primary Yellow**: `hsl(48 98% 55%)`
+Theme HSL lives in `light-mode.css` and `dark-mode.css`.
 
-### Blue Scale
-| Token | HSL | Usage |
-|-------|-----|-------|
-| `blue-50` | `217 30% 97%` | Light backgrounds |
-| `blue-100` | `217 30% 94%` | Secondary backgrounds |
-| `blue-200` | `217 30% 88%` | Borders, dividers |
-| `blue-300` | `217 32% 75%` | Disabled states |
-| `blue-400` | `217 34% 60%` | Icons, accents |
-| `blue-500` | `217 36% 46%` | **Primary brand** |
-| `blue-600` | `217 38% 38%` | Hover states |
-| `blue-700` | `217 40% 30%` | Active states |
-| `blue-800` | `217 42% 22%` | Headlines |
-| `blue-900` | `217 45% 15%` | **Primary text** |
+## Variants
 
-### Yellow Scale
-| Token | HSL | Usage |
-|-------|-----|-------|
-| `yellow-50` | `48 80% 96%` | Light backgrounds |
-| `yellow-100` | `48 85% 90%` | Soft accents |
-| `yellow-200` | `48 90% 80%` | Soft fills |
-| `yellow-300` | `48 95% 65%` | Mid accents |
-| `yellow-400` | `48 98% 55%` | **Primary yellow** |
-| `yellow-500` | `45 95% 48%` | Hover / gradient end |
-| `yellow-600` | `40 90% 42%` | Active / pressed |
+`data-tone` / `data-level` on a base class. The TS enum
+and the CSS attribute selector share one source of
+truth. Tones: `primary`, `success`, `warning`, `error`,
+`info`, `muted`. Levels: `normal`, `warning`, `danger`.
+`toneFor*` returns tone; `levelFor*` returns level.
 
-`--accent` aliases `yellow-400`; `--accent-foreground`
-is `blue-900` (both in `tokens.css`).
+## Components
 
-### Neutral Grays (Blue-tinted)
-All grays are derived from blue tones for brand cohesion.
-**Never use pure black (#000)**.
+Buttons: `btn-primary`, `secondary`, `outline`, `ghost`,
+`destructive`, `success`, `accent`, `hero`,
+`outline-hero`, `outline-light`, `outline-error`,
+`.link`. Cards: `.card`, `.card-flat`. Badges:
+`.status-badge-success`, `.status-badge-warning`,
+`.status-badge-error`.
 
-| Token | HSL | Usage |
-|-------|-----|-------|
-| `gray-50` | `220 20% 98%` | App background (light) |
-| `gray-100` | `220 18% 96%` | Subtle surfaces |
-| `gray-200` | `218 16% 91%` | Borders, muted fills |
-| `gray-300` | `217 14% 82%` | Strong borders |
-| `gray-400` | `217 12% 65%` | Muted icons/text |
-| `gray-500` | `217 10% 50%` | Mid neutrals |
-| `gray-600` | `217 12% 40%` | Secondary text |
-| `gray-700` | `217 14% 30%` | Strong secondary |
-| `gray-800` | `217 16% 22%` | Dark surfaces |
-| `gray-900` | `217 20% 15%` | Darkest surfaces/text |
+**Dialog pattern.** Native `<dialog>` driven by `openDialog(id)`
+/ `closeDialog(id)` from `dialog.ts`. The element is
+`id="{id}-dialog"` with `class="dialog"` (and `aria-labelledby`
+to its title); `openDialog` calls `showModal()` — the platform
+supplies the top-layer focus trap, the `::backdrop`, and Escape
+(the `cancel` event) — and `closeDialog` calls `close()`. No
+backdrop div, no `hidden`/`aria-hidden`. Open and cancel
+controls carry `data-dialog-open="{id}"` /
+`data-dialog-cancel="{id}"`; each page routes its clicks through
+`handleDialogClick(target, e)` (from `dialog.ts`), which opens,
+closes, and light-dismisses by those attributes — one voice
+across every dialog. Submit/confirm stay page-specific (a
+`#{id}-submit` listener or a `data-*-action`).
 
-## 2. Typography System
+**Tab pattern.** Use `initTabs('[data-tab]', '.tab-panel',
+'active')` from `dialog.ts` — the third arg is the
+active-state class. Tab buttons use `data-tab="{name}"`
+attribute, panels use `id="tab-{name}"`.
 
-### Font Families
-- **Display**: IBM Plex Sans (headlines, titles)
-- **Body**: Inter (body text, UI elements)
-- **Mono**: IBM Plex Mono (code, data)
+When groups exist, use native `<optgroup label>` —
+introducing case: AI-member model picker
+`buildModelOptgroups`. Org switcher: sidebar footer
+`.org-switcher` only when ≥2 orgs; CSS in
+`components-organization-switcher.css`. Invitations
+bell: `.icon-badge-host` / `.icon-count-badge`;
+renders only when pending > 0.
 
-### Type Scale
-| Size | Value | Line Height | Usage |
-|------|-------|-------------|-------|
-| `2xs` | 11px | 16px | Metadata, timestamps |
-| `xs` | 12px | 18px | Labels, helper text |
-| `sm` | 14px | 20px | Body text (dense) |
-| `base` | 16px | 24px | Body text (default) |
-| `lg` | 18px | 28px | Card titles, subheadings |
-| `xl` | 20px | 30px | Section headers |
-| `2xl` | 24px | 32px | Page subtitles |
-| `3xl` | 30px | 36px | Page titles |
-| `4xl` | 36px | 40px | Hero headers |
-
-### Font Weights
-- `400` - Regular (body text)
-- `500` - Medium (labels, buttons)
-- `600` - Semibold (headings, emphasis)
-- `700` - Bold (primary headlines)
-
-## 3. Semantic Colors
-
-### Status Colors (WCAG AA Compliant)
-
-| Status | Background | Border | Text | Usage |
-|--------|------------|--------|------|-------|
-| Success | `success-soft` | `success-border` | `success-text` | Approved |
-| Warning | `warning-soft` | `warning-border` | `warning-text` | Pending  |
-| Danger | — | — | `danger` | Hazard, not-ready |
-| Error | `error-soft` | `error-border` | `error-text` | Rejected, failed |
-| Info | `info-soft` | `info-border` | `info-text` | Informational |
-
-`danger` is a solid accent only (no soft/border/text
-trio). Escalation above warning for flow hazard chrome
-(`.flow-node-danger`, `.flow-stats-node-danger`) and
-workbox `.not-ready-icon`. Theme values: light
-`0 80% 45%`, dark `0 75% 60%`. See also
-`[data-level="danger"]` below.
-
-### Contrast Ratios
-
-Measured from the shipped light-mode tokens (WCAG 2.x
-relative luminance); every pair clears the 4.5:1 AA floor.
-
-- Primary text on white: **15.91:1** ✓
-- Muted text on white: **6.06:1** ✓
-- Button text on primary: **5.35:1** ✓
-- Success button text on `success`: **5.88:1**
-  (hover **4.62:1**) ✓
-- Status text on soft bg: **4.87:1+** (success 4.87,
-  warning 5.32, error 6.19, info 8.93) ✓
-
-### Variants via `[data-tone]` and `[data-level]`
-
-Components apply semantic variants through `data-*` attributes
-on a base class rather than distinct class names. Presenters
-emit the attribute value; attribute selectors in
-`components-*.css` and some `pages-*.css` files bind it to
-the matching token set.
-Helpers such as `toneForScore()` / `levelForUsage()` return
-tone and level strings aligned by convention with the CSS
-selectors — not a shared TypeScript enum or generated SSOT.
-
-```html
-<div class="icon-box" data-tone="success">…</div>
-<div class="progress-bar" data-level="warning"
-     style="--progress-fill:60%">…</div>
-```
-
-**`[data-tone]` values**: `primary`, `success`, `warning`,
-`error`, `info`, `muted`.
-Applied to: `.pill`, `.icon-box`, `.icon-box-lg`,
-`.legend-dot`, `.btn-outline`, `.gauge-card`, `.ds-soft-btn`,
-`.ds-soft-row`, `.spark-tip-change`,
-`.score-history-table td` (score cells, via `toneForScore`),
-`.work-order-conflict`, and `.record-instance-conflict`.
-Not every class binds every tone — e.g. `.pill` is only
-`success|warning|error`; conflict classes bind `warning`
-only; `.icon-box` / `.icon-box-lg` take the full set.
-
-**`[data-level]` values**: `normal`, `warning`, `danger`.
-Applied to: `.progress-bar` fill regions.
-
-Helper naming: `toneFor*(status)` returns a `[data-tone]`
-value, `levelFor*(value)` returns a `[data-level]` value.
-Replaces the older `styleFor*` pattern that returned
-inline-style strings.
-
-## 4. Spacing System (8pt Grid)
-
-| Token | Value | Pixels |
-|-------|-------|--------|
-| `space-1` | 0.25rem | 4px |
-| `space-2` | 0.5rem | 8px |
-| `space-3` | 0.75rem | 12px |
-| `space-4` | 1rem | 16px |
-| `space-5` | 1.25rem | 20px |
-| `space-6` | 1.5rem | 24px |
-| `space-8` | 2rem | 32px |
-| `space-12` | 3rem | 48px |
-| `space-16` | 4rem | 64px |
-
-### Usage Guidelines
-- **Component padding**: `space-3` to `space-6`
-- **Section margins**: `space-6` to `space-12`
-- **Page padding**: `space-4` (mobile) to `space-8` (desktop)
-- **Card gaps**: `space-4` to `space-6`
-
-## 5. Component Guidelines
-
-### Buttons
-
-#### Variants
-| Variant | Usage | Example |
-|---------|-------|---------|
-| `primary` | Primary actions (`btn-primary`) | "Create Project" |
-| `secondary` | Secondary actions | "Cancel", "Back" |
-| `outline` | Tertiary actions | "View Details" |
-| `ghost` | Minimal UI, icons | Icon buttons |
-| `destructive` | Dangerous actions | "Delete" |
-| `success` | Positive actions | "Approve" |
-| `accent` | Gradient accent (`btn-accent`) | Landing CTA |
-| `hero` | Gradient hero (`btn-hero`) | Ideas/records CTA |
-| `outline-hero` | Hero outline (`btn-outline-hero`) | Landing secondary |
-| `outline-light` | Light outline (`btn-outline-light`) | On dark chrome |
-| `outline-error` | Error outline (`btn-outline-error`) | Destructive alt |
-| `link` | Inline link button (`.link`) | Text navigation |
-
-#### Sizes
-| Size | Height | Usage |
-|------|--------|-------|
-| `xs` | 28px | Dense tables, inline |
-| `sm` | 32px | Secondary, compact |
-| `default` | 40px | Standard |
-| `lg` | 44px | Primary CTAs |
-| `xl` | 48px | Hero sections |
-
-### Cards
-
-```html
-<!-- Standard card -->
-<div class="card p-6">
-  Content
-</div>
-
-<!-- Flat card (no hover effect) -->
-<div class="card-flat p-4">
-  Content
-</div>
-```
-
-### Status Badges
-
-```html
-<span class="status-badge-success">Approved</span>
-<span class="status-badge-warning">Pending</span>
-<span class="status-badge-error">Rejected</span>
-```
-
-### Pending-invitations indicator
-
-The top-bar bell with a count badge, signalling that the
-caller has invitations awaiting a response. Styled in
-`components-badges.css`:
-
-- `.icon-badge-host` — a `position: relative` anchor placed
-  on the icon button so the badge can be positioned against
-  it.
-- `.icon-count-badge` — a small pill at the button's
-  top-right corner: `background: hsl(var(--primary))`,
-  `color: hsl(var(--primary-foreground))`, and a 2px
-  `hsl(var(--card))` border so it reads cleanly over the
-  button. Carries the pending count.
-
-```html
-<button class="btn-ghost icon-badge-host">
-  <!-- bell SVG -->
-  <span class="icon-count-badge">3</span>
-</button>
-```
-
-The bell renders **only** when the caller has one or more
-pending invitations; the badge shows that count. There is no
-empty bell — the affordance is honest, present exactly when
-there is something to act on.
-
-### Command Palette
-
-Cmd+K (or Ctrl+K) overlay for quick navigation and search.
-Implemented in `web-app/app/command-palette.ts`.
-
-- Full keyboard navigation (arrow keys, Enter to select, Escape to close)
-- Searches across pages, ideas, projects, and members
-- Renders categorized results with icons
-- Focuses the search input on open; restores focus on close
-
-### Heat ramp (flow-stats)
+## Heat ramp
 
 A fixed-scale 4-stop ramp used by `flows/stats.html` to visualize a
 node's share of trailing-90-day flow time. Stop positions are
@@ -295,432 +104,88 @@ information channel: every node carries its avg-sojourn duration on
 its face, and the hover card carries the exact percentage. The
 gradient is decoration over data; the data path is colorblind-safe.
 
-### Flow Designer
-
-SVG workflow canvas in `web-app/app/flow-graph.ts`
-with interactions in `flow-interactions.ts` and
-presenter in `presenters/flow-designer.ts`.
-
-**Canvas**: Dot grid pattern, 24px cell size, on
-`hsl(var(--background))`.
-
-**Nodes**: 160×64 px rounded rectangles, 10 px corner
-radius. Three types, all rendered with the unified
-`flow-node` class but stroked per type: Regular uses
-`hsl(var(--primary))`, Create `hsl(var(--success))`, and
-Archive `hsl(var(--error))`:
-
-| Type    | Port                                    | Draggable |
-|---------|-----------------------------------------|-----------|
-| Create  | When unconnected                        | Yes       |
-| Archive | When unconnected                        | Yes       |
-| Regular | Default right-center; else max free gap | Yes       |
-
-A Create or Archive node shows a port only while it has no
-connections (`canShowPort`); a connected special node hides it.
-
-**Edges**: Cubic bezier curves between node
-perimeters, rendered with the unified `flow-edge` class.
-
-| Type    | Dash    |
-|---------|---------|
-| Forward | Solid   |
-| Cycle   | Dashed  |
-
-Forward edges stroke `hsl(var(--primary))`; cycle edges
-add a warning-color stroke and CSS dashes. Each edge
-references a pre-colored arrowhead marker chosen by type:
-`#flow-arrow` (primary fill) or `#flow-arrow-warn` (warning
-fill), so each head matches its own line.
-
-Edge classification at render time uses DFS
-back-edge detection in `findCycleEdgeIds`
-(`flow-cycle-edges.ts`): during a depth-first
-traversal from the start node, any edge whose target
-is currently on the DFS stack is a back-edge and
-renders as a cycle. During a shift-drag to create a
-new edge, the separate `wouldBeCycle` helper uses
-reachability (`isReachable`) to preview whether the
-prospective edge would close a loop.
-
-Labels render at the bezier midpoint in a pill with
-`--color-card-bg` background. Bidirectional pairs
-are separated with a perpendicular offset.
-
-**Selection**: `--accent` gold glow filter on the
-selected node, and the same glow filter on the selected
-edge (edge stroke stays at the base 2 px).
-
-**Locked**: When a flow is locked, all node rectangles,
-edge paths, and edge-label backgrounds re-stroke in
-`hsl(var(--accent-text))` (theme-adapted gold). The dot
-grid renders in its default unlocked colors. The unified
-primary stroke is restored when unlocked.
-
-**Constraints**:
-- No duplicate edges (same direction between a pair)
-- Start node: one outgoing edge, no incoming
-- Complete node: no outgoing edges, multiple incoming
-  allowed from different nodes
-- Bidirectional pairs separated with perpendicular
-  offset
-
-**Properties panel header**: The node panel's
-`.flow-props-header` carries the "State Properties" title
-on the left and the close button on the right. Member
-assignment lives below it in a `.member-select-fieldset`
-(legend "Members") with two `.member-group` blocks —
-HUMANS and AIs — of checkboxes, not a `<select>`.
-
-### Form Controls
-
-`<select class="input">` with flat `<option>`
-children is the standard pattern for dropdowns
-across the app (project status, profile
-department, filter selectors, etc.).
-
-When a select has semantically distinct option
-groups, use native `<optgroup label="...">` rather
-than disabled-option separators or custom dropdown
-components. The AI-member model picker
-(`buildModelOptgroups`, grouping models by provider)
-is the introducing case — `<optgroup>` is the
-codebase's standard for grouped selects from this
-point forward. Browser default styling (bold-italic
-group labels) is fine; no override needed.
-
-The sidebar org-switcher `<select>` is the documented
-exception to the `.input` select standard: it is a
-compact control styled by `.org-switcher`
-(`components-organization-switcher.css`), not `.input`. It was
-re-homed from the old top-bar greeting into the sidebar
-footer.
-
-### Sidebar org switcher
-
-The native `<select>` (`.org-switcher`) by which a member
-chooses the active org, paired with a quiet "Set as
-default" button (`.org-set-default`). The two sit in an
-`.org-switcher-group` cluster. CSS in
-`components-organization-switcher.css`.
-
-The switcher renders **only** when the member can reach two
-or more orgs; a single-org member sees plain org text
-instead — no control where there is no choice.
-
-In the sidebar footer the cluster wraps in
-`.sidebar-org-switcher`, which restyles the inline
-`.org-switcher-group` to stack vertically: the `<select>`
-goes full-width over the quiet "Set as default" button.
-When the sidebar is collapsed (`.sidebar-collapsed`) the
-whole `.sidebar-org-switcher` is hidden.
-
-```html
-<div class="sidebar-org-switcher">
-  <span class="org-switcher-group">
-    <select class="org-switcher"><!-- orgs --></select>
-    <button class="org-set-default">Set as default</button>
-  </span>
-</div>
-```
-
-### Dark Mode
-
-CSS custom properties on `:root` define light theme values.
-The `[data-theme="dark"]` selector overrides them for dark
-mode. Toggle is persisted to `localStorage` and respects
-`prefers-color-scheme` for initial detection.
-
-```css
-:root { --background: var(--gray-50); }
-[data-theme="dark"] { --background: var(--gray-900); }
-```
-
-## 6. Interaction States
-
-### State Guidelines
-| State | Visual Change |
-|-------|---------------|
-| Default | Base styling |
-| Hover | Slight bg change, cursor pointer |
-| Focus | 2px ring, ring-offset-2 |
-| Active | Darker bg, pressed effect |
-| Disabled | 50% opacity, no pointer |
-| Error | Red border, error text |
-
-### Focus Management
-- All interactive elements must have visible focus states
-- Use `focus-visible` for keyboard-only focus
-- Ring color matches primary brand
-
-## 7. Elevation & Shadows
-
-| Level | Token | Usage |
-|-------|-------|-------|
-| 0 | `shadow-xs` | Subtle separation |
-| 1 | `shadow-sm` | Cards, inputs |
-| 2 | `shadow-md` | Dropdowns, hover |
-| 3 | `shadow-lg` | Modals, popovers |
-| 4 | `shadow-xl` | Dialogs, overlays |
-
-## 8. Motion Guidelines
-
-### Duration Scale
-| Token | Value | Usage |
-|-------|-------|-------|
-| `instant` | 50ms | Toggle states |
-| `fast` | 150ms | Hover, focus |
-| `normal` | 200ms | Transitions |
-| `slow` | 300ms | Modals, drawers |
-| `progress` | 300ms | Progress bar width |
-| `shimmer` | 1.5s | Loading shimmer |
-| `pulse` | 2s | Gauge draw pulse |
-| `spin-slow` | 3s | Slow spinner |
-
-### Easing
-- **Default**: `cubic-bezier(0.4, 0, 0.2, 1)` - Most transitions
-- **Ease-in**: `cubic-bezier(0.4, 0, 1, 1)` - Accelerate
-- **Ease-out**: `cubic-bezier(0, 0, 0.2, 1)` - Decelerate
-
-### Motion Principles
-1. Motion should be subtle and purposeful
-2. Avoid decorative animations
-3. Use motion to show cause and effect
-4. Respect reduced-motion preferences
-
-## 9. Iconography
-
-### Style Guide
-- **Library**: Inline SVG functions in `web-app/app/icons.ts`
-  (line-based, each returns a `SafeHtml` value)
-- **Stroke width**: 2px
-- **Color**: Inherit from parent or use `text-muted`
-
-### Icon Sizing
-Sizes are a named tier scale — `ICON_SIZE` in `icons.ts` —
-extending the `--text-*` typography tier names (adds
-`5xl` / `6xl` beyond `--text-4xl`).
-The `IconFn` size argument is typed `IconSize`, so a call
-passing an off-scale pixel value fails the type-check.
-
-| Tier | Size | Typical use |
-|--------|------|------------------------------------|
-| `2xs` | 10px | Smallest inline markers |
-| `xs` | 12px | Small labels and metadata |
-| `sm` | 14px | Inline chips and status |
-| `base` | 16px | Inline text and buttons (default) |
-| `lg` | 18px | Emphasised inline icons |
-| `xl` | 20px | Nav, cards, toolbar actions |
-| `2xl` | 24px | Feature and section icons |
-| `3xl` | 28px | Prominent standalone icons |
-| `4xl` | 32px | Large state icons |
-| `5xl` | 40px | Avatar and brand marks |
-| `6xl` | 48px | Empty states and full-page errors |
-
-## 10. Content Guidelines
-
-### Tone
-- Clear and direct
-- Professional but approachable
-- No jargon for business users
-- Action-oriented
-
-### Data Formatting
-- **Missing/zero values**: Display `—` (em-dash) instead of
-  `0h`, `$0k`, or blank. Use the guard pattern:
-  `value ? formatted : '—'`
-- **Singular/plural**: Use ternary grammar —
-  `${count} ${count === 1 ? 'item' : 'items'}` — never
-  parenthetical `item(s)` form
-- **Section headers (h3)**: Always include `font-display`
-  class on section header h3 tags to use the display
-  typeface (IBM Plex Sans)
-
-### Error Messages
-**Do:**
-- "Unable to save. Please check your connection and try again."
-
-**Don't:**
-- "Error 500: Internal server error"
-
-### Empty States
-**Do:**
-- "No projects yet. Create your first project to get started."
-
-**Don't:**
-- "No data"
-
-## 11. Responsive Breakpoints
-
-| Breakpoint | Width | Usage |
-|------------|-------|-------|
-| `sm` | 640px | Large phones |
-| `md` | 768px | Tablets |
-| `lg` | 1024px | Small laptops |
-| `xl` | 1280px | Desktops |
-
-### Layout Rules
-- **Mobile**: Single column, full-width cards
-- **Tablet**: Two columns, collapsible sidebar
-- **Desktop**: Three columns, fixed sidebar
-
-## 12. CSS Architecture
-
-Source lives in `web-app/app/styles/`. Single source of truth —
-no raw style strings except:
-
-1. **Dynamic per-element values.** CSS custom properties
-   (`style="--…"`) for progress widths, heat intensity, and
-   similar data-driven chrome.
-2. **Bootstrap fallbacks.** `database-init.ts`
-   `handleDatabaseError` uses raw CSS when tokens or
-   component classes may not load (file-header comment).
-
-CSP allows `style-src-attr 'unsafe-inline'` for those
-data-driven attributes; colors stay in the design system
-except the bootstrap error UI.
-
-### Page-content widths
-
-Named by the kind of work the page supports, not by
-measurement (`tokens.css`). Helpers in
-`components-layout-helpers.css` set `max-width` and
-horizontal auto-margins:
-
-| Class | Token | Value | Kind of work |
-|-------|-------|-------|--------------|
-| `.entity` | `--width-entity` | 48rem | Entity detail/forms |
-| `.overview` | `--width-overview` | 64rem | Mid-width overviews |
-| `.workspace` | `--width-workspace` | 96rem | Full workspace lists |
-
-### Cascade order
-
-The build cascade is locked in `./build`. Each file group loads
-in this order, and within glob groups, alphabetical order
-applies:
-
-1. `tokens.css` — design tokens (CSS custom properties)
-2. `fonts.css` — `@font-face` declarations
-3. `light-mode.css` — light theme HSL assignments
-4. `dark-mode.css` — dark theme overrides
-5. `base.css` — global resets, view transitions
-6. `components-*.css` — reusable component families
-   (avatar, badges, brand, buttons, cards, controls,
-   dialog, feedback, inputs, layout-helpers, menus,
-   metrics, organization-switcher, page-placeholder, tables, tabs,
-   toast)
-7. `layout.css` — sidebar, header, main-content shell
-8. `utilities.css` — single-property primitives plus
-   container widths
-9. `responsive.css` — mobile breakpoint overrides
-   (uses `!important` to win against earlier files)
-10. `command-palette.css` — search overlay
-
-These 10 groups concatenate into `assets/styles.css`, the
-shared bundle every page loads.
-
-11. `pages-*.css` — page-scoped styles (NOT in the shared
-    bundle; each file emits its own per-page bundle)
-
-### Per-page bundles
-
-Each page's `PageEntry` in `web-app/app/page-registry.ts`
-optionally declares which per-page bundles it loads:
-
-```typescript
-'flow-stats': {
-    // ...
-    cssBundles: ['pages-flow-stats'],
-},
-```
-
-Multiple pages can share one bundle — `idea-detail`,
-`idea-create`, and `idea-convert` all declare
-`['pages-ideas']`.
-
-At compose time, `compose.ts` reads `cssBundles` and replaces
-the `{{PAGE_CSS_LINKS}}` placeholder in the page's HTML
-with one `<link rel="stylesheet" href="../assets/pages-X.css"
-/>` tag per bundle. Pages without `cssBundles` get the
-placeholder removed entirely (no stray whitespace).
-
-At build time, every `pages-*.css` file emits its own minified
-bundle via the `pages-*.css` glob in `./build`.
-
-### Browser parallel-loading
-
-All modern browsers fetch `<link rel="stylesheet">` tags in
-parallel. HTTP/1.1 opens ~6 connections per origin; HTTP/2+
-multiplexes a single connection. Total page wait equals
-`max(file_load_times)`, not the sum. Splitting the monolith
-into shared + per-page bundles is a strict byte win because
-each page downloads less total CSS, all parallel-loaded.
-
-Caveat: very small files (under ~5KB) cost more per-request
-overhead than they save. Our per-page bundles range from
-~0.1 KB to ~9.6 KB — well above that threshold for the larger
-bundles, and the smaller ones still amortize via HTTP/2
-multiplexing.
-
-### When to add to which file
-
-| Pattern type                          | Target                    |
-|---------------------------------------|---------------------------|
-| Used by 3+ pages, component-shaped    | `components-X.css`        |
-| Used by one page, page-shaped         | `pages-X.css`             |
-| Single-property reusable              | `utilities.css`           |
-| Global reset, body/html, transitions  | `base.css`                |
-| Design token                          | `tokens.css`              |
-| Theme HSL assignment                  | `light-mode.css` / `dark-mode.css` |
-| Sidebar/header/main shell             | `layout.css`              |
-| Mobile-only override                  | `responsive.css` (`!important`) |
-
-Below the 3-page threshold, keep selectors in a
-`pages-X.css` file, or duplicate. At the third instance,
-promote to `components-X.css`.
-
-### Adding a new page-scoped CSS file
-
-1. Create `web-app/app/styles/pages-NAME.css` with a one-line
-   role header comment (e.g.,
-   `/* Inbox: tray, item card, sort affordances. */`).
-2. Add `cssBundles: ['pages-NAME']` to every matching entry in
-   `web-app/app/page-registry.ts`.
-3. Build emits the per-page bundle automatically via the
-   `pages-*.css` glob in `./build`.
-
-### Adding a new component family
-
-1. Create `web-app/app/styles/components-NAME.css` with a
-   role header.
-2. Build picks it up via the `components-*.css` glob; loads
-   alphabetically among other components.
-3. No `cssBundles` change — components ship in the shared
-   bundle for every page.
-
-### File-level rules
-
-- Each file leads with a one-line role header comment.
-- 78-char max per line in CSS files (enforced by `./validate`).
-- No raw hex colors — `hsl(var(--token))` only.
-- No `style="..."` inline strings except dynamic per-element
-  values via CSS custom properties (see § 5 Component
-  Guidelines for the pattern).
-- Files under ~600 lines. If a file grows past that, split by
-  sub-family.
-
-## 13. Do's and Don'ts
-
-### Do
-- ✅ Use semantic color tokens, not raw hex values
-- ✅ Maintain consistent spacing with the 8pt grid
-- ✅ Ensure all interactive elements have focus states
-- ✅ Use the proper typography scale for hierarchy
-- ✅ Test contrast ratios for accessibility
-
-### Don't
-- ❌ Use pure black (#000) for text
-- ❌ Create custom colors outside the system
-- ❌ Use decorative animations
-- ❌ Skip focus states on interactive elements
-- ❌ Mix typography scales inconsistently
+## Flow designer visuals
+
+Canvas contract: [FLOW-CANVAS.md](FLOW-CANVAS.md).
+Colors: grid on `hsl(var(--background))`; Regular
+`hsl(var(--primary))`, Create `hsl(var(--success))`,
+Archive `hsl(var(--error))`; forward edges primary,
+cycle warning plus dashes; selection `--accent`;
+locked `hsl(var(--accent-text))`.
+
+## Iconography
+
+Inline SVG in `web-app/app/icons.ts` (`SafeHtml`).
+Stroke 2px; color inherits. `ICON_SIZE` extends
+`--text-*` (adds `5xl` / `6xl`). `2xs` 10, `xs` 12,
+`sm` 14, `base` 16, `lg` 18, `xl` 20, `2xl` 24,
+`3xl` 28, `4xl` 32, `5xl` 40, `6xl` 48.
+
+## Responsive breakpoints
+
+Named: `sm` 640px, `md` 768px, `lg` 1024px, `xl`
+1280px. `layout.css` shows and hides chrome;
+`responsive.css` carries grid-column, visibility, and
+reduced-motion.
+
+## Motion and elevation
+
+`--shadow-xs` … `--shadow-xl`. Durations: `instant`,
+`fast`, `normal`, `slow`. Easing: `--ease-default`,
+`--ease-in`, `--ease-out`.
+
+## Content
+
+Missing or zero: em-dash (`—`), never `0h` / `$0k` /
+blank (`value ? formatted : '—'`). Plural: ternary
+`${count} ${count === 1 ? 'item' : 'items'}`, never
+`item(s)`. Error: "Unable to save. Please check your
+connection and try again." Empty: "No projects yet.
+Create your first project to get started."
+
+## CSS architecture
+
+Source lives in `web-app/app/styles/`. No raw style
+strings except dynamic per-element values via CSS
+custom properties. Colors stay in tokens. Page widths:
+`.entity`, `.overview`, `.workspace`.
+
+Cascade (`./build`; alpha within globs):
+
+1. `tokens.css`
+2. `fonts.css`
+3. `light-mode.css`
+4. `dark-mode.css`
+5. `base.css`
+6. `components-*.css`
+7. `layout.css`
+8. `utilities.css`
+9. `responsive.css`
+10. `command-palette.css`
+
+Those ten are `assets/styles.css`. Then
+`pages-*.css` per `cssBundles` on `page-registry.ts`;
+compose fills `{{PAGE_CSS_LINKS}}`.
+
+| Pattern | File |
+|---------|------|
+| 3+ pages, component | `components-X.css` |
+| One page | `pages-X.css` |
+| Single-property | `utilities.css` |
+| Reset / html | `base.css` |
+| Token | `tokens.css` |
+| Theme HSL | `light-mode.css` / `dark-mode.css` |
+| Shell | `layout.css` |
+| Mobile override | `responsive.css` |
+
+Below three pages, keep it in `pages-X.css` or
+duplicate; promote at the third. New
+`pages-NAME.css` or `components-NAME.css`: one-line
+role header; pages also list `cssBundles`. File
+rules: 78-char max; no hex; no `style="..."` except
+dynamic custom properties; split past ~600 lines.
+
+## How we got here
+
+Tokens first, then variants on `data-tone` and
+`data-level`, then per-page CSS bundles.

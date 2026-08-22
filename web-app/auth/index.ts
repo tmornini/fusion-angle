@@ -40,8 +40,10 @@ import type {
 import { decodeReturnTarget } from '../app/auth-redirect.ts';
 import { getUrlParam } from '../app/adapters/url-params.ts';
 
-// The design system's lg breakpoint (AGENTS.md § Mobile
-// Responsiveness) — the one TypeScript viewport check.
+// The design system's lg breakpoint
+// (DESIGN-SYSTEM.md § Responsive
+// breakpoints) — the one TypeScript
+// viewport check.
 const LG_BREAKPOINT_PX = 1024;
 
 function validateEmail(

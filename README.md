@@ -29,9 +29,8 @@ sign-in credentials once on stdout from
 **Demo-grade security.** `./build` emits one artifact:
 `fusion-angle-server-${SHA}.zip` (Node + Postgres, pages and
 API on one origin, `JWT_HMAC_SIGNING_KEY` from the
-environment). A1–A6 are
-disposed as named in [ARCHITECTURE.md](ARCHITECTURE.md)
-§ Demo server tier.
+environment). See [ARCHITECTURE.md](ARCHITECTURE.md)
+`## One origin, one ZIP`.
 
 ## Getting Started
 
@@ -48,19 +47,22 @@ postgres.js 3.4.9 at the exact versions pinned in
 importer) — the named exception. The unzipped artifact
 needs no `npm install`.
 
-Everything operational — build, test, conventions — lives
-in [AGENTS.md](AGENTS.md); the manual browser regression plan
-is [TEST-PLAN.md](TEST-PLAN.md). Architecture, schema, and
-design system: [ARCHITECTURE.md](ARCHITECTURE.md) (with
-[FLOW-CANVAS.md](FLOW-CANVAS.md)), [SCHEMA.md](SCHEMA.md),
-[DESIGN-SYSTEM.md](DESIGN-SYSTEM.md). Audit runbook:
-[AUDIT.md](AUDIT.md).
+## Docs
+
+| Doc | What |
+|---|---|
+| AGENTS.md | commands, gates, invariants |
+| ARCHITECTURE.md | layers, tenancy, residuals |
+| SCHEMA.md | the one table |
+| API.md | dispatch and compositions |
+| DESIGN-SYSTEM.md | tokens and CSS |
+| FLOW-CANVAS.md | designer canvas |
+| AUDIT.md | doctrine audit |
+| TEST-PLAN.md | browser regression |
 
 ## Tech Stack
 
-- TypeScript on ES2024, strict mode. Zero runtime
-  dependencies except postgres.js 3.4.9 bundled into
-  the server ZIP (`api/postgres-client.ts` only)
+- TypeScript on ES2024, strict mode
 - Build-time HTML composition (shared layout + per-page content)
 - CSS custom properties with light/dark theme support
 - SVG charts and ~70 inline SVG icons
@@ -88,3 +90,8 @@ Full reasoning effort, doctrine loaded first, then work. The
 master reads the Full scroll; dispatched subagents read the
 Medium scroll (`Go to Medium Church!`) — see AGENTS.md
 § Subagents.
+
+## How we got here
+
+This file used to narrate how the product grew. It is now
+the front door: product, modules, clone path, and pointers.
