@@ -232,7 +232,7 @@ every other op.
 | Doc | Go there for |
 |---|---|
 | README.md | product sentence, modules |
-| ARCHITECTURE.md | vessel, tenancy, residuals, do-not-resurrect |
+| ARCHITECTURE.md | tenancy, KNOWN seams, later work, do-not-resurrect |
 | SCHEMA.md | the one table, secrets, PII erasure |
 | API.md | dispatch, compositions, seed count |
 | DESIGN-SYSTEM.md | tokens, heat ramp, breakpoints, CSS |

@@ -52,7 +52,7 @@ needs no `npm install`.
 | Doc | What |
 |---|---|
 | AGENTS.md | commands, gates, invariants |
-| ARCHITECTURE.md | layers, tenancy, residuals |
+| ARCHITECTURE.md | layers, tenancy, KNOWN seams |
 | SCHEMA.md | the one table |
 | API.md | dispatch and compositions |
 | DESIGN-SYSTEM.md | tokens and CSS |

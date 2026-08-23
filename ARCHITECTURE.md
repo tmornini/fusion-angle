@@ -238,27 +238,53 @@ through notification channels. Named non-void exceptions:
 `postFlowFromBackup` → `string`; `postFlowFromMermaid` /
 `postFlowFromZip` → `{ flowId, warnings }`.
 
-## Known residuals
+## KNOWN seams
 
-- Work-order locked verbs not executed
-- Two-role views and token-at-rest hashing later
-- Stale-until-navigation (no NOTIFY listener)
-- XSS can use the refresh cookie from the page
-- A raw dump still has verbatim auth messages
-- Single mint process
-- Throttle is a global cap if `TRUSTED_PROXY_HOPS` is
-  wrong; refresh/exchange unlimited
-- Instance public PUT is 405 (`putRecordInstance`
-  still PATCHes — name lie); same-body PATCH still
-  appends 201
-- `withLifecycleTrio` still exists
-- Roster seat that names an AI agent is later
+- Stale-until-navigation (no LISTEN) —
+  `tests/advisory-lock.test.ts`
+- XSS can use the refresh cookie from the page —
+  `tests/api-authentication-token.test.ts`
+- A raw dump still has verbatim auth messages —
+  `tests/api-shadow-ledger-auth.test.ts`
+- Single mint process — `server/boot.ts`
+  (one process, not enforced)
+- Throttle is a global cap if `TRUSTED_PROXY_HOPS`
+  is wrong; refresh/exchange unlimited —
+  `tests/http-throttle.test.ts`
 - Erased PII persists as superseded pairs;
   derived reads and login show none —
   `tests/api-pii-tombstone.test.ts`
 
-[AUDIT.md](AUDIT.md) re-confirms each residual is still
+[AUDIT.md](AUDIT.md) re-confirms each seam is still
 KNOWN.
+
+## Later work
+
+- READY gate rejects dangling attribute
+  refs and unbind prunes them —
+  `tests/adapters-flow-publish.test.ts`
+- One client 401-recovery voice through
+  `redirectToLogin()` with `?return=` —
+  `tests/adapters-http-facade.test.ts`
+- Toast pause on hover and focus
+- Physical PII erasure — closes KNOWN
+  seam: Erased PII persists as superseded
+  pairs
+- Mock seed's fixed 2026-06-15 anchor —
+  after 2026-09-13 serial-mode FS3
+  carries in-flight heat only
+- Work-order locked verbs not executed —
+  `tests/family-registry.test.ts`
+- Token-at-rest hashing — closes KNOWN seam:
+  A raw dump still has verbatim auth messages
+- Two-role views — `tests/backend-postgres.test.ts`
+- `putRecordInstance` still PATCHes (name lie) —
+  `tests/adapters-record-instances.test.ts`,
+  `tests/api-instances-create.test.ts`
+- Same-body PATCH still appends 201 —
+  `tests/api-instances-create.test.ts`
+- Roster seat that names an AI agent —
+  `tests/family-registry.test.ts`
 
 ## Do not resurrect
 

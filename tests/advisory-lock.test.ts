@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    readdirSync,
+    readFileSync,
+    statSync,
+} from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
     sha256Hex,
     sha256HexOfBytes,
 } from '../shared/digest.ts';
@@ -106,4 +113,40 @@ test('notifyPayload emits full when over 8000 bytes',
             .length > PG_NOTIFY_PAYLOAD_MAX_BYTES,
     );
     assert.equal(notifyPayload(large), '{"kind":"full"}');
+});
+
+const repoRoot = fileURLToPath(
+    new URL('..', import.meta.url),
+);
+
+test('postgres notify is issued; server never LISTENs',
+() => {
+    const postgresPath = join(
+        repoRoot, 'api/backend-postgres.ts',
+    );
+    const postgres = readFileSync(postgresPath, 'utf8');
+    assert.match(postgres, /pg_notify/);
+    assert.doesNotMatch(postgres, /\bLISTEN\b/);
+    const serverDir = join(repoRoot, 'server');
+    const files: string[] = [];
+    const walk = (dir: string): void => {
+        for (const name of readdirSync(dir)) {
+            const path = join(dir, name);
+            if (statSync(path).isDirectory()) {
+                walk(path);
+            } else if (name.endsWith('.ts')) {
+                files.push(path);
+            }
+        }
+    };
+    walk(serverDir);
+    assert.ok(files.length >= 8);
+    for (const path of files) {
+        const src = readFileSync(path, 'utf8');
+        assert.doesNotMatch(
+            src,
+            /\bLISTEN\b/,
+            path + ' contains LISTEN',
+        );
+    }
 });

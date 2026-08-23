@@ -387,3 +387,10 @@ async () => {
             && error.message === 'deadlock',
     );
 });
+
+test('POSTGRES_SCHEMA has no CREATE VIEW', () => {
+    assert.doesNotMatch(
+        POSTGRES_SCHEMA,
+        /CREATE\s+VIEW/i,
+    );
+});

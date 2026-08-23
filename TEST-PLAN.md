@@ -204,11 +204,7 @@ Master never re-dispatches a hunter to retry.
   marquee select): synthetic PointerEvents do not reliably
   drive the `flow-interactions.ts` state machines because they
   use pointer-capture semantics. Affected tests include
-  AA27–AA34, F15, F19–F23. The list-row drag-reorders
-  (E11 projects, D36/D37 ideas) are EXEMPT — they share
-  `drag-reorder.ts`, which uses native HTML5 drag-and-drop
-  on the `.drag-handle`, NOT pointer-capture, so they are
-  driveable. Work around the gesture cases by
+  AA27–AA34, F15, F19–F23. Work around the gesture cases by
   validating end-state via message-plane fixtures (PUT a
   flow document message pair through the gate, or GET the
   flow document / its pair history for the flow's
@@ -218,6 +214,26 @@ Master never re-dispatches a hunter to retry.
   note `verified via pair fixture` — NOT BLOCKED.
   `BLOCKED` is reserved for cases where neither gesture
   nor fixture produces a verifiable end state.
+- **List-row drag-reorders** (E11 projects, D36/D37
+  ideas) share `drag-reorder.ts` (native HTML5 DnD
+  on `.drag-handle`, not pointer-capture) but are
+  not `computer`-driveable — CDP mouse events
+  never start a native drag session. Drive them
+  synthetically: `pointerdown` on `.drag-handle`,
+  a real `DataTransfer`, two or more `dragover`
+  samples for D37, then `drop` and `dragend`.
+  Verify persistence by reload. Window at or
+  above 768 CSS px; filter All.
+- **Hunter probe discipline.** Visibility via
+  `checkVisibility()` or `getClientRects()`, never
+  a descendant's computed `display`. Never
+  hand-`fetch` the API from `javascript_tool` —
+  the bearer is memory-only; read the network
+  log. Toasts via one `javascript_tool` call on
+  the Members invite dialog's synchronous
+  "Email is required" toast, clicking
+  `.toast-close` after the 300 ms entrance and
+  asserting detachment inside 3 s.
 - **`resize_window`** does not change the CSS viewport;
   responsive tests at specific widths (I10) cannot be driven.
   Inspect `layout.css` manually to verify the mobile-breakpoint
@@ -445,7 +461,8 @@ depends: AT
     `seat_*` and `flow_id`; F2 names
     `flow_id`; G names
     `org2_*`, `unseated_*`,
-    `member_*`; SV names `seat_*`);
+    `member_*`, `erasable_*`;
+    SV names `seat_*`);
     listen stdout has no passwords;
     seed does not travel over HTTP. If
     a section cannot run from its
@@ -857,6 +874,12 @@ depends: A
   shows a bipolar arc; the Objectives box shows one row per
   objective, each with a small bipolar arc gauge and a
   sparkline trendline.
+  Serial (A3 `--mock-data`, demo admin's active
+  organization Stark): surfaces carry seeded
+  scores. Parallel (A3 `--test-plan-slices`):
+  4 ideas, 3 projects, 1 flow, 4 objectives;
+  both approved projects score every objective.
+  A `—` Impact or a `data-empty` row is a FAIL.
 - [ ] **C5** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
 - [ ] **C6** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
 - [ ] **C7** Check that seed data populates all 4 dashboard
@@ -875,6 +898,10 @@ depends: A
   is excluded from the roster — and 4 AIs).
   Global raw mock totals are larger (~11 ideas, ~17
   projects, ~5 flows across both orgs).
+  Parallel (A3 `--test-plan-slices`): 4 ideas, 3
+  projects, 1 flow, 4 objectives; both approved
+  projects score every objective. A `—` Impact or
+  a `data-empty` row is a FAIL.
 
 ---
 
@@ -1017,6 +1044,11 @@ depends: A
 - [ ] **E9** Modify a field, click "Save". PASS: project saves successfully, returns to view mode with updated data.
 - [ ] **E10** Click "Edit", then "Cancel". PASS: returns to view mode with original data unchanged.
 - [ ] **E10a** On a project whose state shows action-bar buttons (`submitted` → Approve / Decline / Send back, or `approved` → Archive / View history), click "Edit". PASS: those action-bar buttons are hidden; only the State select, editable fields, and Cancel / Save remain. Click Cancel: the action-bar buttons reappear.
+  Observable: `#project-review-actions` /
+  `#project-lifecycle-actions` carry `hidden`
+  while the inner `.action-bar` keeps its own
+  `display:flex`. The objectives section and
+  flows sidebar stay visible in edit mode.
 
 ### Projects List — Drag-reorder
 
@@ -1097,6 +1129,10 @@ opens and renders.)
   transitions between nodes that have no return
   path render as solid blue even when they share
   a level.
+  Serial and Parallel: open the seeded "Layout
+  Test: Proposal Review Cycle" (parallel F lists
+  two flows — garden Customer Onboarding plus
+  Layout Test). Cycle edges live on that graph.
 - [ ] **F10** Connection ports (small circles) are
   visible on every middle node when the flow is
   unlocked. Create and Archive nodes show a port
@@ -1388,6 +1424,10 @@ canvas re-renders after each step.)
   survived navigation because it is the flow's own message-pair
   history, persisted to the schema, not held in memory. Unlike
   before Phase 14, this persistence has no 10-edit bound (see F45).
+  Graph and name are undo content; Locked, Auto
+  Layout, and Auto Fit are guards that undo never
+  flips and never counts. Opening a flow writes
+  nothing.
 
 ### Flow Designer — Flow Tags (API-only, no UI this phase)
 
@@ -1552,6 +1592,8 @@ designer "tag current" action lands.)
   full viewport — the global sidebar does not
   steal canvas space.
 - [ ] **F75** Open a flow whose layout routes edges beyond the node bounding box — the seeded "Layout Test: Proposal Review Cycle" is one (its long back-edges arc above the top row and dip well below the bottom row) — with Auto Fit on. PASS: the whole graph, including the edge curves and waypoints that bow past the outermost nodes, sits inside the canvas with margin; nothing clips at any edge (the prior bug sliced the bottom routing). Then toggle Auto Fit off then on, add then delete an edge, and undo. PASS: every re-fit re-frames the full *drawn* content (curves included), never just the node rectangles — the camera measures the rendered SVG (`.flow-content` `getBBox`), not node positions.
+  Serial and Parallel: open that Layout Test
+  flow (do not open the garden chain).
 
 ---
 
@@ -1847,6 +1889,10 @@ the claude-in-chrome MCP.
   Review is warm, Create/Archive carry the cool (or no-data)
   tint. Node faces show the em-dash on Create and Archive and
   a value like `8.5m` / `2.1d` on regular nodes.
+  Serial (A3 `--mock-data`, demo admin's active
+  organization Stark): the flagship mock population.
+  Parallel (A3 `--test-plan-slices`): Capture is
+  hottest, Review is warm.
 - [ ] **FS4** Hover a node → a read-only stat card pops near
   it with: % of flow time, avg/median/p90 durations, visits /
   distinct WOs / Here now, ~N/wk throughput, loop-back rate, clan
@@ -1881,6 +1927,11 @@ the claude-in-chrome MCP.
   editor's selection glow). At the last visible path, next is
   disabled (or, if there's a rest bucket, advances to
   "+N rarer paths, combined Z%" which highlights nothing).
+  Serial (A3 `--mock-data`, demo admin's active
+  organization Stark): the flagship mock paths.
+  Parallel (A3 `--test-plan-slices`): two or more
+  paths; path one is rooted at Create; `next` is
+  enabled. The no-pulse sentence stands.
 - [ ] **FS8** Dark-mode toggle persists across navigation to
   the stats page; the heat tints and the card remain legible
   in both themes. The face number text contrasts adequately
@@ -2074,6 +2125,8 @@ depends: A
   so the bell works even for a member with no admin role.
   Source: `web-app/app/invitations-indicator.ts`
   (`mutateInvitationsBell`), `component-top-bar.html`.
+  The wire path is `identities/:id/invitations/`
+  (never a root `/api/invitations`).
 - [ ] **V4 — Accept writes a seat; invitee becomes
   multi-org** On `invitations/index.html` (page header
   "Invitations", subtitle "Organizations inviting you to
@@ -2131,6 +2184,12 @@ depends: A
   read/accept/decline require only being the invitee. Source:
   the explicit guards in `grantInvitation` / `revokeInvitation`
   vs. the un-admin-gated invitee read/accept/decline paths.
+  Parallel (A3 `--test-plan-slices`): run before G46
+  so `G Member` still has PII and can sign in; the
+  invitee half is granted from the second G
+  organization (`org2_*`). Serial (A3 `--mock-data`,
+  demo admin's active organization Stark): any
+  seeded non-admin human.
 
 ### Member detail — Human (`members/detail.html?memberId=<hw_*>`)
 
@@ -2185,7 +2244,7 @@ depends: A
 - [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar plus "Service account" + "—" (agents are not identities), then a "Service" badge. Serial (A3 `--mock-data`, demo admin's active organization Stark): the nested PII fence (viaMembership, need-to-know) hides the five org-2-only persons: the list renders 6 named person rows (Emily Rodriguez, Sarah Chen, Lisa Wang, Marcus Johnson, Tony Stark, Jessica Park), 5 "Identity without PII" person rows (the org-2-only members: David Martinez, Alex Kim, Mike Thompson, David Kim, James), and 1 service row (the system service identity). Parallel (A3 `--test-plan-slices`): `identities/` is global (`organizationNested: false`) and the seed is one DB for all 14 slices, so the hunter sees bootstrap current + the system service identity + every slice admin + the B/G/SV extras — not a five-name closed G roster. `getIdentityRoster` GETs identities only — the G extras AI agent is `ai-agents/:id`, not an identity row, so no agent appears on the list. Named G people: G admin, `G Member`, `G Unseated`, plus the system service identity; other-slice people often render as "Identity without PII" (PII 403). An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
 - [ ] **G44** Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → two sequential requests (POST `identities` `{id, kind}`, then PUT `identities/:id/pii` carrying the PII fields), an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email); a second-hop failure toasts a partial-state message naming the PII-less identity rather than a blanket create failure. Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
 - [ ] **G45** From the roster, click a person row (`.card[data-identity-id]`). PASS: navigates to `identities/detail.html?identityId=<id>`, which renders the back button (`#identity-back-btn`), the name + a kind badge + the id, a "Personal Information" card (Name/Email/Phone/Bio — each empty field rendered as "—" via `DISPLAY_ABSENT`), a "Connections" card (Identity Providers / Tokens buttons), and — for a person — an "Erase PII" button (`#identity-erase-btn`). A service identity instead shows a "Credentials" card and NO erase button (only persons carry erasable PII). Source: `web-app/identities/index.ts` (`onListClick`), `web-app/identities/detail.ts`, `web-app/app/presenters/identity-detail.ts`.
-- [ ] **G46** On `G Member`'s identity detail (parallel — never the G admin; serial: any person row that is not the signed-in admin), click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The erasure is ledger-deep: the erased name/email/phone/bio values now appear in zero stored `message_pairs` messages and zero `identity_pii` rows — `/pii` is the message plane's single-slot hard-delete zone, where supersession and erasure alike physically remove prior pairs, and the surviving pair at the address is the bodyless DELETE tombstone. Named residuals outside this guarantee: pre-phase pairs in existing databases, exported snapshots, the caller's own access token, held in memory for its lifetime (≤ 15 min), and replay resurrection of a retained pre-erasure PUT. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
+- [ ] **G46** On `G Erasable`'s identity detail (parallel — never the G admin and never `G Member`; serial: any person row that is not the signed-in admin), click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The surviving pair at the address is the bodyless DELETE tombstone (head). Erased name remains in superseded pairs; derived reads and login show none. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
 - [ ] **G47** On the system service identity's detail page (admin session), a "Client registration" card renders before Credentials showing "Not registered." and a "Register client" button (`data-identity-action="registration"`). Click it → the `client-registration-dialog` opens; fill Grant types `client_credentials`, Audience `fusion-angle`, JWKS `{"keys":[]}`, leave Status Active, Save (`#client-registration-submit`) → "Client registration saved" toast, dialog closes, the card shows an `active` pill (`data-tone="success"`) plus Grant types / Redirect URIs / Audience / JWKS fields, and the button reads "Manage registration". Re-open, change JWKS, Save → the card reflects the new JWKS (rotate = same PUT-overwrite). Re-open, set Status Disabled, Save → `disabled` pill (`data-tone="warning"`). Re-open → a "Deregister" button (`#client-registration-deregister`, hidden while unregistered) is visible; click it → "Client registration removed" toast and the card returns to "Not registered." Empty Grant types / Audience / JWKS shows "Grant types, audience, and JWKS are required" and keeps the dialog open. Cancel (`data-dialog-cancel="client-registration"`) discards edits. Source: `web-app/identities/detail.ts` (`saveRegistration` / `deregisterClient`), `web-app/app/presenters/identity-detail.ts` (`buildRegistrationCard`). Wire: PUT|GET|DELETE `identities/:id/registration` (admin realm; kind gate 404/400).
 
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
@@ -2598,6 +2657,10 @@ every other agent, so no write-domain collision.
   to `records/`. PASS: under the active org (Stark, org 1)
   the list renders Customer Profile; Project Brief is
   seeded under org 2 and is correctly hidden here.
+  Serial (A3 `--mock-data`, demo admin's active
+  organization Stark): Customer Profile visible;
+  Project Brief is org 2 and hidden. Parallel
+  (A3 `--test-plan-slices`): Customer Profile only.
 - [ ] **R2** Click "Add Record" (desktop) / "New Record"
   (mobile) → navigates to a create page
   (`records/create.html`) with Name and Description
@@ -2608,6 +2671,11 @@ every other agent, so no write-domain collision.
   shows name + description + attribute table sorted by
   sort_order + Bound flows (Customer Onboarding, Lead-to-
   Close) + Work orders using this Record list.
+  Serial (A3 `--mock-data`, demo admin's active
+  organization Stark): Bound flows are Customer
+  Onboarding and Lead-to-Close. Parallel (A3
+  `--test-plan-slices`): Bound flows list Customer
+  Onboarding only; work orders are `#r1`–`#r3`.
 - [ ] **R4** Click Edit. PASS: edit mode renders name input,
   description textarea, and one editable row per attribute
   with name input, type picker, options textarea (for
@@ -2652,10 +2720,16 @@ every other agent, so no write-domain collision.
   is the durable covenant; CLI pins it; constraint
   failures still surface via
   `WorkboxDetailPresenter.buildViolations` banner.
+  Serial (A3 `--mock-data`): the work order is
+  `#gate0001`. Parallel (A3 `--test-plan-slices`):
+  the work order is `#r1`.
 - [ ] **R14** Fill Company Name + Contact Email, click
   submit. PASS: transition succeeds; work order advances
   to Review (does NOT demand Reviewer Notes — that is
   current-node only when leaving Review).
+  Serial (A3 `--mock-data`): the work order is
+  `#gate0001`. Parallel (A3 `--test-plan-slices`):
+  the work order is `#r1`.
 - [ ] **R14a** When a node references a `radio`-typed Record attribute, the workbox work-order detail renders it as a radio group — one `<input type="radio">` per option, all sharing the attribute name so only one is selectable — rather than a dropdown; selecting an option and transitioning records that value. NOTE: seeded mock data predates `radio`, so add a radio attribute, reference it Editable on a working node, and create a work order to exercise this.
 - [ ] **R15** Archive a Record from its detail page (if a
   control exists in the toy).

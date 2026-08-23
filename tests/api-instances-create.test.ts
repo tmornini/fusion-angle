@@ -582,6 +582,46 @@ async () => {
     assert.equal(atAddress.length, 2);
 });
 
+test('same-body instance PATCH with new Operation-ID'
++ ' still appends 201',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
+    const body = setBody([
+        { attribute_id: ATTR_ID, value: 'same' },
+    ]);
+    const first = await handleRequest(db, req(
+        'PATCH', INSTANCE_DETAIL, memberToken, body,
+    ));
+    assert.equal(first.status, 201);
+    const headEtag = first.headers.get('ETag');
+    assert.ok(headEtag !== null && headEtag !== '');
+    const prefix = '/organizations/' + ORGANIZATION
+        + '/record-types/' + TYPE_ID
+        + '/instances/';
+    const before = (await db.messagePairs.getAllWhere(
+        'uri_collection', prefix,
+    )).filter((row) => row.uri_id === INSTANCE_ID);
+    const second = await handleRequest(db, req(
+        'PATCH', INSTANCE_DETAIL, memberToken, body,
+        {
+            [IF_MATCH_HEADER]: headEtag,
+            'operation-id': generateIdentifier(),
+        },
+    ));
+    assert.equal(second.status, 201);
+    const after = (await db.messagePairs.getAllWhere(
+        'uri_collection', prefix,
+    )).filter((row) => row.uri_id === INSTANCE_ID);
+    assert.equal(
+        after.length,
+        before.length + 2,
+        'same-body PATCH still appends wire + revision',
+    );
+});
+
 test('two creates racing one address → first 201, '
 + 'second 428',
 async () => {

@@ -250,7 +250,7 @@ contributors included, and returns:
 
 ## Security: KNOWN vs NEW
 
-[ARCHITECTURE.md](ARCHITECTURE.md) § Known residuals
+[ARCHITECTURE.md](ARCHITECTURE.md) § KNOWN seams
 is the canonical KNOWN list — counted at run time,
 never restated here. A KNOWN finding re-confirms its
 seam flag still exists, unwidened; moving KNOWN → NEW
