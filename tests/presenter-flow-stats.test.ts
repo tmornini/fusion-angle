@@ -409,6 +409,18 @@ test('rich card renders all stat blocks for a regular node',
     assert.match(html, /revise\s+19%/);
 });
 
+test('sub-1/wk throughput reads <1/wk', () => {
+    const p = new FlowStatsPresenter(
+        modelWithPaths(),
+        { x: 0, y: 0, w: 600, h: 200 },
+    );
+    const html = p.buildCard(nodeStat({
+        id: 'a', displayName: 'Review',
+        throughputPerWeek: 0.5,
+    })).toString();
+    assert.match(html, />\s*<1\/wk\s*</);
+});
+
 test('top producer not in clan is flagged', () => {
     const p = new FlowStatsPresenter(
         modelWithPaths(),

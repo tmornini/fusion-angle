@@ -58,3 +58,28 @@ test('nonzero value still renders a filled arc', () => {
         'a nonzero value should not emit the zero marker',
     );
 });
+
+const SVG_PATH_DATA = /^[MmZzLlHhVvCcSsQqTtAa0-9 .,eE+-]+$/;
+
+test('empty bipolar gauge path data is SVG grammar', () => {
+    const html = buildBipolarGaugeSvg(
+        {
+            value: undefined,
+            label: 'Baseline',
+            display: 'unset',
+        },
+        {
+            value: undefined,
+            label: 'Actual',
+            display: 'none yet',
+        },
+        'gauge-grammar', 'small',
+    ).toString();
+    const paths = [
+        ...html.matchAll(/\bd="([^"]*)"/g),
+    ].map(m => m[1]!);
+    assert.ok(paths.length >= 2);
+    for (const d of paths) {
+        assert.match(d, SVG_PATH_DATA, 'path d ' + d);
+    }
+});

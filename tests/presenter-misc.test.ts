@@ -315,6 +315,28 @@ test(
 );
 
 test(
+    'GaugePresenter stop-opacity values are decimal',
+    () => {
+        const out = new GaugePresenter(
+            makeGauge(
+                { value: 5, max: 10 },
+                { value: 4, max: 10 },
+            ),
+        ).render().toString();
+        const opacities = [
+            ...out.matchAll(/stop-opacity="([^"]*)"/g),
+        ].map(m => m[1]!);
+        assert.ok(opacities.length >= 4);
+        for (const value of opacities) {
+            assert.match(
+                value, /^\d+(\.\d+)?$/,
+                'stop-opacity ' + value,
+            );
+        }
+    },
+);
+
+test(
     'GaugePresenter bipolar at negative draws'
     + ' the LEFT half only',
     () => {

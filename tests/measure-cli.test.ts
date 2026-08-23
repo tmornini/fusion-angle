@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
     DEFAULT_RUNS,
     MEASURE_DEMO_EMAIL,
@@ -293,4 +294,13 @@ test('local Node spawn is seed then server.mjs', () => {
     ]);
     assert.equal(MEASURE_SERVER_ENTRY, 'server.mjs');
     assert.deepEqual(measureServerArgs(), ['server.mjs']);
+});
+
+test('measure discovery has no identity sentinel', () => {
+    const src = readFileSync(
+        'web-app/app/measure.ts', 'utf8',
+    );
+    assert.doesNotMatch(src, /identityId=current/);
+    assert.doesNotMatch(src, /Tony Stark/);
+    assert.match(src, /Detail URL discovery failed/);
 });

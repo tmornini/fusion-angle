@@ -3,6 +3,7 @@ import type {
     MemberEntity,
     HumanMemberEntity,
     IdentityEntity,
+    HumanProfile,
     IdentityPiiEntity,
     MembershipEntity,
 } from '../../../api/types.ts';
@@ -22,6 +23,7 @@ export {
 export type {
     MemberId,
     HumanMemberEntity,
+    HumanProfile,
     DimensionKey,
 } from '../../../api/types.ts';
 
@@ -43,11 +45,9 @@ export type HumanMemberDraft =
         bio: string;
     };
 
-function emptyPersonProfile(
-    id: MemberId,
-): HumanMemberEntity {
+function emptyPersonProfile(): HumanProfile {
     return {
-        id,
+        present: true,
         title: '',
         department: '',
         strengths: [],
@@ -74,13 +74,16 @@ function seatsCollection(ctx: RequestContext): string {
 
 function profileOf(
     identity: IdentityEntity,
-): HumanMemberEntity {
+): HumanProfile {
+    if (!('title' in identity)) {
+        return { present: false };
+    }
     return {
-        id: identity.id,
-        title: identity.title ?? '',
-        department: identity.department ?? '',
-        strengths: identity.strengths ?? [],
-        team_dimensions: identity.team_dimensions ?? {},
+        present: true,
+        title: identity.title,
+        department: identity.department,
+        strengths: identity.strengths,
+        team_dimensions: identity.team_dimensions,
     };
 }
 
@@ -99,7 +102,7 @@ export function buildHumanMemberMap(
             seat.identity_id,
             new HumanMember(
                 seatedHumanParent(seat.identity_id),
-                emptyPersonProfile(seat.identity_id),
+                emptyPersonProfile(),
                 { erased: true },
             ),
         );
@@ -121,7 +124,7 @@ export async function getHumanMemberMap(
                 id,
                 new HumanMember(
                     seatedHumanParent(id),
-                    emptyPersonProfile(id),
+                    emptyPersonProfile(),
                     pii,
                 ),
             ] as const;
@@ -174,10 +177,10 @@ export async function getHumanMember(
     );
 }
 
-export async function getHumanMemberEntity(
+export async function getHumanMemberProfile(
     ctx: RequestContext,
     id: string,
-): Promise<HumanMemberEntity> {
+): Promise<HumanProfile> {
     const identity = await ctx.GET<IdentityEntity>(
         `identities/${id}`,
     );

@@ -153,7 +153,7 @@ function reconstructRuns(
         );
         const sojourns: Sojourn[] = [];
         const pathNodeIds: string[] = [];
-        let completed = false;
+        let lastNode: GraphNode | undefined;
         let hadDropped = false;
         for (let i = 0; i < ts.length; i++) {
             const t = ts[i]!;
@@ -179,13 +179,18 @@ function reconstructRuns(
                     memberId: t.memberId,
                 });
             }
-            if (node.isArchive) completed = true;
+            lastNode = node;
         }
+        // Covenant: a run is completed when its CURRENT
+        // node is Archive — as currentNodeIdFromHistory
+        // reads it — not when any event ever reached
+        // Archive.
         runs.push({
             workOrderId: woId,
             sojourns,
             pathNodeIds,
-            completed,
+            completed: lastNode !== undefined
+                && lastNode.isArchive,
             hadDroppedStep: hadDropped,
         });
     }

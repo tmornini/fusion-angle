@@ -33,6 +33,7 @@ import {
     getRecordInstance,
     getRecordInstances,
     postWorkOrderCreation,
+    currentNodeIdFromHistory,
     type RecordAttribute,
 } from '../web-app/app/adapters/index.ts';
 
@@ -188,4 +189,60 @@ async () => {
     assert.equal(
         instanceWave.pickerItems.length, 1,
     );
+});
+
+test('F2 Capture has one hop to Review, Review one to Archive',
+async () => {
+    const db = memoryDbAdapter();
+    const reveal = await postTestPlanSlices(
+        db, { hashPassword: testHashPassword },
+    );
+    const row = reveal.find(
+        (r) => r.section === 'F2',
+    );
+    assert.ok(row);
+    assert.ok(row.flowId);
+    const organization = row.organizationId;
+    const ctx = createRequestContext(
+        db,
+        await claimToken({
+            sub: sliceEntityId('f2-admin'),
+            organization,
+            organizations: [organization],
+            roles: ['admin:' + organization],
+        }),
+    );
+    const workOrderId = generateIdentifier();
+    await postWorkOrderCreation(ctx, {
+        workOrderId,
+        flowLinkId: generateIdentifier(),
+        flowId: row.flowId,
+    });
+    const [workOrder, history] = await Promise.all([
+        getWorkOrder(ctx, workOrderId),
+        getWorkOrderHistory(ctx, workOrderId),
+    ]);
+    const currentId = currentNodeIdFromHistory(history);
+    assert.equal(
+        currentId, sliceEntityId('f2-node-capture'),
+    );
+    const graph = workOrder.flowGraph;
+    const fromCapture = graph.edges.filter(
+        (e) => e.fromNodeId === currentId,
+    );
+    assert.equal(fromCapture.length, 1);
+    const review = graph.nodes.find(
+        (n) => n.id === fromCapture[0]!.toNodeId,
+    );
+    assert.ok(review);
+    assert.equal(review.isArchive, false);
+    const fromReview = graph.edges.filter(
+        (e) => e.fromNodeId === review.id,
+    );
+    assert.equal(fromReview.length, 1);
+    const archive = graph.nodes.find(
+        (n) => n.id === fromReview[0]!.toNodeId,
+    );
+    assert.ok(archive);
+    assert.equal(archive.isArchive, true);
 });

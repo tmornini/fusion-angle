@@ -35,6 +35,25 @@ test('validateIdentityEntity accepts person/service', () => {
     );
 });
 
+test('validateIdentityEntity rejects a partial profile', () => {
+    assert.throws(
+        () => validateIdentityEntity({
+            kind: 'person', title: 'Engineer',
+        }),
+        /missing required key "department"/,
+    );
+    const whole = {
+        kind: 'person',
+        title: 'Engineer',
+        department: 'Product',
+        strengths: ['Leadership'],
+        team_dimensions: { driver: 60 },
+    };
+    assert.deepEqual(
+        validateIdentityEntity(whole), whole,
+    );
+});
+
 test('validateIdentityEntity rejects bad kind', () => {
     assert.throws(() =>
         validateIdentityEntity({ kind: 'robot' }));

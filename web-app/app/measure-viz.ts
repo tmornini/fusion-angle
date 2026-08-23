@@ -959,11 +959,11 @@ function vizClientScript(): string {
     startSel.innerHTML = '';
     endSel.innerHTML = '';
     for (var i = 0; i < sweeps.length; i++) {
-      var ohqxgUBEaFQwYbXsonRPmg = document.createElement('option');
-      ohqxgUBEaFQwYbXsonRPmg.value = String(i);
-      ohqxgUBEaFQwYbXsonRPmg.textContent = sweepLabel(i);
-      if (i === startIndex) ohqxgUBEaFQwYbXsonRPmg.selected = true;
-      startSel.appendChild(ohqxgUBEaFQwYbXsonRPmg);
+      var o1 = document.createElement('option');
+      o1.value = String(i);
+      o1.textContent = sweepLabel(i);
+      if (i === startIndex) o1.selected = true;
+      startSel.appendChild(o1);
       var o2 = document.createElement('option');
       o2.value = String(i);
       o2.textContent = sweepLabel(i);

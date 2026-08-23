@@ -45,7 +45,7 @@ async function seeded() {
     return { db, reveal };
 }
 
-const EXPECTED_SLICE_MESSAGE_PAIRS = 485;
+const EXPECTED_SLICE_MESSAGE_PAIRS = 499;
 
 test('slices stamp schema last and reveal 14',
 async () => {
@@ -365,7 +365,9 @@ async () => {
             db, row.organizationId,
         );
         assert.equal(
-            projects.length, 3, section,
+            projects.length,
+            section === 'K' ? 5 : 3,
+            section,
         );
         const approved = projects.filter(
             (p) => p.state === 'approved',

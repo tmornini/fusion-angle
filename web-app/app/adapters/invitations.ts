@@ -18,6 +18,7 @@ import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import {
+    type SessionCredentials,
     getSessionCredentials,
     isCookieSession,
     putSessionCredentials,
@@ -178,10 +179,22 @@ export async function postInvitationGrant(
     return 'sent';
 }
 
+export class SessionRemintFailedError extends Error {
+    constructor(cause: unknown) {
+        super(
+            'invitation accepted, but the session was not'
+            + ' re-minted — sign in again to see the new'
+            + ' organization',
+            { cause },
+        );
+    }
+}
+
 // Accept an invitation — the server writes the membership in the
 // invitation's org (type:"member") and appends 'accepted' in one
 // atomic batch. Then remint via the refresh grant so the access
 // token gains the new member:O claim (roles bake only at mint).
+// The committed seat's bell rings either way.
 export async function postInvitationAcceptance(
     ctx: RequestContext,
     id: Id,
@@ -196,43 +209,43 @@ export async function postInvitationAcceptance(
             at: nowUtc(),
         },
     );
-    await remintSessionClaims(ctx);
-    invitationChanges.notify();
+    try {
+        await remintSessionClaims(ctx);
+    } finally {
+        invitationChanges.notify();
+    }
 }
 
-// Re-bake access-token roles from live memberships. Best-effort:
-// a missing/dead refresh leaves the session as-is; the user can
-// re-login. Never throws on refresh failure after a successful
-// accept — the membership write already committed.
+// Re-bake access-token roles from live memberships. A refresh
+// that fails after the accept committed is named, never
+// swallowed — the page renders it. A 401 is the recovery
+// layer's to recover.
 async function remintSessionClaims(
     ctx: RequestContext,
 ): Promise<void> {
     if (isCookieSession()) {
-        try {
-            const creds = await postSessionRefresh(ctx, '');
-            putSessionToken(creds.accessToken);
-        } catch {
-            // accept already committed; claims catch up on next
-            // natural refresh or login
-        }
-        return;
-    }
-    let stored;
-    try {
-        stored = getSessionCredentials();
-    } catch {
-        return;
-    }
-    if (stored === null) return;
-    try {
-        const creds = await postSessionRefresh(
-            ctx, stored.refreshToken,
-        );
-        putSessionCredentials(creds);
+        const creds = await postRemintRefresh(ctx, '');
         putSessionToken(creds.accessToken);
-    } catch {
-        // accept already committed; claims catch up on next
-        // natural refresh or login
+        return;
+    }
+    const stored = getSessionCredentials();
+    if (stored === null) return;
+    const creds = await postRemintRefresh(
+        ctx, stored.refreshToken,
+    );
+    putSessionCredentials(creds);
+    putSessionToken(creds.accessToken);
+}
+
+// The one try: it wraps only the refresh grant.
+async function postRemintRefresh(
+    ctx: RequestContext,
+    refreshToken: string,
+): Promise<SessionCredentials> {
+    try {
+        return await postSessionRefresh(ctx, refreshToken);
+    } catch (err) {
+        throw new SessionRemintFailedError(err);
     }
 }
 

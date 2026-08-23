@@ -65,7 +65,7 @@ export function makeHumanMember(
 ): HumanMember {
     return new HumanMember(
         memberParentEntity(id, 'human'),
-        { id, ...humanDetail() },
+        { present: true, ...humanDetail() },
         {
             erased: false,
             name,

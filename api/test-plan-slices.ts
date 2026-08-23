@@ -13,6 +13,7 @@ import {
     SYSTEM_MEMBER_ID,
     DEFAULT_LOCK_TIMEOUT,
     MS_PER_DAY,
+    MS_PER_SECOND,
     type StateEntity,
     type GraphNode,
     type GraphEdge,
@@ -734,7 +735,13 @@ const SLICE_ENTITY_IDS: Readonly<
     'r-project-approved-2-state': 'FLhvamGQwczgjLSVQNvpDA',
     'sv-project-submitted-state': 'UgYEsWGUZozEatoKTnjwLg',
     'sv-project-approved-state': 'ZpvzzOazViNSjrLxSBFkrQ',
-    'sv-project-approved-2-state': 'PUdAQZLiCBAGdLAsCKTWWg'
+    'sv-project-approved-2-state': 'PUdAQZLiCBAGdLAsCKTWWg',
+    'k-project-under-review': 'u5uYKcFeIzTHEurdXwtpWg',
+    'k-project-under-review-2': '6T7eX-dXSmMtOGsKbOYNTQ',
+    'k-project-under-review-state':
+        'zQ6r2665iF_DuYIxVoP7wA',
+    'k-project-under-review-2-state':
+        'q4QUZSNifnMC38cHVJUO2Q'
 };
 
 export function sliceEntityId(
@@ -1157,6 +1164,9 @@ async function formF2Extras(
     const archiveNodeId = sliceEntityId(
         token + '-node-archive',
     );
+    const reviewNodeId = sliceEntityId(
+        token + '-node-review',
+    );
     const recordId = sliceEntityId(
         token + '-record-customer',
     );
@@ -1235,10 +1245,32 @@ async function formF2Extras(
                 ],
             },
             {
-                id: archiveNodeId,
-                name: 'Archive',
+                id: reviewNodeId,
+                name: 'Review',
                 positionX: 480,
                 positionY: 250,
+                isCreate: false,
+                isArchive: false,
+                taskInstructions: '',
+                memberIds: [adminId],
+                attributes: [
+                    {
+                        attribute_id: attr1Id,
+                        mode: 'readonly',
+                        isRequired: false,
+                    },
+                    {
+                        attribute_id: attr2Id,
+                        mode: 'readonly',
+                        isRequired: false,
+                    },
+                ],
+            },
+            {
+                id: archiveNodeId,
+                name: 'Archive',
+                positionX: 680,
+                positionY: 370,
                 isCreate: false,
                 isArchive: true,
                 taskInstructions: '',
@@ -1256,11 +1288,15 @@ async function formF2Extras(
                 toNodeId: captureNodeId,
             },
             {
-                id: sliceEntityId(
-                    'f2-edge-capture-archive',
-                ),
-                name: 'archive',
+                id: sliceEntityId(token + '-edge-submit'),
+                name: 'submit',
                 fromNodeId: captureNodeId,
+                toNodeId: reviewNodeId,
+            },
+            {
+                id: sliceEntityId(token + '-edge-approve'),
+                name: 'approve',
+                fromNodeId: reviewNodeId,
                 toNodeId: archiveNodeId,
             },
         ],
@@ -1571,6 +1607,176 @@ async function formCExtras(
         }
     }
     return { baselines, actuals };
+}
+
+type KReviewWrites = {
+    readonly projects: readonly GardenProject[];
+    readonly baselines: readonly CScoreRow[];
+};
+
+const K_UNDER_REVIEW_HIGH_SCORE = 90;
+const K_UNDER_REVIEW_LOW_SCORE = 10;
+const K_APPROVED_BASELINE_SCORE = 50;
+
+async function formKExtras(
+    organizationId: string,
+    adminId: string,
+    requestAt: string,
+): Promise<KReviewWrites> {
+    const projectTemplate = buildProjects()[0]!;
+    const reviews = [
+        {
+            suffix: 'under-review',
+            score: K_UNDER_REVIEW_HIGH_SCORE,
+        },
+        {
+            suffix: 'under-review-2',
+            score: K_UNDER_REVIEW_LOW_SCORE,
+        },
+    ] as const;
+    const objectives = OBJECTIVE_SEEDS.map(
+        (_, i) => ({
+            id: sliceEntityId('k-obj-' + (i + 1)),
+        }),
+    );
+    const projects: GardenProject[] = [];
+    const baselines: CScoreRow[] = [];
+    let projectPosition = PROJECT_GARDEN.length + 1;
+    for (const review of reviews) {
+        const id = sliceEntityId(
+            'k-project-' + review.suffix,
+        );
+        const project = {
+            ...projectTemplate,
+            id,
+            title: projectTemplate.title
+                + ' (' + review.suffix + ')',
+            position: projectPosition,
+        };
+        projectPosition += 1;
+        const event: StateEntity = {
+            id: sliceEntityId(
+                'k-project-' + review.suffix + '-state',
+            ),
+            entity_id: id,
+            member_id: adminId,
+            at: requestAt,
+            state: 'under_review',
+        };
+        const body = projectSeedBody(
+            project, event, organizationId,
+        );
+        const messagePair = await formSeedMessagePair(
+            {
+                key: seedMessagePairKey('projects', id),
+                routePattern:
+                    'organizations/:id/projects/:id',
+                idParams: [organizationId, id],
+                organization: organizationId,
+                requesterIdentityId: adminId,
+                body,
+            },
+            requestAt,
+        );
+        projects.push({ id, body, messagePair });
+        const baselineStart =
+            new Date(project.start_date).getTime();
+        for (let i = 0; i < objectives.length; i++) {
+            const obj = objectives[i]!;
+            const scoredAt = isoFromMs(
+                baselineStart + i * MS_PER_SECOND,
+            );
+            const fields = {
+                project_id: id,
+                objective_id: obj.id,
+                score: review.score,
+                member_id: adminId,
+                at: scoredAt,
+            };
+            const scoreId =
+                `${id}:${obj.id}:${scoredAt}`;
+            const scoreMessagePair =
+                await formSeedMessagePair(
+                    {
+                        key: seedMessagePairKey(
+                            'projects/:id/'
+                                + 'objective-baseline'
+                                + '-scores/:sid',
+                            scoreId,
+                        ),
+                        routePattern:
+                            'organizations/:id'
+                                + '/projects/:id'
+                                + '/objective-baseline'
+                                + '-scores/:sid',
+                        idParams: [
+                            organizationId,
+                            id,
+                            scoreId,
+                        ],
+                        organization:
+                            organizationId,
+                        requesterIdentityId: adminId,
+                        body: fields,
+                    },
+                    requestAt,
+                );
+            baselines.push({
+                id: scoreId,
+                fields,
+                messagePair: scoreMessagePair,
+            });
+        }
+    }
+    const approvedId = sliceEntityId('k-project-approved');
+    const approvedStart =
+        new Date(projectTemplate.start_date).getTime();
+    for (let i = 0; i < objectives.length; i++) {
+        const obj = objectives[i]!;
+        const scoredAt = isoFromMs(
+            approvedStart + i * MS_PER_SECOND,
+        );
+        const fields = {
+            project_id: approvedId,
+            objective_id: obj.id,
+            score: K_APPROVED_BASELINE_SCORE,
+            member_id: adminId,
+            at: scoredAt,
+        };
+        const scoreId =
+            `${approvedId}:${obj.id}:${scoredAt}`;
+        const scoreMessagePair =
+            await formSeedMessagePair(
+                {
+                    key: seedMessagePairKey(
+                        'projects/:id/'
+                            + 'objective-baseline'
+                            + '-scores/:sid',
+                        scoreId,
+                    ),
+                    routePattern:
+                        'organizations/:id'
+                            + '/projects/:id'
+                            + '/objective-baseline'
+                            + '-scores/:sid',
+                    idParams: [
+                        organizationId,
+                        approvedId,
+                        scoreId,
+                    ],
+                    organization: organizationId,
+                    requesterIdentityId: adminId,
+                    body: fields,
+                },
+                requestAt,
+            );
+        baselines.push({
+            id: scoreId,
+            fields,
+            messagePair: scoreMessagePair,
+        });
+    }
+    return { projects, baselines };
 }
 
 async function formFExtras(
@@ -2937,6 +3143,7 @@ export async function postTestPlanSlices(
     const f2Flows: F2FlowWrites[] = [];
     const fFlows: FFlowWrites[] = [];
     const cScores: CScoreWrites[] = [];
+    const kReviews: KReviewWrites[] = [];
     for (const section of PARALLEL_SECTIONS) {
         if (section === 'AA') continue;
         const slice = await formTenantAdminMessagePairs(
@@ -3027,6 +3234,12 @@ export async function postTestPlanSlices(
                 slice.adminId,
                 requestAt,
             ));
+        } else if (section === 'K') {
+            kReviews.push(await formKExtras(
+                slice.organizationId,
+                slice.adminId,
+                requestAt,
+            ));
         } else if (section === 'F') {
             fFlows.push(await formFExtras(
                 slice.organizationId,
@@ -3112,6 +3325,30 @@ export async function postTestPlanSlices(
                             row.messagePair,
                         )),
                 ]),
+            );
+            await Promise.all(
+                kReviews.flatMap((extra) =>
+                    extra.projects.map((project) =>
+                        postProjectDocumentOp(
+                            view,
+                            project.id,
+                            project.body,
+                            SYSTEM_MEMBER_ID,
+                            project.messagePair,
+                        )),
+                ),
+            );
+            await Promise.all(
+                kReviews.flatMap((extra) =>
+                    extra.baselines.map((row) =>
+                        postBaselineScoreDocumentOp(
+                            view,
+                            row.id,
+                            row.fields,
+                            row.fields.member_id,
+                            row.messagePair,
+                        )),
+                ),
             );
             for (const extra of f2Flows) {
                 await appendMessagePair(

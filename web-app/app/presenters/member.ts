@@ -44,6 +44,7 @@ export class HumanMemberRowPresenter {
 
     buildRow(isSelf: boolean = false): SafeHtml {
         const pii = this.#member.pii();
+        const profile = this.#member.profile();
         const name = pii.erased
             ? MEMBER_WITHOUT_PII_NAME
             : pii.name;
@@ -94,24 +95,25 @@ export class HumanMemberRowPresenter {
                 <div class="${
                     'flex items-center gap-2 mt-1'
                 }">
-                    ${this.#buildTitleBadge()}
+                    ${this.#buildTitleBadge(
+                        profile.present ? profile.title : '',
+                    )}
                     <span class="${
                         'text-xs text-muted'
                     }">
-                        ${this.#member
-                            .departmentLabel()}
+                        ${profile.present ? profile.department : ''}
                     </span>
                 </div>
             </div>
         </div>`;
     }
 
-    #buildTitleBadge(): SafeHtml {
+    #buildTitleBadge(title: string): SafeHtml {
         return html`<span
             class="${
                 'badge badge-secondary'
             }">
-            ${this.#member.titleLabel()}
+            ${title}
         </span>`;
     }
 }

@@ -1042,8 +1042,7 @@ function priorClaimCandidates(
         .sort(atIdCompare);
 }
 
-// Each claim pair re-runs the route's own 0/AjdvjuECVZEgZoFajaIEkg/2-event
-// decision
+// Each claim pair re-runs the route's own 0/1/2-event decision
 // with the pair BODY's claimAt as the reference clock (EDGE 2).
 // PRIOR state reduces from priorClaimCandidates above (never
 // old-plane rows) via latestClaimEvent's own CLAIM_STATES filter +
@@ -1459,7 +1458,7 @@ export async function deriveWorkOrderLifecycle(
 //     work-orders prefix + this workOrderId (both
 //     a create's response and its later document PUT/DELETE
 //     share ONE uriId — drift-work-orders.test.ts case 8);
-//   * claim/release/transition: uri_collection at each uUOcdPLOGxYyIcuyDTzQxA
+//   * claim/release/transition: uri_collection at each sub-
 //     resource's own per-id address (WORK_ORDER_CLAIM_PATTERN/
 //     WORK_ORDER_RELEASE_PATTERN/
 //     WORK_ORDER_TRANSITION_PATTERN's own shape, constructed

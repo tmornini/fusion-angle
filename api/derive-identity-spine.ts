@@ -9,7 +9,7 @@ import type {
     IdentityCredentialEntity,
     IdentityCredentialKind,
     IdentityCredentialStatus,
-    JKeRxRPHBGBkzSLrvNpmlg,
+    IdentityProviderEntity,
     IdentityTokenRevocationEntity,
     ClientRegistrationEntity,
     IdentityKind,
@@ -45,8 +45,7 @@ import {
 // OP_ADDRESS_PATTERN at Step 0: '[^/]+' between two literal
 // slashes, anchored at both ends, so '/identities/42/pii/' can
 // never be confused with a sibling address sharing the
-// '/identities/' root ('/identities/42/credentials/WeXjAaAxGSpLpamfEuvcww/',
-// or the
+// '/identities/' root ('/identities/42/credentials/c1/', or the
 // identity's own '/identities/42/' document) — the '/members' vs
 // '/memberships' precedent class this task's brief names.
 //
@@ -261,7 +260,7 @@ function providersPrefixFor(identityId: Id): string {
 
 export function identityProviderEntityOf(
     document: DerivedDocument,
-): JKeRxRPHBGBkzSLrvNpmlg {
+): IdentityProviderEntity {
     return {
         id: document.uriId,
         ...validateIdentityProviderEntity(
@@ -275,7 +274,7 @@ export function identityProviderEntityOf(
 function nestedProviderEntityOf(
     identityId: Id,
     document: DerivedDocument,
-): JKeRxRPHBGBkzSLrvNpmlg {
+): IdentityProviderEntity {
     return identityProviderEntityOf({
         ...document,
         body: {
@@ -300,14 +299,14 @@ async function fetchProviderDocumentsAt(
 export async function deriveIdentityProvidersFor(
     db: DbAdapter,
     identityId: Id,
-): Promise<JKeRxRPHBGBkzSLrvNpmlg[]> {
+): Promise<IdentityProviderEntity[]> {
     const nested = await fetchProviderDocumentsAt(
         db, providersPrefixFor(identityId),
     );
     const flat = await fetchProviderDocumentsAt(
         db, IDENTITY_PROVIDERS_PREFIX,
     );
-    const byId = new Map<string, JKeRxRPHBGBkzSLrvNpmlg>();
+    const byId = new Map<string, IdentityProviderEntity>();
     for (const document of flat.values()) {
         const entity = identityProviderEntityOf(document);
         if (entity.identity_id === identityId) {
@@ -327,7 +326,7 @@ export async function deriveIdentityProvider(
     db: DbAdapter,
     identityId: Id,
     eid: Id,
-): Promise<JKeRxRPHBGBkzSLrvNpmlg> {
+): Promise<IdentityProviderEntity> {
     const nested = await fetchProviderDocumentsAt(
         db, providersPrefixFor(identityId),
     );

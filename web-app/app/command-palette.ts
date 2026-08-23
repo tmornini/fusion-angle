@@ -219,26 +219,29 @@ export function humanMemberToSearchItem(
     member: HumanMember,
 ): SearchItem {
     const pii = member.pii();
+    const profile = member.profile();
     const title = pii.erased
         ? MEMBER_WITHOUT_PII_NAME
         : pii.name;
     const emailKeyword = pii.erased
         ? ''
         : ' ' + pii.email;
+    const role = profile.present
+        ? profile.title + ' · ' + profile.department
+        : '';
+    const roleKeywords = profile.present
+        ? profile.title + ' ' + profile.department
+        : '';
     return {
         id: 'member-' + member.idForLink(),
         title,
-        meta: member.titleLabel()
-            + ' · '
-            + member.departmentLabel(),
+        meta: role,
         category: 'members',
         icon: iconPerson(
             ICON_SIZE.base, '',
         ),
         href: buildPageUrl('members'),
-        keywords: member.titleLabel()
-            + ' ' + member.departmentLabel()
-            + emailKeyword,
+        keywords: roleKeywords + emailKeyword,
     };
 }
 

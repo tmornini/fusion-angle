@@ -453,17 +453,27 @@ export const SYSTEM_MEMBER_NAME = 'System';
 // the universal key: member.id === identity.id, always.
 export type IdentityKind = 'person' | 'service';
 
-export interface IdentityEntity {
-    id: Id;
-    kind: IdentityKind;
-    // Person-only human profile. Omitted on a service and
-    // on a person that has none — never null. Title is
-    // not PII; name/email/phone/bio stay on the pii facet.
-    title?: string;
-    department?: string;
-    strengths?: string[];
-    team_dimensions?: Record<string, number>;
+// Person-only org profile. Whole or absent — never a
+// partial. Title is not PII; name/email/phone/bio stay
+// on the pii facet.
+export interface IdentityProfileFields {
+    title: string;
+    department: string;
+    strengths: string[];
+    team_dimensions: Record<string, number>;
 }
+
+// The entity less its id: a service, a person without
+// a profile, or a person with all four profile fields.
+// `Omit<IdentityEntity, 'id'>` would collapse the union
+// to its common keys, so callers name this type instead.
+export type IdentityEntityFields =
+    | { kind: 'service' }
+    | { kind: 'person' }
+    | ({ kind: 'person' } & IdentityProfileFields);
+
+export type IdentityEntity =
+    IdentityEntityFields & { id: Id };
 
 // The person-PII facet, keyed by the shared identity id. A
 // separately-erasable row: erasing PII splices THIS row;
@@ -600,7 +610,7 @@ export type IdentityProviderAction = 'linked' | 'unlinked';
 // 'linked'. `provider` names the IdP (e.g. 'google'),
 // `provider_subject` is the identity's id AT that provider. An
 // unlink is a NEW 'unlinked' row, never a splice.
-export interface JKeRxRPHBGBkzSLrvNpmlg {
+export interface IdentityProviderEntity {
     id: Id;
     identity_id: Id;
     provider: string;
@@ -671,30 +681,35 @@ export interface HumanMemberEntity {
     team_dimensions: Record<string, number>;
 }
 
+// A person's org profile as read from the identity
+// document: whole, or absent. No field is ever
+// defaulted — a reader that needs a label decides what
+// absence looks like at its own call site.
+export type HumanProfile =
+    | {
+        readonly present: true;
+        readonly title: string;
+        readonly department: string;
+        readonly strengths: readonly string[];
+        readonly team_dimensions:
+            Readonly<Record<string, number>>;
+    }
+    | { readonly present: false };
+
 export class HumanMember {
     readonly kind = 'human' as const;
     readonly #id: MemberId;
     readonly #pii: MemberPii;
-    readonly #title: string;
-    readonly #department: string;
-    readonly #strengths: readonly string[];
-    readonly #teamDimensions:
-        Readonly<Record<string, number>>;
+    readonly #profile: HumanProfile;
 
     constructor(
         parent: MemberEntity,
-        detail: HumanMemberEntity,
+        profile: HumanProfile,
         pii: MemberPii,
     ) {
         this.#id = parent.id;
         this.#pii = pii;
-        this.#title = detail.title;
-        this.#department =
-            detail.department;
-        this.#strengths =
-            detail.strengths;
-        this.#teamDimensions =
-            detail.team_dimensions;
+        this.#profile = profile;
     }
 
     idForLink(): string {
@@ -705,38 +720,32 @@ export class HumanMember {
         return this.#pii;
     }
 
-    titleLabel(): string {
-        return this.#title;
-    }
-
-    departmentLabel(): string {
-        return this.#department;
+    profile(): HumanProfile {
+        return this.#profile;
     }
 
     department():
         | { present: true; label: string }
         | { present: false } {
-        return this.#department !== ''
-            ? { present: true, label: this.#department }
+        return this.#profile.present
+            && this.#profile.department !== ''
+            ? {
+                present: true,
+                label: this.#profile.department,
+            }
             : { present: false };
-    }
-
-    strengths(): readonly string[] {
-        return this.#strengths;
-    }
-
-    teamDimensions():
-        Readonly<Record<string, number>> {
-        return this.#teamDimensions;
     }
 
     matchesSearch(term: string): boolean {
         const t = term.toLowerCase();
         if (
-            this.#title
-                .toLowerCase().includes(t)
-            || this.#department
-                .toLowerCase().includes(t)
+            this.#profile.present
+            && (
+                this.#profile.title
+                    .toLowerCase().includes(t)
+                || this.#profile.department
+                    .toLowerCase().includes(t)
+            )
         ) {
             return true;
         }

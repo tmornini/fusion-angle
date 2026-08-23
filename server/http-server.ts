@@ -43,6 +43,20 @@ export const HASHED_CACHE_CONTROL =
     'public, max-age=31536000, immutable';
 export const NO_STORE = 'no-store';
 
+// The nine directives the page metas carried. A header
+// governs from the first byte; a meta governs only from
+// its parse point and browsers ignore frame-ancestors in
+// meta. HTML only: API.svg is its own document under
+// <object> with an inline <style>; JSON never becomes a
+// document.
+export const CONTENT_SECURITY_POLICY =
+    "default-src 'self'; script-src 'self';"
+    + " style-src 'self';"
+    + " style-src-attr 'unsafe-inline';"
+    + " font-src 'self'; img-src 'self' data:;"
+    + " frame-ancestors 'none'; base-uri 'self';"
+    + " form-action 'self'";
+
 const MIME_BY_EXT: Readonly<Record<string, string>> = {
     '.html': 'text/html; charset=utf-8',
     '.js': 'text/javascript; charset=utf-8',
@@ -360,6 +374,12 @@ async function serveStatic(
     res.setHeader('Content-Type', mime);
     res.setHeader('Content-Length', String(info.size));
     res.setHeader('Cache-Control', staticCacheControl(name));
+    if (ext === '.html') {
+        res.setHeader(
+            'Content-Security-Policy',
+            CONTENT_SECURITY_POLICY,
+        );
+    }
     if (method === 'HEAD') {
         res.end();
         return 200;

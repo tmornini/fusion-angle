@@ -889,7 +889,7 @@ export function createdEntityUriId(
 
 // The coverage gate: pairs, wire headers, and the idempotency
 // fast-path fire ONLY for wired route patterns. Seeded with the
-// ideas patterns in Task 1; every Task BBjWJsjYIDkTRKIIPrzWRw/3 family commit
+// ideas patterns in Task 1; every Task 2/3 family commit
 // extends it; the Task 6 exit test asserts it covers every
 // write route — so no intermediate commit ever advertises a
 // Response-ID it did not store.

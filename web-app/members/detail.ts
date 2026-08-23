@@ -34,7 +34,7 @@ import {
 import {
     sessionContext,
     getHumanMember,
-    getHumanMemberEntity,
+    getHumanMemberProfile,
     putHumanMember,
     subscribeHumanMemberChanges,
     getAIMember,
@@ -204,12 +204,9 @@ export async function init(
     });
 }
 
-export function reduceRefresh(
-    current: PageState,
-    fresh: HumanMember | AIMember | null,
+export function reduceSave(
+    fresh: HumanMember | AIMember,
 ): PageState {
-    if (current.kind === 'editing') return current;
-    if (fresh === null) return current;
     if (fresh.kind === 'human') {
         return {
             kind: 'reading',
@@ -222,6 +219,15 @@ export function reduceRefresh(
         variant: 'ai',
         member: fresh,
     };
+}
+
+export function reduceRefresh(
+    current: PageState,
+    fresh: HumanMember | AIMember | null,
+): PageState {
+    if (current.kind === 'editing') return current;
+    if (fresh === null) return current;
+    return reduceSave(fresh);
 }
 
 async function refresh(
@@ -455,9 +461,9 @@ async function saveHumanMember(
 ): Promise<void> {
     const memberId = s.member.idForLink();
     const ctx = sessionContext();
-    let row;
+    let profile;
     try {
-        row = await getHumanMemberEntity(
+        profile = await getHumanMemberProfile(
             ctx, memberId,
         );
     } catch (err) {
@@ -469,11 +475,15 @@ async function saveHumanMember(
     const patch = trimStrings(
         humanMemberPatchFromDraft(s.draft),
     );
-    const { id: _id, ...rest } = row;
     const {
         name, email, phone, bio, ...detailPatch
     } = patch;
-    const nextDetail = { ...rest, ...detailPatch };
+    const nextDetail = {
+        ...detailPatch,
+        team_dimensions: profile.present
+            ? { ...profile.team_dimensions }
+            : {},
+    };
     const piiPatch = humanMemberPiiPatchIfDirty(
         { name, email, phone, bio }, s.member.pii(),
     );
@@ -488,6 +498,17 @@ async function saveHumanMember(
         return;
     }
     showToast('Member saved', 'success');
+    let fresh;
+    try {
+        fresh = await getHumanMember(ctx, memberId);
+    } catch (err) {
+        reportFault(
+            ctx, 'Failed to reload member', err,
+        );
+        return;
+    }
+    state = reduceSave(fresh);
+    rerender();
 }
 
 async function saveAIMember(
@@ -534,4 +555,15 @@ async function saveAIMember(
     showToast(
         'AI member saved', 'success',
     );
+    let fresh;
+    try {
+        fresh = await getAIMember(ctx, memberId);
+    } catch (err) {
+        reportFault(
+            ctx, 'Failed to reload AI member', err,
+        );
+        return;
+    }
+    state = reduceSave(fresh);
+    rerender();
 }

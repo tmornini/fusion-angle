@@ -301,16 +301,11 @@ export async function postOrganizationInvitationGrant(
     actor: Id,
     _messagePair: MessagePair | undefined,
     _organization: Id | undefined,
-    roles: readonly string[],
+    _roles: readonly string[],
     requestAt: string,
     operationId: string,
 ): Promise<unknown> {
     requireWriteStamp(requestAt, operationId);
-    requireAdmin(
-        roles,
-        'forbidden: granting an invitation requires an'
-        + ' admin role',
-    );
     return grantInvitation(
         db, param(params, 0), payload, actor,
         requestAt, operationId,
@@ -367,16 +362,11 @@ export async function putInvitationOnOrganizationNest(
     actor: Id,
     _messagePair: MessagePair | undefined,
     _organization: Id | undefined,
-    roles: readonly string[],
+    _roles: readonly string[],
     requestAt: string,
     operationId: string,
 ): Promise<unknown> {
     requireWriteStamp(requestAt, operationId);
-    requireAdmin(
-        roles,
-        'forbidden: revoking an invitation requires an'
-        + ' admin role',
-    );
     const organization = param(params, 0);
     const id = param(params, 1);
     const transition = validateInvitationTransitionBody(

@@ -197,7 +197,8 @@ export function generateFlowWorkload(args: {
             // would overrun today, so no
             // event is future-dated.
             if (cursorMs >= nowMs) {
-                cursorMs = nowMs - 1000;
+                cursorMs = nowMs
+                    - (N - j) * MS_PER_SECOND;
             }
             stateEvents.push({
                 id: seedIdentifier(b62Id(rng, 22)),

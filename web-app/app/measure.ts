@@ -737,16 +737,6 @@ async function discoverDetailUrls(
             )?.href ?? null`,
         );
         if (href === null || href.length === 0) {
-            // Documented mock fallback for identity
-            // only (Tony Stark id is "current").
-            if (detailKey === 'identity-detail') {
-                discovered[detailKey] = registryUrl(
-                    baseUrl,
-                    'identity-detail',
-                    'identityId=current',
-                );
-                continue;
-            }
             throw new Error(
                 `Detail URL discovery failed on list`
                 + ` page "${listKey}" for`
@@ -786,33 +776,7 @@ async function discoverDetailUrls(
     const identityDetail =
         discovered['identity-detail'];
     if (identityDetail !== undefined) {
-        const q = queryOf(identityDetail)
-            || 'identityId=current';
-        if (pageKeys.includes(
-            'identity-providers',
-        )) {
-            discovered['identity-providers'] =
-                registryUrl(
-                    baseUrl,
-                    'identity-providers',
-                    q,
-                );
-        }
-        if (pageKeys.includes(
-            'identity-tokens',
-        )) {
-            discovered['identity-tokens'] =
-                registryUrl(
-                    baseUrl,
-                    'identity-tokens',
-                    q,
-                );
-        }
-    } else if (
-        pageKeys.includes('identity-providers')
-        || pageKeys.includes('identity-tokens')
-    ) {
-        const q = 'identityId=current';
+        const q = queryOf(identityDetail);
         if (pageKeys.includes(
             'identity-providers',
         )) {

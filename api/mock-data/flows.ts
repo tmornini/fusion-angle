@@ -158,7 +158,10 @@ export function buildFlows(): FlowSeed[] {
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        memberIds: [],
+                        memberIds: [
+                            'MQFcPtrZPIGjMCRAXtZUnA',
+                            'CJrglMsNBxOWWfbihHQSeg',
+                        ],
                         attributes: [
                             {
                                 attribute_id:

@@ -1,3 +1,24 @@
+// @ts-expect-error — Node global stub
+globalThis.localStorage = (() => {
+    const store = new Map<string, string>();
+    return {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => {
+            store.set(k, v);
+        },
+        removeItem: (k: string) => {
+            store.delete(k);
+        },
+        clear: () => {
+            store.clear();
+        },
+        key: () => null,
+        get length() {
+            return store.size;
+        },
+    };
+})();
+
 import { test } from 'node:test';
 import {
     invitationLifecycleStatesFor,
@@ -15,6 +36,8 @@ import type { NotificationEvent } from '../api/notifications.ts';
 import {
     validateInvitationEntity,
 } from '../api/validators.ts';
+import { UnauthorizedError } from
+    '../api/http-errors.ts';
 import {
     createRequestContext,
     type RequestContext,
@@ -30,6 +53,7 @@ import {
     postInvitationRevocation,
     getInvitations,
     getSentInvitations,
+    SessionRemintFailedError,
 } from '../web-app/app/adapters/invitations.ts';
 import {
     setCookieSession,
@@ -37,6 +61,7 @@ import {
 import {
     getSessionToken,
     deleteSessionToken,
+    putSessionToken,
 } from '../web-app/app/adapters/session-token.ts';
 import { deriveInvitations } from
     '../api/derive-invitations.ts';
@@ -796,6 +821,57 @@ async () => {
             grant_type: 'refresh',
         });
         assert.equal(getSessionToken(), 'reminted-access');
+    } finally {
+        setCookieSession(false);
+        deleteSessionToken();
+    }
+});
+
+test('a failed re-mint after accept surfaces, seat kept',
+async () => {
+    setCookieSession(true);
+    try {
+        const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
+            , 'BBjWJsjYIDkTRKIIPrzWRw');
+        const tony = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
+            , 'BBjWJsjYIDkTRKIIPrzWRw');
+        await postInvitationGrant(tony, 'sarah@x.com');
+        const inv = (await deriveInvitations(db))[0]!;
+        const sarah = await ctxOn(db
+            , 'toccYYkLEABmlbpHJalgtQ', 'AjdvjuECVZEgZoFajaIEkg');
+        putSessionToken('pre-accept');
+        const refused = new UnauthorizedError(
+            'invalid_grant',
+        );
+        const recording: RequestContext = {
+            ...sarah,
+            POST: async <T>(
+                resource: string,
+                body: Record<string, unknown>,
+            ): Promise<T> => {
+                if (resource === 'authentication/token') {
+                    throw refused;
+                }
+                return sarah.POST(resource, body);
+            },
+        };
+        await assert.rejects(
+            postInvitationAcceptance(recording, inv.id),
+            (err: unknown) =>
+                err instanceof SessionRemintFailedError
+                && err.cause === refused,
+        );
+        const organizations =
+            (await deriveMembershipsAll(db))
+                .filter(m =>
+                    m.identity_id === 'toccYYkLEABmlbpHJalgtQ')
+                .map(m => m.organization_id)
+                .sort();
+        assert.deepEqual(organizations, [
+            'AjdvjuECVZEgZoFajaIEkg',
+            'BBjWJsjYIDkTRKIIPrzWRw',
+        ]);
+        assert.equal(getSessionToken(), 'pre-accept');
     } finally {
         setCookieSession(false);
         deleteSessionToken();

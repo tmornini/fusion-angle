@@ -893,14 +893,14 @@ async () => {
     const ticket = await formWriteMessagePair({
         method: 'PUT',
         pathname:
-            '/authentication/VOoVnUGteBpVZJqRqWZolw/' + jti,
+            '/authentication/assertion-jtis/' + jti,
         routePattern:
-            'authentication/VOoVnUGteBpVZJqRqWZolw/:jti',
+            'authentication/assertion-jtis/:jti',
         routeSegments: [
-            'authentication', 'VOoVnUGteBpVZJqRqWZolw', ':jti',
+            'authentication', 'assertion-jtis', ':jti',
         ],
         pathSegments: [
-            'authentication', 'VOoVnUGteBpVZJqRqWZolw', jti,
+            'authentication', 'assertion-jtis', jti,
         ],
         headerFields: [],
         body: { exp: now - 60 },

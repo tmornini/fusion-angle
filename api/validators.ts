@@ -7,14 +7,14 @@ import type {
     AttributeType,
     Constraint,
     MemberId,
-    IdentityEntity,
+    IdentityEntityFields,
     IdentityPiiEntity,
     IdentityCredentialEntity,
     IdentityTokenRevocationEntity,
     IdentityDefaultOrganizationEntity,
     IdentityTokenEntity,
     ClientRegistrationEntity,
-    JKeRxRPHBGBkzSLrvNpmlg,
+    IdentityProviderEntity,
     RoleGrantEntity,
     MemberEntity,
     HumanMemberEntity,
@@ -772,9 +772,10 @@ export function validateMemberEntity(
 
 const IDENTITY_BODY_KEYS: readonly string[] = ['kind'];
 
-// Person-only. Same four fields HumanMemberEntity validates;
-// optional here so `{ kind }` still admits a person without
-// a profile. A service that names any of them is 400.
+// Person-only. The same four fields HumanMemberEntity
+// validates — whole or none: `{ kind }` admits a person
+// without a profile; any one to three of the four is 400;
+// a service that names any of them is 400.
 const IDENTITY_PROFILE_KEYS: readonly string[] = [
     'title', 'department',
     'strengths', 'team_dimensions',
@@ -782,7 +783,7 @@ const IDENTITY_PROFILE_KEYS: readonly string[] = [
 
 export function validateIdentityEntity(
     body: Record<string, unknown>,
-): Omit<IdentityEntity, 'id'> {
+): IdentityEntityFields {
     assertOnlyKeys(
         body, IDENTITY_BODY_KEYS, 'IdentityEntity',
         IDENTITY_PROFILE_KEYS,
@@ -797,38 +798,30 @@ export function validateIdentityEntity(
         );
         return { kind };
     }
+    const namesProfile = IDENTITY_PROFILE_KEYS.some(
+        (key) => key in body,
+    );
+    if (!namesProfile) {
+        return { kind };
+    }
+    assertOnlyKeys(
+        body,
+        [...IDENTITY_BODY_KEYS, ...IDENTITY_PROFILE_KEYS],
+        'IdentityEntity',
+    );
     return {
         kind,
-        ...('title' in body
-            ? { title: pickString(body, 'title') }
-            : {}),
-        ...('department' in body
-            ? {
-                department: pickString(
-                    body, 'department',
-                ),
-            }
-            : {}),
-        ...('strengths' in body
-            ? {
-                strengths: pickStringArray(
-                    body, 'strengths',
-                ),
-            }
-            : {}),
-        ...('team_dimensions' in body
-            ? {
-                team_dimensions:
-                    pickStringNumberRecord(
-                        body, 'team_dimensions',
-                    ),
-            }
-            : {}),
+        title: pickString(body, 'title'),
+        department: pickString(body, 'department'),
+        strengths: pickStringArray(body, 'strengths'),
+        team_dimensions: pickStringNumberRecord(
+            body, 'team_dimensions',
+        ),
     };
 }
 
 export interface IdentityDocumentBody {
-    readonly entity: Omit<IdentityEntity, 'id'>;
+    readonly entity: IdentityEntityFields;
 }
 
 // The HTTP-body gate for PUT /identities/:id: the twelfth
@@ -845,10 +838,10 @@ export interface IdentityDocumentBody {
 // 'IdentityDocumentBody' naming convention every other
 // *DocumentBody validator uses — the label appears in the wire
 // 400 body ("unexpected key ... for IdentityEntity"), and the
-// convention's label would change those bytes. A person may
-// carry the four HumanMemberEntity profile fields; a service
-// that names any of them is 400. Existing `{ kind }` PUTs
-// still admit a person without a profile. Global plane
+// convention's label would change those bytes. A person carries
+// the four HumanMemberEntity profile fields whole or not at all;
+// a service that names any of them is 400. Existing `{ kind }`
+// PUTs still admit a person without a profile. Global plane
 // (family-registry.ts: organizationNested:false).
 export function validateIdentityDocumentBody(
     body: Record<string, unknown>,
@@ -1042,17 +1035,17 @@ const IDENTITY_PROVIDER_BODY_KEYS: readonly string[] = [
 
 export function validateIdentityProviderEntity(
     body: Record<string, unknown>,
-): Omit<JKeRxRPHBGBkzSLrvNpmlg, 'id'> {
+): Omit<IdentityProviderEntity, 'id'> {
     assertOnlyKeys(
         body, IDENTITY_PROVIDER_BODY_KEYS,
-        'JKeRxRPHBGBkzSLrvNpmlg',
+        'IdentityProviderEntity',
     );
     const action = validateEnumField(
         body, 'action', ['linked', 'unlinked'],
-        'provider action', 'JKeRxRPHBGBkzSLrvNpmlg',
+        'provider action', 'IdentityProviderEntity',
     );
     const at = validateTimestampField(
-        body, 'at', 'JKeRxRPHBGBkzSLrvNpmlg',
+        body, 'at', 'IdentityProviderEntity',
     );
     return {
         identity_id: pickIdentifier(body, 'identity_id'),
@@ -1986,7 +1979,7 @@ const MEMBERSHIP_DOCUMENT_BODY_KEYS: readonly string[] = [
     'organization_id', 'identity_id', 'type', 'at',
 ];
 
-export interface NIjaUmatkDaVBQdIjzUjYg {
+export interface MembershipDocumentBody {
     readonly entity: Omit<MembershipEntity, 'id'>;
 }
 
@@ -1997,7 +1990,7 @@ export interface NIjaUmatkDaVBQdIjzUjYg {
 // MANDATE (a NAMED byte-parity-over-convention choice, the
 // Phase 7 Objective precedent): the assertOnlyKeys label is
 // 'MembershipEntity', matching validateMembershipEntity
-// byte-for-byte, NOT the 'NIjaUmatkDaVBQdIjzUjYg' naming
+// byte-for-byte, NOT the 'MembershipDocumentBody' naming
 // convention every other *DocumentBody validator uses — the
 // label appears in the wire 400 body ("unexpected key ... for
 // MembershipEntity"), and the convention's label would change
@@ -2008,7 +2001,7 @@ export interface NIjaUmatkDaVBQdIjzUjYg {
 // paths too.
 export function validateMembershipDocumentBody(
     body: Record<string, unknown>,
-): NIjaUmatkDaVBQdIjzUjYg {
+): MembershipDocumentBody {
     assertOnlyKeys(
         body, MEMBERSHIP_DOCUMENT_BODY_KEYS, 'MembershipEntity',
     );
@@ -3467,7 +3460,7 @@ const OBJECTIVE_CREATE_KEYS: readonly string[] = [
 // objective fields are NOT fully validated here: the org-
 // scoped store stamps organization_id from the verified
 // token and re-validates through validateObjectiveEntity
-// AFTER the stamp, so the body OMITS it. The revision uUOcdPLOGxYyIcuyDTzQxA
+// AFTER the stamp, so the body OMITS it. The revision sub-
 // object is re-validated by the objective_revisions store's
 // own validator; its member_id is a row column (who authored
 // the definition), not state authorship.

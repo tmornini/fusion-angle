@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from
     'node:fs/promises';
+import { readFileSync, readdirSync, statSync } from
+    'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { memoryDbAdapter } from '../api/db-memory.ts';
@@ -11,6 +13,7 @@ import {
     HTTP_UNAUTHORIZED,
 } from '../api/http-errors.ts';
 import {
+    CONTENT_SECURITY_POLICY,
     HASHED_CACHE_CONTROL,
     NO_STORE,
     REQUEST_BODY_MAX_BYTES,
@@ -124,6 +127,56 @@ async () => {
     });
 });
 
+test('HTML carries the Content-Security-Policy header',
+async () => {
+    await withServer({
+        'landing/index.html': '<p>hi</p>',
+        'assets/app.js': 'console.log(1)',
+    }, undefined, async (base) => {
+        const page = await fetch(
+            base + '/landing/index.html',
+        );
+        assert.equal(page.status, 200);
+        assert.equal(
+            page.headers.get('content-security-policy'),
+            "default-src 'self'; script-src 'self';"
+            + " style-src 'self';"
+            + " style-src-attr 'unsafe-inline';"
+            + " font-src 'self'; img-src 'self' data:;"
+            + " frame-ancestors 'none'; base-uri 'self';"
+            + " form-action 'self'",
+        );
+        assert.equal(
+            page.headers.get('content-security-policy'),
+            CONTENT_SECURITY_POLICY,
+        );
+
+        const head = await fetch(
+            base + '/landing/index.html',
+            { method: 'HEAD' },
+        );
+        assert.equal(head.status, 200);
+        assert.equal(
+            head.headers.get('content-security-policy'),
+            CONTENT_SECURITY_POLICY,
+        );
+
+        const app = await fetch(base + '/assets/app.js');
+        assert.equal(app.status, 200);
+        assert.equal(
+            app.headers.get('content-security-policy'),
+            null,
+        );
+
+        const miss = await fetch(base + '/assets/no.js');
+        assert.equal(miss.status, 404);
+        assert.equal(
+            miss.headers.get('content-security-policy'),
+            null,
+        );
+    });
+});
+
 test('missing static file is 404', async () => {
     await withServer({}, undefined, async (base) => {
         const res = await fetch(base + '/assets/no.js');
@@ -154,4 +207,32 @@ async () => {
         );
         assert.equal(last['operationId'], undefined);
     });
+});
+
+test('no web-app HTML carries a CSP meta; the server does',
+() => {
+    const files: string[] = [];
+    const walk = (dir: string): void => {
+        for (const name of readdirSync(dir)) {
+            const path = join(dir, name);
+            if (statSync(path).isDirectory()) {
+                walk(path);
+            } else if (name.endsWith('.html')) {
+                files.push(path);
+            }
+        }
+    };
+    walk('web-app');
+    assert.ok(files.length >= 30);
+    for (const path of files) {
+        assert.doesNotMatch(
+            readFileSync(path, 'utf8'),
+            /Content-Security-Policy/,
+            path + ' carries a CSP meta',
+        );
+    }
+    assert.match(
+        readFileSync('server/http-server.ts', 'utf8'),
+        /Content-Security-Policy/,
+    );
 });

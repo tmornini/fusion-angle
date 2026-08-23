@@ -233,6 +233,10 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
     }),
     writeExample('put', '/identities/:id', {
         kind: 'person',
+        title: 'Engineer',
+        department: 'Product',
+        strengths: ['Leadership'],
+        team_dimensions: { driver: 60 },
     }),
     writeExample(
         'put',

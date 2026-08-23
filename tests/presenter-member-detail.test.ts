@@ -102,7 +102,7 @@ function makeHumanMember() {
             type: 'human',
         },
         {
-            id: 'hw_1',
+            present: true,
             title: 'Engineer',
             department: 'Engineering',
             strengths: ['Leadership'],

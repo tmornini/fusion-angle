@@ -393,7 +393,8 @@ test('PUT service identity with title is 400', async () => {
     assert.equal(res.status, 400);
 });
 
-test('PUT person identity with title is 201', async () => {
+test('PUT person identity with a partial profile is 400',
+async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const res = await handleRequest(
@@ -406,29 +407,31 @@ test('PUT person identity with title is 201', async () => {
             operationId: TEST_OPERATION_ID,
         }),
     );
-    assert.ok(res.status === 201 || res.status === 200);
-    const written = await res.json() as {
-        id: string;
-        kind: string;
-        title?: string;
-    };
-    assert.equal(written.id, 'qUceZILomWDFIEtnAaLHKg');
-    assert.equal(written.kind, 'person');
-    assert.equal(written.title, 'Engineer');
+    assert.equal(res.status, 400);
+    assert.deepEqual(await res.json(), {
+        error: 'missing required key "department"'
+            + ' for IdentityEntity',
+    });
 });
 
-test('GET identity returns title for that person',
+test('GET identity returns the whole profile',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const id = generateIdentifier();
+    const profile = {
+        title: 'Engineer',
+        department: 'Product',
+        strengths: ['Leadership'],
+        team_dimensions: { driver: 60 },
+    };
     const put = await handleRequest(
         db,
         apiRequest({
             method: 'PUT',
             path: '/identities/' + id,
             token: DEV_TOKEN,
-            body: { kind: 'person', title: 'Engineer' },
+            body: { kind: 'person', ...profile },
             operationId: TEST_OPERATION_ID,
         }),
     );
@@ -436,11 +439,19 @@ async () => {
     const got = await GET<{
         id: string;
         kind: string;
-        title?: string;
+        title: string;
+        department: string;
+        strengths: string[];
+        team_dimensions: Record<string, number>;
     }>(db, 'identities/' + id, DEV_TOKEN);
     assert.equal(got.id, id);
     assert.equal(got.kind, 'person');
-    assert.equal(got.title, 'Engineer');
+    assert.equal(got.title, profile.title);
+    assert.equal(got.department, profile.department);
+    assert.deepEqual(got.strengths, profile.strengths);
+    assert.deepEqual(
+        got.team_dimensions, profile.team_dimensions,
+    );
 });
 
 test('PUT pii does not require title; GET pii has no title',
@@ -453,7 +464,13 @@ async () => {
             method: 'PUT',
             path: '/identities/XXZruirZyAOoRpNxaDnpSA',
             token: DEV_TOKEN,
-            body: { kind: 'person', title: 'CEO' },
+            body: {
+                kind: 'person',
+                title: 'CEO',
+                department: 'Product',
+                strengths: ['Leadership'],
+                team_dimensions: { driver: 60 },
+            },
             operationId: TEST_OPERATION_ID,
         }),
     );

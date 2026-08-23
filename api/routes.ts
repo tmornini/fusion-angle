@@ -22,7 +22,7 @@ import type {
     FlowWorkOrderEntity,
     FlowRecordEntity,
     HumanMemberEntity,
-    IdentityEntity,
+    IdentityEntityFields,
     IdentityKind,
     IdentityPiiEntity,
     IdentityCredentialEntity,
@@ -37,7 +37,7 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
     MembershipEntity,
-    JKeRxRPHBGBkzSLrvNpmlg,
+    IdentityProviderEntity,
     WorkOrderEntity,
     WorkOrderFlowGraph,
     MemberEntity,
@@ -348,8 +348,7 @@ export { param, requireOrganization, withoutId };
 // lazy design existed to avoid — order-dependent on which module
 // an entry point reached first; see the fix report.)
 //
-// Decision 7 state-in-entity (Phase BBjWJsjYIDkTRKIIPrzWRw/3): the PUT body
-// is the
+// Decision 7 state-in-entity (Phase 2/3): the PUT body is the
 // FULL document — the entity's own fields plus the state trio —
 // validated once at the gate (documentWriteResponseSpec, via
 // validateDocument). Phase Final Task 2: the ideas ROW half is
@@ -412,8 +411,7 @@ const FLOWS_WIRING: DocumentFamilyWiring = {
 // The work-orders wiring row — the fourth family, and the
 // FIRST 'stateless' one (Decision 7's lifecycle trio does not
 // apply to a work-order document; see postWorkOrderDocumentOp's
-// own comment for why). Both PUT (Task BBjWJsjYIDkTRKIIPrzWRw/3) and GET
-// (Task 7)
+// own comment for why). Both PUT (Task 2/3) and GET (Task 7)
 // now ride the generic machinery, so entityOf serves a live GET
 // reader (documentGetHandler / documentCollectionGetHandler)
 // exactly as ideaEntityOf/projectEntityOf/flowEntityOf each
@@ -2389,7 +2387,7 @@ export async function postWorkOrderTransitionOp(
 // record type (spec W1). Member tier rides the
 // /work-orders MEMBER_VERBS segment prefix — no policy
 // edit (the /claim precedent). Claim-AGNOSTIC (A7).
-// Rebind is forbidden in xDyDkxEPwtcNmJVknUHDsg: a prior binding pair
+// Rebind is forbidden in v1: a prior binding pair
 // naming a different (instance, type) → 409 in-tx;
 // a byte-identical resend replays via message_hash.
 // Covenant ladder: fence → body → instance → join →
@@ -2806,9 +2804,9 @@ export async function postIdentityDocumentOp(
     body: Record<string, unknown>,
     _actor: Id,
     messagePair?: MessagePair,
-): Promise<Omit<IdentityEntity, 'id'>> {
+): Promise<IdentityEntityFields> {
     const entity = withoutId(body) as unknown as
-        Omit<IdentityEntity, 'id'>;
+        IdentityEntityFields;
     return db.transaction(
         // Phase Final Task 2: identities ROW half stripped.
         MESSAGE_TABLES,
@@ -2937,7 +2935,7 @@ export async function postIdentityProviderDocumentOp(
     body: Record<string, unknown>,
     _actor: Id,
     messagePair?: MessagePair,
-): Promise<JKeRxRPHBGBkzSLrvNpmlg> {
+): Promise<IdentityProviderEntity> {
     const raw = withoutId(body);
     if (
         'identity_id' in raw

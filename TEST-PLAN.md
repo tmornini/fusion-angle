@@ -472,7 +472,7 @@ depends: AT
     stdout reveal); the SV hunter
     skips SV1.
 - [ ] **A4** Open `http://localhost:$HTTP_SERVER_PORT/` in the test browser with site data deleted and no `refresh_token` cookie. PASS: unsigned root hops to `landing/index.html` (one hop from the blank root document). Does not open `auth/` and does not open `snapshots/`. Landing remains the public marketing page; it is now also the unsigned root target.
-- [ ] **A5** Open DevTools Console on that load. PASS: no 501; no JSON parse crash. CSP `frame-ancestors` delivered via meta and an anonymous `POST /api/authentication/token` refresh 401 are acceptable.
+- [ ] **A5** Open DevTools Console on that load. PASS: no 501; no JSON parse crash. An anonymous `POST /api/authentication/token` refresh 401 is acceptable.
 
 ---
 
@@ -544,19 +544,28 @@ in order.
   that AI. Read mode shows the AI identity card (Name,
   Model as "{name} — {provider}", Description) and a
   Skill Focus row; there is no Auth Token row.
-- [ ] **AA9** From the human member detail, click Edit,
-  change Phone and Bio, toggle one strength on and one
-  off (`.strength-chip` buttons with `data-strength`,
-  toggled by click — not checkboxes), click Save. PASS:
-  toast "Member saved" appears. Navigate away and
-  return to detail. PASS: edited Phone, Bio, and
+- [ ] **AA9** Open the current user's own detail — the
+  seeded admin, who carries three strengths (Strategic
+  Planning, Data Analysis, Stakeholder Management); never
+  an AA5/AA6-added human, which starts with none. Click
+  Edit, change Phone and Bio, toggle Data Analysis off and
+  Agile Methods on (`.strength-chip` buttons with
+  `data-strength`, toggled by click — not checkboxes),
+  click Save. PASS: toast "Member saved" appears and the
+  page returns to read mode showing the edits — no
+  navigation. Read mode renders `#member-strengths
+  .pill-tag-strength` spans (three, with no
+  `data-strength`); `.strength-chip` is edit-only. Reload
+  the page. PASS: edited Phone, Bio, and the three
   strengths persist.
 - [ ] **AA9a** From an AI member detail, click Edit,
   change Description and Skill Focus, and pick a
   different Model from the pulldown (grouped by
   provider, current model pre-selected), click Save.
-  PASS: toast "AI member saved" fires; on reopen the
-  edited Description, Skill Focus, and Model persist.
+  PASS: toast "AI member saved" fires and the
+  page returns to read mode showing the edits — no
+  navigation. Reload; the edited Description, Skill Focus,
+  and Model persist.
   There is no Auth Token field.
 - [ ] **AA10** Navigate to Organization. Click the
   page-level Edit button (a single button at the page
@@ -1606,7 +1615,7 @@ depends: A
 
 ### AA13. Workbox Source Flow
 
-- [ ] **AA-WB-SETUP** Verify the seeded Workbox-only flow named `WB Test Flow` (A3 reveal `flow_id`) is READY in Create Work Order: three nodes Create → Capture (text + select attributes) → Archive (`isArchive: true`). Open Workbox, click "+ Create Work Order", and confirm `WB Test Flow` sits in the `READY` section (clickable, `data-flow-id` = reveal `flow_id`). Do not build or rewire the graph. This flow is mutated only by Agent-F2. Agent-F2's WO creation reads from this flow, not from any Agent-F flow.
+- [ ] **AA-WB-SETUP** Verify the seeded Workbox-only flow named `WB Test Flow` (A3 reveal `flow_id`) is READY in Create Work Order: four nodes Create → Capture (text + select attributes) → Review (read-only) → Archive (`isArchive: true`). Open Workbox, click "+ Create Work Order", and confirm `WB Test Flow` sits in the `READY` section (clickable, `data-flow-id` = reveal `flow_id`). Do not build or rewire the graph. This flow is mutated only by Agent-F2. Agent-F2's WO creation reads from this flow, not from any Agent-F flow. Serial (A3 `--mock-data`): no `WB Test Flow` exists; the subject is Customer Onboarding (READY once its Review node names Sarah Chen and Emily Rodriguez).
 
 ### Workbox Inbox (`workbox/`)
 
@@ -1621,15 +1630,20 @@ depends: A
   seed has active work orders, so verify against
   an org with none, or by component source.
 - [ ] **WB3** Click the Archive tab. PASS: tab
-  switches to show archive list (empty state
-  initially).
+  switches to show archive list (Parallel: empty.
+  Serial: the Archive list holds the 105 seeded
+  completed work orders.).
 
 ### Workbox — Create Work Order
 
 - [ ] **WB4** Click "+ Create Work Order". PASS:
   a dropdown opens with up to two labeled
   sections — `READY` (clickable rows, one per
-  publishable flow including `WB Test Flow`) and
+  publishable flow including `WB Test Flow`) —
+  Serial: READY is exactly Customer Onboarding and
+  Lead-to-Close; NOT READY is Fusion Angle Flow (16)
+  and Layout Test: Proposal Review Cycle (15), as
+  `tests/mock-flow-readiness.test.ts` pins — and
   `NOT READY` (disabled rows for any flow with
   zero-member or dead-end nodes; each carries a
   red no-entry icon and a subtitle "1 node needs
@@ -1645,14 +1659,17 @@ depends: A
   `READY` section. PASS: work order is created,
   browser navigates to the action screen at the
   first post-start state ("Capture"). Display ID
-  (8-char hex) is visible in the header.
+  (8-char hex) is visible in the header. Serial:
+  click Customer Onboarding; the first post-start
+  state is "Data Capture".
 - [ ] **WB5a** Edit `WB Test Flow` to remove the
   outgoing edge from `Capture` (creating a dead
   end). Return to Workbox, open the Create Work
   Order dropdown. PASS: `WB Test Flow` now
   appears in the `NOT READY` section with
   subtitle "1 node needs attention". Restore the
-  edge and verify it returns to `READY`.
+  edge and verify it returns to `READY`. Serial:
+  remove the `submit` edge from Data Capture.
 - [ ] **WB5b — Server-side gate.** The server-side
   gate is covered by
   `tests/adapters-flow-publish.test.ts`
@@ -1711,7 +1728,9 @@ depends: A
   `work-orders/:id/transition` (201), work order
   moves to the next state, browser navigates back
   to the inbox. The work order appears in the
-  Active tab (unclaimed).
+  Active tab (unclaimed). Serial: bind an instance,
+  fill Company Name and Contact Email, click
+  `submit` → Review.
 - [ ] **WB12** Click the work order row in the
   Active tab. PASS: work order PUTs
   `work-orders/:id/claim` (201) and the browser
@@ -1743,7 +1762,8 @@ depends: A
   completion (Archive) node (its `isArchive` is
   true). PASS:
   work order moves to the Archive tab. It no
-  longer appears in Active.
+  longer appears in Active. Serial: on Review fill
+  Reviewer Notes and click `approve`.
 - [ ] **WB15** Click a completed work order in
   the Archive tab. PASS: action screen shows
   read-only view with history but no attributes
@@ -1900,7 +1920,8 @@ the claude-in-chrome MCP.
   + % of node's work, with "(not in current clan)" iff
   applicable). For a branch node, `next` shows the per-edge
   split. The card has NO inputs and NO Save button.
-  Mouse-out → card hides.
+  Mouse-out → card hides. Serial: Review's card
+  subtitle names the two reviewers.
 - [ ] **FS5** Click a node → the card pins (stays open on
   mouse-out). Click empty canvas → unpins. Click another
   node → re-pins to it.
@@ -2210,13 +2231,14 @@ depends: A
   Styles card stays read-only.
 - [ ] **G21** Edit Phone and Bio, toggle one strength on
   and one off, click Save. PASS: toast "Member saved"
-  appears. Navigate away (e.g. to Dashboard) and return.
-  PASS: all edits persist.
+  appears. PASS: the page returns to read mode showing
+  the edits. Reload; all edits persist.
 - [ ] **G22** Click Edit, change a field, press `Escape`.
   PASS: edits discarded, view returns to read mode.
 - [ ] **G23** Click Edit, change a text field, press
   `Enter` while focused on the input. PASS: save fires
-  (toast "Member saved").
+  (toast "Member saved") and the page returns to read
+  mode.
 - [ ] **G23a** From `member-detail`, click the back button.
   PASS: returns to `members/index.html`.
 
@@ -2233,10 +2255,12 @@ depends: A
   textarea, Skill Focus textarea); there is no Auth
   Token field.
   Change Description and Skill Focus, click Save. PASS:
-  toast "AI member saved"; on reopen the edits persist.
+  toast "AI member saved"; the page returns to read mode
+  showing the edits; reload and they persist.
 - [ ] **G24b** Click Edit again, pick a different Model
   from the pulldown, click Save. PASS: toast "AI member
-  saved"; on reopen the read view shows the new model as
+  saved"; the page returns to read mode showing the new
+  model; reload and it persists as
   "{name} — {provider}".
 
 ### Identities (list & detail) (`identities/`, `identities/detail.html`)
@@ -2568,8 +2592,8 @@ project.
 ### K24–K26 — Projects list Projected Impact column (Agent-E)
 
 **K24.** Open Projects list; PASS if the Projected Impact
-column renders a value for each row — unscored / pre-approval
-projects show "—"; scored projects show a signed value.
+column renders a value for each row — unscored projects show
+"—"; scored projects show a signed value.
 NOTE: the column header carries no visible text label (the
 "Projected Impact" name is not rendered in the header row),
 so identify the column by its position/content, not header
@@ -2579,8 +2603,12 @@ text.
 re-order accordingly (most-positive first).
 
 **K26.** Filter to `under_review` status + sort by Projected
-Impact descending; PASS if the result is the "review queue
-ranked by impact" workflow we designed.
+Impact descending. Precondition: the K seed carries two
+`under_review` projects, each with four baselines and
+distinct Projected Impact values (`k-project-under-review`
+high, `k-project-under-review-2` low). PASS if both rows
+render, ranked high first — the "review queue ranked by
+impact" workflow we designed.
 
 ### K27–K29 — Dashboard Impact + Aggregates (Agent-CH)
 
@@ -2598,8 +2626,9 @@ arc-gauges; Impact is a bipolar arc) and an Objectives box
 - The "actual" tick is visually distinct from the baseline
   area (thinner / different opacity)
 
-**K29.** From another tab, log a measurement on an approved
-project. PASS if the Objectives box updates within
+**K29.** From another tab, log a measurement on the approved K project
+(`k-project-approved`, seeded with four baselines by
+the admin). PASS if the Objectives box updates within
 ~1 second (BroadcastChannel `fusion-angle:data` + `subscribeProjectScoreChanges`); the
 three arc-gauge cards refresh only on full page load.
 

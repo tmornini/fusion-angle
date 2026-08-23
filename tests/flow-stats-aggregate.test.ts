@@ -819,3 +819,41 @@ test('collapses long tail into a rest bucket', () => {
     assert.equal(rest.count, 2);
     assert.equal(rest.combinedSharePct, 20);
 });
+
+test(
+    'an out-of-order Archive is here-now at the later node',
+    () => {
+        const f = makeFixture();
+        const tied = tBefore(f, 30_000);
+        const input: FlowStatsInput = { ...f,
+            transitions: [
+                { id: 't0', workOrderId: 'xdaJyuuPyHfffCGLhqDrOQ',
+                  kind: 'creation',
+                  toNodeId: 'c', memberId: 'pnXmXrxOWayANgDLdCjuBw',
+                  at: tBefore(f, 90_000) },
+                { id: 't1', workOrderId: 'xdaJyuuPyHfffCGLhqDrOQ',
+                  kind: 'step',
+                  fromNodeId: 'c',
+                  toNodeId: 'a', memberId: 'pnXmXrxOWayANgDLdCjuBw',
+                  at: tBefore(f, 60_000) },
+                { id: 't2', workOrderId: 'xdaJyuuPyHfffCGLhqDrOQ',
+                  kind: 'step',
+                  fromNodeId: 'a',
+                  toNodeId: 'z', memberId: 'pnXmXrxOWayANgDLdCjuBw',
+                  at: tied },
+                { id: 't3', workOrderId: 'xdaJyuuPyHfffCGLhqDrOQ',
+                  kind: 'step',
+                  fromNodeId: 'z',
+                  toNodeId: 'b', memberId: 'pnXmXrxOWayANgDLdCjuBw',
+                  at: tied },
+            ],
+        };
+        const m = buildFlowStats(input);
+        assert.equal(m.completedWorkOrderCount, 0);
+        assert.equal(m.incompleteWorkOrderCount, 1);
+        assert.equal(
+            m.nodes.find(n => n.id === 'b')!.currentlyHere,
+            1,
+        );
+    },
+);

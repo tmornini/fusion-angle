@@ -17,6 +17,7 @@ import {
     l2cTriageNodeId,
     memberLisa,
     memberClaude,
+    buildLeadToCloseWorkload,
 } from '../api/mock-data/lead-to-close-flow.ts';
 import { seededMockDb } from './mock-seed.ts';
 
@@ -165,3 +166,24 @@ test(
         }
     },
 );
+
+test('generated state events are strictly ascending', () => {
+    const generated = buildLeadToCloseWorkload();
+    const atsByWorkOrder = new Map<string, string[]>();
+    for (const event of generated.stateEvents) {
+        const ats =
+            atsByWorkOrder.get(event.entity_id) ?? [];
+        ats.push(event.at);
+        atsByWorkOrder.set(event.entity_id, ats);
+    }
+    assert.ok(atsByWorkOrder.size >= WO_COUNT_MIN);
+    for (const [id, ats] of atsByWorkOrder) {
+        for (let i = 1; i < ats.length; i++) {
+            assert.ok(
+                ats[i]! > ats[i - 1]!,
+                id + ' step ' + i + ': ' + ats[i - 1]
+                    + ' then ' + ats[i],
+            );
+        }
+    }
+});

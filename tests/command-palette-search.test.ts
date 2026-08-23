@@ -63,7 +63,7 @@ function buildHumanMember(
             type: 'human',
         },
         {
-            id,
+            present: true,
             title,
             department,
             strengths: [],

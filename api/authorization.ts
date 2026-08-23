@@ -70,9 +70,8 @@ export function matchesOnSegmentBoundary(
     // at that position — a `:`-prefixed prefix segment is the
     // route's variable id and matches any one segment. So
     // '/members' never half-matches '/memberships', and
-    // '/flows/:id/versions' matches
-    // '/flows/ZOousbbnzpqlxJExVAruYQ/versions/xDyDkxEPwtcNmJVknUHDsg'
-    // but not the shallower '/flows/ZOousbbnzpqlxJExVAruYQ'.
+    // '/flows/:id/versions' matches '/flows/f1/versions/v1'
+    // but not the shallower '/flows/f1'.
     if (pathSegs.length < prefixSegs.length) return false;
     return prefixSegs.every(
         (seg, i) =>

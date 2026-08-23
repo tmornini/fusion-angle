@@ -24,8 +24,13 @@ const { makeHumanMember, makeAIMember } = await import(
     './member-fixtures.ts'
 );
 
-const { reduceRefresh, humanMemberPiiPatchIfDirty } = await import(
-    '../web-app/members/detail.ts'
+const { reduceRefresh, reduceSave, humanMemberPiiPatchIfDirty } =
+    await import('../web-app/members/detail.ts');
+
+const { HumanMember } = await import('../api/types.ts');
+
+const { HumanMemberDetailPresenter } = await import(
+    '../web-app/app/presenters/human-member-detail.ts'
 );
 
 const HUMAN_DRAFT = {
@@ -203,5 +208,90 @@ test(
         assert.deepEqual(patch, {
             name: 'New Name', email: '', phone: '', bio: '',
         });
+    },
+);
+
+function makeRecordingContainer(): {
+    container: HTMLElement;
+    allHtml: () => string;
+} {
+    let shell = '';
+    const slots = new Map<string, { html: string }>();
+    const makeSlot = (key: string) => {
+        let slot = slots.get(key);
+        if (!slot) {
+            slot = { html: '' };
+            slots.set(key, slot);
+        }
+        const ref = slot;
+        return {
+            set innerHTML(v: string) {
+                ref.html = v;
+            },
+            get innerHTML(): string {
+                return ref.html;
+            },
+            querySelector(_sel: string) {
+                return null;
+            },
+        };
+    };
+    const container = {
+        set innerHTML(v: string) {
+            shell = v;
+        },
+        get innerHTML(): string {
+            return shell;
+        },
+        querySelector(sel: string) {
+            return makeSlot(sel);
+        },
+    };
+    return {
+        container: container as unknown as HTMLElement,
+        allHtml: () =>
+            shell
+            + [...slots.values()]
+                .map(s => s.html)
+                .join(''),
+    };
+}
+
+test(
+    'reduceSave lands in read mode painting the fresh member',
+    () => {
+        const fresh = new HumanMember(
+            { id: 'hw_1', type: 'human' },
+            {
+                present: true,
+                title: 'Engineer',
+                department: 'Engineering',
+                strengths: ['Agile Methods'],
+                team_dimensions: {},
+            },
+            {
+                erased: false,
+                name: 'Sarah Chen',
+                email: 'sarah@example.com',
+                phone: '555-0199',
+                bio: 'Ships things.',
+            },
+        );
+        const next = reduceSave(fresh);
+        assert.equal(next.kind, 'reading');
+        assert.equal(next.variant, 'human');
+        assert.equal(next.member, fresh);
+        const rec = makeRecordingContainer();
+        new HumanMemberDetailPresenter(fresh)
+            .renderShell(rec.container);
+        const out = rec.allHtml();
+        assert.match(out, /555-0199/);
+        assert.match(out, /Ships things\./);
+        assert.match(out, /Agile Methods/);
+        assert.doesNotMatch(out, /Builds things\./);
+        assert.match(out, /data-member-action="edit"/);
+        assert.doesNotMatch(
+            out, /data-member-action="save"/,
+        );
     },
 );

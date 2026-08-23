@@ -80,15 +80,7 @@ export async function fillHumanMemberPii(
                 id: member.idForLink(),
                 type: 'human',
             },
-            {
-                id: member.idForLink(),
-                title: member.titleLabel(),
-                department: member.departmentLabel(),
-                strengths: [...member.strengths()],
-                team_dimensions: {
-                    ...member.teamDimensions(),
-                },
-            },
+            member.profile(),
             pii,
         );
     }));

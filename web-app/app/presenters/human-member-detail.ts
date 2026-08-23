@@ -84,14 +84,19 @@ export function humanMemberDraftFromMember(
     member: HumanMember,
 ): HumanMemberDraftFields {
     const pii = member.pii();
+    const profile = member.profile();
     return {
         name: pii.erased ? '' : pii.name,
         email: pii.erased ? '' : pii.email,
         phone: pii.erased ? '' : pii.phone,
-        title: member.titleLabel(),
-        department: member.departmentLabel(),
+        title: profile.present ? profile.title : '',
+        department: profile.present
+            ? profile.department
+            : '',
         bio: pii.erased ? '' : pii.bio,
-        strengths: [...member.strengths()],
+        strengths: profile.present
+            ? [...profile.strengths]
+            : [],
     };
 }
 
@@ -162,6 +167,7 @@ function buildReadonlyTitleSection(
     member: HumanMember,
 ): SafeHtml {
     const pii = member.pii();
+    const profile = member.profile();
     const name = pii.erased
         ? MEMBER_WITHOUT_PII_NAME
         : pii.name;
@@ -179,9 +185,9 @@ function buildReadonlyTitleSection(
             </h1>
         </div>
         <p class="text-sm text-muted">
-            ${member.titleLabel()}
+            ${profile.present ? profile.title : ''}
             •
-            ${member.departmentLabel()}
+            ${profile.present ? profile.department : ''}
         </p>`;
 }
 
@@ -308,6 +314,7 @@ function buildReadonlyPersonalInfoBody(
     member: HumanMember,
 ): SafeHtml {
     const pii = member.pii();
+    const profile = member.profile();
     const name = pii.erased
         ? MEMBER_WITHOUT_PII_NAME
         : pii.name;
@@ -347,12 +354,14 @@ function buildReadonlyPersonalInfoBody(
         }">
             ${buildReadonlyField(
                 'Title',
-                member.titleLabel(),
+                profile.present ? profile.title : '',
                 iconBriefcase(ICON_SIZE.base, ''),
             )}
             ${buildReadonlyField(
                 'Department',
-                member.departmentLabel(),
+                profile.present
+                    ? profile.department
+                    : '',
             )}
         </div>
         ${buildReadonlyBio(bio)}`;
@@ -513,8 +522,9 @@ function buildEditableActionButtons(
 function buildTeamDimensionsCard(
     member: HumanMember,
 ): SafeHtml {
+    const profile = member.profile();
     return new WorkingStylesPresenter(
-        member.teamDimensions(),
+        profile.present ? profile.team_dimensions : {},
     ).buildCard();
 }
 
@@ -539,6 +549,7 @@ export class HumanMemberDetailPresenter {
     renderUpdate(
         container: HTMLElement,
     ): void {
+        const profile = this.#member.profile();
         mutateSlot(
             container,
             '.member-title-slot',
@@ -565,8 +576,7 @@ export class HumanMemberDetailPresenter {
                 )}
                 ${buildStrengthsCard(
                     buildSelectedStrengthChips(
-                        this.#member
-                            .strengths(),
+                        profile.present ? profile.strengths : [],
                     ),
                 )}`,
         );

@@ -32,6 +32,8 @@ const INV_SARAH = generateIdentifier();
 const EV_GRANT = generateIdentifier();
 const INV_X = generateIdentifier();
 const EV_X = generateIdentifier();
+const INV_REVOKE = generateIdentifier();
+const EV_REVOKE = generateIdentifier();
 const MS_SARAH = generateIdentifier();
 const EV_ACC = generateIdentifier();
 const MS_SARAH_2 = generateIdentifier();
@@ -220,6 +222,31 @@ test('a non-admin is forbidden from granting', async () => {
             grantAt: AT,
         }));
     assert.equal(res.status, 403);
+    assert.deepEqual(await res.json(), {
+        error: 'forbidden: POST'
+            + ' /organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/invitations/'
+            + ' requires a role this principal lacks',
+    });
+});
+
+test('a non-admin is forbidden from revoking', async () => {
+    const db = await seed();
+    const res = await handleRequest(db, req(
+        'PUT',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
+            + INV_REVOKE,
+        await organizationToken('toccYYkLEABmlbpHJalgtQ'
+            , 'AjdvjuECVZEgZoFajaIEkg'),
+        { state: 'revoked', eventId: EV_REVOKE, at: AT },
+    ));
+    assert.equal(res.status, 403);
+    assert.deepEqual(await res.json(), {
+        error: 'forbidden: PUT'
+            + ' /organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/invitations/' + INV_REVOKE
+            + ' requires a role this principal lacks',
+    });
 });
 
 test('a pending invite writes no membership', async () => {

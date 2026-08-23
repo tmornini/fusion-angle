@@ -6,8 +6,11 @@ import { deriveIdentityPii } from
 import {
     postHumanMemberCreation,
     featuredHumanMembers,
+    getHumanMemberProfile,
     type HumanMemberDraft,
 } from '../web-app/app/adapters/members.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import type {
     HumanMember,
 } from '../web-app/app/presenters/member.ts';
@@ -107,4 +110,31 @@ test('featuredHumanMembers caps the list at six', () => {
             unknown as HumanMember;
     const ten = Array.from({ length: 10 }, mk);
     assert.equal(featuredHumanMembers(ten).length, 6);
+});
+
+test('a { kind } identity reads as an absent profile',
+async () => {
+    const { ctx } = await adminContext();
+    const id = generateIdentifier();
+    await ctx.PUT('identities/' + id, { kind: 'person' });
+    assert.deepEqual(
+        await getHumanMemberProfile(ctx, id),
+        { present: false },
+    );
+});
+
+test('a full identity document reads 1:1', async () => {
+    const { db, ctx } = await adminContext();
+    const id = generateIdentifier();
+    await seedHumanMember(db, id, 'Whole Profile');
+    assert.deepEqual(
+        await getHumanMemberProfile(ctx, id),
+        {
+            present: true,
+            title: 'product_manager',
+            department: 'Product',
+            strengths: [],
+            team_dimensions: {},
+        },
+    );
 });
