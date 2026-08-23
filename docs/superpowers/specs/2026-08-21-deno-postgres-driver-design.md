@@ -2,14 +2,22 @@
 
 Date: 2026-08-21
 Status: outline (authored beside the roadmap on
-2026-08-21; optional; re-validated against the tree and
+2026-08-21; optional; reconciled 2026-08-23 against the
+tree at `eaa73075`; re-validated against the tree and
 brainstormed to full depth before its implementation
 plan). Spec only; no implementation lives here.
 
-This scroll is Spec 6 of
-[the Deno migration roadmap](2026-08-21-deno-migration-roadmap-design.md)
+This scroll is Spec 6 of the Deno migration roadmap
 and follows
 [Spec 5, Test idiom](2026-08-21-deno-test-idiom-design.md).
+The roadmap scroll left with the `docs/` cleanout
+(`0e1b8538`) and was not restored with the six specs
+(`ee4b7331`); read it from history:
+
+```sh
+git show 9620d38c:docs/superpowers/specs/\
+2026-08-21-deno-migration-roadmap-design.md
+```
 
 ## The Goal
 
@@ -31,15 +39,19 @@ new driver reads. Nothing above `SqlClient` notices.
   `statement_timeout` as a connection parameter.
 - `api/backend-postgres.ts` reads BYTEA through
   `latin1OfBytea`, which accepts a `Buffer` or a plain
-  `Uint8Array`; advisory locks are
-  `pg_advisory_xact_lock` inside `begin`; writes
-  `pg_notify`. `api/errors-postgres.ts` maps SQLSTATE
-  codes from the driver's error shape
-  (`isUndefinedTable` and kin).
+  `Uint8Array` (via `Octets`); advisory locks are
+  `pg_advisory_xact_lock` and
+  `pg_advisory_xact_lock_shared` inside `begin`; writes
+  `pg_notify`; `POSTGRES_DROP_SCHEMA` is the wipe
+  statement `server/postgres-wipe.ts` runs.
+  `api/errors-postgres.ts` maps SQLSTATE codes from the
+  driver's error shape (`mapPostgresError`,
+  `isUndefinedTable`).
 - Tests: `backend-postgres.test.ts` fakes `SqlClient`
   (driver-free); `errors-postgres.test.ts` pins the
-  mapping; the five `pg-*` files run live through
-  `connectPostgres`.
+  mapping; the seven `./test-postgres` files (six
+  `pg-*` and `schema-lifecycle.test.ts`) run live
+  through `connectPostgres`.
 - postgres.js reads 22 `PG*` names from the environment
   (roadmap § The Environment Contract).
 - `jsr.io` is unreachable from the Claude sandbox; every
@@ -69,8 +81,9 @@ new driver reads. Nothing above `SqlClient` notices.
    driver's reads, measured by compiling and booting
    with a scoped `--allow-env` until no `NotCapable`
    names a variable.
-7. **`postgres-lib`'s wipe** (already the operator tool
-   from Spec 2) and `tests/pg-*` move with the adapter.
+7. **`server/postgres-wipe.ts`** (the operator wipe;
+   compiled since Spec 2) and the seven
+   `./test-postgres` files move with the adapter.
 
 ## Decisions Deferred to This Spec's Brainstorm
 
@@ -84,7 +97,8 @@ new driver reads. Nothing above `SqlClient` notices.
 ## The Gates
 
 - `./test-postgres` against the compose Postgres — the
-  acceptance, races, boot, seed, and explain suites.
+  acceptance, races, boot, seed, explain,
+  identifier-order, and schema-lifecycle suites.
 - `./validate`.
 - `./measure` full ceremony; `--check` against the
   committed budgets, and the phase mix compared with the

@@ -2,15 +2,24 @@
 
 Date: 2026-08-21
 Status: draft (brainstorm 2026-08-21; approved in chat;
-awaiting the user's review of this written spec). Spec
-only; no implementation lives in this document.
+awaiting the user's review of this written spec;
+reconciled 2026-08-23 against the tree at `eaa73075`,
+114 commits on — every count and line number below is
+from that tree). Spec only; no implementation lives in
+this document.
 
-This scroll is Spec 1 of
-[the Deno migration roadmap](2026-08-21-deno-migration-roadmap-design.md).
+This scroll is Spec 1 of the Deno migration roadmap.
 The roadmap holds the goals, the evidence, and the
 decisions every spec inherits; this scroll holds what
 changes in this step and nothing that belongs to a later
-one.
+one. The roadmap scroll left with the `docs/` cleanout
+(`0e1b8538`) and was not restored with the six specs
+(`ee4b7331`); read it from history:
+
+```sh
+git show 9620d38c:docs/superpowers/specs/\
+2026-08-21-deno-migration-roadmap-design.md
+```
 
 ## The Goal
 
@@ -19,35 +28,42 @@ automated test suite, and the two generator gates move
 to Deno 2.9.5, while `./build`, `./serve`, `./measure`,
 and the seed keep Node for exactly one more spec.
 
-The suite does not change its idiom. 371 files keep
+The suite does not change its idiom. 388 files keep
 `node:test` and `node:assert` and run through Deno's
-compat layer; the test counts are the oracle —
-3329 tests, 3324 passing, 5 skipped, the same numbers
-Node reports today.
+compat layer; the test counts are the oracle — what
+Node reports at the plan's first commit. At `eaa73075`
+that is 3735 tests, 3728 passing, 7 skipped, plus
+8 in `tests/tz/` (Node v26.7.0, 34.3 s).
 
 ## Context
 
 - `./validate` runs `npx --no-install tsc --noEmit -p
   web-app/app/tsconfig.json`, then `./test`, the
-  line-length and vocabulary lints, then
+  line-length lint, the root-doc line-count gate, the
+  `org` and retired-vocabulary lints, then
   `./generate-schema-svg --check` and
   `./generate-api-documentation --check` — both
   `node --strip-types` wrappers.
 - `./test` runs `node --strip-types --import
   ./tests/hmac-test-key.ts --test tests/*.test.ts` under
   `TZ=UTC`, then `tests/tz/*.test.ts` under
-  `TZ=Pacific/Honolulu`. `./test-postgres` runs five
-  `pg-*` files serially with `SCHEMA_NAME` set.
+  `TZ=Pacific/Honolulu`. `./test-postgres` runs seven
+  files serially with `SCHEMA_NAME` set — six `pg-*`
+  files and `tests/schema-lifecycle.test.ts`.
 - `web-app/app/tsconfig.json` includes `web-app/**`,
   `api/**`, `shared/**` and excludes the five
   entrypoints. `server/` and `tests/` are not checked.
-- Measured (roadmap § What Was Measured): under Deno
-  with named permissions and a `localStorage` preload,
-  the unchanged suite is 3320 pass, 5 fail, 5 ignored in
-  9.7 s. The five failures are `debouncer.test.ts`'s
-  mock timers. `deno check` over the new surface finds
-  six errors outside `tests/` and one extensionless
-  import family of 35 sites.
+- Measured (roadmap § What Was Measured, against the
+  2026-08-21 tree): under Deno with named permissions
+  and a `localStorage` preload, the then-unchanged suite
+  was 3320 pass, 5 fail, 5 ignored in 9.7 s. The five
+  failures were `debouncer.test.ts`'s mock timers.
+  `deno check` over the new surface found six errors
+  outside `tests/` and one extensionless import family
+  of 35 sites. The 35 sites and the six error sites are
+  still present at `eaa73075` (re-cited below); the
+  plan's first task re-runs the suite under Deno and
+  records today's counts.
 - `tests/server-zip-metafile.test.ts` imports `esbuild`
   to walk the client graph; that stays until Spec 2
   replaces it with `deno info`.
@@ -73,7 +89,7 @@ Node reports today.
    and commented: the tests are type-checked in Spec 5.
 5. **`tests/local-storage-stub.ts`** is a preload that
    installs a writable in-memory `localStorage` through
-   `Object.defineProperty`. The 25 stubbing test files
+   `Object.defineProperty`. The 30 stubbing test files
    are not edited.
 6. **`debouncer.test.ts`** gains
    `t.after(() => { t.mock.timers.reset(); });` as the
@@ -118,7 +134,7 @@ Changed: `validate`, `test`, `test-postgres`,
 `web-app/app/page-registry.ts`, `header-info.ts`,
 `invitations-indicator.ts`, `sidebar-member.ts`,
 `app-boot.ts`; `tests/debouncer.test.ts`;
-`package.json`, `package-lock.json`; `CLAUDE.md`,
+`package.json`, `package-lock.json`; `AGENTS.md`,
 `README.md`, `TEST-PLAN.md`.
 
 Removed: `web-app/app/tsconfig.json`.
@@ -255,12 +271,13 @@ The existing `JWT_HMAC_SIGNING_KEY` line is unchanged.
 ## `./test-postgres`
 
 Its own array with the same flags and permissions, but
-without `--parallel` (the five files share one Postgres
-and today run serially; parallelism there is a
+without `--parallel` (the seven files share one
+Postgres and today run serially; parallelism there is a
 measurement for later, not an assumption) and without
 preloads (today's script passes no `--import`; the
-`pg-*` files bring their own fixtures), over the five
-`pg-*` files with `SCHEMA_NAME` exported as today.
+files bring their own fixtures), over the seven files
+the script lists today with `SCHEMA_NAME` exported as
+today.
 
 ## `./validate`
 
@@ -273,8 +290,9 @@ deno check --frozen api shared server web-app
 
 `deno --version` is evidence, not a gate: the pinned
 2.9.5 is visible in every transcript. The awk
-line-length list gains `deno.json`. Nothing else in the
-script moves.
+line-length list gains `deno.json`. The root-doc
+line-count gate, the `org` lint, and the
+retired-vocabulary lint do not move.
 
 ## The generators
 
@@ -296,7 +314,7 @@ every `./validate`.
 
 ## Source fixes
 
-1. **`server/boot.ts:122`** — `trustedProxyHops:
+1. **`server/boot.ts:126`** — `trustedProxyHops:
    string | undefined` is passed into an optional
    `string` property. Conditional spread:
 
@@ -311,7 +329,7 @@ every `./validate`.
    });
    ```
 
-2. **`measure.ts:886` and `:930`** — `process.env`
+2. **`measure.ts:850` and `:894`** — `process.env`
    (`NodeJS.ProcessEnv`, an index signature) has no
    property in common with the weak type `MeasureEnv`.
    `measure-cli.ts` widens the alias:
@@ -325,7 +343,7 @@ every `./validate`.
    `string | undefined`; the call sites and the
    `measure-cli` tests are unchanged.
 
-3. **`measure.ts:1355`** — the stale-budget offenders
+3. **`measure.ts:1319`** — the stale-budget offenders
    are spread into an untyped array whose
    `'unknown-page'` arm lacks `medianReadyMs`. Annotate
    the array: `const offenders: BudgetOffender[] = […]`,
@@ -344,7 +362,7 @@ every `./validate`.
    `sidebar-member.ts:44`: `'./adapters'` becomes
    `'./adapters/index.ts'`. `header-info.ts:40`:
    `'./safe-html'` becomes `'./safe-html.ts'`.
-   `app-boot.ts:83`: `'./command-palette'` becomes
+   `app-boot.ts:84`: `'./command-palette'` becomes
    `'./command-palette.ts'`. esbuild resolves both
    forms to the same file and inlines them, so
    `assets/app.js` is byte-identical before and after —
@@ -369,33 +387,44 @@ under Deno's compat, where the second `enable` throws
 
 ## Documentation
 
-- **CLAUDE.md** — § Commands: a line stating Deno 2.9.5
-  is the toolchain for `./validate` and `./test`, and
-  that `./build` still needs `npm ci` until the build
-  spec lands. § Validate semantics: `deno check --frozen
-  api shared server web-app` replaces the tsc sentence;
-  the test sentence names `deno test --parallel`, the
-  two preloads, and `--no-check`. § TypeScript:
-  `deno.json` replaces the tsconfig path; the five
-  entrypoints are no longer "excluded from type
-  checking" — they are checked. § Testing / Automated
-  tests: the runner sentence. § Gotchas: one entry —
-  under Deno `localStorage` is a real global; the
-  preload installs the fake the tests stub.
-- **README.md** — § Getting Started: install Deno 2.9.5;
-  `npm ci` remains for `./build` until Spec 2, stated
-  plainly.
-- **TEST-PLAN.md** — AT2's command text and its PASS
-  wording (`N passed | 0 failed`).
-- **ARCHITECTURE.md** — no change; it describes the
-  server process, which this spec does not touch.
+The root docs were rewritten after this spec was
+drafted: `CLAUDE.md` is now a one-line `@AGENTS.md`
+stub, and `AGENTS.md` is a thin router that `./validate`
+gates at 300 lines (README.md at 150). The targets
+below name today's headings.
+
+- **AGENTS.md** — the command block: a line stating
+  Deno 2.9.5 is the toolchain for `./validate` and
+  `./test`, and that `./build` still needs `npm ci`
+  until the build spec lands. § Gates: `deno check
+  --frozen api shared server web-app` replaces the
+  `tsc --noEmit` clause; the `./test` clause names
+  `deno test --parallel`, the two preloads, and
+  `--no-check`; the generator gates are named as
+  `deno run`. § Invariants that bite,
+  `noUncheckedIndexedAccess`: "tsconfig enables this"
+  becomes "`deno.json` enables this". One new
+  invariant: under Deno `localStorage` is a real
+  global; the preload installs the fake the tests stub.
+- **README.md** — § Getting Started: install Deno
+  2.9.5; `npm ci` remains for `./build` until Spec 2,
+  stated plainly (today's paragraph says `npm ci`
+  installs tsc; after this spec it does not).
+- **TEST-PLAN.md** — AT1 becomes the `deno check`
+  line; AT2's command text and its PASS wording
+  (`N passed | 0 failed | 7 ignored`); AT3's lint list
+  gains `deno.json`.
+- **ARCHITECTURE.md** — no change; § One origin, one
+  ZIP describes the server process, which this spec
+  does not touch.
 
 ## The Gates
 
 After this spec, `./validate` is: `deno --version`;
 `deno check` over `api shared server web-app`; `./test`
-(Deno, two suites); the line-length, `org`, and retired
-vocabulary lints; `./generate-schema-svg --check` and
+(Deno, two suites); the line-length lint, the root-doc
+line-count gate, the `org` and retired-vocabulary lints;
+`./generate-schema-svg --check` and
 `./generate-api-documentation --check` under
 `deno run`. Node is called nowhere in it.
 
@@ -408,7 +437,7 @@ Node remains required by `./build`, `./serve`,
 - **No per-file process.** Node runs each test file in
   its own process; `deno test` runs every module a
   worker receives in one isolate. Module-level state —
-  the 25 `localStorage` stubs, the preload's store —
+  the 30 `localStorage` stubs, the preload's store —
   persists from file to file within a worker. The
   measured runs are stable (three runs, identical
   counts); Spec 5 closes the gap with per-test fixtures
@@ -416,7 +445,7 @@ Node remains required by `./build`, `./serve`,
   `--parallel` is this divergence until proven
   otherwise.
 - Skipped tests report as "ignored"; the summary line
-  reads `ok | N passed | 0 failed | 5 ignored`.
+  reads `ok | N passed | 0 failed | 7 ignored`.
 - `TZ` is honored (measured: 8/8 under Honolulu).
 - `--no-check` means a test file with a type error still
   runs. Today's tsc never saw the tests either; nothing
@@ -431,15 +460,18 @@ Node remains required by `./build`, `./serve`,
    import-extension commit: `cmp` on `assets/app.js`
    reports identical.
 4. `./validate` exits 0. The transcript shows `deno
-   check` with no diagnostics, `ok | 3324 passed |
-   0 failed | 5 ignored` for the main suite, `ok |
+   check` with no diagnostics, `ok | 3728 passed |
+   0 failed | 7 ignored` for the main suite (the
+   `eaa73075` counts; the oracle is whatever Node
+   reported at the plan's first commit), `ok |
    8 passed | 0 failed` for `tests/tz/`, and both
    generator gates up to date.
-5. The main suite's wall time is recorded in CLAUDE.md's
-   testing section beside Node's 33.5 s baseline.
+5. The main suite's wall time is recorded in AGENTS.md
+   § Gates beside Node's baseline (34.3 s at
+   `eaa73075`, v26.7.0).
 6. `./test-postgres` against the compose Postgres
    (Docker is outside the sandbox; the user runs it with
-   `!`): five files pass.
+   `!`): seven files pass.
 7. `grep -c node validate test test-postgres
    generate-schema-svg generate-api-documentation`
    reports 0 for each.

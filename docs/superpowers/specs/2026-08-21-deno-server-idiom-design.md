@@ -2,14 +2,22 @@
 
 Date: 2026-08-21
 Status: outline (authored beside the roadmap on
-2026-08-21; re-validated against the tree and
+2026-08-21; reconciled 2026-08-23 against the tree at
+`eaa73075`; re-validated against the tree and
 brainstormed to full depth before its implementation
 plan). Spec only; no implementation lives here.
 
-This scroll is Spec 3 of
-[the Deno migration roadmap](2026-08-21-deno-migration-roadmap-design.md)
+This scroll is Spec 3 of the Deno migration roadmap
 and follows
 [Spec 2, Build and artifact](2026-08-21-deno-build-artifact-design.md).
+The roadmap scroll left with the `docs/` cleanout
+(`0e1b8538`) and was not restored with the six specs
+(`ee4b7331`); read it from history:
+
+```sh
+git show 9620d38c:docs/superpowers/specs/\
+2026-08-21-deno-migration-roadmap-design.md
+```
 
 ## The Goal
 
@@ -33,15 +41,25 @@ keyed by the socket address, honoring `Forwarded` and
 static files (the MIME table, `Cache-Control` no-store
 against immutable for hashed names, HEAD, 405 with
 `Allow`, directory index, `/not-found/index.html` for
-navigations, the traversal guard); JSON error bodies;
-one JSON log line per request (`at`, `level`, `method`,
-`path`, `status`, `latencyMs`, `operationId`); a 10 s
-drain on close, then `closeAllConnections`.
+navigations, the traversal guard); the
+`Content-Security-Policy` header on every HTML
+response (`CONTENT_SECURITY_POLICY`, nine directives —
+the page metas were dropped for it, so the port must
+send it or the pages run without a policy); JSON error
+bodies; one JSON log line per request (`at`, `level`,
+`method`, `path`, `status`, `latencyMs`,
+`operationId`); a 10 s drain on close, then
+`closeAllConnections`.
 
-`server/boot.ts` owns the gates, SIGTERM → close → exit,
-and the JSON stdout/stderr lines. `throttle.ts`,
-`seed.ts`, and `postgres-gate.ts` are runtime-neutral
-apart from `postgres-gate.ts`'s `process.env` default.
+`server/boot.ts` owns the gates (argv, env, UTF-8, no
+legacy message tables, the schema marker), SIGTERM →
+close → exit, and the JSON stdout/stderr lines.
+`server/postgres-seed.ts` and `server/postgres-wipe.ts`
+are the operator tools, each with its own
+`isMainModule()`, `process.argv`, and `process.stdout`.
+`throttle.ts`, `seed.ts`, and `postgres-gate.ts` are
+runtime-neutral apart from `postgres-gate.ts`'s
+`process.env` default.
 
 Deno offers `Deno.serve({ port, hostname, onListen,
 signal })` with a handler `(request, info)` where
@@ -79,8 +97,11 @@ verified first.
    (the `pg-boot` fixture passes a plain array either
    way); SIGTERM through `Deno.addSignalListener`; exit
    through `Deno.exit`.
-7. **`postgres-seed.ts`** receives the same treatment:
-   `Deno.args`, `Deno.env.get`, `Deno.stdout`.
+7. **`postgres-seed.ts` and `postgres-wipe.ts`**
+   receive the same treatment: `Deno.args`,
+   `Deno.env.get`, `Deno.stdout`; their
+   `isMainModule()` checks become `import.meta.main`
+   (Spec 2 made them compiled operator tools).
 8. **`scrypt-hash.ts` keeps `node:crypto`**; its header
    names the reason (Web Crypto has no scrypt) and the
    day it may leave (a `Deno` or `@std` scrypt).
@@ -94,10 +115,11 @@ verified first.
   explicit handler produces the current
   `{"error":"internal error"}` 500 body with
   `Cache-Control: no-store`.
-- Whether the two tests that send
-  `sec-fetch-mode: navigate` through `node:http.request`
-  can use `fetch` under Deno (forbidden-header rules),
-  or keep `node:http` until Spec 5.
+- Whether the tests that send `sec-fetch-mode:
+  navigate` through `node:http.request`
+  (`http-static-directory-index.test.ts`) can use
+  `fetch` under Deno (forbidden-header rules), or keep
+  `node:http` until Spec 5.
 
 ## Open Items
 
@@ -117,5 +139,6 @@ verified first.
 ## Risks
 
 - A behavior the `node:http` adapter had and no test
-  names. The four test files are the covenant; what they
-  do not pin, the compose smoke and TEST-PLAN must.
+  names. The four test files are the covenant
+  (`http-server.test.ts` pins the CSP header); what
+  they do not pin, the compose smoke and TEST-PLAN must.

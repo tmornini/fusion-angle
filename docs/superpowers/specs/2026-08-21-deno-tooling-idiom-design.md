@@ -2,21 +2,29 @@
 
 Date: 2026-08-21
 Status: outline (authored beside the roadmap on
-2026-08-21; re-validated against the tree and
+2026-08-21; reconciled 2026-08-23 against the tree at
+`eaa73075`; re-validated against the tree and
 brainstormed to full depth before its implementation
 plan). Spec only; no implementation lives here.
 
-This scroll is Spec 4 of
-[the Deno migration roadmap](2026-08-21-deno-migration-roadmap-design.md)
+This scroll is Spec 4 of the Deno migration roadmap
 and follows
 [Spec 3, Server idiom](2026-08-21-deno-server-idiom-design.md).
+The roadmap scroll left with the `docs/` cleanout
+(`0e1b8538`) and was not restored with the six specs
+(`ee4b7331`); read it from history:
+
+```sh
+git show 9620d38c:docs/superpowers/specs/\
+2026-08-21-deno-migration-roadmap-design.md
+```
 
 ## The Goal
 
 The five entrypoints — `compose.ts`,
 `generate-schema-svg.ts`,
 `generate-api-documentation.ts`, `measure.ts`,
-`measure-viz.ts` — and `postgres-lib`'s nine inline
+`measure-viz.ts` — and `postgres-lib`'s eight inline
 programs speak Deno. `process` and `node:` imports leave
 `web-app/app/*.ts` and the root scripts.
 
@@ -32,10 +40,13 @@ programs speak Deno. `process` and `node:` imports leave
   use `node:fs`, `node:path`, `import.meta.url`, and
   `process.argv`/`exit`/`stdout`/`stderr`.
 - `postgres-lib` runs `node --input-type=module -e`
-  nine times: JSON extraction from Render API replies,
-  the loopback host check, the log flattener, the
-  reveal printer, and the inline wipe (which Spec 2
-  replaced with the operator tool).
+  eight times: the Render error-message reader, the
+  job-body writer, the log flattener, the reveal
+  printer, the loopback host check, the job-id and
+  job-status readers, and the Render-id discovery. The
+  inline wipe already left for `server/postgres-wipe.ts`
+  (Spec 2 turns its `node -e` Render start command into
+  the operator tool).
 - After Spec 1 the entrypoints are type-checked; after
   Spec 2 `measure.ts` spawns the binary.
 

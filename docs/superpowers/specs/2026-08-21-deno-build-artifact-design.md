@@ -2,14 +2,22 @@
 
 Date: 2026-08-21
 Status: outline (authored beside the roadmap on
-2026-08-21; re-validated against the tree and
+2026-08-21; reconciled 2026-08-23 against the tree at
+`eaa73075`; re-validated against the tree and
 brainstormed to full depth before its implementation
 plan). Spec only; no implementation lives here.
 
-This scroll is Spec 2 of
-[the Deno migration roadmap](2026-08-21-deno-migration-roadmap-design.md)
+This scroll is Spec 2 of the Deno migration roadmap
 and follows
 [Spec 1, Toolchain](2026-08-21-deno-toolchain-design.md).
+The roadmap scroll left with the `docs/` cleanout
+(`0e1b8538`) and was not restored with the six specs
+(`ee4b7331`); read it from history:
+
+```sh
+git show 9620d38c:docs/superpowers/specs/\
+2026-08-21-deno-migration-roadmap-design.md
+```
 
 ## The Goal
 
@@ -41,8 +49,15 @@ leave the repository.
   `tests/fusion-angle-live-name.test.ts` (walks
   `package-lock.json`).
 - `measure.ts` spawns `node server.mjs` through
-  `measureServerArgs()`; `postgres-lib` runs postgres.js
-  through `node -e` for the Render wipe.
+  `measureServerArgs()`. `server/postgres-wipe.ts` is
+  the operator wipe already: `./postgres-wipe
+  --postgres local` runs it under `node --strip-types`,
+  and for Render its `renderWipeStartCommand()` prints
+  a `node -e` program (importing `postgres`) as the
+  job's `startCommand`. `./postgres-seed` has three
+  modes — `--bootstrap`, `--mock-data`,
+  `--test-plan-slices` — and a `compose` target that
+  runs the `seed` service.
 - Measured: `deno bundle` output sizes equal esbuild's;
   `--format iife`, `--minify`, `--keep-names`, and
   `--external '*.woff2'` work; `deno compile` embeds
@@ -141,8 +156,11 @@ leave the repository.
 13. **Render** moves to the Docker runtime: build from
     the Dockerfile, start from its `CMD`. `postgres-seed
     --postgres render` posts a job whose `startCommand`
-    is the operator tool; `postgres-wipe` likewise.
-    The compose spec's "no Render config change" is
+    is the operator tool; `postgres-wipe` likewise —
+    `renderWipeStartCommand()` names the tool instead
+    of rendering a `node -e` program. The compose-stack
+    spec's "no Render config change" (that scroll now
+    lives only in history, before `0e1b8538`) is
     consciously retired here.
 14. **`package.json`, `package-lock.json`,
     `node_modules/`** are deleted; `.gitignore` and
@@ -150,6 +168,18 @@ leave the repository.
     `fusion-angle-live-name.test.ts`'s file list drops
     `package-lock.json` and gains `deno.json`; README's
     Getting Started installs Deno only.
+15. **Root docs.** The root docs were rewritten after
+    this outline; each pins the Node artifact by name
+    and moves with it: AGENTS.md's command block
+    (`./build`, `./serve`, the `TMPDIR` sandbox note)
+    and § Operator seed and wipe; README.md § Modules
+    (the ZIP line) and § Getting Started (the `npm ci`
+    paragraph); ARCHITECTURE.md § One origin, one ZIP
+    (`server.mjs`, the ZIP name, "Node serves",
+    postgres.js bundled); TEST-PLAN.md A1–A3 and the
+    other `server.mjs` / `node server.mjs` lines (18
+    today). `./validate` gates AGENTS.md at 300 lines
+    and README.md at 150.
 
 ## Decisions Deferred to This Spec's Brainstorm
 
@@ -158,13 +188,16 @@ leave the repository.
   `fusion-angle-wipe` — each ~100 MB, three compiles.
   (b) One `fusion-angle` binary whose first argument
   selects `serve`, `seed`, or `wipe`; `serve` takes no
-  options, restating the A5 covenant ("no seed flag on
-  the server") as "no options on serve". Recommendation:
+  options, restating the `NO_ARGUMENTS` covenant
+  (`server/postgres-gate.ts`, pinned by
+  `pg-boot.test.ts` and ARCHITECTURE.md § One origin,
+  one ZIP) as "no options on serve". Recommendation:
   (b) — one binary, a self-sufficient ZIP (unzip, seed,
   serve), and a ZIP renamed `fusion-angle-${SHA}.zip`.
-  A `server/postgres-wipe.ts` entry (`DROP_SCHEMA` from
-  `PostgresBackend`) replaces `postgres-lib`'s inline
-  program either way.
+  `server/postgres-wipe.ts` (`POSTGRES_DROP_SCHEMA`
+  from `api/backend-postgres.ts`) already exists as the
+  wipe entry; either way it becomes the compiled `wipe`,
+  and `postgres-lib` keeps no inline program for it.
 - **Runtime image:** `denoland/deno:2.9.5` (decision 11)
   against `debian:bookworm-slim` plus `curl` for the
   healthcheck. Recommendation: the Deno image — one
