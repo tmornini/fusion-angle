@@ -45,7 +45,7 @@ async function seeded() {
     return { db, reveal };
 }
 
-const EXPECTED_SLICE_MESSAGE_PAIRS = 380;
+const EXPECTED_SLICE_MESSAGE_PAIRS = 485;
 
 test('slices stamp schema last and reveal 14',
 async () => {
@@ -243,6 +243,13 @@ async () => {
     assert.equal(
         memberSeats[0]!.organization_id,
         g.organizationId,
+    );
+    assert.equal(
+        g.erasableUsername,
+        'g-erasable@test-plan.example',
+    );
+    assert.ok(
+        (g.erasablePassword ?? '').length >= 16,
     );
     const requests = await db.messagePairs.getAll();
     const agents = requests.filter((r) =>
@@ -450,14 +457,15 @@ async () => {
             db, row.organizationId,
         );
         assert.equal(
-            flows.length, 1, section,
-        );
-        assert.equal(
-            flows[0]!.name,
-            'Customer Onboarding',
+            flows.length,
+            section === 'F' ? 2 : 1,
             section,
         );
-        const nodes = flows[0]!.graph['nodes'];
+        const flow = flows.find((entry) =>
+            entry.name === 'Customer Onboarding',
+        );
+        assert.ok(flow, section);
+        const nodes = flow.graph['nodes'];
         assert.ok(
             Array.isArray(nodes), section,
         );
@@ -501,10 +509,19 @@ async () => {
         const flows = await deriveFlows(
             db, row.organizationId,
         );
-        const flow = flows[0]!;
+        const flow = flows.find((entry) =>
+            entry.name === 'Customer Onboarding',
+        );
+        assert.ok(flow, section);
         const joins = await deriveFlowWorkOrders(
             db, row.organizationId, flow.id,
         );
+        if (section === 'FS') {
+            assert.ok(
+                joins.length >= 12, section,
+            );
+            continue;
+        }
         assert.equal(
             joins.length, 3, section,
         );

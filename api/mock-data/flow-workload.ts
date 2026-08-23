@@ -13,7 +13,6 @@ import {
     MS_PER_SECOND,
 } from '../types.ts';
 import {
-    now,
     mulberry32,
     b62Id,
     seedIdentifier,
@@ -22,7 +21,6 @@ import {
     sampleLogNormal,
     isoFromMs,
 } from './seed-kit.ts';
-import { STARK_ORGANIZATION } from './seed-constants.ts';
 
 const MS_PER_HOUR =
     SECONDS_PER_HOUR * MS_PER_SECOND;
@@ -77,11 +75,14 @@ export function generateFlowWorkload(args: {
     readonly oldestDaysAgo: number;
     readonly newestDaysAgo: number;
     readonly seed: number;
+    readonly organizationId: Id;
+    readonly nowMs: number;
 }): GeneratedFlowData {
     const {
         flow, paths, sojourn, skill,
         totalWorkOrders, oldestDaysAgo,
         newestDaysAgo, seed,
+        organizationId, nowMs,
     } = args;
 
     const rng = mulberry32(seed);
@@ -102,8 +103,6 @@ export function generateFlowWorkload(args: {
     const flowWorkOrders:
         FlowWorkOrderEntity[] = [];
     const stateEvents: StateEntity[] = [];
-
-    const nowMs = now.getTime();
 
     for (let i = 0; i < totalWorkOrders; i++) {
         const woId = seedIdentifier(b62Id(rng, 22));
@@ -211,7 +210,7 @@ export function generateFlowWorkload(args: {
 
         workOrders.push({
             id: woId,
-            organization_id: STARK_ORGANIZATION,
+            organization_id: organizationId,
             display_id: displayId,
             flow_graph: frozenFlowGraph,
             position: i + 1,

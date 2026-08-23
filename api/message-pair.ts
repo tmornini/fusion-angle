@@ -987,11 +987,6 @@ export const REPLAY_EXEMPT_ROUTE_PATTERNS: Set<string> =
 // e.g. states/:id) never head-read, even though an event-
 // append uriId is never ''. Grown family by family alongside
 // MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.
-// 'identities/:id/pii' is RETIRED here (Phase 10 Task 3): the
-// /pii address is the message plane's sanctioned hard-delete
-// zone (api/pii-hard-delete.ts) — CHAINLESS by construction, so
-// this Set's pre-tx head-read must never run for it. It stays
-// wired for pair STORAGE in MESSAGE_PAIR_WIRED_ROUTE_PATTERNS above.
 export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
     new Set([
         'organizations/:id/ideas/:id',
@@ -1026,6 +1021,7 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         'ai-agents/:id',
         'identities/',
         'identities/:id',
+        'identities/:id/pii',
         'identities/:id/credentials/:cid',
         'identities/:id/registration',
         'identities/:id/default-organization',

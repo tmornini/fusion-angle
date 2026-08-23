@@ -266,12 +266,14 @@ test(
 
 // Successful-mutation coverage of withNodeMemberIds
 // lives in flow-designer-actions.test.ts as a
-// direct applyUpdateNode test. The presenter
-// wrapping triggers #saveFlow which calls
-// createRequestContext() with the default
-// LocalStorage adapter — not available under
-// node:test. Same reason no other withNode*
-// mutation test exists in this file.
+// direct applyUpdateNode test. Presenter wrapping
+// that queues a save is pinned in
+// tests/flow-designer-open.test.ts:
+// putClientFacade(wrapInPageAdapter(db)) plus
+// putSessionToken(DEV_TOKEN) makes
+// sessionContext() live under node:test. Same
+// reason no other withNode* mutation test exists
+// in this file.
 //
 // Locked-state coverage of withNodeMemberIds is
 // manual (TEST-PLAN F51). The presenter's
@@ -365,10 +367,11 @@ test(
 // and silently queued a save whenever the snapshot's node
 // centroid drifted off origin — corrupting undo-as-replay's
 // document-pair history on every such render, not just page
-// load. This test cannot reach #queueSave at all (this
-// file installs no client facade — see this file's other
-// tests' centered-input convention) so it asserts the
-// STRUCTURAL guarantee that
+// load. putClientFacade(wrapInPageAdapter(db)) plus
+// putSessionToken(DEV_TOKEN) makes sessionContext()
+// live; tests/flow-designer-open.test.ts is the seam
+// that reaches #queueSave. This file still asserts
+// the STRUCTURAL guarantee that
 // implies no save was queued: an off-center snapshot survives
 // the plain constructor byte-for-byte. Only the 5-arg,
 // migrateToCenter=true form (onFlowLoaded's own one call

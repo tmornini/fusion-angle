@@ -215,9 +215,9 @@ async function ctxOn(db: DbAdapter, sub: string, organization: string) {
 // joins below now read deriveIdentityPiiRows (the message
 // ledger), so a raw row delete leaves the slot's message pair
 // intact and the "erased" identity would still show up in the
-// derived read. The live DELETE also replaces the pair
-// (replacePiiSlot, the hard-delete zone), matching what an
-// actual erasure does. `actor` is the caller (self or admin);
+// derived read. The live DELETE appends a bodyless
+// tombstone pair, matching what an actual erasure does.
+// `actor` is the caller (self or admin);
 // `organization` only needs to resolve a valid fenced token —
 // authorizeIdentityPii's self-or-admin check does not itself
 // consult org membership.

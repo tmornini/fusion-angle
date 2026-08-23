@@ -12,7 +12,10 @@ import {
     nowUtc,
     SYSTEM_MEMBER_ID,
     DEFAULT_LOCK_TIMEOUT,
+    MS_PER_DAY,
     type StateEntity,
+    type GraphNode,
+    type GraphEdge,
 } from './types.ts';
 import {
     postIdentityDocumentOp,
@@ -29,6 +32,9 @@ import {
     postWorkOrderDocumentOp,
     postWorkOrderTransitionOp,
     postFlowWorkOrderDocumentOp,
+    postFlowRecordDocumentOp,
+    postBaselineScoreDocumentOp,
+    postActualScoreDocumentOp,
     recordDocumentBodyOf,
     recordAttributeDocumentBodyOf,
     objectiveDocumentBodyOf,
@@ -40,8 +46,14 @@ import {
 } from './routes.ts';
 import type { MessagePair } from
     './message-pair.ts';
-import { appendMessagePair } from
-    './message-pair.ts';
+import {
+    appendMessagePair,
+    formWriteMessagePair,
+} from './message-pair.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+import { HTTP_OK } from
+    './http-errors.ts';
 import {
     formBootstrapMessagePair,
     formDefaultOrganizationSeedMessagePair,
@@ -54,9 +66,16 @@ import {
     projectSeedBody,
     objectiveSeedBody,
     flowWorkOrderJoinSeedBody,
+    flowRecordJoinSeedBody,
 } from './mock-data/seed-message-pairs.ts';
-import { daysFromNow } from
-    './mock-data/seed-kit.ts';
+import {
+    daysFromNow,
+    isoFromMs,
+    deterministicScore,
+    pickHumanMember,
+} from './mock-data/seed-kit.ts';
+import { seedHashKey } from
+    './mock-data/seed-hash-preimage.ts';
 import { STARK_ORGANIZATION } from
     './mock-data/seed-constants.ts';
 import {
@@ -69,6 +88,7 @@ import {
     RECORD_TYPES_COLLECTION_PATTERN,
     RECORD_TYPE_DETAIL_PATTERN,
     ATTRIBUTE_DETAIL_PATTERN,
+    INSTANCE_DETAIL_PATTERN,
 } from './family-registry.ts';
 import { buildAiMembers } from
     './mock-data/ai-members.ts';
@@ -80,8 +100,17 @@ import { OBJECTIVE_SEEDS } from
     './mock-data/objectives.ts';
 import { buildRecords } from
     './mock-data/records.ts';
-import { buildFlowGraphRelations } from
-    './mock-data/flows.ts';
+import {
+    buildFlows,
+    buildFlowGraphRelations,
+} from './mock-data/flows.ts';
+import {
+    generateFlowWorkload,
+    type FlowSeedSpec,
+    type PathProfile,
+    type SojournProfile,
+    type MemberSkill,
+} from './mock-data/flow-workload.ts';
 import {
     validateObjectiveCreateBody,
     validateRecordWriteBody,
@@ -102,6 +131,8 @@ export type TestPlanSliceReveal = {
     readonly unseatedPassword?: string;
     readonly memberUsername?: string;
     readonly memberPassword?: string;
+    readonly erasableUsername?: string;
+    readonly erasablePassword?: string;
     readonly flowId?: string;
 };
 
@@ -241,6 +272,7 @@ const SLICE_ENTITY_IDS: Readonly<
     'c-attr-2': 'xNXoGMjCgYkFgSHylrrnvQ',
     'c-state-record-customer': 'rpgPxnrYlfBQcoQsjyKIiQ',
     'c-flow': 'wGFoZKHuJIhDNkuFtafOVw',
+    'c-flow-record': 'mYgImTkt_AtV2LrJ1sPmew',
     'c-node-create': 'VOvZGYNDScsZkzLaIcYeLQ',
     'c-node-capture': 'zbFAvlwrMvHAZlMRuPHJng',
     'c-node-review': 'COZlWfLvbhNbTmiNphBSHg',
@@ -278,6 +310,7 @@ const SLICE_ENTITY_IDS: Readonly<
     'd-attr-2': 'ozydrOWHXZrZPJAQptHwrQ',
     'd-state-record-customer': 'rlAWvPiEfgBjDtydoXxQDw',
     'd-flow': 'UgQvGSOzRwAGysXHQfZPCg',
+    'd-flow-record': 'nOIYYiLPQ6ki2E3kLWzJqQ',
     'd-node-create': 'vArHIbnQwQmROVYGygqIHA',
     'd-node-capture': 'ZaApzKSTovzCKivtrHbiEw',
     'd-node-review': 'ZJlbmGQBfiJOfIOQWRPwKw',
@@ -315,6 +348,7 @@ const SLICE_ENTITY_IDS: Readonly<
     'e-attr-2': 'POolfJPMtENAIloFzGNnvg',
     'e-state-record-customer': 'PDHSUSnzFoTcdyXZBbxWWQ',
     'e-flow': 'iaLNFiscTqqcDmAlALPbOw',
+    'e-flow-record': '9rHRouE6MKL_PFReiXoLwg',
     'e-node-create': 'XjxsYNrgybpgkiWBavvNbQ',
     'e-node-capture': 'svIbPlhAzRJPGYDMNPlDQA',
     'e-node-review': 'vhIaJtmJbKJVZFtWeGVasA',
@@ -352,6 +386,7 @@ const SLICE_ENTITY_IDS: Readonly<
     'f-attr-2': 'XzsBTUrqoijPRVPskGmYbA',
     'f-state-record-customer': 'MfeoyMCsGYmicGSkZuxbew',
     'f-flow': 'WGrawvQlBCEtOwQaDfNYzg',
+    'f-flow-record': 'dldB6BJT-hmWC6RV_uxupQ',
     'f-node-create': 'UlwhAnqPkssQBaKWPOjPHw',
     'f-node-capture': 'joVDOAiJZVtgnElmOCAyAA',
     'f-node-review': 'LVryuKRUgVkuTdVeKYqDcw',
@@ -361,6 +396,9 @@ const SLICE_ENTITY_IDS: Readonly<
     'f-edge-approve': 'DBacZPqqChMYfkjjqSRZog',
     'f-project-flow': 'LBcldHIXITLfvljfXpefog',
     'f-state-flow': 'wXEqVCZvISuDsLdNNCWLeQ',
+    'f-layout-flow': 'bjwmUYT-PowOqpyLivLrgQ',
+    'f-layout-project-flow': 'Tw3ysK1fsVQV28ORCYx40g',
+    'f-layout-state': 'OTUsms6qK3oiqFXHnntnqw',
     'f-wo-capture': 'PrfmrgcRHkNLhzlhPoPVUg',
     'f-wo-review': 'WOJPFOKFmWASZROqIiiCig',
     'f-wo-archive': 'VnmXenQTOeGhKheRJEvFQA',
@@ -381,10 +419,12 @@ const SLICE_ENTITY_IDS: Readonly<
     'f2-obj-3': 'GJEWXzgtkzGQmJavYYYjFw',
     'f2-obj-4': 'hxhFEGMmvzDrJpSlkmQdPQ',
     'f2-record-customer': 'ShEwahhRZEafyzmgXqfciQ',
+    'f2-instance-1': 'x_l0LSw4ud2zRD1Z0OLMIg',
     'f2-attr-1': 'YErPUsjpzqQjteXbusYqiQ',
     'f2-attr-2': 'mxyQyZkqIyMjiQINxMcJpg',
     'f2-state-record-customer': 'lnyXdDKmWojVxcxTfFnvjg',
     'f2-flow': 'DccQFYFgizAgqBvhRHkgew',
+    'f2-flow-record': 'T-R_lfaxzn4C_TQF_Ua5OQ',
     'f2-node-create': 'meDWiMTCzPAPaOykaGdmWQ',
     'f2-node-capture': 'gERGOBxsTCVinbjnNxFayw',
     'f2-node-review': 'vzttFjxTEgpNmfyyrKusNw',
@@ -425,6 +465,7 @@ const SLICE_ENTITY_IDS: Readonly<
     'fs-attr-2': 'SSzlwaLazYbrbVTxBoEPrg',
     'fs-state-record-customer': 'bKxhTVKnzuDKMgEwORgacg',
     'fs-flow': 'zFkTGJvfUppRCCdJvFszcg',
+    'fs-flow-record': '_hrSZwgy2Nwwjg8H5sVMRw',
     'fs-node-create': 'KRUlvITqCzLbngoRcKaTAQ',
     'fs-node-capture': 'QYypRkKLzMGbSGxotgIxNQ',
     'fs-node-review': 'jVhhOAhaHKPbIJuhwYjDSg',
@@ -432,6 +473,7 @@ const SLICE_ENTITY_IDS: Readonly<
     'fs-edge-begin': 'AdVOtqtQSKfGZGtaYLfdPw',
     'fs-edge-submit': 'ItZFnpoyOndFMUIYeAOIhg',
     'fs-edge-approve': 'uCdEHZjvudxpNyqyUtQKtA',
+    'fs-edge-revise': 'k3-rt2yDSOovQkFMqRlZgw',
     'fs-project-flow': 'etPELgkwzjYWnosrKJZWpg',
     'fs-state-flow': 'MbLBcUlBjgnUYOsLraNUNg',
     'fs-wo-capture': 'fTsrGwymzlLKIKnTPKvkEQ',
@@ -442,6 +484,7 @@ const SLICE_ENTITY_IDS: Readonly<
     'fs-wo-archive-move': 'yFZJuUZhsLwQdJhyAqxlaw',
     'g-org': 'wxOovfCwcKNldjMnmAkuCQ',
     'g-admin': 'kHaSgLhnsobjMXxNLEzpBw',
+    'g-erasable': 'qbtQzOgP8OTJSr9Idicllg',
     'g-idea-active': 'LHTpPuJQpgwmykSTlDezAg',
     'g-idea-in_review': 'MGctitcHoekEYcGdDcSUvQ',
     'g-idea-sent_back': 'mVhTQMpsOwBYEUWrpZLahA',
@@ -561,6 +604,7 @@ const SLICE_ENTITY_IDS: Readonly<
     'k-attr-2': 'czuxJBVggLcKkJSPkLbZMQ',
     'k-state-record-customer': 'PpTgnhjiIgWVPOkfKAcazA',
     'k-flow': 'KLmPzgUDqnlEfkDSIZnTqg',
+    'k-flow-record': 'thCp5woj-unXfr4jxJsUcw',
     'k-node-create': 'THtUTDrIWcEdlAwJgjvzyw',
     'k-node-capture': 'yyIZUPVeYThRDRAhqrpEfQ',
     'k-node-review': 'icFCNQEmjzyjwhgOJdxYRg',
@@ -598,6 +642,7 @@ const SLICE_ENTITY_IDS: Readonly<
     'r-attr-2': 'dqyTeecJBQmttvQWXErnRg',
     'r-state-record-customer': 'pAdySOwTblAIOGayXpfKSA',
     'r-flow': 'woyUPAYCghVYHwkFAUEZEQ',
+    'r-flow-record': 'SUn6E2xm_GnhV4Jpb_DqFg',
     'r-node-create': 'iZmbcpBGnOexjJdnUFtALA',
     'r-node-capture': 'mUApBGklrQKzvoBaxlRalw',
     'r-node-review': 'CihiRQzXuHILZTTKOpAgag',
@@ -1025,6 +1070,13 @@ async function formGExtras(
         requestAt,
         organizationId,
     );
+    const erasable = await formExtraIdentity(
+        'qbtQzOgP8OTJSr9Idicllg',
+        'G Erasable',
+        'g-erasable@test-plan.example',
+        requestAt,
+        organizationId,
+    );
     const firstAi = buildAiMembers()[0]!;
     const aiBody: Record<string, unknown> = {
         name: firstAi.name,
@@ -1047,7 +1099,7 @@ async function formGExtras(
         requestAt,
     );
     return {
-        identities: [unseated, member],
+        identities: [unseated, member, erasable],
         organizationMessagePair,
         extraAdminSeat: {
             identityId: adminId,
@@ -1081,6 +1133,12 @@ type F2FlowWrites = {
     readonly body: Record<string, unknown>;
     readonly operation: MessagePair;
     readonly document: MessagePair;
+    readonly recordBody: Record<string, unknown>;
+    readonly recordMessagePairs: RecordWriteMessagePairs;
+    readonly bindingId: string;
+    readonly bindingBody: Record<string, unknown>;
+    readonly bindingMessagePair: MessagePair;
+    readonly instanceMessagePair: MessagePair;
 };
 
 async function formF2Extras(
@@ -1099,6 +1157,48 @@ async function formF2Extras(
     const archiveNodeId = sliceEntityId(
         token + '-node-archive',
     );
+    const recordId = sliceEntityId(
+        token + '-record-customer',
+    );
+    const attr1Id = sliceEntityId(token + '-attr-1');
+    const attr2Id = sliceEntityId(token + '-attr-2');
+    const bindingId = sliceEntityId(
+        token + '-flow-record',
+    );
+    const profile = buildRecords()[0]!;
+    const formedRecord =
+        await formRecordBindingMessagePairs({
+            organizationId,
+            adminId,
+            requestAt,
+            recordId,
+            attributes: [
+                {
+                    id: attr1Id,
+                    name: 'Company Name',
+                    attribute_type: 'text',
+                    sort_order: 1,
+                    options: [],
+                    constraints: [],
+                },
+                {
+                    id: attr2Id,
+                    name: 'Industry',
+                    attribute_type: 'select',
+                    sort_order: 2,
+                    options: ['Technology'],
+                    constraints: [],
+                },
+            ],
+            flowId,
+            bindingId,
+            recordName: profile.name,
+            recordDescription: profile.description,
+            recordPosition: profile.position,
+            initialStateEventId: sliceEntityId(
+                token + '-state-record-customer',
+            ),
+        });
     const graph: Record<string, unknown> = {
         nodes: [
             {
@@ -1123,16 +1223,12 @@ async function formF2Extras(
                 memberIds: [adminId],
                 attributes: [
                     {
-                        attribute_id: sliceEntityId(
-                            'f2-node-capture-attr-text',
-                        ),
+                        attribute_id: attr1Id,
                         mode: 'editable',
                         isRequired: true,
                     },
                     {
-                        attribute_id: sliceEntityId(
-                            'f2-node-capture-attr-select',
-                        ),
+                        attribute_id: attr2Id,
                         mode: 'editable',
                         isRequired: true,
                     },
@@ -1247,8 +1343,356 @@ async function formF2Extras(
         },
         requestAt,
     );
+    const instanceId = sliceEntityId(
+        token + '-instance-1',
+    );
+    const instanceRouteSegments =
+        INSTANCE_DETAIL_PATTERN.split('/');
+    const instancePathSegments = [
+        'organizations', organizationId,
+        'record-types', recordId,
+        'instances', instanceId,
+    ];
+    const instanceMessagePair =
+        await formWriteMessagePair({
+            method: 'PUT',
+            pathname: '/'
+                + instancePathSegments.join('/'),
+            routePattern:
+                INSTANCE_DETAIL_PATTERN,
+            routeSegments: instanceRouteSegments,
+            pathSegments: instancePathSegments,
+            headerFields: [],
+            body: { values: [] },
+            requesterIdentityId: adminId,
+            requestAt,
+            organization: organizationId,
+            responseStatus: HTTP_OK,
+            responseBody: { values: [] },
+            operationId: generateIdentifier(),
+        });
     return {
         flowId, body: flowBody, operation, document,
+        recordBody: formedRecord.body,
+        recordMessagePairs: formedRecord.messagePairs,
+        bindingId,
+        bindingBody: formedRecord.bindingBody,
+        bindingMessagePair:
+            formedRecord.bindingMessagePair,
+        instanceMessagePair,
+    };
+}
+
+type FFlowWrites = {
+    readonly body: Record<string, unknown>;
+    readonly messagePairs: FlowCreationMessagePairs;
+};
+
+type CScoreFields = {
+    readonly project_id: string;
+    readonly objective_id: string;
+    readonly score: number;
+    readonly member_id: string;
+    readonly at: string;
+};
+
+type CScoreRow = {
+    readonly id: string;
+    readonly fields: CScoreFields;
+    readonly messagePair: MessagePair;
+};
+
+type CScoreWrites = {
+    readonly baselines: readonly CScoreRow[];
+    readonly actuals: readonly CScoreRow[];
+};
+
+async function formCExtras(
+    organizationId: string,
+    adminId: string,
+    requestAt: string,
+): Promise<CScoreWrites> {
+    const projectTemplate = buildProjects()[0]!;
+    const projects = [
+        sliceEntityId('c-project-approved'),
+        sliceEntityId('c-project-approved-2'),
+    ].map((id) => ({
+        id,
+        organization_id: organizationId,
+        start_date: projectTemplate.start_date,
+        state: 'approved',
+    }));
+    const pools = new Map([
+        [organizationId, [adminId]],
+    ]);
+    const objectives = OBJECTIVE_SEEDS.map(
+        (_, i) => ({
+            id: sliceEntityId(
+                'c-obj-' + (i + 1)),
+        }),
+    );
+    const baselines: CScoreRow[] = [];
+    const actuals: CScoreRow[] = [];
+    for (const p of projects) {
+        const baselineCoverage =
+            objectives.length;
+        const baselineStart =
+            new Date(p.start_date).getTime();
+        const baselineMin = 0;
+        for (let i = 0; i < baselineCoverage; i++) {
+            const obj = objectives[i]!;
+            const score = deterministicScore(
+                seedHashKey(p.id) + ':'
+                    + seedHashKey(obj.id)
+                    + ':baseline',
+                baselineMin,
+                100,
+            );
+            const scoredAt = isoFromMs(
+                baselineStart + i * 1000,
+            );
+            const fields = {
+                project_id: p.id,
+                objective_id: obj.id,
+                score,
+                member_id: pickHumanMember(
+                    pools, p.organization_id,
+                    seedHashKey(p.id) + ':'
+                        + seedHashKey(obj.id)
+                        + ':baseline',
+                ),
+                at: scoredAt,
+            };
+            const id = `${p.id}:${obj.id}:${scoredAt}`;
+            const messagePair =
+                await formSeedMessagePair(
+                    {
+                        key: seedMessagePairKey(
+                            'projects/:id/'
+                                + 'objective-baseline'
+                                + '-scores/:sid',
+                            id,
+                        ),
+                        routePattern:
+                            'organizations/:id'
+                                + '/projects/:id'
+                                + '/objective-baseline'
+                                + '-scores/:sid',
+                        idParams: [
+                            organizationId,
+                            p.id,
+                            id,
+                        ],
+                        organization:
+                            organizationId,
+                        requesterIdentityId:
+                            fields.member_id,
+                        body: fields,
+                    },
+                    requestAt,
+                );
+            baselines.push({
+                id, fields, messagePair,
+            });
+        }
+        const minActuals = 1;
+        const baseActualTime =
+            baselineStart + MS_PER_DAY;
+        for (
+            let i = 0; i < objectives.length; i++
+        ) {
+            const obj = objectives[i]!;
+            const nActuals =
+                minActuals
+                + deterministicScore(
+                    seedHashKey(p.id) + ':'
+                        + seedHashKey(obj.id)
+                        + ':nactual',
+                    0,
+                    2,
+                );
+            for (let k = 0; k < nActuals; k++) {
+                const score = deterministicScore(
+                    seedHashKey(p.id) + ':'
+                        + seedHashKey(obj.id)
+                        + ':actual:' + k,
+                    -100,
+                    100,
+                );
+                const scoredAt = isoFromMs(
+                    baseActualTime
+                        + (i * 10 + k) * 1000,
+                );
+                const fields = {
+                    project_id: p.id,
+                    objective_id: obj.id,
+                    score,
+                    member_id: pickHumanMember(
+                        pools, p.organization_id,
+                        seedHashKey(p.id) + ':'
+                            + seedHashKey(obj.id)
+                            + ':actual:' + k,
+                    ),
+                    at: scoredAt,
+                };
+                const id =
+                    `${p.id}:${obj.id}:${scoredAt}`;
+                const messagePair =
+                    await formSeedMessagePair(
+                        {
+                            key: seedMessagePairKey(
+                                'projects/:id/'
+                                    + 'objective-actual'
+                                    + '-scores/:sid',
+                                id,
+                            ),
+                            routePattern:
+                                'organizations/:id'
+                                    + '/projects/:id'
+                                    + '/objective-actual'
+                                    + '-scores/:sid',
+                            idParams: [
+                                organizationId,
+                                p.id,
+                                id,
+                            ],
+                            organization:
+                                organizationId,
+                            requesterIdentityId:
+                                fields.member_id,
+                            body: fields,
+                        },
+                        requestAt,
+                    );
+                actuals.push({
+                    id, fields, messagePair,
+                });
+            }
+        }
+    }
+    return { baselines, actuals };
+}
+
+async function formFExtras(
+    organizationId: string,
+    adminId: string,
+    requestAt: string,
+): Promise<FFlowWrites> {
+    const layout = buildFlows().find((flow) =>
+        flow.name
+            === 'Layout Test: Proposal Review Cycle',
+    );
+    if (layout === undefined) {
+        throw new Error(
+            'no Layout Test flow in buildFlows',
+        );
+    }
+    const flowId = sliceEntityId('f-layout-flow');
+    const projectId = sliceEntityId(
+        'f-project-approved-2',
+    );
+    const projectFlowId = sliceEntityId(
+        'f-layout-project-flow',
+    );
+    const relations = buildFlowGraphRelations(
+        [{ id: flowId, graph: layout.graph }],
+        requestAt,
+    );
+    const nodeIds = new Set(
+        relations.nodes.map((node) => node.id),
+    );
+    const flowBody: Record<string, unknown> = {
+        id: flowId,
+        flow: {
+            organization_id: organizationId,
+            name: layout.name,
+            is_locked: layout.is_locked,
+            is_auto_layout: layout.is_auto_layout,
+            is_auto_fit: layout.is_auto_fit,
+            lock_timeout: layout.lock_timeout,
+        },
+        projectFlowId,
+        projectFlow: {
+            project_id: projectId,
+            flow_id: flowId,
+            at: requestAt,
+        },
+        initialState: 'active',
+        initialStateEventId: sliceEntityId(
+            'f-layout-state',
+        ),
+        initialStateAt: requestAt,
+        graphDelta: {
+            nodes: relations.nodes,
+            edges: relations.edges,
+            deletions: [],
+            memberEvents: relations.members.filter(
+                (row) => nodeIds.has(
+                    row.flow_node_id,
+                ),
+            ),
+            attributeEvents:
+                relations.attributes.filter(
+                    (row) => nodeIds.has(
+                        row.flow_node_id,
+                    ),
+                ),
+        },
+    };
+    const validated =
+        validateFlowCreateBody(flowBody);
+    const operation = await formSeedMessagePair(
+        {
+            key: seedMessagePairKey('flows', flowId),
+            routePattern:
+                'organizations/:id/flows/',
+            idParams: [organizationId],
+            op: true,
+            organization: organizationId,
+            requesterIdentityId: adminId,
+            body: flowBody,
+        },
+        requestAt,
+    );
+    const document = await formSeedMessagePair(
+        {
+            key: seedMessagePairKey(
+                'flows/:id', flowId,
+            ),
+            routePattern:
+                'organizations/:id/flows/:id',
+            idParams: [organizationId, flowId],
+            organization: organizationId,
+            requesterIdentityId: adminId,
+            body: flowCreateDocumentBody(
+                validated,
+            ),
+        },
+        requestAt,
+    );
+    const join = await formSeedMessagePair(
+        {
+            key: seedMessagePairKey(
+                'projects/:id/flows/:pfid',
+                projectFlowId,
+            ),
+            routePattern:
+                'organizations/:id/projects/:id'
+                + '/flows/:pfid',
+            idParams: [
+                organizationId,
+                projectId,
+                projectFlowId,
+            ],
+            organization: organizationId,
+            requesterIdentityId: adminId,
+            body: validated.projectFlow,
+        },
+        requestAt,
+    );
+    return {
+        body: flowBody,
+        messagePairs: { operation, document, join },
     };
 }
 
@@ -1353,6 +1797,11 @@ const WORK_ORDER_GARDEN = [
     { suffix: 'archive', node: 'archive', position: 3 },
 ] as const;
 
+const FS_WORKLOAD_SEED = 0x4653;
+const FS_OLDEST_DAYS_AGO = 20;
+const FS_NEWEST_DAYS_AGO = 3;
+const FS_WORK_ORDER_COUNT = 12;
+
 type GardenIdea = {
     readonly id: string;
     readonly body: Record<string, unknown>;
@@ -1377,6 +1826,9 @@ type GardenObjective = {
 type GardenRecord = {
     readonly body: Record<string, unknown>;
     readonly messagePairs: RecordWriteMessagePairs;
+    readonly bindingId: string;
+    readonly bindingBody: Record<string, unknown>;
+    readonly bindingMessagePair: MessagePair;
 };
 
 type GardenFlow = {
@@ -1391,8 +1843,10 @@ type GardenWorkOrder = {
     readonly joinId: string;
     readonly joinBody: Record<string, unknown>;
     readonly joinMessagePair: MessagePair;
-    readonly transitionBody: Record<string, unknown>;
-    readonly transitionMessagePair: MessagePair;
+    readonly transitions: readonly {
+        readonly body: Record<string, unknown>;
+        readonly messagePair: MessagePair;
+    }[];
 };
 
 type GardenWrites = {
@@ -1403,6 +1857,150 @@ type GardenWrites = {
     readonly flow: GardenFlow;
     readonly workOrders: readonly GardenWorkOrder[];
 };
+
+async function formRecordBindingMessagePairs(
+    args: {
+        readonly organizationId: string;
+        readonly adminId: string;
+        readonly requestAt: string;
+        readonly recordId: string;
+        readonly attributes: readonly {
+            readonly id: string;
+            readonly name: string;
+            readonly attribute_type: string;
+            readonly sort_order: number;
+            readonly options: readonly string[];
+            readonly constraints: readonly unknown[];
+        }[];
+        readonly flowId: string;
+        readonly bindingId: string;
+        readonly recordName: string;
+        readonly recordDescription: string;
+        readonly recordPosition: number;
+        readonly initialStateEventId: string;
+    },
+): Promise<{
+    readonly body: Record<string, unknown>;
+    readonly messagePairs: RecordWriteMessagePairs;
+    readonly bindingBody: Record<string, unknown>;
+    readonly bindingMessagePair: MessagePair;
+}> {
+    const attributeRows = args.attributes.map(
+        (attribute) => ({
+            ...attribute,
+            record_id: args.recordId,
+            organization_id: args.organizationId,
+        }),
+    );
+    const body: Record<string, unknown> = {
+        kind: 'create',
+        id: args.recordId,
+        record: {
+            organization_id: args.organizationId,
+            name: args.recordName,
+            description: args.recordDescription,
+            position: args.recordPosition,
+        },
+        attributes: attributeRows,
+        initialState: 'active',
+        initialStateEventId: args.initialStateEventId,
+        initialStateAt: args.requestAt,
+    };
+    const validated = validateRecordWriteBody(body);
+    const operation = await formSeedMessagePair(
+        {
+            key: seedMessagePairKey(
+                RECORD_TYPES_COLLECTION_PATTERN,
+                args.recordId,
+            ),
+            routePattern:
+                RECORD_TYPES_COLLECTION_PATTERN,
+            idParams: [args.organizationId],
+            op: true,
+            organization: args.organizationId,
+            requesterIdentityId: args.adminId,
+            body,
+        },
+        args.requestAt,
+    );
+    const document = await formSeedMessagePair(
+        {
+            key: seedMessagePairKey(
+                RECORD_TYPE_DETAIL_PATTERN,
+                args.recordId,
+            ),
+            routePattern: RECORD_TYPE_DETAIL_PATTERN,
+            idParams: [
+                args.organizationId, args.recordId,
+            ],
+            organization: args.organizationId,
+            requesterIdentityId: args.adminId,
+            body: recordDocumentBodyOf(validated),
+        },
+        args.requestAt,
+    );
+    const attributePuts: MessagePair[] = [];
+    for (const attribute of attributeRows) {
+        attributePuts.push(await formSeedMessagePair(
+            {
+                key: seedMessagePairKey(
+                    ATTRIBUTE_DETAIL_PATTERN,
+                    attribute.id,
+                ),
+                routePattern: ATTRIBUTE_DETAIL_PATTERN,
+                idParams: [
+                    args.organizationId,
+                    args.recordId,
+                    attribute.id,
+                ],
+                organization: args.organizationId,
+                requesterIdentityId: args.adminId,
+                body: recordAttributeDocumentBodyOf(
+                    attribute as unknown as
+                        Record<string, unknown>,
+                ),
+            },
+            args.requestAt,
+        ));
+    }
+    const bindingBody = flowRecordJoinSeedBody({
+        id: args.bindingId,
+        flow_id: args.flowId,
+        record_id: args.recordId,
+        at: args.requestAt,
+    });
+    const bindingMessagePair = await formSeedMessagePair(
+        {
+            key: seedMessagePairKey(
+                'flows/:id/records/:frid',
+                args.bindingId,
+            ),
+            routePattern:
+                'organizations/:id/flows/:id'
+                + '/records/:frid',
+            idParams: [
+                args.organizationId,
+                args.flowId,
+                args.bindingId,
+            ],
+            organization: args.organizationId,
+            requesterIdentityId: args.adminId,
+            body: bindingBody,
+        },
+        args.requestAt,
+    );
+    return {
+        body,
+        messagePairs: {
+            operation,
+            document,
+            attributePuts,
+            attributeDeletes: [],
+        },
+        bindingBody,
+        bindingMessagePair,
+    };
+}
 
 async function formGarden(
     token: string,
@@ -1417,13 +2015,14 @@ async function formGarden(
         ...ideaFields
     } = ideaTemplate;
     const ideas: GardenIdea[] = [];
-    for (const state of IDEA_GARDEN_STATES) {
+    for (const [i, state] of IDEA_GARDEN_STATES.entries()) {
         const id = sliceEntityId(token + '-idea-' + state);
         const body: Record<string, unknown> = {
             ...ideaFields,
             title: ideaTitle + ' (' + state + ')',
             organization_id: organizationId,
             state,
+            position: i + 1,
         };
         const messagePair = await formSeedMessagePair(
             {
@@ -1585,108 +2184,78 @@ async function formGarden(
     const profile = buildRecords()[0]!;
     const recordId = sliceEntityId(
         token + '-record-customer');
-    const attributeRows = [
-        {
-            id: sliceEntityId(token + '-attr-1'),
-            record_id: recordId,
-            organization_id: organizationId,
-            name: 'Company Name',
-            attribute_type: 'text',
-            sort_order: 1,
-            options: [] as string[],
-            constraints: [] as unknown[],
-        },
-        {
-            id: sliceEntityId(token + '-attr-2'),
-            record_id: recordId,
-            organization_id: organizationId,
-            name: 'Contact Email',
-            attribute_type: 'text',
-            sort_order: 2,
-            options: [] as string[],
-            constraints: [] as unknown[],
-        },
-    ];
-    const recordBody: Record<string, unknown> = {
-        kind: 'create',
-        id: recordId,
-        record: {
-            organization_id: organizationId,
-            name: profile.name,
-            description: profile.description,
-            position: profile.position,
-        },
-        attributes: attributeRows,
-        initialState: 'active',
-        initialStateEventId:
-            sliceEntityId(
-            token + '-state-record-customer'),
-        initialStateAt: requestAt,
-    };
-    const validatedRecord =
-        validateRecordWriteBody(recordBody);
-    const recordOperationMessagePair = await formSeedMessagePair(
-        {
-            key: seedMessagePairKey(
-                RECORD_TYPES_COLLECTION_PATTERN,
-                recordId,
-            ),
-            routePattern:
-                RECORD_TYPES_COLLECTION_PATTERN,
-            idParams: [organizationId],
-            op: true,
-            organization: organizationId,
-            requesterIdentityId: adminId,
-            body: recordBody,
-        },
-        requestAt,
-    );
-    const recordDocumentMessagePair = await formSeedMessagePair(
-        {
-            key: seedMessagePairKey(
-                RECORD_TYPE_DETAIL_PATTERN, recordId,
-            ),
-            routePattern: RECORD_TYPE_DETAIL_PATTERN,
-            idParams: [organizationId, recordId],
-            organization: organizationId,
-            requesterIdentityId: adminId,
-            body: recordDocumentBodyOf(
-                validatedRecord,
-            ),
-        },
-        requestAt,
-    );
-    const attributePuts: MessagePair[] = [];
-    for (const attribute of attributeRows) {
-        attributePuts.push(await formSeedMessagePair(
-            {
-                key: seedMessagePairKey(
-                    ATTRIBUTE_DETAIL_PATTERN,
-                    attribute.id,
-                ),
-                routePattern: ATTRIBUTE_DETAIL_PATTERN,
-                idParams: [
-                    organizationId,
-                    recordId,
-                    attribute.id,
-                ],
-                organization: organizationId,
-                requesterIdentityId: adminId,
-                body: recordAttributeDocumentBodyOf(
-                    attribute as unknown as
-                        Record<string, unknown>,
-                ),
-            },
-            requestAt,
-        ));
-    }
+    const attr1Id = sliceEntityId(token + '-attr-1');
+    const attr2Id = sliceEntityId(token + '-attr-2');
     const flowId = sliceEntityId(token + '-flow');
+    const bindingId = sliceEntityId(
+        token + '-flow-record');
+    const formedRecord =
+        await formRecordBindingMessagePairs({
+            organizationId,
+            adminId,
+            requestAt,
+            recordId,
+            attributes: [
+                {
+                    id: attr1Id,
+                    name: 'Company Name',
+                    attribute_type: 'text',
+                    sort_order: 1,
+                    options: [],
+                    constraints: [],
+                },
+                {
+                    id: attr2Id,
+                    name: 'Contact Email',
+                    attribute_type: 'text',
+                    sort_order: 2,
+                    options: [],
+                    constraints: [],
+                },
+            ],
+            flowId,
+            bindingId,
+            recordName: profile.name,
+            recordDescription: profile.description,
+            recordPosition: profile.position,
+            initialStateEventId: sliceEntityId(
+                token + '-state-record-customer'),
+        });
     const createNodeId = sliceEntityId(token + '-node-create');
     const captureNodeId = sliceEntityId(
         token + '-node-capture');
     const reviewNodeId = sliceEntityId(token + '-node-review');
     const archiveNodeId = sliceEntityId(
         token + '-node-archive');
+    const graphEdges: Record<string, unknown>[] = [
+        {
+            id: sliceEntityId(token + '-edge-begin'),
+            name: 'begin',
+            fromNodeId: createNodeId,
+            toNodeId: captureNodeId,
+        },
+        {
+            id: sliceEntityId(token + '-edge-submit'),
+            name: 'submit',
+            fromNodeId: captureNodeId,
+            toNodeId: reviewNodeId,
+        },
+        {
+            id: sliceEntityId(
+                token + '-edge-approve'),
+            name: 'approve',
+            fromNodeId: reviewNodeId,
+            toNodeId: archiveNodeId,
+        },
+    ];
+    if (token === 'fs') {
+        graphEdges.push({
+            id: sliceEntityId('fs-edge-revise'),
+            name: 'needs revision',
+            fromNodeId: reviewNodeId,
+            toNodeId: captureNodeId,
+        });
+    }
     const graph: Record<string, unknown> = {
         nodes: [
             {
@@ -1709,7 +2278,18 @@ async function formGarden(
                 isArchive: false,
                 taskInstructions: '',
                 memberIds: [adminId],
-                attributes: [],
+                attributes: [
+                    {
+                        attribute_id: attr1Id,
+                        mode: 'editable',
+                        isRequired: true,
+                    },
+                    {
+                        attribute_id: attr2Id,
+                        mode: 'editable',
+                        isRequired: true,
+                    },
+                ],
             },
             {
                 id: reviewNodeId,
@@ -1720,7 +2300,18 @@ async function formGarden(
                 isArchive: false,
                 taskInstructions: '',
                 memberIds: [adminId],
-                attributes: [],
+                attributes: [
+                    {
+                        attribute_id: attr1Id,
+                        mode: 'readonly',
+                        isRequired: false,
+                    },
+                    {
+                        attribute_id: attr2Id,
+                        mode: 'readonly',
+                        isRequired: false,
+                    },
+                ],
             },
             {
                 id: archiveNodeId,
@@ -1734,27 +2325,7 @@ async function formGarden(
                 attributes: [],
             },
         ],
-        edges: [
-            {
-                id: sliceEntityId(token + '-edge-begin'),
-                name: 'begin',
-                fromNodeId: createNodeId,
-                toNodeId: captureNodeId,
-            },
-            {
-                id: sliceEntityId(token + '-edge-submit'),
-                name: 'submit',
-                fromNodeId: captureNodeId,
-                toNodeId: reviewNodeId,
-            },
-            {
-                id: sliceEntityId(
-                    token + '-edge-approve'),
-                name: 'approve',
-                fromNodeId: reviewNodeId,
-                toNodeId: archiveNodeId,
-            },
-        ],
+        edges: graphEdges,
     };
     const relations = buildFlowGraphRelations(
         [{ id: flowId, graph }],
@@ -1858,106 +2429,312 @@ async function formGarden(
         archive: archiveNodeId,
     };
     const workOrders: GardenWorkOrder[] = [];
-    for (const spec of WORK_ORDER_GARDEN) {
-        const id = sliceEntityId(
-            token + '-wo-' + spec.suffix);
-        const body: Record<string, unknown> = {
-            display_id: token + spec.position,
-            flow_graph: frozenGraph,
-            position: spec.position,
-            organization_id: organizationId,
-        };
-        const messagePair = await formSeedMessagePair(
+    if (token === 'fs') {
+        const nodes = graph['nodes'] as GraphNode[];
+        const edges = graph['edges'] as GraphEdge[];
+        const beginId = sliceEntityId(
+            token + '-edge-begin');
+        const submitId = sliceEntityId(
+            token + '-edge-submit');
+        const approveId = sliceEntityId(
+            token + '-edge-approve');
+        const reviseId = sliceEntityId(
+            'fs-edge-revise');
+        const paths: readonly PathProfile[] = [
             {
-                key: seedMessagePairKey(
-                    'work-orders/:id', id,
-                ),
-                routePattern:
-                    'organizations/:id/work-orders/:id',
-                idParams: [organizationId, id],
-                organization: organizationId,
-                requesterIdentityId: adminId,
-                body,
-            },
-            requestAt,
-        );
-        const joinId = id;
-        const joinBody = flowWorkOrderJoinSeedBody({
-            id: joinId,
-            flow_id: flowId,
-            work_order_id: id,
-            at: requestAt,
-        });
-        const joinMessagePair = await formSeedMessagePair(
-            {
-                key: seedMessagePairKey(
-                    'flows/:id/work-orders/:woid',
-                    joinId,
-                ),
-                routePattern:
-                    'organizations/:id/flows/:id'
-                    + '/work-orders/:woid',
-                idParams: [
-                    organizationId, flowId, joinId,
+                nodeIds: [
+                    createNodeId, captureNodeId,
+                    reviewNodeId, archiveNodeId,
                 ],
-                organization: organizationId,
-                requesterIdentityId: adminId,
-                body: joinBody,
+                edgeIds: [
+                    beginId, submitId, approveId,
+                ],
+                weight: 0.7,
             },
-            requestAt,
-        );
-        const parkId = parkNodeId[spec.node]!;
-        const transitionEventId =
-            sliceEntityId(
-                token + '-wo-' + spec.suffix
-                + '-move');
-        const transitionBody: Record<string, unknown> = {
-            transitionEventId,
-            targetState: parkId,
-            fieldValues: [],
-            release: null,
-            transitionAt: requestAt,
-        };
-        const transitionMessagePair = await formSeedMessagePair(
             {
-                key: seedMessagePairKey(
-                    'work-orders/:id/transition',
-                    transitionEventId,
-                ),
-                routePattern:
-                    'organizations/:id/work-orders/:id'
-                    + '/transition',
-                idParams: [organizationId, id],
-                op: true,
-                organization: organizationId,
-                requesterIdentityId: adminId,
-                body: transitionBody,
+                nodeIds: [
+                    createNodeId, captureNodeId,
+                    reviewNodeId, captureNodeId,
+                    reviewNodeId, archiveNodeId,
+                ],
+                edgeIds: [
+                    beginId, submitId, reviseId,
+                    submitId, approveId,
+                ],
+                weight: 0.15,
             },
-            requestAt,
-        );
-        workOrders.push({
-            id,
-            body,
-            messagePair,
-            joinId,
-            joinBody,
-            joinMessagePair,
-            transitionBody,
-            transitionMessagePair,
+            {
+                nodeIds: [
+                    createNodeId, captureNodeId,
+                    reviewNodeId,
+                ],
+                edgeIds: [beginId, submitId],
+                weight: 0.15,
+            },
+        ];
+        const sojourn: SojournProfile = {
+            meanHoursByNodeId: new Map([
+                [captureNodeId, 72],
+                [reviewNodeId, 18],
+            ]),
+            sigmaByNodeId: new Map([
+                [captureNodeId, 0.8],
+                [reviewNodeId, 0.5],
+            ]),
+        };
+        const skill: MemberSkill = {
+            byMemberAndNode: new Map([
+                [adminId, new Map([
+                    [captureNodeId, 1.0],
+                    [reviewNodeId, 1.0],
+                ])],
+            ]),
+            jitterPct: 0.15,
+        };
+        const flowSpec: FlowSeedSpec = {
+            flowId,
+            name: 'Customer Onboarding',
+            nodes,
+            edges,
+            creator: nodes[0]!,
+            archive: nodes[3]!,
+        };
+        const generated = generateFlowWorkload({
+            flow: flowSpec,
+            paths,
+            sojourn,
+            skill,
+            totalWorkOrders: FS_WORK_ORDER_COUNT,
+            oldestDaysAgo: FS_OLDEST_DAYS_AGO,
+            newestDaysAgo: FS_NEWEST_DAYS_AGO,
+            seed: FS_WORKLOAD_SEED,
+            organizationId,
+            nowMs: Date.parse(requestAt),
         });
+        for (const wo of generated.workOrders) {
+            const { id: woId, ...woFields } = wo;
+            const body: Record<string, unknown> = {
+                ...woFields,
+            };
+            const messagePair =
+                await formSeedMessagePair(
+                    {
+                        key: seedMessagePairKey(
+                            'work-orders/:id', woId,
+                        ),
+                        routePattern:
+                            'organizations/:id'
+                            + '/work-orders/:id',
+                        idParams: [
+                            organizationId, woId,
+                        ],
+                        organization: organizationId,
+                        requesterIdentityId: adminId,
+                        body,
+                    },
+                    requestAt,
+                );
+            const join = generated.flowWorkOrders.find(
+                (row) => row.work_order_id === woId,
+            )!;
+            const joinBody =
+                flowWorkOrderJoinSeedBody(join);
+            const joinMessagePair =
+                await formSeedMessagePair(
+                    {
+                        key: seedMessagePairKey(
+                            'flows/:id/work-orders/:woid',
+                            join.id,
+                        ),
+                        routePattern:
+                            'organizations/:id/flows/:id'
+                            + '/work-orders/:woid',
+                        idParams: [
+                            organizationId,
+                            flowId,
+                            join.id,
+                        ],
+                        organization: organizationId,
+                        requesterIdentityId: adminId,
+                        body: joinBody,
+                    },
+                    requestAt,
+                );
+            const transitions: {
+                readonly body:
+                    Record<string, unknown>;
+                readonly messagePair: MessagePair;
+            }[] = [];
+            const events = generated.stateEvents.filter(
+                (event) => event.entity_id === woId,
+            );
+            for (const event of events) {
+                const transitionBody: Record<
+                    string, unknown
+                > = {
+                    transitionEventId: event.id,
+                    targetState: event.state,
+                    fieldValues: [],
+                    release: null,
+                    transitionAt: event.at,
+                };
+                const transitionMessagePair =
+                    await formSeedMessagePair(
+                        {
+                            key: seedMessagePairKey(
+                                'work-orders/:id'
+                                + '/transition',
+                                event.id,
+                            ),
+                            routePattern:
+                                'organizations/:id'
+                                + '/work-orders/:id'
+                                + '/transition',
+                            idParams: [
+                                organizationId, woId,
+                            ],
+                            op: true,
+                            organization:
+                                organizationId,
+                            requesterIdentityId:
+                                adminId,
+                            body: transitionBody,
+                        },
+                        requestAt,
+                    );
+                transitions.push({
+                    body: transitionBody,
+                    messagePair:
+                        transitionMessagePair,
+                });
+            }
+            workOrders.push({
+                id: woId,
+                body,
+                messagePair,
+                joinId: join.id,
+                joinBody,
+                joinMessagePair,
+                transitions,
+            });
+        }
+    } else {
+        for (const spec of WORK_ORDER_GARDEN) {
+            const id = sliceEntityId(
+                token + '-wo-' + spec.suffix);
+            const body: Record<string, unknown> = {
+                display_id: token + spec.position,
+                flow_graph: frozenGraph,
+                position: spec.position,
+                organization_id: organizationId,
+            };
+            const messagePair =
+                await formSeedMessagePair(
+                    {
+                        key: seedMessagePairKey(
+                            'work-orders/:id', id,
+                        ),
+                        routePattern:
+                            'organizations/:id'
+                            + '/work-orders/:id',
+                        idParams: [
+                            organizationId, id,
+                        ],
+                        organization: organizationId,
+                        requesterIdentityId: adminId,
+                        body,
+                    },
+                    requestAt,
+                );
+            const joinId = id;
+            const joinBody = flowWorkOrderJoinSeedBody({
+                id: joinId,
+                flow_id: flowId,
+                work_order_id: id,
+                at: requestAt,
+            });
+            const joinMessagePair =
+                await formSeedMessagePair(
+                    {
+                        key: seedMessagePairKey(
+                            'flows/:id/work-orders/:woid',
+                            joinId,
+                        ),
+                        routePattern:
+                            'organizations/:id/flows/:id'
+                            + '/work-orders/:woid',
+                        idParams: [
+                            organizationId,
+                            flowId,
+                            joinId,
+                        ],
+                        organization: organizationId,
+                        requesterIdentityId: adminId,
+                        body: joinBody,
+                    },
+                    requestAt,
+                );
+            const parkId = parkNodeId[spec.node]!;
+            const transitionEventId =
+                sliceEntityId(
+                    token + '-wo-' + spec.suffix
+                    + '-move');
+            const transitionBody: Record<
+                string, unknown
+            > = {
+                transitionEventId,
+                targetState: parkId,
+                fieldValues: [],
+                release: null,
+                transitionAt: requestAt,
+            };
+            const transitionMessagePair =
+                await formSeedMessagePair(
+                    {
+                        key: seedMessagePairKey(
+                            'work-orders/:id/transition',
+                            transitionEventId,
+                        ),
+                        routePattern:
+                            'organizations/:id'
+                            + '/work-orders/:id'
+                            + '/transition',
+                        idParams: [
+                            organizationId, id,
+                        ],
+                        op: true,
+                        organization: organizationId,
+                        requesterIdentityId: adminId,
+                        body: transitionBody,
+                    },
+                    requestAt,
+                );
+            workOrders.push({
+                id,
+                body,
+                messagePair,
+                joinId,
+                joinBody,
+                joinMessagePair,
+                transitions: [{
+                    body: transitionBody,
+                    messagePair:
+                        transitionMessagePair,
+                }],
+            });
+        }
     }
     return {
         ideas,
         projects,
         objectives,
         record: {
-            body: recordBody,
-            messagePairs: {
-                operation: recordOperationMessagePair,
-                document: recordDocumentMessagePair,
-                attributePuts,
-                attributeDeletes: [],
-            },
+            body: formedRecord.body,
+            messagePairs: formedRecord.messagePairs,
+            bindingId,
+            bindingBody: formedRecord.bindingBody,
+            bindingMessagePair:
+                formedRecord.bindingMessagePair,
         },
         flow: {
             body: flowBody,
@@ -2015,6 +2792,13 @@ async function writeGarden(
             SYSTEM_MEMBER_ID,
             garden.record.messagePairs,
         ),
+        postFlowRecordDocumentOp(
+            adapter,
+            garden.record.bindingId,
+            garden.record.bindingBody,
+            SYSTEM_MEMBER_ID,
+            garden.record.bindingMessagePair,
+        ),
         postFlowCreationOp(
             adapter,
             garden.flow.body,
@@ -2039,15 +2823,17 @@ async function writeGarden(
                 workOrder.joinMessagePair,
             ),
         ),
-        ...garden.workOrders.map((workOrder) =>
-            postWorkOrderTransitionOp(
-                adapter,
-                workOrder.id,
-                workOrder.transitionBody,
-                SYSTEM_MEMBER_ID,
-                undefined,
-                [],
-                workOrder.transitionMessagePair,
+        ...garden.workOrders.flatMap((workOrder) =>
+            workOrder.transitions.map((row) =>
+                postWorkOrderTransitionOp(
+                    adapter,
+                    workOrder.id,
+                    row.body,
+                    SYSTEM_MEMBER_ID,
+                    undefined,
+                    [],
+                    row.messagePair,
+                ),
             ),
         ),
     ]);
@@ -2099,6 +2885,9 @@ function fillPasswords(
         const memberPassword = passwordFor(
             passwords, row.memberUsername,
         );
+        const erasablePassword = passwordFor(
+            passwords, row.erasableUsername,
+        );
         return {
             ...row,
             adminPassword,
@@ -2111,6 +2900,9 @@ function fillPasswords(
             ...(memberPassword === undefined
                 ? {}
                 : { memberPassword }),
+            ...(erasablePassword === undefined
+                ? {}
+                : { erasablePassword }),
         };
     });
 }
@@ -2143,6 +2935,8 @@ export async function postTestPlanSlices(
     const extras: ExtraWrites[] = [];
     const gardens: GardenWrites[] = [];
     const f2Flows: F2FlowWrites[] = [];
+    const fFlows: FFlowWrites[] = [];
+    const cScores: CScoreWrites[] = [];
     for (const section of PARALLEL_SECTIONS) {
         if (section === 'AA') continue;
         const slice = await formTenantAdminMessagePairs(
@@ -2192,6 +2986,11 @@ export async function postTestPlanSlices(
                 email:
                     'g-member@test-plan.example',
             });
+            recipients.push({
+                identityId: 'qbtQzOgP8OTJSr9Idicllg',
+                email:
+                    'g-erasable@test-plan.example',
+            });
             reveal = {
                 ...reveal,
                 secondOrganizationId: 'WlkfISpndVJfICRnWksipQ',
@@ -2203,6 +3002,9 @@ export async function postTestPlanSlices(
                 memberUsername:
                     'g-member@test-plan.example',
                 memberPassword: '',
+                erasableUsername:
+                    'g-erasable@test-plan.example',
+                erasablePassword: '',
             };
         } else if (section === 'SV') {
             extras.push(await formSvExtras(
@@ -2219,6 +3021,18 @@ export async function postTestPlanSlices(
                     'sv-member@test-plan.example',
                 seatPassword: '',
             };
+        } else if (section === 'C') {
+            cScores.push(await formCExtras(
+                slice.organizationId,
+                slice.adminId,
+                requestAt,
+            ));
+        } else if (section === 'F') {
+            fFlows.push(await formFExtras(
+                slice.organizationId,
+                slice.adminId,
+                requestAt,
+            ));
         } else if (section === 'F2') {
             const extra = await formF2Extras(
                 slice.organizationId,
@@ -2269,12 +3083,58 @@ export async function postTestPlanSlices(
                     writeGarden(view, garden),
                 ),
             );
+            await Promise.all(
+                fFlows.map((extra) =>
+                    postFlowCreationOp(
+                        view,
+                        extra.body,
+                        SYSTEM_MEMBER_ID,
+                        extra.messagePairs,
+                    ),
+                ),
+            );
+            await Promise.all(
+                cScores.flatMap((extra) => [
+                    ...extra.baselines.map((row) =>
+                        postBaselineScoreDocumentOp(
+                            view,
+                            row.id,
+                            row.fields,
+                            row.fields.member_id,
+                            row.messagePair,
+                        )),
+                    ...extra.actuals.map((row) =>
+                        postActualScoreDocumentOp(
+                            view,
+                            row.id,
+                            row.fields,
+                            row.fields.member_id,
+                            row.messagePair,
+                        )),
+                ]),
+            );
             for (const extra of f2Flows) {
                 await appendMessagePair(
                     view, extra.operation,
                 );
                 await appendMessagePair(
                     view, extra.document,
+                );
+                await postRecordWriteOp(
+                    view,
+                    extra.recordBody,
+                    SYSTEM_MEMBER_ID,
+                    extra.recordMessagePairs,
+                );
+                await postFlowRecordDocumentOp(
+                    view,
+                    extra.bindingId,
+                    extra.bindingBody,
+                    SYSTEM_MEMBER_ID,
+                    extra.bindingMessagePair,
+                );
+                await appendMessagePair(
+                    view, extra.instanceMessagePair,
                 );
             }
         },

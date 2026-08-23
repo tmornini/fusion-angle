@@ -51,3 +51,17 @@ export function resolveCredentialDecision(
 function isLive(token: string, now: number): boolean {
     return now < decodeAccessToken(token).exp;
 }
+
+// Empty reachable on invitations stays on the page; every
+// other page bounces (null). Non-empty reachable always
+// proceeds. Pure: bootOrganizationGate is the I/O caller.
+export function resolveOrganizationGate<T>(
+    reachable: readonly T[],
+    currentPage: string,
+): readonly T[] | null {
+    if (reachable.length > 0) return reachable;
+    if (currentPage === 'invitations') {
+        return reachable;
+    }
+    return null;
+}

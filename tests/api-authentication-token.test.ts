@@ -6,7 +6,15 @@ import {
 } from '../api/db-memory.ts';
 import { GET, handleRequest } from '../api/api.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
-import { devToken } from './token-fixtures.ts';
+import {
+    claimToken, devToken, reachableToken,
+} from './token-fixtures.ts';
+import {
+    postTestPlanSlices, sliceEntityId,
+} from '../api/test-plan-slices.ts';
+import { testHashPassword } from './mock-seed.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import { captureConsole } from './console-capture.ts';
 import {
     makeAssertionSigner,
@@ -1051,3 +1059,166 @@ async () => {
     const body = await res.json() as { error: string };
     assert.match(body.error, /unknown client/);
 });
+
+const UNSEATED = 'dtmZgnDBlVcoyjxKzlaKgA';
+
+test('unseated password grant has no org claims',
+async () => {
+    const db = memoryDbAdapter();
+    const reveal = await postTestPlanSlices(
+        db, { hashPassword: testHashPassword },
+    );
+    const g = reveal.find(
+        (row) => row.section === 'G',
+    );
+    assert.ok(g);
+    const password = g.unseatedPassword;
+    assert.ok(
+        (password ?? '').length >= 16,
+    );
+    const gOrganization = g.organizationId;
+    const gAdmin = sliceEntityId('g-admin');
+    const verifier = 'pkce-verifier-unseated';
+    const challenge = await s256Challenge(verifier);
+    const authorized = await handleRequest(
+        db,
+        new Request(`${BASE}/authentication/authorize`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                method: 'password',
+                username:
+                    'g-unseated@test-plan.example',
+                password,
+                client_id: 'web',
+                code_challenge: challenge,
+                code_challenge_method: 'S256',
+            }),
+        }),
+    );
+    assert.equal(authorized.status, 201);
+    const { code } = await authorized.json() as {
+        code: string;
+    };
+    const exchanged = await handleRequest(
+        db, tokenRequest({
+            grant_type: 'authorization_code',
+            code, client_id: 'web',
+            code_verifier: verifier,
+        }),
+    );
+    assert.equal(exchanged.status, 201);
+    const exchangedBody = await exchanged.json() as {
+        access_token: string;
+    };
+    const exchangedClaims = decodeAccessToken(
+        exchangedBody.access_token,
+    );
+    assert.equal(
+        exchangedClaims.organization, undefined,
+    );
+    assert.equal(
+        exchangedClaims.organizations, undefined,
+    );
+    const seats = await handleRequest(db, new Request(
+        `${BASE}/identities/` + UNSEATED
+            + '/organizations/',
+        {
+            headers: {
+                Authorization: 'Bearer '
+                    + exchangedBody.access_token,
+            },
+        },
+    ));
+    assert.equal(seats.status, 200);
+    assert.deepEqual(await seats.json(), []);
+    const refreshToken =
+        refreshTokenFromSetCookie(exchanged);
+    const refreshed = await handleRequest(
+        db, new Request(
+            `${BASE}/authentication/token`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Cookie: 'refresh_token='
+                        + refreshToken,
+                },
+                body: JSON.stringify({
+                    grant_type: 'refresh',
+                }),
+            },
+        ),
+    );
+    assert.equal(refreshed.status, 201);
+    const refreshedBody = await refreshed.json() as {
+        access_token: string;
+    };
+    const refreshedClaims = decodeAccessToken(
+        refreshedBody.access_token,
+    );
+    assert.equal(
+        refreshedClaims.organization, undefined,
+    );
+    assert.equal(
+        refreshedClaims.organizations, undefined,
+    );
+    const gAdminToken = await claimToken({
+        sub: gAdmin,
+        organization: gOrganization,
+        organizations: [gOrganization],
+        roles: ['admin:' + gOrganization],
+    });
+    const granted = await handleRequest(db, new Request(
+        `${BASE}/organizations/` + gOrganization
+            + '/invitations/',
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + gAdminToken,
+                'operation-id': generateIdentifier(),
+            },
+            body: JSON.stringify({
+                email:
+                    'g-unseated@test-plan.example',
+                invitationId: generateIdentifier(),
+                grantEventId: generateIdentifier(),
+                grantAt: nowUtc(),
+            }),
+        },
+    ));
+    assert.equal(granted.status, 200);
+    const pending = await handleRequest(db, new Request(
+        `${BASE}/identities/` + UNSEATED
+            + '/invitations/',
+        {
+            headers: {
+                Authorization: 'Bearer '
+                    + refreshedBody.access_token,
+            },
+        },
+    ));
+    assert.equal(pending.status, 200);
+    const invitations = await pending.json() as {
+        state: string;
+    }[];
+    assert.equal(invitations.length, 1);
+    assert.equal(invitations[0]!.state, 'pending');
+    const reachableClaims = decodeAccessToken(
+        await reachableToken(UNSEATED, []),
+    );
+    assert.deepEqual(
+        reachableClaims.organizations, [],
+    );
+    assert.deepEqual(
+        exchangedClaims.organizations ?? [],
+        reachableClaims.organizations ?? [],
+    );
+    assert.deepEqual(
+        refreshedClaims.organizations ?? [],
+        reachableClaims.organizations ?? [],
+    );
+});
+

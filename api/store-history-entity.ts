@@ -150,11 +150,4 @@ export class HistoryEntityStore<
             },
         );
     }
-
-    async delete(id: string): Promise<void> {
-        await this.#run(
-            [this.#table], 'readwrite',
-            tx => tx.delete(this.#table, id),
-        );
-    }
 }

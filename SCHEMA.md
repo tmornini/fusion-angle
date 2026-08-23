@@ -76,13 +76,13 @@ Reads expose existence and lifecycle, never the hash.
 `secret` out of a credential before it crosses the API
 boundary.
 
-## PII erasure — the one hard delete
+## PII erasure is a tombstone
 
-Document DELETE is a marked tombstone pair. The sole
-physical hard-delete is PII erasure (`identities/:id/pii`
-via `replacePiiSlot` in `api/pii-hard-delete.ts`) — pair
-splice plus a bodyless erasure tombstone. Credentials and
-registration stay append-only / tombstone.
+Document DELETE is a marked tombstone pair. No physical
+delete exists. Erasure of `identities/:id/pii` appends a
+bodyless DELETE head; superseded PUT pairs remain in the
+ledger. Credentials and registration stay append-only /
+tombstone.
 
 ## State alphabets
 

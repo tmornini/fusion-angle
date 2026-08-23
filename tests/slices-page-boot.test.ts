@@ -18,6 +18,13 @@ import {
 } from './token-fixtures.ts';
 import { PAGE_REGISTRY } from
     '../web-app/app/page-registry.ts';
+import {
+    WorkboxDetailPresenter,
+} from '../web-app/app/presenters/index.ts';
+import {
+    instanceListItems,
+} from
+    '../web-app/app/presenters/record-detail.ts';
 import { getDashboardGauges } from
     '../web-app/app/adapters/dashboard.ts';
 import {
@@ -55,9 +62,14 @@ import { getFlowStats } from
 import {
     getRecords, getRecordModel, getRecordEntities,
 } from '../web-app/app/adapters/records.ts';
-import { getRecordAttributesByRecord } from
+import {
+    getRecordAttributesByRecord,
+    type RecordAttribute,
+} from
     '../web-app/app/adapters/record-attributes.ts';
-import { getRecordInstances } from
+import {
+    getRecordInstances, getRecordInstance,
+} from
     '../web-app/app/adapters/record-instances.ts';
 import {
     getFlowSummariesForRecord,
@@ -69,6 +81,9 @@ import {
     getWorkOrders, getWorkOrder,
     getWorkOrderHistories,
     getWorkOrderHistory,
+    transitionEventsFromHistory,
+    fieldValuesByEventFromHistory,
+    activeClaimFromHistory,
 } from
     '../web-app/app/adapters/work-orders-queries.ts';
 import { getFlowsForCreation } from
@@ -234,17 +249,141 @@ const MANIFEST: Record<string, BootFn> = {
         await getFlowsForCreation(ctx);
     },
     'workbox-detail': async (ctx) => {
-        await getCurrentHumanMember(ctx);
+        const currentMemberId =
+            (await getCurrentHumanMember(ctx)).id;
         const orders = await getWorkOrders(ctx);
         for (const order of orders) {
-            await getWorkOrder(ctx, order.id);
-            await getWorkOrderHistory(
+            const workOrder = await getWorkOrder(
                 ctx, order.id,
             );
-            await getMemberMap(ctx);
-            await getRecordForWorkOrder(
-                ctx, order.id,
+            const history =
+                await getWorkOrderHistory(
+                    ctx, order.id,
+                );
+            const memberMap =
+                await getMemberMap(ctx);
+            const recordId =
+                await getRecordForWorkOrder(
+                    ctx, order.id,
+                );
+            const transitions =
+                transitionEventsFromHistory(
+                    order.id, history,
+                );
+            const fieldValuesByEvent =
+                fieldValuesByEventFromHistory(
+                    history,
+                );
+            const activeClaim =
+                activeClaimFromHistory(
+                    history,
+                    workOrder.flowGraph.lockTimeout,
+                );
+            const bound =
+                workOrder.instanceId !== undefined
+                && workOrder.recordTypeId
+                    !== undefined
+                    ? {
+                        instanceId:
+                            workOrder.instanceId,
+                        recordTypeId:
+                            workOrder.recordTypeId,
+                    }
+                    : null;
+            const attributesPromise: Promise<
+                RecordAttribute[]
+            > = recordId === null
+                ? Promise.resolve([])
+                : getRecordAttributesByRecord(
+                    ctx, recordId,
+                );
+            type InstanceWave = {
+                instanceValues:
+                    ReadonlyMap<
+                        string, string
+                    > | null;
+                instanceEtag: string | null;
+                pickerItems: readonly {
+                    readonly id: string;
+                    readonly fields: readonly {
+                        readonly name: string;
+                        readonly value: string;
+                    }[];
+                }[];
+                heldTypeId: string | null;
+            };
+            const instanceWavePromise: Promise<
+                InstanceWave
+            > = (async (): Promise<
+                InstanceWave
+            > => {
+                if (bound !== null) {
+                    const instance =
+                        await getRecordInstance(
+                            ctx,
+                            bound.recordTypeId,
+                            bound.instanceId,
+                        );
+                    return {
+                        instanceValues:
+                            instance.values,
+                        instanceEtag:
+                            instance.etag,
+                        pickerItems: [],
+                        heldTypeId:
+                            bound.recordTypeId,
+                    };
+                }
+                if (recordId !== null) {
+                    const attributes =
+                        await attributesPromise;
+                    const instances =
+                        await getRecordInstances(
+                            ctx, recordId,
+                        );
+                    return {
+                        instanceValues: null,
+                        instanceEtag: null,
+                        pickerItems:
+                            instanceListItems(
+                                instances,
+                                attributes,
+                            ),
+                        heldTypeId: recordId,
+                    };
+                }
+                return {
+                    instanceValues: null,
+                    instanceEtag: null,
+                    pickerItems: [],
+                    heldTypeId: recordId,
+                };
+            })();
+            const [attributes, instanceWave] =
+                await Promise.all([
+                    attributesPromise,
+                    instanceWavePromise,
+                ]);
+            const attributeMap = new Map(
+                attributes.map(
+                    (a) => [a.id, a] as const,
+                ),
             );
+            const detail =
+                new WorkboxDetailPresenter(
+                    workOrder,
+                    transitions,
+                    fieldValuesByEvent,
+                    activeClaim,
+                    memberMap,
+                    currentMemberId,
+                    attributeMap,
+                    instanceWave.instanceValues,
+                    bound,
+                    instanceWave.pickerItems,
+                    null,
+                );
+            detail.buildPage();
         }
     },
     members: async (ctx) => {

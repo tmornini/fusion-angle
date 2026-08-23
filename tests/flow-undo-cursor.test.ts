@@ -29,27 +29,37 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import {
     createRequestContext,
+    sessionContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
     postFlowCreation,
     putFlow,
+    enqueueFlowSave,
 } from '../web-app/app/adapters/flow-mutations.ts';
+import { getFlowGraph } from
+    '../web-app/app/adapters/flow-queries.ts';
 import {
     buildFlowHistorySnapshot,
 } from '../web-app/app/flow-history.ts';
 import {
+    FlowDesignerPresenter,
     buildInitialFlowSnapshot,
     type FlowSnapshot,
 } from '../web-app/app/presenters/flow-designer.ts';
 import { performUndo } from '../web-app/app/flow-operations.ts';
+import { wrapInPageAdapter } from
+    './in-page-facade.ts';
+import { putClientFacade } from
+    '../web-app/app/adapters/facade-holder.ts';
+import { putSessionToken } from
+    '../web-app/app/adapters/session-token.ts';
 import type { GraphNode } from '../api/types.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 
 const PROJECT_1 = generateIdentifier();
-const CURSOR_RECONCILE_NOISE = generateIdentifier();
 const FLOWID_A = generateIdentifier();
 const FLOWID_B = generateIdentifier();
 const FLOWID_U1 = generateIdentifier();
@@ -795,94 +805,155 @@ test(
     },
 );
 
-// -- 7. fix wave 2 (Task 11 browser regression) ------
+// -- 7. flags are guards, not undo content -----------
 
-// ROOT CAUSE, wire evidence, and the two fixes are narrated in
-// full in .superpowers/sdd/phase14-task-8-report.md's
-// "Fix wave 2" section. Short version:
-// web-app/organizations/AjdvjuECVZEgZoFajaIEkg/flows/detail.ts's
-// handleUndo/handleRedo used to follow their OWN commit with
-// commitAndFit(pageState.presenter().withLayoutReconciled()) —
-// a SAVE-TRIGGERING call, even though op.freshSnap already
-// carries server-reconciled positions (performUndo/performRedo
-// build it from getFlowGraph, whose withRenderableLayout ALWAYS
-// recomputes fresh positions for an auto-layout flow, purely
-// client-side). That redundant save landed its own
-// document message pair immediately after every
-// undo/redo click — and the cursor
-// (resolveFlowUndoTarget) correctly, BY DESIGN, treats
-// every organizations/:id/flows/:id document message
-// pair as a full history step (that's the whole point
-// of undo-as-replay) — so it "ate" the NEXT undo click,
-// which reverted the reconcile noise instead of reaching
-// the user's actual prior edit. The fix (removing the two
-// commitAndFit(...withLayoutReconciled()) calls,
-// web-app/organizations/AjdvjuECVZEgZoFajaIEkg/flows/detail.ts) is NOT
-// reachable from this test
-// file:
-// it is a page-level DOM change with no automated seam
-// (FlowDesignerPresenter#queueSave calls sessionContext()
-// internally; this file installs no client facade;
-// tests/flow-designer-presenter.test.ts's own header comment
-// independently documents the SAME wall for every
-// #queueSave-triggering presenter method). This test instead
-// pins the MECHANISM the fix prevents from ever occurring: an
-// interleaved, content-invisible reconcile-only save DOES
-// consume an undo step, at the server-side cursor level — proof
-// that the fix (stopping the client from ever queuing such a
-// save after undo/redo) is necessary and correctly targeted.
-// The fix's ACTUAL effect (no such save is queued any more) is
-// verified in the browser, not here — see the report's browser
-// re-sweep.
+// Graph and name are undo content. Locked / Auto Layout /
+// Auto Fit are guards: a pair that only changes those
+// flags is carried, not restored, not counted. The earlier
+// "content-invisible save consumes a step" covenant was
+// the old cursor rule; this is the retarget, not a weaken.
+// putClientFacade(wrapInPageAdapter(db)) plus
+// putSessionToken(DEV_TOKEN) makes sessionContext() live
+// under node:test — the seam earlier comments called
+// unreachable.
 test(
-    'undo cursor (fix wave 2): an interleaved, content-'
-    + 'invisible reconcile-only save consumes an undo step —'
-    + ' the mechanism the detail.ts fix (dropping'
-    + ' handleUndo/handleRedo\'s own extra commitAndFit) now'
-    + ' prevents from ever being queued',
+    'undo cursor: a flag-only pair is not a step',
     async () => {
         const db = await freshDb();
         const token = await organizationToken();
-        const flowId = CURSOR_RECONCILE_NOISE;
+        const flowId = generateIdentifier();
         await createFlow(db, token, flowId);
         await save(db, token, flowId, 'A', FLOWID_A);
         await save(db, token, flowId, 'B', FLOWID_B);
 
-        // Undo #1 (the user's first click): reverts B -> A.
+        const got = await handleRequest(db, req(
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + flowId, token,
+        ));
+        const etag = got.headers.get('ETag');
+        assert.ok(etag, 'no ETag on GET before flag PUT');
+        const head = await got.json() as {
+            name: string;
+            graph: unknown;
+            is_locked: boolean;
+        };
+        const flagged = await handleRequest(db, req(
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + flowId, token,
+            {
+                ...flowFields(head.name),
+                is_locked: !head.is_locked,
+                state: 'updated',
+                state_at: AT,
+                state_event_id: FLOWID_RECONCILE,
+                graph: head.graph,
+                graphDelta: emptyDelta(),
+                revivals: [],
+            },
+            { 'if-match': etag },
+        ));
+        assert.equal(flagged.status, 201);
+
         const first = await undo(
             db, token, flowId, FLOWID_U1, AT,
         );
         assert.equal(first.status, 201);
+        const afterFirst = await handleRequest(db, req(
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + flowId, token,
+        ));
+        const firstBody = await afterFirst.json() as {
+            name: string;
+            is_locked: boolean;
+        };
+        assert.equal(firstBody.name, 'A');
         assert.equal(
-            await currentGraphName(db, token, flowId), 'A',
+            firstBody.is_locked, !head.is_locked,
+            'is_locked stays the current head\'s value',
         );
 
-        // The OLD, buggy handleUndo/handleRedo pattern: an
-        // auto-layout reconcile save with the SAME name (no
-        // visible change) immediately after the undo — exactly
-        // what commitAndFit(...withLayoutReconciled()) used to
-        // queue. A genuine document message pair despite changing
-        // nothing the user perceives.
-        await save(
-            db, token, flowId, 'A', FLOWID_RECONCILE,
-        );
-
-        // Undo #2 (the user's second click): with the reconcile
-        // noise present, it lands back on 'A' AGAIN — the SAME
-        // content undo #1 already reached — never progressing
-        // to a NEW, earlier state. This is precisely the Task 11
-        // browser report's "Undo flips the toolbar but the
-        // canvas never visibly changes."
         const second = await undo(
             db, token, flowId, FLOWID_U2,
             '2026-01-01T00:00:01.000000Z',
         );
         assert.equal(second.status, 201);
+        const afterSecond = await handleRequest(db, req(
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + flowId, token,
+        ));
+        const secondBody = await afterSecond.json() as {
+            name: string;
+            is_locked: boolean;
+        };
+        assert.equal(secondBody.name, 'genesis');
         assert.equal(
-            await currentGraphName(db, token, flowId), 'A',
-            'without the fix, a second undo click cannot make'
-            + ' visible progress past the reconcile noise —'
-            + ' this is the danger the detail.ts fix closes',
+            secondBody.is_locked, !head.is_locked,
+            'flag-only pairs are carried, not restored',
         );
+    },
+);
+
+test(
+    'undo after lock toggles reverts name not lock',
+    async () => {
+        const db = await freshDb();
+        const token = await organizationToken();
+        const flowId = generateIdentifier();
+        await createFlow(db, token, flowId);
+        putClientFacade(wrapInPageAdapter(db));
+        putSessionToken(DEV_TOKEN);
+
+        const livePresenter = async (
+            migrateToCenter = false,
+        ): Promise<FlowDesignerPresenter> => {
+            const graph = await getFlowGraph(
+                sessionContext(), flowId,
+            );
+            const snap = buildInitialFlowSnapshot(
+                graph, 800, 600, [], [], [],
+            );
+            return new FlowDesignerPresenter(
+                snap, 800, 600,
+                buildFlowHistorySnapshot(
+                    graph.hasUndoHistory,
+                ),
+                migrateToCenter,
+            );
+        };
+
+        (await livePresenter()).withFlowName('Renamed');
+        await enqueueFlowSave(
+            flowId, async () => undefined,
+        );
+        (await livePresenter()).withLockToggled();
+        await enqueueFlowSave(
+            flowId, async () => undefined,
+        );
+        (await livePresenter()).withLockToggled();
+        await enqueueFlowSave(
+            flowId, async () => undefined,
+        );
+
+        const opened = await livePresenter(true);
+        opened.withCanvasSize(800, 600);
+        opened.withLayoutReconciled();
+        await enqueueFlowSave(
+            flowId, async () => undefined,
+        );
+
+        const graph = await getFlowGraph(
+            sessionContext(), flowId,
+        );
+        const op = await performUndo(
+            sessionContext(),
+            buildInitialFlowSnapshot(
+                graph, 800, 600, [], [], [],
+            ),
+            buildFlowHistorySnapshot(true),
+        );
+        assert.equal(op.kind, 'ok');
+        if (op.kind !== 'ok') return;
+        assert.equal(op.freshSnap.flowName, 'genesis');
+        assert.equal(op.freshSnap.isLocked, false);
     },
 );

@@ -11,6 +11,8 @@ import type {
     GeneratedFlowData,
 } from './flow-workload.ts';
 import { generateFlowWorkload } from './flow-workload.ts';
+import { now } from './seed-kit.ts';
+import { STARK_ORGANIZATION } from './seed-constants.ts';
 
 // Stable ids for the seeded Lead-to-Close flow: its flow and
 // project-flow binding, its 7 graph nodes, and its 9 graph
@@ -404,5 +406,7 @@ export function buildLeadToCloseWorkload(): GeneratedFlowData {
         oldestDaysAgo: 80,
         newestDaysAgo: 5,
         seed: 0xC0DEF00D,
+        organizationId: STARK_ORGANIZATION,
+        nowMs: now.getTime(),
     });
 }

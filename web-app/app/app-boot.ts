@@ -58,6 +58,7 @@ import { runSingleFlightRefresh } from
     './adapters/session-refresh-mutex.ts';
 import {
     resolveCredentialDecision,
+    resolveOrganizationGate,
 } from './credential-resolution.ts';
 import {
     postSessionRefresh,
@@ -276,9 +277,14 @@ async function bootOrganizationGate(
 ): Promise<readonly OrganizationEntity[] | null> {
     const organizations =
         await scopeBootToActiveOrganization();
-    if (organizations.length > 0) return organizations;
-    bounceTo('invitations');
-    return null;
+    const decided = resolveOrganizationGate(
+        organizations, getPageName(),
+    );
+    if (decided === null) {
+        bounceTo('invitations');
+        return null;
+    }
+    return decided;
 }
 
 // Refresh a dead-access / live-refresh session and install

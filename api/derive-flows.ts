@@ -235,7 +235,9 @@ export async function deriveFlow(
 // document-pair history and replays it as a stack with a
 // pointer: a GENUINE pair (no correlated undo call)
 // truncates any abandoned branch to `[0..pointer]` then
-// pushes; an UNDO-correlated pair only moves the pointer
+// pushes unless its (name, graph) matches the previous
+// step — a flag-only pair is carried, not a new step;
+// an UNDO-correlated pair only moves the pointer
 // back — it never adds a new logical state (the fix that
 // makes undo-save-undo target the SAVE's own baseline,
 // never a discarded future — see the PINNED Step 0 trace,
@@ -295,6 +297,25 @@ export async function resolveFlowUndoTarget(
             pointer -= 1;
         } else {
             stack.length = Math.max(pointer + 1, 0);
+            const previous = stack.at(-1);
+            const sameName = previous !== undefined
+                && pickString(previous.body, 'name')
+                    === pickString(
+                        messagePair.body, 'name',
+                    );
+            const sameGraph = previous !== undefined
+                && JSON.stringify(
+                    normalizedStoredGraph(
+                        previous.body['graph'],
+                    ),
+                ) === JSON.stringify(
+                    normalizedStoredGraph(
+                        messagePair.body['graph'],
+                    ),
+                );
+            if (sameName && sameGraph) {
+                continue;
+            }
             stack.push(messagePair);
             pointer = stack.length - 1;
         }

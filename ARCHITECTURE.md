@@ -253,6 +253,9 @@ through notification channels. Named non-void exceptions:
   appends 201
 - `withLifecycleTrio` still exists
 - Roster seat that names an AI agent is later
+- Erased PII persists as superseded pairs;
+  derived reads and login show none —
+  `tests/api-pii-tombstone.test.ts`
 
 [AUDIT.md](AUDIT.md) re-confirms each residual is still
 KNOWN.

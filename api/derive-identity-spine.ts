@@ -50,21 +50,20 @@ import {
 // identity's own '/identities/42/' document) — the '/members' vs
 // '/memberships' precedent class this task's brief names.
 //
-// READ SEMANTICS (concurrency lens): '/pii' is the message
-// plane's ONE sanctioned hard-delete zone (api/pii-hard-delete.ts)
-// — a write physically DELETES the slot's prior pair before
-// appending its own. Two INDEPENDENT half-store reads could
-// straddle a concurrent supersession: the first read
-// captures the OLD request row, a concurrent replacePiiSlot then
-// deletes it and appends a NEW pair, and the second read captures
-// the NEW response row alone — the two rows never share an id, so
-// deriveDocumentsAt's match fails and a LIVE
-// identity spuriously 404s. Both pii derives below close this by
-// reading db.messagePairs inside ONE shared readonly
-// db.readTransaction(MESSAGE_TABLES, ...) —
-// greenfield code, closed at zero cost. No other facet in this
-// module is a delete zone, so none of the other reads need this
-// — a prefix getAllWhere outside a transaction (the
+// READ SEMANTICS (concurrency lens): '/pii' is an ordinary
+// document address. Two INDEPENDENT half-store reads could
+// still straddle a concurrent append: the first read
+// captures the OLD request row, a concurrent write then
+// appends a NEW pair, and the second read captures
+// the NEW response row alone — the two rows never share an
+// id, so deriveDocumentsAt's match fails and a LIVE
+// identity spuriously 404s. Both pii derives below close
+// this by reading db.messagePairs inside ONE shared
+// readonly db.readTransaction(MESSAGE_TABLES, ...) —
+// greenfield code, closed at zero cost. Other facets in
+// this module are not this concurrent-append race, so
+// none of the other reads need this — a prefix getAllWhere
+// outside a transaction (the
 // deriveMembers/deriveInvitations precedent) is sufficient
 // for them.
 //

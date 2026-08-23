@@ -116,7 +116,6 @@ export interface EntityStore<
         entries: readonly EntityPut<T>[],
         deleteIds: readonly string[],
     ): Promise<void>;
-    delete(id: string): Promise<void>;
 }
 
 // The storage-edge validator. Stores accept one at

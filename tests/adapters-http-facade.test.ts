@@ -12,6 +12,8 @@ import { UnauthorizedError } from
     '../api/http-errors.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { isIdentifier } from '../shared/identifier.ts';
+import { postPasswordLogin } from
+    '../web-app/app/adapters/authentication.ts';
 
 async function withMockFetch(
     handler: typeof fetch,
@@ -155,5 +157,103 @@ test(
                 },
             );
         });
+    },
+);
+
+test(
+    '401 on authentication/authorize does not'
+    + ' refresh or bounce',
+    async () => {
+        // @ts-expect-error — Node stub
+        globalThis.document = {
+            documentElement: {
+                getAttribute: () => 'auth',
+            },
+        };
+        // @ts-expect-error — Node stub
+        globalThis.window = {
+            location: { href: '' },
+        };
+        const urls: string[] = [];
+        await withMockFetch(async (input) => {
+            urls.push(String(input));
+            return new Response(
+                JSON.stringify({
+                    error: 'invalid_grant',
+                }),
+                { status: 401 },
+            );
+        }, async () => {
+            const facade = createHttpFacade(
+                'http://example.test',
+            );
+            await assert.rejects(
+                () => facade.POST(
+                    'authentication/authorize',
+                    {
+                        method: 'password',
+                        username: 'a@b.c',
+                        password: 'WRONG',
+                    },
+                    'tok',
+                ),
+                UnauthorizedError,
+            );
+        });
+        assert.deepEqual(urls, [
+            'http://example.test/api/'
+            + 'authentication/authorize',
+        ]);
+        assert.equal(
+            window.location.href, '',
+        );
+    },
+);
+
+test(
+    'postPasswordLogin wrong password is'
+    + ' one fetch and null',
+    async () => {
+        // @ts-expect-error — Node stub
+        globalThis.document = {
+            documentElement: {
+                getAttribute: () => 'auth',
+            },
+        };
+        // @ts-expect-error — Node stub
+        globalThis.window = {
+            location: { href: '' },
+        };
+        const urls: string[] = [];
+        await withMockFetch(async (input) => {
+            urls.push(String(input));
+            return new Response(
+                JSON.stringify({
+                    error: 'invalid_grant',
+                }),
+                { status: 401 },
+            );
+        }, async () => {
+            const ctx = createRequestContext(
+                createHttpFacade(
+                    'http://example.test',
+                ),
+                DEV_TOKEN,
+            );
+            assert.equal(
+                await postPasswordLogin(
+                    ctx, 'a@b.c', 'WRONG',
+                ),
+                null,
+            );
+        });
+        assert.equal(urls.length, 1);
+        assert.match(
+            urls[0]!,
+            /authentication\/authorize$/,
+        );
+        assert.equal(
+            window.location.href, '',
+        );
     },
 );

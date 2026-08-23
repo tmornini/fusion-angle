@@ -422,7 +422,6 @@ export class FlowDesignerPresenter {
                 positionY: n.positionY - centerY,
             })),
         };
-        this.#queueSave(next);
         return next;
     }
 
@@ -803,7 +802,6 @@ Auto Fit</label>
             nodes: result.nodes,
             edgeWaypoints: result.edgeWaypoints,
         };
-        this.#queueSave(next);
         return next;
     }
 

@@ -96,6 +96,13 @@ async function unwrapResponse<T>(
     );
 }
 
+function isCredentialDoor(
+    resource: string,
+): boolean {
+    return resource === 'authentication/authorize'
+        || resource === 'authentication/token';
+}
+
 function etagFromHeader(
     response: Response,
 ): string | undefined {
@@ -214,7 +221,7 @@ export function createHttpFacade(
         if (first.status !== HTTP_UNAUTHORIZED) {
             return first;
         }
-        if (resource === 'authentication/token') {
+        if (isCredentialDoor(resource)) {
             return first;
         }
         const access = await runSingleFlightRefresh(

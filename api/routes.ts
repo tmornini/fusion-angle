@@ -105,7 +105,6 @@ import {
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
-import { replacePiiSlot } from './pii-hard-delete.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';
@@ -1538,11 +1537,16 @@ export async function postFlowUndoOp(
     );
     const flowFields = {
         name: pickString(target.body, 'name'),
-        is_locked: pickBoolean(target.body, 'is_locked'),
+        is_locked:
+            pickBoolean(current.body, 'is_locked'),
         is_auto_layout:
-            pickBoolean(target.body, 'is_auto_layout'),
+            pickBoolean(
+                current.body, 'is_auto_layout',
+            ),
         is_auto_fit:
-            pickBoolean(target.body, 'is_auto_fit'),
+            pickBoolean(
+                current.body, 'is_auto_fit',
+            ),
         lock_timeout:
             pickNumber(target.body, 'lock_timeout'),
     };
@@ -2762,13 +2766,10 @@ export async function postHumanMemberDocumentOp(
 }
 
 // Identity PII document write — Phase Final Task 2: the
-// identity_pii ROW half is stripped — pure message-plane write
-// via replacePiiSlot (hard-delete zone). No states
-// interaction. `messagePair` is optional so a below-facade caller
-// keeps compiling; the live route always supplies one.
-// WRITE_RESPONSE_SPECS successBody forms the wire bytes
-// via piiEntityOf (GET derive). G5: the slot still
-// physically deletes the prior pair.
+// identity_pii ROW half is stripped — pure message-plane write.
+// No states interaction. `messagePair` is optional so a below-
+// facade caller keeps compiling; the live route always
+// supplies one.
 export async function postIdentityPiiDocumentOp(
     db: DbAdapter,
     id: Id,
@@ -2787,11 +2788,7 @@ export async function postIdentityPiiDocumentOp(
         MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
-                await replacePiiSlot(
-                    view,
-                    messagePair.uriCollection,
-                    messagePair,
-                );
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2875,12 +2872,11 @@ export async function postIdentityCredentialDocumentOp(
 
 // Client-registration document write (clients elimination) —
 // pure message-plane write, the postIdentityCredentialDocumentOp
-// shape: Supersedes-chained appendMessagePair, never the pii
-// hard-delete zone. `messagePair` is optional so a below-facade
-// caller keeps compiling; the live route always supplies one.
-// WRITE_RESPONSE_SPECS successBody forms the wire bytes
-// via registrationEntityOf (GET derive). DELETE stays a
-// marked tombstone (append), not a slot replace.
+// shape: Supersedes-chained appendMessagePair. `messagePair`
+// is optional so a below-facade caller keeps compiling; the
+// live route always supplies one. WRITE_RESPONSE_SPECS
+// successBody forms the wire bytes via registrationEntityOf
+// (GET derive). DELETE stays a marked tombstone (append).
 export async function postClientRegistrationDocumentOp(
     db: DbAdapter,
     id: Id,
@@ -3244,8 +3240,8 @@ export const WRITE_RESPONSE_SPECS:
     // this spec via formDocumentMessagePairFor.
     'identities/:id': documentWriteResponseSpec(IDENTITIES_WIRING),
     'ai-agents/:id': documentWriteResponseSpec(AI_AGENTS_WIRING),
-    // G5: piiEntityOf (GET derive). replacePiiSlot still
-    // physically deletes the prior pair.
+    // G5: piiEntityOf (GET derive). DELETE is a marked
+    // tombstone pair; PUT appends.
     'identities/:id/pii': {
         status: HTTP_OK,
         successBody: (params, body) => piiEntityOf(
@@ -4011,18 +4007,14 @@ export const routes: Route[] = [
     // the request gate, mirroring
     // /identities/:id/default-organization). There is no
     // flat identity-pii collection (retired, router 404).
-    // PUT/DELETE each REPLACE the slot's message pair
-    // (replacePiiSlot, api/pii-hard-delete.ts) in the same
-    // transaction as the write — the message plane's sanctioned
-    // hard-delete zone: CHAINLESS (retired from DOCUMENT_CLASS_
-    // ROUTE_PATTERNS, message-pair.ts — no Supersedes, no
-    // Follows) and the ONLY address whose prior pair is
-    // physically deleted rather than superseded. The pattern's
-    // last segment ('pii') is not a :param, so messageAddress
-    // yields uriId '' (a singleton document at a collection-
-    // style address). GET is FLIPPED (Phase 10 Task 8): derived
-    // via deriveIdentityPii — wire-identical to the hand-written
-    // db.identityPii.getById dispatch it replaces.
+    // PUT/DELETE each append a message pair in the same
+    // transaction as the write. DELETE is a marked tombstone.
+    // The pattern's last segment ('pii') is not a :param, so
+    // messageAddress yields uriId '' (a singleton document at
+    // a collection-style address). GET is FLIPPED (Phase 10
+    // Task 8): derived via deriveIdentityPii — wire-identical
+    // to the hand-written db.identityPii.getById dispatch it
+    // replaces.
     // authorizeIdentityPii (the gate dispatch) restricts a GET
     // to self or admin. The handler then applies the same
     // viaMembership org fence credentials use: foreign 403,
@@ -4057,16 +4049,13 @@ export const routes: Route[] = [
             postIdentityPiiDocumentOp(
                 db, param(p, 0), body, actor, messagePair,
             ),
-        // G5: DELETE still replacePiiSlot (physical delete).
         delete: (db, _p, _actor, messagePair) => {
-            // Phase Final Task 2: identity_pii ROW half
-            // stripped — message-plane replacePiiSlot only.
             return db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {
                     if (messagePair !== undefined) {
-                        await replacePiiSlot(
-                            view, messagePair.uriCollection, messagePair,
+                        await appendMessagePair(
+                            view, messagePair,
                         );
                     }
                 },
