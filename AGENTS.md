@@ -83,12 +83,6 @@ median readyMs against `measurements/budgets.json`.
 `--base-url` hits a running origin (needs `--password`).
 See `./measure --help` for flags.
 
-```
-docs/superpowers/specs/2026-07-12-page-performance-measurement-design.md
-docs/superpowers/specs/2026-07-12-measure-visualize-design.md
-docs/superpowers/specs/2026-08-08-measure-viz-dashboard-design.md
-```
-
 ## Commit
 
 Commit completed, tested work. Do not ask.

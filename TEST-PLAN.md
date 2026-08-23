@@ -229,7 +229,9 @@ Master never re-dispatches a hunter to retry.
   a descendant's computed `display`. Never
   hand-`fetch` the API from `javascript_tool` —
   the bearer is memory-only; read the network
-  log. Toasts via one `javascript_tool` call on
+  log. WB16 reads the work-order history from
+  the network log, never a hand `fetch`. Toasts
+  via one `javascript_tool` call on
   the Members invite dialog's synchronous
   "Email is required" toast, clicking
   `.toast-close` after the 300 ms entrance and
@@ -238,6 +240,11 @@ Master never re-dispatches a hunter to retry.
   responsive tests at specific widths (I10) cannot be driven.
   Inspect `layout.css` manually to verify the mobile-breakpoint
   media queries (the show/hide of the desktop sidebar/header).
+- **Loading skeletons** (I21): `navigate` resolves after
+  the page's fetches settle, so the skeleton paints and
+  clears before any probe can see it. Verify by source
+  (`web-app/app/loading-states.ts`); BLOCKED is
+  sanctioned.
 - **`prefers-reduced-motion`** cannot be emulated via the MCP;
   the behavioral tier of the reduced-motion view-transition
   test (I30) cannot be driven. Verify by source instead:
@@ -351,23 +358,15 @@ run by the master after join.
 
 ### Combined Totals (CLI + Browser)
 
-The per-section table above counts browser-regression cases
-only. Combined with the CLI automated suite:
-
-| Layer                  | Cases    |
-|------------------------|---------:|
-| CLI automated tests    |     3321 |
-| Browser regression     |      398 |
-| **Combined TOTAL**     | **3719** |
-
-CLI count = most recent `./validate` (AT2) report — the main
-`tests/*.test.ts` suite plus the `tests/tz/*.test.ts` timezone
-suite (3313 main + 8 tz). AT2 without
-`POSTGRES_URL` skips the seven `pg-*.test.ts` /
-`schema-lifecycle.test.ts` stubs; after AT4 those
+The per-section table above counts browser-regression
+cases only (398). The CLI count is the most recent
+`./validate` (AT2) report — the main `tests/*.test.ts`
+suite plus the `tests/tz/*.test.ts` timezone suite; AT2
+without `POSTGRES_URL` skips the seven `pg-*.test.ts` /
+`schema-lifecycle.test.ts` stubs, and after AT4 those
 seven run. The number grows as tests land in either
-glob. Browser count = the per-section table above.
-Update both numbers when either side changes.
+glob and is not pinned here. Update the browser count
+when a case is added or removed.
 
 Outcome categories used by run summaries (see `## Summary
 Format` at the bottom of this file):
@@ -382,10 +381,11 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = 3719, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
-where the six status counts sum to **Combined TOTAL** (3719).
-`BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
-regression.
+`PASS = AT2 + 398, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j,
+DRIFT = 0`, where AT2 is the CLI count that run reported
+and the six status counts sum to AT2 + 398.
+`BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL`
+indicates a regression.
 
 ---
 
@@ -493,7 +493,7 @@ started from mock-data. Each later step creates
 data that subsequent steps depend on. Run AA3+
 in order.
 
-- [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
+- [ ] **AA3** Verify bootstrap data exists: user "Tony Stark", organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
 
 ### AA2. Create Members
 
@@ -1026,7 +1026,7 @@ depends: A
 - [ ] **E4** Page loads with project summary
   card (description, dates, progress bar) and
   baseline vs. current metrics. PASS: all cards
-  render with data. Baseline/XXZruirZyAOoRpNxaDnpSA metrics
+  render with data. Baseline/current metrics
   show em dash when values are zero or missing.
 - [ ] **E5** Sidebar shows the Flows section
   (Team card has been retired with the team
@@ -2157,11 +2157,18 @@ depends: A
   buttons. Click Accept on the V1 invitation. PASS: an
   "Invitation accepted" toast fires and the row leaves the
   pending list. A REAL seat is now written in the
-  INVITATION's org (Stark), so the invitee becomes multi-org:
+  INVITATION's org (the invitation's org), so the invitee becomes multi-org:
   reload any sidebar-layout page and the sidebar footer now
   shows the org `<select>` (G36) listing both their original
   org and Stark. Accept is idempotent — a re-accept is a 204
-  no-op, no duplicate seat. Source:
+  no-op, no duplicate seat.
+  Parallel (A3 `--test-plan-slices`): the V1 invitee
+  `g-unseated` holds no prior seat, so after Accept `GET
+  identities/:id/organizations/` lists ONE org and the
+  sidebar footer shows it as plain text with no `<select>`
+  (G36 needs two); multi-org is exercised by V7's invitee
+  half (G Member accepts Wayne → both listed). Serial
+  stands as written. Source:
   `postInvitationAcceptance`, `acceptInvitation` (atomic
   seat document message pair + invitations/:id/acceptance
   operation message pair via `appendMessagePair`).
@@ -2192,19 +2199,27 @@ depends: A
   may still read & accept** Sign in as a NON-admin member of
   an org (a seeded human with no admin role). PASS: any
   attempt to grant — POST `invitations` (the path behind the
-  Invite dialog) — is rejected with "forbidden: granting an
-  invitation requires an admin role" (403), and the
+  Invite dialog) — is rejected with "forbidden: POST
+  /organizations/<orgId>/invitations/ requires a role this
+  principal lacks" (403), and the
   Organization page's Sent-invitations admin read fails and
-  the section stays hidden (V8), so no Revoke is offered; a
-  forced revoke POST is rejected with "forbidden: revoking an
-  invitation requires an admin role" (403). YET the SAME role-
+  the section stays hidden (V9), so no Revoke is offered; a
+  forced revoke — PUT
+  `/organizations/<orgId>/invitations/<invitationId>`
+  with `{state: "revoked"}` — is rejected with
+  "forbidden: PUT /organizations/<orgId>/invitations/
+  <invitationId> requires a role this principal lacks"
+  (403). YET the SAME role-
   less identity, when it is the INVITEE, CAN read its own
   invitations (the bell + `invitations/` work — the read is
   identity-scoped, not admin-gated) and CAN Accept/Decline its
   own invitation (V4/V5). PASS: grant/revoke require admin;
   read/accept/decline require only being the invitee. Source:
-  the explicit guards in `grantInvitation` / `revokeInvitation`
-  vs. the un-admin-gated invitee read/accept/decline paths.
+  the absent `MEMBER_VERBS` row for the org invitation nest
+  (`api/authorization.ts`) and `authorizeRequest`
+  (`api/request-auth.ts`), which 403s before any handler;
+  the invitee read/accept/decline paths ride the identity
+  nest.
   Parallel (A3 `--test-plan-slices`): run before G46
   so `G Member` still has PII and can sign in; the
   invitee half is granted from the second G
@@ -2273,12 +2288,12 @@ depends: A
 
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
 
-- [ ] **G25** Navigate to `identity-tokens/index.html?identityId=current` (or open an identity from `identities/` and click its "Tokens" link). PASS: the page title is "Tokens" with muted subtitle "Refresh-token chains for this identity"; the page renders one card per chain, each showing the chain id, the event jti, `parent: —` for a root event (or the parent jti for a rotated one), an `issued`/`rotated`/`revoked` badge, and a LOCAL-time stamp; an identity with no tokens shows "No tokens." The presenter consumes the adapter's camelCase `TokenEvent` domain shape (`jti`, `parentJti`, `action`, `at`) — a snake_case storage leak would render `parent: undefined` instead of `parent: —`. Source: `GET identities/:id/tokens` via `web-app/app/adapters/identity-tokens.ts` (`TokenEvent`), `web-app/app/presenters/identity-tokens.ts`.
-- [ ] **G26** Navigate to `identity-providers/index.html?identityId=current` (or the identity's "Providers" link). PASS: the page title is "Identity Providers" with muted subtitle "External sign-in links for this identity"; the page renders one card per link/unlink event (provider name + the `providerSubject` + a `linked`/`unlinked` badge + local-time stamp), or "No linked providers." for an identity with none (the seeded `current` logs in by password, so its providers list is empty). The presenter consumes the adapter's camelCase `ProviderEvent` shape (`provider`, `providerSubject`, `action`, `at`). Source: `GET identities/:id/providers` via `web-app/app/adapters/identity-providers.ts` (`ProviderEvent`), `web-app/app/presenters/identity-providers.ts`.
+- [ ] **G25** Open `identities/`, click an identity, then its "Tokens" link (`data-identity-link="tokens"`). PASS: the page title is "Tokens" with muted subtitle "Refresh-token chains for this identity"; the page renders one card per chain, each showing the chain id, the event jti, `parent: —` for a root event (or the parent jti for a rotated one), an `issued`/`rotated`/`revoked` badge, and a LOCAL-time stamp; an identity with no tokens shows "No tokens." The presenter consumes the adapter's camelCase `TokenEvent` domain shape (`jti`, `parentJti`, `action`, `at`) — a snake_case storage leak would render `parent: undefined` instead of `parent: —`. A non-canonical `identityId` (any value that is not a 22-character identifier) 400s at the route gate; an absent one bounces to `identities/`. Source: `GET identities/:id/tokens` via `web-app/app/adapters/identity-tokens.ts` (`TokenEvent`), `web-app/app/presenters/identity-tokens.ts`.
+- [ ] **G26** From the same detail, click its "Providers" link (`data-identity-link="providers"`). PASS: the page title is "Identity Providers" with muted subtitle "External sign-in links for this identity"; the page renders one card per link/unlink event (provider name + the `providerSubject` + a `linked`/`unlinked` badge + local-time stamp), or "No linked providers." for an identity with none (the seeded Tony Stark logs in by password, so its providers list is empty). The presenter consumes the adapter's camelCase `ProviderEvent` shape (`provider`, `providerSubject`, `action`, `at`). Source: `GET identities/:id/providers` via `web-app/app/adapters/identity-providers.ts` (`ProviderEvent`), `web-app/app/presenters/identity-providers.ts`.
 
 ### Sidebar org-switcher
 
-- [ ] **G36 — Sidebar org-switcher (multi-org user)** A3 mock-data seeds two orgs and Tony Stark (`current`) is the multi-org admin. Sign in as Tony. The SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrganizationSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-angle:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`.
+- [ ] **G36 — Sidebar org-switcher (multi-org user)** A3 mock-data seeds two orgs and Tony Stark is the multi-org admin. Sign in as Tony. The SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrganizationSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-angle:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`.
 - [ ] **G41** Person and agent writes land on the message
   plane. On a human detail page, click Edit, change
   Title or Bio, and Save. PASS: `PUT /identities/:id`

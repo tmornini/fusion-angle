@@ -285,6 +285,23 @@ KNOWN.
   `tests/api-instances-create.test.ts`
 - Roster seat that names an AI agent —
   `tests/family-registry.test.ts`
+- Profile as its own document,
+  `identities/:id/profile`, 404 = no profile —
+  closes whole-or-none —
+  `tests/api-identity-document.test.ts`
+- Roster rows carry a fabricated empty profile
+  (`emptyPersonProfile`) —
+  `web-app/app/adapters/members.ts`
+- `DEFAULT_DIM` stands in for an assessment that
+  never happened — `web-app/members/index.ts`
+- The re-mint refresh is not single-flighted with
+  the facade's cookie refresh —
+  `web-app/app/adapters/shared.ts`
+- Member detail's subscriber refresh after save is
+  a redundant GET trio — `web-app/members/detail.ts`
+- `./measure` harvests error-page timings;
+  `page:ready` carries no status —
+  `web-app/app/measure.ts`
 
 ## Do not resurrect
 
