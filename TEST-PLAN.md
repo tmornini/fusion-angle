@@ -153,8 +153,9 @@ a K-hunter case on the parallel path.
   `node server.mjs` (this pin **is** SV1). One
   process, one mock tenant, one cookie jar. Walk
   document order including K8 inside K, then J.
-  Headers are not consulted. Case text is
-  unchanged.
+  Headers are not consulted. Serial does not
+  mint garden rows (AA and E7) and does not
+  wipe to `--bootstrap`.
 - **Parallel (default)**: the same A1–A2. Grant Chrome
   origin `http://localhost` before anything else. A3
   `./postgres-wipe --postgres local` then
@@ -494,15 +495,22 @@ parallel: yes
 global_lock: none
 depends: A
 
-On the parallel path AA's slice is already
-bootstrap-only — do not restart the process. Sign
-in as the AA admin and run AA3+. Serial may stop,
-`./postgres-wipe --postgres local`, then
-`./postgres-seed --postgres local --bootstrap`,
-then start `node server.mjs` if the operator
-started from mock-data. Each later step creates
-data that subsequent steps depend on. Run AA3+
-in order.
+Parallel: AA's slice is already bootstrap-only —
+do not restart the process. Sign in as the AA
+admin and run AA3+ create-from-empty.
+Each later step creates data that subsequent
+steps depend on. Run AA3+ in order. Serial: A3
+`--mock-data` stands through J. Do not wipe to
+`--bootstrap`. Do not mint garden rows: no Add
+Member, no Add objective, no Create Idea, no
+Submit for Review, no idea Approve, no Create
+Project, no New Flow (AA26 and E7). Dialog-open
+cases stay. Edits of a seeded subject stay.
+AA24a may approve one seeded `submitted`
+project (not an idea, not a K26 `under_review`
+title). Serial leftover Convert is AA21: click
+Convert to open the form; do not Create
+Project.
 
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark", organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
 
@@ -516,31 +524,55 @@ in order.
   Name, a Model pulldown (grouped by provider, no
   default selection), Description, and a Skill Focus
   textarea — no Auth Token field or security warning.
-- [ ] **AA5** With Human selected, fill all fields for
-  "Sarah Chen" (Title: Project Lead, Department:
-  Operations). Click Create. PASS: toast confirms
-  creation; `PUT /identities/:id` plus PII and a seat at
-  the active organization (`PUT organizations/:id/members/:identity-id`);
-  the person appears in the seat-derived roster.
-- [ ] **AA6** Repeat for all 10 humans: Sarah Chen, Mike
-  Thompson, Jessica Park, David Martinez, Emily Rodriguez,
-  Alex Kim, Marcus Johnson, David Kim, Lisa
-  Wang, James Miller. PASS: all 10 are written
-  as identity + PII + seat and appear in the seat-derived
+- [ ] **AA5** Serial: Sarah Chen is already seated
+  (Title: Project Lead, Department: Operations);
+  do not Create. PASS: she appears in the
+  seat-derived roster. Parallel: With Human
+  selected, fill all fields for "Sarah Chen"
+  (Title: Project Lead, Department: Operations).
+  Click Create. PASS: toast confirms creation;
+  `PUT /identities/:id` plus PII and a seat at
+  the active organization (`PUT
+  organizations/:id/members/:identity-id`); the
+  person appears in the seat-derived roster.
+- [ ] **AA6** Serial: the mock garden already
+  holds all 10 humans — Sarah Chen, Mike
+  Thompson, Jessica Park, David Martinez, Emily
+  Rodriguez, Alex Kim, Marcus Johnson, David
+  Kim, Lisa Wang, James Miller. Do not Create.
+  PASS: Stark Members shows the six seated
+  there (Sarah Chen, Jessica Park, Emily
+  Rodriguez, Marcus Johnson, Lisa Wang, plus
+  Tony Stark from AA3); the other five sit on
+  Wayne. Parallel: Repeat for all 10 humans:
+  Sarah Chen, Mike Thompson, Jessica Park,
+  David Martinez, Emily Rodriguez, Alex Kim,
+  Marcus Johnson, David Kim, Lisa Wang, James
+  Miller. PASS: all 10 are written as identity
+  + PII + seat and appear in the seat-derived
   roster.
-- [ ] **AA7** Reload the Members page. PASS: the roster
-  is seat-derived; the freshly Added humans re-render
+- [ ] **AA7** Reload the Members page. PASS:
+  the roster is seat-derived. Serial: the
+  seeded humans re-render with their seats.
+  Parallel: the freshly Added humans re-render
   with the seeded seats.
-- [ ] **AA7a** Click "+ Add Member", switch the Kind
-  toggle to AI. PASS: the Human form hides and the AI
-  form appears. Fill Name, pick a Model, fill
-  Description and Skill Focus. PASS: Create is blocked
-  until a Model is chosen; once chosen, click Create →
-  toast confirms and the AI is written as a message-plane
-  AI agent document (`PUT /ai-agents/:id`); it appears in
-  the AIs group (agents are global, not seated).
-  Repeat for 4 AIs matching mock data (Claude Opus 4.8,
-  Claude Sonnet 4.6, GPT-5.5, Grok 4.3).
+- [ ] **AA7a** Click "+ Add Member", switch the
+  Kind toggle to AI. PASS: the Human form hides
+  and the AI form appears. Serial: PASS: the
+  AIs group already holds Claude Opus 4.8,
+  Claude Sonnet 4.6, GPT-5.5, and Grok 4.3
+  (agents are global, not seated); do not
+  Create. Parallel: Fill Name, pick a Model,
+  fill Description and Skill Focus. PASS:
+  Create is blocked until a Model is chosen;
+  once chosen, click Create →
+  toast confirms and the AI is written as a
+  message-plane AI agent document (`PUT
+  /ai-agents/:id`); it appears in the AIs
+  group (agents are global, not seated).
+  Repeat for 4 AIs matching mock data (Claude
+  Opus 4.8, Claude Sonnet 4.6, GPT-5.5, Grok
+  4.3).
 
 ### AA3. Member Detail & Organization
 
@@ -587,65 +619,230 @@ in order.
   PASS: edited Domain persists with saved value, card is
   back in read mode.
 - [ ] **AA-Obj** On the Organization page, locate the
-  Objectives box. Click `+ Add objective` four times,
-  creating in order: "Lower expenses", "Increase incomes",
-  "Raise customer NPS", "Improve employee morale". PASS:
-  all four appear in the active list in the order created.
-  End-state delivered to Phase 2: 4 active objectives —
-  required by Agent-E's K9–K23 scoring lifecycle, which
-  has a read-dependency on the Organization Objectives
-  produced here.
+  Objectives box. Serial: 4 active objectives already
+  sit in that order — "Lower expenses", "Increase
+  incomes", "Raise customer NPS", "Improve employee
+  morale". Do not Add. PASS: all four appear in the
+  active list in that order. Parallel: Click `+ Add
+  objective` four times, creating in that same order.
+  PASS: all four appear in the active list in the
+  order created. End-state delivered to Phase 2: 4
+  active objectives — required by Agent-E's K9–K23
+  scoring lifecycle, which has a read-dependency on
+  the Organization Objectives produced here.
 
 ### AA4. Create Ideas
 
-- [ ] **AA12** Navigate to Ideas. Click "Create Idea". Fill in title, problem, solution, and outcome for "AI-Powered Customer Segmentation". Click "Submit Idea". PASS: idea appears on ideas list.
-- [ ] **AA13** Navigate to the new idea's detail page. Click "Edit". Verify title and text fields (problem, solution, outcome) are editable. Click "Save". PASS: toast confirms save, all fields persist.
-- [ ] **AA14** Repeat creation and field entry for all 11 ideas matching mock data titles. PASS: ideas list shows all 11 with correct titles.
+- [ ] **AA12** Navigate to Ideas. Serial: open
+  seeded "AI-Powered Customer Segmentation"; do
+  not Create. PASS: the idea is on the list.
+  Parallel: Click "Create Idea". Fill in title,
+  problem, solution, and outcome for
+  "AI-Powered Customer Segmentation". Click
+  "Submit Idea". PASS: idea appears on ideas
+  list.
+- [ ] **AA13** Navigate to that idea's detail
+  page (Serial: the seeded idea. Parallel: the
+  idea just created). Click "Edit". Verify
+  title and text fields (problem, solution,
+  outcome) are editable. Click "Save". PASS:
+  toast confirms save, all fields persist.
+- [ ] **AA14** Serial: Stark Ideas list already
+  shows the 6 Stark mock titles — AI-Powered
+  Customer Segmentation, Predictive Maintenance
+  System, Smart Inventory Optimization,
+  AI-Powered Customer Support Chatbot,
+  Sustainability Dashboard for Operations,
+  Real-time Inventory Tracking System. Do not
+  Create. Do not claim 11 titles on one page.
+  Wayne holds the other 5; do not mint; do not
+  switch here. PASS: those six titles are
+  present. Parallel: Repeat creation and field
+  entry for all 11 ideas matching mock data
+  titles. PASS: ideas list shows all 11 with
+  correct titles.
 
 ### AA5. Submit Ideas for Review
 
-- [ ] **AA15** Navigate to idea #1 detail (status: active). Click "Submit for Review". PASS: status changes to "In Review", button disappears.
-- [ ] **AA16** Submit ideas 1, 4, 7, 8, 9, 10, 11 for review (matching mock data statuses). PASS: each transitions from active to in_review.
-- [ ] **AA17** Navigate to Ideas list and filter by "In Review" status badge. PASS: the 7 submitted ideas appear.
+- [ ] **AA15** Serial: seeded statuses already
+  match; do not Submit. PASS: "AI-Powered
+  Customer Segmentation" is already
+  `in_review`. Parallel: Navigate to idea #1
+  detail (status: active). Click "Submit for
+  Review". PASS: status changes to "In Review",
+  button disappears.
+- [ ] **AA16** Serial: do not Submit. PASS:
+  the four Stark `in_review` titles (AI-Powered
+  Customer Segmentation, AI-Powered Customer
+  Support Chatbot, Sustainability Dashboard
+  for Operations, Real-time Inventory Tracking
+  System). Do not name Wayne titles as already
+  `in_review` on this page. Parallel: Submit
+  ideas 1, 4, 7, 8, 9, 10, 11 for review
+  (matching mock data statuses). PASS: each
+  transitions from active to in_review.
+- [ ] **AA17** Navigate to Ideas list and
+  filter by "In Review" status badge. Serial:
+  PASS: 4 cards on Stark. Parallel: PASS: the
+  7 just submitted ideas appear.
 
 ### AA7. Approve Ideas & Convert to Projects
 
-- [ ] **AA18** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with Send Back / Approve buttons in the header next to Edit.
-- [ ] **AA19** Click "Approve". PASS: idea status changes to approved, confirmation shown.
-- [ ] **AA20** Approve idea #4 as well (it was submitted for review in AA16). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in_review/active).
-- [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 4 required fields (Project Name, Time with a "days" input suffix, Cost, Success Criteria) — there is no Impact field — plus a Scores box holding one required baseline slider per active objective.
-- [ ] **AA22** Fill the 4 required fields (Project Name, Time with a "days" input suffix, Cost, Success Criteria) and drag every objective baseline slider in the Scores box. PASS: Create Project stays disabled until all required fields AND all baselines are set, then enables; clicking it navigates to project detail for the new project (the baselines commit atomically with project creation).
-- [ ] **AA22a** On the Convert form before scoring, every baseline slider in the Scores box reads as pending, not zero: the slider is dimmed (~50% opacity) and its value shows an em-dash "—" in muted text (unscored is genuine absence — no score row is written — not a measured 0). PASS: dragging a slider clears only that row's pending styling (full opacity, a signed value such as "+51", a green check by the label) while untouched rows stay dimmed, and Create Project stays disabled until all four objectives are scored.
-- [ ] **AA23** On project detail, click "Edit". Set fields (title, description, status, start date, end date, cost baseline) to match mock data. Save. PASS: project data persists. (Impact is no longer a directly-editable field — it is derived read-only from the objective baseline scores.)
-- [ ] **AA24** Approve remaining ideas (7, 8, 9, 10) from Ideas list (filter by "In Review"), then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status and progress.
+- [ ] **AA18** On Ideas list, filter by "In
+  Review". Click an `in_review` idea (Serial:
+  seeded "AI-Powered Customer Segmentation".
+  Parallel: idea #1). PASS: navigates to idea
+  detail with Send Back / Approve buttons in
+  the header next to Edit.
+- [ ] **AA19** Serial: PASS: Send Back / Approve
+  are visible; do not Approve. Parallel: Click
+  "Approve". PASS: idea status changes to
+  approved, confirmation shown.
+- [ ] **AA20** Serial: do not Approve. PASS on
+  Stark: 0 `approved`, 4 `in_review`, 2
+  `active`, 0 `sent_back`. The one seeded
+  `approved` idea (Automated Report Generation)
+  sits on Wayne. Parallel: Approve idea #4 as
+  well (it was submitted for review in AA16).
+  Leave others in their current status. PASS:
+  statuses match the AA walk (2 approved, rest
+  in_review/active).
+- [ ] **AA21** Serial: leftover Convert stays
+  Automated Report Generation
+  (`WurwPqXxGtLhRAoCEcPzfQ`) on Wayne. Select
+  Wayne Enterprises in the sidebar footer
+  `.org-switcher` (G36). Convert is visible;
+  click Convert. PASS: conversion form loads
+  with 4 required fields (Project Name, Time
+  with a "days" input suffix, Cost, Success
+  Criteria) — there is no Impact field — plus
+  a Scores box holding one required baseline
+  slider per active objective. Do not Create
+  Project. (D16 inherits this Wayne-switch.)
+  Parallel: Navigate to approved idea #1.
+  Click "Convert". PASS: the same form loads.
+- [ ] **AA22** Serial: do not Create Project.
+  PASS: Create Project is present on the form;
+  do not click it. Parallel: Fill the 4 required
+  fields (Project Name, Time with a "days"
+  input suffix, Cost, Success Criteria) and
+  drag every objective baseline slider in the
+  Scores box. PASS: Create Project stays
+  disabled until all required fields AND all
+  baselines are set, then enables; clicking it
+  navigates to project detail for the new
+  project (the baselines commit atomically
+  with project creation).
+- [ ] **AA22a** On the Convert form before
+  scoring, every baseline slider in the Scores
+  box reads as pending, not zero: the slider
+  is dimmed (~50% opacity) and its value shows
+  an em-dash "—" in muted text (unscored is
+  genuine absence — no score row is written —
+  not a measured 0). Serial: PASS: one pending
+  Wayne slider (Wayne demo objective), em-dash,
+  Create still disabled; inspect; do not drag;
+  then select Stark Industries in
+  `.org-switcher` before AA23–AA24a. Parallel:
+  PASS: four sliders; dragging a slider clears
+  only that row's pending styling (full
+  opacity, a signed value such as "+51", a
+  green check by the label) while untouched
+  rows stay dimmed, and Create Project stays
+  disabled until all four objectives are
+  scored.
+- [ ] **AA23** Serial: on a seeded project
+  (AI-Powered Customer Segmentation), click
+  "Edit". Set a field and Save. PASS: project
+  data persists. Parallel: On the newly
+  converted project detail, click "Edit". Set
+  fields (title, description, status, start
+  date, end date, cost baseline) to match mock
+  data. Save. PASS: project data persists.
+  (Impact is no longer a directly-editable
+  field — it is derived read-only from the
+  objective baseline scores.)
+- [ ] **AA24** Serial: do not Approve remaining
+  ideas; do not Convert. Hunter is on Stark
+  Industries after AA22a. PASS: Projects list
+  is the seeded Stark list (~16). Parallel:
+  Approve remaining ideas (7, 8, 9, 10) from
+  Ideas list (filter by "In Review"), then
+  convert all 6 approved ideas to projects.
+  PASS: Projects list shows all 6 with
+  correct status and progress.
 
 ### AA8. Score and Approve Projects
 
-- [ ] **AA24a** From the Projects list, click into project #1 (the first converted project, status `submitted`). Click Edit, change Status to `under_review`, Save. PASS: toast confirms. The objectives section's baseline sliders are now editable INLINE (no Score button, no modal); because this project was converted through the UI its baselines were committed at convert time, so the Approve button is already enabled. (To exercise the unscored→score flow, use a project created WITHOUT baselines: move each baseline slider off its initial value and click Save, watching Approve enable only once every objective is scored.) Click Approve; confirm. PASS: status flips to `approved`; the action bar re-renders with `Archive` / `View history`, and the per-objective actual sliders become editable. The project is now eligible for the New Flow gate in AA25. (Without approving, projects remain at `submitted` and the New Flow button stays hidden behind the `Approve to add flows` info badge.)
+- [ ] **AA24a** From the Projects list, click
+  into a `submitted` project. Serial: seeded
+  Market Sentiment Analyzer
+  (`PIfhHMLQQxTxKFDdabXbOw`), the only Stark
+  `submitted` — not a K26 `under_review` title
+  (Workforce Capacity Forecasting, Predictive
+  Maintenance System, Employee Training
+  Assistant). Parallel: project #1 (the first
+  converted project, status `submitted`).
+  Click Edit, change Status to `under_review`,
+  Save. PASS: toast confirms. The objectives
+  section's baseline sliders are now editable
+  INLINE (no Score button, no modal). Serial:
+  this project was seeded `submitted` with no
+  baselines — move each baseline slider off
+  its initial value and click Save; Approve
+  enables only once every objective is scored.
+  Parallel: because this project was converted
+  through the UI its baselines were committed
+  at convert time, so the Approve button is
+  already enabled. Click Approve; confirm.
+  PASS: status flips to `approved`; the action
+  bar re-renders with `Archive` / `View
+  history`, and the per-objective actual
+  sliders become editable. Parallel: the
+  project is now eligible for the New Flow
+  gate in AA25. (Without approving, projects
+  remain at `submitted` and the New Flow
+  button stays hidden behind the `Approve to
+  add flows` info badge.)
 
 ### AA9. Create Flows
 
 - [ ] **AA25** Navigate to Projects. Click into
-  project #1 detail (status: approved). PASS:
-  a "Flows" section is visible showing "No
-  flows yet" empty state and a "New Flow"
-  button. Non-approved projects show an info
-  badge "Approve to add flows" instead of
-  the button, and empty state reads "Flow
-  creation limited to approved projects only".
-- [ ] **AA26** Click "New Flow". PASS: a "New Flow"
-  dialog opens with a Flow Name input and Create/
-  Cancel buttons. Enter a name and click Create.
-  PASS: navigates to the flow designer page. The SVG
-  canvas shows two nodes: "Create" (start, top-left
-  with green border) and "Archive" (end,
-  bottom-right with red 3-px border) connected by
-  no edges. Toolbar shows Undo, Redo, Zoom −/+,
-  Copy Mermaid, Export ZIP, and Delete (trash icon);
-  the header above the canvas hosts the Locked, Auto
-  Layout, and Auto Fit switches. Changes auto-save
-  (no explicit Save button).
-- [ ] **AA27** Drag the port circle on the start
+  an approved project's detail. Serial: an
+  approved project that already has flows —
+  Sales Pipeline Modernization (Lead-to-Close)
+  or AI-Powered Customer Segmentation
+  (Customer Onboarding and Layout Test). PASS:
+  a "Flows" section is visible listing those
+  flows (not "No flows yet") and a "New Flow"
+  button. Parallel: project #1 detail (status:
+  approved). PASS: a "Flows" section is
+  visible showing "No flows yet" empty state
+  and a "New Flow" button. Non-approved
+  projects show an info badge "Approve to add
+  flows" instead of the button, and empty
+  state reads "Flow creation limited to
+  approved projects only".
+- [ ] **AA26** Click "New Flow". PASS: a "New
+  Flow" dialog opens with a Flow Name input
+  and Create/Cancel buttons. Serial: PASS:
+  Cancel; do not Create. Parallel: Enter a
+  name and click Create. PASS: navigates to
+  the flow designer page. The SVG canvas
+  shows two nodes:
+  "Create" (start, top-left with green
+  border) and "Archive" (end, bottom-right
+  with red 3-px border) connected by no
+  edges. Toolbar shows Undo, Redo, Zoom −/+,
+  Copy Mermaid, Export ZIP, and Delete (trash
+  icon); the header above the canvas hosts
+  the Locked, Auto Layout, and Auto Fit
+  switches. Changes auto-save (no explicit
+  Save button).
+- [ ] **AA27** Serial: N/A — requires the empty
+  Create+Archive graph that serial must not
+  mint; do not add nodes; do not JSON-inject.
+  Parallel: Drag the port circle on the start
   node into empty canvas past 20 pixels. PASS:
   during the drag a ghost "New State" card
   follows the cursor along with a faint bezier
@@ -663,7 +860,10 @@ in order.
   limitation; if the gesture cannot be driven,
   validate end-state via direct JSON injection per
   the AGENTS.md workaround.)
-- [ ] **AA28** Double-click the new blue-bordered
+- [ ] **AA28** Serial: N/A — requires the empty
+  Create+Archive graph that serial must not
+  mint; do not add nodes; do not JSON-inject.
+  Parallel: Double-click the new blue-bordered
   node. PASS: properties panel appears with a
   "State Properties" title and close button on
   the right, then a `<fieldset>` labeled "Members"
@@ -677,17 +877,26 @@ in order.
   MCP pointer-capture limitation; validate end-state
   via pair fixture on the flow document address
   (`message_pairs`) per the protocol workaround.)
-- [ ] **AA29** Edit the state name in the
+- [ ] **AA29** Serial: N/A — requires the empty
+  Create+Archive graph that serial must not
+  mint; do not add nodes; do not JSON-inject.
+  Parallel: Edit the state name in the
   properties panel to "Data Capture". PASS: the
   node label updates on the canvas immediately
   (auto-saves via 800ms debounce).
-- [ ] **AA30** Double-click the edge between
+- [ ] **AA30** Serial: N/A — requires the empty
+  Create+Archive graph that serial must not
+  mint; do not add nodes; do not JSON-inject.
+  Parallel: Double-click the edge between
   start and "Data Capture". PASS: no properties
   panel opens — the outgoing edge from Create is
   intentionally not interactive. The edge has no
   name label visible on the canvas, just a plain
   blue arrow.
-- [ ] **AA31** Drag from "Data Capture"'s port
+- [ ] **AA31** Serial: N/A — requires the empty
+  Create+Archive graph that serial must not
+  mint; do not add nodes; do not JSON-inject.
+  Parallel: Drag from "Data Capture"'s port
   into empty canvas past 20 pixels to create a
   new middle node; rename it "Review" via its
   properties panel. Rename the new edge
@@ -698,7 +907,10 @@ in order.
   drag gesture per the MCP pointer-capture
   limitation — validate end-state via JSON
   injection per the AGENTS.md workaround.)
-- [ ] **AA32** Hold Shift and drag from "Review"
+- [ ] **AA32** Serial: N/A — requires the empty
+  Create+Archive graph that serial must not
+  mint; do not add nodes; do not JSON-inject.
+  Parallel: Hold Shift and drag from "Review"
   onto "Data Capture". PASS: during the drag the
   preview redraws as a dashed-orange curved
   bezier because a forward path "Data Capture" →
@@ -719,7 +931,10 @@ in order.
   (`performAddEdge`). This browser case remains
   BLOCKED for the shift-drag gesture itself per
   the MCP pointer-capture limitation.)
-- [ ] **AA33** In the "Data Capture" properties
+- [ ] **AA33** Serial: N/A — requires the empty
+  Create+Archive graph that serial must not
+  mint; do not add nodes; do not JSON-inject.
+  Parallel: In the "Data Capture" properties
   panel, open the "Attributes" fieldset. Click the
   "+ Add Attribute…" dropdown. PASS: the picker
   lists available record attributes pre-defined
@@ -732,36 +947,53 @@ in order.
   (`performAddAttributeRef`) — this case verifies
   the picker rendering and attribute-binding UI
   only.)
-- [ ] **AA34** Add more attributes to "Data
+- [ ] **AA34** Serial: N/A — requires the empty
+  Create+Archive graph that serial must not
+  mint; do not add nodes; do not JSON-inject.
+  Parallel: Add more attributes to "Data
   Capture": select 2–3 attributes from the
   picker, each with a distinct mode (Editable /
   Read-only) and required toggle. PASS: all
   attributes appear in the list with correct
   mode (Editable / Read-only) and toggle state.
-- [ ] **AA35** Wait for auto-save (800ms debounce).
-  Navigate away and back. PASS: all nodes, edges,
-  and attributes persist.
+- [ ] **AA35** Serial: N/A — requires the empty
+  Create+Archive graph that serial must not
+  mint; do not add nodes; do not JSON-inject.
+  Parallel: Wait for auto-save (800ms
+  debounce). Navigate away and back. PASS: all
+  nodes, edges, and attributes persist.
 
 ### AA10. Verify Dashboard
 
-- [ ] **AA36** Navigate to Dashboard. PASS: gauge
-  cards (Time, Cost, Impact) show aggregated values
-  computed from the entered project data.
-- [ ] **AA37** Header stats reflect entered data
+- [ ] **AA36** Navigate to Dashboard. PASS:
+  gauge cards (Time, Cost, Impact) show
+  aggregated values. Serial: computed from
+  the seeded project data. Parallel: computed
+  from the entered project data.
+- [ ] **AA37** Header stats reflect data
   counts (ideas, projects, flows). PASS:
-  counts are non-zero and match.
+  counts are non-zero and match. Serial:
+  seeded Stark counts. Parallel: the entered
+  garden counts.
 
 ### AA11. Edit & Verify Cycle
 
 - [ ] **AA38** Edit idea #1: change title. Save,
   navigate to ideas list, return to detail. PASS:
-  changed title persists.
-- [ ] **AA39** Edit project #1: change description.
-  Save, navigate away, return. PASS: changed
-  description persists.
+  changed title persists. Serial: seeded
+  "AI-Powered Customer Segmentation". Parallel:
+  idea #1 from AA12.
+- [ ] **AA39** Edit project #1: change
+  description. Save, navigate away, return.
+  PASS: changed description persists. Serial:
+  seeded AI-Powered Customer Segmentation.
+  Parallel: the first converted project.
 - [ ] **AA40** Edit flow: navigate to flow
-  designer, rename a state (auto-saves). Navigate
-  away, return. PASS: changed state name persists.
+  designer, rename a state (auto-saves).
+  Navigate away, return. PASS: changed state
+  name persists. Serial: a seeded flow (Layout
+  Test or Lead-to-Close). Parallel: the AA26
+  flow.
 - [ ] **AA41** Edit human member: navigate to a human
   member's detail page, click Edit, change phone number,
   Save. Navigate away, return. PASS: changed phone
@@ -968,7 +1200,18 @@ depends: A
   status: clicking the card navigates to
   `ideas/detail.html` with Send Back /
   Approve buttons in the header next to Edit.
-- [ ] **D16** For a convertible idea: "Convert" action button is visible. PASS: clicking it navigates to `ideas/convert.html` page.
+- [ ] **D16** Convert is on the list card
+  (`data-idea-convert`) and on detail
+  (`#idea-convert-btn`). Serial: leftover
+  Convert is Automated Report Generation
+  (`WurwPqXxGtLhRAoCEcPzfQ`) on Wayne. Select
+  Wayne Enterprises in the sidebar footer
+  `.org-switcher` (G36) — it is not on the
+  Stark list. PASS: the control is visible;
+  clicking it navigates to `ideas/convert.html`.
+  That click does **not** promote (D24 does).
+  Parallel: a slice-garden `approved` idea,
+  same control, same PASS.
 - [ ] **D17** Navigate to `ideas/detail.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows error state, no unhandled JS exception.
 
 ### Idea Detail — Submit for Review
@@ -983,9 +1226,51 @@ depends: A
 
 ### Idea Convert (`ideas/convert.html`)
 
-- [ ] **D22** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 4 required fields: Project Name, Time (label "Time", unit "days" as the input suffix; field key `time-days`), Cost, Success Criteria (it maps to the project description). There is no Impact field. A Scores box renders one required baseline slider per active objective. Sticky sidebar shows the idea summary (Title, Problem Statement, Target Users, Proposed Solution, Expected Outcome, Success Metrics). Source of truth: `REQUIRED_FIELDS` in `web-app/app/presenters/idea-conversion.ts`.
-- [ ] **D23** With required fields empty, "Create Project" is disabled and the progress bar shows 0/N where N = 4 + one per active objective (e.g. 0/8 with 4 objectives). Fill fields and drag baseline sliders one at a time. PASS: the bar increments with each required field AND each baseline, checkmarks appear next to completed items, and the button enables only when all required fields AND all baselines are set. Success Criteria is required — filling it advances the bar.
-- [ ] **D24** Fill every required field and baseline (the progress bar reaches its max, e.g. 8/8), click "Create Project". PASS: navigates to project detail page for the newly created project. The source idea's lifecycle state becomes `promoted` (list badge label **Promoted**, not "Approved") — convert is a promotion, not a re-approve.
+- [ ] **D22** Navigate to
+  `ideas/convert.html?ideaId=<id>` for a
+  convertible idea. Serial: Automated Report
+  Generation (`WurwPqXxGtLhRAoCEcPzfQ`) on
+  Wayne (org-switch `.org-switcher` / G36 if
+  not already on Wayne; D16 verified this
+  leftover). Parallel: a slice-garden
+  `approved` idea. PASS: page loads with
+  conversion form showing 4 required fields:
+  Project Name, Time (label "Time", unit
+  "days" as the input suffix; field key
+  `time-days`), Cost, Success Criteria (it
+  maps to the project description). There is
+  no Impact field. A Scores box renders one
+  required baseline slider per active
+  objective. Serial: 1 Wayne slider (Wayne
+  demo objective). Parallel: 4 sliders.
+  Sticky sidebar shows the idea summary
+  (Title, Problem Statement, Target Users,
+  Proposed Solution, Expected Outcome,
+  Success Metrics). Source of truth:
+  `REQUIRED_FIELDS` in
+  `web-app/app/presenters/idea-conversion.ts`.
+- [ ] **D23** With required fields empty, "Create
+  Project" is disabled and the progress bar
+  shows 0/N where N = 4 + one per active
+  objective. Serial: 0/5 (4 fields + 1 Wayne
+  objective). Parallel: 0/8 (4 + 4). Fill
+  fields and drag baseline sliders one at a
+  time. PASS: the bar increments with each
+  required field AND each baseline, checkmarks
+  appear next to completed items, and the
+  button enables only when all required fields
+  AND all baselines are set. Success Criteria
+  is required — filling it advances the bar.
+- [ ] **D24** Fill every required field and
+  baseline (the progress bar reaches its max;
+  Serial: 5/5. Parallel: 8/8), click "Create
+  Project". Serial: Create Project on ARG
+  after D16 verified the leftover. PASS:
+  navigates to project detail page for the
+  newly created project. The source idea's
+  lifecycle state becomes `promoted` (list
+  badge label **Promoted**, not "Approved") —
+  convert is a promotion, not a re-approve.
 
 ### Idea Status Filtering (`ideas/index.html`)
 
@@ -997,7 +1282,10 @@ depends: A
 ### Idea Detail — Approval Actions
 
 - [ ] **D29** Navigate to `ideas/detail.html?ideaId=<id>` for an in_review idea (entity ids are identifiers, not sequential integers — copy a real id from the Ideas list). PASS: page loads with idea details and Send Back / Approve buttons in the header next to Edit.
-- [ ] **D30** Click "Approve". PASS: success toast, navigates to ideas list, idea status is now "approved".
+- [ ] **D30** Click "Approve". PASS: success toast,
+  navigates to ideas list, idea status is now
+  "approved". This is a second `approved` — not
+  D16's leftover Convert subject.
 - [ ] **D31** Click "Send Back". PASS: confirm dialog opens. Confirm. PASS: idea status changes to "sent_back", navigates to ideas list.
 - [ ] **D32** Navigate to idea detail for a non-in_review idea. PASS: no Send Back / Approve buttons are shown.
 - [ ] **D32a** On an in_review idea, click "Edit". PASS: the header shows only Cancel / Save — no Send Back, Approve, Submit, or Convert. Click Cancel: the read header (Send Back / Approve / Edit) returns.
@@ -1056,10 +1344,12 @@ depends: A
 - [ ] **E7** On an approved project, click "New
   Flow" button. PASS: a "New Flow" dialog opens
   with a Flow Name input and Create/Cancel
-  buttons. Enter a name and click Create. PASS:
-  a new flow is created and the browser
-  navigates to the flow designer page. The new
-  flow is associated with the current project.
+  buttons. Serial: PASS: dialog stays; do not
+  Create. Parallel: Enter a name and click
+  Create. PASS: a new flow is created and
+  the browser navigates to the flow designer
+  page. The new flow is associated with the
+  current project.
 
 ### Project Detail — Edit Mode
 
@@ -1242,9 +1532,13 @@ opens and renders.)
   depth. Create heads the first column and
   Archive ends the last — never above or below
   a column-mate; the covenant is the columns,
-  not the corners. On a fan (Layout Test) both
-  sit mid-height. A long chain wraps into a
-  serpentine (Customer Onboarding,
+  not the corners. Create min x, Archive max x.
+  Hunter measures laid-out node positions on
+  `svg.flow-canvas` (`data-node-id` plus the
+  node's x/y or transform) after the second
+  Auto Layout toggle, not screenshot y. A long
+  chain wraps into a serpentine (Customer
+  Onboarding,
   Lead-to-Close): Create leads the top row and
   Archive ends the last — bottom-left on an
   even row count.

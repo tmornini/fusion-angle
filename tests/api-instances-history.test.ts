@@ -48,6 +48,7 @@ const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const TYPE_ID = generateIdentifier();
 const ATTR_PUBLIC = generateIdentifier();
 const ATTR_SECRET = generateIdentifier();
+const ATTR_RETIRED = generateIdentifier();
 const INSTANCE_ID = generateIdentifier();
 const ORGANIZATION_B = generateIdentifier();
 const FOREIGN_TYPE_ID = generateIdentifier();
@@ -233,6 +234,7 @@ async function appendInstancePair(
 interface HistoryEntry {
     at: string;
     etag: string;
+    version: string;
     values: { attribute_id: string; value: string }[];
 }
 
@@ -526,4 +528,78 @@ async () => {
     assert.deepEqual(await res.json(), {
         error: 'Not found: record_types/oZjfWriXLxoqurdbwfBnpA',
     });
+});
+
+// A deleted attribute may survive in revision history:
+// RESTRICT guards heads only (clear, then DELETE → 204).
+// Its values are unreadable by every role — never a 500,
+// never an attribute the schema no longer knows.
+test('history after clear + attribute DELETE → 200; the '
++ 'deleted attribute is absent from every entry',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await putAttribute(db, adminToken, ATTR_PUBLIC, {
+        name: 'Title',
+        attribute_type: 'text',
+        sort_order: 0,
+        options: [],
+        constraints: [],
+        read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+        write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+    });
+    await putAttribute(db, adminToken, ATTR_RETIRED, {
+        name: 'Retired',
+        attribute_type: 'text',
+        sort_order: 1,
+        options: [],
+        constraints: [],
+        read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+        write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+    });
+
+    const put = await putInstance(db, memberToken, [
+        { attribute_id: ATTR_PUBLIC, value: 'kept' },
+        { attribute_id: ATTR_RETIRED, value: 'gone' },
+    ]);
+    assert.equal(put.status, 201);
+    const etag0 = put.headers.get('ETag')!;
+
+    const cleared = await patchInstance(
+        db, memberToken, etag0, { clear: [ATTR_RETIRED] },
+    );
+    assert.equal(cleared.status, 201);
+
+    const del = await handleRequest(db, req(
+        'DELETE', ATTRS + ATTR_RETIRED, adminToken,
+    ));
+    assert.equal(del.status, 204);
+
+    for (const token of [memberToken, adminToken]) {
+        const history = await handleRequest(db, req(
+            'GET', INSTANCE_HISTORY, token,
+        ));
+        assert.equal(history.status, 200);
+        const entries =
+            await history.json() as HistoryEntry[];
+        assert.equal(entries.length, 2);
+        for (const entry of entries) {
+            assert.deepEqual(entry.values, [
+                { attribute_id: ATTR_PUBLIC, value: 'kept' },
+            ]);
+        }
+        const older = await handleRequest(db, req(
+            'GET',
+            INSTANCE_HISTORY + '/' + entries[1]!.version,
+            token,
+        ));
+        assert.equal(older.status, 200);
+        const body = await older.json() as {
+            values: HistoryEntry['values'];
+        };
+        assert.deepEqual(body.values, [
+            { attribute_id: ATTR_PUBLIC, value: 'kept' },
+        ]);
+    }
 });

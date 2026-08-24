@@ -10,8 +10,9 @@ import {
 // projection. Admin bypass is FENCED-org roles only
 // (roles already fenced at the gate). Write asserts are
 // all-or-nothing: one denied id → 403 for the whole set.
-// Projection trusts RESTRICT — unknown attribute ids are
-// not guarded (no internal defense).
+// Projection serves heads AND revision history; RESTRICT
+// guards heads only, so an old revision may still name a
+// deleted attribute — it projects as unreadable.
 
 function rolesIntersect(
     held: readonly string[],
@@ -71,8 +72,8 @@ export function assertWritableAttributeIds(
     }
 }
 
-// Drops values the caller may not read. Unknown ids are
-// impossible under RESTRICT and are not guarded.
+// Drops values the caller may not read. An attribute
+// absent from the live schema is unreadable by every role.
 export function projectReadableValues(
     values: readonly {
         attribute_id: string;
@@ -86,7 +87,8 @@ export function projectReadableValues(
     return values.filter((entry) => {
         const attribute = attributesById.get(
             entry.attribute_id,
-        )!;
-        return rolesCanRead(roles, attribute);
+        );
+        return attribute !== undefined
+            && rolesCanRead(roles, attribute);
     });
 }
