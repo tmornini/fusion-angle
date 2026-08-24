@@ -60,6 +60,7 @@ export interface ViewBox {
 export type FlowGestureContext = Readonly<{
     isAutoFit: boolean;
     isLocked: boolean;
+    interaction: InteractionState;
 }>;
 
 export type Selection =
@@ -278,6 +279,64 @@ function ancestorAttr(
     return null;
 }
 
+// A commit rebuilds the canvas and detaches whatever
+// held focus, so the page re-focuses the same id
+// afterward. That focus() fires a synchronous focusin
+// which is NOT a user focus change: honoring it would
+// promote the re-focused item back to selected over a
+// selection the pointer just made. The wrap carries
+// the mark for exactly the restore call — the finally
+// releases it even if the restore throws.
+const FOCUS_RESTORE_ATTR = 'data-focus-restoring';
+
+export function withCanvasFocusRestore(
+    wrap: Element,
+    restore: () => void,
+): void {
+    wrap.setAttribute(FOCUS_RESTORE_ATTR, 'true');
+    try {
+        restore();
+    } finally {
+        wrap.removeAttribute(FOCUS_RESTORE_ATTR);
+    }
+}
+
+// The FSM input a focusin on the canvas carries, or
+// null when the wrap is mid-restore or the focused
+// element is neither a node nor an edge.
+// isRenderedSelected reads the RENDERED aria-current
+// rather than the FSM's own selection — see
+// onCanvasFocus in flow-fsm-reduce.
+export function canvasFocusInputOf(
+    target: Element,
+    wrap: Element,
+): Extract<FsmInput, {
+    kind: 'canvas-focus';
+}> | null {
+    if (
+        wrap.getAttribute(FOCUS_RESTORE_ATTR) !== null
+    ) {
+        return null;
+    }
+    const nodeId = ancestorAttr(
+        target, 'data-node-id',
+    );
+    const edgeId = ancestorAttr(
+        target, 'data-edge-id',
+    );
+    if (!nodeId && !edgeId) return null;
+    const isRenderedSelected =
+        ancestorAttr(
+            target, 'aria-current',
+        ) === 'true';
+    return {
+        kind: 'canvas-focus',
+        nodeId,
+        edgeId,
+        isRenderedSelected,
+    };
+}
+
 function buildSelectedPositions(
     state: InteractionState,
     clickedId: string,
@@ -324,7 +383,6 @@ function isFormFocused(): boolean {
 
 export function bindInteractions(
     wrap: HTMLElement,
-    state: InteractionState,
     onUpdate: InteractionCallback,
     onPanelRequest: PanelRequestCallback,
     onNodesDragEnd: (
@@ -349,7 +407,8 @@ export function bindInteractions(
     signal: AbortSignal,
 ): (next: FlowGestureContext) => void {
     let context = initialContext;
-    let currentState: InteractionState = state;
+    let currentState: InteractionState =
+        initialContext.interaction;
     let activePointerId: number | null = null;
     let gestureRect: GestureRect | null = null;
     if (currentState.isPanMode) {
@@ -679,6 +738,22 @@ export function bindInteractions(
         { passive: false, signal },
     );
 
+    wrap.addEventListener(
+        'focusin',
+        (e) => {
+            const target = e.target;
+            if (
+                !(target instanceof Element)
+            ) return;
+            const input = canvasFocusInputOf(
+                target, wrap,
+            );
+            if (input === null) return;
+            dispatch(input);
+        },
+        { signal },
+    );
+
     const handleShift = (
         ke: KeyboardEvent,
     ): void => {
@@ -703,6 +778,9 @@ export function bindInteractions(
         if (ke.key !== ' ') return;
         // auto-repeat would chatter the toggle
         if (ke.repeat) return;
+        // the activation listener (document phase)
+        // claims Space for a focused node or edge
+        if (ke.defaultPrevented) return;
         if (isFormFocused()) return;
         ke.preventDefault();
         dispatch({
@@ -751,6 +829,9 @@ export function bindInteractions(
 
     return (next) => {
         context = next;
+        if (!isGestureActive(currentState)) {
+            currentState = next.interaction;
+        }
     };
 }
 

@@ -204,6 +204,7 @@ const SEED_PASSWORD_CREDENTIAL_BY_IDENTITY:
     'dtmZgnDBlVcoyjxKzlaKgA': 'bOMGBKTGNCuZxtrUYLAkMQ',
     'dmGzDTZwsyIYCQhhRISXrw': 'BpqpoywaRNVNGplpFduhSw',
     'qbtQzOgP8OTJSr9Idicllg': 'Foe97qlbGsDqwE_Xq4yizQ',
+    'GIo3puu_xoFWELY0Dsdklg': 'kGB8qfzle_4R3rJvLEFIlg',
     'uVgzITlKxKcWZtGSPzmsqA': 'OKUnRcADsiFabnVTmveTFA',
     'JbaPyILUCkLRVIVxJlHMSg': 'doiqitfReBBNaXouPmQNpA',
     'rgrOKkoZRGtCKXoZCKwkTw': 'xWvGfhdTzelnxfPOrqmuKA',

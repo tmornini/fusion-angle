@@ -195,6 +195,10 @@ const SLICE_REVEAL_FIELDS: ReadonlyArray<{
         field: 'member_username' },
     { key: 'memberPassword',
         field: 'member_password' },
+    { key: 'erasableUsername',
+        field: 'erasable_username' },
+    { key: 'erasablePassword',
+        field: 'erasable_password' },
     { key: 'flowId', field: 'flow_id' },
 ];
 

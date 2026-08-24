@@ -258,6 +258,17 @@ Master never re-dispatches a hunter to retry.
   `javascript_tool` and dispatching a synthetic change event.
 - **Keyboard events** (arrows, Cmd+K, Delete, Tab) work
   normally and bypass the pointer-capture limitation.
+- **The canvas `<svg>` is replaced on every commit**:
+  probe `svg.flow-canvas` by fresh query after every
+  click, never through a held element reference.
+- **Chords carry the browser's `key`**: Shift
+  uppercases (Cmd+Shift+Z arrives as `key: 'Z'`);
+  match chords Shift-insensitively.
+- **On canvas nodes and edges, `el.focus()` selects
+  like Tab** (the `focusin` promotion) while
+  `el.click()` fires no `pointerdown` and selects
+  nothing — drive canvas selection with real pointer
+  events or `.focus()`.
 - **`kill` syscall against the background HTTP server**: the
   Claude Code sandbox rejects `kill -TERM` and `kill -9`
   against PIDs of long-running background tasks started via
@@ -344,7 +355,7 @@ run by the master after join.
 | C. Core: Dashboard | 7 |
 | D. Core: Ideas Workflow | 38 |
 | E. Core: Projects | 12 |
-| F. Tools | 77 |
+| F. Tools | 80 |
 | F2. Workbox | 31 |
 | FS. Flow Statistics | 9 |
 | G. Admin Pages | 38 |
@@ -354,12 +365,12 @@ run by the master after join.
 | K. Objectives & Scoring | 30 |
 | R. Records | 25 |
 | SV. Server (Node + Postgres) | 10 |
-| **Total** | **398** |
+| **Total** | **401** |
 
 ### Combined Totals (CLI + Browser)
 
 The per-section table above counts browser-regression
-cases only (398). The CLI count is the most recent
+cases only (401). The CLI count is the most recent
 `./validate` (AT2) report — the main `tests/*.test.ts`
 suite plus the `tests/tz/*.test.ts` timezone suite; AT2
 without `POSTGRES_URL` skips the seven `pg-*.test.ts` /
@@ -381,9 +392,9 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = AT2 + 398, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j,
+`PASS = AT2 + 401, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j,
 DRIFT = 0`, where AT2 is the CLI count that run reported
-and the six status counts sum to AT2 + 398.
+and the six status counts sum to AT2 + 401.
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL`
 indicates a regression.
 
@@ -797,7 +808,7 @@ depends: A
 - [ ] **B8** Enter `test@example.com`, password `123`. PASS: "Password must be at least 6 characters" error on password.
 - [ ] **B9** Enter the seeded admin credentials (`demo@example.com` + the password revealed at seed time), click "Sign in". PASS: button shows spinner briefly, then navigates to `dashboard/index.html`. Auto-login is retired, so an unseeded credential is rejected with "Invalid email or password.".
 - [ ] **B10** Click the "Sign up" button (positioned next to the static "Don't have an account?" label — the label is not itself the toggle; the adjacent button is). PASS: switches to Sign Up mode — title changes to "Get started", "Company name (optional)" field appears, submit reads "Create account" with an SVG arrow icon (not a literal "→" character).
-- [ ] **B11** Fill valid email + password (≥6 chars) in Sign Up mode, click the "Create account" submit control (SVG arrow icon, not a literal "→"). PASS: toast "Sign-up is coming soon — sign in with a seeded account." appears, the form flips to **Sign In** mode (title "Welcome back"), and NO navigation occurs — the demo no longer mock-establishes a session (real sign-up is SP-6; minting a bare mock with no refresh token would bounce on reload and could admit anyone to the seeded admin's data).
+- [ ] **B11** Fill valid email + password (≥6 chars) in Sign Up mode, click the "Create account" submit control (SVG arrow icon, not a literal "→"). PASS: toast "Sign-up is coming soon — sign in with a seeded account." appears, the form flips to **Sign In** mode (title "Welcome back"), and NO navigation occurs — the demo no longer mock-establishes a session (real sign-up is SP-6 — see `TODO.md`; minting a bare mock with no refresh token would bounce on reload and could admit anyone to the seeded admin's data).
 
 ### Auth Validation Edge Cases
 
@@ -876,8 +887,11 @@ depends: A
   ratio arc-gauges — dual concentric semicircles: outer
   baseline track + inner actual fill; Impact is a bipolar
   arc — left/right split from a center apex; all three
-  share the same card chrome) and a full-width Objectives
-  box below (card title "Objectives"). PASS: all 4 render
+  share the same card chrome) and, below the grid, an
+  Objectives box one gauge column wide
+  (`.objective-aggregates-card`,
+  `calc((100% - 2 * var(--space-6)) / 3)`; full width
+  only under 768px; card title "Objectives"). PASS: all 4 render
   with baseline and current values; the Time and Cost cards
   each show dual concentric ratio arcs and the Impact card
   shows a bipolar arc; the Objectives box shows one row per
@@ -1213,16 +1227,27 @@ opens and renders.)
   can be placed freely on the canvas.
 - [ ] **F17** Drag the start node. PASS: it moves
   freely like any standard node (start and
-  complete nodes are both draggable; Auto Layout
-  restores them to upper-left and lower-right
-  respectively when invoked). Clicking the start
-  node's port still initiates a drag-from-start
-  to create a new state.
+  complete nodes are both draggable; with Auto
+  Layout on, the drop re-lays out — Create
+  returns to the head of the first column,
+  Archive to the foot of the last). Clicking
+  the start node's port still initiates a
+  drag-from-start to create a new state.
 - [ ] **F18** Toggle the Auto Layout header
-  switch. PASS:
-  all nodes reposition based on their rank from
-  start. Create is placed top-left, Archive
-  bottom-right, others arranged by graph depth.
+  switch twice (the seed starts ON — the first
+  toggle turns it off and moves nothing). PASS:
+  all nodes reposition by rank from start — one
+  column per rank (one row per rank when the
+  graph is taller than wide), others by graph
+  depth. Create heads the first column and
+  Archive ends the last — never above or below
+  a column-mate; the covenant is the columns,
+  not the corners. On a fan (Layout Test) both
+  sit mid-height. A long chain wraps into a
+  serpentine (Customer Onboarding,
+  Lead-to-Close): Create leads the top row and
+  Archive ends the last — bottom-left on an
+  even row count.
 - [ ] **F19** Hold Shift and drag from a middle
   node's port over another middle node, then
   release. PASS: during the drag the preview
@@ -1290,12 +1315,20 @@ opens and renders.)
 - [ ] **F28** Select an edge, click the Delete
   (trash) button in toolbar. PASS: edge is
   removed from the canvas.
-- [ ] **F29** Click the Zoom in and Zoom out
-  toolbar controls (icon-only buttons;
-  `title` / `aria-label` "Zoom in" / "Zoom out").
-  PASS: canvas zooms in and out smoothly.
-  Toggle the Auto Fit header switch on. PASS:
-  canvas adjusts to show all nodes.
+- [ ] **F29** The seed loads with Auto Fit ON:
+  click Zoom in (icon-only buttons; `title` /
+  `aria-label` "Zoom in" / "Zoom out") — an
+  error toast "Disable Auto-Fit to change the
+  view" appears and `viewBox` stands. Toggle
+  Auto Fit OFF. Click Zoom in,
+  then Zoom out, re-querying `svg.flow-canvas`
+  after each click (every commit rebuilds the
+  `<svg>`). PASS: `viewBox` width and height
+  shrink then restore (zoom steps ±0.1,
+  clamped 0.25–2.0). Click the empty canvas
+  once — `viewBox` keeps the zoomed value.
+  Toggle Auto Fit ON — the canvas re-fits to
+  all nodes.
 - [ ] **F30** Edit a node name via the properties
   panel, wait 1 second for auto-save. Navigate
   away and return to the designer. PASS: all
@@ -1307,22 +1340,21 @@ opens and renders.)
 
 ### Flow Designer — Undo/Redo
 
-(Undo is undo-as-replay (Phase 14 Task 8): the server
-resolves the restore target by replaying the flow's own
-document-message-pair history against its own undo operation-message-pair
-history (stack+pointer — a second consecutive undo goes
-FURTHER back rather than oscillating; a save after an
-undo-undo truncates the abandoned branch). This cursor
-algorithm, redo's in-memory stack, exhaustion as a graceful
-no-op, and the 412-retry-then-fresh-resolve on a save racing
-an undo are covered by `tests/flow-undo-cursor.test.ts` and
-`tests/flow-operations.test.ts` (`performUndo` /
-`performRedo`). `flow_versions` routes were RETIRED
-(Phase 15 Task 7; router 404) and the table is DELETED
-(Phase Final); undo walks the flow's own document-message-pair
-history only. The cases below verify the toolbar buttons,
-the keyboard shortcuts, the disabled states, and that the
-canvas re-renders after each step.)
+(Undo is undo-as-replay (Phase 14 Task 8): the server resolves the restore
+target by replaying the flow's own document-message-pair history against its
+own undo operation-message-pair history (stack+pointer — a second consecutive
+undo goes FURTHER back rather than oscillating; a save after an undo-undo
+truncates the abandoned branch). Redo is client-only — an in-memory stack
+(`web-app/app/flow-history.ts`) cleared by `recordFlowMutation()` on every
+committed content edit. This cursor algorithm, redo's in-memory stack,
+exhaustion as a graceful no-op, and the 412-retry-then-fresh-resolve on a save
+racing an undo are covered by `tests/flow-undo-cursor.test.ts` and
+`tests/flow-operations.test.ts` (`performUndo` / `performRedo`).
+`flow_versions` routes were RETIRED (Phase 15 Task 7; router 404) and the
+table is DELETED (Phase Final); undo walks the flow's own
+document-message-pair history only. The cases below verify the toolbar
+buttons, the keyboard shortcuts, the disabled states, and that the canvas
+re-renders after each step.)
 
 - [ ] **F32** After adding a state, click the Undo
   toolbar button. PASS: the state and its
@@ -1339,10 +1371,19 @@ canvas re-renders after each step.)
   restored.
 - [ ] **F36** Undo and Redo buttons are disabled
   when their respective stacks are empty. PASS:
-  buttons show disabled state initially.
+  buttons show disabled state initially. (Undo
+  may stay enabled at exhaustion —
+  `hasUndoHistory` is `pairs > 1`
+  (`api/derive-flows.ts`) — and the click is a
+  graceful server no-op.)
 - [ ] **F37** Perform an action, undo, then perform
-  a new action. PASS: the redo stack is cleared
-  (redo button disabled).
+  a new action; let the new action's
+  `PUT /api/organizations/:id/flows/:id` land —
+  a panel rename saves `SAVE_DELAY_MS` = 800 ms
+  after the last keystroke; do not click the
+  canvas or another node before the PUT. PASS:
+  the redo stack is cleared (redo button
+  disabled).
 - [ ] **F37a** Open the same flow in two tabs. In tab A, edit
   a node name and let auto-save complete. In tab B (which
   still shows the pre-edit head), click Undo immediately.
@@ -1365,11 +1406,34 @@ canvas re-renders after each step.)
 
 ### Flow Designer — Keyboard Shortcuts
 
-- [ ] **F38** Press Delete or Backspace with a node
-  or edge selected (not focused in an input).
-  PASS: selected item is deleted.
-- [ ] **F39** Press Cmd+Z / Ctrl+Z to undo, press
-  Cmd+Shift+Z / Ctrl+Shift+Z to redo. PASS:
+- [ ] **F38** Tab until a node shows the focus
+  outline — it also takes the selection (glow,
+  `aria-current="true"`), panel closed. Press
+  Delete or Backspace. PASS: the focused node
+  is deleted; focus lands on `<body>`.
+- [ ] **F38a** Tab again: focus moves to the next
+  node or edge, never the page top; selection
+  follows the focus. With the panel open the
+  camera pans to reveal the selection, zoom
+  unchanged. Tab across a marquee-selected
+  group keeps the group selected only while
+  focus lands on one of its members — Tab
+  order is DOM order (render order, not
+  selection order), so the first tab onto a
+  non-member collapses the selection to that
+  node. PASS: focus and selection stay paired
+  through every re-render.
+- [ ] **F38b** Tab to a node, press Enter — its
+  panel opens and the node keeps focus through
+  the re-render; Escape closes the panel and
+  focus stays on the node. A mouse click
+  selects without keeping focus. PASS:
+  keyboard focus survives open and close.
+- [ ] **F39** With Undo enabled, press Cmd+Z /
+  Ctrl+Z — it matches the Undo toolbar button.
+  Without a node click in between, press
+  Cmd+Shift+Z / Ctrl+Shift+Z (the browser
+  reports `key: 'Z'`) — it matches Redo. PASS:
   keyboard shortcuts match toolbar button
   behavior.
 
@@ -1417,16 +1481,16 @@ canvas re-renders after each step.)
   (ZIP round-trip is covered by `tests/zip-guards.test.ts`; this
   case verifies the `.zip` import path through the dialog and the
   preserved-position rendering.)
-- [ ] **F45** Make 11 edits in the flow designer (e.g. rename 11
-  nodes one at a time, waiting for each auto-save), then click
-  Undo 11 times in a row. PASS: every one of the 11 edits
-  reverts in order — undo history is NO LONGER capped at 10
-  (Phase 14 Task 8 retired the `FLOW_VERSION_CAP` trim from the
-  live path; undo now walks the flow's own full document-message-pair
-  history). The `flow_versions` store is DELETED (Phase
-  Final) — there is nothing to inspect; the flow's own
-  document-message-pair history in `message_pairs` is the
-  sole undo source.
+- [ ] **F45** Rename 11 nodes one at a time; after each
+  name, wait for that flow's `PUT /api/organizations/
+  :id/flows/:id` in the network log (the save fires
+  `SAVE_DELAY_MS` = 800 ms after the last keystroke)
+  before selecting the next node. Then click Undo 11
+  times in a row. PASS: every one of the 11 renames
+  reverts in order — undo walks the flow's own full
+  document-message-pair history (`FLOW_VERSION_CAP`
+  and `flow_versions` are retired; there is no
+  10-edit bound).
 - [ ] **F46** Edit a flow (rename a state), let auto-save complete.
   Navigate away from the designer to `flows/index.html`. Re-open the
   same flow. Click Undo. PASS: the rename reverts — the undo history
@@ -1447,8 +1511,8 @@ automated suite (`tests/api-flow-tags.test.ts`,
 flows/:id/tags" fence case) is the sole coverage: PUT/GET/
 DELETE lifecycle, Response-ID pinning survives further flow
 saves, marked delete, member-tier authorization, two-tag
-concurrency, and the org fence. Revisit this note if/when a
-designer "tag current" action lands.)
+concurrency, and the org fence. A designer "tag current" action is tracked in
+`TODO.md`.)
 
 ### Space Toggle (Pan Mode)
 
@@ -1486,6 +1550,9 @@ designer "tag current" action lands.)
 - [ ] **F57** Focus a text input (e.g. node name in the panel).
   Tap the spacebar. PASS: a literal space character is inserted
   into the input; pan mode state is unchanged.
+- [ ] **F57a** Tab to a node, tap Space. PASS: the
+  node's panel opens (Space activates the
+  focused item); pan mode stays off.
 
 ### Members Selector (Node Panel)
 
@@ -2092,7 +2159,8 @@ depends: A
 > `invitations/` (reached via the top-bar bell) and Accepts
 > (writes a seat in the invitation's org) or
 > Declines; an admin can Revoke an outstanding one from the
-> Organization page. DEFERRED (not built): email delivery.
+> Organization page. DEFERRED: email delivery (see
+> `TODO.md`).
 > Sources:
 > `web-app/members/index.ts` (`handleInviteSubmit`),
 > `web-app/app/adapters/invitations.ts`,
@@ -2308,9 +2376,8 @@ depends: A
 
 Billing is a placeholder page. `init()` is empty and
 the body is hand-written static HTML. These tests
-verify the page loads and the sidebar nav link works
-— functional billing tests will be added when the
-feature is implemented.
+verify the page loads and the sidebar nav link
+works; functional billing is tracked in `TODO.md`.
 
 - [ ] **G42** Click "Billing" in the sidebar. PASS:
   browser navigates to `billing/index.html`. The page
@@ -2630,7 +2697,8 @@ impact" workflow we designed.
 **K27.** Open dashboard; PASS if four surfaces render: three
 arc-gauge cards sharing one card shell (Time and Cost are ratio
 arc-gauges; Impact is a bipolar arc) and an Objectives box
-(full-width row below; card title "Objectives").
+(below the grid, one gauge column wide; card title
+"Objectives").
 
 **K28.** Inspect the Impact gauge. PASS if:
 - The arc has muted background visible at all values
@@ -2704,7 +2772,9 @@ every other agent, so no write-domain collision.
   Serial (A3 `--mock-data`, demo admin's active
   organization Stark): Customer Profile visible;
   Project Brief is org 2 and hidden. Parallel
-  (A3 `--test-plan-slices`): Customer Profile only.
+  (A3 `--test-plan-slices`): Customer
+  Profile and Account Review (the R21 subject;
+  never edit it).
 - [ ] **R2** Click "Add Record" (desktop) / "New Record"
   (mobile) → navigates to a create page
   (`records/create.html`) with Name and Description
@@ -2775,10 +2845,16 @@ every other agent, so no write-domain collision.
   `#gate0001`. Parallel (A3 `--test-plan-slices`):
   the work order is `#r1`.
 - [ ] **R14a** When a node references a `radio`-typed Record attribute, the workbox work-order detail renders it as a radio group — one `<input type="radio">` per option, all sharing the attribute name so only one is selectable — rather than a dropdown; selecting an option and transitioning records that value. NOTE: seeded mock data predates `radio`, so add a radio attribute, reference it Editable on a working node, and create a work order to exercise this.
-- [ ] **R15** Archive a Record from its detail page (if a
-  control exists in the toy).
-  PASS: lifecycle state reads `archived`; the list page
-  excludes the row from active counts.
+- [ ] **R15** Open the R2-created Record's detail
+  page — never Customer Profile (R16–R20 read it).
+  Click Archive; confirm in the house dialog
+  (`data-dialog-open="confirm-archive"`). PASS: a
+  "Record archived" toast appears, the header badge
+  reads Archived, and the Archive button is gone. On
+  `records/` the card reads Archived, an Archived
+  chip appears beside Active, and toggling the
+  Active chip hides the card. There are no numeric
+  counts on the chips.
 - [ ] **R16** Open Customer Profile detail. PASS: an
   Instances section lists instances (id + readable values)
   or "No instances yet", with a "New instance" control.
@@ -2803,13 +2879,18 @@ every other agent, so no write-domain collision.
   `confirm-delete-instance`). PASS: instance disappears
   from the list; reopening the address is not available
   (spent id).
-- [ ] **R21** ACL projection (member vs admin): as admin,
-  every attribute on the edit form is writable. As a
-  member against attributes whose `write_roles` exclude
-  `member` (set via API / seed), those fields render
-  read-only and unreadable fields are omitted. PASS:
+- [ ] **R21** ACL projection (member vs admin) on
+  Account Review. As the R admin, click New instance:
+  Owner Notes and Credit Limit both render
+  `data-access="writable"`. Sign in as the R
+  `member_*` credentials, open New instance: Owner
+  Notes renders `data-access="readonly"`; Credit
+  Limit is absent (`read_roles: ['admin']`). PASS:
   projection matches held roles; no ACL editing UI on
-  this page.
+  this page (ACLs are set only by
+  `PUT …/attributes/:id`). Serial (A3 `--mock-data`):
+  set the roles by the nested PUT on a record no case
+  edits.
 
 ## J. Teardown
 
@@ -2960,8 +3041,8 @@ After join, one markdown file per FAIL cluster under
 `docs/superpowers/test-plan-mitigations/`. Product design
 specs stay in `docs/superpowers/specs/`. Do not create the
 directory until the first cluster exists. The master lists
-paths in the summary. Implementing those specs is a later
-session.
+paths in the summary. Implementing those specs is
+tracked in `TODO.md`.
 
 File name:
 `YYYY-MM-DD-{section}-{first-case}.md`

@@ -162,7 +162,11 @@ export function computeLayout(
     const baseLayers = assignLayers(nodes, forwardEdges);
     const aug = insertDummies(baseLayers, forwardEdges);
     const ordered = placeArchiveLast(
-        reduceCrossings(aug.layers, aug.edges), nodes,
+        placeCreateFirst(
+            reduceCrossings(aug.layers, aug.edges),
+            nodes,
+        ),
+        nodes,
     );
     const topo = ordered
         .flat()
@@ -252,6 +256,26 @@ function finalizeLayout(
         edges, dummyPositions, reversedIds,
     );
     return { positions, waypoints };
+}
+
+// Create is the root; ordering it first within its
+// (first) layer heads the leftmost column, so the
+// mirror's `sp.y > ep.y` no longer arises where a
+// column has mates. This shapes the order the
+// coordinate pass consumes; it moves no final pixels.
+function placeCreateFirst(
+    layers: Layers,
+    nodes: readonly LayoutInput[],
+): Layers {
+    const create = nodes.find(n => n.isCreate);
+    if (!create) return layers;
+    return layers.map(layer => {
+        if (!layer.includes(create.id)) return layer;
+        return [
+            create.id,
+            ...layer.filter(id => id !== create.id),
+        ];
+    });
 }
 
 // Archive is terminal; ordering it last within its (last)

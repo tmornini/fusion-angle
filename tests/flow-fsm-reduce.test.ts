@@ -611,3 +611,192 @@ test(
         }
     },
 );
+
+test(
+    'canvas-key-activate on a node single-selects it,'
+    + ' opens the panel, and requests an update',
+    () => {
+        const state = buildState();
+        const r = reduceFsm(state, {
+            kind: 'canvas-key-activate',
+            nodeId: 'n1',
+            edgeId: null,
+        });
+        assert.equal(
+            r.state.selection.kind, 'nodes',
+        );
+        if (r.state.selection.kind === 'nodes') {
+            assert.deepEqual(
+                [...r.state.selection.nodeIds],
+                ['n1'],
+            );
+        }
+        const open = findAction(
+            r.actions, 'open-panel',
+        );
+        assert.equal(open?.open, true);
+        const update = findAction(
+            r.actions, 'request-update',
+        );
+        assert.ok(update);
+        assert.equal(update.state, r.state);
+    },
+);
+
+test(
+    'canvas-key-activate on an edge selects the edge'
+    + ' and opens the panel',
+    () => {
+        const state = buildState();
+        const r = reduceFsm(state, {
+            kind: 'canvas-key-activate',
+            nodeId: null,
+            edgeId: 'e1',
+        });
+        assert.equal(
+            r.state.selection.kind, 'edge',
+        );
+        if (r.state.selection.kind === 'edge') {
+            assert.equal(
+                r.state.selection.edgeId, 'e1',
+            );
+        }
+        const open = findAction(
+            r.actions, 'open-panel',
+        );
+        assert.equal(open?.open, true);
+        assert.ok(findAction(
+            r.actions, 'request-update',
+        ));
+    },
+);
+
+test(
+    'canvas-focus on an unselected node single-selects'
+    + ' it with request-update and no open-panel',
+    () => {
+        const state = buildState();
+        const r = reduceFsm(state, {
+            kind: 'canvas-focus',
+            nodeId: 'n1',
+            edgeId: null,
+            isRenderedSelected: false,
+        });
+        assert.equal(
+            r.state.selection.kind, 'nodes',
+        );
+        if (r.state.selection.kind === 'nodes') {
+            assert.deepEqual(
+                [...r.state.selection.nodeIds],
+                ['n1'],
+            );
+        }
+        assert.ok(findAction(
+            r.actions, 'request-update',
+        ));
+        assert.equal(
+            findAction(r.actions, 'open-panel'),
+            undefined,
+        );
+    },
+);
+
+test(
+    'canvas-focus on a rendered-selected item is a'
+    + ' no-op (the promotion loop-breaker)',
+    () => {
+        const state = buildState({
+            selection: {
+                kind: 'nodes',
+                nodeIds: new Set(['n1']),
+            },
+        });
+        const r = reduceFsm(state, {
+            kind: 'canvas-focus',
+            nodeId: 'n1',
+            edgeId: null,
+            isRenderedSelected: true,
+        });
+        assert.equal(r.state, state);
+        assert.equal(r.actions.length, 0);
+    },
+);
+
+test(
+    'canvas-focus mid-gesture is ignored',
+    () => {
+        const state = buildState({
+            drag: {
+                kind: 'dragging',
+                anchorNodeId: 'n1',
+                startPointerX: 0,
+                startPointerY: 0,
+                currentPointerX: 50,
+                currentPointerY: 30,
+                initialPositions: new Map([
+                    ['n1', { x: 0, y: 0 }],
+                ]),
+            },
+        });
+        const r = reduceFsm(state, {
+            kind: 'canvas-focus',
+            nodeId: 'n2',
+            edgeId: null,
+            isRenderedSelected: false,
+        });
+        assert.equal(r.state, state);
+        assert.equal(r.actions.length, 0);
+    },
+);
+
+test(
+    'canvas-focus on an edge selects the edge',
+    () => {
+        const state = buildState();
+        const r = reduceFsm(state, {
+            kind: 'canvas-focus',
+            nodeId: null,
+            edgeId: 'e1',
+            isRenderedSelected: false,
+        });
+        assert.equal(
+            r.state.selection.kind, 'edge',
+        );
+        if (r.state.selection.kind === 'edge') {
+            assert.equal(
+                r.state.selection.edgeId, 'e1',
+            );
+        }
+        assert.ok(findAction(
+            r.actions, 'request-update',
+        ));
+    },
+);
+
+test(
+    'canvas-focus collapses a foreign multi-selection'
+    + ' to the focused node',
+    () => {
+        const state = buildState({
+            selection: {
+                kind: 'nodes',
+                nodeIds: new Set(['n2', 'n3']),
+            },
+        });
+        const r = reduceFsm(state, {
+            kind: 'canvas-focus',
+            nodeId: 'n1',
+            edgeId: null,
+            isRenderedSelected: false,
+        });
+        assert.equal(
+            r.state.selection.kind, 'nodes',
+        );
+        if (r.state.selection.kind === 'nodes') {
+            assert.deepEqual(
+                [...r.state.selection.nodeIds],
+                ['n1'],
+            );
+        }
+    },
+);

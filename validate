@@ -52,6 +52,7 @@ API.md 400
 DESIGN-SYSTEM.md 300
 FLOW-CANVAS.md 300
 AUDIT.md 400
+TODO.md 450
 EOF
 
 if [ -n "${DOC_LINE_FAIL}" ]; then
@@ -107,6 +108,51 @@ RETIRED_VOCAB=$(
 if [ -n "$RETIRED_VOCAB" ]; then
     echo "Error: retired storage-tier vocabulary:" >&2
     echo "$RETIRED_VOCAB" >&2
+    exit 1
+fi
+
+# Later work has one home (run-four remediation §10):
+# the section lives in TODO.md and nowhere else, and no
+# other root doc defers work in prose. Rows that POINT
+# at TODO.md are the sanctioned exception (the
+# in-browser-ZIP precedent above).
+LATER_HOME_FAIL=
+if [ "$(grep -c '^## Later work' ARCHITECTURE.md)" \
+    != "0" ]; then
+    LATER_HOME_FAIL="${LATER_HOME_FAIL}\
+ARCHITECTURE.md: '## Later work' count must be 0
+"
+fi
+if [ "$(grep -c '^## KNOWN seams' ARCHITECTURE.md)" \
+    != "1" ]; then
+    LATER_HOME_FAIL="${LATER_HOME_FAIL}\
+ARCHITECTURE.md: '## KNOWN seams' count must be 1
+"
+fi
+if [ "$(grep -c '^## Critical path' TODO.md)" \
+    != "1" ]; then
+    LATER_HOME_FAIL="${LATER_HOME_FAIL}\
+TODO.md: '## Critical path' count must be 1
+"
+fi
+LATER_PATTERN='later work|\(later\)|not built'
+LATER_PATTERN="$LATER_PATTERN|coming soon"
+LATER_PATTERN="$LATER_PATTERN|later session"
+LATER_PATTERN="$LATER_PATTERN|will be added when"
+DEFERRAL_PROSE=$(
+    find . -maxdepth 1 -type f -name '*.md' \
+        ! -name 'TODO.md' ! -name 'TEST-PLAN.md' \
+        -exec grep -nEi "$LATER_PATTERN" {} + \
+        2>/dev/null \
+    | grep -v 'TODO.md' || true
+)
+
+if [ -n "${LATER_HOME_FAIL}${DEFERRAL_PROSE}" ]; then
+    echo "Error: later work must live in TODO.md:" >&2
+    printf '%s' "${LATER_HOME_FAIL}" >&2
+    if [ -n "${DEFERRAL_PROSE}" ]; then
+        echo "${DEFERRAL_PROSE}" >&2
+    fi
     exit 1
 fi
 

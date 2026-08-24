@@ -823,10 +823,14 @@ export function recordDocumentBodyOf(
         };
 }
 
-// Nested attribute storage body (Task 8): strip id /
-// organization_id / record_id (parentage is the URI under
-// the type) and stamp DEFAULT_ATTRIBUTE_ACL_ROLES so seed
-// and composed-operation message pairs always carry both ACL arrays.
+// Nested attribute storage body: strip id /
+// organization_id / record_id (parentage is the URI
+// under the type). ACL arrays pass through when given;
+// DEFAULT_ATTRIBUTE_ACL_ROLES stamps only a body that
+// carries none — a genuinely NEW attribute. The
+// composed edit hands each existing attribute its
+// stored arrays (formRecordWriteMessagePairs), so the
+// nested attribute PUT stays the only ACL writer.
 export function recordAttributeDocumentBodyOf(
     row: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -882,18 +886,38 @@ async function formRecordWriteMessagePairs(
         operationId: messagePair.operationId,
         organization,
     });
-    // Attribute pairs form at nested ATTRIBUTE_DETAIL_
-    // PATTERN addresses (type id = top-level body id);
-    // bodies rectified (no record_id, ACL stamped).
+    // Covenant: an ACL is set only by the nested
+    // attribute PUT; the composed edit carries each
+    // stored ACL forward, and a new attribute takes
+    // the default. The composed body can never carry
+    // roles (the validator's key set — correctly).
+    const storedAttributes = b.kind === 'edit'
+        ? await loadAttributeSchemaById(
+            db, organization, b.id,
+        )
+        : undefined;
     const attributePuts = await Promise.all(
         b.attributes.map(async (attr) => {
+            const stored = storedAttributes?.get(attr.id);
+            const raw = attr as unknown as
+                Record<string, unknown>;
             const attributeBody =
                 recordAttributeDocumentBodyOf(
-                    attr as unknown as
-                        Record<string, unknown>,
+                    stored === undefined
+                        ? raw
+                        : {
+                            ...raw,
+                            read_roles: [
+                                ...stored.readRoles,
+                            ],
+                            write_roles: [
+                                ...stored.writeRoles,
+                            ],
+                        },
                 );
             return formDocumentMessagePairFor(db, {
-                routePattern: ATTRIBUTE_DETAIL_PATTERN,
+                routePattern:
+                    ATTRIBUTE_DETAIL_PATTERN,
                 params: [
                     organization, b.id, attr.id,
                 ],

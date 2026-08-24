@@ -151,6 +151,79 @@ function buildPresenterWithNodes(
 }
 
 test(
+    'buildGestureContext carries the committed'
+    + ' interaction (the FSM reduces from it)',
+    () => {
+        const presenter =
+            buildPresenterWithNodes(false);
+        const zoomed = presenter.withZoomedIn();
+        assert.notEqual(
+            zoomed.interaction.zoom,
+            presenter.snapshot().interaction.zoom,
+        );
+        const next = new FlowDesignerPresenter(
+            zoomed, 1200, 800,
+            buildFlowHistorySnapshot(false),
+        );
+        assert.equal(
+            next.buildGestureContext().interaction,
+            zoomed.interaction,
+        );
+    },
+);
+
+test(
+    'withZoomedIn steps +0.1 scaling the viewBox about'
+    + ' its center; withZoomedOut reverses it',
+    () => {
+        const presenter =
+            buildPresenterWithNodes(false);
+        const before =
+            presenter.snapshot().interaction;
+        const cx = before.viewBox.x
+            + before.viewBox.w / 2;
+        const cy = before.viewBox.y
+            + before.viewBox.h / 2;
+        const zoomed = presenter.withZoomedIn();
+        const vb = zoomed.interaction.viewBox;
+        const ratio =
+            before.zoom / zoomed.interaction.zoom;
+        assert.ok(
+            Math.abs(zoomed.interaction.zoom - 1.1)
+                < 1e-9,
+        );
+        assert.ok(
+            Math.abs(vb.w - before.viewBox.w * ratio)
+                < 1e-9,
+        );
+        assert.ok(
+            Math.abs(vb.h - before.viewBox.h * ratio)
+                < 1e-9,
+        );
+        assert.ok(
+            Math.abs(vb.x + vb.w / 2 - cx) < 1e-9,
+        );
+        assert.ok(
+            Math.abs(vb.y + vb.h / 2 - cy) < 1e-9,
+        );
+        const back = new FlowDesignerPresenter(
+            zoomed, 1200, 800,
+            buildFlowHistorySnapshot(false),
+        ).withZoomedOut();
+        assert.ok(
+            Math.abs(back.interaction.zoom - 1.0)
+                < 1e-9,
+        );
+        assert.ok(
+            Math.abs(
+                back.interaction.viewBox.w
+                    - before.viewBox.w,
+            ) < 1e-9,
+        );
+    },
+);
+
+test(
     'withFitToBox updates the viewBox to frame'
     + ' the given content box',
     () => {
@@ -458,6 +531,124 @@ test(
         );
         assert.deepEqual(
             saved.agentIds, [agentId],
+        );
+    },
+);
+
+test(
+    'withCanvasSize keeps a non-auto-fit presenter\'s'
+    + ' zoom — a resize never re-fits the camera',
+    () => {
+        const presenter =
+            buildPresenterWithNodes(false);
+        const zoomed = presenter.withZoomedIn();
+        const next = new FlowDesignerPresenter(
+            zoomed, 1200, 800,
+            buildFlowHistorySnapshot(false),
+        );
+        const resized = next.withCanvasSize(1000, 700);
+        assert.ok(
+            Math.abs(resized.interaction.zoom - 1.1)
+                < 1e-9,
+            'zoom survives the resize',
+        );
+        assert.ok(
+            Math.abs(
+                resized.interaction.viewBox.w
+                    - 1000 / 1.1,
+            ) < 1e-9,
+            'viewBox rescales about the center',
+        );
+    },
+);
+
+test(
+    'withNodeNamed(id, name) renames that node even'
+    + ' when the selection has moved to another',
+    () => {
+        const graph = {
+            ...emptyGraph,
+            nodes: [node('a'), node('b')],
+        };
+        const snap = buildInitialFlowSnapshot(
+            graph, 800, 600, [], [], [],
+        );
+        const selectedB = {
+            ...snap,
+            interaction: {
+                ...snap.interaction,
+                selection: {
+                    kind: 'nodes' as const,
+                    nodeIds: new Set(['b']),
+                },
+            },
+        };
+        const presenter = new FlowDesignerPresenter(
+            selectedB, 800, 600,
+            buildFlowHistorySnapshot(false),
+        );
+        const next = presenter
+            .withNodeNamed('a', 'typed');
+        assert.equal(
+            next.nodes.find(n => n.id === 'a')!.name,
+            'typed',
+        );
+        assert.equal(
+            next.nodes.find(n => n.id === 'b')!.name,
+            'B',
+        );
+    },
+);
+
+test(
+    'withNodeNamed(id, name) applies with no selection'
+    + ' at all — the flush is bound to its target',
+    () => {
+        const graph = {
+            ...emptyGraph,
+            nodes: [node('a')],
+        };
+        const snap = buildInitialFlowSnapshot(
+            graph, 800, 600, [], [], [],
+        );
+        const presenter = new FlowDesignerPresenter(
+            snap, 800, 600,
+            buildFlowHistorySnapshot(false),
+        );
+        const next = presenter
+            .withNodeNamed('a', 'typed');
+        assert.equal(
+            next.nodes.find(n => n.id === 'a')!.name,
+            'typed',
+        );
+    },
+);
+
+test(
+    'withEdgeNamed(id, name) applies with no selection',
+    () => {
+        const graph = {
+            ...emptyGraph,
+            nodes: [node('a'), node('b')],
+            edges: [{
+                id: 'e1',
+                name: 'go',
+                fromNodeId: 'a',
+                toNodeId: 'b',
+            }],
+        };
+        const snap = buildInitialFlowSnapshot(
+            graph, 800, 600, [], [], [],
+        );
+        const presenter = new FlowDesignerPresenter(
+            snap, 800, 600,
+            buildFlowHistorySnapshot(false),
+        );
+        const next = presenter
+            .withEdgeNamed('e1', 'renamed');
+        assert.equal(
+            next.edges.find(e => e.id === 'e1')!.name,
+            'renamed',
         );
     },
 );

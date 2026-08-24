@@ -28,3 +28,30 @@
         </button>
     </div>
 </dialog>
+
+<dialog id="confirm-archive-dialog"
+    class="dialog dialog-narrow"
+    role="alertdialog"
+    aria-labelledby="confirm-archive-title"
+    aria-describedby="confirm-archive-message">
+    <div class="dialog-header">
+        <h3 id="confirm-archive-title"
+            class="dialog-title">
+            Archive Record?</h3>
+    </div>
+    <p id="confirm-archive-message"
+        class="text-sm text-muted">
+        The Record leaves the Active list; its
+        instances and history stay readable.
+    </p>
+    <div class="dialog-footer">
+        <button class="btn btn-outline"
+            data-dialog-cancel="confirm-archive">
+            Cancel
+        </button>
+        <button class="btn btn-primary"
+            data-action="confirm-archive">
+            Archive
+        </button>
+    </div>
+</dialog>

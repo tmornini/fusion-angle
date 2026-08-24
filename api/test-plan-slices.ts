@@ -14,6 +14,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
     MS_PER_DAY,
     MS_PER_SECOND,
+    DEFAULT_ATTRIBUTE_ACL_ROLES,
     type StateEntity,
     type GraphNode,
     type GraphEdge,
@@ -659,6 +660,11 @@ const SLICE_ENTITY_IDS: Readonly<
     'r-wo-capture-move': 'uWTNopQBCaIMxmJlsFWaJA',
     'r-wo-review-move': 'LRPrEiOANEzQxSPZcCMSIA',
     'r-wo-archive-move': 'XVSvgJYmsIZjEEkiSIwFZg',
+    'r-member': 'GIo3puu_xoFWELY0Dsdklg',
+    'r-record-review': 'YibTo-BhicvsQvsyJxaW_A',
+    'r-state-record-review': 'EKEYE6Rc0Pxwaf0aXWyttQ',
+    'r-attr-review-notes': 'k6_pWZzmIyk1Z2nTGjW7lQ',
+    'r-attr-review-limit': 'IZz4eActXfrcP9kHSnCbqQ',
     'sv-org': 'gXKZHmZgcbfwQYiYhEQDug',
     'sv-admin': 'hPrdaZfedPOJYevSaGziHw',
     'sv-idea-active': 'wmRZaGDtUSWNiHXkRtNEaw',
@@ -1777,6 +1783,157 @@ async function formKExtras(
         });
     }
     return { projects, baselines };
+}
+
+type RExtras = {
+    readonly member: ExtraIdentity;
+    readonly record: {
+        readonly body: Record<string, unknown>;
+        readonly messagePairs:
+            RecordWriteMessagePairs;
+    };
+    readonly attributePuts: readonly MessagePair[];
+};
+
+// The R21 subject: a second R record type carrying two
+// explicit-ACL attributes, seeded as an operator would
+// write it today — create an empty type, PUT an
+// attribute, PUT an attribute (three operation ids).
+// Roles are spelled, never stamped. Customer Profile
+// cannot host this: R16–R20 edit it, and the composed
+// edit path is R21's very subject.
+async function formRExtras(
+    organizationId: string,
+    adminId: string,
+    requestAt: string,
+): Promise<RExtras> {
+    const member = await formExtraIdentity(
+        sliceEntityId('r-member'),
+        'R Member',
+        'r-member@test-plan.example',
+        requestAt,
+        organizationId,
+    );
+    const recordId =
+        sliceEntityId('r-record-review');
+    const body: Record<string, unknown> = {
+        kind: 'create',
+        id: recordId,
+        record: {
+            organization_id: organizationId,
+            name: 'Account Review',
+            description:
+                'ACL projection subject (R21);'
+                + ' no case edits it.',
+            position: 2,
+        },
+        attributes: [],
+        initialState: 'active',
+        initialStateEventId:
+            sliceEntityId('r-state-record-review'),
+        initialStateAt: requestAt,
+    };
+    const validated = validateRecordWriteBody(body);
+    const operation = await formSeedMessagePair(
+        {
+            key: seedMessagePairKey(
+                RECORD_TYPES_COLLECTION_PATTERN,
+                recordId,
+            ),
+            routePattern:
+                RECORD_TYPES_COLLECTION_PATTERN,
+            idParams: [organizationId],
+            op: true,
+            organization: organizationId,
+            requesterIdentityId: adminId,
+            body,
+        },
+        requestAt,
+    );
+    const document = await formSeedMessagePair(
+        {
+            key: seedMessagePairKey(
+                RECORD_TYPE_DETAIL_PATTERN,
+                recordId,
+            ),
+            routePattern:
+                RECORD_TYPE_DETAIL_PATTERN,
+            idParams: [organizationId, recordId],
+            organization: organizationId,
+            requesterIdentityId: adminId,
+            body: recordDocumentBodyOf(validated),
+        },
+        requestAt,
+    );
+    const attributeRows = [
+        {
+            id: sliceEntityId(
+                'r-attr-review-notes',
+            ),
+            body: {
+                name: 'Owner Notes',
+                attribute_type: 'text',
+                sort_order: 1,
+                options: [],
+                constraints: [],
+                read_roles: [
+                    ...DEFAULT_ATTRIBUTE_ACL_ROLES,
+                ],
+                write_roles: ['admin'],
+            },
+        },
+        {
+            id: sliceEntityId(
+                'r-attr-review-limit',
+            ),
+            body: {
+                name: 'Credit Limit',
+                attribute_type: 'text',
+                sort_order: 2,
+                options: [],
+                constraints: [],
+                read_roles: ['admin'],
+                write_roles: ['admin'],
+            },
+        },
+    ];
+    const attributePuts: MessagePair[] = [];
+    for (const row of attributeRows) {
+        attributePuts.push(
+            await formSeedMessagePair(
+                {
+                    key: seedMessagePairKey(
+                        ATTRIBUTE_DETAIL_PATTERN,
+                        row.id,
+                    ),
+                    routePattern:
+                        ATTRIBUTE_DETAIL_PATTERN,
+                    idParams: [
+                        organizationId,
+                        recordId,
+                        row.id,
+                    ],
+                    organization: organizationId,
+                    requesterIdentityId: adminId,
+                    body: row.body,
+                },
+                requestAt,
+            ),
+        );
+    }
+    return {
+        member,
+        record: {
+            body,
+            messagePairs: {
+                operation,
+                document,
+                attributePuts: [],
+                attributeDeletes: [],
+            },
+        },
+        attributePuts,
+    };
 }
 
 async function formFExtras(
@@ -3144,6 +3301,7 @@ export async function postTestPlanSlices(
     const fFlows: FFlowWrites[] = [];
     const cScores: CScoreWrites[] = [];
     const kReviews: KReviewWrites[] = [];
+    const rSubjects: RExtras[] = [];
     for (const section of PARALLEL_SECTIONS) {
         if (section === 'AA') continue;
         const slice = await formTenantAdminMessagePairs(
@@ -3240,6 +3398,28 @@ export async function postTestPlanSlices(
                 slice.adminId,
                 requestAt,
             ));
+        } else if (section === 'R') {
+            const extra = await formRExtras(
+                slice.organizationId,
+                slice.adminId,
+                requestAt,
+            );
+            rSubjects.push(extra);
+            extras.push({
+                identities: [extra.member],
+            });
+            recipients.push({
+                identityId:
+                    sliceEntityId('r-member'),
+                email:
+                    'r-member@test-plan.example',
+            });
+            reveal = {
+                ...reveal,
+                memberUsername:
+                    'r-member@test-plan.example',
+                memberPassword: '',
+            };
         } else if (section === 'F') {
             fFlows.push(await formFExtras(
                 slice.organizationId,
@@ -3373,6 +3553,22 @@ export async function postTestPlanSlices(
                 await appendMessagePair(
                     view, extra.instanceMessagePair,
                 );
+            }
+            for (const extra of rSubjects) {
+                await postRecordWriteOp(
+                    view,
+                    extra.record.body,
+                    SYSTEM_MEMBER_ID,
+                    extra.record.messagePairs,
+                );
+                for (
+                    const pair
+                    of extra.attributePuts
+                ) {
+                    await appendMessagePair(
+                        view, pair,
+                    );
+                }
             }
         },
     );

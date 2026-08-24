@@ -2,6 +2,7 @@ import { html, trusted } from '../safe-html.ts';
 import type { SafeHtml } from '../safe-html.ts';
 import {
     ICON_SIZE,
+    iconArchive,
     iconArrowLeft,
     iconEdit,
     iconCheck,
@@ -489,12 +490,15 @@ export class RecordDetailPresenter {
                         }">${cfg.label}</span>
                     </div>
                 </div>
-                <button
-                    id="record-edit-btn"
-                    class="btn btn-primary">
-                    ${iconEdit(ICON_SIZE.base, '')}
-                    Edit
-                </button>
+                <div class="flex gap-2">
+                    ${this.#buildArchiveButton()}
+                    <button
+                        id="record-edit-btn"
+                        class="btn btn-primary">
+                        ${iconEdit(ICON_SIZE.base, '')}
+                        Edit
+                    </button>
+                </div>
             </div>
             <p class="text-muted mb-6"
                 >${
@@ -508,6 +512,19 @@ export class RecordDetailPresenter {
             ${this.#buildBoundFlowsCard()}
             ${this.#buildWorkOrdersCard()}
         </div>`;
+    }
+
+    #buildArchiveButton(): SafeHtml {
+        if (!this.#view.record.isActive()) {
+            return trusted('');
+        }
+        return html`<button
+            id="record-archive-btn"
+            class="btn btn-outline"
+            data-dialog-open="confirm-archive">
+            ${iconArchive(ICON_SIZE.base, '')}
+            Archive
+        </button>`;
     }
 
     #buildAttributesCard(): SafeHtml {

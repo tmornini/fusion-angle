@@ -48,6 +48,8 @@ export function reduceFsm(
             return onCanvasKeyActivate(
                 state, input,
             );
+        case 'canvas-focus':
+            return onCanvasFocus(state, input);
     }
 }
 
@@ -780,6 +782,66 @@ function onCanvasKeyActivate(
                     kind: 'open-panel',
                     open: true,
                 },
+                {
+                    kind: 'request-update',
+                    state: next,
+                },
+            ],
+        };
+    }
+    return { state, actions: [] };
+}
+
+// Focus is the keyboard's click: promote it to a single
+// selection with request-update only — Enter stays the
+// double-click (open-panel lives in canvas-key-activate).
+// isRenderedSelected reads the RENDERED aria-current, not
+// this FSM's selection, because the page writes selection
+// behind the FSM; it breaks the focus -> commit -> restore
+// -> focusin loop.
+function onCanvasFocus(
+    state: FsmState,
+    input: Extract<FsmInput, {
+        kind: 'canvas-focus';
+    }>,
+): FsmResult {
+    if (isGestureActive(state)) {
+        return { state, actions: [] };
+    }
+    if (input.isRenderedSelected) {
+        return { state, actions: [] };
+    }
+    if (input.nodeId) {
+        const next: FsmState = {
+            ...state,
+            selection: {
+                kind: 'nodes',
+                nodeIds: new Set([
+                    input.nodeId,
+                ]),
+            },
+        };
+        return {
+            state: next,
+            actions: [
+                {
+                    kind: 'request-update',
+                    state: next,
+                },
+            ],
+        };
+    }
+    if (input.edgeId) {
+        const next: FsmState = {
+            ...state,
+            selection: {
+                kind: 'edge',
+                edgeId: input.edgeId,
+            },
+        };
+        return {
+            state: next,
+            actions: [
                 {
                     kind: 'request-update',
                     state: next,

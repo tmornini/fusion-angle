@@ -14,12 +14,14 @@ import {
 } from '../app/dialog.ts';
 import {
     sessionContext,
+    getRecord,
     getRecordModel,
     getRecordAttributesByRecord,
     getFlowSummariesForRecord,
     getWorkOrdersForRecord,
     putRecord,
     postRecordChange,
+    postRecordStateChange,
     subscribeRecordChanges,
     generateIdentifier,
     getRecordInstances,
@@ -294,6 +296,13 @@ function onDocumentClick(
     if (confirm) {
         closeDialog('confirm-delete-instance');
         void handleDeleteInstance(root);
+    }
+    const archive = target.closest(
+        '[data-action="confirm-archive"]',
+    );
+    if (archive) {
+        closeDialog('confirm-archive');
+        void handleArchive();
     }
 }
 
@@ -703,6 +712,24 @@ async function handleDeleteInstance(
     } finally {
         saveInProgress = false;
     }
+}
+
+async function handleArchive(): Promise<void> {
+    if (pageState.kind !== 'reading') return;
+    if (!recordId) return;
+    const ctx = sessionContext();
+    const entity = await getRecord(ctx, recordId);
+    try {
+        await postRecordStateChange(
+            ctx, entity, 'archived',
+        );
+    } catch (err) {
+        reportFault(
+            ctx, 'Failed to archive Record', err,
+        );
+        return;
+    }
+    showToast('Record archived', 'success');
 }
 
 function applyInstanceFieldDraft(

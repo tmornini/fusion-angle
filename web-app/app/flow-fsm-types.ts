@@ -96,6 +96,12 @@ export type FsmInput =
         kind: 'canvas-key-activate';
         nodeId: string | null;
         edgeId: string | null;
+    }
+    | {
+        kind: 'canvas-focus';
+        nodeId: string | null;
+        edgeId: string | null;
+        isRenderedSelected: boolean;
     };
 
 export type Action =

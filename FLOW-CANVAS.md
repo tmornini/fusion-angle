@@ -15,7 +15,8 @@ canvas with pan, marquee, drag, and edge connection.
 - `flow-interactions.ts` — pointer/keyboard state
   machines (discriminated unions). Pan toggles via Space:
   one tap on, one tap off; the toggle is ignored
-  mid-gesture
+  mid-gesture; focus promotes to selection via
+  `canvas-focus`
 - `mermaid-{generate,parse}.ts` — round-trip text format
 - `zip.ts` — in-browser ZIP
 - `adapters/flow-export.ts` — integration point
@@ -42,7 +43,12 @@ The FSM (`flow-fsm-reduce.ts`) propagates its new state
 to the presenter via the `request-update` action payload,
 consumed by `detail.ts` through
 `presenter.withInteractionState(state)` — the single
-sanctioned seam, no shared mutable state.
+sanctioned seam, no shared mutable state. After every
+commit the page pushes the committed interaction state
+back in the gesture context, so a gesture reduces from
+the committed camera. The page restores canvas focus
+after every rebuild in `update()` (`canvasFocusOf` /
+`restoreCanvasFocus`).
 
 ## Gesture rendering
 

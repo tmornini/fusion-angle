@@ -59,6 +59,7 @@ needs no `npm install`.
 | FLOW-CANVAS.md | designer canvas |
 | AUDIT.md | doctrine audit |
 | TEST-PLAN.md | browser regression |
+| TODO.md | critical path, later work, sequencing |
 
 ## Tech Stack
 

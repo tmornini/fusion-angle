@@ -957,3 +957,44 @@ test(
         assert.equal(op.freshSnap.isLocked, false);
     },
 );
+
+test(
+    'undo cursor: eleven saves walk eleven undos —'
+    + ' N10 back to genesis, no cap',
+    async () => {
+        const db = await freshDb();
+        const token = await organizationToken();
+        const flowId = generateIdentifier();
+        await createFlow(db, token, flowId);
+        for (let i = 1; i <= 11; i++) {
+            await save(
+                db, token, flowId, 'N' + i,
+                generateIdentifier(),
+            );
+        }
+        for (let i = 10; i >= 1; i--) {
+            const res = await undo(
+                db, token, flowId,
+                generateIdentifier(), AT,
+            );
+            assert.equal(res.status, 201);
+            assert.equal(
+                await currentGraphName(
+                    db, token, flowId,
+                ),
+                'N' + i,
+            );
+        }
+        const last = await undo(
+            db, token, flowId,
+            generateIdentifier(), AT,
+        );
+        assert.equal(last.status, 201);
+        assert.equal(
+            await currentGraphName(
+                db, token, flowId,
+            ),
+            'genesis',
+        );
+    },
+);

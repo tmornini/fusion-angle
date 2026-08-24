@@ -436,3 +436,129 @@ test(
         );
     },
 );
+
+function columnOf(
+    positions: Map<string, { x: number; y: number }>,
+    id: string,
+): string[] {
+    const x = positions.get(id)!.x;
+    return [...positions.entries()]
+        .filter(([, p]) => Math.abs(p.x - x) < 0.5)
+        .toSorted((a, b) => a[1].y - b[1].y)
+        .map(([memberId]) => memberId);
+}
+
+function edge(fromId: string, toId: string) {
+    return { fromId, toId, labelWidth: 0 };
+}
+
+test(
+    'computeLayout: Create heads its column when an'
+    + ' orphan precedes it in input order',
+    () => {
+        const r = computeLayout({
+            nodes: [
+                lin('o'),
+                lin('s', { start: true }),
+                lin('a'),
+                lin('z', { complete: true }),
+            ],
+            edges: [edge('s', 'a'), edge('a', 'z')],
+            canvasWidth: 0, canvasHeight: 0,
+        });
+        assert.equal(
+            columnOf(r.positions, 's')[0], 's',
+            'Create heads its column',
+        );
+    },
+);
+
+test(
+    'computeLayout: Create heads its column beside a'
+    + ' second root, and Archive ends its',
+    () => {
+        const r = computeLayout({
+            nodes: [
+                lin('r'),
+                lin('s', { start: true }),
+                lin('a'),
+                lin('x'),
+                lin('d'),
+                lin('z', { complete: true }),
+            ],
+            edges: [
+                edge('r', 'x'), edge('x', 'd'),
+                edge('s', 'a'), edge('a', 'z'),
+            ],
+            canvasWidth: 0, canvasHeight: 0,
+        });
+        assert.equal(
+            columnOf(r.positions, 's')[0], 's',
+            'Create heads its column',
+        );
+        assert.equal(
+            columnOf(r.positions, 'z').at(-1), 'z',
+            'Archive ends its column',
+        );
+    },
+);
+
+test(
+    'computeLayout: Archive ends its column when the'
+    + ' relative mirror would fire',
+    () => {
+        const r = computeLayout({
+            nodes: [
+                lin('r'),
+                lin('s', { start: true }),
+                lin('x'),
+                lin('a1'),
+                lin('a2'),
+                lin('m'),
+                lin('z', { complete: true }),
+            ],
+            edges: [
+                edge('r', 'x'), edge('x', 'm'),
+                edge('s', 'a1'), edge('a1', 'z'),
+                edge('s', 'a2'),
+            ],
+            canvasWidth: 0, canvasHeight: 0,
+        });
+        assert.equal(
+            columnOf(r.positions, 'z').at(-1), 'z',
+            'Archive ends its column under the mirror',
+        );
+    },
+);
+
+test(
+    'computeLayout: a wrapped chain keeps Create'
+    + ' leftmost past an orphan',
+    () => {
+        const r = computeLayout({
+            nodes: [
+                lin('o'),
+                lin('s', { start: true }),
+                lin('a'),
+                lin('b'),
+                lin('c'),
+                lin('d'),
+                lin('z', { complete: true }),
+            ],
+            edges: [
+                edge('s', 'a'), edge('a', 'b'),
+                edge('b', 'c'), edge('c', 'd'),
+                edge('d', 'z'),
+            ],
+            canvasWidth: 1400, canvasHeight: 740,
+        });
+        let minX = Infinity;
+        for (const p of r.positions.values()) {
+            if (p.x < minX) minX = p.x;
+        }
+        assert.equal(
+            r.positions.get('s')!.x, minX,
+            'Create leads the serpentine',
+        );
+    },
+);

@@ -45,7 +45,7 @@ async function seeded() {
     return { db, reveal };
 }
 
-const EXPECTED_SLICE_MESSAGE_PAIRS = 499;
+const EXPECTED_SLICE_MESSAGE_PAIRS = 507;
 
 test('slices stamp schema last and reveal 14',
 async () => {
@@ -437,11 +437,14 @@ async () => {
                 db, row.organizationId,
             );
         assert.equal(
-            records.length, 1, section,
+            records.length,
+            section === 'R' ? 2 : 1,
+            section,
         );
-        assert.equal(
-            records[0]!.name,
-            'Customer Profile',
+        assert.ok(
+            records.some(
+                (r) => r.name === 'Customer Profile',
+            ),
             section,
         );
     }

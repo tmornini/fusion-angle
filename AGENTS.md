@@ -226,13 +226,14 @@ every other op.
 | Doc | Go there for |
 |---|---|
 | README.md | product sentence, modules |
-| ARCHITECTURE.md | tenancy, KNOWN seams, later work, do-not-resurrect |
+| ARCHITECTURE.md | tenancy, KNOWN seams, do-not-resurrect |
 | SCHEMA.md | the one table, secrets, PII erasure |
 | API.md | dispatch, compositions, seed count |
 | DESIGN-SYSTEM.md | tokens, heat ramp, breakpoints, CSS |
 | FLOW-CANVAS.md | canvas FSM, camera MUST NOTs, hazards |
 | AUDIT.md | doctrine audit runbook |
 | TEST-PLAN.md | browser regression, Protocol |
+| TODO.md | critical path, later work, sequencing |
 
 ## How we got here
 

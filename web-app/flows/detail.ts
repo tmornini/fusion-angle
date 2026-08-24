@@ -43,6 +43,7 @@ import {
 } from '../app/adapters/blob-download.ts';
 import {
     bindInteractions,
+    withCanvasFocusRestore,
     type FlowGestureContext,
     type InteractionState,
     type Selection,
@@ -157,7 +158,6 @@ class PageState {
     #container: HTMLElement | null = null;
     #canvasW: number = FALLBACK_W;
     #canvasH: number = FALLBACK_H;
-    #needsFit: boolean = true;
     #history: FlowHistorySnapshot =
         buildFlowHistorySnapshot(false);
     #gestureRaf: number | null = null;
@@ -212,14 +212,6 @@ class PageState {
         this.#canvasH = h;
     }
 
-    needsFit(): boolean {
-        return this.#needsFit;
-    }
-
-    setNeedsFit(value: boolean): void {
-        this.#needsFit = value;
-    }
-
     history(): FlowHistorySnapshot {
         return this.#history;
     }
@@ -245,7 +237,7 @@ function commit(
         pageState.history(),
     );
     pageState.setPresenter(presenter);
-    update(pageState.container(), presenter);
+    update(pageState.container());
 }
 
 async function handleAddEdge(
@@ -579,16 +571,101 @@ async function handleAddNodeAtPosition(
     );
 }
 
-function update(
-    container: HTMLElement,
-    presenter: FlowDesignerPresenter,
+export type CanvasFocus = {
+    readonly kind: 'node' | 'edge';
+    readonly id: string;
+};
+
+// The previously focused CANVAS item, if any. Null
+// unless the active element sits inside the wrap and
+// an ancestor carries data-node-id / data-edge-id —
+// the panel, the name input, a <dialog>, and <body>
+// all yield null, so nothing is stolen from them.
+export function canvasFocusOf(
+    active: Element | null,
+    wrap: Element,
+): CanvasFocus | null {
+    if (
+        active === null
+        || active === wrap
+        || !wrap.contains(active)
+    ) {
+        return null;
+    }
+    let current: Element | null = active;
+    while (current && current !== wrap) {
+        const nodeId =
+            current.getAttribute('data-node-id');
+        if (nodeId !== null) {
+            return { kind: 'node', id: nodeId };
+        }
+        const edgeId =
+            current.getAttribute('data-edge-id');
+        if (edgeId !== null) {
+            return { kind: 'edge', id: edgeId };
+        }
+        current = current.parentElement;
+    }
+    return null;
+}
+
+// Re-focus the same id in the rebuilt canvas — the
+// previously FOCUSED id, never aria-current. A deleted
+// id finds nothing and focus stays on <body>. The wrap
+// is overflow: hidden, so a bare focus() would scroll
+// the wrap against the viewBox camera — preventScroll
+// is load-bearing. Call it only inside
+// withCanvasFocusRestore — the focusin it fires would
+// otherwise revert the selection the user just made.
+export function restoreCanvasFocus(
+    focus: CanvasFocus | null,
+    wrap: Element,
 ): void {
-    pageState.saveDebouncer().flush();
-    presenter.renderUpdate(container);
-    pageState.pushGestureContext(
-        presenter.buildGestureContext(),
+    if (focus === null) return;
+    const attrName = focus.kind === 'node'
+        ? 'data-node-id'
+        : 'data-edge-id';
+    const els = wrap.querySelectorAll(
+        '[' + attrName + ']',
     );
-    pageState.setHistory(presenter.history());
+    for (const el of els) {
+        if (
+            el.getAttribute(attrName) !== focus.id
+        ) {
+            continue;
+        }
+        if (el instanceof SVGElement) {
+            el.focus({ preventScroll: true });
+        }
+        return;
+    }
+}
+
+function update(container: HTMLElement): void {
+    pageState.saveDebouncer().flush();
+    const presenter = pageState.presenter();
+    const wrap = $(
+        '.flow-canvas-wrap', container,
+    );
+    const focus = wrap === null
+        ? null
+        : canvasFocusOf(
+            document.activeElement, wrap,
+        );
+    presenter.renderUpdate(container);
+    if (wrap !== null) {
+        withCanvasFocusRestore(wrap, () => {
+            restoreCanvasFocus(focus, wrap);
+        });
+    }
+    // Re-read: the restore can re-enter commit(), and
+    // the pre-nested presenter installed here would
+    // silently overwrite what the nested commit left.
+    const settled = pageState.presenter();
+    pageState.pushGestureContext(
+        settled.buildGestureContext(),
+    );
+    pageState.setHistory(settled.history());
 }
 
 // One narrow paint per animation frame while a gesture
@@ -893,11 +970,8 @@ function bindCanvasInteractions(
     if (!(wrap instanceof HTMLElement)) {
         return;
     }
-    const state =
-        presenter.interactionState();
     const push = bindInteractions(
         wrap,
-        state,
         (next) => {
             // Mid-gesture updates paint narrowly under
             // rAF; gesture boundaries (and everything
@@ -1275,30 +1349,45 @@ function bindPanelActions(
             const id = target.id;
             const value = target.value;
             if (id === 'prop-node-name') {
+                const nodeId = pageState
+                    .presenter().selectedNodeId();
+                if (nodeId === null) return;
                 pageState.saveDebouncer().schedule(
                     () => commit(
                         pageState.presenter()
-                            .withNodeNamed(value),
+                            .withNodeNamed(
+                                nodeId, value,
+                            ),
                         { advanceHistory: true },
                     ),
                 );
             } else if (
                 id === 'prop-node-instructions'
             ) {
+                const nodeId = pageState
+                    .presenter().selectedNodeId();
+                if (nodeId === null) return;
                 pageState.saveDebouncer().schedule(
                     () => commit(
                         pageState.presenter()
-                            .withNodeTaskInstructions(value),
+                            .withNodeTaskInstructions(
+                                nodeId, value,
+                            ),
                         { advanceHistory: true },
                     ),
                 );
             } else if (
                 id === 'prop-edge-name'
             ) {
+                const edgeId = pageState
+                    .presenter().selectedEdgeId();
+                if (edgeId === null) return;
                 pageState.saveDebouncer().schedule(
                     () => commit(
                         pageState.presenter()
-                            .withEdgeNamed(value),
+                            .withEdgeNamed(
+                                edgeId, value,
+                            ),
                         { advanceHistory: true },
                     ),
                 );
@@ -1529,7 +1618,6 @@ function onFlowLoaded(
     flowId: string,
 ): void {
     pageState.setCanvasSize(FALLBACK_W, FALLBACK_H);
-    pageState.setNeedsFit(true);
     pageState.setHistory(
         buildFlowHistorySnapshot(
             loaded.graph.hasUndoHistory,
@@ -1601,7 +1689,6 @@ function onFlowLoaded(
         const h = initialWrap.clientHeight;
         if (w > 0 && h > 0) {
             pageState.setCanvasSize(w, h);
-            pageState.setNeedsFit(false);
             pageState.presenter()
                 .withCanvasSize(w, h);
             commit(
@@ -1622,12 +1709,9 @@ function onFlowLoaded(
         const h = liveWrap.clientHeight;
         if (w > 0 && h > 0) {
             pageState.setCanvasSize(w, h);
-            pageState.setNeedsFit(true);
             pageState.presenter()
                 .withCanvasSize(w, h);
-            update(
-                container, pageState.presenter(),
-            );
+            update(container);
             reconcileFitFromDom();
         }
     });
@@ -1807,6 +1891,42 @@ function bindFlushOnLeave(
     );
 }
 
+export type DesignerShortcut =
+    | 'escape'
+    | 'delete'
+    | 'undo'
+    | 'redo';
+
+export interface DesignerShortcutInput {
+    readonly key: string;
+    readonly metaKey: boolean;
+    readonly ctrlKey: boolean;
+    readonly shiftKey: boolean;
+    readonly isEditableFocused: boolean;
+    readonly isPanelOpen: boolean;
+}
+
+export function reduceDesignerShortcut(
+    input: DesignerShortcutInput,
+): DesignerShortcut | null {
+    if (input.key === 'Escape') {
+        return input.isPanelOpen ? 'escape' : null;
+    }
+    if (
+        input.key === 'Delete'
+        || input.key === 'Backspace'
+    ) {
+        return input.isEditableFocused
+            ? null : 'delete';
+    }
+    if (!input.metaKey && !input.ctrlKey) return null;
+    if (input.key !== 'z' && input.key !== 'Z') {
+        return null;
+    }
+    if (input.isEditableFocused) return null;
+    return input.shiftKey ? 'redo' : 'undo';
+}
+
 function bindKeyboardShortcuts(
     panelStateRef: PanelStateRef,
     signal: AbortSignal,
@@ -1814,52 +1934,34 @@ function bindKeyboardShortcuts(
     document.addEventListener(
         'keydown',
         (e: KeyboardEvent) => {
-            if (
-                e.key === 'Escape'
-                && panelStateRef.open
-            ) {
-                e.preventDefault();
+            const active = document.activeElement;
+            const shortcut = reduceDesignerShortcut({
+                key: e.key,
+                metaKey: e.metaKey,
+                ctrlKey: e.ctrlKey,
+                shiftKey: e.shiftKey,
+                isEditableFocused:
+                    active instanceof HTMLInputElement
+                    || active instanceof
+                        HTMLTextAreaElement
+                    || active instanceof
+                        HTMLSelectElement,
+                isPanelOpen: panelStateRef.open,
+            });
+            if (shortcut === null) return;
+            e.preventDefault();
+            if (shortcut === 'escape') {
                 panelStateRef.open = false;
                 commit(
                     pageState.presenter()
                         .withPanelOpen(false),
                 );
                 reconcileFitFromDom();
-                return;
-            }
-            if (
-                (e.key === 'Delete'
-                    || e.key === 'Backspace')
-                && !(
-                    document.activeElement
-                    instanceof
-                    HTMLInputElement
-                    || document.activeElement
-                    instanceof
-                    HTMLTextAreaElement
-                    || document.activeElement
-                    instanceof
-                    HTMLSelectElement
-                )
-            ) {
-                e.preventDefault();
+            } else if (shortcut === 'delete') {
                 void handleDeleteSelected();
-            }
-            const mod =
-                e.metaKey || e.ctrlKey;
-            if (!mod) return;
-            if (
-                e.key === 'z'
-                && !e.shiftKey
-            ) {
-                e.preventDefault();
+            } else if (shortcut === 'undo') {
                 void handleUndo();
-            }
-            if (
-                e.key === 'z'
-                && e.shiftKey
-            ) {
-                e.preventDefault();
+            } else {
                 void handleRedo();
             }
         },

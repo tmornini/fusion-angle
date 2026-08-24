@@ -519,3 +519,39 @@ test(
         assert.ok(start.positionX < end.positionX);
     },
 );
+
+test(
+    'the Layout Test flow keeps the ruled covenant:'
+    + ' Create min x, Archive max x, inside the y range',
+    async () => {
+        const db = await seededMockDb();
+        const g = await getFlowGraph(
+            createRequestContext(
+                db, await organizationToken(),
+            ),
+            LAYOUT_TEST_FLOW_ID,
+        );
+        const xs = g.nodes.map(n => n.positionX);
+        const ys = g.nodes.map(n => n.positionY);
+        const start = g.nodes.find(n => n.isCreate)!;
+        const end = g.nodes.find(n => n.isArchive)!;
+        assert.equal(
+            start.positionX, Math.min(...xs),
+            'Create at min x',
+        );
+        assert.equal(
+            end.positionX, Math.max(...xs),
+            'Archive at max x',
+        );
+        assert.ok(
+            start.positionY <= end.positionY,
+            'Create never below Archive',
+        );
+        assert.ok(
+            start.positionY > Math.min(...ys)
+            || end.positionY < Math.max(...ys),
+            'on a fan the pair sits inside the y range,'
+            + ' not pinned to the corners',
+        );
+    },
+);

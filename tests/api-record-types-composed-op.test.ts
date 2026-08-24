@@ -396,3 +396,158 @@ async () => {
         + " 'create' or 'edit', got explode",
     );
 });
+
+test('composed edit carries each stored ACL forward '
++ '— a rename never resets a restriction',
+async () => {
+    const { db, adminToken } = await adminDb();
+    const attr2Id = generateIdentifier();
+    // Absent from the create: the edit is this
+    // attribute's genesis, so it takes the default.
+    const attr3Id = generateIdentifier();
+    const body = createBody(TYPE_ID, ATTR_ID, 'Asset');
+    (body['attributes'] as unknown[]).push({
+        id: attr2Id,
+        organization_id: ORGANIZATION,
+        record_id: TYPE_ID,
+        name: 'Notes',
+        attribute_type: 'text',
+        sort_order: 1,
+        options: [],
+        constraints: [],
+    });
+    const create = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken, body,
+    ));
+    assert.equal(create.status, 201);
+
+    const restrict = await handleRequest(db, req(
+        'PUT', ATTR_DETAIL, adminToken, {
+            name: 'Priority',
+            attribute_type: 'text',
+            sort_order: 0,
+            options: [],
+            constraints: [],
+            read_roles: ['admin'],
+            write_roles: ['admin'],
+        },
+    ));
+    assert.equal(restrict.status, 201);
+
+    // A fresh operationId (not req()'s shared
+    // TEST_OPERATION_ID): ATTR_ID's own fields are unchanged
+    // by this edit, so its stamped-default body would be
+    // byte-identical to its create-time PUT under the SAME
+    // operation id, and appendMessagePair's request-hash
+    // replay guard would silently drop it — masking the very
+    // reset this test exists to catch.
+    const edit = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: COLLECTION,
+        token: adminToken,
+        operationId: generateIdentifier(),
+        body: {
+            kind: 'edit',
+            id: TYPE_ID,
+            record: {
+                organization_id: ORGANIZATION,
+                name: 'Asset',
+                description: 'Asset desc',
+                position: 1,
+            },
+            attributes: [
+                {
+                    id: ATTR_ID,
+                    organization_id: ORGANIZATION,
+                    record_id: TYPE_ID,
+                    name: 'Priority',
+                    attribute_type: 'text',
+                    sort_order: 0,
+                    options: [],
+                    constraints: [],
+                },
+                {
+                    id: attr2Id,
+                    organization_id: ORGANIZATION,
+                    record_id: TYPE_ID,
+                    name: 'Notes v2',
+                    attribute_type: 'text',
+                    sort_order: 1,
+                    options: [],
+                    constraints: [],
+                },
+                {
+                    id: attr3Id,
+                    organization_id: ORGANIZATION,
+                    record_id: TYPE_ID,
+                    name: 'Serial',
+                    attribute_type: 'text',
+                    sort_order: 2,
+                    options: [],
+                    constraints: [],
+                },
+            ],
+            state: 'active',
+            removedAttributeIds: [],
+        },
+    }));
+    assert.equal(edit.status, 201);
+
+    const restricted = await handleRequest(db, req(
+        'GET', ATTR_DETAIL, adminToken,
+    ));
+    assert.equal(restricted.status, 200);
+    const restrictedRow =
+        await restricted.json() as {
+            read_roles: string[];
+            write_roles: string[];
+        };
+    assert.deepEqual(
+        restrictedRow.read_roles, ['admin'],
+    );
+    assert.deepEqual(
+        restrictedRow.write_roles, ['admin'],
+    );
+
+    const renamed = await handleRequest(db, req(
+        'GET',
+        DETAIL + '/attributes/' + attr2Id,
+        adminToken,
+    ));
+    assert.equal(renamed.status, 200);
+    const renamedRow = await renamed.json() as {
+        name: string;
+        read_roles: string[];
+        write_roles: string[];
+    };
+    assert.equal(renamedRow.name, 'Notes v2');
+    assert.deepEqual(
+        renamedRow.read_roles,
+        ['member', 'admin'],
+    );
+    assert.deepEqual(
+        renamedRow.write_roles,
+        ['member', 'admin'],
+    );
+
+    const born = await handleRequest(db, req(
+        'GET',
+        DETAIL + '/attributes/' + attr3Id,
+        adminToken,
+    ));
+    assert.equal(born.status, 200);
+    const bornRow = await born.json() as {
+        name: string;
+        read_roles: string[];
+        write_roles: string[];
+    };
+    assert.equal(bornRow.name, 'Serial');
+    assert.deepEqual(
+        bornRow.read_roles,
+        ['member', 'admin'],
+    );
+    assert.deepEqual(
+        bornRow.write_roles,
+        ['member', 'admin'],
+    );
+});
