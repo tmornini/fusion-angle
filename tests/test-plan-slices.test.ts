@@ -45,7 +45,7 @@ async function seeded() {
     return { db, reveal };
 }
 
-const EXPECTED_SLICE_MESSAGE_PAIRS = 507;
+const EXPECTED_SLICE_MESSAGE_PAIRS = 509;
 
 test('slices stamp schema last and reveal 14',
 async () => {

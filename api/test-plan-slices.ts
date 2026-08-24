@@ -35,6 +35,7 @@ import {
     postWorkOrderTransitionOp,
     postFlowWorkOrderDocumentOp,
     postFlowRecordDocumentOp,
+    postWorkOrderBindingOp,
     postBaselineScoreDocumentOp,
     postActualScoreDocumentOp,
     recordDocumentBodyOf,
@@ -54,8 +55,10 @@ import {
 } from './message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { HTTP_OK } from
-    './http-errors.ts';
+import {
+    HTTP_OK,
+    HTTP_NO_CONTENT,
+} from './http-errors.ts';
 import {
     formBootstrapMessagePair,
     formDefaultOrganizationSeedMessagePair,
@@ -640,6 +643,7 @@ const SLICE_ENTITY_IDS: Readonly<
     'r-obj-3': 'jVrJWdqovgipwOfeVfEOrw',
     'r-obj-4': 'iJVjJKUZfrTwxbxGReVupQ',
     'r-record-customer': 'NlTUsuvZqqNpXXDvtZORJg',
+    'r-instance-1': '8fHkocPt8auDVdchSHxgMg',
     'r-attr-1': 'nIvyKEMWevzIynfqPKHkbA',
     'r-attr-2': 'dqyTeecJBQmttvQWXErnRg',
     'r-state-record-customer': 'pAdySOwTblAIOGayXpfKSA',
@@ -1793,6 +1797,13 @@ type RExtras = {
             RecordWriteMessagePairs;
     };
     readonly attributePuts: readonly MessagePair[];
+    readonly instanceMessagePair: MessagePair;
+    readonly binding: {
+        readonly organizationId: string;
+        readonly workOrderId: string;
+        readonly body: Record<string, unknown>;
+        readonly messagePair: MessagePair;
+    };
 };
 
 // The R21 subject: a second R record type carrying two
@@ -1921,6 +1932,73 @@ async function formRExtras(
             ),
         );
     }
+    // The R14 subject: #r1 binds to this empty Customer
+    // Profile instance. Unbound, the Data Capture inputs
+    // are disabled (WB10b) and a value-bearing submit
+    // 400s — the F2 genesis shape, one operation id.
+    const instanceId = sliceEntityId('r-instance-1');
+    const customerRecordId = sliceEntityId(
+        'r-record-customer',
+    );
+    const instanceRouteSegments =
+        INSTANCE_DETAIL_PATTERN.split('/');
+    const instancePathSegments = [
+        'organizations', organizationId,
+        'record-types', customerRecordId,
+        'instances', instanceId,
+    ];
+    const instanceMessagePair =
+        await formWriteMessagePair({
+            method: 'PUT',
+            pathname: '/'
+                + instancePathSegments.join('/'),
+            routePattern:
+                INSTANCE_DETAIL_PATTERN,
+            routeSegments: instanceRouteSegments,
+            pathSegments: instancePathSegments,
+            headerFields: [],
+            body: { values: [] },
+            requesterIdentityId: adminId,
+            requestAt,
+            organization: organizationId,
+            responseStatus: HTTP_OK,
+            responseBody: { values: [] },
+            operationId: generateIdentifier(),
+        });
+    // Bound through the route's own op so the seed
+    // cannot drift from the gate (the mock's shape).
+    const workOrderId = sliceEntityId('r-wo-capture');
+    const bindingBody: Record<string, unknown> = {
+        instance_id: instanceId,
+        record_type_id: customerRecordId,
+    };
+    const bindingMessagePair =
+        await formWriteMessagePair({
+            method: 'PUT',
+            pathname:
+                '/organizations/' + organizationId
+                + '/work-orders/' + workOrderId
+                + '/binding',
+            routePattern:
+                'organizations/:id/work-orders/:id'
+                + '/binding',
+            routeSegments: [
+                'organizations', ':id',
+                'work-orders', ':id', 'binding',
+            ],
+            pathSegments: [
+                'organizations', organizationId,
+                'work-orders', workOrderId, 'binding',
+            ],
+            headerFields: [],
+            body: bindingBody,
+            requesterIdentityId: adminId,
+            requestAt,
+            organization: organizationId,
+            responseStatus: HTTP_NO_CONTENT,
+            responseBody: undefined,
+            operationId: generateIdentifier(),
+        });
     return {
         member,
         record: {
@@ -1933,6 +2011,13 @@ async function formRExtras(
             },
         },
         attributePuts,
+        instanceMessagePair,
+        binding: {
+            organizationId,
+            workOrderId,
+            body: bindingBody,
+            messagePair: bindingMessagePair,
+        },
     };
 }
 
@@ -3569,6 +3654,17 @@ export async function postTestPlanSlices(
                         view, pair,
                     );
                 }
+                await appendMessagePair(
+                    view, extra.instanceMessagePair,
+                );
+                await postWorkOrderBindingOp(
+                    view,
+                    extra.binding.workOrderId,
+                    extra.binding.body,
+                    SYSTEM_MEMBER_ID,
+                    extra.binding.organizationId,
+                    extra.binding.messagePair,
+                );
             }
         },
     );

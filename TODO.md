@@ -293,6 +293,31 @@ Off the critical path; each with its oracle.
   code and 32 test comments describe a past state as
   present; the enumeration is the run-four
   remediation's Evidence
+- C4 / C7 scored FAIL on a foreign paint, not a product
+  regression. The failing tiles — 0 ideas, 0 projects,
+  1 flow, Impact `—`, no objective rows, a chip naming
+  another admin — are the B org's dashboard exactly, and
+  B is the hunter joined just before C; the C org
+  derives 4 / 3 / 1, +56 / −33, four objectives with
+  trendlines (`tests/slices-portfolio-scores.test.ts`).
+  Two leak vectors: the previous hunter's tab is still
+  the globally selected page, or the HttpOnly
+  `refresh_token` survives a JS-side "delete site data"
+  so the next hunter's first boot cookie-refreshes as
+  the previous admin (B20's own covenant). Shelved
+  behind the serial run in flight. The fix is Protocol,
+  not product: a hunter preflight — close every MCP tab,
+  open one, Sign out if boot lands authenticated, sign
+  in, then assert the sidebar chip names this admin and
+  the header names this org before any case; the master
+  closes a joined hunter's tabs; a data-shape FAIL reads
+  the chip in the same `javascript_tool` call and a
+  foreign chip is BLOCKED "foreign paint", never FAIL; a
+  Known MCP limitations bullet for the shared-jar leak;
+  and the C pin extended to `actualMean` and four
+  non-empty trendlines. Spec:
+  `docs/superpowers/test-plan-mitigations/`
+  `2026-08-24-c4-c7-dashboard-gauges.md`
 
 ## Sequencing
 
