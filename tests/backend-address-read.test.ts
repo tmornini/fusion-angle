@@ -95,52 +95,6 @@ async () => {
     assert.deepEqual(got.map((row) => row.id), ['a']);
 });
 
-test('getAddressVersion is address+version, ordered',
-async () => {
-    const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['message_pairs']);
-    await backend.transaction(
-        ['message_pairs'], 'readwrite',
-        async (tx) => {
-            await tx.put('message_pairs', {
-                id: 'old',
-                uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                    + '',
-                uri_id: 'AjdvjuECVZEgZoFajaIEkg',
-                response_at: '2026-01-01T00:00:00.000001Z',
-                version: 'aa',
-            });
-            await tx.put('message_pairs', {
-                id: 'new',
-                uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                    + '',
-                uri_id: 'AjdvjuECVZEgZoFajaIEkg',
-                response_at: '2026-01-01T00:00:00.000002Z',
-                version: 'aa',
-            });
-            await tx.put('message_pairs', {
-                id: 'other',
-                uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                    + '',
-                uri_id: 'AjdvjuECVZEgZoFajaIEkg',
-                response_at: '2026-01-01T00:00:00.000003Z',
-                version: 'bb',
-            });
-        },
-    );
-    const got = await backend.transaction(
-        ['message_pairs'], 'readonly',
-        (tx) => tx.getAddressVersion(
-            'message_pairs', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                , 'AjdvjuECVZEgZoFajaIEkg', 'aa',
-        ),
-    );
-    assert.deepEqual(
-        got.map((row) => row.id),
-        ['old', 'new'],
-    );
-});
-
 function jsonWire(body: unknown): string {
     const json = JSON.stringify(body);
     return serializeWire({
@@ -218,24 +172,6 @@ test('memory getWhere refuses uri_id', async () => {
             error instanceof Error
             && error.message
                 === 'getWhere does not accept uri_id',
-    );
-});
-
-test('memory getWhere refuses version', async () => {
-    const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['message_pairs']);
-    await assert.rejects(
-        () => backend.transaction(
-            ['message_pairs'],
-            'readonly',
-            (tx) => tx.getWhere(
-                'message_pairs', 'version', 'ab',
-            ),
-        ),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message
-                === 'getWhere does not accept version',
     );
 });
 

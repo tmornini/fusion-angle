@@ -59,7 +59,6 @@ export interface DocumentMessagePair {
     readonly method: string;
     readonly body: Record<string, unknown>;
     readonly requesterIdentityId: Id;
-    readonly version: string;
 }
 
 // Every PUT/DELETE pair at `uriCollection`, decoded once —
@@ -95,7 +94,6 @@ export function documentMessagePairsAt(
             body: requestBodyOf(messagePair.request),
             requesterIdentityId:
                 messagePair.requester_identity_id,
-            version: messagePair.version,
         });
     }
     return out.sort((left, right) =>
@@ -161,7 +159,7 @@ export interface DocumentLifecycleEvent {
     readonly state: string;
     readonly stateAt: string;
     readonly memberId: Id;
-    readonly version: string;
+    readonly etag: string;
 }
 
 // Walk a document's pairs in ARRIVAL order and keep the FIRST
@@ -207,7 +205,7 @@ export function documentLifecycleEvents(
                     messagePair.body, 'state_at',
                 ),
                 memberId: messagePair.requesterIdentityId,
-                version: messagePair.version,
+                etag: messagePair.id,
             });
             afterDelete = false;
             continue;
@@ -227,7 +225,7 @@ export function documentLifecycleEvents(
             state,
             stateAt: messagePair.at,
             memberId: messagePair.requesterIdentityId,
-            version: messagePair.version,
+            etag: messagePair.id,
         });
     }
     return events;
@@ -246,7 +244,7 @@ export function stateHistoryFrom(
         state: event.state,
         member_id: event.memberId,
         at: event.stateAt,
-        version: event.version,
+        etag: event.etag,
     }));
     return rows.sort((a, b) =>
         a.at < b.at ? -1

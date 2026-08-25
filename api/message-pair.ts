@@ -15,9 +15,6 @@ import {
     buildResponseModel,
     storedWire,
     requestMessageHash,
-    documentVersion,
-    bodyOctetsOf,
-    HEX64,
 } from './message-form.ts';
 import { validateIdentityTokenEntity } from './validators.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
@@ -62,7 +59,6 @@ export interface MessagePair {
     readonly requestHash: string;
     readonly responseStatus: number;
     readonly responseMessage: string;
-    readonly responseEtag: string;
     readonly responseHash: string;
     readonly method: string;
     readonly operationId: string;
@@ -109,9 +105,6 @@ export interface WriteMessagePairInput {
     readonly organization: Id | undefined;
     readonly responseStatus: number;
     readonly responseBody: unknown | undefined;
-    // 64-hex advertised ETag this later write is matching.
-    // Omitted on genesis / unconditional writes.
-    readonly matchedEtag?: string;
     readonly latchedHeadMessagePairId?: string;
     // Required on every formed pair. Public writes supply
     // the hoisted Operation-ID; seed and inner PUTs pass
@@ -241,12 +234,6 @@ export async function formWriteMessagePair(
     });
     const requestMessage = storedWire(requestModel);
     const responseMessage = storedWire(responseModel);
-    const version = input.method === 'DELETE'
-        ? await requestMessageHash(responseMessage)
-        : await documentVersion(
-            bodyOctetsOf(responseModel),
-            input.matchedEtag,
-        );
     return {
         id,
         requestAt: input.requestAt,
@@ -257,7 +244,6 @@ export async function formWriteMessagePair(
         requestHash: await requestMessageHash(requestMessage),
         responseStatus: input.responseStatus,
         responseMessage,
-        responseEtag: version,
         responseHash: await requestMessageHash(responseMessage),
         method: input.method,
         operationId: input.operationId,
@@ -432,17 +418,15 @@ export function httpDateOf(at: string): string {
 }
 
 // Locked PUT and PATCH concurrency dialect: If-Match carries
-// the strong ETag (quoted 64-hex documentVersion). Not a
-// credential — stored verbatim so two writes differing only
-// in If-Match are different messages for replay identity.
+// the strong ETag. Not a credential — stored verbatim so two
+// writes differing only in If-Match are different messages
+// for replay identity.
 export const IF_MATCH_HEADER = 'if-match';
 
-export { HEX64 } from './message-form.ts';
-
-// Parse a wire If-Match value into the unquoted 64-hex
-// tag. Accepts exactly one strong etag (`"<hex64>"`).
-// Anything else — `*`, weak, lists, unquoted, pair id —
-// yields undefined; the caller answers 400.
+// Parse a wire If-Match into the unquoted validator.
+// ETag is the message-pair identifier. Anything else —
+// 64-hex, `*`, weak, lists, unquoted — yields undefined;
+// the caller answers 400.
 export function parseIfMatch(
     header: string,
 ): string | undefined {
@@ -454,7 +438,9 @@ export function parseIfMatch(
         return undefined;
     }
     const inner = header.slice(1, -1);
-    if (!HEX64.test(inner)) return undefined;
+    if (!isIdentifier(inner)) {
+        return undefined;
+    }
     return inner;
 }
 
@@ -494,7 +480,7 @@ export function rawIfMatchFromMessagePair(
     return field?.value;
 }
 
-// Strong wire ETag: quotes a 64-hex version token.
+// Strong wire ETag: quotes the validator token.
 export function strongEtagOf(tag: string): string {
     return '"' + tag + '"';
 }
@@ -571,7 +557,7 @@ export function responseFromStored(stored: MessagePairEntity): Response {
 
 // Stream a stored PUT as this caller's GET: same body
 // octets, Date replaced with now, no Operation-ID.
-// ETag and Response-ID are projection headers.
+// ETag and Response-ID both name the stored pair.
 export function streamGetFromStored(
     stored: MessagePairEntity,
     at: string,
@@ -599,7 +585,7 @@ export function streamGetFromStored(
             status: HTTP_OK,
             headers,
         });
-    return attachEtag(response, stored.version);
+    return attachEtag(response, stored.id);
 }
 
 // Send-time status: 201 if this request appended a pair
@@ -714,7 +700,6 @@ async function writeMessagePairRows(
         request_hash: messagePair.requestHash,
         request: messagePair.requestMessage,
         response_at: nowUtc(),
-        version: messagePair.responseEtag,
         response: messagePair.responseMessage,
         operation_id: messagePair.operationId,
     });

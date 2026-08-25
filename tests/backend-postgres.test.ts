@@ -92,7 +92,6 @@ const MESSAGE_PAIR_ROW = {
         + '1.1\r\n\r\n'
         + String.fromCharCode(0x80, 0x9c, 0xe9),
     response_at: '2026-01-01T00:00:00.000001Z',
-    version: 'e'.repeat(64),
     response: 'HTTP/1.1 200 OK\r\n\r\n'
         + String.fromCharCode(0x80, 0x9c, 0xe9),
     operation_id: 'WvNiHVgksjrlfhPfdgfcyQ',
@@ -217,49 +216,6 @@ async () => {
     assert.deepEqual(
         fake.calls[0]!.values,
         ['/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42'],
-    );
-});
-
-test('getAddressVersion uses the triple predicate',
-async () => {
-    const fake = fakeClient();
-    const backend = new PostgresBackend(fake.sql);
-    await backend.transaction(
-        ['message_pairs'],
-        'readonly',
-        (tx) => tx.getAddressVersion(
-            'message_pairs',
-            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-            '42', 'ab',
-        ),
-    );
-    const text = fake.calls[0]!.text;
-    assert.match(text, /FROM message_pairs/);
-    assert.match(text, /uri_collection = \$1/);
-    assert.match(text, /uri_id = \$2/);
-    assert.match(text, /version = \$3/);
-    assert.match(text, /ORDER BY response_at, id/);
-    assert.deepEqual(
-        fake.calls[0]!.values,
-        ['/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42', 'ab'],
-    );
-});
-
-test('getWhere throws for version', async () => {
-    const fake = fakeClient();
-    const backend = new PostgresBackend(fake.sql);
-    await assert.rejects(
-        () => backend.transaction(
-            ['message_pairs'],
-            'readonly',
-            (tx) => tx.getWhere(
-                'message_pairs', 'version', 'ab',
-            ),
-        ),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message
-                === 'getWhere does not accept version',
     );
 });
 

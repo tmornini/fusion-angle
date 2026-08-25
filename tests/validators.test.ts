@@ -1298,7 +1298,6 @@ const validMessagePair = {
     request_hash: 'a'.repeat(64),
     request: '{"kind":"request"}',
     response_at: '2026-01-01T00:00:00.000001Z',
-    version: 'e'.repeat(64),
     response: '{"kind":"response"}',
     operation_id: '0123456789ABCDEFGHIJKw',
 };

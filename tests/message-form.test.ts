@@ -2,12 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     buildRequestModel,
-    buildResponseModel,
     canonicalJson,
     storedWire,
     requestMessageHash,
-    documentVersion,
-    HEX64,
 } from '../api/message-form.ts';
 import { formWriteMessagePair } from '../api/message-pair.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
@@ -84,26 +81,6 @@ test('message hash covers the fields', async () => {
         await requestMessageHash(storedWire(withKey)),
         await requestMessageHash(storedWire(without)),
     );
-});
-
-test('documentVersion covers only the body octets',
-async () => {
-    const a = buildResponseModel({
-        status: 200,
-        fields: [{ name: 'x-trace', value: 'rOEPOcVMQdJiiiMuiiEhlg' }],
-        body: { v: 1 },
-    });
-    const b = buildResponseModel({
-        status: 200, fields: [], body: { v: 1 },
-    });
-    const octetsA = HttpMessage.fromModel(a).body()
-        .toBytes();
-    const octetsB = HttpMessage.fromModel(b).body()
-        .toBytes();
-    const tagA = await documentVersion(octetsA);
-    const tagB = await documentVersion(octetsB);
-    assert.equal(tagA, tagB);
-    assert.match(tagA, HEX64);
 });
 
 test('stored pair message is serializeWire',

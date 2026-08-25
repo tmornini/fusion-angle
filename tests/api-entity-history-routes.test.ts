@@ -18,8 +18,10 @@ import { sharedMockDb } from './mock-seed.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
 
 // GET <family>/:id/versions/ — Phase A3 of states-URI
 // elimination. Per trio family (ideas, projects, records,
@@ -37,7 +39,7 @@ interface HistoryEvent {
     state: string;
     member_id: string;
     at: string;
-    version?: string;
+    etag?: string;
 }
 
 function req(
@@ -754,6 +756,135 @@ test(
         assert.equal(rows[1]!.id, ev1);
         assert.equal(rows[1]!.state, 'active');
         assertDesc(rows);
+    },
+);
+
+test(
+    'GET flows/:id/versions/ etag is the pair id,'
+    + ' not version',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const genesis = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + id,
+                DEV_TOKEN,
+                flowDocBody(
+                    'Hist Flow',
+                    'active',
+                    '2026-03-01T00:00:00.000000Z',
+                    generateIdentifier(),
+                ),
+            ),
+        );
+        assert.equal(genesis.status, 201);
+        const pairId = versionOf(genesis);
+        assert.equal(isIdentifier(pairId), true);
+
+        const res = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assert.equal(res.status, 200);
+        const rows = await res.json() as HistoryEvent[];
+        assert.equal(rows.length, 1);
+        assert.equal(rows[0]!.etag, pairId);
+        assert.equal(
+            isIdentifier(rows[0]!.etag ?? ''),
+            true,
+        );
+        assert.equal('version' in rows[0]!, false);
+    },
+);
+
+test(
+    'GET flows/:id/versions/ A→B→A has three etags',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const path =
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + id;
+        const first = await handleRequest(
+            db,
+            req(
+                'PUT',
+                path,
+                DEV_TOKEN,
+                flowDocBody(
+                    'Hist Flow',
+                    'active',
+                    '2026-03-01T00:00:00.000000Z',
+                    generateIdentifier(),
+                ),
+            ),
+        );
+        assert.equal(first.status, 201);
+        const etagA = versionOf(first);
+        const second = await handleRequest(
+            db,
+            req(
+                'PUT',
+                path,
+                DEV_TOKEN,
+                flowDocBody(
+                    'Hist Flow',
+                    'updated',
+                    '2026-03-02T00:00:00.000000Z',
+                    generateIdentifier(),
+                ),
+                { 'if-match': first.headers.get('ETag')! },
+            ),
+        );
+        assert.equal(second.status, 201);
+        const etagB = versionOf(second);
+        const third = await handleRequest(
+            db,
+            req(
+                'PUT',
+                path,
+                DEV_TOKEN,
+                flowDocBody(
+                    'Hist Flow',
+                    'active',
+                    '2026-03-03T00:00:00.000000Z',
+                    generateIdentifier(),
+                ),
+                { 'if-match': second.headers.get('ETag')! },
+            ),
+        );
+        assert.equal(third.status, 201);
+        const etagA2 = versionOf(third);
+        assert.notEqual(etagA, etagB);
+        assert.notEqual(etagB, etagA2);
+        assert.notEqual(etagA, etagA2);
+
+        const res = await handleRequest(
+            db,
+            req(
+                'GET',
+                path + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assert.equal(res.status, 200);
+        const rows = await res.json() as HistoryEvent[];
+        assert.equal(rows.length, 3);
+        const etags = rows.map((row) => row.etag);
+        assert.deepEqual(etags, [etagA2, etagB, etagA]);
+        assert.equal(new Set(etags).size, 3);
+        for (const etag of etags) {
+            assert.equal(isIdentifier(etag ?? ''), true);
+        }
+        assert.equal('version' in rows[0]!, false);
     },
 );
 

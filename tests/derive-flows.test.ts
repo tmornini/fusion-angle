@@ -23,7 +23,7 @@ import { generateIdentifier } from
 // only) does not exercise. MECHANISM: flows are the LOCKED
 // class (Decision 7) — a SECOND PUT to an existing flow is
 // non-genesis and must thread If-Match via a header-
-// capable req helper (echo the first PUT's 64-hex ETag),
+// capable req helper (echo the first PUT's pair-id ETag),
 // unlike the bare-req idiom the
 // organizations/AjdvjuECVZEgZoFajaIEkg/ideas/projects skew tests
 // use.

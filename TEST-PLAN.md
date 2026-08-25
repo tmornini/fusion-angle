@@ -48,8 +48,9 @@ other coordination state is read or written.
 
 BLOCKED ≠ FAIL. BLOCKED is reserved for known MCP
 environmental limits (pointer-capture gestures,
-`resize_window`, file I/O, sandbox EPERM) — never used
-to mask a real failure.
+`resize_window`, file I/O, sandbox EPERM, one
+selected page) — never used to mask a real
+failure.
 
 ### Sub-agent invocation contract
 
@@ -155,7 +156,8 @@ a K-hunter case on the parallel path.
   document order including K8 inside K, then J.
   Headers are not consulted. Serial does not
   mint garden rows (AA and E7) and does not
-  wipe to `--bootstrap`.
+  wipe to `--bootstrap` except K8 (then
+  restore `--mock-data`).
 - **Parallel (default)**: the same A1–A2. Grant Chrome
   origin `http://localhost` before anything else. A3
   `./postgres-wipe --postgres local` then
@@ -168,6 +170,15 @@ a K-hunter case on the parallel path.
   contexts (one Chrome profile, one cookie
   jar, one selected page). Each hunter
   deletes site data for the origin first.
+  After each hunter: delete site data.
+  Stolen-tab rule as C4/C7/R14: empty
+  bind picker, `data-empty` rows, or
+  0/0/1 tiles are stolen-tab paint.
+  BLOCKED (MCP selected-page) only if
+  the chip names another section's
+  admin. Otherwise FAIL. Do not treat
+  parallel-MCP noise as a product bug
+  unless a serial C or R pin fails.
   The CLI belt is the parallel layer.
   Then K8 (wipe/reseed of the shared DB; no
   hunter still running). Then J. Then summary
@@ -213,6 +224,7 @@ Master never re-dispatches a hunter to retry.
   render. When the fixture succeeds and the SVG renders
   the expected end state, the case is **PASS** with the
   note `verified via pair fixture` — NOT BLOCKED.
+  WB5a graph repair is pair fixture + reload.
   `BLOCKED` is reserved for cases where neither gesture
   nor fixture produces a verifiable end state.
 - **List-row drag-reorders** (E11 projects, D36/D37
@@ -230,6 +242,7 @@ Master never re-dispatches a hunter to retry.
   a descendant's computed `display`. Never
   hand-`fetch` the API from `javascript_tool` —
   the bearer is memory-only; read the network
+  log. V7 reads grant 403 from the network
   log. WB16 reads the work-order history from
   the network log, never a hand `fetch`. Toasts
   via one `javascript_tool` call on
@@ -294,6 +307,18 @@ Master never re-dispatches a hunter to retry.
   `tabs_context_mcp({ createIfEmpty: true })` to allocate a
   fresh group, then proceed. Pre-existing tab IDs from
   before the dissolution are invalidated.
+- **One selected page (stolen-tab).** This MCP
+  has one Chrome profile, one cookie jar, one
+  selected page. After each hunter: delete
+  site data. Empty bind picker, `data-empty`
+  rows, or 0/0/1 tiles on C — or toast
+  "work order has no instance binding" on
+  R14's named subject — is stolen-tab
+  paint. If the chip names another
+  section's admin: BLOCKED (MCP
+  selected-page). Otherwise FAIL. Do not
+  treat parallel-MCP noise as a product
+  bug unless a serial C or R pin fails.
 - **`javascript_tool` async/await blocked by CSP**: the app
   ships `script-src 'self'` with no `unsafe-eval`, so the
   tool's async/IIFE wrapper throws `await is not defined`.
@@ -1135,6 +1160,12 @@ depends: A
   4 ideas, 3 projects, 1 flow, 4 objectives;
   both approved projects score every objective.
   A `—` Impact or a `data-empty` row is a FAIL.
+  Delete site data, sign in as this slice's
+  admin, wait ≥14s, then assert C4/C7.
+  0/0/1 tiles or `data-empty` rows on C
+  are stolen-tab paint. If the chip names
+  another section's admin: BLOCKED (MCP
+  selected-page). Otherwise FAIL.
 - [ ] **C5** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
 - [ ] **C6** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
 - [ ] **C7** Check that seed data populates all 4 dashboard
@@ -1157,6 +1188,12 @@ depends: A
   projects, 1 flow, 4 objectives; both approved
   projects score every objective. A `—` Impact or
   a `data-empty` row is a FAIL.
+  Delete site data, sign in as this slice's
+  admin, wait ≥14s, then assert C4/C7.
+  0/0/1 tiles or `data-empty` rows on C
+  are stolen-tab paint. If the chip names
+  another section's admin: BLOCKED (MCP
+  selected-page). Otherwise FAIL.
 
 ---
 
@@ -1207,34 +1244,60 @@ depends: A
   (`WurwPqXxGtLhRAoCEcPzfQ`) on Wayne. Select
   Wayne Enterprises in the sidebar footer
   `.org-switcher` (G36) — it is not on the
-  Stark list. PASS: the control is visible;
-  clicking it navigates to `ideas/convert.html`.
-  That click does **not** promote (D24 does).
+  Stark list. PASS: both Convert controls are
+  visible; one click (list or detail) navigates
+  to `ideas/convert.html`. That click does
+  **not** promote (D24 does). Then select Stark
+  Industries in `.org-switcher` before D17–D19.
   Parallel: a slice-garden `approved` idea,
   same control, same PASS.
 - [ ] **D17** Navigate to `ideas/detail.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows error state, no unhandled JS exception.
 
 ### Idea Detail — Submit for Review
 
-- [ ] **D18** Navigate to an idea with status "active". PASS: "Submit for Review" button is visible in the header area.
-- [ ] **D19** Click "Submit for Review". PASS: toast "Submitted for review", navigates to the ideas list, and the idea's status badge there now reads "In Review".
+- [ ] **D18** Navigate to an idea with status
+  "active". Serial: leftover `active` is
+  Stark — Predictive Maintenance System or
+  Smart Inventory Optimization. Parallel: a
+  slice-garden `active` idea. PASS: "Submit
+  for Review" button is visible in the
+  header area.
+- [ ] **D19** Click "Submit for Review". PASS:
+  toast "Submitted for review", navigates to
+  the ideas list, and the idea's status badge
+  there now reads "In Review". Serial: stay
+  on D18's Stark `active` leftover.
 
 ### Idea Detail — Sent Back Re-Submit
 
-- [ ] **D20** Navigate to an idea with status "sent_back" (after a reviewer sends it back). PASS: "Submit for Review" button is visible, allowing re-submission.
-- [ ] **D21** Click "Edit", modify a field, click "Save". PASS: idea updates. Click "Submit for Review". PASS: navigates to the ideas list with the idea now "In Review".
+- [ ] **D20** Navigate to an idea with status
+  "sent_back" (after a reviewer sends it
+  back). Serial: org-switch to Wayne
+  Enterprises in `.org-switcher` (G36).
+  Leftover `sent_back` is Employee Training
+  Assistant (`IjrYiSuRyjkQaqiRLhadAg`).
+  Parallel: a slice-garden `sent_back` idea.
+  PASS: "Submit for Review" button is
+  visible, allowing re-submission.
+- [ ] **D21** Click "Edit", modify a field,
+  click "Save". PASS: idea updates. Click
+  "Submit for Review". PASS: navigates to
+  the ideas list with the idea now "In
+  Review". Serial: leftover is Wayne
+  Employee Training Assistant; stay on
+  Wayne for D22.
 
 ### Idea Convert (`ideas/convert.html`)
 
 - [ ] **D22** Navigate to
   `ideas/convert.html?ideaId=<id>` for a
-  convertible idea. Serial: Automated Report
-  Generation (`WurwPqXxGtLhRAoCEcPzfQ`) on
-  Wayne (org-switch `.org-switcher` / G36 if
-  not already on Wayne; D16 verified this
-  leftover). Parallel: a slice-garden
-  `approved` idea. PASS: page loads with
-  conversion form showing 4 required fields:
+  convertible idea. Serial: stay on Wayne
+  Enterprises after D21. Automated Report
+  Generation (`WurwPqXxGtLhRAoCEcPzfQ`) —
+  D16 verified this leftover. Parallel: a
+  slice-garden `approved` idea. PASS: page
+  loads with conversion form showing 4
+  required fields:
   Project Name, Time (label "Time", unit
   "days" as the input suffix; field key
   `time-days`), Cost, Success Criteria (it
@@ -1271,6 +1334,8 @@ depends: A
   lifecycle state becomes `promoted` (list
   badge label **Promoted**, not "Approved") —
   convert is a promotion, not a re-approve.
+  Then select Stark Industries in
+  `.org-switcher` before D25–D30.
 
 ### Idea Status Filtering (`ideas/index.html`)
 
@@ -2000,9 +2065,11 @@ depends: A
 - [ ] **WB4** Click "+ Create Work Order". PASS:
   a dropdown opens with up to two labeled
   sections — `READY` (clickable rows, one per
-  publishable flow including `WB Test Flow`) —
-  Serial: READY is exactly Customer Onboarding and
-  Lead-to-Close; NOT READY is Fusion Angle Flow (16)
+  publishable flow) — Parallel: READY includes
+  `WB Test Flow` as today — Serial: READY is
+  exactly Customer Onboarding and Lead-to-Close
+  (never a third from AA26/E7); NOT READY is
+  Fusion Angle Flow (16)
   and Layout Test: Proposal Review Cycle (15), as
   `tests/mock-flow-readiness.test.ts` pins — and
   `NOT READY` (disabled rows for any flow with
@@ -2023,14 +2090,14 @@ depends: A
   (8-char hex) is visible in the header. Serial:
   click Customer Onboarding; the first post-start
   state is "Data Capture".
-- [ ] **WB5a** Edit `WB Test Flow` to remove the
-  outgoing edge from `Capture` (creating a dead
-  end). Return to Workbox, open the Create Work
-  Order dropdown. PASS: `WB Test Flow` now
-  appears in the `NOT READY` section with
-  subtitle "1 node needs attention". Restore the
-  edge and verify it returns to `READY`. Serial:
-  remove the `submit` edge from Data Capture.
+- [ ] **WB5a** Remove the outgoing `submit` edge
+  via pair fixture (no port-drag). Reload Workbox
+  and open Create Work Order. PASS: the subject
+  sits in `NOT READY` with subtitle "1 node needs
+  attention" (`verified via pair fixture`).
+  Restore the same pair, reload. PASS: the
+  subject returns to `READY`. Parallel: `WB Test
+  Flow` / Capture. Serial: Data Capture `submit`.
 - [ ] **WB5b — Server-side gate.** The server-side
   gate is covered by
   `tests/adapters-flow-publish.test.ts`
@@ -2092,6 +2159,31 @@ depends: A
   Active tab (unclaimed). Serial: bind an instance,
   fill Company Name and Contact Email, click
   `submit` → Review.
+- [ ] **WB16** On this same load's network log —
+  do not navigate again — assert the binding PUT,
+  the transition POST (instance shape), and the
+  history GET. Never `javascript_tool` `fetch`
+  (bearer is memory-only). PASS: the work-order
+  document message pair head carries `display_id`
+  and `flow_graph` JSON; the binding PUT is at
+  `work-orders/:id/binding` with
+  `{instance_id, record_type_id}`; value-bearing
+  transitions are `work-orders/:id/transition`
+  operation message pairs whose body is the
+  **instance shape** (`targetState`, `instance_id`,
+  `record_type_id`, `set`/`clear` delta, `release`,
+  `transitionAt` — no `fieldValues` bag) and carry
+  strong If-Match against the instance etag; pure
+  moves omit `set`/`clear`/`instance_id`/
+  `record_type_id` and send no If-Match; a sibling
+  instance revision pair advances the head when
+  the transition was value-bearing. Derived WO
+  history is `(at, id)` DESC (index 0 = current)
+  with one non-claim event per transition
+  (`entity_id` = work-order id, `state` = target
+  node id, `member_id` = actor, `at` = RFC-3339
+  Zulu). Live form values come from the instance
+  head, not a history fold.
 - [ ] **WB12** Click the work order row in the
   Active tab. PASS: work order PUTs
   `work-orders/:id/claim` (201) and the browser
@@ -2116,6 +2208,47 @@ depends: A
   `entity_id` (inspect via
   `GET work-orders/:id/history` or the matching
   operation message pairs). No shared event-append write is involved.
+- [ ] **WB19** Subject: the bound Active WO from
+  WB11–WB13 (still Active; WB14 archives it).
+  Skipping because "WO already archived" is FAIL.
+  After transitioning a work order through at
+  least two states, read the derived history
+  (`GET work-orders/:id/history` or the matching pairs in
+  `message_pairs`) for this work order's id. PASS:
+  rows are `(at, id)` DESC (index 0 = current); each
+  non-claim event has the immutable shape `{id, entity_id,
+  state, member_id, at, field_values}`, with `state`
+  carrying the target node's identifier. Live values live
+  on the instance head; history `field_values` may be
+  empty for new-shape transitions. Verify no app code
+  path mutates an existing pair — the message plane is
+  append-only.
+- [ ] **WB19a — Two-tab 412 on the action screen.**
+  Subject: the same bound Active WO from WB11–WB13;
+  skipping because "WO already archived" is FAIL.
+  Bind a work order to an instance. Open the action
+  screen in two tabs. In tab 2, change an instance
+  value via the records detail instance editor (or a
+  second transition) so the head etag advances. In
+  tab 1, edit a value and transition. PASS: tab 1
+  receives 412, re-GETs the instance, re-presents the
+  action screen with a conflict notice and a warning
+  toast ("This instance changed underneath you —
+  values refreshed; re-apply your edit"),
+  and does **not** auto-retry the transition.
+- [ ] **WB19b — Direct instance PATCH vs transition
+  412 convergence.** Subject: the same bound Active
+  WO from WB11–WB13; skipping because "WO already
+  archived" is FAIL. With a bound WO open on the
+  action screen, PATCH the same instance from the
+  record detail UI (save) so the head advances; then
+  attempt a value-bearing transition on the stale
+  action screen. PASS: same 412 recovery shape as
+  WB19a (re-present + warning toast). Conversely,
+  after a successful value-bearing transition, a
+  stale instance edit on record detail also 412s and
+  recovers — both writers share the instance etag
+  covenant.
 
 ### Workbox — Completion
 
@@ -2132,29 +2265,6 @@ depends: A
 
 ### Workbox — Data Integrity
 
-- [ ] **WB16** After binding an instance and
-  transitioning with value changes, inspect
-  `message_pairs` (or derived
-  `GET work-orders/:id/history` and the instance
-  head). PASS: the work-order document message pair head
-  carries `display_id` and `flow_graph` JSON; the
-  binding PUT is at `work-orders/:id/binding` with
-  `{instance_id, record_type_id}`; value-bearing
-  transitions are `work-orders/:id/transition` operation
-  message pairs whose body is the **instance shape**
-  (`targetState`, `instance_id`, `record_type_id`,
-  `set`/`clear` delta, `release`, `transitionAt` —
-  no `fieldValues` bag) and carry strong If-Match
-  against the instance etag; pure moves omit
-  `set`/`clear`/`instance_id`/`record_type_id` and
-  send no If-Match; a sibling instance revision
-  pair advances the head when the transition was
-  value-bearing. Derived WO history is `(at, id)`
-  DESC (index 0 = current) with one non-claim event
-  per transition (`entity_id` = work-order id,
-  `state` = target node id, `member_id` = actor,
-  `at` = RFC-3339 Zulu). Live form values come from
-  the instance head, not a history fold.
 - [ ] **WB17** Navigate away from the action
   screen and return. PASS: all data persists
   correctly across page navigation.
@@ -2171,40 +2281,6 @@ depends: A
   in place). Inspect via `message_pairs` or derived
   `GET work-orders/:id/history` (DESC; claim rows carry
   `field_values: []`).
-- [ ] **WB19** After transitioning a work order through at
-  least two states, read the derived history
-  (`GET work-orders/:id/history` or the matching pairs in
-  `message_pairs`) for this work order's id. PASS:
-  rows are `(at, id)` DESC (index 0 = current); each
-  non-claim event has the immutable shape `{id, entity_id,
-  state, member_id, at, field_values}`, with `state`
-  carrying the target node's identifier. Live values live
-  on the instance head; history `field_values` may be
-  empty for new-shape transitions. Verify no app code
-  path mutates an existing pair — the message plane is
-  append-only.
-- [ ] **WB19a — Two-tab 412 on the action screen.**
-  Bind a work order to an instance. Open the action
-  screen in two tabs. In tab 2, change an instance
-  value via the records detail instance editor (or a
-  second transition) so the head etag advances. In
-  tab 1, edit a value and transition. PASS: tab 1
-  receives 412, re-GETs the instance, re-presents the
-  action screen with a conflict notice and a warning
-  toast ("This instance changed underneath you —
-  values refreshed; re-apply your edit"),
-  and does **not** auto-retry the transition.
-- [ ] **WB19b — Direct instance PATCH vs transition
-  412 convergence.** With a bound WO open on the
-  action screen, PATCH the same instance from the
-  record detail UI (save) so the head advances; then
-  attempt a value-bearing transition on the stale
-  action screen. PASS: same 412 recovery shape as
-  WB19a (re-present + warning toast). Conversely,
-  after a successful value-bearing transition, a
-  stale instance edit on record detail also 412s and
-  recovers — both writers share the instance etag
-  covenant.
 
 ### Workbox — All-See-All Visibility
 
@@ -2358,34 +2434,8 @@ depends: A
   Organization Name and Domain.
   (There is no health score — the retired 92/"excellent"
   badge has been removed.)
-- [ ] **V8 — Organization "Sent invitations" section + Revoke
-  (admin)** As an org admin with ≥1 outstanding invitation
-  granted (V1), on `organization/index.html` confirm a "Sent
-  invitations" section (`#sent-invitations-box`, h2 "Sent
-  invitations") appears below the cards, listing one row per
-  PENDING org invitation (`#sent-invitations-list`) — each row
-  shows the invitee EMAIL, an "Invited {date}" sub-line, a
-  state badge, and a Revoke button. PASS: the section is
-  VISIBLE only when the admin read succeeds (it boots hidden
-  and reveals on success). Click Revoke on a row. PASS: an
-  "Invitation revoked" toast fires and the row leaves the
-  pending list (a 'revoked' event supersedes the pending; the
-  invitation row persists as audit, and the invitee's pending
-  list — V3/V4 — no longer shows it). With no outstanding
-  invitations, the list shows "No outstanding invitations."
-  Revoke is idempotent (re-revoke → 204). Source:
-  `web-app/organization/index.ts` (`renderSentInvitations` /
-  `onSentInvitationClick`), `SentInvitationsPresenter`,
-  `revokeInvitation`.
-- [ ] **V9 — Sent-invitations section is admin-only** Sign in
-  as a NON-admin member and open `organization/index.html`.
-  PASS: the admin Sent-invitations read fails (403 "forbidden:
-  listing sent invitations requires an admin role") and the
-  section stays HIDDEN — the read rejects before the reveal
-  line, so the box never un-hides, and no Revoke affordance is
-  offered to a non-admin. (Pairs with V7's grant/revoke 403s.)
-  Source: `sentInvitations` admin guard in
-  `api/invitations-domain.ts`.
+  V8 (Sent invitations + Revoke) and V9 (admin-only)
+  run in the invitation walk after V5, beside V7.
 
 ### Members list (`members/index.html`)
 
@@ -2425,10 +2475,13 @@ depends: A
   filter chip. PASS: only the HUMANS group is visible.
   Click AIs. PASS: only the AIs group is visible. Click
   All. PASS: both groups return.
-- [ ] **G14** Click `+ Add Member`. PASS: dialog opens with
-  the Kind toggle defaulting to Human, the Human form
-  visible, and the AI form hidden. Switch the toggle to
-  AI. PASS: the Human form hides, the AI form appears
+- [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar plus "Service account" + "—" (agents are not identities), then a "Service" badge. Serial (A3 `--mock-data`, demo admin's active organization Stark): the nested PII fence (viaMembership, need-to-know) hides the five org-2-only persons: the list renders 6 named person rows (Emily Rodriguez, Sarah Chen, Lisa Wang, Marcus Johnson, Tony Stark, Jessica Park), 5 "Identity without PII" person rows (the org-2-only members: David Martinez, Alex Kim, Mike Thompson, David Kim, James), and 1 service row (the system service identity). Parallel (A3 `--test-plan-slices`): `identities/` is global (`organizationNested: false`) and the seed is one DB for all 14 slices, so the hunter sees bootstrap current + the system service identity + every slice admin + the B/G/SV extras — not a five-name closed G roster. `getIdentityRoster` GETs identities only — the G extras AI agent is `ai-agents/:id`, not an identity row, so no agent appears on the list. Named G people: G admin, `G Member`, `G Unseated`, plus the system service identity; other-slice people often render as "Identity without PII" (PII 403). An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
+- [ ] **G14** Return to `members/index.html` (G43 left
+  the hunter on Identities). Click `+ Add Member`. PASS:
+  dialog opens with the Kind toggle defaulting to Human,
+  the Human form visible, and the AI form hidden. Switch
+  the toggle to AI. PASS: the Human form hides, the AI
+  form appears
   with a Model pulldown and a Skill Focus textarea; no
   Auth Token field or security warning. Create Human
   writes `PUT /identities/:id` plus PII and `PUT`s a
@@ -2472,9 +2525,9 @@ depends: A
   text "Invite an existing person to this organization", a
   Cancel and a "Send invitation" submit (`#invite-member-
   submit`). Enter the email of an EXISTING identity who is NOT
-  yet a member of the inviting org. Serial: a Wayne-only
-  seeded human's email. Parallel: `unseated_username`
-  (`g-unseated@test-plan.example`).
+  yet a member of the inviting org. This grant is invitation
+  A. Serial: `david.martinez@company.com` (Wayne-only).
+  Parallel: `g-unseated@test-plan.example`.
   Click "Send invitation". PASS: an "Invitation sent" toast
   fires, the dialog closes, and the email field is cleared.
   The grant is idempotent — sending the same email again while
@@ -2492,9 +2545,22 @@ depends: A
   (the 409 maps to an 'already-member' outcome). The "Failed
   to invite: …" toast fires only on an unexpected server fault.
   In all three the dialog stays usable and no pending
-  invitation is created. Source: `setInviteEmailError` in
+  invitation is created. Leftover: does not consume
+  invitation A (V1). Source: `setInviteEmailError` in
   `web-app/members/index.ts`; `grantInvitation` guards in
   `api/invitations-domain.ts`.
+- [ ] **V6 — Org fence: a pending invite is invisible until
+  accepted** While the V1 invitation is still PENDING (before
+  V4), confirm the org fence holds: the invitee is NOT in the
+  inviting org's Members roster (the roster derives from
+  seats, and no seat exists yet), and the
+  inviting org is NOT reachable by the invitee — it does not
+  appear in their sidebar org `<select>` and boot will not
+  scope a token to it (a pending invitation grants no
+  seat). Do not Accept — V4 owns the accepted half.
+  PASS: pending ⇒ not in roster, not reachable. Source:
+  the org fence (`resolveOwningOrganization` via
+  `writeAuthorizerFor`), `acceptInvitation`.
 - [ ] **V3 — Top-bar pending-invitations bell → invitations
   page** As an identity with ≥1 pending invitation (the V1
   invitee, signed in), confirm the top bar shows a bell
@@ -2535,8 +2601,14 @@ depends: A
   seat document message pair + invitations/:id/acceptance
   operation message pair via `appendMessagePair`).
 - [ ] **V5 — Decline appends declined, writes no seat**
-  As an invitee with a fresh pending invitation, on
-  `invitations/` click Decline. PASS: an "Invitation declined"
+  Grant invitation B first (V4 consumed A). On
+  `members/index.html` as an org admin, Invite member
+  with a fresh EXISTING identity who is not a member of
+  the inviting org. Serial: `alex.kim@company.com`
+  (Wayne-only). Parallel: `r-member@test-plan.example`
+  (seated in r-org, not G). PASS: "Invitation sent"
+  toast. Sign in as that invitee. On `invitations/`
+  click Decline. PASS: an "Invitation declined"
   toast fires, the row leaves the pending list, and NO
   seat is written (the declined org does NOT appear in
   the sidebar switcher and its rows stay unreachable). With no
@@ -2544,50 +2616,66 @@ depends: A
   state "No invitations." and the top-bar bell disappears
   (V3). Decline is idempotent (re-decline → 204). Source:
   `postInvitationDecline`, `declineInvitation`.
-- [ ] **V6 — Org fence: a pending invite is invisible until
-  accepted** While the V1 invitation is still PENDING (before
-  V4), confirm the org fence holds: the invitee is NOT in the
-  inviting org's Members roster (the roster derives from
-  seats, and no seat exists yet), and the
-  inviting org is NOT reachable by the invitee — it does not
-  appear in their sidebar org `<select>` and boot will not
-  scope a token to it (a pending invitation grants no
-  seat). Only after Accept (V4) does the seat
-  appear and the org become reachable. PASS: pending ⇒ not in
-  roster, not reachable; accepted ⇒ both. Source: the org
-  fence (`resolveOwningOrganization` via
-  `writeAuthorizerFor`), `acceptInvitation`.
+- [ ] **V8 — Organization "Sent invitations" section + Revoke
+  (admin)** Grant invitation C if none is pending (V4
+  consumed A; V5 declined B). On `members/index.html` as
+  an org admin, Invite member. Serial:
+  `mike.thompson@company.com` (Wayne-only). Parallel:
+  `sv-member@test-plan.example`. PASS: "Invitation sent"
+  toast. Then on `organization/index.html` confirm a "Sent
+  invitations" section (`#sent-invitations-box`, h2 "Sent
+  invitations") appears below the cards, listing one row per
+  PENDING org invitation (`#sent-invitations-list`) — each row
+  shows the invitee EMAIL, an "Invited {date}" sub-line, a
+  state badge, and a Revoke button. PASS: the section is
+  VISIBLE only when the admin read succeeds (it boots hidden
+  and reveals on success). Click Revoke on C. PASS: an
+  "Invitation revoked" toast fires and the row leaves the
+  pending list (a 'revoked' event supersedes the pending; the
+  invitation row persists as audit, and the invitee's pending
+  list — V3/V4 — no longer shows it). With no outstanding
+  invitations, the list shows "No outstanding invitations."
+  Revoke is idempotent (re-revoke → 204). Source:
+  `web-app/organization/index.ts` (`renderSentInvitations` /
+  `onSentInvitationClick`), `SentInvitationsPresenter`,
+  `revokeInvitation`.
 - [ ] **V7 — Authz: non-admin grant/revoke rejected; invitee
   may still read & accept** Sign in as a NON-admin member of
-  an org (a seeded human with no admin role). PASS: any
-  attempt to grant — POST `invitations` (the path behind the
-  Invite dialog) — is rejected with "forbidden: POST
-  /organizations/<orgId>/invitations/ requires a role this
-  principal lacks" (403), and the
-  Organization page's Sent-invitations admin read fails and
-  the section stays hidden (V9), so no Revoke is offered; a
-  forced revoke — PUT
-  `/organizations/<orgId>/invitations/<invitationId>`
-  with `{state: "revoked"}` — is rejected with
-  "forbidden: PUT /organizations/<orgId>/invitations/
-  <invitationId> requires a role this principal lacks"
-  (403). YET the SAME role-
-  less identity, when it is the INVITEE, CAN read its own
-  invitations (the bell + `invitations/` work — the read is
-  identity-scoped, not admin-gated) and CAN Accept/Decline its
-  own invitation (V4/V5). PASS: grant/revoke require admin;
-  read/accept/decline require only being the invitee. Source:
-  the absent `MEMBER_VERBS` row for the org invitation nest
-  (`api/authorization.ts`) and `authorizeRequest`
-  (`api/request-auth.ts`), which 403s before any handler;
-  the invitee read/accept/decline paths ride the identity
-  nest.
+  an org (a seeded human with no admin role). Open the
+  Invite dialog (`#invite-member-btn`) and submit a grant.
+  Read the 403 from the **network log** on this load —
+  never `javascript_tool` `fetch` (the bearer is
+  memory-only). PASS: the grant POST is rejected with
+  "forbidden: POST /organizations/<orgId>/invitations/
+  requires a role this principal lacks" (403). The
+  Organization page's Sent-invitations admin read fails
+  and the section stays hidden (V9), so no Revoke is
+  offered. YET the SAME role-less identity, when it is
+  the INVITEE, CAN read its own invitations (the bell +
+  `invitations/` work — the read is identity-scoped, not
+  admin-gated) and CAN Accept/Decline its own invitation
+  (V4/V5). PASS: grant/revoke require admin;
+  read/accept/decline require only being the invitee.
+  Source: the absent `MEMBER_VERBS` row for the org
+  invitation nest (`api/authorization.ts`) and
+  `authorizeRequest` (`api/request-auth.ts`), which 403s
+  before any handler; the invitee read/accept/decline
+  paths ride the identity nest.
   Parallel (A3 `--test-plan-slices`): run before G46
   so `G Member` still has PII and can sign in; the
   invitee half is granted from the second G
   organization (`org2_*`). Serial (A3 `--mock-data`,
   demo admin's active organization Stark): any
   seeded non-admin human.
+- [ ] **V9 — Sent-invitations section is admin-only** Sign in
+  as a NON-admin member and open `organization/index.html`.
+  PASS: the admin Sent-invitations read fails (403 "forbidden:
+  listing sent invitations requires an admin role") and the
+  section stays HIDDEN — the read rejects before the reveal
+  line, so the box never un-hides, and no Revoke affordance is
+  offered to a non-admin. (Pairs with V7's grant/revoke 403s.)
+  Source: `sentInvitations` admin guard in
+  `api/invitations-domain.ts`.
 
 ### Member detail — Human (`members/detail.html?memberId=<hw_*>`)
 
@@ -2642,8 +2730,10 @@ depends: A
 
 ### Identities (list & detail) (`identities/`, `identities/detail.html`)
 
-- [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar plus "Service account" + "—" (agents are not identities), then a "Service" badge. Serial (A3 `--mock-data`, demo admin's active organization Stark): the nested PII fence (viaMembership, need-to-know) hides the five org-2-only persons: the list renders 6 named person rows (Emily Rodriguez, Sarah Chen, Lisa Wang, Marcus Johnson, Tony Stark, Jessica Park), 5 "Identity without PII" person rows (the org-2-only members: David Martinez, Alex Kim, Mike Thompson, David Kim, James), and 1 service row (the system service identity). Parallel (A3 `--test-plan-slices`): `identities/` is global (`organizationNested: false`) and the seed is one DB for all 14 slices, so the hunter sees bootstrap current + the system service identity + every slice admin + the B/G/SV extras — not a five-name closed G roster. `getIdentityRoster` GETs identities only — the G extras AI agent is `ai-agents/:id`, not an identity row, so no agent appears on the list. Named G people: G admin, `G Member`, `G Unseated`, plus the system service identity; other-slice people often render as "Identity without PII" (PII 403). An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
-- [ ] **G44** Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → two sequential requests (POST `identities` `{id, kind}`, then PUT `identities/:id/pii` carrying the PII fields), an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email); a second-hop failure toasts a partial-state message naming the PII-less identity rather than a blanket create failure. Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
+G43 ran before G14 (closed roster snapshot). Do not
+re-pin the closed 6+5+1 count.
+
+- [ ] **G44** Navigate to `identities/index.html`. Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → two sequential requests (POST `identities` `{id, kind}`, then PUT `identities/:id/pii` carrying the PII fields), an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email); a second-hop failure toasts a partial-state message naming the PII-less identity rather than a blanket create failure. Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
 - [ ] **G45** From the roster, click a person row (`.card[data-identity-id]`). PASS: navigates to `identities/detail.html?identityId=<id>`, which renders the back button (`#identity-back-btn`), the name + a kind badge + the id, a "Personal Information" card (Name/Email/Phone/Bio — each empty field rendered as "—" via `DISPLAY_ABSENT`), a "Connections" card (Identity Providers / Tokens buttons), and — for a person — an "Erase PII" button (`#identity-erase-btn`). A service identity instead shows a "Credentials" card and NO erase button (only persons carry erasable PII). Source: `web-app/identities/index.ts` (`onListClick`), `web-app/identities/detail.ts`, `web-app/app/presenters/identity-detail.ts`.
 - [ ] **G46** On `G Erasable`'s identity detail (parallel — never the G admin and never `G Member`; serial: any person row that is not the signed-in admin), click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The surviving pair at the address is the bodyless DELETE tombstone (head). Erased name remains in superseded pairs; derived reads and login show none. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
 - [ ] **G47** On the system service identity's detail page (admin session), a "Client registration" card renders before Credentials showing "Not registered." and a "Register client" button (`data-identity-action="registration"`). Click it → the `client-registration-dialog` opens; fill Grant types `client_credentials`, Audience `fusion-angle`, JWKS `{"keys":[]}`, leave Status Active, Save (`#client-registration-submit`) → "Client registration saved" toast, dialog closes, the card shows an `active` pill (`data-tone="success"`) plus Grant types / Redirect URIs / Audience / JWKS fields, and the button reads "Manage registration". Re-open, change JWKS, Save → the card reflects the new JWKS (rotate = same PUT-overwrite). Re-open, set Status Disabled, Save → `disabled` pill (`data-tone="warning"`). Re-open → a "Deregister" button (`#client-registration-deregister`, hidden while unregistered) is visible; click it → "Client registration removed" toast and the card returns to "Not registered." Empty Grant types / Audience / JWKS shows "Grant types, audience, and JWKS are required" and keeps the dialog open. Cancel (`data-dialog-cancel="client-registration"`) discards edits. Source: `web-app/identities/detail.ts` (`saveRegistration` / `deregisterClient`), `web-app/app/presenters/identity-detail.ts` (`buildRegistrationCard`). Wire: PUT|GET|DELETE `identities/:id/registration` (admin realm; kind gate 404/400).
@@ -2867,6 +2957,12 @@ by stopping again, `./postgres-wipe --postgres
 local`, then `./postgres-seed --postgres local
 --mock-data`, then start.
 
+Serial: do not skip — this is the named
+`--bootstrap` exception (then restore
+`--mock-data`). After restore, K9 sees a
+fresh mock garden (Market Sentiment
+Analyzer is `submitted` again).
+
 ### K9–K18 — Project detail: inline scoring + Approve (Agent-E)
 
 The Score and Log-measurement MODALS are retired. Baseline
@@ -2884,7 +2980,16 @@ unscored→score→approve path you need a project created
 WITHOUT baselines (converted when no objectives existed, or
 seeded directly).
 
-**K9.** Open a `submitted` project; confirm the header
+**K9.** Open a `submitted` project. Serial:
+after K8 restore, open Market Sentiment
+Analyzer (`PIfhHMLQQxTxKFDdabXbOw`,
+`submitted`) on Stark. AA24a may have
+approved it during AA; K8 restore returns
+it. If it is already `approved` and K8 did
+not run, org-switch to Wayne and open
+Wayne R&D Portfolio (org-2 `submitted`) —
+do not invent a garden. Parallel: a slice
+`submitted` project. Confirm the header
 actions slot shows Edit (`#project-edit-btn` in
 `.project-actions-slot`) and the review action bar
 (`#project-review-actions` / `.action-bar`) shows Approve /
@@ -2896,7 +3001,12 @@ pre-approval states submitted/under_review/sent_back).
 
 **K10.** Transition status to `under_review` via the edit
 form. PASS if the baseline sliders remain editable inline —
-there is NO Score button and NO modal.
+there is NO Score button and NO modal. Leftover: stay on
+K9's subject. Do not approve or archive K26's serial
+queue (Workforce Capacity Forecasting, Predictive
+Maintenance System, Employee Training Assistant) or
+the parallel slice ids `k-project-under-review` /
+`k-project-under-review-2`.
 
 **K11.** With baselines unscored, the `Approve` button is
 disabled with a tooltip prefixed "Set a baseline score
@@ -2928,7 +3038,8 @@ baseline.
 **K16.** Click Approve; confirm dialog opens. Confirm. PASS
 if status flips to `approved` and the action bar re-renders
 with `Archive` / `View history`; the row `.actual-slider`s
-become editable inline.
+become editable inline. Leftover: do not Approve K26's
+serial queue or the parallel K26 slice ids.
 
 **K17.** Negative-score path: on an under_review project,
 drag a baseline slider to the far left (-100). Save. PASS if
@@ -2963,7 +3074,8 @@ Archive; PASS if a confirmation dialog opens.
 
 **K23.** Confirm the archive. PASS if status flips to
 `archived` and the action bar reflects the archived
-project.
+project. Leftover: do not Archive K26's serial queue
+or the parallel K26 slice ids.
 
 ### K24–K26 — Projects list Projected Impact column (Agent-E)
 
@@ -2979,12 +3091,17 @@ text.
 re-order accordingly (most-positive first).
 
 **K26.** Filter to `under_review` status + sort by Projected
-Impact descending. Precondition: the K seed carries two
+Impact descending. Parallel: the K seed carries two
 `under_review` projects, each with four baselines and
-distinct Projected Impact values (`k-project-under-review`
-high, `k-project-under-review-2` low). PASS if both rows
-render, ranked high first — the "review queue ranked by
-impact" workflow we designed.
+distinct Projected Impact values
+(`k-project-under-review` high,
+`k-project-under-review-2` low). PASS if both rows
+render, ranked high first. Serial: three seeded
+`under_review` mock projects, high first: Workforce
+Capacity Forecasting, Predictive Maintenance System,
+Employee Training Assistant. Do not require slice ids.
+PASS if those three rows render, ranked high first —
+the "review queue ranked by impact" workflow we designed.
 
 ### K27–K29 — Dashboard Impact + Aggregates (Agent-CH)
 
@@ -3129,15 +3246,35 @@ every other agent, so no write-domain collision.
   failures still surface via
   `WorkboxDetailPresenter.buildViolations` banner.
   Serial (A3 `--mock-data`): the work order is
-  `#gate0001`. Parallel (A3 `--test-plan-slices`):
-  the work order is `#r1`.
+  `#gate0001` (`eOlNZpGQfmCdpSFWXGkzFQ`) at
+  Data Capture, unbound. Only WO01 (`a7c3e1f9`
+  / `xqcXYHXBJJXcLkRYkRngKA`) is
+  instance-bound. Do not bind — leftover
+  stays unbound so empty submit still toasts
+  "Please fill all required attributes"
+  (the seeded Customer Profile instance is
+  Acme, values already set). Parallel (A3
+  `--test-plan-slices`): the work order is
+  `#r1` (already bound).
 - [ ] **R14** Fill Company Name + Contact Email, click
   submit. PASS: transition succeeds; work order advances
   to Review (does NOT demand Reviewer Notes — that is
   current-node only when leaving Review).
   Serial (A3 `--mock-data`): the work order is
-  `#gate0001`. Parallel (A3 `--test-plan-slices`):
-  the work order is `#r1`.
+  `#gate0001`. If still unbound, bind the
+  seeded Customer Profile instance via the
+  bind picker (existing instance, not mint),
+  then fill and submit. Parallel (A3
+  `--test-plan-slices`): the work order is
+  `#r1` (already bound). Bind picker "No
+  instances available" or toast "work order
+  has no instance binding" with this slice's
+  own admin chip is FAIL. Delete site data,
+  sign in as this slice's admin, wait ≥14s,
+  then assert. If the chip names another
+  section's admin: BLOCKED (MCP
+  selected-page). No mint+bind of a new
+  instance. No extra seed row.
 - [ ] **R14a** When a node references a `radio`-typed Record attribute, the workbox work-order detail renders it as a radio group — one `<input type="radio">` per option, all sharing the attribute name so only one is selectable — rather than a dropdown; selecting an option and transitioning records that value. NOTE: seeded mock data predates `radio`, so add a radio attribute, reference it Editable on a working node, and create a work order to exercise this.
 - [ ] **R15** Open the R2-created Record's detail
   page — never Customer Profile (R16–R20 read it).
@@ -3323,7 +3460,8 @@ and Drift Candidates, a one-line BLOCKED list, and fits in
 under 50 lines.
 
 `BLOCKED` is reserved for known MCP environmental limits
-(pointer-capture gestures, `resize_window`, file I/O).
+(pointer-capture gestures, `resize_window`, file I/O,
+one selected page).
 `FAIL` is for real regressions. A case that "mostly passes
 but one subassertion drifts" is scored PASS with the drift
 noted in the Drift Candidates table — the agent surfaces;

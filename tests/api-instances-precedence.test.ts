@@ -18,7 +18,7 @@ import {
 import {
     formWriteMessagePair,
     IF_MATCH_HEADER,
-    HEX64,
+    strongEtagOf,
 } from '../api/message-pair.ts';
 import {
     nowUtc,
@@ -29,8 +29,13 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
+import {
+    deriveInstanceHead,
+} from '../api/derive-record-instances.ts';
 
 // Task 20 covenant suite — 12-step status ladder (earlier
 // step answers) + If-Match / ETag cross-pins. Each pin is
@@ -543,8 +548,7 @@ async () => {
     );
 });
 
-test('document ETag === version; instance projected ETag '
-+ 'is not stored',
+test('instance ETag is the head pair id',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -554,23 +558,18 @@ async () => {
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
     assert.equal(put.status, 201);
-    const messagePairId = put.headers.get('Response-ID')!;
     const res = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
     assert.equal(res.status, 200);
     const header = res.headers.get('ETag');
-    assert.ok(header !== null);
-    assert.match(header.slice(1, -1), HEX64);
-    const stored = await db.messagePairs.getById(messagePairId);
-    assert.ok(stored !== undefined);
-    assert.match(stored.version, HEX64);
-    assert.notEqual(
-        header.slice(1, -1),
-        stored.version,
-        'instance projected ETag is not stored version',
+    const head = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assert.notEqual(messagePairId, stored.version);
+    assert.ok(head !== undefined);
+    assert.ok(header !== null);
+    assert.ok(isIdentifier(header.slice(1, -1)));
+    assert.equal(header, strongEtagOf(head.messagePairId));
 });
 
 test('list-row etag == detail ETag validator sans quotes',
@@ -593,7 +592,7 @@ async () => {
     }[];
     assert.equal(rows.length, 1);
     assert.equal(rows[0]!.id, INSTANCE_ID);
-    assert.ok(HEX64.test(rows[0]!.etag));
+    assert.ok(isIdentifier(rows[0]!.etag));
     const detail = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));

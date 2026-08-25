@@ -43,7 +43,6 @@ const INDEX_FILL: Record<string, string> = {
     address: 'hsl(217 36% 46%)',
     collection: 'hsl(173 42% 32%)',
     replay: 'hsl(32 70% 42%)',
-    version: 'hsl(270 35% 42%)',
     body: 'hsl(350 48% 44%)',
 };
 

@@ -431,7 +431,13 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'aVuvRoPHPHSNWPovkYhZqw');
-    for (const bad of ['*', 'W/"x"', '"a", "b"', 'bare']) {
+    for (const bad of [
+        '*',
+        'W/"x"',
+        '"a", "b"',
+        'bare',
+        '"' + 'b'.repeat(64) + '"',
+    ]) {
         const res = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aVuvRoPHPHSNWPovkYhZqw', token,
@@ -456,7 +462,7 @@ async () => {
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aYDQdfcyFUkOqCLKIIvnww', token,
         documentBody('Stale Match', generateIdentifier()),
-        { 'if-match': '"' + 'b'.repeat(64) + '"' },
+        { 'if-match': '"' + generateIdentifier() + '"' },
     ));
     assert.equal(res.status, 412);
     const body = await res.json() as {
@@ -477,7 +483,7 @@ async () => {
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'awMkvSKFOHJymfXEpFypPw', token,
         documentBody('Ghost', generateIdentifier()),
-        { 'if-match': '"' + 'b'.repeat(64) + '"' },
+        { 'if-match': '"' + generateIdentifier() + '"' },
     ));
     assert.equal(res.status, 412);
     assert.equal(
@@ -519,7 +525,7 @@ test('e2e: a byte-identical resend converges (one event, one'
     assert.ok(stored !== undefined);
     assert.equal(
         second.headers.get('ETag'),
-        strongEtagOf(stored.version),
+        strongEtagOf(stored.id),
     );
     const eventsAfterSecond =
         await deriveFlowStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
@@ -554,7 +560,7 @@ async () => {
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'bACksPDpiYvefaEzSXoaZg', token,
         documentBody('Stale Echo', generateIdentifier()),
-        { 'if-match': '"' + 'b'.repeat(64) + '"' },
+        { 'if-match': '"' + generateIdentifier() + '"' },
     ));
     assert.equal(staleEcho.status, 412);
 
@@ -599,7 +605,7 @@ async () => {
     const etag = await headEtag(db, token, 'bWdlaTZZcKRsLsGXiKQZkw');
     const stored = await db.messagePairs.getById(headId);
     assert.ok(stored !== undefined);
-    assert.equal(etag, strongEtagOf(stored.version));
+    assert.equal(etag, strongEtagOf(stored.id));
     const requests = await db.messagePairs.getAll();
     const atAddress = requests.filter(
         r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'

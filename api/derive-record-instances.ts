@@ -6,11 +6,6 @@ import {
     byIdAscending,
     type DocumentMessagePair,
 } from './derive-documents.ts';
-import {
-    documentVersion,
-    jsonBodyOctets,
-} from './message-form.ts';
-import { ifMatchFromMessage } from './message-pair.ts';
 
 // Instance derive surface — full-state heads (R5 / Task 14).
 // NO fold. Each revision pair stores the COMPLETE value map
@@ -31,7 +26,6 @@ export interface InstanceRevision {
     readonly at: string;
     readonly messagePairId: string;
     readonly values: readonly InstanceValue[];
-    readonly version: string;
 }
 
 export interface InstanceHead {
@@ -66,24 +60,6 @@ export function projectionOmitsStored(
     );
     return stored.some(
         (row) => !visible.has(row.attribute_id),
-    );
-}
-
-export async function instanceParentEtag(
-    db: DbAdapter,
-    messagePairId: string,
-): Promise<string | undefined> {
-    const messagePair = await db.messagePairs.getById(messagePairId);
-    return ifMatchFromMessage(messagePair.request);
-}
-
-export function advertisedInstanceEtag(
-    projectedBody: unknown,
-    matchedEtag?: string,
-): Promise<string> {
-    return documentVersion(
-        jsonBodyOctets(projectedBody),
-        matchedEtag,
     );
 }
 
@@ -255,7 +231,6 @@ export async function deriveInstanceRevisions(
             at: messagePair.at,
             messagePairId: messagePair.id,
             values: revisionValuesOf(messagePair.body),
-            version: messagePair.version,
         });
     }
     return revisions;

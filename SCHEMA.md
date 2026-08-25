@@ -29,9 +29,9 @@ same rows in an in-process Map keyed by table name.
    chronological → the `(at, id)` total order.
 3. **`message_pairs_address`** — head and history for free
    (`uri_collection`, `uri_id`, `response_at`, `id`).
-4. **`message_pairs_version` plus the sha256 chain** —
-   ETag / If-Match and tamper-evident lineage (`version` is
-   64-hex; see `api/message-pair.ts`).
+4. **The pair `id` is the ETag** — If-Match names that
+   identifier; integrity is `request_hash`; lineage is
+   the latched head (`api/message-pair.ts`). No chain.
 5. **`message_pairs_replay`** — idempotent replay on
    `request_hash` (`shared/digest.ts` `sha256HexOfBytes`).
 6. **The CHECK constraints** — Postgres as the storage-edge

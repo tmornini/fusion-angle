@@ -44,11 +44,6 @@ export interface MessageStore {
         collection: string,
         filters: Readonly<Record<string, string>>,
     ): Promise<unknown[]>;
-    getByVersion(
-        collection: string,
-        id: string,
-        version: string,
-    ): Promise<MessagePairEntity | undefined>;
 }
 
 export function messageStore(db: DbAdapter): MessageStore {
@@ -89,13 +84,6 @@ export function messageStore(db: DbAdapter): MessageStore {
             return rows.filter((row) => matchesFilters(
                 row, filters,
             ));
-        },
-        async getByVersion(collection, id, version) {
-            return latestOf(
-                await db.messagePairs.getAllAtVersion(
-                    collection, id, version,
-                ),
-            );
         },
     };
 }

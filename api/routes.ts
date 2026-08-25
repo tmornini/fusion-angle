@@ -187,8 +187,6 @@ import {
     deriveInstanceRevisions,
     mergeInstanceValues,
     instanceGetBody,
-    instanceParentEtag,
-    advertisedInstanceEtag,
     revisionValuesOf,
     type InstanceValue,
 } from './derive-record-instances.ts';
@@ -1593,7 +1591,6 @@ export async function postFlowUndoOp(
         requestAt: messagePair.requestAt,
         operationId: messagePair.operationId,
         organization,
-        matchedEtag: current.version,
         latchedHeadMessagePairId: current.id,
     });
     return db.transaction(
@@ -2302,19 +2299,7 @@ export async function postWorkOrderTransitionOp(
     const attributesById = await loadAttributeSchemaById(
         db, org, typeId,
     );
-    const projected = projectReadableValues(
-        head.values, attributesById, roles,
-    );
-    const parent = await instanceParentEtag(
-        db, head.messagePairId,
-    );
-    const advertised = await advertisedInstanceEtag(
-        instanceGetBody(
-            instanceId, org, typeId, projected,
-        ),
-        parent,
-    );
-    if (ifMatchTarget !== advertised) {
+    if (ifMatchTarget !== head.messagePairId) {
         throw new ApiError(
             'If-Match does not match the current '
                 + 'instance at ' + pathname,
@@ -2367,7 +2352,6 @@ export async function postWorkOrderTransitionOp(
             status: HTTP_OK,
             body: { values: mergedValues },
         },
-        matchedEtag: ifMatchTarget,
         headerFields: [{
             name: IF_MATCH_HEADER,
             value: strongEtagOf(ifMatchTarget),
@@ -2388,7 +2372,7 @@ export async function postWorkOrderTransitionOp(
                 );
             }
             // R9: lock head must still be the latched pair
-            // id, not the 64-hex If-Match.
+            // id.
             const latest = await headMessagePairIdAt(
                 view,
                 revisionMessagePair.uriCollection,
@@ -3447,7 +3431,6 @@ export interface DocumentMessagePairFormInput {
         readonly status: number;
         readonly body: unknown;
     };
-    readonly matchedEtag?: string;
     // Locked-class synthesized PUTs (flow undo) must
     // carry the document head they restored from, or
     // coordinateWrite 412s an unlatched PUT at a live
@@ -3516,9 +3499,6 @@ export async function formDocumentMessagePairFor(
         responseStatus,
         responseBody,
         operationId: input.operationId,
-        ...(input.matchedEtag !== undefined
-            ? { matchedEtag: input.matchedEtag }
-            : {}),
         ...(input.latchedHeadMessagePairId !== undefined
             ? { latchedHeadMessagePairId: input.latchedHeadMessagePairId }
             : {}),
@@ -3797,19 +3777,7 @@ export async function postInstancePatchOp(
     const attributesById = await loadAttributeSchemaById(
         db, org, typeId,
     );
-    const projectedHead = projectReadableValues(
-        head.values, attributesById, roles,
-    );
-    const parent = await instanceParentEtag(
-        db, head.messagePairId,
-    );
-    const advertised = await advertisedInstanceEtag(
-        instanceGetBody(
-            instanceId, org, typeId, projectedHead,
-        ),
-        parent,
-    );
-    if (ifMatchTarget !== advertised) {
+    if (ifMatchTarget !== head.messagePairId) {
         throw new ApiError(
             'If-Match does not match the current '
                 + 'instance at ' + pathname,
@@ -3851,7 +3819,6 @@ export async function postInstancePatchOp(
             status: HTTP_OK,
             body: { values: mergedValues },
         },
-        matchedEtag: ifMatchTarget,
         headerFields: [{
             name: IF_MATCH_HEADER,
             value: strongEtagOf(ifMatchTarget),
@@ -3862,7 +3829,7 @@ export async function postInstancePatchOp(
         MESSAGE_TABLES,
         async (view) => {
             // R9: lock head must still be the latched pair
-            // id, not the 64-hex If-Match.
+            // id.
             const latest = await headMessagePairIdAt(
                 view,
                 revisionMessagePair.uriCollection,
@@ -5366,7 +5333,7 @@ export const routes: Route[] = [
     // Nested instances collection (Task 16): member GET
     // under a live type. Parent probe first; heads via
     // deriveInstanceCollection; each row projects values
-    // by attribute ACL and embeds etag (64-hex, no quotes).
+    // by attribute ACL and embeds etag (pair id, no quotes).
     route(INSTANCES_COLLECTION_PATTERN, {
         get: async (
             db, p, _actor, organization, roles,
@@ -5386,21 +5353,12 @@ export const routes: Route[] = [
                 const values = projectReadableValues(
                     head.values, attributesById, roles,
                 );
-                const parent = await instanceParentEtag(
-                    db, head.messagePairId,
-                );
-                const etag = await advertisedInstanceEtag(
-                    instanceGetBody(
-                        head.id, org, typeId, values,
-                    ),
-                    parent,
-                );
                 rows.push({
                     id: head.id,
                     organization_id: org,
                     record_type_id: typeId,
                     values,
-                    etag,
+                    etag: head.messagePairId,
                 });
             }
             return rows;
@@ -5413,8 +5371,7 @@ export const routes: Route[] = [
     // (at, id) DESC so index 0 is the live head. Empty →
     // missedReadError('record_instances') (R2: foreign 403
     // / absent-or-tombstoned 404). Parent type miss first.
-    // etag is the projected hash; version is the full-state
-    // column hash.
+    // etag is the revision pair id.
     route(INSTANCE_VERSIONS_PATTERN, {
         get: async (
             db, p, _actor, organization, roles,
@@ -5441,19 +5398,9 @@ export const routes: Route[] = [
                 const values = projectReadableValues(
                     rev.values, attributesById, roles,
                 );
-                const parent = await instanceParentEtag(
-                    db, rev.messagePairId,
-                );
-                const etag = await advertisedInstanceEtag(
-                    instanceGetBody(
-                        instanceId, org, typeId, values,
-                    ),
-                    parent,
-                );
                 entries.push({
                     at: rev.at,
-                    etag,
-                    version: rev.version,
+                    etag: rev.messagePairId,
                     values,
                 });
             }
@@ -5467,13 +5414,13 @@ export const routes: Route[] = [
             const org = requireOrganization(organization);
             const typeId = param(p, 1);
             const instanceId = param(p, 2);
-            const version = param(p, 3);
+            const etag = param(p, 3);
             await requireRecordTypeExists(db, org, typeId);
             const found = await lookupStoredRevision(
                 db,
                 instancesUriPrefix(org, typeId),
                 instanceId,
-                version,
+                etag,
             );
             if (
                 found === undefined

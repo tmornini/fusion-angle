@@ -274,9 +274,7 @@ async () => {
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [{ attribute_id: ATTR_ID, value: 'x' }] },
         {
-            [IF_MATCH_HEADER]:
-                '"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-                + 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',
+            [IF_MATCH_HEADER]: put.headers.get('ETag')!,
         },
     ));
     assert.equal(patch.status, 404);

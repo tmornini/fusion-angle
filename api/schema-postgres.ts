@@ -25,9 +25,6 @@ export const POSTGRES_MESSAGE_PAIRS_TABLE =
         CONSTRAINT message_pairs_response_at_chk
         CHECK (response_at ~
         '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$'),
-    version text COLLATE "C" NOT NULL
-        CONSTRAINT message_pairs_version_chk
-        CHECK (version ~ '^[0-9a-f]{64}$'),
     response bytea NOT NULL,
     operation_id uuid NOT NULL
 );`;
@@ -61,8 +58,6 @@ CREATE INDEX IF NOT EXISTS message_pairs_collection
     ON message_pairs (uri_collection, response_at, id);
 CREATE INDEX IF NOT EXISTS message_pairs_replay
     ON message_pairs (request_hash);
-CREATE INDEX IF NOT EXISTS message_pairs_version
-    ON message_pairs (uri_collection, uri_id, version);
 CREATE INDEX IF NOT EXISTS message_pairs_body
     ON message_pairs
     USING gin (message_body(response) jsonb_path_ops);`;

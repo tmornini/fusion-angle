@@ -49,7 +49,6 @@ test(
                 + ' HTTP/1.1\r\n\r\n',
             response_at:
                 '2026-01-01T00:00:00.000001Z',
-            version: 'e'.repeat(64),
             response:
                 'HTTP/1.1 200 OK\r\n\r\n',
             operation_id: '0123456789ABCDEFGHIJKw',

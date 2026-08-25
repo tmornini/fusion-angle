@@ -409,9 +409,9 @@ export interface StateEntity {
     state: string;
     member_id: Id;
     at: string;
-    // Present on /versions index rows: the response
-    // version of the pair that recorded this event.
-    version?: string;
+    // Present on /versions index rows; value is that
+    // revision's pair id.
+    etag?: string;
 }
 
 // Nested field-value shape on work-order history events
@@ -958,7 +958,6 @@ export interface MessagePairEntity {
     request_hash: string;
     request: string;
     response_at: string;
-    version: string;
     response: string;
     operation_id: string;
 }

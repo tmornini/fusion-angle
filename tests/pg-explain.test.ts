@@ -142,7 +142,6 @@ async function putMessagePair(
         request_hash: hex64(n),
         request: message,
         response_at: at,
-        version: hex64(n),
         response: message,
         operation_id: OPERATION,
     });
@@ -167,7 +166,6 @@ async function putAuthorize(
             'GET /authentication/authorize/'
             + ' HTTP/1.1\r\n\r\n',
         response_at: at,
-        version: hex64(n),
         response: jsonWire({ code }),
         operation_id: OPERATION,
     });
@@ -202,9 +200,8 @@ async function seedRows(
                     'PUT',
                 );
             }
-            // Fat address (81 versions at one uri_id):
-            // version triple beats address + filter;
-            // address ORDER BY prefers responses_address.
+            // Fat address (81 pairs at one uri_id):
+            // address ORDER BY prefers message_pairs_address.
             // Keep /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/ small for the
             // collection pin.
             await putMessagePair(
@@ -286,7 +283,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     const backend = new PostgresBackend(sql);
     const ideaId = id22(IDEA_N);
     const ideaHash = hex64(IDEA_N);
-    const versionHit = hex64(VERSION_N);
 
     before(async () => {
         await sql.unsafe(
@@ -366,24 +362,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assertIndexPlan(
             explainText(plans),
             ['message_pairs_address'],
-        );
-    });
-
-    test('version triple uses message_pairs_version',
-    async () => {
-        const plans = await sql.query<
-            Record<string, unknown>
-        >`
-            EXPLAIN
-            SELECT * FROM message_pairs
-            WHERE uri_collection = ${VERSION_COLLECTION}
-              AND uri_id = ${VERSION_URI_ID}
-              AND version = ${versionHit}
-            ORDER BY response_at, id
-        `;
-        assertIndexPlan(
-            explainText(plans),
-            ['message_pairs_version'],
         );
     });
 

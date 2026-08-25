@@ -12,9 +12,9 @@ import {
 } from './http-fixtures.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
-import { sha256HexOfBytes } from '../shared/digest.ts';
 import { messageStore } from '../api/message-store.ts';
 import { strongEtagOf } from '../api/message-pair.ts';
+import { isIdentifier } from '../shared/identifier.ts';
 
 const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const MEMBERSHIP_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/';
@@ -130,6 +130,31 @@ async () => {
     assert.equal(stored.hasOperationId, false);
 });
 
+test('document GET detail ETag equals Response-ID',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const path = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+        + 'yGetEtagEqRespIdXXXXXw';
+    const put = await handleRequest(
+        db, req('PUT', path, token, ideaDocument(
+            'GetEtag', 'ev-ws-get-etag',
+        )),
+    );
+    assert.equal(put.status, 201);
+    const putId = put.headers.get('Response-ID');
+    assert.ok(putId !== null && isIdentifier(putId));
+    assert.equal(put.headers.get('ETag'), strongEtagOf(putId));
+    const got = await handleRequest(
+        db, req('GET', path, token),
+    );
+    assert.equal(got.status, 200);
+    const getId = got.headers.get('Response-ID');
+    assert.ok(getId !== null && isIdentifier(getId));
+    assert.equal(got.headers.get('ETag'), strongEtagOf(getId));
+    assert.equal(getId, putId);
+});
+
 test('same-body PUT is 200 and does not append',
 async () => {
     const db = await freshDb();
@@ -141,8 +166,10 @@ async () => {
             + 'yjsYYXruOryrZjnfLsgSJg', token, body),
     );
     assert.equal(first.status, 201);
+    const firstId = first.headers.get('Response-ID');
+    assert.ok(firstId !== null && isIdentifier(firstId));
     const firstEtag = first.headers.get('ETag');
-    assert.ok(firstEtag !== null && firstEtag !== '');
+    assert.equal(firstEtag, strongEtagOf(firstId));
     const before = await pairsAt(
         db, IDEA_PREFIX, 'yjsYYXruOryrZjnfLsgSJg',
     );
@@ -316,10 +343,14 @@ async () => {
         }),
     );
     assert.equal(res.status, 201);
-    const emptyTag = strongEtagOf(
-        await sha256HexOfBytes(new Uint8Array(0)),
+    const responseId = res.headers.get('Response-ID');
+    assert.ok(
+        responseId !== null && isIdentifier(responseId),
     );
-    assert.equal(res.headers.get('ETag'), emptyTag);
+    assert.equal(
+        res.headers.get('ETag'),
+        strongEtagOf(responseId),
+    );
     const stored = await storedResponseAt(
         db, IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
     );
@@ -329,5 +360,4 @@ async () => {
         IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
     );
     assert.ok(live !== undefined, 'empty PUT must live');
-    assert.equal(live.version, emptyTag.slice(1, -1));
 });

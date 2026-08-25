@@ -143,7 +143,7 @@ export const INSTANCE_DETAIL_PATTERN =
 export const INSTANCE_VERSIONS_PATTERN =
     INSTANCE_DETAIL_PATTERN + '/versions';
 export const INSTANCE_VERSION_PATTERN =
-    INSTANCE_VERSIONS_PATTERN + '/:version';
+    INSTANCE_VERSIONS_PATTERN + '/:etag';
 // Organization member seat (Task 52): the relationship
 // itself. Path carries organization + identity; body is
 // privilege type. Collection prefix slice is the roster

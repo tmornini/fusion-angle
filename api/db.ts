@@ -98,11 +98,6 @@ export interface EntityStore<
         collection: string,
         uriId: string,
     ): Promise<T[]>;
-    getAllAtVersion(
-        collection: string,
-        uriId: string,
-        version: string,
-    ): Promise<T[]>;
     getAllWhereBody(
         collection: string,
         containment: Record<string, unknown>,
@@ -162,12 +157,6 @@ export interface Tx {
         table: string,
         collection: string,
         uriId: string,
-    ): Promise<T[]>;
-    getAddressVersion<T extends { id: string }>(
-        table: string,
-        collection: string,
-        uriId: string,
-        version: string,
     ): Promise<T[]>;
     getWhereBody<T extends { id: string }>(
         table: string,

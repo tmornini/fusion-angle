@@ -306,7 +306,7 @@ export function defineStoreAcceptance(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'tYhGBKEoBjBYeqTcJWMNVQ', token,
             flowDocument('Stale', generateIdentifier()),
-            { 'if-match': '"' + 'b'.repeat(64) + '"' },
+            { 'if-match': '"' + generateIdentifier() + '"' },
         ));
         assert.equal(stale.status, 412);
         assert.equal(

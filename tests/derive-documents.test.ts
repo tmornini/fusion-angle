@@ -46,7 +46,6 @@ async function storedMessagePairAt(
         request_hash: messagePair.requestHash,
         request: messagePair.requestMessage,
         response_at: AT,
-        version: messagePair.responseEtag,
         response: messagePair.responseMessage,
         operation_id: messagePair.operationId,
     };

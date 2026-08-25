@@ -63,19 +63,6 @@ export class HistoryEntityStore<
         );
     }
 
-    async getAllAtVersion(
-        collection: string,
-        uriId: string,
-        version: string,
-    ): Promise<T[]> {
-        return this.#run(
-            [this.#table], 'readonly',
-            tx => tx.getAddressVersion<T>(
-                this.#table, collection, uriId, version,
-            ),
-        );
-    }
-
     async getAllWhereBody(
         collection: string,
         containment: Record<string, unknown>,

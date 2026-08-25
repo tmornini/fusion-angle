@@ -80,7 +80,6 @@ function transitionFieldValueCandidates(
                     body: fieldValue.fields,
                     requesterIdentityId:
                         transition.requesterIdentityId,
-                    version: '',
                 });
             }
         }

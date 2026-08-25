@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -189,5 +190,26 @@ test(
             ),
             /Not found/,
         );
+    },
+);
+
+test(
+    'InstanceHistoryWire has no version; etag is'
+    + ' not 64-hex',
+    () => {
+        const src = readFileSync(
+            'web-app/app/adapters/record-instances.ts',
+            'utf8',
+        );
+        const start = src.indexOf(
+            'interface InstanceHistoryWire',
+        );
+        assert.ok(start >= 0);
+        const wire = src.slice(
+            start,
+            src.indexOf('function instancesPath'),
+        );
+        assert.doesNotMatch(wire, /\bversion\b/);
+        assert.doesNotMatch(src, /64-hex/);
     },
 );

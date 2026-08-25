@@ -25,7 +25,6 @@ import {
     IF_MATCH_HEADER,
     strongEtagOf,
     parseIfMatch,
-    HEX64,
 } from '../api/message-pair.ts';
 import {
     ApiError,
@@ -47,13 +46,14 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
 
 // Instance PATCH — If-Match + full-state revision (R5).
 // Two pairs per PATCH: wire delta + PUT {values} revision.
-// Gate ladder after replay; ETag is documentVersion of
-// the projected body (not the pair id).
+// Gate ladder after replay; ETag is the revision pair id.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -75,7 +75,8 @@ const TYPE_DETAIL =
 const ATTRS = TYPE_DETAIL + '/attributes/';
 const INSTANCES = TYPE_DETAIL + '/instances/';
 const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
-const WELL_FORMED_TAG =
+const WELL_FORMED_TAG = generateIdentifier();
+const HEX64_TAG =
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     + 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
@@ -302,12 +303,84 @@ async () => {
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
     assert.ok(head !== undefined);
-    assert.ok(newEtag !== null && HEX64.test(newEtag.slice(1, -1)));
-    assert.notEqual(newEtag, strongEtagOf(head.messagePairId));
+    assert.ok(
+        newEtag !== null
+        && isIdentifier(newEtag.slice(1, -1)),
+    );
+    assert.equal(newEtag, strongEtagOf(head.messagePairId));
     assert.equal(
         await countInstanceMessagePairs(db),
         before + 2,
         'each PATCH adds TWO pairs (wire + revision)',
+    );
+});
+
+test('If-Match with the shared pair-id token succeeds '
++ 'for member and admin',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
+    const put = await putInstance(db, memberToken, [
+        { attribute_id: ATTR_ID, value: 'Hello' },
+    ]);
+    assert.equal(put.status, 201);
+    const memberGet = await handleRequest(db, req(
+        'GET', INSTANCE_DETAIL, memberToken,
+    ));
+    const adminGet = await handleRequest(db, req(
+        'GET', INSTANCE_DETAIL, adminToken,
+    ));
+    assert.equal(memberGet.status, 200);
+    assert.equal(adminGet.status, 200);
+    const shared = memberGet.headers.get('ETag');
+    assert.ok(shared !== null);
+    assert.equal(adminGet.headers.get('ETag'), shared);
+    const memberPatch = await handleRequest(db, req(
+        'PATCH', INSTANCE_DETAIL, memberToken,
+        {
+            set: [
+                {
+                    attribute_id: ATTR_ID,
+                    value: 'Member',
+                },
+            ],
+        },
+        { [IF_MATCH_HEADER]: shared },
+    ));
+    assert.equal(memberPatch.status, 201);
+    const afterMember = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
+    );
+    assert.ok(afterMember !== undefined);
+    assert.equal(
+        memberPatch.headers.get('ETag'),
+        strongEtagOf(afterMember.messagePairId),
+    );
+    const adminPatch = await handleRequest(db, req(
+        'PATCH', INSTANCE_DETAIL, adminToken,
+        {
+            set: [
+                {
+                    attribute_id: ATTR_ID,
+                    value: 'Admin',
+                },
+            ],
+        },
+        {
+            [IF_MATCH_HEADER]:
+                memberPatch.headers.get('ETag')!,
+        },
+    ));
+    assert.equal(adminPatch.status, 201);
+    const afterAdmin = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
+    );
+    assert.ok(afterAdmin !== undefined);
+    assert.equal(
+        adminPatch.headers.get('ETag'),
+        strongEtagOf(afterAdmin.messagePairId),
     );
 });
 
@@ -400,6 +473,7 @@ async () => {
         '"a", "b"',
         'W/"weak"',
         'unquoted',
+        '"' + HEX64_TAG + '"',
     ];
     for (const raw of malformed) {
         const res = await handleRequest(db, req(
@@ -1073,15 +1147,15 @@ async () => {
         { [IF_MATCH_HEADER]: e0 },
     ));
     assert.equal(blind.status, 412);
-    // Re-GET: member does not see secret; projected ETag
-    // differs from admin's stored-write ETag.
+    // Re-GET: member does not see secret; ETag is the
+    // shared head pair id; limited header still appears.
     const reget = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
     assert.equal(reget.status, 200);
     const memberEtag = reget.headers.get('ETag')!;
     assert.notEqual(memberEtag, e0);
-    assert.notEqual(memberEtag, YiJPbufDpkyrZcZCYbUJpg);
+    assert.equal(memberEtag, YiJPbufDpkyrZcZCYbUJpg);
     assert.equal(
         reget.headers.get(
             'Authorization-Limited-Attributes',

@@ -31,7 +31,7 @@ async function writePair(
         readonly uriId: string;
         readonly responseBody?: unknown;
     },
-): Promise<{ id: string; version: string }> {
+): Promise<{ id: string }> {
     const deleted = input.method === 'DELETE';
     const messagePair = await formWriteMessagePair({
         method: input.method,
@@ -57,7 +57,6 @@ async function writePair(
     );
     return {
         id: messagePair.id,
-        version: messagePair.responseEtag,
     };
 }
 
@@ -124,45 +123,6 @@ async () => {
         { name: 'a' },
         { name: 'b' },
     ]);
-});
-
-test('getByVersion returns the matching revision',
-async () => {
-    const db = await freshDb();
-    const first = await writePair(db, {
-        method: 'PUT',
-        uriId: 'XufQcWIKhZshfJYOVNeUSw',
-        responseBody: { n: 1 },
-    });
-    await writePair(db, {
-        method: 'PUT',
-        uriId: 'XufQcWIKhZshfJYOVNeUSw',
-        responseBody: { n: 2 },
-    });
-    const got = await messageStore(db).getByVersion(
-        COLLECTION, 'XufQcWIKhZshfJYOVNeUSw', first.version,
-    );
-    assert.equal(got?.id, first.id);
-});
-
-test('getByVersion with N matches uses latest at,id',
-async () => {
-    const db = await freshDb();
-    const first = await writePair(db, {
-        method: 'PUT',
-        uriId: 'XufQcWIKhZshfJYOVNeUSw',
-        responseBody: { n: 1 },
-    });
-    const second = await writePair(db, {
-        method: 'PUT',
-        uriId: 'XufQcWIKhZshfJYOVNeUSw',
-        responseBody: { n: 1 },
-    });
-    assert.equal(first.version, second.version);
-    const got = await messageStore(db).getByVersion(
-        COLLECTION, 'XufQcWIKhZshfJYOVNeUSw', first.version,
-    );
-    assert.equal(got?.id, second.id);
 });
 
 test('getAllWhereBody matches one JSON fact',

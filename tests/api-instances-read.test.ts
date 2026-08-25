@@ -21,11 +21,13 @@ import {
     formWriteMessagePair,
     appendMessagePair,
     strongEtagOf,
-    HEX64,
 } from '../api/message-pair.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
+import {
+    deriveInstanceHead,
+} from '../api/derive-record-instances.ts';
 import {
     nowUtc,
     SYSTEM_MEMBER_ID,
@@ -38,12 +40,13 @@ import { seedSeat } from './root-admin-fixture.ts';
 import {
     compareIdentifiers,
     generateIdentifier,
+    isIdentifier,
 } from '../shared/identifier.ts';
 
 // Instance GET detail + list: read projection by attribute
-// ACL, advertised ETag is documentVersion of the projected
-// body (not the stored version, not pair id). List embeds
-// etag sans quotes. Full-state head only (R5 — no fold).
+// ACL; advertised ETag is the head pair id, shared by every
+// caller. List embeds etag sans quotes. Full-state head
+// only (R5 — no fold).
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -239,7 +242,7 @@ interface InstanceDetailWire {
 }
 
 test('GET detail member → 200; only read-permitted '
-+ 'values; ETag is quoted 64-hex',
++ 'values; ETag is the quoted head pair id',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -258,15 +261,19 @@ async () => {
         ],
     );
     assert.equal(put.status, 201);
-    const putMessagePairId = put.headers.get('Response-ID');
-    assert.ok(putMessagePairId !== null && putMessagePairId !== '');
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
     ));
     assert.equal(res.status, 200);
     const etag = res.headers.get('ETag');
-    assert.ok(etag !== null && HEX64.test(etag.slice(1, -1)));
-    assert.notEqual(etag, strongEtagOf(putMessagePairId!));
+    const head = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, INSTANCE_A,
+    );
+    assert.ok(head !== undefined);
+    assert.ok(
+        etag !== null && isIdentifier(etag.slice(1, -1)),
+    );
+    assert.equal(etag, strongEtagOf(head.messagePairId));
     const body = await res.json() as InstanceDetailWire;
     assert.deepEqual(body, {
         id: INSTANCE_A,
@@ -351,6 +358,82 @@ async () => {
     );
     assert.equal(byId.get(ATTR_PUBLIC), 'Hello');
     assert.equal(byId.get(ATTR_SECRET), 'hidden');
+});
+
+test('member and admin share the head pair id as ETag',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedPublicAndSecretAttrs(db, adminToken);
+    const put = await putInstance(
+        db, adminToken, INSTANCE_A, [
+            {
+                attribute_id: ATTR_PUBLIC,
+                value: 'Hello',
+            },
+            {
+                attribute_id: ATTR_SECRET,
+                value: 'hidden',
+            },
+        ],
+    );
+    assert.equal(put.status, 201);
+    const head = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, INSTANCE_A,
+    );
+    assert.ok(head !== undefined);
+    const expected = strongEtagOf(head.messagePairId);
+    const memberGet = await handleRequest(db, req(
+        'GET', detailPath(INSTANCE_A), memberToken,
+    ));
+    const adminGet = await handleRequest(db, req(
+        'GET', detailPath(INSTANCE_A), adminToken,
+    ));
+    assert.equal(memberGet.status, 200);
+    assert.equal(adminGet.status, 200);
+    assert.equal(memberGet.headers.get('ETag'), expected);
+    assert.equal(adminGet.headers.get('ETag'), expected);
+    assert.equal(memberGet.headers.get('Response-ID'), null);
+    assert.equal(adminGet.headers.get('Response-ID'), null);
+    assert.equal(
+        memberGet.headers.get(
+            'Authorization-Limited-Attributes',
+        ),
+        'true',
+    );
+    assert.equal(
+        adminGet.headers.get(
+            'Authorization-Limited-Attributes',
+        ),
+        null,
+    );
+    const listMember = await handleRequest(db, req(
+        'GET', INSTANCES, memberToken,
+    ));
+    const listAdmin = await handleRequest(db, req(
+        'GET', INSTANCES, adminToken,
+    ));
+    assert.equal(listMember.status, 200);
+    assert.equal(listAdmin.status, 200);
+    const memberRows = await listMember.json() as {
+        id: string;
+        etag: string;
+    }[];
+    const adminRows = await listAdmin.json() as {
+        id: string;
+        etag: string;
+    }[];
+    const memberRow = memberRows.find(
+        (row) => row.id === INSTANCE_A,
+    );
+    const adminRow = adminRows.find(
+        (row) => row.id === INSTANCE_A,
+    );
+    assert.ok(memberRow !== undefined);
+    assert.ok(adminRow !== undefined);
+    assert.equal(memberRow.etag, head.messagePairId);
+    assert.equal(adminRow.etag, head.messagePairId);
 });
 
 test('GET detail absent → 404 record_instances '
@@ -495,8 +578,8 @@ async () => {
         .sort(compareIdentifiers);
     assert.equal(rows[0]!.id, ordered[0]);
     assert.equal(rows[1]!.id, ordered[1]);
-    assert.ok(HEX64.test(rows[0]!.etag!));
-    assert.ok(HEX64.test(rows[1]!.etag!));
+    assert.ok(isIdentifier(rows[0]!.etag!));
+    assert.ok(isIdentifier(rows[1]!.etag!));
     const firstId = rows[0]!.id;
     const detailFirst = await handleRequest(db, req(
         'GET', detailPath(firstId), memberToken,
@@ -528,8 +611,7 @@ async () => {
     });
 });
 
-test('document ETag === version; instance projected ETag '
-+ 'is not stored',
+test('instance ETag is the head pair id',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -552,23 +634,18 @@ async () => {
         ],
     );
     assert.equal(put.status, 201);
-    const messagePairId = put.headers.get('Response-ID')!;
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
     ));
     assert.equal(res.status, 200);
     const header = res.headers.get('ETag');
-    assert.ok(header !== null);
-    assert.match(header.slice(1, -1), HEX64);
-    const stored = await db.messagePairs.getById(messagePairId);
-    assert.ok(stored !== undefined);
-    assert.match(stored.version, HEX64);
-    assert.notEqual(
-        header.slice(1, -1),
-        stored.version,
-        'instance projected ETag is not stored version',
+    const head = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, INSTANCE_A,
     );
-    assert.notEqual(messagePairId, stored.version);
+    assert.ok(head !== undefined);
+    assert.ok(header !== null);
+    assert.ok(isIdentifier(header.slice(1, -1)));
+    assert.equal(header, strongEtagOf(head.messagePairId));
 });
 
 test('GET after full-state revision pair → values from '
@@ -618,9 +695,9 @@ async () => {
     const revEtag = res.headers.get('ETag');
     assert.ok(
         revEtag !== null
-        && HEX64.test(revEtag.slice(1, -1)),
+        && isIdentifier(revEtag.slice(1, -1)),
     );
-    assert.notEqual(revEtag, strongEtagOf(revisionId));
+    assert.equal(revEtag, strongEtagOf(revisionId));
     const body = await res.json() as InstanceDetailWire;
     const byId = new Map(
         body.values.map((v) => [v.attribute_id, v.value]),

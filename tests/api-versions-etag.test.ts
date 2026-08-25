@@ -317,7 +317,7 @@ async () => {
     const snapshot = await handleRequest(db, req(
         'GET',
         '/organizations/' + ORGANIZATION_B + '/versions/'
-            + stored.version,
+            + stored.id,
         token,
     ));
     assert.equal(snapshot.status, 200);

@@ -42,14 +42,12 @@ import {
     bodyOctetsOf,
 } from './message-form.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
-import { HttpMessage } from '../shared/http-message/http-message.ts';
 import type {
     MessagePair, AuthMessagePairSeed,
 } from './message-pair.ts';
 import {
     familyRegistration,
     INSTANCE_DETAIL_PATTERN,
-    INSTANCE_VERSION_PATTERN,
     RECORD_TYPES_COLLECTION_PATTERN,
 } from './family-registry.ts';
 import {
@@ -57,7 +55,6 @@ import {
     documentHeadMessagePairId,
     entityIdParam,
     idFamilyOf,
-    lookupStoredRevision,
     throwDocumentMiss,
     requireOrganization,
     resolveStreamedTrioWriteBody,
@@ -67,11 +64,7 @@ import {
 } from './message-store.ts';
 import {
     deriveInstanceHead,
-    instanceGetBody,
-    instanceParentEtag,
-    advertisedInstanceEtag,
     projectionOmitsStored,
-    revisionValuesOf,
     instancesUriPrefix,
 } from './derive-record-instances.ts';
 import { projectReadableValues } from './attribute-acl.ts';
@@ -257,26 +250,6 @@ function octetsEqual(
     return true;
 }
 
-async function livePutVersion(
-    db: DbAdapter,
-    prefix: string,
-    uriId: string,
-): Promise<{
-    messagePairId: string; version: string;
-} | undefined> {
-    const messagePairId = await documentHeadMessagePairId(
-        db, prefix, uriId,
-    );
-    if (messagePairId === undefined) return undefined;
-    const stored = await db.messagePairs.getById(
-        messagePairId,
-    );
-    if (stored === undefined) return undefined;
-    return {
-        messagePairId, version: stored.version,
-    };
-}
-
 async function instanceAdvertised(
     db: DbAdapter,
     organization: string,
@@ -286,7 +259,6 @@ async function instanceAdvertised(
 ): Promise<{
     tag: string;
     limited: boolean;
-    messagePairId: string;
 } | undefined> {
     const head = await deriveInstanceHead(
         db, organization, typeId, instanceId,
@@ -298,19 +270,11 @@ async function instanceAdvertised(
     const projected = projectReadableValues(
         head.values, attributesById, roles,
     );
-    const parent = await instanceParentEtag(db, head.messagePairId);
-    const tag = await advertisedInstanceEtag(
-        instanceGetBody(
-            instanceId, organization, typeId, projected,
-        ),
-        parent,
-    );
     return {
-        tag,
+        tag: head.messagePairId,
         limited: projectionOmitsStored(
             head.values, projected,
         ),
-        messagePairId: head.messagePairId,
     };
 }
 
@@ -363,43 +327,6 @@ async function revisionMessagePairIdForPatch(
     return revision?.id;
 }
 
-async function advertisedForRevisionMessagePair(
-    db: DbAdapter,
-    organization: string,
-    typeId: string,
-    instanceId: string,
-    roles: readonly string[],
-    revisionMessagePairId: string,
-): Promise<string | undefined> {
-    const stored = await db.messagePairs.getById(
-        revisionMessagePairId,
-    );
-    if (stored === undefined) return undefined;
-    const model = parseWire(stored.request);
-    const wireBody = HttpMessage.fromModel(model).body();
-    const parsed = wireBody.exists()
-        ? JSON.parse(wireBody.toText()) as Record<
-            string, unknown
-        >
-        : {};
-    const values = revisionValuesOf(parsed);
-    const attributesById = await loadAttributeSchemaById(
-        db, organization, typeId,
-    );
-    const projected = projectReadableValues(
-        values, attributesById, roles,
-    );
-    const parent = await instanceParentEtag(
-        db, revisionMessagePairId,
-    );
-    return advertisedInstanceEtag(
-        instanceGetBody(
-            instanceId, organization, typeId, projected,
-        ),
-        parent,
-    );
-}
-
 // The one catch shared by both pre-dispatch ownership regions
 // (handleRequest, below) so their redaction discipline cannot
 // diverge: fenceRequest membership/role reads, and the write
@@ -430,7 +357,7 @@ function redactedFenceFailure(
 }
 
 const NON_IDENTIFIER_PARAMS = new Set([
-    'etag', 'version', 'name',
+    'name',
 ]);
 
 function rejectMalformedIdentifierParams(
@@ -870,19 +797,19 @@ export async function handleRequest(
                 && wiring !== undefined
                 && familyRegistration(wiring.family)
                     ?.concurrency === 'locked';
-            // Advertised ETag is the live PUT's version,
-            // never the lock-head pair id. DELETE heads have
-            // no If-Match target (documentHeadMessagePairId skips
-            // them). Same-body no-append uses this for both
-            // PUT kinds (simple and locked).
+            // Advertised ETag is the live PUT's pair id.
+            // DELETE heads have no If-Match target
+            // (documentHeadMessagePairId skips them).
+            // Same-body no-append uses this for both PUT
+            // kinds (simple and locked).
             const livePut = isDocumentPut
-                ? await livePutVersion(
+                ? await documentHeadMessagePairId(
                     effective, canonicalPrefix, uriId,
                 )
                 : undefined;
-            const advertised = livePut?.version;
+            const advertised = livePut;
             // The hoisted echo: read If-Match directly so
-            // the gate can compare the parsed 64-hex tag
+            // the gate can compare the parsed validator
             // against the advertised ETag BEFORE dispatch.
             const rawIfMatch = isLockedWrite
                 ? request.headers.get(IF_MATCH_HEADER)
@@ -987,9 +914,7 @@ export async function handleRequest(
                     && echo !== undefined
                     && livePut !== undefined
                     ? {
-                        matchedEtag: echo,
-                        latchedHeadMessagePairId:
-                            livePut.messagePairId,
+                        latchedHeadMessagePairId: echo,
                     }
                     : {}),
             });
@@ -1025,20 +950,9 @@ export async function handleRequest(
                             if (
                                 revisionId !== undefined
                             ) {
-                                const tag =
-                                    await advertisedForRevisionMessagePair(
-                                        effective,
-                                        param(params, 0),
-                                        param(params, 1),
-                                        param(params, 2),
-                                        roles,
-                                        revisionId,
-                                    );
-                                if (tag !== undefined) {
-                                    return attachEtag(
-                                        response, tag,
-                                    );
-                                }
+                                return attachEtag(
+                                    response, revisionId,
+                                );
                             }
                         }
                         const advertisedReplay =
@@ -1060,7 +974,7 @@ export async function handleRequest(
                     }
                     if (isDocumentPut) {
                         return attachEtag(
-                            response, replay.version,
+                            response, replay.id,
                         );
                     }
                     return response;
@@ -1088,7 +1002,7 @@ export async function handleRequest(
                                     actor, organization,
                                     roles,
                                 ),
-                                livePut.version,
+                                livePut,
                                 false,
                             );
                         } catch {
@@ -1138,7 +1052,7 @@ export async function handleRequest(
                                     actor, organization,
                                     roles,
                                 ),
-                                livePut.version,
+                                livePut,
                                 false,
                             );
                         } catch {
@@ -1338,7 +1252,7 @@ export async function handleRequest(
                 )
             ) {
                 const liveReq = await effective.messagePairs
-                    .getById(livePut.messagePairId);
+                    .getById(livePut);
                 if (liveReq !== undefined) {
                     const liveOctets = bodyOctetsOf(
                         parseWire(liveReq.request),
@@ -1358,12 +1272,12 @@ export async function handleRequest(
                                             uriId,
                                         );
                                     return latest
-                                        !== livePut.messagePairId;
+                                        !== livePut;
                                 },
                             );
                         if (raced) {
                             const nowLive =
-                                await livePutVersion(
+                                await documentHeadMessagePairId(
                                     effective,
                                     canonicalPrefix,
                                     uriId,
@@ -1383,7 +1297,7 @@ export async function handleRequest(
                                             organization,
                                             roles,
                                         ),
-                                        nowLive.version,
+                                        nowLive,
                                         false,
                                     );
                                 } catch {
@@ -1406,21 +1320,20 @@ export async function handleRequest(
                         }
                         const stored =
                             await effective.messagePairs
-                                .getById(livePut.messagePairId);
+                                .getById(livePut);
                         if (stored !== undefined) {
                             return attachEtag(
                                 sendWriteResponse(
                                     stored, 'PUT', false,
                                 ),
-                                stored.version,
+                                stored.id,
                             );
                         }
                     }
                 }
             }
             // Empty-body PUT is a live empty document. Skip
-            // the family validator; store GET-shaped 200
-            // with ETag sha256('').
+            // the family validator; store GET-shaped 200.
             if (
                 method === 'PUT'
                 && body === undefined
@@ -1472,7 +1385,7 @@ export async function handleRequest(
                     sendWriteResponse(
                         stored, 'PUT', true,
                     ),
-                    stored.version,
+                    stored.id,
                 );
             }
         }
@@ -1561,31 +1474,23 @@ export async function handleRequest(
                             ),
                         );
                     if (headMessagePairId !== undefined) {
-                        const stored = await effective
-                            .messagePairs.getById(
-                                headMessagePairId,
-                            );
-                        if (stored !== undefined) {
-                            return attachEtag(
-                                Response.json(result, {
-                                    headers: {
-                                        'Response-ID':
-                                            headMessagePairId,
-                                    },
-                                }),
-                                stored.version,
-                            );
-                        }
+                        return attachEtag(
+                            Response.json(result, {
+                                headers: {
+                                    'Response-ID':
+                                        headMessagePairId,
+                                },
+                            }),
+                            headMessagePairId,
+                        );
                     }
                 }
                 // Document /versions/:etag: ETag is the
-                // column hash (same as the path token).
+                // path token.
                 if (
                     routePattern.endsWith(
                         '/versions/:etag',
                     )
-                    && routePattern
-                        !== INSTANCE_VERSION_PATTERN
                 ) {
                     return attachEtag(
                         Response.json(result),
@@ -1594,38 +1499,7 @@ export async function handleRequest(
                         ),
                     );
                 }
-                // Instance versions leaf: ETag is the
-                // projected hash, not the path token.
-                if (
-                    routePattern
-                        === INSTANCE_VERSION_PATTERN
-                ) {
-                    const found =
-                        await lookupStoredRevision(
-                            effective,
-                            instancesUriPrefix(
-                                param(params, 0),
-                                param(params, 1),
-                            ),
-                            param(params, 2),
-                            param(params, 3),
-                        );
-                    const parent = found === undefined
-                        ? undefined
-                        : await instanceParentEtag(
-                            effective,
-                            found.id,
-                        );
-                    const tag =
-                        await advertisedInstanceEtag(
-                            result, parent,
-                        );
-                    return attachEtag(
-                        Response.json(result), tag,
-                    );
-                }
-                // Instance detail ETag: documentVersion of
-                // this caller's projected GET body.
+                // Instance detail ETag: the head pair id.
                 if (
                     routePattern
                         === INSTANCE_DETAIL_PATTERN
@@ -1723,7 +1597,7 @@ export async function handleRequest(
                             )
                     ) {
                         return attachEtag(
-                            response, stored.version,
+                            response, stored.id,
                         );
                     }
                     return response;
@@ -1789,25 +1663,17 @@ export async function handleRequest(
                         routePattern
                             === INSTANCE_DETAIL_PATTERN
                     ) {
-                        const advertisedPatch =
-                            await instanceAdvertised(
-                                effective,
-                                param(params, 0),
-                                param(params, 1),
-                                param(params, 2),
-                                roles,
+                        const revisionId =
+                            await revisionMessagePairIdForPatch(
+                                effective, stored.id,
                             );
                         if (
-                            advertisedPatch !== undefined
+                            revisionId !== undefined
                         ) {
                             return attachEtag(
-                                response,
-                                advertisedPatch.tag,
+                                response, revisionId,
                             );
                         }
-                        return attachEtag(
-                            response, stored.version,
-                        );
                     }
                     return response;
                 }
@@ -2397,9 +2263,9 @@ function isLiveHeadCollectionGet(
     return documentFamilyWiring(family) !== undefined;
 }
 
-// Strong ETag header → unquoted 64-hex version token
-// (strip surrounding quotes when present). Absent /
-// empty → undefined.
+// Strong ETag header → unquoted validator (strip
+// surrounding quotes when present). Absent / empty →
+// undefined.
 function etagFromHeader(
     response: Response,
 ): string | undefined {

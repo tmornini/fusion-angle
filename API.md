@@ -58,11 +58,13 @@ path is never exempt.
 The response is rebuilt from the stored row
 (`responseFromStored` in `api/message-pair.ts`). Four
 headers (`wireHeadersFor` + `attachEtag`): Date,
-Response-ID, Operation-ID, ETag (quoted 64-hex
-`documentVersion`). Replay returns the original,
+Response-ID, Operation-ID, ETag (quoted message-pair
+identifier). A document PUT's ETag equals its
+Response-ID (both the pair id). Instance reads do not
+emit Response-ID. Replay returns the original,
 including Date. If-Match is the sole conflict
-mechanism: exactly one strong validator (`"<hex64>"`);
-`*`, weak, lists, or unquoted yield 400.
+mechanism: exactly one strong validator (`"<identifier>"`);
+`*`, weak, lists, unquoted, or 64-hex yield 400.
 
 `sendWriteResponse` sets send-time status: 201 if this
 request appended a pair (PUT/PATCH/POST), 200 if it
@@ -96,7 +98,7 @@ Status ladder:
 - **simple** — same-body as live head → 200, no append;
   first append 201
 - **locked** — live family is flows only. If-Match
-  quoted 64-hex. live+absent → 428; live+≠ head → 412;
+  quoted identifier. live+absent → 428; live+≠ head → 412;
   genesis with no If-Match → 201
 - **instance PATCH** — public PUT is 405
   (`INSTANCE_DETAIL_PATTERN`). A pin is a well-formed

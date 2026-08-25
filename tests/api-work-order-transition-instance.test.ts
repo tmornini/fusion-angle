@@ -1,6 +1,8 @@
 import { test } from 'node:test';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -18,7 +20,6 @@ import { seedCurrentMember } from './member-fixtures.ts';
 import {
     IF_MATCH_HEADER,
     strongEtagOf,
-    HEX64,
 } from '../api/message-pair.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
@@ -520,6 +521,7 @@ async () => {
         '*',
         '"a", "b"',
         'unquoted',
+        '"' + 'a'.repeat(64) + '"',
     ];
     for (const raw of malformed) {
         const res = await handleRequest(db, req(
@@ -611,9 +613,9 @@ async () => {
     const getEtag = get.headers.get('ETag');
     assert.ok(
         getEtag !== null
-        && HEX64.test(getEtag.slice(1, -1)),
+        && isIdentifier(getEtag.slice(1, -1)),
     );
-    assert.notEqual(getEtag, strongEtagOf(head.messagePairId));
+    assert.equal(getEtag, strongEtagOf(head.messagePairId));
     assert.notEqual(
         get.headers.get('ETag'),
         etag,

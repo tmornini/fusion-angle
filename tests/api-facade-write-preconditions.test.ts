@@ -5,13 +5,14 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { GET, GETWithEtag, PUT } from '../api/api.ts';
-import { HEX64 } from '../api/message-form.ts';
 import { jitteredBackoff } from
     '../web-app/app/adapters/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
 
 // Facade plumbing that carries the C6 retry loop's If-Match
 // echo (web-app/app/adapters/flow-mutations.ts). Ideas/:id is
@@ -80,7 +81,7 @@ test('PUT with no headerFields behaves exactly as before —'
 });
 
 test('GETWithEtag returns the parsed body and the'
-+ ' stored PUT version as ETag (streamed organizations/:id/ideas/:id)',
++ ' head pair id as ETag (streamed organizations/:id/ideas/:id)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -96,7 +97,7 @@ async () => {
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId, token);
     assert.equal(body.title, 'Plain');
-    assert.ok(etag !== undefined && HEX64.test(etag));
+    assert.ok(etag !== undefined && isIdentifier(etag));
 });
 
 test('GETWithEtag and GET agree on the body for the'

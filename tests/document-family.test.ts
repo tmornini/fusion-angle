@@ -51,8 +51,10 @@ import { ApiError, HTTP_PRECONDITION_FAILED } from
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
 
 const PROJECT_1 = generateIdentifier();
 const ID_1 = generateIdentifier();
@@ -232,7 +234,7 @@ const TEST_PATTERN = TEST_FAMILY + '/:id';
 // A SIBLING document-class route under the SAME family prefix —
 // never served via documentPutHandler, mirroring a real family's
 // own hand-written sub-resource (e.g.
-// organizations/:id/flows/:id/versions/:vid
+// organizations/:id/flows/:id/versions/:etag
 // beside the locked organizations/:id/flows/:id). Proves the gate keys the
 // locked
 // arm off the EXACT entity-route pattern, never the family's
@@ -379,6 +381,125 @@ async () => {
         assert.equal(res.status, 201);
         assert.equal(res.headers.get('Follows'), null);
         assert.equal(res.headers.get('Supersedes'), null);
+        const responseId = res.headers.get('Response-ID');
+        assert.ok(
+            responseId !== null && isIdentifier(responseId),
+        );
+        assert.equal(
+            res.headers.get('ETag'),
+            strongEtagOf(responseId),
+        );
+    });
+});
+
+test('locked arm: GET ETag equals Response-ID',
+async () => {
+    await withSyntheticLockedFamily(async () => {
+        const db = await freshDb();
+        const token = await organizationToken();
+        const path = '/' + TEST_FAMILY + '/'
+            + generateIdentifier();
+        const put = await handleRequest(db, req(
+            'PUT', path, token, { v: 'first' },
+        ));
+        assert.equal(put.status, 201);
+        const got = await handleRequest(db, req(
+            'GET', path, token,
+        ));
+        assert.equal(got.status, 200);
+        const responseId = got.headers.get('Response-ID');
+        assert.ok(
+            responseId !== null && isIdentifier(responseId),
+        );
+        assert.equal(
+            got.headers.get('ETag'),
+            strongEtagOf(responseId),
+        );
+        assert.equal(
+            got.headers.get('ETag'),
+            put.headers.get('ETag'),
+        );
+    });
+});
+
+test('locked arm: If-Match with the pair id succeeds; a'
++ ' stale token 412s; live head with no pin 428s',
+async () => {
+    await withSyntheticLockedFamily(async () => {
+        const db = await freshDb();
+        const token = await organizationToken();
+        const path = '/' + TEST_FAMILY + '/'
+            + generateIdentifier();
+        const genesis = await handleRequest(db, req(
+            'PUT', path, token, { v: 'first' },
+        ));
+        assert.equal(genesis.status, 201);
+        const pairId = genesis.headers.get('Response-ID');
+        assert.ok(pairId !== null);
+        assert.equal(
+            genesis.headers.get('ETag'),
+            strongEtagOf(pairId),
+        );
+        const matched = await handleRequest(db, req(
+            'PUT', path, token, { v: 'second' },
+            { [IF_MATCH_HEADER]: strongEtagOf(pairId) },
+        ));
+        assert.equal(matched.status, 201);
+        const stale = await handleRequest(db, req(
+            'PUT', path, token, { v: 'third' },
+            { [IF_MATCH_HEADER]: strongEtagOf(pairId) },
+        ));
+        assert.equal(stale.status, 412);
+        const unpinned = await handleRequest(db, req(
+            'PUT', path, token, { v: 'fourth' },
+        ));
+        assert.equal(unpinned.status, 428);
+    });
+});
+
+test('locked arm: A then B then A yields three distinct'
++ ' ETags',
+async () => {
+    await withSyntheticLockedFamily(async () => {
+        const db = await freshDb();
+        const token = await organizationToken();
+        const path = '/' + TEST_FAMILY + '/'
+            + generateIdentifier();
+        const first = await handleRequest(db, req(
+            'PUT', path, token, { v: 'A' },
+        ));
+        assert.equal(first.status, 201);
+        const tagA = first.headers.get('ETag')!;
+        const second = await handleRequest(db, req(
+            'PUT', path, token, { v: 'B' },
+            { [IF_MATCH_HEADER]: tagA },
+        ));
+        assert.equal(second.status, 201);
+        const tagB = second.headers.get('ETag')!;
+        const third = await handleRequest(db, req(
+            'PUT', path, token, { v: 'A' },
+            { [IF_MATCH_HEADER]: tagB },
+        ));
+        assert.equal(third.status, 201);
+        const tagA2 = third.headers.get('ETag')!;
+        assert.notEqual(tagA, tagB);
+        assert.notEqual(tagB, tagA2);
+        assert.notEqual(tagA, tagA2);
+        assert.equal(
+            tagA, strongEtagOf(first.headers.get(
+                'Response-ID',
+            )!),
+        );
+        assert.equal(
+            tagB, strongEtagOf(second.headers.get(
+                'Response-ID',
+            )!),
+        );
+        assert.equal(
+            tagA2, strongEtagOf(third.headers.get(
+                'Response-ID',
+            )!),
+        );
     });
 });
 
@@ -438,8 +559,7 @@ test('locked arm: a stale If-Match echo 412s', async () => {
             'PUT', '/' + TEST_FAMILY + '/YIuEjXvCwXAgrpyvcvLJjg', token,
             { v: 'second' },
             { [IF_MATCH_HEADER]: strongEtagOf(
-                'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-                + 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+                generateIdentifier(),
             ) },
         ));
         assert.equal(res.status, 412);
@@ -567,7 +687,7 @@ test('locked arm: two writers racing the SAME echo — the'
     // cannot close; the in-tx head re-read closes it.
     const echo = {
         name: IF_MATCH_HEADER,
-        value: strongEtagOf(genesis.responseEtag),
+        value: strongEtagOf(genesis.id),
     };
     const writerA = await formWriteMessagePair({
         method: 'PUT', pathname: '/' + TEST_PATTERN,
@@ -579,7 +699,6 @@ test('locked arm: two writers racing the SAME echo — the'
         organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
         responseBody: undefined,
         latchedHeadMessagePairId: genesis.id,
-        matchedEtag: genesis.responseEtag,
         operationId: TEST_OPERATION_ID,
     });
     const writerB = await formWriteMessagePair({
@@ -592,7 +711,6 @@ test('locked arm: two writers racing the SAME echo — the'
         organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
         responseBody: undefined,
         latchedHeadMessagePairId: genesis.id,
-        matchedEtag: genesis.responseEtag,
         operationId: TEST_OPERATION_ID,
     });
     await testDocumentOp(

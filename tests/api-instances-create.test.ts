@@ -21,7 +21,6 @@ import {
     appendMessagePair,
     IF_MATCH_HEADER,
     strongEtagOf,
-    HEX64,
 } from '../api/message-pair.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
@@ -38,8 +37,10 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
 
 // Instance create is public PATCH (Task 20). Public PUT
 // is 405. Pins use deriveInstanceHead for post-create
@@ -171,9 +172,7 @@ function setBody(
     return { set: [...entries] };
 }
 
-const WELL_FORMED_TAG =
-    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    + 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const WELL_FORMED_TAG = generateIdentifier();
 
 test('public instance PUT is 405', async () => {
     const { db, adminToken, memberToken } =
@@ -245,7 +244,7 @@ async () => {
     const createEtag = res.headers.get('ETag');
     assert.ok(
         createEtag !== null
-        && HEX64.test(createEtag.slice(1, -1)),
+        && isIdentifier(createEtag.slice(1, -1)),
     );
     assert.notEqual(createEtag, strongEtagOf(responseId!));
     const echo = await res.json() as {
@@ -269,6 +268,10 @@ async () => {
     );
     assert.ok(head !== undefined);
     assert.notEqual(head.messagePairId, responseId);
+    assert.equal(
+        createEtag,
+        strongEtagOf(head.messagePairId),
+    );
     assert.deepEqual(head.values, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -315,7 +318,7 @@ async () => {
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [] },
-        { [IF_MATCH_HEADER]: '"anything"' },
+        { [IF_MATCH_HEADER]: '"' + 'a'.repeat(64) + '"' },
     ));
     assert.equal(res.status, 400);
     assert.deepEqual(await res.json(), {

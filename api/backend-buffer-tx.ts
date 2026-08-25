@@ -119,34 +119,6 @@ export function bufferTx(
                 })
                 .map((row) => ({ ...row })) as T[];
         },
-        async getAddressVersion<T extends { id: string }>(
-            table: string,
-            collection: string,
-            uriId: string,
-            version: string,
-        ): Promise<T[]> {
-            return scoped(table)
-                .filter((row) => {
-                    const rec = row as
-                        Record<string, unknown>;
-                    return rec['uri_collection']
-                        === collection
-                        && rec['uri_id'] === uriId
-                        && rec['version'] === version;
-                })
-                .sort((left, right) => {
-                    const l = left as
-                        Record<string, unknown>;
-                    const r = right as
-                        Record<string, unknown>;
-                    return compareResponseAtThenId(
-                        left, right,
-                        String(l['response_at'] ?? ''),
-                        String(r['response_at'] ?? ''),
-                    );
-                })
-                .map((row) => ({ ...row })) as T[];
-        },
         async getWhereBody<T extends { id: string }>(
             table: string,
             collection: string,

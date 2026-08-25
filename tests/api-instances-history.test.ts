@@ -35,8 +35,13 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
+import {
+    deriveInstanceHead,
+} from '../api/derive-record-instances.ts';
 
 // Instance GET history — full-state revision chain (Task 19).
 // Wire DESC; each entry full state projected by CURRENT read
@@ -234,7 +239,6 @@ async function appendInstancePair(
 interface HistoryEntry {
     at: string;
     etag: string;
-    version: string;
     values: { attribute_id: string; value: string }[];
 }
 
@@ -335,12 +339,132 @@ async () => {
         assert.ok(Array.isArray(entry.values));
         assert.equal(
             typeof entry.etag === 'string'
+            && isIdentifier(entry.etag)
             && !entry.etag.includes('"'),
             true,
-            'etag is 64-hex, no quotes in JSON',
+            'etag is an identifier, no quotes in JSON',
+        );
+        assert.equal(
+            'version' in entry,
+            false,
+            'history entries carry no version field',
         );
         assert.equal(typeof entry.at, 'string');
     }
+    const head = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
+    );
+    assert.ok(head !== undefined);
+    assert.equal(entries[0]!.etag, head.messagePairId);
+});
+
+test('history etag[0] is the head pair id for both roles',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedPublicAndSecretAttrs(db, adminToken);
+    const put = await putInstance(db, adminToken, [
+        {
+            attribute_id: ATTR_PUBLIC,
+            value: 'public-0',
+        },
+        {
+            attribute_id: ATTR_SECRET,
+            value: 'secret-0',
+        },
+    ]);
+    assert.equal(put.status, 201);
+    const head = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
+    );
+    assert.ok(head !== undefined);
+    const memberHist = await handleRequest(db, req(
+        'GET', INSTANCE_HISTORY, memberToken,
+    ));
+    const adminHist = await handleRequest(db, req(
+        'GET', INSTANCE_HISTORY, adminToken,
+    ));
+    assert.equal(memberHist.status, 200);
+    assert.equal(adminHist.status, 200);
+    const memberEntries =
+        await memberHist.json() as HistoryEntry[];
+    const adminEntries =
+        await adminHist.json() as HistoryEntry[];
+    assert.equal(
+        memberEntries[0]!.etag,
+        head.messagePairId,
+    );
+    assert.equal(
+        adminEntries[0]!.etag,
+        head.messagePairId,
+    );
+});
+
+test('GET versions/:etag by pair id; foreign pair id 404s',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedPublicAndSecretAttrs(db, adminToken);
+    const put = await putInstance(db, adminToken, [
+        {
+            attribute_id: ATTR_PUBLIC,
+            value: 'public-0',
+        },
+        {
+            attribute_id: ATTR_SECRET,
+            value: 'secret-0',
+        },
+    ]);
+    assert.equal(put.status, 201);
+    const head = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
+    );
+    assert.ok(head !== undefined);
+    const leafPath =
+        INSTANCE_HISTORY + '/' + head.messagePairId;
+    const memberLeaf = await handleRequest(db, req(
+        'GET', leafPath, memberToken,
+    ));
+    const adminLeaf = await handleRequest(db, req(
+        'GET', leafPath, adminToken,
+    ));
+    assert.equal(memberLeaf.status, 200);
+    assert.equal(adminLeaf.status, 200);
+    assert.equal(
+        memberLeaf.headers.get('ETag'),
+        strongEtagOf(head.messagePairId),
+    );
+    assert.equal(
+        adminLeaf.headers.get('ETag'),
+        strongEtagOf(head.messagePairId),
+    );
+    await seedOrganizationDocument(
+        db, ORGANIZATION_B, 'Beta',
+    );
+    const foreignPairId = await appendInstancePair(
+        db, ORGANIZATION_B, FOREIGN_TYPE_ID, INSTANCE_ID,
+        'PUT', {
+            set: [
+                {
+                    attribute_id: ATTR_PUBLIC,
+                    value: 'foreign',
+                },
+            ],
+        },
+        AT,
+    );
+    const foreign = await handleRequest(db, req(
+        'GET',
+        INSTANCE_HISTORY + '/' + foreignPairId,
+        memberToken,
+    ));
+    assert.equal(foreign.status, 404);
+    assert.deepEqual(await foreign.json(), {
+        error:
+            'Not found: record_instances/' + INSTANCE_ID,
+    });
 });
 
 test('history projection: member sees only currently-'
@@ -591,7 +715,7 @@ async () => {
         }
         const older = await handleRequest(db, req(
             'GET',
-            INSTANCE_HISTORY + '/' + entries[1]!.version,
+            INSTANCE_HISTORY + '/' + entries[1]!.etag,
             token,
         ));
         assert.equal(older.status, 200);

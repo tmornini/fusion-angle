@@ -318,6 +318,11 @@ Off the critical path; each with its oracle.
   non-empty trendlines. Spec:
   `docs/superpowers/test-plan-mitigations/`
   `2026-08-24-c4-c7-dashboard-gauges.md`
+- Cryptographically verifiable ledger — brainstorm
+  hash-and-verify (or sign) of stored pairs. The dropped
+  `version` column hashed on write and was never checked
+  on read. `request_hash` is replay identity, not
+  response integrity — `SCHEMA.md` item 4
 
 ## Sequencing
 

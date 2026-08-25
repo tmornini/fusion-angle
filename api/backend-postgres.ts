@@ -190,18 +190,6 @@ function postgresTx(
             );
             return rows.map((row) => entityOf<T>(row));
         },
-        async getAddressVersion<T extends { id: string }>(
-            table: string,
-            collection: string,
-            uriId: string,
-            version: string,
-        ): Promise<T[]> {
-            const name = assertMessageTable(table);
-            const rows = await selectAddressVersion(
-                sql, name, collection, uriId, version,
-            );
-            return rows.map((row) => entityOf<T>(row));
-        },
         async getWhereBody<T extends { id: string }>(
             table: string,
             collection: string,
@@ -474,22 +462,6 @@ async function selectAddress(
     `;
 }
 
-async function selectAddressVersion(
-    sql: SqlClient,
-    _table: 'message_pairs',
-    collection: string,
-    uriId: string,
-    version: string,
-): Promise<Record<string, unknown>[]> {
-    return sql.query`
-        SELECT * FROM message_pairs
-        WHERE uri_collection = ${collection}
-          AND uri_id = ${uriId}
-          AND version = ${version}
-        ORDER BY response_at, id
-    `;
-}
-
 async function selectWhereBody(
     sql: SqlClient,
     _table: 'message_pairs',
@@ -541,7 +513,6 @@ async function upsertRow(
     const requestHash = textField(row, 'request_hash');
     const request = byteaOfWire(row.request);
     const responseAt = textField(row, 'response_at');
-    const version = textField(row, 'version');
     const response = byteaOfWire(row.response);
     const operationId = uuidTextOfIdentifier(
         textField(row, 'operation_id'),
@@ -551,13 +522,13 @@ async function upsertRow(
             id, uri_collection, uri_id,
             requester_identity_id, method,
             request_at, request_hash, request,
-            response_at, version, response,
+            response_at, response,
             operation_id
         ) VALUES (
             ${id}, ${collection}, ${uriId},
             ${requester}, ${method},
             ${requestAt}, ${requestHash}, ${request},
-            ${responseAt}, ${version}, ${response},
+            ${responseAt}, ${response},
             ${operationId}
         )
         ON CONFLICT (id) DO UPDATE SET
@@ -570,7 +541,6 @@ async function upsertRow(
             request_hash = EXCLUDED.request_hash,
             request = EXCLUDED.request,
             response_at = EXCLUDED.response_at,
-            version = EXCLUDED.version,
             response = EXCLUDED.response,
             operation_id = EXCLUDED.operation_id
     `;
