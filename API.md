@@ -85,8 +85,9 @@ Status ladder:
 - **409** — domain conflict (rebind, invitation not
   pending, instance tombstone create without pin)
 - **412** — stale If-Match
-- **428** — missing If-Match over live locked PUT or
-  live instance PATCH / value-bearing transition
+- **428** — missing If-Match over live locked PUT,
+  live instance PATCH / value-bearing transition, or a
+  latched operation over a live parent document
 
 409 is domain; 412 is concurrency.
 
@@ -100,6 +101,16 @@ Status ladder:
 - **locked** — live family is flows only. If-Match
   quoted identifier. live+absent → 428; live+≠ head → 412;
   genesis with no If-Match → 201
+- **latched operation** — a sub-resource POST that acts
+  ON its parent document (flow undo today,
+  `LATCHED_OPERATION_ROUTE_PATTERNS`). If-Match pins the
+  PARENT head, not the operation's own address: absent
+  → 428; malformed → 400; ≠ head → 412. No parent head
+  at all is absence, not conflict — the gate stands
+  aside and the handler 404s. The pin rides
+  `pinnedDocumentMessagePairId` and is re-verified
+  in-transaction, so the 412 names a real racer rather
+  than the server's own resolution timing
 - **instance PATCH** — public PUT is 405
   (`INSTANCE_DETAIL_PATTERN`). A pin is a well-formed
   If-Match (malformed is 400). Never-written + no pin
@@ -120,7 +131,11 @@ project document + idea promoted + N baselines.
 `postFlowUndoOp` (`api/routes.ts`); target
 `resolveFlowUndoTarget` (`api/derive-flows.ts`).
 Restore: op + locked flow document (2 pairs).
-Exhaustion: op only.
+Exhaustion: op only. If-Match is REQUIRED and pins the
+flow document head the caller saw — the resolution walk
+runs outside the transaction, so without the pin a 412
+would report the server's own read timing rather than a
+conflict.
 
 **Work-order transition.**
 `postWorkOrderTransitionOp` (`api/routes.ts`). Pure

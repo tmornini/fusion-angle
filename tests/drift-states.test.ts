@@ -1087,6 +1087,8 @@ async () => {
             eventId: FLOWID_UNDO_EV,
             at: undoAt,
         },
+        { 'if-match': '"'
+            + await headResponseId(db, token, flowId) + '"' },
     ));
     assert.equal(undone.status, 201);
 

@@ -286,10 +286,16 @@ async function undo(
     db: MemoryDbAdapter, token: string, flowId: string,
     eventId: string, at: string,
 ): Promise<Response> {
+    const head = await handleRequest(db, req(
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + flowId, token,
+    ));
+    const etag = head.headers.get('ETag');
     return handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
             + '/undo', token,
         { eventId, at },
+        etag === null ? undefined : { 'if-match': etag },
     ));
 }
 
@@ -521,9 +527,11 @@ test(
         let posts = 0;
         const flaky: RequestContext = {
             ...ctx,
-            POST: <T>(
+            POSTWithHeaders: <T>(
                 resource: string,
                 body: Record<string, unknown>,
+                headerFields:
+                    readonly (readonly [string, string])[],
             ): Promise<T> => {
                 if (resource === 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + '' + flowId +
@@ -537,6 +545,14 @@ test(
                         );
                     }
                 }
+                return ctx.POSTWithHeaders<T>(
+                    resource, body, headerFields,
+                );
+            },
+            POST: <T>(
+                resource: string,
+                body: Record<string, unknown>,
+            ): Promise<T> => {
                 return ctx.POST<T>(resource, body);
             },
         };

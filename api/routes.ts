@@ -1602,7 +1602,15 @@ export async function postFlowUndoOp(
                 documentMessagePair.uriCollection,
                 documentMessagePair.uriId,
             );
-            if (latest !== current.id) {
+            // The CLIENT's pin, not this walk's own read:
+            // the gate proved it matched the head before
+            // dispatch, so a mismatch here means a racer
+            // committed in between — a real conflict, never
+            // a scheduling artifact of our own resolution.
+            const pinned =
+                messagePair.pinnedDocumentMessagePairId
+                    ?? current.id;
+            if (latest !== pinned) {
                 throw new ApiError(
                     'If-Match does not match the current'
                     + ' document at /flows/' + id,

@@ -518,7 +518,13 @@ test(
         // named POST flows/:id/undo replay (the
         // server restores the prior body's graph
         // verbatim, same edge id).
-        await ctx.POST(
+        const undoHead = await ctx.GETWithEtag<unknown>(
+            organizationItem(
+                ctx, 'flows',
+                'ZOousbbnzpqlxJExVAruYQ',
+            ),
+        );
+        await ctx.POSTWithHeaders(
             organizationItem(
                 ctx, 'flows',
                 'ZOousbbnzpqlxJExVAruYQ',
@@ -527,6 +533,9 @@ test(
                 eventId: generateIdentifier(),
                 at: nowUtc(),
             },
+            undoHead.etag === undefined
+                ? []
+                : [['if-match', '"' + undoHead.etag + '"']],
         );
         // A work order born AFTER the restore —
         // WB5a's most damning witness.

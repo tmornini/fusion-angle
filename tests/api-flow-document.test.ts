@@ -695,6 +695,9 @@ async () => {
             revivals: [],
             // `graph` deliberately omitted — the old shape.
         },
+        { 'if-match': await headEtag(
+            db, token, 'cnRwmsMXKOgLWsMVIjtubQ',
+        ) },
     ));
     assert.equal(res.status, 400);
 
@@ -970,6 +973,9 @@ test('e2e: POST organizations/:id/flows/:id/undo forms a'
             eventId: generateIdentifier(),
             at: AT,
         },
+        { 'if-match': await headEtag(
+            db, token, 'cvdqOxjRwvTEYzWTrFDNFw',
+        ) },
     ));
     assert.equal(undone.status, 201);
 
@@ -1033,6 +1039,107 @@ test('e2e: POST organizations/:id/flows/:id/undo forms a'
     );
 });
 
+// The undo's If-Match gate (locked-class parity for the
+// flows sub-resource POST): an undo names the head it
+// intends to revert, exactly as a save names the head it
+// intends to replace. Without the echo the server would be
+// free to revert whatever happened to be current when its
+// own resolution walk ran — a 412 the caller can neither
+// predict nor act on. These three pin the gate's outcomes.
+test('e2e: POST undo without If-Match is 428 and stores'
++ ' nothing', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    await createFlow(db, token, 'ncQDxSCbnUKFdKmFHzhqyQ');
+    await handleRequest(db, req(
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ncQDxSCbnUKFdKmFHzhqyQ', token,
+        documentBody('Undoable', generateIdentifier()),
+        { 'if-match': await headEtag(
+            db, token, 'ncQDxSCbnUKFdKmFHzhqyQ',
+        ) },
+    ));
+    const before = (await db.messagePairs.getAll()).length;
+
+    const undone = await handleRequest(db, req(
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ncQDxSCbnUKFdKmFHzhqyQ/undo', token,
+        { eventId: generateIdentifier(), at: AT },
+    ));
+
+    assert.equal(undone.status, 428);
+    assert.equal(
+        (await db.messagePairs.getAll()).length, before,
+        'a 428 undo stores nothing',
+    );
+});
+
+test('e2e: POST undo with a stale If-Match is 412 and stores'
++ ' nothing', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    await createFlow(db, token, 'zzVLgKwrIUqXQTHxaSbAmg');
+    await handleRequest(db, req(
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'zzVLgKwrIUqXQTHxaSbAmg', token,
+        documentBody('First', generateIdentifier()),
+        { 'if-match': await headEtag(
+            db, token, 'zzVLgKwrIUqXQTHxaSbAmg',
+        ) },
+    ));
+    // The echo the caller captured, then a save that moves
+    // the head out from under it.
+    const stale = await headEtag(
+        db, token, 'zzVLgKwrIUqXQTHxaSbAmg',
+    );
+    await handleRequest(db, req(
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'zzVLgKwrIUqXQTHxaSbAmg', token,
+        documentBody('Second', generateIdentifier()),
+        { 'if-match': stale },
+    ));
+    const before = (await db.messagePairs.getAll()).length;
+
+    const undone = await handleRequest(db, req(
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'zzVLgKwrIUqXQTHxaSbAmg/undo', token,
+        { eventId: generateIdentifier(), at: AT },
+        { 'if-match': stale },
+    ));
+
+    assert.equal(undone.status, 412);
+    assert.equal(
+        (await db.messagePairs.getAll()).length, before,
+        'a 412 undo stores nothing',
+    );
+});
+
+test('e2e: POST undo echoing the current head succeeds',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    await createFlow(db, token, 'pAYuqZoLC0OFbTfLPWCjLA');
+    await handleRequest(db, req(
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'pAYuqZoLC0OFbTfLPWCjLA', token,
+        documentBody('Undoable', generateIdentifier()),
+        { 'if-match': await headEtag(
+            db, token, 'pAYuqZoLC0OFbTfLPWCjLA',
+        ) },
+    ));
+
+    const undone = await handleRequest(db, req(
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'pAYuqZoLC0OFbTfLPWCjLA/undo', token,
+        { eventId: generateIdentifier(), at: AT },
+        { 'if-match': await headEtag(
+            db, token, 'pAYuqZoLC0OFbTfLPWCjLA',
+        ) },
+    ));
+
+    assert.equal(undone.status, 201);
+});
+
 // NAMED REWRITE (Phase 14 Task 8, undo-as-replay): no
 // flow_versions row is published or consumed at all any more —
 // undo resolves its target from the
@@ -1069,6 +1176,7 @@ async () => {
                 eventId: undoEventId,
                 at: AT,
             },
+            { 'if-match': headEtagValue },
         )),
         handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
@@ -1263,6 +1371,7 @@ async () => {
             eventId: generateIdentifier(),
             at: AT,
         },
+        { 'if-match': await headEtag(db, token, flowId) },
     ));
     assert.equal(undone.status, 201);
     assert.equal(await documentMessagePairCount(db, flowId), 3);

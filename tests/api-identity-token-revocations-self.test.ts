@@ -9,7 +9,9 @@ import {
     mintAccessToken,
     TOKEN_AUDIENCE,
 } from '../api/access-token.ts';
-import { organizationToken } from './token-fixtures.ts';
+import {
+    organizationToken, reachableToken,
+} from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
@@ -183,6 +185,83 @@ async () => {
     assert.match(cookie, /HttpOnly/i);
     assert.match(cookie, /Path=\/api\/authentication/);
     assert.match(cookie, /SameSite=Strict/i);
+});
+
+test('org-less self-revoke PUT 201s and clears the'
++ ' refresh cookie', async () => {
+    const db = await freshDb();
+    const token = await reachableToken(
+        'nkgaOHZISTQrILTfPThWCA', [],
+    );
+    const rid = generateIdentifier();
+    const res = await handleRequest(db, req(
+        'PUT', nestedPath('nkgaOHZISTQrILTfPThWCA', rid),
+        token,
+        { at: '2026-01-01T00:00:00.000000Z' },
+    ));
+    assert.equal(res.status, 201);
+    const cookies = typeof res.headers.getSetCookie
+        === 'function'
+        ? res.headers.getSetCookie()
+        : [res.headers.get('Set-Cookie') ?? ''];
+    const cookie = cookies.join('\n');
+    assert.match(cookie, /refresh_token=/);
+    assert.match(cookie, /Max-Age=0/);
+    const row = await deriveTokenRevocation(
+        db, 'nkgaOHZISTQrILTfPThWCA', rid,
+    );
+    assert.deepEqual(row, {
+        id: rid,
+        identity_id: 'nkgaOHZISTQrILTfPThWCA',
+        at: '2026-01-01T00:00:00.000000Z',
+    });
+});
+
+test('org-less GET nested revocation still 403s',
+async () => {
+    const db = await freshDb();
+    const admin = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA',
+    );
+    const rid = generateIdentifier();
+    const path = nestedPath('nkgaOHZISTQrILTfPThWCA', rid);
+    const put = await handleRequest(db, req(
+        'PUT', path, admin,
+        { at: '2026-01-01T00:00:00.000000Z' },
+    ));
+    assert.equal(put.status, 201);
+    const token = await reachableToken(
+        'nkgaOHZISTQrILTfPThWCA', [],
+    );
+    const get = await handleRequest(
+        db, req('GET', path, token),
+    );
+    assert.equal(get.status, 403);
+});
+
+test('org-less PUT naming another identity 403s',
+async () => {
+    const db = await freshDb();
+    const token = await reachableToken(
+        'nkgaOHZISTQrILTfPThWCA', [],
+    );
+    const rid = generateIdentifier();
+    const path = nestedPath(
+        'uTGrEpVpODbNhDhDVdWeqQ', rid,
+    );
+    const res = await handleRequest(db, req(
+        'PUT', path, token,
+        {
+            identity_id: 'uTGrEpVpODbNhDhDVdWeqQ',
+            at: '2026-01-01T00:00:00.000000Z',
+        },
+    ));
+    assert.equal(res.status, 403);
+    const requests = await db.messagePairs.getAll();
+    assert.equal(
+        requests.filter(r => r.uri_id === rid).length,
+        0,
+    );
 });
 
 test("a member's self-revoke: ACCESS still works until exp"

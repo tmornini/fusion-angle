@@ -431,3 +431,38 @@ test(
         assert.notEqual(rows[0]!.at, AT);
     },
 );
+
+// Sibling to the member pin above: invitationDocumentEntity
+// spreads document.body (carrying the invitation's OWN `at`,
+// validated at write time by grantInvitation's
+// validateTimestampField(body, 'grantAt', …)) before
+// versionSnapshotsAt overwrites it with the ledger arrival
+// time. This pins the versions wire to the ledger fact and
+// proves it is NOT the invitation's own grant time.
+test(
+    'invitation versions at is the ledger arrival time,'
+    + ' not the invitation grant time',
+    async () => {
+        const db = await seedInviteeWorld();
+        const invitationId = generateIdentifier();
+        await grantDave(db, invitationId);
+        const token = await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
+        );
+        const list = await handleRequest(db, req(
+            'GET',
+            '/identities/' + DAVE + '/invitations/'
+                + invitationId + '/versions/',
+            token,
+        ));
+        assert.equal(list.status, 200);
+        const rows = await list.json() as { at: string }[];
+        assert.equal(rows.length, 1);
+        const stored = await messageStore(db).get(
+            '/invitations/', invitationId,
+        );
+        assert.ok(stored);
+        assert.equal(rows[0]!.at, stored.response_at);
+        assert.notEqual(rows[0]!.at, AT);
+    },
+);

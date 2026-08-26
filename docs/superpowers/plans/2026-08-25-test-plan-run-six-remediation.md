@@ -459,7 +459,7 @@ tree, report and await the master.
   and undo restore the graph'`. Task 3 appends beside it
   and must leave it untouched.
 
-- [ ] **Step 1: Append the green guard**
+- [x] **Step 1: Append the green guard**
 
 Append to `tests/workbox-inbox.test.ts` (after the last
 test), and add the two imports named above:
@@ -525,7 +525,7 @@ test(
 );
 ```
 
-- [ ] **Step 2: Run the file — the guard passes as
+- [x] **Step 2: Run the file — the guard passes as
   written**
 
 Run: `TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \`
@@ -534,7 +534,7 @@ Run: `TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \`
 Expected: ALL tests pass, including the new one. If the
 new test FAILS, stop and report (see preamble above).
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 Run: `./validate` — green.
 
@@ -579,7 +579,7 @@ Represent instead.
   voice). `buildInboxItems`'s signature is UNCHANGED.
   No later task consumes the new field.
 
-- [ ] **Step 1: Replace the hide pin with the red
+- [x] **Step 1: Replace the hide pin with the red
   visibility pin**
 
 In `tests/workbox-inbox.test.ts`, DELETE the test
@@ -623,7 +623,7 @@ assertion after its last one:
         assert.equal(item.claimedByName, null);
 ```
 
-- [ ] **Step 2: Run the file — red exactly where
+- [x] **Step 2: Run the file — red exactly where
   expected**
 
 Run: `TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \`
@@ -634,7 +634,7 @@ claim filter drops it); the strengthened test FAILS at
 runtime (`claimedByName` is `undefined`, not `null`);
 Task 2's guard and every other test still pass.
 
-- [ ] **Step 3: Fix the presenter**
+- [x] **Step 3: Fix the presenter**
 
 In `web-app/app/presenters/workbox-inbox.ts`:
 
@@ -714,7 +714,7 @@ and interpolate it in the row markup immediately after
                         ${claimedBadge}
 ```
 
-- [ ] **Step 4: Run the file — green across the board**
+- [x] **Step 4: Run the file — green across the board**
 
 Same single-file run as Step 2.
 Expected: every test passes — the new visibility pin,
@@ -723,7 +723,7 @@ Task 2's guard, and the untouched archived-mode tests
 (a claimed unfinished item still stays out of
 `'archived'` mode via `itemMatchesMode`).
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 Run: `./validate` — green (tsc type-checks the presenter;
 the deleted helper must leave no unused imports).
@@ -767,7 +767,7 @@ sin; the generic stamp is the smaller diff (Ruling 6).
   these three wire fields. Flows' StateEntity branch is
   untouched.
 
-- [ ] **Step 1: Extend the wire pin — red**
+- [x] **Step 1: Extend the wire pin — red**
 
 In `tests/api-entity-history-routes.test.ts`, in the test
 `'GET organizations/:id/objectives/:id/versions: 200 DESC
@@ -804,7 +804,7 @@ assertions, so the body reads:
 field is `at`, the StateEntity spelling; `state_at` stays
 banned from this wire.)
 
-- [ ] **Step 2: Run the file — red on the new
+- [x] **Step 2: Run the file — red on the new
   assertions**
 
 Run: `TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \`
@@ -813,7 +813,7 @@ Run: `TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \`
 Expected: exactly this test fails (`etag` is
 `undefined`); everything else passes.
 
-- [ ] **Step 3: Stamp the pair facts**
+- [x] **Step 3: Stamp the pair facts**
 
 In `api/document-family.ts`, change `versionSnapshotsAt`:
 the `toEntity` parameter type goes from
@@ -855,7 +855,7 @@ export async function versionSnapshotsAt(
 }
 ```
 
-- [ ] **Step 4: Correct the stale route comment**
+- [x] **Step 4: Correct the stale route comment**
 
 In `api/routes.ts` (~:5861-5862), replace
 
@@ -872,7 +872,7 @@ with
     // member_id); empty → missedReadError('objectives').
 ```
 
-- [ ] **Step 5: Run the file, then the suite — green**
+- [x] **Step 5: Run the file, then the suite — green**
 
 Single-file run from Step 2: the extended test passes.
 Run: `./test`
@@ -881,7 +881,7 @@ Expected: green — the sibling family versions tests
 property access and tolerate the new fields; flows tests
 ride the untouched StateEntity branch.
 
-- [ ] **Step 6: Validate and commit**
+- [x] **Step 6: Validate and commit**
 
 Run: `./validate` — green. If
 `generate-api-documentation --check` reports drift
@@ -946,7 +946,7 @@ export async function getObjectiveLifecycleEvents(
 ): Promise<ObjectiveLifecycleEvent[]>
 ```
 
-- [ ] **Step 1: Write the two red pins**
+- [x] **Step 1: Write the two red pins**
 
 Append to `tests/adapters-objectives.test.ts`, beside the
 existing archival-stream test (whose imports —
@@ -1041,7 +1041,7 @@ test(
 );
 ```
 
-- [ ] **Step 2: Run the file — red**
+- [x] **Step 2: Run the file — red**
 
 Run: `TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \`
 `node --strip-types --import ./tests/hmac-test-key.ts \`
@@ -1052,7 +1052,7 @@ is this step's red. (An ESM named-import miss fails the
 whole file, not just the new tests; the rest of the
 suite is untouched.)
 
-- [ ] **Step 3: Retype the histories door, add the
+- [x] **Step 3: Retype the histories door, add the
   stream**
 
 In `web-app/app/adapters/objectives.ts`:
@@ -1138,7 +1138,7 @@ so `toReversed()` walks oldest-first. On the genesis row
 neither arm's condition-for-event; an archived genesis
 would truthfully be an archival.)
 
-- [ ] **Step 4: Run the file — green**
+- [x] **Step 4: Run the file — green**
 
 Single-file run from Step 2. Expected: all tests pass,
 including the untouched
@@ -1146,7 +1146,7 @@ including the untouched
 rows only'` (the retype is source-compatible: it reads
 only `row.state`).
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 Run: `./validate` — green.
 
@@ -1198,7 +1198,7 @@ remove tests of a deleted function.
   name-based and unaffected. No later task consumes
   this.
 
-- [ ] **Step 1: Rework the presenter-test fixtures and
+- [x] **Step 1: Rework the presenter-test fixtures and
   write the three red pins**
 
 In `tests/presenter-project-score-history.test.ts`:
@@ -1341,7 +1341,7 @@ test(
 );
 ```
 
-- [ ] **Step 2: Run the file — red exactly on the three
+- [x] **Step 2: Run the file — red exactly on the three
   new tests**
 
 Run: `TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \`
@@ -1355,7 +1355,7 @@ runtime only reads `kind`/`objectiveId` off today's
 events, and the empty `lifecycle` array changes
 nothing).
 
-- [ ] **Step 3: Reshape the presenter**
+- [x] **Step 3: Reshape the presenter**
 
 In `web-app/app/presenters/project-score-history.ts`:
 
@@ -1462,7 +1462,7 @@ compile error, not a blank row):
 If `DISPLAY_ABSENT` is now unread in this module, delete
 its import (tsc `noUnusedLocals` is the witness).
 
-- [ ] **Step 4: Switch the page, delete the old stream**
+- [x] **Step 4: Switch the page, delete the old stream**
 
 (a) In `web-app/projects/detail.ts`: at :51 import
 `getObjectiveLifecycleEvents` instead of
@@ -1488,7 +1488,7 @@ tests) and remove `getObjectiveArchivalEvents` from the
 import list (keep `getObjectiveHistories` only if still
 imported by a remaining test — otherwise drop it too).
 
-- [ ] **Step 5: Run both files, then the suite — green**
+- [x] **Step 5: Run both files, then the suite — green**
 
 Run the presenter test file (Step 2 command): all pass,
 including the three new pins.
@@ -1497,7 +1497,7 @@ Run: `./test` — green (`grep -rn
 "getObjectiveArchivalEvents" web-app/ tests/` must
 return nothing).
 
-- [ ] **Step 6: Validate and commit**
+- [x] **Step 6: Validate and commit**
 
 Run: `./validate` — green.
 
@@ -1535,7 +1535,7 @@ depends on and must not disturb.
   `onEmpty` NOT; rejecting fetch ⇒ neither. Task 9's
   page fix rides the first arm.
 
-- [ ] **Step 1: Write the new test file**
+- [x] **Step 1: Write the new test file**
 
 Create `tests/loading-states.test.ts`:
 
@@ -1650,7 +1650,7 @@ test(
 );
 ```
 
-- [ ] **Step 2: Run the file — green as written**
+- [x] **Step 2: Run the file — green as written**
 
 Run: `TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \`
 `node --strip-types --import ./tests/hmac-test-key.ts \`
@@ -1664,7 +1664,7 @@ established stub preamble from
 dynamic `await import(...)`) — the in-tree pattern for
 exactly this.
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 Run: `./validate` — green.
 
@@ -1706,7 +1706,7 @@ export function subscribeOnce(
 ): void
 ```
 
-- [ ] **Step 1: Write the two red pins**
+- [x] **Step 1: Write the two red pins**
 
 Append to `tests/channels.test.ts` after the
 `createChannel` tests (add `subscribeOnce` to the
@@ -1742,7 +1742,7 @@ test(
 );
 ```
 
-- [ ] **Step 2: Run the file — red**
+- [x] **Step 2: Run the file — red**
 
 Run: `TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \`
 `node --strip-types --import ./tests/hmac-test-key.ts \`
@@ -1752,7 +1752,7 @@ Expected: the FILE fails at import — the named import
 red. (An ESM named-import miss fails the whole file; the
 rest of the suite is untouched.)
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Append to `web-app/app/channels.ts`:
 
@@ -1776,11 +1776,11 @@ export function subscribeOnce(
 }
 ```
 
-- [ ] **Step 4: Run the file — green**
+- [x] **Step 4: Run the file — green**
 
 Same run as Step 2. Expected: all pass.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 Run: `./validate` — green.
 
@@ -1841,7 +1841,7 @@ all — recorded in Task 14, NOT fixed here.
 - Produces: the four pages live-update from a cold empty
   list. No later task consumes this.
 
-- [ ] **Step 1: Write the page-level red pin**
+- [x] **Step 1: Write the page-level red pin**
 
 Create `tests/ideas-empty-subscribe.test.ts`. The recipe
 is `tests/command-palette-init.test.ts` (stub globals →
@@ -2009,7 +2009,7 @@ test(
 );
 ```
 
-- [ ] **Step 2: Run the file — red on the final
+- [x] **Step 2: Run the file — red on the final
   assertion**
 
 Run: `TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \`
@@ -2024,7 +2024,7 @@ stub to the established trio's shape, nothing more) —
 the test must reach the final assertion red before any
 page code changes.
 
-- [ ] **Step 3: Arm the one-shot on all four pages**
+- [x] **Step 3: Arm the one-shot on all four pages**
 
 (a) `web-app/ideas/index.ts` — add to the import block
 `import { subscribeOnce } from '../app/channels.ts';`
@@ -2087,12 +2087,12 @@ panel and re-arms a fresh one-shot: the loop IS the arc.
 The already-removed create button re-`remove()`s as a
 `?.` no-op.
 
-- [ ] **Step 4: Run the file — green; then the suite**
+- [x] **Step 4: Run the file — green; then the suite**
 
 Single-file run from Step 2: both assertions pass.
 Run: `./test` — green.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 Run: `./validate` — green.
 
@@ -2140,7 +2140,7 @@ fields, so this is purely a client UX gate.
   precedent); `ideaCreateDraftIsComplete` (unchanged).
 - Produces: nothing later tasks consume.
 
-- [ ] **Step 1: Flip the presenter pin — red**
+- [x] **Step 1: Flip the presenter pin — red**
 
 In `tests/presenter-idea.test.ts`, replace the test
 `'IdeaCreatePresenter.render disables the submit button
@@ -2173,7 +2173,7 @@ Leave the adjacent
 test untouched — a complete draft renders enabled before
 and after this change.
 
-- [ ] **Step 2: Run the file — red on the flipped pin**
+- [x] **Step 2: Run the file — red on the flipped pin**
 
 Run: `TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \`
 `node --strip-types --import ./tests/hmac-test-key.ts \`
@@ -2182,7 +2182,7 @@ Expected: exactly the flipped test fails (render still
 emits `disabled`); the four-field truth-table test and
 all others pass.
 
-- [ ] **Step 3: Un-mute the presenter**
+- [x] **Step 3: Un-mute the presenter**
 
 In `web-app/app/presenters/idea-create.ts`:
 
@@ -2211,7 +2211,7 @@ If `trusted` (or `ideaCreateDraftIsComplete`) is now
 unread in this module, delete it from the import list —
 `./validate`'s tsc pass is the witness.
 
-- [ ] **Step 4: Guard the submit handler; retire the
+- [x] **Step 4: Guard the submit handler; retire the
   mute machinery**
 
 In `web-app/ideas/create.ts`:
@@ -2253,12 +2253,12 @@ after `formState = readFormFromDom();` and before
 (`ideaCreateDraftIsComplete` is already imported by this
 page for `mutateSubmitButton`; keep that import.)
 
-- [ ] **Step 5: Run the file — green; then the suite**
+- [x] **Step 5: Run the file — green; then the suite**
 
 Single-file run from Step 2: all pass.
 Run: `./test` — green.
 
-- [ ] **Step 6: Validate and commit**
+- [x] **Step 6: Validate and commit**
 
 Run: `./validate` — green.
 
@@ -2303,7 +2303,7 @@ TEST-PLAN.md AA-Obj (~:646) on the next browser run.
   cast voice (:236-247).
 - Produces: nothing later tasks consume.
 
-- [ ] **Step 1: Assign-on-open**
+- [x] **Step 1: Assign-on-open**
 
 In `web-app/organization/index.ts`, replace the bare arm
 
@@ -2327,7 +2327,7 @@ with
 
 (the `} else if (` chain continues unchanged).
 
-- [ ] **Step 2: Validate and commit**
+- [x] **Step 2: Validate and commit**
 
 Run: `./validate` — green.
 
@@ -2368,7 +2368,7 @@ time") on the next browser run.
 - Consumes: nothing new.
 - Produces: nothing later tasks consume.
 
-- [ ] **Step 1: Fix the class names, clear the text**
+- [x] **Step 1: Fix the class names, clear the text**
 
 In the toggle handler in `web-app/auth/index.ts`,
 replace
@@ -2420,7 +2420,7 @@ with
 (the `aria-invalid` removals between them stay exactly
 as they are).
 
-- [ ] **Step 2: Validate and commit**
+- [x] **Step 2: Validate and commit**
 
 Run: `./validate` — green.
 
@@ -2479,7 +2479,7 @@ preimage entry is needed — `seed-hash-preimage.ts`
   Email", "Contact Phone" (all `text`). No later task
   consumes this.
 
-- [ ] **Step 1: Extend the count and write the red pin**
+- [x] **Step 1: Extend the count and write the red pin**
 
 In `tests/test-plan-slices.test.ts`:
 
@@ -2526,7 +2526,7 @@ async () => {
 `deriveDocumentsAt`, `canonicalUriCollection`,
 `sliceEntityId` — is already in the file's import block).
 
-- [ ] **Step 2: Run the file — red in two places**
+- [x] **Step 2: Run the file — red in two places**
 
 Run: `TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \`
 `node --strip-types --import ./tests/hmac-test-key.ts \`
@@ -2535,7 +2535,7 @@ Expected: the new AA test fails (`records.length` is 0)
 and `'slice seed pair count is pinned'` fails (509
 pairs ≠ 514); everything else passes.
 
-- [ ] **Step 3: Mint the third attribute id**
+- [x] **Step 3: Mint the third attribute id**
 
 In `api/test-plan-slices.ts`, after the `'aa-attr-2'`
 line (~:207), add:
@@ -2550,7 +2550,7 @@ then verify uniqueness:
 its neighbors). If the grep finds a collision, mint a
 fresh 22-char `[A-Za-z0-9_-]` literal and re-check.
 
-- [ ] **Step 4: Form the record**
+- [x] **Step 4: Form the record**
 
 In `api/test-plan-slices.ts`, immediately after the
 `formRExtras` function's closing brace, add:
@@ -2696,7 +2696,7 @@ async function formAaRecord(
 file's own established idiom at the same call —
 `formRecordBindingMessagePairs`'s attribute loop.)
 
-- [ ] **Step 5: Form outside the tx, write inside it**
+- [x] **Step 5: Form outside the tx, write inside it**
 
 In `postTestPlanSlices`:
 
@@ -2718,7 +2718,7 @@ In `postTestPlanSlices`:
             );
 ```
 
-- [ ] **Step 6: Run the file — green; then the suite**
+- [x] **Step 6: Run the file — green; then the suite**
 
 Single-file run from Step 2. Expected: all pass — the
 new AA test, the flipped count pin at 514, the
@@ -2732,7 +2732,7 @@ count, extend it in this same commit (`./test-postgres`
 verifies where a local postgres is available; the memory
 suite is the gate either way).
 
-- [ ] **Step 7: Document the bind prerequisite**
+- [x] **Step 7: Document the bind prerequisite**
 
 In TEST-PLAN.md's AA33 case (~:962), the Parallel
 paragraph currently opens:
@@ -2753,7 +2753,7 @@ picker sources ONLY the bound record —
 is the case's own precondition). TEST-PLAN.md is exempt
 from the 78-char lint; match the file's local wrap.
 
-- [ ] **Step 8: Validate and commit**
+- [x] **Step 8: Validate and commit**
 
 Run: `./validate` — green.
 
@@ -2783,7 +2783,7 @@ against a 450 ceiling — six bullets fit.
   observations.
 - Produces: nothing later tasks consume.
 
-- [ ] **Step 1: Append the bullets**
+- [x] **Step 1: Append the bullets**
 
 Append to `## Later work` (matching its terse
 bullet-with-oracle voice, ≤78-char lines):
@@ -2815,7 +2815,7 @@ bullet-with-oracle voice, ≤78-char lines):
   observation
 ```
 
-- [ ] **Step 2: Validate and commit**
+- [x] **Step 2: Validate and commit**
 
 Run: `./validate` — green (the later-work gate accepts
 TODO.md content; the line-count ceiling holds at
@@ -2845,19 +2845,19 @@ this commit records the fully ticked state.
 - Consumes: every prior task's ticked boxes.
 - Produces: the campaign's history is complete.
 
-- [ ] **Step 1: Verify every box above is ticked**
+- [x] **Step 1: Verify every box above is ticked**
 
 Every `- [ ]` in Tasks 1-14 reads `- [x]`. Any unticked
 box is unfinished work — finish it or report why, before
 this task.
 
-- [ ] **Step 2: Verify the tree**
+- [x] **Step 2: Verify the tree**
 
 Run: `git status --short`
 Expected: only this plan file, modified (its ticked
 boxes). Run `./validate` one final time — green.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-25-test-plan-run-six-remediation.md

@@ -32,6 +32,7 @@ import {
     attachDate,
     streamGetFromStored,
     parseIfMatch,
+    LATCHED_OPERATION_ROUTE_PATTERNS,
     requireOperationId,
     OPERATION_ID_HEADER,
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
@@ -484,8 +485,13 @@ export async function handleRequest(
         try {
             const fence = await fenceRequest(authed);
             if (!fence.ok) {
-                // Org-less identity-scoped GET reaches
-                // the handler; fence would 403 first.
+                // Org-less identity-scoped reads (invitations,
+                // default-org, reachable orgs) reach the
+                // handler; fence would 403 first. Sign-out
+                // PUT is the same class: a zero-membership
+                // identity must still revoke its refresh
+                // cookie. GET of revocations stays fenced
+                // (admin-only via authorizeRequest).
                 if (
                     fencePattern
                         !== 'identities/:id/'
@@ -506,6 +512,13 @@ export async function handleRequest(
                         !== 'identities/:id/'
                             + 'invitations/:id/versions/'
                             + ':etag'
+                    && !(
+                        method === 'PUT'
+                        && fencePattern
+                            === 'identities/:id/'
+                                + 'token-revocations/'
+                                + ':rid'
+                    )
                 ) {
                     return Response.json(
                         { error: fence.error },
@@ -822,6 +835,34 @@ export async function handleRequest(
                 && echo !== null
                 && advertised !== undefined
                 && echo === advertised;
+            // The latched operation arm: a sub-resource
+            // write that acts ON the parent document (undo).
+            // Its precondition target is that parent's head —
+            // the route's segments minus the trailing literal
+            // — so the caller pins what it saw, not what the
+            // server's own resolution walk later reads.
+            const isLatchedOperation =
+                LATCHED_OPERATION_ROUTE_PATTERNS
+                    .has(routePattern);
+            const latchAddress = isLatchedOperation
+                ? messageAddress(
+                    matched.segments.slice(0, -1),
+                    pathSegments.slice(0, -1),
+                )
+                : undefined;
+            const latchHead = latchAddress === undefined
+                ? undefined
+                : await documentHeadMessagePairId(
+                    effective,
+                    canonicalUriCollection(
+                        organization,
+                        latchAddress.uriCollection,
+                    ),
+                    latchAddress.uriId,
+                );
+            const latchEcho = isLatchedOperation
+                ? request.headers.get(IF_MATCH_HEADER)
+                : null;
             // DELETE responses are UNIVERSALLY 204 with no
             // body — every wired DELETE handler returns void
             // (message-pair.ts resolution: DELETEs join their
@@ -917,6 +958,14 @@ export async function handleRequest(
                         latchedHeadMessagePairId: echo,
                     }
                     : {}),
+                ...(isLatchedOperation
+                    && latchEcho !== null
+                    ? {
+                        pinnedDocumentMessagePairId:
+                            parseIfMatch(latchEcho)
+                                ?? latchEcho,
+                    }
+                    : {}),
             });
             // The pre-tx idempotency fast-path: a byte-
             // identical resend never reaches the handler and
@@ -978,6 +1027,55 @@ export async function handleRequest(
                         );
                     }
                     return response;
+                }
+            }
+            // The latched-operation table, the locked
+            // table's sibling for sub-resource writes:
+            // absent → 428; malformed → 400; ≠ parent head
+            // → 412; == head → proceed with the echo latched
+            // onto the operation pair, re-verified in-tx by
+            // the handler. Returns BEFORE dispatch, so a
+            // rejected operation stores nothing.
+            // Absence is NOT a precondition failure: with no
+            // parent head there is nothing to pin, so the
+            // gate stands aside and the handler's own
+            // missedReadError speaks the 404 (AGENTS.md
+            // "Genuine absence still 404s"). Gating first
+            // would answer a foreign or never-written id
+            // with 428/412 and bury the real verdict.
+            if (isLatchedOperation && latchHead !== undefined) {
+                if (latchEcho === null) {
+                    return Response.json(
+                        {
+                            error: 'If-Match is required to '
+                                + 'POST ' + pathname,
+                        },
+                        {
+                            status:
+                                HTTP_PRECONDITION_REQUIRED,
+                        },
+                    );
+                }
+                const parsed = parseIfMatch(latchEcho);
+                if (parsed === undefined) {
+                    return Response.json(
+                        {
+                            error: 'If-Match must carry '
+                                + 'exactly one strong '
+                                + 'validator',
+                        },
+                        { status: HTTP_BAD_REQUEST },
+                    );
+                }
+                if (parsed !== latchHead) {
+                    return Response.json(
+                        {
+                            error: 'If-Match does not '
+                                + 'match the current document '
+                                + 'at ' + pathname,
+                        },
+                        { status: HTTP_PRECONDITION_FAILED },
+                    );
                 }
             }
             // The locked six-outcome table, applied ONLY after

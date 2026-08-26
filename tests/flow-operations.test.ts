@@ -1455,6 +1455,22 @@ function faultingPostCtx(
     let count = 0;
     const wrapped: RequestContext = {
         ...ctx,
+        POSTWithHeaders: <T>(
+            resource: string,
+            body: Record<string, unknown>,
+            headerFields:
+                readonly (readonly [string, string])[],
+        ): Promise<T> => {
+            if (resource === faultResource) {
+                count += 1;
+                return Promise.reject(
+                    new Error('injected POST fault'),
+                );
+            }
+            return ctx.POSTWithHeaders<T>(
+                resource, body, headerFields,
+            );
+        },
         POST: <T>(
             resource: string,
             body: Record<string, unknown>,

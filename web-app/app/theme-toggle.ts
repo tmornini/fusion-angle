@@ -1,38 +1,16 @@
 import {
-    getThemeIcon,
     persistThemePreference,
+    mutateThemeToggleIcon,
 } from './state.ts';
 import {
     isStoredTheme,
     type StoredTheme,
 } from './adapters/preferences.ts';
 import { $, $$ } from './dom.ts';
-import { setHtml } from './safe-html.ts';
 import { showToast } from './toast.ts';
 import { log } from './logger.ts';
-import { ICON_SIZE } from './icons.ts';
 
-const THEME_TOGGLE_IDS = [
-    'theme-toggle',
-    'mobile-theme-toggle',
-] as const;
-
-export function mutateThemeToggleIcon(
-): void {
-    const themeIcon = getThemeIcon(ICON_SIZE.xl, '');
-    const themeLabel = 'Toggle theme';
-    THEME_TOGGLE_IDS.forEach(id => {
-        const button =
-            $(`#${id}`, document);
-        if (button) {
-            setHtml(button, themeIcon);
-            button.setAttribute(
-                'aria-label',
-                themeLabel,
-            );
-        }
-    });
-}
+export { mutateThemeToggleIcon };
 
 export function initDropdown(
     toggleId: string,

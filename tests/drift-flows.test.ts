@@ -670,6 +670,7 @@ test('live-write chain: create, save, node delete, undo, '
             eventId: FLOWID_UNDO_EV,
             at: undoAt,
         },
+        { 'if-match': await headEtag(db, token, flowId) },
     ));
     assert.equal(undone.status, 201);
     headId = await headResponseId(db, token, flowId);

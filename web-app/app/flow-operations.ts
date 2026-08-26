@@ -696,14 +696,27 @@ async function postFlowUndo(
         attempt <= MAX_UNDO_ATTEMPTS;
         attempt++
     ) {
+        // The echo is the precondition, so it is re-read
+        // EVERY attempt: retrying against the stale one
+        // would 412 forever. A head that moved under us is
+        // exactly what the backoff is for — the next
+        // attempt pins the NEW head and the server
+        // re-resolves one step back from it.
+        const resource =
+            organizationItem(ctx, 'flows', flowId);
+        const { etag } =
+            await ctx.GETWithEtag<unknown>(resource);
         try {
-            await ctx.POST(
-                organizationItem(ctx, 'flows', flowId)
-                    + '/undo',
+            await ctx.POSTWithHeaders(
+                resource + '/undo',
                 {
-                eventId: generateIdentifier(),
-                at: nowUtc(),
-            });
+                    eventId: generateIdentifier(),
+                    at: nowUtc(),
+                },
+                etag === undefined
+                    ? []
+                    : [['if-match', '"' + etag + '"']],
+            );
             return;
         } catch (err) {
             if (

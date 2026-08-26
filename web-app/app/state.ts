@@ -20,11 +20,14 @@ import {
 } from './storage-keys.ts';
 import {
     type IconSize,
+    ICON_SIZE,
     iconSun,
     iconMoon,
     iconMonitor,
 } from './icons.ts';
-import type { SafeHtml } from './safe-html.ts';
+import {
+    setHtml, type SafeHtml,
+} from './safe-html.ts';
 
 interface AppState {
     theme: StoredTheme;
@@ -33,6 +36,11 @@ interface AppState {
 
 const DARK_QUERY =
     '(prefers-color-scheme: dark)';
+
+const THEME_TOGGLE_IDS = [
+    'theme-toggle',
+    'mobile-theme-toggle',
+] as const;
 
 // State starts at pure domain defaults so importing
 // this module touches neither localStorage nor window.
@@ -71,6 +79,20 @@ function getThemeIcon(
     return iconMonitor(size, cssClass);
 }
 
+function mutateThemeToggleIcon(): void {
+    const themeIcon = getThemeIcon(ICON_SIZE.xl, '');
+    for (const id of THEME_TOGGLE_IDS) {
+        const button = document.querySelector(
+            '#' + id,
+        );
+        if (button === null) continue;
+        setHtml(button, themeIcon);
+        button.setAttribute(
+            'aria-label', 'Toggle theme',
+        );
+    }
+}
+
 function applyResolvedTheme(): void {
     const resolved = computeTheme();
     document.documentElement
@@ -83,6 +105,7 @@ function applyResolvedTheme(): void {
             'dark',
             resolved === 'dark',
         );
+    mutateThemeToggleIcon();
 }
 
 // Returns true when the preference was
@@ -183,6 +206,7 @@ export {
     computeTheme,
     getThemeIcon,
     applyResolvedTheme,
+    mutateThemeToggleIcon,
     persistThemePreference,
     collapseSidebar,
     initState,

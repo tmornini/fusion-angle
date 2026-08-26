@@ -409,11 +409,21 @@ test(
             nodes: [],
             edges: [],
         });
-        await ctx.POST('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'aEsGMmBEFaVdWihhHXwCbw/undo', {
-            eventId: generateIdentifier(),
-            at: '2099-01-02T00:00:00.000000Z',
-        });
+        const undoHead = await ctx.GETWithEtag<unknown>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw',
+        );
+        await ctx.POSTWithHeaders(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw/undo',
+            {
+                eventId: generateIdentifier(),
+                at: '2099-01-02T00:00:00.000000Z',
+            },
+            undoHead.etag === undefined
+                ? []
+                : [['if-match', '"' + undoHead.etag + '"']],
+        );
         const events = await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',

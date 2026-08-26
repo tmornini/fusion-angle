@@ -859,6 +859,19 @@ function invitationDocumentEntity(
 ): Record<string, unknown> {
     return {
         id: document.uriId,
+        // The spread body's `at` is the invitation's own
+        // grant time — validated at write time by
+        // grantInvitation's validateTimestampField(body,
+        // 'grantAt', …) and copied to the document body —
+        // not a ledger fact: GET
+        // .../invitations/:id/versions/ stamps a DIFFERENT
+        // `at` on top of this entity — the message pair's
+        // own arrival time (versionSnapshotsAt,
+        // document-family.ts). Same name, different fact —
+        // see InvitationEntity.at (api/types.ts) and the
+        // pin at tests/api-versions-etag.test.ts
+        // ('invitation versions at is the ledger arrival
+        // time, not the invitation grant time').
         ...document.body,
     };
 }

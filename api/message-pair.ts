@@ -65,6 +65,12 @@ export interface MessagePair {
     // Pre-tx lock-head pair id, latched when If-Match
     // matches the advertised ETag. In-tx re-query only.
     readonly latchedHeadMessagePairId?: string;
+    // A latched OPERATION's pin: the head of the PARENT
+    // document this operation acts on, not of this pair's
+    // own address. coordinateWrite never reads it — its
+    // latch is same-address by definition — the handler
+    // re-verifies it in-tx against the document address.
+    readonly pinnedDocumentMessagePairId?: string;
 }
 
 // The gate's seed for the two /authentication/* grant routes
@@ -106,6 +112,7 @@ export interface WriteMessagePairInput {
     readonly responseStatus: number;
     readonly responseBody: unknown | undefined;
     readonly latchedHeadMessagePairId?: string;
+    readonly pinnedDocumentMessagePairId?: string;
     // Required on every formed pair. Public writes supply
     // the hoisted Operation-ID; seed and inner PUTs pass
     // the envelope id here. Never minted for a public write.
@@ -249,6 +256,12 @@ export async function formWriteMessagePair(
         operationId: input.operationId,
         ...(input.latchedHeadMessagePairId !== undefined
             ? { latchedHeadMessagePairId: input.latchedHeadMessagePairId }
+            : {}),
+        ...(input.pinnedDocumentMessagePairId !== undefined
+            ? {
+                pinnedDocumentMessagePairId:
+                    input.pinnedDocumentMessagePairId,
+            }
             : {}),
     };
 }
@@ -871,6 +884,20 @@ export function createdEntityUriId(
     return typeof value === 'string' && value !== ''
         ? value : undefined;
 }
+
+// A latched operation is a sub-resource write that REVERTS or
+// REPLACES the document it hangs off — it names the head it
+// intends to act on, exactly as a locked PUT names the head it
+// intends to overwrite. Without the echo the server would act
+// on whatever its own pre-transaction resolution happened to
+// read, so the same request would 412 or succeed by scheduling
+// alone — a verdict the caller can neither predict nor retry
+// into. The latch target is the PARENT document address: the
+// route's segments minus its trailing literal.
+export const LATCHED_OPERATION_ROUTE_PATTERNS:
+    Set<string> = new Set([
+        'organizations/:id/flows/:id/undo',
+    ]);
 
 // The coverage gate: pairs, wire headers, and the idempotency
 // fast-path fire ONLY for wired route patterns. Seeded with the

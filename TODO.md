@@ -50,15 +50,15 @@ spec → plan → ship cycle, implemented sequentially. A
 5. Execute TEST-PLAN.md with up to 48 subagents —
    after the run-four remediation ships; the
    Protocol's one-profile, hunters-in-turn contract is
-   revisited for 48. BLOCKING precondition, cleared
-   before the run starts: `./validate` is this run's
-   automatic abort, and a false prophet in the gating
-   suite kills the run spuriously —
-   `tests/api-flow-document.test.ts:1038` ("an undo
-   racing a save") failed three times (two on Markdown
-   diffs), two racers winning where one was expected,
-   then passed in isolation and on re-run. Merged: the
-   five run-four mitigation stubs (absorbed by the
+   revisited for 48. BLOCKING precondition CLEARED:
+   the false prophet in the gating suite
+   (`tests/api-flow-document.test.ts` "an undo racing a
+   save", two racers winning where one was expected) is
+   fixed at the root — the undo POST now carries
+   If-Match, so its 412 names a real conflict instead of
+   the server's own resolution timing. Measured 17/100
+   before, 0/300 after; `./test` 15/15 green. Merged:
+   the five run-four mitigation stubs (absorbed by the
    remediation spec); the flaky-test bullet.
 6. Re-implement workbox, work orders, and flows —
    nodes become processes; process kinds: record
@@ -347,32 +347,69 @@ Off the critical path; each with its oracle.
   non-canvas pages (Billing) — a flow-canvas gesture
   listener may be bound globally — TEST-PLAN.md G42
   observation
-- `tests/api-flow-document.test.ts` "undo racing a save"
-  fails intermittently under the full-suite `node --test`
-  parallel run; verified 8/8 green in isolation, so it is a
-  timing assumption that breaks under load, not a broken
-  test — three sightings during the run-six campaign
-- `subscribeOnce` discards a re-init rejection: `void fn()`
-  means a throw inside the re-run `init` is never logged,
-  never painted, and never retried — unlike first boot,
-  which `page-loader.ts` catches and paints with a retry.
-  No global `unhandledrejection` handler exists —
-  `web-app/app/channels.ts:152`,
-  `web-app/app/page-loader.ts:37-70`
-- `subscribeOnce`'s comment claims "exactly one live
-  subscription at all times"; the true guarantee is "never
-  two". A bell arriving between teardown and re-arm is
-  dropped, leaving an empty list page blank. Correct the
-  prose, not the code — a pending flag reintroduces the
-  shared state the design avoids —
-  `web-app/app/channels.ts:138-152`
+- A re-init failure degrades weaker than a first-boot one:
+  `subscribeOnce`'s `void fn()` lets the rejection reach the
+  global `unhandledrejection` handler, which logs and
+  toasts — but first boot gets `handlePageLoadError`'s full
+  error state with a Try Again button. Toast-only, no retry
+  — `web-app/app/channels.ts:152`,
+  `web-app/app/page-loader.ts:41-75`,
+  `web-app/app/error-helpers.ts:41-57`
+- `subscribeOnce` guarantees "never two" live subscriptions,
+  not "always one": a bell arriving between teardown and
+  re-arm is dropped, leaving an empty list page blank — the
+  symptom run-six Task 9 fixes. Needs two bells inside one
+  fetch window; a pending flag would close it but
+  reintroduces the shared state the design avoids —
+  `web-app/app/channels.ts:138-154`
 - Objective lifecycle history compares two clocks:
   `revision.at` is client-minted while the lifecycle `at`
   is the server-stamped pair fact. A browser clock ahead of
-  the server can invert them, throw, and blank the whole
-  History modal through an un-caught async click listener —
+  the server can invert them and throw, so the History
+  modal fails to open with an error toast instead of
+  rendering —
   `web-app/app/adapters/objectives.ts:311`,
   `web-app/projects/detail.ts:318`
+- `api/test-plan-slices.ts` forms a record write in three
+  near-verbatim ~100-line blocks — `formAaRecord` (:2026),
+  `formRecordBindingMessagePairs` (:2445), and the first
+  fifty lines of `formRExtras` (:1830); past the rule of
+  three, extract the no-binding core once
+- The resolve-and-throw block in
+  `web-app/app/presenters/project-score-history.ts` is four
+  identical 11-line copies (:139, :161, :182, :201) — a
+  `#definitionAt(objectiveId, at)` helper collapses each
+- `tests/ideas-empty-subscribe.test.ts` enforces its
+  load-bearing property by comment, not assertion: assert
+  the two raw PUTs alone do not wake the page before
+  posting the bell
+- `tests/presenter-project-score-history.test.ts:224,:259`
+  assert substrings the row-selection predicate already
+  implies, leaving the detail cell unpinned — assert
+  `<td>archived</td>`
+- `tests/test-plan-slices.test.ts:466-472` pins the AA
+  attribute count but not names or types; a rename keeps it
+  green while invalidating AA33 (`TEST-PLAN.md:970`)
+- Untested by design after run-six: the records/projects/
+  flows `onEmpty` arms (only ideas is pinned), `loadInto`'s
+  retry branch, a work order both claimed and completed,
+  and the archived-genesis walk
+  (`web-app/app/adapters/objectives.ts:190-192`)
+- `subscribeOnce`'s `const unsubscribe = subscribe(...)`
+  would throw a TDZ ReferenceError if any `subscribe` fired
+  its callback synchronously; all thirteen
+  `subscribe<Entity>Changes` delegate to `createChannel`,
+  so it is inert — guard only if that changes
+- Run-six cosmetics, none load-bearing: the only
+  human-readable seed id among 560
+  (`api/test-plan-slices.ts:208`), `unknown[]` returns now
+  provably narrower (`api/document-family.ts:438,:445`), a
+  non-strict DESC pin
+  (`tests/api-entity-history-routes.test.ts:1033`),
+  `adminId` hard-coded where siblings parameterize it
+  (`api/test-plan-slices.ts:2040`), and a dead
+  `disconnect()` stub in
+  `tests/ideas-empty-subscribe.test.ts`
 
 ## Sequencing
 

@@ -291,11 +291,21 @@ test(
         // graphDelta/revivals from CURRENT (advancedGraph) vs
         // TARGET, re-introducing what the advance dropped and
         // deleting what it added.
-        await ctx.POST('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + flowId + '/undo', {
-            eventId: generateIdentifier(),
-            at: nowUtc(),
-        });
+        const undoHead = await ctx.GETWithEtag<unknown>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + flowId,
+        );
+        await ctx.POSTWithHeaders(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + flowId + '/undo',
+            {
+                eventId: generateIdentifier(),
+                at: nowUtc(),
+            },
+            undoHead.etag === undefined
+                ? []
+                : [['if-match', '"' + undoHead.etag + '"']],
+        );
 
         // Step 5: GET must return the target (undone) graph.
         const fetched =
