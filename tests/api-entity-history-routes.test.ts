@@ -1015,6 +1015,9 @@ test(
         const rows = await res.json() as {
             id: string;
             state: string;
+            etag: string;
+            at: string;
+            member_id: string;
         }[];
         assert.equal(rows.length, 2);
         assert.equal(rows[0]!.id, id);
@@ -1022,6 +1025,17 @@ test(
         assert.equal(rows[1]!.id, id);
         assert.equal(rows[1]!.state, 'active');
         assert.equal('state_at' in rows[0]!, false);
+        assert.equal(typeof rows[0]!.etag, 'string');
+        assert.notEqual(rows[0]!.etag, '');
+        assert.notEqual(
+            rows[0]!.etag, rows[1]!.etag,
+        );
+        assert.ok(rows[0]!.at >= rows[1]!.at);
+        assert.equal(typeof rows[0]!.member_id, 'string');
+        assert.notEqual(rows[0]!.member_id, '');
+        assert.equal(
+            rows[0]!.member_id, rows[1]!.member_id,
+        );
     },
 );
 

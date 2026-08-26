@@ -124,6 +124,16 @@ export function seatEntityOf(
         organization_id: organization,
         identity_id: document.uriId,
         type: body.type,
+        // The seat's own grant time (validated above), not
+        // a ledger fact: GET .../members/:id/versions/
+        // stamps a DIFFERENT `at` on top of this entity —
+        // the message pair's own arrival time
+        // (versionSnapshotsAt, document-family.ts). Same
+        // name, different fact — see MembershipEntity.at
+        // (api/types.ts) and the pin at
+        // tests/api-versions-etag.test.ts ('member versions
+        // at is the ledger arrival time, not the seat grant
+        // time').
         at: body.at,
     };
 }

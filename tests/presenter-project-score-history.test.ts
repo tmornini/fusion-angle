@@ -55,8 +55,11 @@ const revisions = [
       description: 'd2', memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
       at: '2026-03-18T11:02:00.000000Z' },
 ];
-const archivals: {
+const lifecycle: {
     objectiveId: string;
+    kind: 'archival' | 'reactivation';
+    memberId: string;
+    at: string;
 }[] = [];
 
 const memberNames = new Map([['xdaJyuuPyHfffCGLhqDrOQ', 'Sarah Lee']]);
@@ -78,7 +81,7 @@ function resolver(objId: string, atTime: string) {
 
 test('merges all four streams chronologically', () => {
     const p = new ProjectScoreHistoryPresenter(
-        baselines, actuals, revisions, archivals,
+        baselines, actuals, revisions, lifecycle,
         resolver, whoName,
     );
     const html = p.buildBody().toString();
@@ -98,7 +101,7 @@ test('merges all four streams chronologically', () => {
 test('resolves historical objective name at each event',
     () => {
         const p = new ProjectScoreHistoryPresenter(
-            baselines, actuals, revisions, archivals,
+            baselines, actuals, revisions, lifecycle,
             resolver, whoName,
         );
         const html = p.buildBody().toString();
@@ -121,7 +124,7 @@ test('resolves historical objective name at each event',
 test('revision event row shows the new objective name',
     () => {
         const p = new ProjectScoreHistoryPresenter(
-            [], [], revisions, archivals, resolver, whoName,
+            [], [], revisions, lifecycle, resolver, whoName,
         );
         const html = p.buildBody().toString();
         const r1Pos = html.indexOf('2026-02-01');
@@ -144,7 +147,7 @@ test('positive score TD carries data-tone="success"', () => {
             , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
             score: 40, memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
             at: '2026-03-05T09:10:00.000000Z' }],
-        [], revisions, archivals, resolver, whoName,
+        [], revisions, lifecycle, resolver, whoName,
     );
     const html = p.buildBody().toString();
     assert.match(html,
@@ -158,7 +161,7 @@ test('negative score TD carries data-tone="error"', () => {
             objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: -50,
             memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
             at: '2026-04-01T16:45:00.000000Z' }],
-        revisions, archivals, resolver, whoName,
+        revisions, lifecycle, resolver, whoName,
     );
     const html = p.buildBody().toString();
     assert.match(html,
@@ -171,24 +174,10 @@ test('zero score TD carries data-tone="muted"', () => {
             , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
             score: 0, memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
             at: '2026-03-05T09:10:00.000000Z' }],
-        [], revisions, archivals, resolver, whoName,
+        [], revisions, lifecycle, resolver, whoName,
     );
     const html = p.buildBody().toString();
     assert.match(html, /<td data-tone="muted">0<\/td>/);
-});
-
-test('archival event row labels the archive', () => {
-    const dep = [{
-        objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
-    }];
-    const p = new ProjectScoreHistoryPresenter(
-        [], [], revisions, dep, resolver, whoName,
-    );
-    const html = p.buildBody().toString();
-    assert.ok(
-        html.includes('Objective archived'),
-        'archival event label missing',
-    );
 });
 
 test('Who column renders the actor name per row', () => {
@@ -206,3 +195,103 @@ test('Who column renders the actor name per row', () => {
     assert.ok(html.includes('Sarah Lee'),
         'Who cell should render the resolved name');
 });
+
+test(
+    'archival row shows date, who, and objective'
+    + ' name',
+    () => {
+        const p = new ProjectScoreHistoryPresenter(
+            [], [], revisions,
+            [{
+                objectiveId:
+                    'ohqxgUBEaFQwYbXsonRPmg',
+                kind: 'archival',
+                memberId:
+                    'xdaJyuuPyHfffCGLhqDrOQ',
+                at: '2026-05-01T10:00:00.000000Z',
+            }],
+            resolver, whoName,
+        );
+        const html = p.buildBody().toString();
+        const row = html.split('<tr>').find(
+            r => r.includes('Objective archived'),
+        );
+        assert.ok(row, 'archival row missing');
+        assert.ok(row.includes(
+            'datetime="2026-05-01T10:00:00.000000Z"',
+        ));
+        assert.ok(row.includes('Sarah Lee'));
+        assert.ok(row.includes('Drive Growth'));
+        assert.ok(row.includes('archived'));
+        assert.ok(
+            !row.includes('—'),
+            'no em-dash resignation',
+        );
+    },
+);
+
+test(
+    'reactivation renders its own dated row',
+    () => {
+        const p = new ProjectScoreHistoryPresenter(
+            [], [], revisions,
+            [{
+                objectiveId:
+                    'ohqxgUBEaFQwYbXsonRPmg',
+                kind: 'reactivation',
+                memberId:
+                    'xdaJyuuPyHfffCGLhqDrOQ',
+                at: '2026-05-02T10:00:00.000000Z',
+            }],
+            resolver, whoName,
+        );
+        const html = p.buildBody().toString();
+        const row = html.split('<tr>').find(
+            r => r.includes(
+                'Objective reactivated',
+            ),
+        );
+        assert.ok(row, 'reactivation row missing');
+        assert.ok(row.includes(
+            'datetime="2026-05-02T10:00:00.000000Z"',
+        ));
+        assert.ok(row.includes('Sarah Lee'));
+        assert.ok(row.includes('Drive Growth'));
+        assert.ok(row.includes('reactivated'));
+    },
+);
+
+test(
+    'lifecycle rows interleave chronologically',
+    () => {
+        const p = new ProjectScoreHistoryPresenter(
+            baselines, [], revisions,
+            [{
+                objectiveId:
+                    'ohqxgUBEaFQwYbXsonRPmg',
+                kind: 'archival',
+                memberId:
+                    'xdaJyuuPyHfffCGLhqDrOQ',
+                at: '2026-03-03T00:00:00.000000Z',
+            }],
+            resolver, whoName,
+        );
+        const html = p.buildBody().toString();
+        const first = html.indexOf(
+            'datetime="2026-03-01',
+        );
+        const mid = html.indexOf(
+            'datetime="2026-03-03',
+        );
+        const last = html.indexOf(
+            'datetime="2026-03-05',
+        );
+        assert.ok(first >= 0 && mid >= 0
+            && last >= 0);
+        assert.ok(
+            first < mid && mid < last,
+            'archival must sort between the'
+            + ' baselines, not trail the table',
+        );
+    },
+);

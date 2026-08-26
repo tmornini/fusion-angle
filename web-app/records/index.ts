@@ -6,6 +6,7 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
+import { subscribeOnce } from '../app/channels.ts';
 import {
     ICON_SIZE,
     iconPlus, iconDatabase,
@@ -64,6 +65,9 @@ export async function init(): Promise<void> {
                     '#create-record-btn',
                     document,
                 )?.remove();
+                subscribeOnce(
+                    subscribeRecordChanges, init,
+                );
             },
         },
         onData: records => onRecordsLoaded(

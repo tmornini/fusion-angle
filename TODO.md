@@ -323,6 +323,56 @@ Off the critical path; each with its oracle.
   `version` column hashed on write and was never checked
   on read. `request_hash` is replay identity, not
   response integrity — `SCHEMA.md` item 4
+- The add-identity dialog never clears its fields —
+  AA-Obj's stale-state sibling —
+  `web-app/identities/index.ts:213-281`
+- `flows/stats.ts` wires no change subscription; the
+  stats page stays stale until navigation
+- The empty-state `onEmpty` removes the header create
+  button irreversibly; a live empty→populated re-init
+  (run-six Task 9) leaves the list without its header
+  CTA — hide, don't remove —
+  `web-app/ideas/index.ts`, `web-app/records/index.ts`
+- Claim-on-load with no release-on-leave plus the
+  8-hour `DEFAULT_LOCK_TIMEOUT` turns a drive-by
+  work-order view into an 8-hour claim
+  (run-six Task 3 renders it; the UX remains) —
+  `web-app/workbox/detail.ts:583-593`,
+  `api/types.ts:1007`
+- G/V5 needs a cross-slice identity to verify Decline,
+  or the case text should sanction any invited
+  identity — plan defect vs hunter slip, unresolved —
+  TEST-PLAN.md G/V5
+- Intermittent "flow-marquee" console exceptions on
+  non-canvas pages (Billing) — a flow-canvas gesture
+  listener may be bound globally — TEST-PLAN.md G42
+  observation
+- `tests/api-flow-document.test.ts` "undo racing a save"
+  fails intermittently under the full-suite `node --test`
+  parallel run; verified 8/8 green in isolation, so it is a
+  timing assumption that breaks under load, not a broken
+  test — three sightings during the run-six campaign
+- `subscribeOnce` discards a re-init rejection: `void fn()`
+  means a throw inside the re-run `init` is never logged,
+  never painted, and never retried — unlike first boot,
+  which `page-loader.ts` catches and paints with a retry.
+  No global `unhandledrejection` handler exists —
+  `web-app/app/channels.ts:152`,
+  `web-app/app/page-loader.ts:37-70`
+- `subscribeOnce`'s comment claims "exactly one live
+  subscription at all times"; the true guarantee is "never
+  two". A bell arriving between teardown and re-arm is
+  dropped, leaving an empty list page blank. Correct the
+  prose, not the code — a pending flag reintroduces the
+  shared state the design avoids —
+  `web-app/app/channels.ts:138-152`
+- Objective lifecycle history compares two clocks:
+  `revision.at` is client-minted while the lifecycle `at`
+  is the server-stamped pair fact. A browser clock ahead of
+  the server can invert them, throw, and blank the whole
+  History modal through an un-caught async click listener —
+  `web-app/app/adapters/objectives.ts:311`,
+  `web-app/projects/detail.ts:318`
 
 ## Sequencing
 

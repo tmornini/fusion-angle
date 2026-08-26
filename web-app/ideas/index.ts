@@ -8,6 +8,7 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
+import { subscribeOnce } from '../app/channels.ts';
 import {
     ICON_SIZE,
     iconPlus, iconLightbulb,
@@ -64,6 +65,9 @@ export async function init(): Promise<void> {
                 $(
                     '#create-idea-btn', document,
                 )?.remove();
+                subscribeOnce(
+                    subscribeIdeaChanges, init,
+                );
             },
         },
         onData: ideas => onIdeasLoaded(

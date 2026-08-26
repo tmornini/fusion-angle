@@ -492,10 +492,10 @@ export async function init(): Promise<void> {
                 form.reset();
             }
             emailInput.classList.remove(
-                'error',
+                'input-error',
             );
             passwordInput.classList.remove(
-                'error',
+                'input-error',
             );
             emailInput.removeAttribute(
                 'aria-invalid',
@@ -503,9 +503,11 @@ export async function init(): Promise<void> {
             passwordInput.removeAttribute(
                 'aria-invalid',
             );
+            emailError.textContent = '';
             emailError.classList.add(
                 'hidden',
             );
+            passwordError.textContent = '';
             passwordError.classList.add(
                 'hidden',
             );

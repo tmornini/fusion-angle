@@ -48,7 +48,7 @@ import {
     getObjectives,
     getCurrentObjectiveDefinitions,
     getObjectiveRevisionsByObjective,
-    getObjectiveArchivalEvents,
+    getObjectiveLifecycleEvents,
     subscribeObjectiveChanges,
     postProjectApproval,
     postProjectArchival,
@@ -924,11 +924,11 @@ async function openHistoryModal(
     ctx: RequestContext,
     projectId: string,
 ): Promise<void> {
-    // Wave 1: scoring + archivals + member map.
-    const [scoring, allArchivals, memberMap] =
+    // Wave 1: scoring + lifecycle + member map.
+    const [scoring, allLifecycle, memberMap] =
         await Promise.all([
             getProjectScoring(ctx, projectId),
-            getObjectiveArchivalEvents(ctx),
+            getObjectiveLifecycleEvents(ctx),
             getMemberMap(ctx),
         ]);
     const baselineObjIds = new Set(
@@ -937,7 +937,7 @@ async function openHistoryModal(
     for (const a of scoring.actual) {
         baselineObjIds.add(a.objectiveId);
     }
-    const archivals = allArchivals.filter(
+    const lifecycle = allLifecycle.filter(
         d => baselineObjIds.has(d.objectiveId),
     );
     // Wave 2: revisions need the scoring-derived ids.
@@ -972,7 +972,7 @@ async function openHistoryModal(
     const presenter =
         new ProjectScoreHistoryPresenter(
             scoring.baseline, scoring.actual,
-            revisions, archivals, resolver,
+            revisions, lifecycle, resolver,
             memberId => memberName(memberMap, memberId),
         );
     const bodyEl =

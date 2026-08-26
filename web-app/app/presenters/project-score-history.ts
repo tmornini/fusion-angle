@@ -4,7 +4,7 @@ import type {
     ObjectiveId,
 } from '../../../api/types.ts';
 import type {
-    ObjectiveArchivalEvent,
+    ObjectiveLifecycleEvent,
     ObjectiveRevision,
 } from '../adapters/objectives.ts';
 import type {
@@ -15,7 +15,6 @@ import {
     toneForScore,
 } from '../scoring-format.ts';
 import { formatDateTime } from '../format.ts';
-import { DISPLAY_ABSENT } from '../format.ts';
 
 export type DefinitionResolver = (
     objectiveId: ObjectiveId,
@@ -32,17 +31,17 @@ type DatedEvent =
     | { kind: 'actual'; at: string; memberId: Id;
         objectiveId: ObjectiveId; score: number }
     | { kind: 'revision'; at: string; memberId: Id;
-        objectiveId: ObjectiveId; name: string };
-
-type Event =
-    | DatedEvent
-    | { kind: 'archival'; objectiveId: ObjectiveId };
+        objectiveId: ObjectiveId; name: string }
+    | { kind: 'archival'; at: string; memberId: Id;
+        objectiveId: ObjectiveId }
+    | { kind: 'reactivation'; at: string;
+        memberId: Id; objectiveId: ObjectiveId };
 
 export class ProjectScoreHistoryPresenter {
     readonly #baselines: ObjectiveScore[];
     readonly #actuals: ObjectiveScore[];
     readonly #revisions: ObjectiveRevision[];
-    readonly #archivals: ObjectiveArchivalEvent[];
+    readonly #lifecycle: ObjectiveLifecycleEvent[];
     readonly #resolver: DefinitionResolver;
     readonly #memberName: MemberNameResolver;
 
@@ -50,14 +49,14 @@ export class ProjectScoreHistoryPresenter {
         baselines: ObjectiveScore[],
         actuals: ObjectiveScore[],
         revisions: ObjectiveRevision[],
-        archivals: ObjectiveArchivalEvent[],
+        lifecycle: ObjectiveLifecycleEvent[],
         resolver: DefinitionResolver,
         memberName: MemberNameResolver,
     ) {
         this.#baselines = baselines;
         this.#actuals = actuals;
         this.#revisions = revisions;
-        this.#archivals = archivals;
+        this.#lifecycle = lifecycle;
         this.#resolver = resolver;
         this.#memberName = memberName;
     }
@@ -85,8 +84,8 @@ export class ProjectScoreHistoryPresenter {
         `;
     }
 
-    #mergedEvents(): Event[] {
-        const events: Event[] = [];
+    #mergedEvents(): DatedEvent[] {
+        const events: DatedEvent[] = [];
         for (const b of this.#baselines) {
             events.push({
                 kind: 'baseline',
@@ -114,35 +113,21 @@ export class ProjectScoreHistoryPresenter {
                 name: r.name,
             });
         }
-        for (const d of this.#archivals) {
+        for (const d of this.#lifecycle) {
             events.push({
-                kind: 'archival',
+                kind: d.kind,
+                at: d.at,
+                memberId: d.memberId,
                 objectiveId: d.objectiveId,
             });
         }
-        const dated: DatedEvent[] = [];
-        const archivals: Event[] = [];
-        for (const e of events) {
-            if (e.kind === 'archival') {
-                archivals.push(e);
-            } else {
-                dated.push(e);
-            }
-        }
-        dated.sort((a, b) => a.at.localeCompare(b.at));
-        return [...dated, ...archivals];
+        events.sort(
+            (a, b) => a.at.localeCompare(b.at),
+        );
+        return events;
     }
 
-    #row(e: Event): SafeHtml {
-        if (e.kind === 'archival') {
-            return html`<tr>
-                <td>${DISPLAY_ABSENT}</td>
-                <td>${DISPLAY_ABSENT}</td>
-                <td>Objective archived</td>
-                <td>${DISPLAY_ABSENT}</td>
-                <td>${DISPLAY_ABSENT}</td>
-            </tr>`;
-        }
+    #row(e: DatedEvent): SafeHtml {
         const dateLabel = formatDateTime(e.at);
         const dateCell = html`<td>
             <time datetime="${e.at}">${dateLabel}</time>
@@ -201,6 +186,44 @@ export class ProjectScoreHistoryPresenter {
                     <td>${e.name}</td>
                     <td>renamed/edited</td>
                 </tr>`;
+            case 'archival': {
+                const def = this.#resolver(
+                    e.objectiveId, e.at,
+                );
+                if (!def) {
+                    throw new Error(
+                        `objective definition missing `
+                        + `for ${e.objectiveId} at `
+                        + `${e.at}`,
+                    );
+                }
+                return html`<tr>
+                    ${dateCell}
+                    ${whoCell}
+                    <td>Objective archived</td>
+                    <td>${def.name}</td>
+                    <td>archived</td>
+                </tr>`;
+            }
+            case 'reactivation': {
+                const def = this.#resolver(
+                    e.objectiveId, e.at,
+                );
+                if (!def) {
+                    throw new Error(
+                        `objective definition missing `
+                        + `for ${e.objectiveId} at `
+                        + `${e.at}`,
+                    );
+                }
+                return html`<tr>
+                    ${dateCell}
+                    ${whoCell}
+                    <td>Objective reactivated</td>
+                    <td>${def.name}</td>
+                    <td>reactivated</td>
+                </tr>`;
+            }
         }
     }
 }

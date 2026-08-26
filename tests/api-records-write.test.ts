@@ -110,11 +110,14 @@ test(
         // (Phase 15 Task 7).
         const history = await GET<{
             state: string;
+            member_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rcaSzEaORBkezCxyhLhecA/versions/', DEV_TOKEN);
         assert.equal(history.length, 1);
         assert.equal(history[0]!.state, 'active');
-        assert.equal('member_id' in history[0]!, false);
+        assert.equal(typeof history[0]!.member_id, 'string');
+        assert.notEqual(history[0]!.member_id, '');
+        assert.equal('state_at' in history[0]!, false);
     },
 );
 

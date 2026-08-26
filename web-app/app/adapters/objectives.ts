@@ -104,19 +104,29 @@ export async function getArchivedObjectiveIds(
     );
 }
 
+// A versions index row: the entity snapshot plus the
+// pair facts the list stamps on every row (etag is the
+// message-pair id).
+export interface ObjectiveVersionRow
+    extends ObjectiveEntity {
+    etag: string;
+    at: string;
+    member_id: Id;
+}
+
 // Parallel GET objectives/:id/versions/ for each live
-// objective. Rows are collection-item shape (state, not
-// StateEntity). Source for the archival stream.
+// objective. Rows are entity snapshots stamped with pair
+// facts. Source for the lifecycle stream.
 export async function getObjectiveHistories(
     ctx: RequestContext,
-): Promise<Map<Id, ObjectiveEntity[]>> {
+): Promise<Map<Id, ObjectiveVersionRow[]>> {
     const rows = await ctx.GET<{ id: Id }[]>(
         organizationCollection(ctx, 'objectives'),
     );
     const pairs = await Promise.all(
         rows.map(async (row) => {
             const versions = await ctx.GET<
-                ObjectiveEntity[]
+                ObjectiveVersionRow[]
             >(
                 organizationItem(ctx, 'objectives', row.id)
                     + '/versions/',
@@ -127,25 +137,47 @@ export async function getObjectiveHistories(
     return new Map(pairs);
 }
 
-export interface ObjectiveArchivalEvent {
+export interface ObjectiveLifecycleEvent {
     objectiveId: ObjectiveId;
+    kind: 'archival' | 'reactivation';
+    memberId: Id;
+    at: string;
 }
 
-// Streams every `state='archived'` version from the
-// per-item versions door — one event per archival,
-// including re-archivals after reactivation. Consumed
-// by the project score-history presenter. Versions
-// carry no member or at; those facts live on the pair.
-export async function getObjectiveArchivalEvents(
+// One event per lifecycle TRANSITION, walked oldest-
+// first per objective: archived after non-archived is an
+// archival; non-archived after archived is a
+// reactivation. Echo versions (a position PUT re-sending
+// the standing state) collapse; genesis-active is never
+// an event. Consumed by the project score-history
+// presenter.
+export async function getObjectiveLifecycleEvents(
     ctx: RequestContext,
-): Promise<ObjectiveArchivalEvent[]> {
-    const histories = await getObjectiveHistories(ctx);
-    const events: ObjectiveArchivalEvent[] = [];
-    for (const [objectiveId, versions] of histories) {
-        for (const row of versions) {
-            if (row.state === 'archived') {
-                events.push({ objectiveId });
+): Promise<ObjectiveLifecycleEvent[]> {
+    const histories =
+        await getObjectiveHistories(ctx);
+    const events: ObjectiveLifecycleEvent[] = [];
+    for (
+        const [objectiveId, versions] of histories
+    ) {
+        let previous: string | undefined;
+        for (const row of versions.toReversed()) {
+            const transition =
+                row.state === 'archived'
+                    ? previous !== 'archived'
+                    : previous === 'archived';
+            if (transition) {
+                events.push({
+                    objectiveId,
+                    kind:
+                        row.state === 'archived'
+                            ? 'archival'
+                            : 'reactivation',
+                    memberId: row.member_id,
+                    at: row.at,
+                });
             }
+            previous = row.state;
         }
     }
     return events;

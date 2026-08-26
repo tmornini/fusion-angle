@@ -1308,6 +1308,13 @@ export interface MembershipEntity {
     organization_id: Id;
     identity_id: Id;
     type: MembershipType;
+    // The seat's own grant time
+    // (validateSeatDocumentBody), a domain fact — NOT a
+    // ledger fact. GET .../members/:id/versions/ stamps a
+    // DIFFERENT `at` on each row: the message pair's own
+    // arrival time (versionSnapshotsAt, document-family.ts,
+    // seatEntityOf in derive-memberships.ts). Same name on
+    // this entity and on that versions row, different facts.
     at: string;
 }
 

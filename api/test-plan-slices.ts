@@ -205,6 +205,7 @@ const SLICE_ENTITY_IDS: Readonly<
     'aa-record-customer': 'nbVVZabdDBQlDtspwUAVNA',
     'aa-attr-1': 'cxNzttibtFvlWVOqwNxnYg',
     'aa-attr-2': 'dSbcrUIZTpJuBJzPxrfrRA',
+    'aa-attr-3': 'kWpAaAttrPhoneSeedIdZg',
     'aa-state-record-customer': 'OlBcqVcxakMASmTOZNWsww',
     'aa-flow': 'tDRyatMpIeXmrmVGYxRMlg',
     'aa-node-create': 'YZqteEBJUhWMPcMFkqNjnA',
@@ -2021,6 +2022,141 @@ async function formRExtras(
     };
 }
 
+type AaRecordWrites = {
+    readonly body: Record<string, unknown>;
+    readonly messagePairs: RecordWriteMessagePairs;
+};
+
+// AA33/AA34's fixture: the Customer Profile record
+// with three text attributes, so the flow-state
+// Attributes picker has options once AA33 binds the
+// record via the designer header's "Record:" dropdown.
+// No flow binding — AA's flow is minted in the UI at
+// AA26, so its id does not exist at seed time.
+async function formAaRecord(
+    requestAt: string,
+): Promise<AaRecordWrites> {
+    const organizationId = STARK_ORGANIZATION;
+    const adminId = 'XXZruirZyAOoRpNxaDnpSA';
+    const recordId =
+        sliceEntityId('aa-record-customer');
+    const attributeRows = [
+        {
+            id: sliceEntityId('aa-attr-1'),
+            name: 'Company Name',
+            attribute_type: 'text',
+            sort_order: 1,
+            options: [],
+            constraints: [],
+            record_id: recordId,
+            organization_id: organizationId,
+        },
+        {
+            id: sliceEntityId('aa-attr-2'),
+            name: 'Contact Email',
+            attribute_type: 'text',
+            sort_order: 2,
+            options: [],
+            constraints: [],
+            record_id: recordId,
+            organization_id: organizationId,
+        },
+        {
+            id: sliceEntityId('aa-attr-3'),
+            name: 'Contact Phone',
+            attribute_type: 'text',
+            sort_order: 3,
+            options: [],
+            constraints: [],
+            record_id: recordId,
+            organization_id: organizationId,
+        },
+    ];
+    const body: Record<string, unknown> = {
+        kind: 'create',
+        id: recordId,
+        record: {
+            organization_id: organizationId,
+            name: 'Customer Profile',
+            description:
+                'AA33/AA34 attribute-picker'
+                + ' fixture; no case edits it.',
+            position: 1,
+        },
+        attributes: attributeRows,
+        initialState: 'active',
+        initialStateEventId: sliceEntityId(
+            'aa-state-record-customer',
+        ),
+        initialStateAt: requestAt,
+    };
+    const validated = validateRecordWriteBody(body);
+    const operation = await formSeedMessagePair(
+        {
+            key: seedMessagePairKey(
+                RECORD_TYPES_COLLECTION_PATTERN,
+                recordId,
+            ),
+            routePattern:
+                RECORD_TYPES_COLLECTION_PATTERN,
+            idParams: [organizationId],
+            op: true,
+            organization: organizationId,
+            requesterIdentityId: adminId,
+            body,
+        },
+        requestAt,
+    );
+    const document = await formSeedMessagePair(
+        {
+            key: seedMessagePairKey(
+                RECORD_TYPE_DETAIL_PATTERN,
+                recordId,
+            ),
+            routePattern: RECORD_TYPE_DETAIL_PATTERN,
+            idParams: [organizationId, recordId],
+            organization: organizationId,
+            requesterIdentityId: adminId,
+            body: recordDocumentBodyOf(validated),
+        },
+        requestAt,
+    );
+    const attributePuts: MessagePair[] = [];
+    for (const attribute of attributeRows) {
+        attributePuts.push(await formSeedMessagePair(
+            {
+                key: seedMessagePairKey(
+                    ATTRIBUTE_DETAIL_PATTERN,
+                    attribute.id,
+                ),
+                routePattern:
+                    ATTRIBUTE_DETAIL_PATTERN,
+                idParams: [
+                    organizationId,
+                    recordId,
+                    attribute.id,
+                ],
+                organization: organizationId,
+                requesterIdentityId: adminId,
+                body: recordAttributeDocumentBodyOf(
+                    attribute as unknown as
+                        Record<string, unknown>,
+                ),
+            },
+            requestAt,
+        ));
+    }
+    return {
+        body,
+        messagePairs: {
+            operation,
+            document,
+            attributePuts,
+            attributeDeletes: [],
+        },
+    };
+}
+
 async function formFExtras(
     organizationId: string,
     adminId: string,
@@ -3379,6 +3515,7 @@ export async function postTestPlanSlices(
         adminUsername: 'demo@example.com',
         adminPassword: '',
     }];
+    const aaRecord = await formAaRecord(requestAt);
     const formed: TenantAdminMessagePairs[] = [];
     const extras: ExtraWrites[] = [];
     const gardens: GardenWrites[] = [];
@@ -3545,6 +3682,12 @@ export async function postTestPlanSlices(
                 bootstrap.systemIdentityMessagePair,
                 bootstrap.defaultOrganizationMessagePair,
                 bootstrap.organizationMessagePair,
+            );
+            await postRecordWriteOp(
+                view,
+                aaRecord.body,
+                SYSTEM_MEMBER_ID,
+                aaRecord.messagePairs,
             );
             await Promise.all(
                 formed.map((slice) =>

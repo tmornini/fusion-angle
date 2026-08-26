@@ -1,10 +1,11 @@
 import {
-    $, $$, $input, $required, $textarea,
+    $input, $required, $textarea,
     bindEnterToClick,
 } from '../app/dom.ts';
 import {
     setHtml,
 } from '../app/safe-html.ts';
+import { showToast } from '../app/toast.ts';
 import { navigateTo } from '../app/navigation.ts';
 import {
     sessionContext,
@@ -90,22 +91,6 @@ export async function init():
         };
     }
 
-    function mutateSubmitButton(): void {
-        const btn = $(
-            '#idea-create-step-next',
-            document,
-        );
-        if (
-            btn instanceof
-            HTMLButtonElement
-        ) {
-            btn.disabled =
-                !ideaCreateDraftIsComplete(
-                    formState,
-                );
-        }
-    }
-
     function bindEvents(): void {
         const goBack = () => {
             navigateTo('ideas');
@@ -131,6 +116,20 @@ export async function init():
             'click',
             async () => {
                 formState = readFormFromDom();
+                if (
+                    !ideaCreateDraftIsComplete(
+                        formState,
+                    )
+                ) {
+                    showToast(
+                        'Title, problem,'
+                            + ' solution, and'
+                            + ' outcome are'
+                            + ' required',
+                        'error',
+                    );
+                    return;
+                }
                 const ctx = sessionContext();
                 const ideaId =
                     generateIdentifier();
@@ -172,25 +171,6 @@ export async function init():
                 navigateTo('ideas');
             },
         );
-
-        const selector =
-            '#idea-create'
-            + '-step-content'
-            + ' input,'
-            + ' #idea-create'
-            + '-step-content'
-            + ' textarea';
-        $$(selector, document)
-            .forEach(field => {
-                field.addEventListener(
-                    'input',
-                    () => {
-                        formState =
-                            readFormFromDom();
-                        mutateSubmitButton();
-                    },
-                );
-            });
 
         const nextSel =
             '#idea-create-step-next';

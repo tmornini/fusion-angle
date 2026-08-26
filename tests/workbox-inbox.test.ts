@@ -6,6 +6,7 @@ import {
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
+    organizationItem,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
@@ -35,6 +36,7 @@ import {
 '../web-app/app/presenters/workbox-inbox.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
+    nowUtc,
 } from '../api/types.ts';
 import type {
     GraphNode,
@@ -256,6 +258,7 @@ test(
             typeof item.lastTransitionedAt,
             'string',
         );
+        assert.equal(item.claimedByName, null);
     },
 );
 
@@ -277,8 +280,9 @@ test(
 );
 
 test(
-    'buildInboxItems hides a work order with an'
-    + ' active claim that is not yet finished',
+    'buildInboxItems surfaces a claimed,'
+    + ' unfinished work order as an active item'
+    + ' naming its claimant',
     async () => {
         const { tables } =
             await setupOneWorkOrder();
@@ -293,7 +297,10 @@ test(
             workOrders, transitionsByWo,
             activeClaimsByWo, memberMap, 'active',
         );
-        assert.deepEqual(items, []);
+        assert.equal(items.length, 1);
+        assert.equal(
+            items[0]!.claimedByName, 'Demo Test',
+        );
     },
 );
 
@@ -480,5 +487,64 @@ test(
         assert.equal(
             items[0]!.taskInstructions, '',
         );
+    },
+);
+
+test(
+    'buildInboxItems keeps deriving after an'
+    + ' edge delete and undo restore the graph',
+    async () => {
+        const { ctx, tables } =
+            await setupOneWorkOrder();
+        const graph = buildLinearGraph();
+        // Delete the N_MIDDLE -> N_FINISH edge
+        // the way the designer toolbar does: a
+        // putFlow whose graph omits it.
+        await putFlow(
+            ctx, 'ZOousbbnzpqlxJExVAruYQ',
+            {
+                name: 'Test flow',
+                isLocked: false,
+                isAutoLayout: true,
+                isAutoFit: true,
+                lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                nodes: graph.nodes,
+                edges: graph.edges.filter(
+                    e => e.id !== E2,
+                ),
+            },
+        );
+        // Undo the way performUndo does: the
+        // named POST flows/:id/undo replay (the
+        // server restores the prior body's graph
+        // verbatim, same edge id).
+        await ctx.POST(
+            organizationItem(
+                ctx, 'flows',
+                'ZOousbbnzpqlxJExVAruYQ',
+            ) + '/undo',
+            {
+                eventId: generateIdentifier(),
+                at: nowUtc(),
+            },
+        );
+        // A work order born AFTER the restore —
+        // WB5a's most damning witness.
+        await postWorkOrderCreation(ctx, {
+            workOrderId: generateIdentifier(),
+            flowLinkId: generateIdentifier(),
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+        });
+        const {
+            workOrders, transitionsByWo, memberMap,
+        } = await tables();
+        assert.equal(workOrders.length, 2);
+        // Claims ignored: the graph-derivation
+        // path alone. Both work orders derive.
+        const items = buildInboxItems(
+            workOrders, transitionsByWo,
+            new Map(), memberMap, 'active',
+        );
+        assert.equal(items.length, 2);
     },
 );

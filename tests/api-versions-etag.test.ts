@@ -21,6 +21,8 @@ import {
 } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { messageStore } from '../api/message-store.ts';
+import { seatsPrefixFor } from
+    '../api/derive-memberships.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
@@ -395,3 +397,37 @@ async () => {
         assert.ok(rows.length >= 1, path);
     }
 });
+
+// Task 4 fix round 1, Finding 3: the member entity's OWN
+// `at` (validateSeatDocumentBody's grant time, seatEntityOf
+// derive-memberships.ts:127) and the versions row's `at`
+// (the ledger's response_at, stamped by versionSnapshotsAt)
+// are different facts that share a name. This pins the
+// versions wire to the ledger fact and proves it is NOT the
+// seat's own grant time.
+test(
+    'member versions at is the ledger arrival time,'
+    + ' not the seat grant time',
+    async () => {
+        const db = await seedMemberOrganizations();
+        const token = await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
+        );
+        const list = await handleRequest(db, req(
+            'GET',
+            '/organizations/' + ORGANIZATION_A
+                + '/members/XXZruirZyAOoRpNxaDnpSA/versions/',
+            token,
+        ));
+        assert.equal(list.status, 200);
+        const rows = await list.json() as { at: string }[];
+        assert.equal(rows.length, 1);
+        const stored = await messageStore(db).get(
+            seatsPrefixFor(ORGANIZATION_A),
+            'XXZruirZyAOoRpNxaDnpSA',
+        );
+        assert.ok(stored);
+        assert.equal(rows[0]!.at, stored.response_at);
+        assert.notEqual(rows[0]!.at, AT);
+    },
+);

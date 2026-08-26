@@ -959,8 +959,11 @@ Project.
 - [ ] **AA33** Serial: N/A — requires the empty
   Create+Archive graph that serial must not
   mint; do not add nodes; do not JSON-inject.
-  Parallel: In the "Data Capture" properties
-  panel, open the "Attributes" fieldset. Click the
+  Parallel: In the flow header, set the
+  "Record:" dropdown to "Customer Profile"
+  (seeded in the AA slice). Then in the "Data
+  Capture" properties panel, open the
+  "Attributes" fieldset. Click the
   "+ Add Attribute…" dropdown. PASS: the picker
   lists available record attributes pre-defined
   in the bound Record. Select an attribute (e.g.

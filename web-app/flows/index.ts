@@ -10,6 +10,7 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
+import { subscribeOnce } from '../app/channels.ts';
 import { extractErrorMessage } from '../app/error-helpers.ts';
 import {
     ICON_SIZE,
@@ -104,6 +105,11 @@ export async function init(
                 href:
                     '../projects/'
                     + 'index.html',
+            },
+            onEmpty: () => {
+                subscribeOnce(
+                    subscribeFlowChanges, init,
+                );
             },
         },
         onData: result => onFlowsLoaded(

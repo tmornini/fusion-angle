@@ -19,13 +19,6 @@ import type { Id } from '../../../api/types.ts';
 
 const DAY_MS = SECONDS_PER_DAY * MS_PER_SECOND;
 
-function isClaimedAndUnfinished(
-    hasActiveClaim: boolean,
-    completed: boolean,
-): boolean {
-    return hasActiveClaim && !completed;
-}
-
 function itemMatchesMode(
     mode: InboxMode,
     completed: boolean,
@@ -54,6 +47,7 @@ export interface InboxItem {
     flowName: string;
     stateName: string;
     transitionerName: string | null;
+    claimedByName: string | null;
     lastTransitionedAt: string | null;
     completed: boolean;
     position: number;
@@ -63,8 +57,9 @@ export interface InboxItem {
 export type InboxMode = 'active' | 'archived';
 
 // An active claim resolved from the states log for one
-// work order. The inbox does not care which member
-// holds it — only whether one is held.
+// work order. The inbox names the claim-holder on the
+// item it renders — a claimed work order is shown, never
+// hidden.
 export interface ActiveClaim {
     memberId: Id;
     at: string;
@@ -110,6 +105,14 @@ export class WorkboxInboxPresenter {
                 class="badge badge-info"${
                 titleAttr}
                 >${item.stateName}</span>`;
+        const claimedBadge =
+            !item.completed && item.claimedByName
+                ? html`<span
+                    class="badge badge-warning"
+                    >In progress — ${
+                        item.claimedByName
+                    }</span>`
+                : html``;
         const from = item.transitionerName
             ?? DISPLAY_ABSENT;
         const grip = this.#showGrip
@@ -163,6 +166,7 @@ export class WorkboxInboxPresenter {
                         + ' text-muted'
                     }">
                         ${badge}
+                        ${claimedBadge}
                         <span>from ${
                             from
                         }</span>
@@ -225,11 +229,8 @@ export function buildInboxItems(
         }
         const completed = curNode.isArchive;
 
-        const hasActiveClaim =
-            activeClaimsByWo.has(wo.id);
-        if (isClaimedAndUnfinished(
-            hasActiveClaim, completed,
-        )) continue;
+        const activeClaim =
+            activeClaimsByWo.get(wo.id);
         if (!itemMatchesMode(mode, completed))
             continue;
 
@@ -241,6 +242,12 @@ export function buildInboxItems(
             transitionerName: memberName(
                 memberMap, lastTransition.memberId,
             ),
+            claimedByName: activeClaim
+                ? memberName(
+                    memberMap,
+                    activeClaim.memberId,
+                )
+                : null,
             lastTransitionedAt:
                 lastTransition.at,
             completed,

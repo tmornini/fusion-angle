@@ -45,7 +45,7 @@ async function seeded() {
     return { db, reveal };
 }
 
-const EXPECTED_SLICE_MESSAGE_PAIRS = 509;
+const EXPECTED_SLICE_MESSAGE_PAIRS = 514;
 
 test('slices stamp schema last and reveal 14',
 async () => {
@@ -448,6 +448,37 @@ async () => {
             section,
         );
     }
+});
+
+test('AA slice seeds the Customer Profile record',
+async () => {
+    const { db, reveal } = await seeded();
+    const aa = reveal.find(
+        (row) => row.section === 'AA',
+    );
+    assert.ok(aa);
+    const records =
+        await deriveRecordTypeCollection(
+            db, aa.organizationId,
+        );
+    assert.equal(records.length, 1);
+    assert.equal(
+        records[0]!.name, 'Customer Profile',
+    );
+    const requests =
+        await db.messagePairs.getAll();
+    const attributes = deriveDocumentsAt(
+        requests,
+        canonicalUriCollection(
+            aa.organizationId,
+            '/record-types/'
+                + sliceEntityId(
+                    'aa-record-customer',
+                )
+                + '/attributes/',
+        ),
+    );
+    assert.equal(attributes.size, 3);
 });
 
 test('garden slices seed Customer Onboarding',

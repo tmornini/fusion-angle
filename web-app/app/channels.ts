@@ -134,3 +134,21 @@ export function createSubscriptionChannel(
             channel.subscribe(fn),
     };
 }
+
+// One-shot subscription: the first event tears the
+// subscription down, then runs fn. Serves the empty
+// list pages (SV8b): an empty initial load wires no
+// steady-state subscriber, so the first change bell
+// re-runs init — which either wires the steady state
+// (data now) or re-renders empty and re-arms. Teardown
+// precedes fn, so the steady-state subscription fn
+// wires never coexists with the one-shot.
+export function subscribeOnce(
+    subscribe: (fn: () => void) => () => void,
+    fn: () => void | Promise<void>,
+): void {
+    const unsubscribe = subscribe(() => {
+        unsubscribe();
+        void fn();
+    });
+}

@@ -6,6 +6,7 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
+import { subscribeOnce } from '../app/channels.ts';
 import { ICON_SIZE, iconFolderKanban } from '../app/icons.ts';
 import { navigateTo } from '../app/navigation.ts';
 import {
@@ -86,6 +87,11 @@ export async function init(): Promise<void> {
             action: {
                 label: 'Create Idea',
                 href: '../ideas/create.html',
+            },
+            onEmpty: () => {
+                subscribeOnce(
+                    subscribeProjectChanges, init,
+                );
             },
         },
         onData: projects => onProjectsLoaded(

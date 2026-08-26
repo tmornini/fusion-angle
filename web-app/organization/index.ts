@@ -224,6 +224,12 @@ async function onObjectiveAction(
         ?.getAttribute('data-objective-id');
     const ctx = sessionContext();
     if (action === 'add-objective') {
+        ($(
+            '#add-obj-name', document,
+        ) as HTMLInputElement).value = '';
+        ($(
+            '#add-obj-description', document,
+        ) as HTMLTextAreaElement).value = '';
         openDialog('add-objective');
     } else if (
         action === 'edit'

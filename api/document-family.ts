@@ -147,7 +147,7 @@ export interface DocumentFamilyWiring {
         document: DerivedDocument,
         organization: Id,
         current?: { readonly state: string },
-    ) => unknown;
+    ) => object;
 }
 
 // The per-family wiring table — grown family by family (ideas,
@@ -438,7 +438,7 @@ export async function versionSnapshotsAt(
     db: DbAdapter,
     prefix: string,
     id: Id,
-    toEntity: (document: DerivedDocument) => unknown,
+    toEntity: (document: DerivedDocument) => object,
 ): Promise<unknown[]> {
     const stored = await messageStore(db).getMessagePairs(
         prefix, id,
@@ -449,12 +449,17 @@ export async function versionSnapshotsAt(
     const snapshots: unknown[] = [];
     for (const messagePair of messagePairs.toReversed()) {
         if (messagePair.method !== PUT_METHOD) continue;
-        snapshots.push(toEntity({
-            uriId: id,
-            messagePairId: messagePair.id,
-            method: messagePair.method,
-            body: messagePair.body,
-        }));
+        snapshots.push({
+            ...toEntity({
+                uriId: id,
+                messagePairId: messagePair.id,
+                method: messagePair.method,
+                body: messagePair.body,
+            }),
+            etag: messagePair.id,
+            at: messagePair.at,
+            member_id: messagePair.requesterIdentityId,
+        });
     }
     return snapshots;
 }
@@ -540,9 +545,11 @@ function stateFromDocument(
 export function documentVersionListHandler(
     wiring: DocumentFamilyWiring,
 ): GetHandler {
-    // Flow keeps StateEntity[] (deferred). The four
-    // families return entityOf snapshots so list items
-    // match GET collection / GET :id.
+    // Flow keeps StateEntity[] (deferred). The other
+    // five wirings (identities, ai-agents, ideas,
+    // projects, objectives) return entityOf snapshots
+    // stamped with the pair facts (etag, at, member_id) —
+    // beyond, not identical to, GET collection / GET :id.
     if (
         wiring.lifecycle === 'trio'
         && wiring.family === 'flows'

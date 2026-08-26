@@ -12,6 +12,7 @@ import { strict as assert } from 'node:assert';
 import {
     createChannel,
     createSubscriptionChannel,
+    subscribeOnce,
 } from '../web-app/app/channels.ts';
 import {
     putSessionToken,
@@ -79,6 +80,34 @@ test('send with no subscribers is a no-op', () => {
     const ch = createChannel<number>();
     assert.doesNotThrow(() => ch.send(1));
 });
+
+test('subscribeOnce delivers exactly once', () => {
+    const ch = createChannel<void>();
+    let calls = 0;
+    subscribeOnce(ch.subscribe, () => {
+        calls += 1;
+    });
+    ch.send();
+    ch.send();
+    assert.equal(calls, 1);
+});
+
+test(
+    'subscribeOnce tears down before fn runs',
+    () => {
+        const ch = createChannel<void>();
+        let calls = 0;
+        subscribeOnce(ch.subscribe, () => {
+            calls += 1;
+            // A send from inside fn must not
+            // recurse: the one-shot is already
+            // gone.
+            ch.send();
+        });
+        ch.send();
+        assert.equal(calls, 1);
+    },
+);
 
 // The notification matching-behavior suite below posts from a
 // SEPARATE BroadcastChannel object sharing the same name — the

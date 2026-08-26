@@ -1,5 +1,5 @@
 import {
-    html, SafeHtml, trusted,
+    html, SafeHtml,
 } from '../safe-html.ts';
 import {
     ICON_SIZE,
@@ -43,10 +43,6 @@ export class IdeaCreatePresenter {
     }
 
     render(): SafeHtml {
-        const isArchive =
-            ideaCreateDraftIsComplete(
-                this.#draft,
-            );
         return html`
     <div class="entity">
     <div class="${
@@ -133,12 +129,7 @@ export class IdeaCreatePresenter {
                     + ' gap-2'
                 }"
                 id=${'idea-create'
-                    + '-step-next'}
-                ${trusted(
-                    isArchive
-                        ? ''
-                        : 'disabled',
-                )}>
+                    + '-step-next'}>
                 ${'Submit Idea'}
                 ${iconCheck(ICON_SIZE.base, '')}
             </button>

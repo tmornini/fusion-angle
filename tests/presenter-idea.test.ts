@@ -771,8 +771,8 @@ test(
 );
 
 test(
-    'IdeaCreatePresenter.render disables the'
-    + ' submit button while the draft is empty',
+    'IdeaCreatePresenter.render keeps submit'
+    + ' clickable while the draft is empty',
     () => {
         const out = new IdeaCreatePresenter(
             EMPTY_IDEA_CREATE_DRAFT,
@@ -780,7 +780,12 @@ test(
         assert.match(out, /New Idea/);
         assert.match(out, /Describe Your Idea/);
         assert.match(out, /Submit Idea/);
-        assert.match(out, /disabled/);
+        assert.ok(
+            !out.includes('disabled'),
+            'the gate must speak, not mute:'
+            + ' an incomplete submit surfaces a'
+            + ' toast at the click handler',
+        );
         assert.ok(!out.includes('undefined'));
     },
 );
