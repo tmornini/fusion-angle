@@ -6,28 +6,29 @@
 
 Beware the use of parallelism due to the single
 cookie-jar. Use a fresh local Postgres via Docker.
-Set `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and
-`HTTP_SERVER_PORT` with random inputs for passwords
-and other secrets.
+Do not set `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`,
+or `HTTP_SERVER_PORT` by hand — `./crank` mints
+them for its children and never prints them.
 
 When the user says "run the test plan", the master
 session:
 
 1. Reads this document's `### Protocol` — required
    context. Default is the section DAG below.
-2. Executes **AT** as a fail-fast gate. Any AT
-   failure aborts before A1.
-3. Executes A1–A5. Parallel A3 is
-   `./postgres-wipe --postgres local` then
-   `./postgres-seed --postgres local
-   --test-plan-slices` then `node server.mjs`
-   (14 disjoint slices, stdout credential
-   map). Serial (`--serial`) A3 is
-   `./postgres-wipe --postgres local` then
-   `./postgres-seed --postgres local
-   --mock-data` then `node server.mjs` (SV1).
-4. Grants Chrome origin `http://localhost` **before**
-   dispatch.
+2. Executes **A1** and **A2** (ZIP inventory) so
+   the tree is already clean for crank's
+   `./build --no-zip`.
+3. Starts `./crank --test-plan-slices port`
+   (serial: `./crank --mock-data port`) as the
+   origin. Crank runs `./validate` (AT1–AT3),
+   mints secrets, brings postgres up, runs
+   `./test-postgres` (AT4), builds `--no-zip`
+   into a temp dir, wipes, seeds, and listens.
+   Read the seed reveal from crank's stdout.
+   Red validate aborts with no Docker. Red AT4
+   or later hits the trap.
+4. Grants Chrome origin `http://localhost`
+   **before** dispatch.
 5. Parallel: this MCP has no isolated
    contexts — one Chrome profile, one
    cookie jar, one selected page. One
@@ -44,7 +45,9 @@ session:
    tenant, document order, headers not
    consulted.
 6. Joins in document order. Then K8 (process lock),
-   then J. Then the canonical `## Summary Format` plus
+   then J. Stopping crank IS J1 and J2
+   (EXIT trap). J3 stays (Desktop ZIP remains).
+   Then the canonical `## Summary Format` plus
    one mitigation-spec path per FAIL cluster. The
    master does not patch FAILs and does not
    re-dispatch.
@@ -57,7 +60,7 @@ environmental limits (pointer-capture gestures,
 `resize_window`, file I/O, one selected page) —
 never used to mask a real failure. Sandbox EPERM
 on `kill` is not BLOCKED: J1 uses the harness
-task stop.
+task stop of the `./crank` process.
 
 ### Sub-agent invocation contract
 
@@ -144,9 +147,10 @@ file.
 
 ### Protocol
 
-The automated layer (`## AT`) runs first as a fail-fast
-gate. Abort on red. On green, the browser regression
-runs against **one Node origin** in one of two modes.
+The automated layer (`## AT`) is crank's fail-fast
+gate, not a master step before A1. Abort on red.
+On green, the browser regression runs against
+**one Node origin** in one of two modes.
 
 Parse each `##` section's four fields (`tenant`,
 `parallel`, `global_lock`, `depends`). Nested letter
@@ -155,10 +159,8 @@ ride the parent hunter. K8 is a process-lock case, not
 a K-hunter case on the parallel path.
 
 - **Serial (`--serial`)**: A1 `./build` → ZIP; A2 unzip
-  or `./build --no-zip`; A3 `./postgres-wipe
-  --postgres local` then `./postgres-seed
-  --postgres local --mock-data` then
-  `node server.mjs` (this pin **is** SV1). One
+  or `./build --no-zip`; A3 `./crank --mock-data
+  port` (this pin **is** SV1). One
   process, one mock tenant, one cookie jar. Walk
   document order including K8 inside K, then J.
   Headers are not consulted. Serial does not
@@ -167,9 +169,7 @@ a K-hunter case on the parallel path.
   restore `--mock-data`).
 - **Parallel (default)**: the same A1–A2. Grant Chrome
   origin `http://localhost` before anything else. A3
-  `./postgres-wipe --postgres local` then
-  `./postgres-seed --postgres local
-  --test-plan-slices` then `node server.mjs`.
+  `./crank --test-plan-slices port`.
   Capture the stdout credential map. Spawn one
   hunter per `parallel: yes` section, join that
   hunter, then spawn the next — never two
@@ -193,7 +193,6 @@ a K-hunter case on the parallel path.
 
 DAG edges only:
 
-- `AT` → `A`
 - `A` → every `parallel: yes` section
 - those → `global_lock: process` (K8, then J)
 
@@ -208,12 +207,12 @@ Failure:
 
 | Event | Action |
 |---|---|
-| AT red | Abort. No seed, no hunters. |
+| AT red | Abort. Crank exits before Docker. No seed, no hunters. |
 | A3 seed fail | Abort. No hunters. |
 | Hunter crash | That section FAIL (MCP BLOCKED as today). Siblings finish. |
 | Hunter FAIL cases | Join continues. Then one mitigation spec per cluster. |
 | K8 fail | Record FAIL; still attempt J; still write earlier mitigations. |
-| J1 stop fails | J1 FAIL. J2 DEFERRED if the server is still up. |
+| J1 stop fails | J1 FAIL. J2 DEFERRED if the origin is still up. |
 
 Master never re-dispatches a hunter to retry.
 
@@ -296,15 +295,17 @@ Master never re-dispatches a hunter to retry.
 - **`kill` syscall against the background HTTP server**: the
   sandbox may EPERM `kill -TERM` / `kill -9` against a
   background PID. **J1 does not use that syscall.** Stop
-  A3's `server.mjs` with the harness-native task stop
-  (the same handle A3 started). J1 PASS when that
-  process exits. Do not mark J1 BLOCKED for sandbox
+  the `./crank` process A3 started with the
+  harness-native task stop (the same handle A3
+  started). J1 PASS when that process exits; the
+  trap stops serve, downs compose, removes the
+  temp bundle. Do not mark J1 BLOCKED for sandbox
   EPERM. If the harness stop fails, J1 is FAIL.
-- **Phase 5 build-dir cleanup (J2)**: runs after J1
-  PASS. Deleting the A2 temp dir while `server.mjs`
-  still holds open file descriptors leaves the
-  process in an unrecoverable state. J2 is DEFERRED
-  only when the server is still up.
+- **Phase 5 build-dir cleanup (J2)**: J2 is the
+  trap's `rm -rf` of crank's temp bundle,
+  verified after crank has exited. J2 is
+  DEFERRED only when crank/serve is still up.
+  Do not `rm` a still-running bundle.
 - **Chrome MCP tab-group volatility**: the MCP tab group can
   dissolve between calls when no tabs in the group are
   actively held. If `tabs_create_mcp` returns "No tab
@@ -354,22 +355,18 @@ SV6–SV10 run before J as today.
 
 ### Execution Order
 
-**AT precedes everything.** Any AT failure aborts
-before A1.
+**A1–A2 ZIP inventory first**, then crank as A3.
+AT is inside crank, not a master step before A1.
 
 **Parallel (default):** A1–A2 → grant
-`http://localhost` → A3 `./postgres-wipe
---postgres local` then `./postgres-seed
---postgres local --test-plan-slices` then
-`node server.mjs` → 14 hunters → join in
-document order → K8 → J → summary.
+`http://localhost` → A3 `./crank
+--test-plan-slices port` → 14 hunters → join
+in document order → K8 → J → summary.
 
 **Serial (`--serial`):** A1–A2 → A3
-`./postgres-wipe --postgres local` then
-`./postgres-seed --postgres local --mock-data`
-then `node server.mjs` → A → AA → B → C → D →
-E → F → F2 → FS → G → H → I → K (including K8
-in document order) → R → SV6–SV10 → J.
+`./crank --mock-data port` → A → AA → B → C →
+D → E → F → F2 → FS → G → H → I → K (including
+K8 in document order) → R → SV6–SV10 → J.
 
 K's product cases on the parallel path run K1–K6,
 K9–K30, K7 last. K8 is skipped by the K hunter and
@@ -443,20 +440,21 @@ parallel: no
 global_lock: none
 depends: —
 
-The automated layer is the gate. Any AT failure aborts the
-run before A1's build. AT1–AT3 stay the `./validate`
-gate. AT4 is additional, Postgres-gated, still
-before A1. The automated layer is four cases.
+The automated layer is crank's gate, not a
+master step before A1. AT1–AT3 are crank's one
+`./validate`. AT4 is crank step 6
+(`./test-postgres` after postgres is up). How
+to invoke does not run AT and then crank.
 Abort on any AT red.
 
 - [ ] **AT1** Run `npx tsc --noEmit -p web-app/app/tsconfig.json`. PASS: exits 0; no diagnostics emitted.
 - [ ] **AT2** Run `./test` (delegates to `TZ=UTC node --test --strip-types tests/*.test.ts` for the main suite, then `TZ=Pacific/Honolulu node --test --strip-types tests/tz/*.test.ts` for the timezone suite). PASS: exits 0; the runner's final summary reports `pass N` with `fail 0` for both suites.
-- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, the root `.md` files except `TEST-PLAN.md`, and the root scripts `build`, `serve`, `test`, `test-postgres`, `validate`, `generate-schema-svg`, `generate-api-documentation`, `measure`, `postgres-wipe`, `postgres-lib`, and `postgres-seed`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
-- [ ] **AT4** With `POSTGRES_URL` set (A3
-  requires it), run `./test-postgres`. The
+- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `build`, `serve`, `crank`, `test`, `test-postgres`, `validate`, `generate-schema-svg`, `generate-api-documentation`, `measure`, `postgres-wipe`, `postgres-lib`, and `postgres-seed`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
+- [ ] **AT4** Crank sets `POSTGRES_URL` and
+  runs `./test-postgres` after postgres is
+  up and before `./build --no-zip`. The
   suite creates and drops its own
-  `fusion_test_*` schema, so it runs against
-  A3's database before A1. PASS: exits 0,
+  `fusion_test_*` schema. PASS: exits 0,
   `fail 0`. `./validate` stays Postgres-free.
 
 ---
@@ -466,25 +464,22 @@ Abort on any AT red.
 tenant: none
 parallel: no
 global_lock: none
-depends: AT
+depends: —
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-angle-server-${SHA}.zip`.
 - [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
-- [ ] **A3** With `POSTGRES_URL`,
-  `JWT_HMAC_SIGNING_KEY`, and
-  `HTTP_SERVER_PORT` set. Wipe, then seed
-  from the checkout, then start
-  `node server.mjs` from the A2 directory.
-  Empty is the wipe step, not a human
-  prerequisite:
-
-  `./postgres-wipe --postgres local`
-
-  then the mode seed below, then listen.
+- [ ] **A3** `./crank --mock-data port` (serial)
+  or `./crank --test-plan-slices port`
+  (parallel). Crank validates, mints secrets,
+  starts postgres only, runs `./test-postgres`,
+  `./build --no-zip` into a temp dir, wipes,
+  seeds, and listens. Empty is the wipe step,
+  not a human prerequisite. Secrets never
+  print (seed's one-shot stdout is the only
+  reveal).
 
   - **Serial (`--serial`):**
-    `./postgres-seed --postgres local
-    --mock-data` then `node server.mjs`.
+    `./crank --mock-data port`.
     PASS: process listens; seed stdout
     prints `Save your demo sign-ins —
     shown once; copy them now.` plus
@@ -496,9 +491,7 @@ depends: AT
     not travel over HTTP. This pin
     **is** SV1.
   - **Parallel (default):**
-    `./postgres-seed --postgres local
-    --test-plan-slices` then
-    `node server.mjs`.
+    `./crank --test-plan-slices port`.
     PASS: process listens; seed stdout
     prints the same reveal header plus
     TSV `section<TAB>field<TAB>value`
@@ -3367,12 +3360,18 @@ parallel: no
 global_lock: process
 depends: AA, B, C, D, E, F, F2, FS, G, H, I, K, R, SV
 
-- [ ] **J1** Stop the `server.mjs` process started in A3
-  via the harness-native task stop (not `kill`). PASS:
-  process terminates. Sandbox EPERM on `kill` is not a
-  reason to mark this BLOCKED.
-- [ ] **J2** Remove the build directory (`rm -rf /tmp/fusion-test` or equivalent). PASS: directory removed.
-- [ ] **J3** Verify the ZIP file remains on `~/Desktop` for archival. PASS: `fusion-angle-server-${SHA}.zip` exists.
+- [ ] **J1** Stop the `./crank` process started
+  in A3 via the harness-native task stop (not
+  `kill`). PASS: process terminates; the trap
+  stopped `./serve`. Sandbox EPERM on `kill`
+  is not a reason to mark this BLOCKED.
+- [ ] **J2** After J1 PASS, verify crank's temp
+  bundle is gone (trap `rm -rf`). PASS:
+  directory removed. DEFERRED only if crank
+  is still up.
+- [ ] **J3** Verify the ZIP file remains on
+  `~/Desktop` for archival. PASS:
+  `fusion-angle-server-${SHA}.zip` exists.
 
 ## SV. Server (Node + Postgres)
 
@@ -3388,20 +3387,11 @@ two-tab / stale-until-navigation pins.
 
 Operator prerequisites:
 
-- `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and
-  `HTTP_SERVER_PORT` set (required; no defaults; never
-  logged)
-- Wipe then seed: `./postgres-wipe --postgres
-  local`, then serial A3 with
-  `./postgres-seed --postgres local --mock-data`
-  then `node server.mjs`, and parallel A3 with
-  `./postgres-seed --postgres local
-  --test-plan-slices` then `node server.mjs`.
-  The SV hunter still skips SV1 and does
-  not re-seed.
+- A3 is crank. The SV hunter still skips SV1
+  and does not re-seed.
 - Credentials print once on **stdout**, never HTTP
-- One mint process — do not run two `server.mjs`
-  replicas
+- One mint process — do not run two crank
+  processes
 
 Named residual: the backend emits
 `pg_notify('fusion_events', …)` inside the write

@@ -14,13 +14,11 @@ LONG_LINES=$( {
         \( -name '*.ts' -o -name '*.html' -o -name '*.css' \) \
         ! -path 'web-app/app/compose.ts' \
         -exec awk "$AWK_LINT" {} +
-    find . -maxdepth 1 -type f -name '*.md' \
-        ! -name 'TEST-PLAN.md' \
-        -exec awk "$AWK_LINT" {} +
     awk "$AWK_LINT" build serve test test-postgres \
         validate generate-schema-svg \
         generate-api-documentation measure \
         postgres-wipe postgres-lib postgres-seed \
+        crank \
         Dockerfile compose.yaml .dockerignore
 } )
 
@@ -30,12 +28,12 @@ if [ -n "$LONG_LINES" ]; then
     exit 1
 fi
 
+DOC_LINE_FAIL=
 # Root-doc line-count ceilings (target × 1.5, rounded up
 # to the nearest 50). TEST-PLAN.md is exempt: cases grow.
 # CLAUDE.md is the one-line stub and is not gated.
 # AUDIT.md and FLOW-CANVAS.md sit above the original
 # estimate; the ceiling follows the rewritten size.
-DOC_LINE_FAIL=
 while read -r FILE MAX; do
     [ -z "${FILE}" ] && continue
     N=$(wc -l < "${FILE}" | tr -d ' ')

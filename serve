@@ -1,15 +1,38 @@
 #!/bin/bash
 set -euo pipefail
 
-DEFAULT_PORT=8080
+usage() {
+    cat <<'USAGE'
+Usage: ./serve dir/ port
+  dir/   Bundle directory (trailing / required)
+  port   HTTP_SERVER_PORT (required; no default)
+  Requires POSTGRES_URL and JWT_HMAC_SIGNING_KEY.
+USAGE
+}
 
-if [ $# -gt 1 ]; then
-    echo "Usage: ./serve [port]" >&2
-    echo "  port   Default: $DEFAULT_PORT" >&2
-    echo "  Requires POSTGRES_URL and" \
-        "JWT_HMAC_SIGNING_KEY." >&2
+if [ $# -eq 1 ] && { [ "$1" = "--help" ] \
+    || [ "$1" = "-h" ]; }; then
+    usage
+    exit 0
+fi
+
+if [ $# -ne 2 ]; then
+    usage >&2
     exit 1
 fi
+
+DIR="$1"
+PORT="$2"
+
+case "$DIR" in
+    */)
+        ;;
+    *)
+        echo "Error: dir/ requires a trailing /" >&2
+        usage >&2
+        exit 1
+        ;;
+esac
 
 if [ -z "${POSTGRES_URL:-}" ]; then
     echo "Error: missing required env POSTGRES_URL" >&2
@@ -21,14 +44,8 @@ if [ -z "${JWT_HMAC_SIGNING_KEY:-}" ]; then
     exit 1
 fi
 
-PORT="${1:-$DEFAULT_PORT}"
 export HTTP_SERVER_PORT="$PORT"
-
-BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fusion-serve.XXXXXX")
-trap 'rm -rf "$BUILD_DIR"' EXIT
-
-./build --no-zip "$BUILD_DIR/"
 
 echo
 echo "Serving on http://localhost:$PORT/"
-cd "$BUILD_DIR" && node server.mjs
+cd "$DIR" && exec node server.mjs

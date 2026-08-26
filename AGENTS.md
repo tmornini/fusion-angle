@@ -11,7 +11,8 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 ./build --no-zip dir/  # server-core + server.mjs to dir/
 ./build dir/           # Server ZIP to dir/ instead of ~/Desktop/
 ./build --help         # Show usage
-./serve [port]         # Build + node server.mjs (default 8080)
+./crank --mock-data|--test-plan-slices|--bootstrap port
+./serve dir/ port      # node server.mjs from dir/ (no build)
 ./postgres-seed --postgres local --bootstrap|--mock-data|--test-plan-slices
 ./postgres-seed --postgres render TOKEN \
     --bootstrap|--mock-data|--test-plan-slices
@@ -35,39 +36,41 @@ docker compose down        # stop; the database dies with it
 ./measure --base-url URL  # Hit a running origin (needs --password)
 ```
 
-**Commit before building.** `./build` and `./serve`
-(which runs `./build`) require a clean working directory.
+**Commit before building.** `./build` and `./crank`
+require a clean working directory.
 Run `./validate` to catch type errors and lint issues;
-commit; then build or serve.
+commit; then build or crank.
 
 `./serve` and a local `./measure` sweep need
-`POSTGRES_URL` and `JWT_HMAC_SIGNING_KEY`. `./serve`
-[port] is `HTTP_SERVER_PORT`.
+`POSTGRES_URL` and `JWT_HMAC_SIGNING_KEY` already
+set. `./serve dir/ port` sets `HTTP_SERVER_PORT`
+from `port`. `./crank` mints those for its children.
 
 When running under the Claude Code sandbox, the default
 fails because `/tmp/` is not writable. Use this invocation
 instead:
 
 ```bash
-TMPDIR=/tmp/claude ./serve 8080
+TMPDIR=/tmp/claude ./crank --mock-data 8080
 # open http://localhost:8080/landing/index.html
 ```
 
-`TMPDIR=/tmp/claude` redirects `./serve`'s temp build dir
-into the sandbox-allowed path.
-`localhost` is reachable from the sandbox, so the Chrome MCP
-tools can drive the page normally.
+`TMPDIR=/tmp/claude` redirects `./crank`'s temp
+bundle into the sandbox-allowed path.
+`localhost` is reachable from the sandbox, so the
+Chrome MCP tools can drive the page normally.
 
 ## Gates
 
 `./validate` composes `tsc --noEmit`, then `./test` (two
 TZ passes: `TZ=UTC` on `tests/*.test.ts`, then
 `TZ=Pacific/Honolulu` on `tests/tz/*.test.ts`), then
-78-character lint, the `org` identifier ban under `api/`,
+78-character lint of code and scripts (not `.md`),
+the `org` identifier ban under `api/`,
 `web-app/`, `tests/`, and `shared/`, then
 `generate-schema-svg --check` and
 `generate-api-documentation --check`. Clean tree for
-`./build` and `./measure`.
+`./build`, `./crank`, and `./measure`.
 
 When an agent runs the full test plan (CLI + browser),
 `./validate` is the gate: a failing type-check, test, or
@@ -130,7 +133,8 @@ the proselytization, the dispatching agent MUST also push
 down the codebase-specific patterns the scripture itself
 cannot know:
 
-- **Voice rules.** 78-char max line, 4-space indent, no
+- **Voice rules.** 78-char max line in files
+  `./validate` still lints, 4-space indent, no
   inline styles (use CSS custom properties + classes per
   DESIGN-SYSTEM.md), present-tense imperative
   commit messages, Co-Authored-By trailer.

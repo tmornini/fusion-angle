@@ -9,7 +9,7 @@ Options:
   path/      Output directory (trailing / required)
              Default: ~/Desktop/
   --no-zip   Create bundle directory without zipping
-             (server-core + server.mjs — for ./serve)
+             (server-core + server.mjs — for ./crank)
   --help     Show this help message
 
 Examples:

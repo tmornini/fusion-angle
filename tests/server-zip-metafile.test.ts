@@ -109,3 +109,14 @@ test(
         assert.deepEqual(hits, []);
     },
 );
+
+test('build --no-zip help names crank', () => {
+    assert.match(
+        BUILD_SCRIPT,
+        /server-core \+ server\.mjs — for \.\/crank/,
+    );
+    assert.doesNotMatch(
+        BUILD_SCRIPT,
+        /for \.\/serve/,
+    );
+});

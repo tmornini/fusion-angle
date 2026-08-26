@@ -1,0 +1,134 @@
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+    cat <<'USAGE'
+Usage: ./crank --mock-data|--test-plan-slices|--bootstrap port
+USAGE
+}
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+
+BOOTSTRAP=false
+MOCK_DATA=false
+TEST_PLAN_SLICES=false
+PORT=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --bootstrap)
+            BOOTSTRAP=true
+            shift
+            ;;
+        --mock-data)
+            MOCK_DATA=true
+            shift
+            ;;
+        --test-plan-slices)
+            TEST_PLAN_SLICES=true
+            shift
+            ;;
+        -*)
+            echo "Error: unknown argument: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+        *)
+            if [ -n "$PORT" ]; then
+                echo "Error: unexpected argument:" \
+                    "$1" >&2
+                usage >&2
+                exit 1
+            fi
+            PORT="$1"
+            shift
+            ;;
+    esac
+done
+
+MODE_COUNT=0
+if [ "$BOOTSTRAP" = true ]; then
+    MODE_COUNT=$((MODE_COUNT + 1))
+fi
+if [ "$MOCK_DATA" = true ]; then
+    MODE_COUNT=$((MODE_COUNT + 1))
+fi
+if [ "$TEST_PLAN_SLICES" = true ]; then
+    MODE_COUNT=$((MODE_COUNT + 1))
+fi
+
+if [ "$MODE_COUNT" -gt 1 ]; then
+    echo "Error: --bootstrap, --mock-data, and" \
+        "--test-plan-slices are exclusive" >&2
+    usage >&2
+    exit 1
+fi
+
+if [ "$MODE_COUNT" -eq 0 ]; then
+    echo "Error: exactly one of --bootstrap," \
+        "--mock-data, or --test-plan-slices" \
+        "is required" >&2
+    usage >&2
+    exit 1
+fi
+
+if [ -z "$PORT" ]; then
+    echo "Error: port is required" >&2
+    usage >&2
+    exit 1
+fi
+
+if [ "$BOOTSTRAP" = true ]; then
+    MODE='--bootstrap'
+elif [ "$MOCK_DATA" = true ]; then
+    MODE='--mock-data'
+else
+    MODE='--test-plan-slices'
+fi
+
+./validate
+
+POSTGRES_PASSWORD="$(openssl rand -hex 16)"
+JWT_HMAC_SIGNING_KEY="$(openssl rand -hex 32)"
+export POSTGRES_PASSWORD
+export JWT_HMAC_SIGNING_KEY
+export HTTP_SERVER_PORT="$PORT"
+POSTGRES_URL="postgres://fusion:${POSTGRES_PASSWORD}"
+POSTGRES_URL="${POSTGRES_URL}@127.0.0.1:5432/fusion"
+export POSTGRES_URL
+
+BUILD_DIR=""
+SERVE_PID=""
+CLEANED=""
+
+cleanup() {
+    if [ -n "${CLEANED:-}" ]; then
+        return
+    fi
+    CLEANED=1
+    if [ -n "${SERVE_PID:-}" ]; then
+        kill "$SERVE_PID" 2>/dev/null || true
+        wait "$SERVE_PID" 2>/dev/null || true
+    fi
+    docker compose down --remove-orphans || true
+    if [ -n "${BUILD_DIR:-}" ]; then
+        rm -rf "$BUILD_DIR"
+    fi
+}
+trap cleanup EXIT INT TERM
+
+docker compose up -d --wait postgres
+./test-postgres
+BUILD_DIR="$(mktemp -d \
+    "${TMPDIR:-/tmp}/fusion-crank.XXXXXX")"
+./build --no-zip "${BUILD_DIR}/"
+./postgres-wipe --postgres local
+./postgres-seed --postgres local "$MODE"
+./serve "${BUILD_DIR}/" "$PORT" &
+SERVE_PID=$!
+wait "$SERVE_PID"
