@@ -217,6 +217,13 @@ Off the critical path; each with its oracle.
 - Invitation email delivery
 - The `≥ N` doc debt (`TEST-PLAN.md:131-132, 185-186`)
 - Attribute drag-reorder (TEST-PLAN R8)
+- Idea-create toasts an incomplete submit; convert
+  still sets `btn.disabled` — two forms, one
+  directory, opposite validation voices
+  (`web-app/ideas/create.ts:124`,
+  `web-app/ideas/convert.ts:356`;
+  `docs/superpowers/test-plan-mitigations/`
+  `2026-08-26-d-d6.md`)
 - The run-four remediation's remaining seams — the
   Objectives sparkline track collapses at 304px
   (`web-app/app/styles/components-metrics.css:80-82`);
@@ -410,6 +417,9 @@ Off the critical path; each with its oracle.
   (`api/test-plan-slices.ts:2040`), and a dead
   `disconnect()` stub in
   `tests/ideas-empty-subscribe.test.ts`
+- Investigate `docker compose up -d --wait` postgres
+  only. Not the compose `server` — that would be a
+  second origin (`compose.yaml`)
 
 ## Sequencing
 

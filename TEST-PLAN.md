@@ -4,6 +4,12 @@
 
 ### How to invoke
 
+Beware the use of parallelism due to the single
+cookie-jar. Use a fresh local Postgres via Docker.
+Set `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and
+`HTTP_SERVER_PORT` with random inputs for passwords
+and other secrets.
+
 When the user says "run the test plan", the master
 session:
 
@@ -48,9 +54,10 @@ other coordination state is read or written.
 
 BLOCKED ≠ FAIL. BLOCKED is reserved for known MCP
 environmental limits (pointer-capture gestures,
-`resize_window`, file I/O, sandbox EPERM, one
-selected page) — never used to mask a real
-failure.
+`resize_window`, file I/O, one selected page) —
+never used to mask a real failure. Sandbox EPERM
+on `kill` is not BLOCKED: J1 uses the harness
+task stop.
 
 ### Sub-agent invocation contract
 
@@ -206,7 +213,7 @@ Failure:
 | Hunter crash | That section FAIL (MCP BLOCKED as today). Siblings finish. |
 | Hunter FAIL cases | Join continues. Then one mitigation spec per cluster. |
 | K8 fail | Record FAIL; still attempt J; still write earlier mitigations. |
-| J1 sandbox EPERM | J1 BLOCKED, J2 DEFERRED. |
+| J1 stop fails | J1 FAIL. J2 DEFERRED if the server is still up. |
 
 Master never re-dispatches a hunter to retry.
 
@@ -216,7 +223,7 @@ Master never re-dispatches a hunter to retry.
   marquee select): synthetic PointerEvents do not reliably
   drive the `flow-interactions.ts` state machines because they
   use pointer-capture semantics. Affected tests include
-  AA27–AA34, F15, F19–F23. Work around the gesture cases by
+  AA27–AA34, F15, F19–F23, F50–F54. Work around the gesture cases by
   validating end-state via message-plane fixtures (PUT a
   flow document message pair through the gate, or GET the
   flow document / its pair history for the flow's
@@ -250,10 +257,13 @@ Master never re-dispatches a hunter to retry.
   "Email is required" toast, clicking
   `.toast-close` after the 300 ms entrance and
   asserting detachment inside 3 s.
-- **`resize_window`** does not change the CSS viewport;
-  responsive tests at specific widths (I10) cannot be driven.
-  Inspect `layout.css` manually to verify the mobile-breakpoint
-  media queries (the show/hide of the desktop sidebar/header).
+- **`resize_window`** does not change the CSS viewport
+  (`innerWidth` stays at the desktop size). I10 is
+  source-verified. I11–I15 need a CSS viewport ≤767px
+  for the mobile drawer; they are BLOCKED until one
+  exists. Inspect `layout.css` to verify the
+  mobile-breakpoint media queries (the show/hide of
+  the desktop sidebar/header).
 - **Loading skeletons** (I21): `navigate` resolves after
   the page's fetches settle, so the skeleton paints and
   clears before any probe can see it. Verify by source
@@ -284,22 +294,17 @@ Master never re-dispatches a hunter to retry.
   nothing — drive canvas selection with real pointer
   events or `.focus()`.
 - **`kill` syscall against the background HTTP server**: the
-  Claude Code sandbox rejects `kill -TERM` and `kill -9`
-  against PIDs of long-running background tasks started via
-  the Bash tool's `run_in_background: true` (EPERM).
-  Teardown's **J1** ("Stop `server.mjs`") cannot terminate
-  the process from within the sandbox; mark J1 BLOCKED with
-  the reason "sandbox EPERM on kill". The server is cleaned
-  up at session end. Workaround: the user terminates manually
-  after the run via
-  `lsof -ti tcp:$HTTP_SERVER_PORT | xargs kill -9`
-  outside the sandbox.
-- **Phase 5 build-dir cleanup (J2)**: deferred while the
-  server remains alive. Deleting the A2 temp dir while
-  `server.mjs` holds open file descriptors leaves the
-  process in an unrecoverable state. After the user kills
-  the server outside the sandbox, they should `rm -rf`
-  that dir. J2 is marked DEFERRED whenever J1 is BLOCKED.
+  sandbox may EPERM `kill -TERM` / `kill -9` against a
+  background PID. **J1 does not use that syscall.** Stop
+  A3's `server.mjs` with the harness-native task stop
+  (the same handle A3 started). J1 PASS when that
+  process exits. Do not mark J1 BLOCKED for sandbox
+  EPERM. If the harness stop fails, J1 is FAIL.
+- **Phase 5 build-dir cleanup (J2)**: runs after J1
+  PASS. Deleting the A2 temp dir while `server.mjs`
+  still holds open file descriptors leaves the
+  process in an unrecoverable state. J2 is DEFERRED
+  only when the server is still up.
 - **Chrome MCP tab-group volatility**: the MCP tab group can
   dissolve between calls when no tabs in the group are
   actively held. If `tabs_create_mcp` returns "No tab
@@ -390,19 +395,24 @@ run by the master after join.
 | J. Teardown | 3 |
 | K. Objectives & Scoring | 30 |
 | R. Records | 25 |
-| SV. Server (Node + Postgres) | 10 |
-| **Total** | **401** |
+| SV. Server (Node + Postgres) | 9 |
+| **Total** | **400** |
+
+A3 **is** SV1 — counted once, in A. The SV hunter
+skips SV1. F is 80 (F1–F75 plus F37a, F37b, F38a,
+F38b, F57a).
 
 ### Combined Totals (CLI + Browser)
 
-The per-section table above counts browser-regression
-cases only (401). The CLI count is the most recent
-`./validate` (AT2) report — the main `tests/*.test.ts`
-suite plus the `tests/tz/*.test.ts` timezone suite; AT2
-without `POSTGRES_URL` skips the seven `pg-*.test.ts` /
+The per-section table above counts 400 distinct
+TEST-PLAN cases (A3 is SV1; not counted twice). The
+CLI count is the most recent `./validate` (AT2)
+report — the main `tests/*.test.ts` suite plus the
+`tests/tz/*.test.ts` timezone suite; AT2 without
+`POSTGRES_URL` skips the seven `pg-*.test.ts` /
 `schema-lifecycle.test.ts` stubs, and after AT4 those
 seven run. The number grows as tests land in either
-glob and is not pinned here. Update the browser count
+glob and is not pinned here. Update the case count
 when a case is added or removed.
 
 Outcome categories used by run summaries (see `## Summary
@@ -418,9 +428,9 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = AT2 + 401, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j,
+`PASS = AT2 + 400, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j,
 DRIFT = 0`, where AT2 is the CLI count that run reported
-and the six status counts sum to AT2 + 401.
+and the six status counts sum to AT2 + 400.
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL`
 indicates a regression.
 
@@ -1096,7 +1106,7 @@ depends: A
 
 > Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The seed gives every login-capable identity a membership, so create the zero-membership state via pair fixtures (the B21 precedent): sign in as a single-org seeded member, then append a DELETE-shaped membership document message pair (and clear any default-organization pairs) for that identity through the gate or by inserting matching `message_pairs` rows — do NOT poke a retired `memberships` table. `getOrganizations` is fenced to the derived membership ledger, so the identity now reaches no org. Their login credential is untouched.
 
-- [ ] **B25** From the zero-membership state, sign out, then sign in again with that member's credentials. PASS: lands directly on `invitations/index.html` — NOT the `?return=` target and NOT the dashboard "Something went wrong" card; no flash of the dashboard shell (the auth-page short-circuit decides before the first navigation). Sidebar renders the member chip from token claims with NO org switcher.
+- [ ] **B25** From the zero-membership state, click "Sign out", then sign in again with that member's credentials. PASS: the `refresh_token` cookie is cleared (`Set-Cookie` `Max-Age=0`) — sign-out is not org-fenced; a zero-membership identity must still revoke. Lands directly on `invitations/index.html` — NOT the `?return=` target and NOT the dashboard "Something went wrong" card; no flash of the dashboard shell (the auth-page short-circuit decides before the first navigation). Sidebar renders the member chip from token claims with NO org switcher. Navigating Back after sign-out does not boot into the account.
 - [ ] **B26** From the zero-membership state while signed in, open `dashboard/index.html` (or any org-gated page) directly and reload (Cmd-R). PASS: redirected to `invitations/index.html` by the boot org gate — no dashboard error card, no retry loop (the returning-user path, not just fresh login).
 - [ ] **B27** As the zero-membership identity, land on `invitations/index.html`. PASS: the page renders and STAYS — no redirect loop (the gate's self-guard exempts the invitations page); it shows pending invitations, or the "No invitations." empty state when none exist.
 - [ ] **B28** Restore the deleted membership row (or repeat with an untouched seeded member), then sign in. PASS: lands on the `?return=` target / dashboard as before — the org gate does not fire for an identity that reaches an org (B16/B18 unaffected by the new gate).
@@ -1217,10 +1227,17 @@ depends: A
 ### Idea Create Form (`ideas/create.html`)
 
 - [ ] **D5** Page loads showing a single-page form with six conversationally-labeled fields: "Give your idea a clear title" (Title), "What problem does this solve?" (Problem Statement), "Who will benefit from this?" (Target Users), "How would you solve this?" (Proposed Solution), "What outcome do you expect?" (Expected Outcome), "How would you measure success?" (Success Metrics). Parentheticals are conceptual field names (draft keys: title, problemStatement, targetUsers, proposedSolution, expectedOutcome, successMetrics), not DOM field ids; the prompt is the visible label. DOM ids for selectors: `idea-create-field-title|problem|target|solution|outcome|metrics`. PASS: all six fields visible.
-- [ ] **D6** "Submit Idea" button is disabled when any required field is empty. PASS: button is visually disabled and not clickable.
+- [ ] **D6** With any required field empty, click
+  "Submit Idea". PASS: an error toast reads
+  "Title, problem, solution, and outcome are
+  required"; the page does not navigate. The
+  button stays clickable (no `disabled`
+  attribute — validation is post-click).
 - [ ] **D7** Fill in all required fields (Title,
   Problem Statement, Proposed Solution,
-  Expected Outcome). PASS: "Submit Idea" button becomes enabled.
+  Expected Outcome). PASS: the button stays
+  clickable (there is no disabled→enabled
+  transition). Submit itself is D8.
 - [ ] **D8** Click "Submit Idea". PASS: navigates to `ideas/index.html`.
 - [ ] **D9** Click "Cancel". PASS: navigates to `ideas/` list.
 
@@ -1315,18 +1332,21 @@ depends: A
   Success Metrics). Source of truth:
   `REQUIRED_FIELDS` in
   `web-app/app/presenters/idea-conversion.ts`.
-- [ ] **D23** With required fields empty, "Create
-  Project" is disabled and the progress bar
-  shows 0/N where N = 4 + one per active
-  objective. Serial: 0/5 (4 fields + 1 Wayne
-  objective). Parallel: 0/8 (4 + 4). Fill
-  fields and drag baseline sliders one at a
-  time. PASS: the bar increments with each
-  required field AND each baseline, checkmarks
-  appear next to completed items, and the
-  button enables only when all required fields
-  AND all baselines are set. Success Criteria
-  is required — filling it advances the bar.
+- [ ] **D23** Project Name auto-prefills from the
+  idea title, so the bar starts 1/N — not 0/N
+  — with the other required fields empty.
+  N = 4 + one per active objective. Serial:
+  1/5 (4 fields + 1 Wayne objective). Parallel:
+  1/8 (4 + 4). "Create Project" stays disabled
+  until every remaining required field and
+  every baseline is set. Fill fields and drag
+  baseline sliders one at a time. PASS: the
+  bar increments with each required field AND
+  each baseline, checkmarks appear next to
+  completed items, and the button enables only
+  when all required fields AND all baselines
+  are set. Success Criteria is required —
+  filling it advances the bar.
 - [ ] **D24** Fill every required field and
   baseline (the progress bar reaches its max;
   Serial: 5/5. Parallel: 8/8), click "Create
@@ -1848,11 +1868,16 @@ re-renders after each step.)
   :id/flows/:id` in the network log (the save fires
   `SAVE_DELAY_MS` = 800 ms after the last keystroke)
   before selecting the next node. Then click Undo 11
-  times in a row. PASS: every one of the 11 renames
+  times, waiting after each click for the canvas
+  (node name / graph) to change — not merely for
+  HTTP 201. PASS: every one of the 11 renames
   reverts in order — undo walks the flow's own full
   document-message-pair history (`FLOW_VERSION_CAP`
   and `flow_versions` are retired; there is no
-  10-edit bound).
+  10-edit bound). A further Undo that answers 201
+  with no canvas change, Undo still enabled, is F36
+  exhaustion (graceful server no-op), not a missed
+  step.
 - [ ] **F46** Edit a flow (rename a state), let auto-save complete.
   Navigate away from the designer to `flows/index.html`. Re-open the
   same flow. Click Undo. PASS: the rename reverts — the undo history
@@ -1907,8 +1932,13 @@ concurrency, and the org fence. A designer "tag current" action is tracked in
   spacebar. PASS: an error toast appears ("Disable Auto-Fit to
   change the view"); pan mode stays off.
 - [ ] **F56** With pan mode on, toggle Auto-Fit on, then tap the
-  spacebar. PASS: pan mode turns off cleanly with no toast —
-  exiting pan mode is always permitted.
+  spacebar. Do **not** click the canvas first to move focus
+  off the Auto-Fit switch — that click starts a pan
+  gesture, so Space is ignored (`isGestureActive`) and a
+  leftover Auto-Fit toast looks like a fail. Drive Space
+  with canvas focus and no in-flight gesture. PASS: pan
+  mode turns off cleanly with no toast — exiting pan
+  mode is always permitted.
 - [ ] **F57** Focus a text input (e.g. node name in the panel).
   Tap the spacebar. PASS: a literal space character is inserted
   into the input; pan mode state is unchanged.
@@ -2292,13 +2322,14 @@ work order regardless of node assignment. There is no
 per-user visibility filter.
 
 - [ ] **WB20** As the demo user, navigate to `workbox/`.
-  Active tab. PASS: every active (non-completed,
-  unclaimed — any claimer hides the row, including the
-  current user's own claim) work order is listed
-  regardless of its current node's `memberIds` —
-  including nodes assigned only to AI members and nodes
-  with zero members (which carry the danger badge in the
-  designer but are still visible in the inbox).
+  Active tab. PASS: every active (non-completed) work
+  order is listed, claimed or not — a claim does not
+  hide the row; the row names its claimant
+  (`claimedByName` badge). Listed regardless of the
+  current node's `memberIds` — including nodes assigned
+  only to AI members and nodes with zero members
+  (which carry the danger badge in the designer but
+  are still visible in the inbox).
 - [ ] **WB21** Switch to the Archive tab. PASS: every
   completed work order is listed regardless of which
   member(s) the final transition referenced.
@@ -2461,9 +2492,11 @@ depends: A
   on the right opens the kind-picker dialog. Below the
   header sit a search input and three filter chips (All /
   Humans / AIs, with All pressed by default). The list
-  table groups members under HUMANS first then AIs, each
-  group showing avatar/name, title (humans) or the
-  model name (AIs), and department (humans only).
+  table groups members under YOU (the signed-in human),
+  then HUMANS, then AIs, each group showing avatar/name,
+  title (humans) or the model name (AIs), and department
+  (humans only). The YOU group is a third header, not a
+  row inside HUMANS.
 - [ ] **G12** Click the sidebar member chip (lower-left:
   name/avatar in the sidebar footer). PASS: navigates to
   the current human member's `member-detail` page
@@ -2827,7 +2860,7 @@ depends: A
 - [ ] **I3** Select "Light" theme. PASS: page returns to light theme.
 - [ ] **I4** Select "System" theme. PASS: theme follows OS preference (matches `prefers-color-scheme`).
 - [ ] **I5** Reload the page. PASS: theme choice persists (stored in `localStorage` key `fusion-angle:theme`).
-- [ ] **I6** Open the app in a second browser tab. Change theme in the first tab. PASS: second tab updates to the new theme without manual reload (cross-tab sync via StorageEvent).
+- [ ] **I6** Open the app in a second browser tab. Change theme in the first tab. PASS: second tab updates to the new theme without manual reload (cross-tab sync via StorageEvent), including the sun / moon / system toggle icon — not only `data-theme` on `<html>`. An OS `prefers-color-scheme` change while the preference is System updates the icon the same way.
 
 ### Sidebar
 
@@ -3295,10 +3328,11 @@ every other agent, so no write-domain collision.
   (mutation domain: `records` / instances under the type —
   Agent-F2 exclusive.)
 - [ ] **R17** Click "New instance". PASS: an identifier is
-  minted, PUT creates an empty instance (etag consumed),
-  and the section enters edit mode with writable attribute
-  inputs (readable non-writable attributes render
-  read-only; unreadable omitted).
+  minted, PATCH creates an empty instance (201, etag
+  consumed; the adapter is `putRecordInstance`, the wire
+  verb is PATCH), and the section enters edit mode with
+  writable attribute inputs (readable non-writable
+  attributes render read-only; unreadable omitted).
 - [ ] **R18** Fill a writable field and click Save. PASS:
   `patchRecordInstance` succeeds with the held etag; the
   section returns to list mode and the new value appears.
@@ -3333,7 +3367,10 @@ parallel: no
 global_lock: process
 depends: AA, B, C, D, E, F, F2, FS, G, H, I, K, R, SV
 
-- [ ] **J1** Stop the `server.mjs` process started in A3. PASS: process terminates.
+- [ ] **J1** Stop the `server.mjs` process started in A3
+  via the harness-native task stop (not `kill`). PASS:
+  process terminates. Sandbox EPERM on `kill` is not a
+  reason to mark this BLOCKED.
 - [ ] **J2** Remove the build directory (`rm -rf /tmp/fusion-test` or equivalent). PASS: directory removed.
 - [ ] **J3** Verify the ZIP file remains on `~/Desktop` for archival. PASS: `fusion-angle-server-${SHA}.zip` exists.
 
@@ -3431,7 +3468,7 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 | C | 7 | | | |
 | D | 38 | | | |
 | E | 12 | | | |
-| F | 77 | | | |
+| F | 80 | | | |
 | F2 | 31 | | | |
 | FS | 9 | | | |
 | G | 38 | | | |
