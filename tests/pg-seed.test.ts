@@ -282,6 +282,9 @@ test('formatTestPlanSliceCredentials is TSV',
             erasableUsername:
                 'g-erasable@test-plan.example',
             erasablePassword: 'secret-g-e',
+            inviteeUsername:
+                'r-member@test-plan.example',
+            inviteePassword: 'secret-g-i',
         },
     ]);
     assert.ok(text.includes(SEED_REVEAL_HEADER));
@@ -321,6 +324,14 @@ test('formatTestPlanSliceCredentials is TSV',
         text,
         /^G\terasable_password\tsecret-g-e$/m,
     );
+    assert.match(
+        text,
+        /^G\tinvitee_username\tr-member@test-plan.example$/m,
+    );
+    assert.match(
+        text,
+        /^G\tinvitee_password\tsecret-g-i$/m,
+    );
     assert.doesNotMatch(text, /"level":/);
 });
 
@@ -350,6 +361,7 @@ async () => {
         'unseated_password',
         'member_password',
         'erasable_password',
+        'invitee_password',
     ] as const;
     const omitExtras = [
         'AA', 'C', 'D', 'E', 'F', 'F2',
@@ -398,6 +410,17 @@ async () => {
     assert.ok(gErasable);
     assert.ok(
         (gErasable[1] ?? '').length >= 16,
+    );
+    const gInvitee = text.match(
+        /^G\tinvitee_password\t(.+)$/m,
+    );
+    assert.ok(gInvitee);
+    assert.ok(
+        (gInvitee[1] ?? '').length >= 16,
+    );
+    assert.match(
+        text,
+        /^G\tinvitee_username\tr-member@test-plan.example$/m,
     );
     const rMember = text.match(
         /^R\tmember_password\t(.+)$/m,

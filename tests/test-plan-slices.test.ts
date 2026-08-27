@@ -251,6 +251,13 @@ async () => {
     assert.ok(
         (g.erasablePassword ?? '').length >= 16,
     );
+    assert.equal(
+        g.inviteeUsername,
+        'r-member@test-plan.example',
+    );
+    assert.ok(
+        (g.inviteePassword ?? '').length >= 16,
+    );
     const requests = await db.messagePairs.getAll();
     const agents = requests.filter((r) =>
         r.uri_collection === '/ai-agents/'

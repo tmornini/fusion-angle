@@ -4,63 +4,84 @@
 
 ### How to invoke
 
-Beware the use of parallelism due to the single
-cookie-jar. Use a fresh local Postgres via Docker.
+Use a fresh local Postgres via Docker.
 Do not set `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`,
 or `HTTP_SERVER_PORT` by hand — `./crank` mints
 them for its children and never prints them.
 
-When the user says "run the test plan", the master
-session:
+The browser layer is the **browser-use** plugin
+(MCP `browser-use`, or CLI `browser-use`). If
+that plugin is not connected and the CLI is
+not on PATH, **refuse the run**. Do not fall
+back to Claude-in-Chrome, chrome-devtools
+MCP, or source-only workarounds. Canvas
+gestures, CSS viewport, skeletons,
+reduced-motion, and two-jar SV need
+compositor mouse and a real CSS viewport;
+without browser-use those cases are not
+worth running.
 
-1. Reads this document's `### Protocol` — required
-   context. Default is the section DAG below.
-2. Executes **A1** and **A2** (ZIP inventory) so
-   the tree is already clean for crank's
+When the user says "run the test plan", the
+master session:
+
+1. Confirms browser-use is available (MCP
+   tools `browser_exec` /
+   `browser_screenshot`, or `browser-use`
+   on PATH attached to Chrome with remote
+   debugging). Missing → refuse. Do not
+   dispatch hunters.
+2. Reads this document's `### Protocol` —
+   required context. Default is the section
+   DAG below.
+3. Executes **A1** and **A2** (ZIP inventory)
+   so the tree is already clean for crank's
    `./build --no-zip`.
-3. Starts `./crank --test-plan-slices port`
-   (serial: `./crank --mock-data port`) as the
-   origin. Crank runs `./validate` (AT1–AT3),
-   mints secrets, brings postgres up, runs
-   `./test-postgres` (AT4), builds `--no-zip`
-   into a temp dir, wipes, seeds, and listens.
-   Read the seed reveal from crank's stdout.
-   Red validate aborts with no Docker. Red AT4
-   or later hits the trap.
-4. Grants Chrome origin `http://localhost`
-   **before** dispatch.
-5. Parallel: this MCP has no isolated
-   contexts — one Chrome profile, one
-   cookie jar, one selected page. One
-   hunter per `parallel: yes` section
-   (14), each with that section's `##`
-   body only and that slice's
-   credentials. The master dispatches
-   them **one at a time**, joining each
-   before the next. Each hunter begins
-   by deleting site data for the origin
-   so the shared jar carries no previous
-   hunter's refresh cookie. The CLI belt
-   is the parallel layer. Serial: one
+4. Starts `./crank --test-plan-slices port`
+   (serial: `./crank --mock-data port`) as
+   the origin. Crank runs `./validate`
+   (AT1–AT3), mints secrets, brings postgres
+   up, runs `./test-postgres` (AT4), builds
+   `--no-zip` into a temp dir, wipes, seeds,
+   and listens. Read the seed reveal from
+   crank's stdout. Red validate aborts with
+   no Docker. Red AT4 or later hits the trap.
+5. Parallel: isolated browser-use CDP per
+   hunter (own cookie jar). One hunter per
+   `parallel: yes` section (14), each with
+   that section's `##` body only and that
+   slice's credentials. A second CDP/jar is
+   required for SV6–SV10. Serialize hunters
+   on one daemon only when each hunter
+   deletes site data first; never share a
+   jar across live hunters. Serial: one
    tenant, document order, headers not
    consulted.
-6. Joins in document order. Then K8 (process lock),
-   then J. Stopping crank IS J1 and J2
-   (EXIT trap). J3 stays (Desktop ZIP remains).
-   Then the canonical `## Summary Format` plus
-   one mitigation-spec path per FAIL cluster. The
-   master does not patch FAILs and does not
-   re-dispatch.
+6. Joins in document order. Then K8 (process
+   lock), then J. Stopping crank IS J1 and
+   J2 (EXIT trap). J3 stays (Desktop ZIP
+   remains). Then the canonical
+   `## Summary Format` plus one
+   mitigation-spec path per FAIL cluster.
+   The master does not patch FAILs and does
+   not re-dispatch.
 
-This document is the complete regression contract — no
-other coordination state is read or written.
+This document is the complete regression
+contract — no other coordination state is
+read or written.
 
-BLOCKED ≠ FAIL. BLOCKED is reserved for known MCP
-environmental limits (pointer-capture gestures,
-`resize_window`, file I/O, one selected page) —
-never used to mask a real failure. Sandbox EPERM
-on `kill` is not BLOCKED: J1 uses the harness
-task stop of the `./crank` process.
+BLOCKED ≠ FAIL. BLOCKED is not a driver
+limit. Canvas port-drag, shift-connect,
+marquee, list reorder, mobile drawer,
+loading skeleton, reduced-motion, and
+two-jar SV are driven with browser-use.
+Native HTML5 DnD on D36/D37 and K6 still
+needs a synthetic DataTransfer — that is
+a PASS/FAIL drive, not BLOCKED. BLOCKED
+is reserved for a missing process
+prerequisite (K7 waiting on K3). Sandbox
+EPERM on `kill` is not BLOCKED: J1 uses
+the harness task stop of the `./crank`
+process.
 
 ### Sub-agent invocation contract
 
@@ -79,17 +100,22 @@ full, then **only** its assigned `##` section body
 K omits K8). It does not read other sections. It
 does not re-seed.
 
+Refuse if browser-use is not available.
+Drive with compositor mouse and a real CSS
+viewport (`browser_exec` / `browser_screenshot`,
+or CLI `browser-use`). Do not use
+Claude-in-Chrome or chrome-devtools MCP.
 Delete site data for the origin, then sign
 in as that slice's admin from the credential
-map. Tab-scoped MCP tools only (navigate,
-find, evaluate, snapshot, form fill).
-Coordinate clicks and screenshots are
-display-global and collide.
+map.
 
-Return per-case PASS / FAIL / BLOCKED / DEFERRED /
-DRIFT. "Sign in as demo@…" means this hunter's
-admin. Stark / Wayne names mean this hunter's
-seeded org names from the map.
+Return per-case PASS / FAIL / BLOCKED /
+DEFERRED / DRIFT. BLOCKED is only for a
+missing process prerequisite (K7 waiting
+on K3). "Sign in as demo@…" means this
+hunter's admin. Stark / Wayne names mean
+this hunter's seeded org names from the
+map.
 
 K runs K1–K6, then K9–K30, then K7 last. K8 is not
 in this hunter.
@@ -121,15 +147,29 @@ case list. Do not read other
 sections. Do not re-seed. Do not
 patch FAILs.
 
+Refuse if browser-use is not
+available. Do not fall back to
+Claude-in-Chrome or
+chrome-devtools MCP.
+
 Delete site data for the origin
 before sign-in. Sign in as the
 admin above. Run the cases in
 document order. For K: skip K8;
 run K7 last after K30.
 
+Drive canvas gestures, CSS
+viewport, skeletons, and
+reduced-motion with compositor
+mouse / real CSS viewport.
+Native HTML5 DnD on D36/D37 and
+K6 still needs a synthetic
+DataTransfer.
+
 Return one line per case:
 ID PASS|FAIL|BLOCKED|DEFERRED|DRIFT
-— one-line note.
+— one-line note. BLOCKED only
+for K7 waiting on K3.
 ```
 
 ### Scope
@@ -167,29 +207,24 @@ a K-hunter case on the parallel path.
   mint garden rows (AA and E7) and does not
   wipe to `--bootstrap` except K8 (then
   restore `--mock-data`).
-- **Parallel (default)**: the same A1–A2. Grant Chrome
-  origin `http://localhost` before anything else. A3
+- **Parallel (default)**: the same A1–A2. Confirm
+  browser-use first; refuse if missing. A3
   `./crank --test-plan-slices port`.
   Capture the stdout credential map. Spawn one
-  hunter per `parallel: yes` section, join that
-  hunter, then spawn the next — never two
-  hunters at once. This MCP has no isolated
-  contexts (one Chrome profile, one cookie
-  jar, one selected page). Each hunter
-  deletes site data for the origin first.
-  After each hunter: delete site data.
-  Stolen-tab rule as C4/C7/R14: empty
-  bind picker, `data-empty` rows, or
-  0/0/1 tiles are stolen-tab paint.
-  BLOCKED (MCP selected-page) only if
-  the chip names another section's
-  admin. Otherwise FAIL. Do not treat
-  parallel-MCP noise as a product bug
-  unless a serial C or R pin fails.
-  The CLI belt is the parallel layer.
-  Then K8 (wipe/reseed of the shared DB; no
-  hunter still running). Then J. Then summary
-  + mitigation paths.
+  hunter per `parallel: yes` section. Isolated
+  CDP per hunter (own cookie jar). A second
+  CDP is required for SV6–SV10. Serialize on
+  one daemon only when each hunter deletes
+  site data first. After each hunter: delete
+  site data. Stolen-tab rule as C4/C7/R14:
+  empty bind picker, `data-empty` rows, or
+  0/0/1 tiles are stolen-tab paint. If the
+  chip names another section's admin: FAIL
+  (wrong jar). Do not treat a shared-jar
+  accident as a product bug unless a serial
+  C or R pin fails. Then K8 (wipe/reseed of
+  the shared DB; no hunter still running).
+  Then J. Then summary + mitigation paths.
 
 DAG edges only:
 
@@ -209,144 +244,182 @@ Failure:
 |---|---|
 | AT red | Abort. Crank exits before Docker. No seed, no hunters. |
 | A3 seed fail | Abort. No hunters. |
-| Hunter crash | That section FAIL (MCP BLOCKED as today). Siblings finish. |
+| Hunter crash | That section FAIL. Siblings finish. |
 | Hunter FAIL cases | Join continues. Then one mitigation spec per cluster. |
 | K8 fail | Record FAIL; still attempt J; still write earlier mitigations. |
 | J1 stop fails | J1 FAIL. J2 DEFERRED if the origin is still up. |
 
 Master never re-dispatches a hunter to retry.
 
-#### Known MCP limitations
+#### Browser-use driving
 
-- **Flow designer gestures** (port drag, shift-drag to connect,
-  marquee select): synthetic PointerEvents do not reliably
-  drive the `flow-interactions.ts` state machines because they
-  use pointer-capture semantics. Affected tests include
-  AA27–AA34, F15, F19–F23, F50–F54. Work around the gesture cases by
-  validating end-state via message-plane fixtures (PUT a
-  flow document message pair through the gate, or GET the
-  flow document / its pair history for the flow's
-  `uri_prefix`/`uri_id`), then reloading and verifying
-  render. When the fixture succeeds and the SVG renders
-  the expected end state, the case is **PASS** with the
-  note `verified via pair fixture` — NOT BLOCKED.
-  WB5a graph repair is pair fixture + reload.
-  `BLOCKED` is reserved for cases where neither gesture
-  nor fixture produces a verifiable end state.
-- **List-row drag-reorders** (E11 projects, D36/D37
-  ideas) share `drag-reorder.ts` (native HTML5 DnD
-  on `.drag-handle`, not pointer-capture) but are
-  not `computer`-driveable — CDP mouse events
-  never start a native drag session. Drive them
-  synthetically: `pointerdown` on `.drag-handle`,
-  a real `DataTransfer`, two or more `dragover`
-  samples for D37, then `drop` and `dragend`.
-  Verify persistence by reload. Window at or
-  above 768 CSS px; filter All.
-- **Hunter probe discipline.** Visibility via
-  `checkVisibility()` or `getClientRects()`, never
-  a descendant's computed `display`. Never
-  hand-`fetch` the API from `javascript_tool` —
-  the bearer is memory-only; read the network
-  log. V7 reads grant 403 from the network
-  log. WB16 reads the work-order history from
-  the network log, never a hand `fetch`. Toasts
-  via one `javascript_tool` call on
-  the Members invite dialog's synchronous
-  "Email is required" toast, clicking
-  `.toast-close` after the 300 ms entrance and
+Refuse the run if browser-use is missing. Do
+not fall back to Claude-in-Chrome,
+chrome-devtools MCP, or source-only
+workarounds. Compositor mouse and a real
+CSS viewport drive canvas gestures, CSS
+viewport, skeletons, reduced-motion, and
+two-jar SV.
+
+- **Flow designer gestures** (port drag,
+  shift-drag to connect, marquee select):
+  drive with compositor mouse
+  (AA27–AA34, F15, F19–F23, F50–F54).
+  PASS/FAIL on the live gesture. Pair
+  fixture + reload is a last-resort
+  corroboration, not a substitute and
+  not BLOCKED. WB5a graph repair is
+  pair fixture + reload.
+- **List-row drag-reorders.** E11
+  (projects) is compositor-mouse
+  driveable. D36/D37 (ideas) and K6
+  (objectives) still need a synthetic
+  DataTransfer — CDP mouse does not
+  start that native HTML5 DnD session.
+  Drive them: `pointerdown` on
+  `.drag-handle`, a real
+  `DataTransfer`, two or more
+  `dragover` samples for D37, then
+  `drop` and `dragend`. Verify
+  persistence by reload. Window at or
+  above 768 CSS px; filter All. That
+  synthetic drive is PASS/FAIL, not
+  BLOCKED.
+- **CSS viewport.** Set a real CSS
+  viewport (not a screenshot-only
+  resize). I10–I15 need ≤767px for the
+  mobile drawer. PASS/FAIL on the
+  live layout.
+- **Loading skeletons** (I21): probe
+  before fetches settle (do not wait
+  for `wait_for_load` first). PASS if
+  the skeleton paints, then content
+  replaces it.
+- **`prefers-reduced-motion`** (I30):
+  emulate via CDP
+  (`Emulation.setEmulatedMedia`) and
+  assert the view-transition
+  neutralizing rule takes effect.
+  PASS/FAIL on the live behavior.
+- **Two-jar SV6–SV10:** a second
+  browser-use CDP/jar. Same origin,
+  distinct cookies.
+- **Hunter probe discipline.**
+  Visibility via `checkVisibility()`
+  or `getClientRects()`, never a
+  descendant's computed `display`.
+  Never hand-`fetch` the API from
+  `js()` — the bearer is memory-only;
+  read the network log. V7 reads
+  grant 403 from the network log.
+  WB16 reads the work-order history
+  from the network log, never a hand
+  `fetch`. Toasts via one `js()` call
+  on the Members invite dialog's
+  synchronous "Email is required"
+  toast, clicking `.toast-close`
+  after the 300 ms entrance and
   asserting detachment inside 3 s.
-- **`resize_window`** does not change the CSS viewport
-  (`innerWidth` stays at the desktop size). I10 is
-  source-verified. I11–I15 need a CSS viewport ≤767px
-  for the mobile drawer; they are BLOCKED until one
-  exists. Inspect `layout.css` to verify the
-  mobile-breakpoint media queries (the show/hide of
-  the desktop sidebar/header).
-- **Loading skeletons** (I21): `navigate` resolves after
-  the page's fetches settle, so the skeleton paints and
-  clears before any probe can see it. Verify by source
-  (`web-app/app/loading-states.ts`); BLOCKED is
-  sanctioned.
-- **`prefers-reduced-motion`** cannot be emulated via the MCP;
-  the behavioral tier of the reduced-motion view-transition
-  test (I30) cannot be driven. Verify by source instead:
-  confirm the `::view-transition-*` neutralizing rule in
-  `base.css` / `responsive.css` (PASS = rule present). Observe
-  true suppression manually with OS reduced-motion enabled.
-- **File downloads** cannot write to disk from the MCP
-  sandbox. Capture Blob content via `javascript_tool`
-  intercepting `URL.createObjectURL` for validation.
-- **File uploads** require constructing a `DataTransfer` in
-  `javascript_tool` and dispatching a synthetic change event.
-- **Keyboard events** (arrows, Cmd+K, Delete, Tab) work
-  normally and bypass the pointer-capture limitation.
-- **The canvas `<svg>` is replaced on every commit**:
-  probe `svg.flow-canvas` by fresh query after every
-  click, never through a held element reference.
-- **Chords carry the browser's `key`**: Shift
-  uppercases (Cmd+Shift+Z arrives as `key: 'Z'`);
-  match chords Shift-insensitively.
-- **On canvas nodes and edges, `el.focus()` selects
-  like Tab** (the `focusin` promotion) while
-  `el.click()` fires no `pointerdown` and selects
-  nothing — drive canvas selection with real pointer
-  events or `.focus()`.
-- **`kill` syscall against the background HTTP server**: the
-  sandbox may EPERM `kill -TERM` / `kill -9` against a
-  background PID. **J1 does not use that syscall.** Stop
-  the `./crank` process A3 started with the
-  harness-native task stop (the same handle A3
-  started). J1 PASS when that process exits; the
-  trap stops serve, downs compose, removes the
-  temp bundle. Do not mark J1 BLOCKED for sandbox
-  EPERM. If the harness stop fails, J1 is FAIL.
-- **Phase 5 build-dir cleanup (J2)**: J2 is the
-  trap's `rm -rf` of crank's temp bundle,
-  verified after crank has exited. J2 is
-  DEFERRED only when crank/serve is still up.
-  Do not `rm` a still-running bundle.
-- **Chrome MCP tab-group volatility**: the MCP tab group can
-  dissolve between calls when no tabs in the group are
-  actively held. If `tabs_create_mcp` returns "No tab
-  available", recover via
-  `tabs_context_mcp({ createIfEmpty: true })` to allocate a
-  fresh group, then proceed. Pre-existing tab IDs from
-  before the dissolution are invalidated.
-- **One selected page (stolen-tab).** This MCP
-  has one Chrome profile, one cookie jar, one
-  selected page. After each hunter: delete
-  site data. Empty bind picker, `data-empty`
-  rows, or 0/0/1 tiles on C — or toast
-  "work order has no instance binding" on
-  R14's named subject — is stolen-tab
-  paint. If the chip names another
-  section's admin: BLOCKED (MCP
-  selected-page). Otherwise FAIL. Do not
-  treat parallel-MCP noise as a product
-  bug unless a serial C or R pin fails.
-- **`javascript_tool` async/await blocked by CSP**: the app
-  ships `script-src 'self'` with no `unsafe-eval`, so the
-  tool's async/IIFE wrapper throws `await is not defined`.
-  Drive the page with callback-built `Promise`s (no `await`
-  keyword).
-- **`getBoundingClientRect` ≠ click coordinates**: a ~1.19×
-  CSS-px ↔ screenshot-px scale exists on the driven tab.
-  Click by the coordinates seen in a screenshot, never by
-  `getBoundingClientRect` (its larger CSS-px values miss).
-- **List pages populate slowly (5–14s)**: org-scoped list
-  reads re-derive each entity's lifecycle from the
-  message-plane pair ledger (`message_pairs`), so
-  cards can take 5–14s to paint (Flows is slowest). Wait
-  ≥14s and assert the container's `childCount` /
-  `data-*-card` count — never an early screenshot, which
-  shows a skeleton or blank mid-render and reads as a
-  false "empty list".
-- **First post-reload mouse click often only focuses**: a
-  page's `init()` wires button handlers asynchronously, so a
-  click landing before init merely focuses the control with
-  no dialog. Use the element's `.click()` or re-click once
-  init has settled.
+- **File downloads:** intercept
+  `URL.createObjectURL` (or the
+  browser-use downloads skill) for
+  Blob content. PASS/FAIL.
+- **File uploads:** construct a
+  `DataTransfer` and dispatch a
+  synthetic change event, or use the
+  browser-use uploads skill.
+- **Keyboard events** (arrows,
+  Cmd+K, Delete, Tab, Space) work
+  with compositor/CDP key events.
+- **The canvas `<svg>` is replaced
+  on every commit**: probe
+  `svg.flow-canvas` by fresh query
+  after every click, never through a
+  held element reference.
+- **Chords carry the browser's
+  `key`**: Shift uppercases
+  (Cmd+Shift+Z arrives as
+  `key: 'Z'`); match chords
+  Shift-insensitively.
+- **On canvas nodes and edges,
+  `el.focus()` selects like Tab**
+  (the `focusin` promotion) while
+  `el.click()` fires no
+  `pointerdown` and selects nothing
+  — drive canvas selection with
+  compositor pointer events or
+  `.focus()`.
+- **F56 Space after Auto-Fit:** do
+  **not** click the canvas to move
+  focus off the Auto-Fit switch —
+  that click starts a pan gesture,
+  so Space is ignored. Focus
+  `svg.flow-canvas` via `js()` /
+  Tab, then send Space.
+- **`kill` syscall against the
+  background HTTP server**: the
+  sandbox may EPERM `kill -TERM` /
+  `kill -9` against a background
+  PID. **J1 does not use that
+  syscall.** Stop the `./crank`
+  process A3 started with the
+  harness-native task stop (the
+  same handle A3 started). J1 PASS
+  when that process exits; the trap
+  stops serve, downs compose,
+  removes the temp bundle. Do not
+  mark J1 BLOCKED for sandbox
+  EPERM. If the harness stop fails,
+  J1 is FAIL.
+- **Phase 5 build-dir cleanup
+  (J2)**: J2 is the trap's `rm -rf`
+  of crank's temp bundle, verified
+  after crank has exited. J2 is
+  DEFERRED only when crank/serve is
+  still up. Do not `rm` a
+  still-running bundle.
+- **Stolen-tab.** Isolated CDP per
+  hunter. After each hunter: delete
+  site data. Empty bind picker,
+  `data-empty` rows, or 0/0/1 tiles
+  on C — or toast "work order has no
+  instance binding" on R14's named
+  subject — is stolen-tab paint. If
+  the chip names another section's
+  admin: FAIL (wrong jar). Do not
+  treat a shared-jar accident as a
+  product bug unless a serial C or
+  R pin fails.
+- **`getBoundingClientRect` ≠
+  click coordinates**: a ~1.19×
+  CSS-px ↔ screenshot-px scale
+  exists on the driven tab. Click
+  by the coordinates seen in a
+  screenshot, never by
+  `getBoundingClientRect` (its
+  larger CSS-px values miss).
+- **List pages populate slowly
+  (5–14s)**: org-scoped list reads
+  re-derive each entity's lifecycle
+  from the message-plane pair
+  ledger (`message_pairs`), so
+  cards can take 5–14s to paint
+  (Flows is slowest). Wait ≥14s and
+  assert the container's
+  `childCount` / `data-*-card`
+  count — never an early
+  screenshot, which shows a
+  skeleton or blank mid-render and
+  reads as a false "empty list".
+- **First post-reload mouse click
+  often only focuses**: a page's
+  `init()` wires button handlers
+  asynchronously, so a click
+  landing before init merely
+  focuses the control with no
+  dialog. Use the element's
+  `.click()` or re-click once init
+  has settled.
 
 #### Serial single-tester mode
 
@@ -358,10 +431,10 @@ SV6–SV10 run before J as today.
 **A1–A2 ZIP inventory first**, then crank as A3.
 AT is inside crank, not a master step before A1.
 
-**Parallel (default):** A1–A2 → grant
-`http://localhost` → A3 `./crank
---test-plan-slices port` → 14 hunters → join
-in document order → K8 → J → summary.
+**Parallel (default):** confirm browser-use
+→ A1–A2 → A3 `./crank --test-plan-slices
+port` → 14 hunters → join in document
+order → K8 → J → summary.
 
 **Serial (`--serial`):** A1–A2 → A3
 `./crank --mock-data port` → A → AA → B → C →
@@ -419,17 +492,18 @@ Format` at the bottom of this file):
 |----------|--------------------------------------|:------:|
 | PASS     | Assertion satisfied                  |   no   |
 | FAIL     | Real regression; investigate         |  YES   |
-| BLOCKED  | Known MCP environmental limit        |   no   |
-| DEFERRED | Skipped — dependency BLOCKED         |   no   |
+| BLOCKED  | Process prerequisite missing (K7)    |   no   |
+| DEFERRED | Skipped — dependency not produced    |   no   |
 | DRIFT    | Passes but doc/UI mismatch surfaced  |   no   |
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = AT2 + 400, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j,
+`PASS = AT2 + 400, FAIL = 0, BLOCKED = 0, DEFERRED ≤ j,
 DRIFT = 0`, where AT2 is the CLI count that run reported
 and the six status counts sum to AT2 + 400.
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL`
-indicates a regression.
+indicates a regression. Never score BLOCKED for a
+driver limit, a missing toy, or a shared jar.
 
 ---
 
@@ -501,7 +575,8 @@ depends: —
     `seat_*` and `flow_id`; F2 names
     `flow_id`; G names
     `org2_*`, `unseated_*`,
-    `member_*`, `erasable_*`;
+    `member_*`, `erasable_*`,
+    `invitee_*`;
     SV names `seat_*`);
     listen stdout has no passwords;
     seed does not travel over HTTP. If
@@ -883,11 +958,7 @@ Project.
   the start-node-single-outgoing rule — is now
   covered by `tests/flow-operations.test.ts`
   (`performAddNodeAtPosition` + `performAddEdge`).
-  This browser case remains BLOCKED for the port-
-  drag gesture itself per the MCP pointer-capture
-  limitation; if the gesture cannot be driven,
-  validate end-state via direct JSON injection per
-  the AGENTS.md workaround.)
+  Drive the port-drag with compositor mouse.)
 - [ ] **AA28** Serial: N/A — requires the empty
   Create+Archive graph that serial must not
   mint; do not add nodes; do not JSON-inject.
@@ -901,10 +972,7 @@ Project.
   textarea, an empty Attributes list, and outgoing
   transitions. The node gets a gold glow selection
   effect on the canvas.
-  (Properties panel double-click is BLOCKED per the
-  MCP pointer-capture limitation; validate end-state
-  via pair fixture on the flow document address
-  (`message_pairs`) per the protocol workaround.)
+  Drive the double-click with compositor mouse.
 - [ ] **AA29** Serial: N/A — requires the empty
   Create+Archive graph that serial must not
   mint; do not add nodes; do not JSON-inject.
@@ -931,10 +999,7 @@ Project.
   "submit".
   (The add-node-at-position + auto-edge logic is
   now covered by `tests/flow-operations.test.ts`.
-  This browser case remains BLOCKED for the port-
-  drag gesture per the MCP pointer-capture
-  limitation — validate end-state via JSON
-  injection per the AGENTS.md workaround.)
+  Drive the port-drag with compositor mouse.)
 - [ ] **AA32** Serial: N/A — requires the empty
   Create+Archive graph that serial must not
   mint; do not add nodes; do not JSON-inject.
@@ -956,9 +1021,8 @@ Project.
   outgoing, and the cycle-vs-forward
   classification via the reachability check — are
   now covered by `tests/flow-operations.test.ts`
-  (`performAddEdge`). This browser case remains
-  BLOCKED for the shift-drag gesture itself per
-  the MCP pointer-capture limitation.)
+  (`performAddEdge`). Drive the shift-drag with
+  compositor mouse.)
 - [ ] **AA33** Serial: N/A — requires the empty
   Create+Archive graph that serial must not
   mint; do not add nodes; do not JSON-inject.
@@ -1170,8 +1234,8 @@ depends: A
   admin, wait ≥14s, then assert C4/C7.
   0/0/1 tiles or `data-empty` rows on C
   are stolen-tab paint. If the chip names
-  another section's admin: BLOCKED (MCP
-  selected-page). Otherwise FAIL.
+  another section's admin: FAIL (wrong
+  jar).
 - [ ] **C5** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
 - [ ] **C6** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
 - [ ] **C7** Check that seed data populates all 4 dashboard
@@ -1198,8 +1262,8 @@ depends: A
   admin, wait ≥14s, then assert C4/C7.
   0/0/1 tiles or `data-empty` rows on C
   are stolen-tab paint. If the chip names
-  another section's admin: BLOCKED (MCP
-  selected-page). Otherwise FAIL.
+  another section's admin: FAIL (wrong
+  jar).
 
 ---
 
@@ -1380,12 +1444,16 @@ depends: A
 ### Ideas List — Drag-reorder
 
 - [ ] **D36** On `ideas/index.html`, press and hold on an idea row then
-  drag it upward past another row's midpoint. PASS: during the drag a
+  drag it upward past another row's midpoint. Native HTML5
+  DnD needs a synthetic DataTransfer (pointerdown on
+  `.drag-handle`, real DataTransfer, drop, dragend).
+  PASS: during the drag a
   hysteresis indicator appears at the target drop position, the
   dragged row follows the pointer, and on release the ideas list
   reorders in place. Reload the page — new order persists.
 - [ ] **D37** During a drag, hover slowly across the midpoint of a
-  neighbouring row. PASS: the drop indicator line only flips to the
+  neighbouring row. Drive with two or more `dragover`
+  samples. PASS: the drop indicator line only flips to the
   new target once the pointer crosses the hysteresis threshold, not
   on the first pixel over the midpoint.
 
@@ -1552,20 +1620,14 @@ opens and renders.)
   groups), then state name, a Task Instructions
   textarea, the attributes list, and outgoing
   transitions.
-  (Properties panel double-click is BLOCKED per the
-  MCP pointer-capture limitation; validate end-state
-  via pair fixture on the flow document address per
-  the protocol workaround.)
+  Drive the double-click with compositor mouse.
 - [ ] **F12** Pan so a node sits near the right
   edge of the canvas, then double-click it. PASS:
   the properties panel slides out from the
   toolbar edge over ~200ms and the canvas
   re-centers so the node sits at the visual center
   of the canvas region not covered by the panel.
-  (Properties panel double-click is BLOCKED per the
-  MCP pointer-capture limitation; validate end-state
-  via pair fixture on the flow document address per
-  the protocol workaround.)
+  Drive the double-click with compositor mouse.
 - [ ] **F13** While the panel is open, double-click
   a different node. PASS: panel content updates to
   the new selection and the canvas re-centers on
@@ -1590,9 +1652,7 @@ opens and renders.)
   (The node-creation + auto-edge logic is now
   covered by `tests/flow-operations.test.ts`
   (`performAddNodeAtPosition` + `performAddEdge`).
-  This browser case remains BLOCKED for the port-
-  drag gesture itself per the MCP pointer-capture
-  limitation.)
+  Drive the port-drag with compositor mouse.)
 - [ ] **F16** Drag a standard node to a new
   position. PASS: node follows the pointer and
   can be placed freely on the canvas.
@@ -1641,9 +1701,8 @@ opens and renders.)
   check — are now covered by
   `tests/flow-operations.test.ts` (`performAddEdge`,
   including the noop branch for a release in empty
-  canvas). F19–F23 remain BLOCKED for the shift-
-  drag gesture itself per the MCP pointer-capture
-  limitation; the FSM preview transitions are also
+  canvas). Drive F19–F23 with compositor mouse;
+  the FSM preview transitions are also
   exercised by `tests/flow-fsm-reduce.test.ts`.)
 - [ ] **F20** Shift-drag forward (earlier node →
   later node). PASS: the curved preview is solid
@@ -1928,8 +1987,10 @@ concurrency, and the org fence. A designer "tag current" action is tracked in
   spacebar. Do **not** click the canvas first to move focus
   off the Auto-Fit switch — that click starts a pan
   gesture, so Space is ignored (`isGestureActive`) and a
-  leftover Auto-Fit toast looks like a fail. Drive Space
-  with canvas focus and no in-flight gesture. PASS: pan
+  leftover Auto-Fit toast looks like a fail. Focus
+  `svg.flow-canvas` via `js()` or Tab (no
+  `pointerdown` on the canvas), then send Space
+  with no in-flight gesture. PASS: pan
   mode turns off cleanly with no toast — exiting pan
   mode is always permitted.
 - [ ] **F57** Focus a text input (e.g. node name in the panel).
@@ -2188,7 +2249,7 @@ depends: A
 - [ ] **WB16** On this same load's network log —
   do not navigate again — assert the binding PUT,
   the transition POST (instance shape), and the
-  history GET. Never `javascript_tool` `fetch`
+  history GET. Never `js()` `fetch`
   (bearer is memory-only). PASS: the work-order
   document message pair head carries `display_id`
   and `flow_graph` JSON; the binding PUT is at
@@ -2350,10 +2411,9 @@ against the parallel-protocol's "greater-than-or-equal-N"
 tolerance; expected counts in those sections are now lower
 bounds, not equalities.
 
-**MCP note:** hover/click on SVG `<g>` works with synthetic
-events on this page (no pointer-capture FSM, unlike
-`flows/detail`), so FS4 / FS5 / FS7 are directly drivable by
-the claude-in-chrome MCP.
+Hover/click on SVG `<g>` is compositor-mouse
+driveable on this page (no pointer-capture
+FSM, unlike `flows/detail`).
 
 ### Flow Statistics Page (`flows/stats.html`)
 
@@ -2436,6 +2496,11 @@ tenant: required
 parallel: yes
 global_lock: none
 depends: A
+
+Parallel reveal extras: `org2_*`,
+`unseated_*`, `member_*`, `erasable_*`,
+`invitee_*` (`r-member@test-plan.example`
+password for V5).
 
 ### Organization (`organization/index.html`)
 
@@ -2634,8 +2699,10 @@ depends: A
   `members/index.html` as an org admin, Invite member
   with a fresh EXISTING identity who is not a member of
   the inviting org. Serial: `alex.kim@company.com`
-  (Wayne-only). Parallel: `r-member@test-plan.example`
-  (seated in r-org, not G). PASS: "Invitation sent"
+  (Wayne-only). Parallel: G reveal
+  `invitee_username` / `invitee_password`
+  (`r-member@test-plan.example`, seated in
+  r-org, not G). PASS: "Invitation sent"
   toast. Sign in as that invitee. On `invitations/`
   click Decline. PASS: an "Invitation declined"
   toast fires, the row leaves the pending list, and NO
@@ -2673,7 +2740,7 @@ depends: A
   an org (a seeded human with no admin role). Open the
   Invite dialog (`#invite-member-btn`) and submit a grant.
   Read the 403 from the **network log** on this load —
-  never `javascript_tool` `fetch` (the bearer is
+  never `js()` `fetch` (the bearer is
   memory-only). PASS: the grant POST is rejected with
   "forbidden: POST /organizations/<orgId>/invitations/
   requires a role this principal lacks" (403). The
@@ -2764,7 +2831,7 @@ re-pin the closed 6+5+1 count.
 
 - [ ] **G44** Navigate to `identities/index.html`. Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → two sequential requests (POST `identities` `{id, kind}`, then PUT `identities/:id/pii` carrying the PII fields), an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email); a second-hop failure toasts a partial-state message naming the PII-less identity rather than a blanket create failure. Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
 - [ ] **G45** From the roster, click a person row (`.card[data-identity-id]`). PASS: navigates to `identities/detail.html?identityId=<id>`, which renders the back button (`#identity-back-btn`), the name + a kind badge + the id, a "Personal Information" card (Name/Email/Phone/Bio — each empty field rendered as "—" via `DISPLAY_ABSENT`), a "Connections" card (Identity Providers / Tokens buttons), and — for a person — an "Erase PII" button (`#identity-erase-btn`). A service identity instead shows a "Credentials" card and NO erase button (only persons carry erasable PII). Source: `web-app/identities/index.ts` (`onListClick`), `web-app/identities/detail.ts`, `web-app/app/presenters/identity-detail.ts`.
-- [ ] **G46** On `G Erasable`'s identity detail (parallel — never the G admin and never `G Member`; serial: any person row that is not the signed-in admin), click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The surviving pair at the address is the bodyless DELETE tombstone (head). Erased name remains in superseded pairs; derived reads and login show none. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
+- [ ] **G46** On `G Erasable`'s identity detail (parallel — never the G admin and never `G Member`; serial: any person row that is not the signed-in admin), click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The surviving pair at the address is the bodyless DELETE tombstone (head). Erased name remains in superseded pairs; derived reads and login show none. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). Drive the native `<dialog>` directly — no `window.confirm` stub needed.
 - [ ] **G47** On the system service identity's detail page (admin session), a "Client registration" card renders before Credentials showing "Not registered." and a "Register client" button (`data-identity-action="registration"`). Click it → the `client-registration-dialog` opens; fill Grant types `client_credentials`, Audience `fusion-angle`, JWKS `{"keys":[]}`, leave Status Active, Save (`#client-registration-submit`) → "Client registration saved" toast, dialog closes, the card shows an `active` pill (`data-tone="success"`) plus Grant types / Redirect URIs / Audience / JWKS fields, and the button reads "Manage registration". Re-open, change JWKS, Save → the card reflects the new JWKS (rotate = same PUT-overwrite). Re-open, set Status Disabled, Save → `disabled` pill (`data-tone="warning"`). Re-open → a "Deregister" button (`#client-registration-deregister`, hidden while unregistered) is visible; click it → "Client registration removed" toast and the card returns to "Not registered." Empty Grant types / Audience / JWKS shows "Grant types, audience, and JWKS are required" and keeps the dialog open. Cancel (`data-dialog-cancel="client-registration"`) discards edits. Source: `web-app/identities/detail.ts` (`saveRegistration` / `deregisterClient`), `web-app/app/presenters/identity-detail.ts` (`buildRegistrationCard`). Wire: PUT|GET|DELETE `identities/:id/registration` (admin realm; kind gate 404/400).
 
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
@@ -2866,7 +2933,18 @@ depends: A
 
 ### Mobile Responsive
 
-- [ ] **I10 — Mobile breakpoint** (NOT MCP-driven — `resize_window` does not change the CSS viewport). Verify by source: read `web-app/app/styles/layout.css` and confirm the `@media (max-width: 767px)` block (lines 296–306) hides the desktop sidebar (`.sidebar` → `display: none`), and that the mobile drawer is revealed by `.mobile-header`'s default `display: flex` (line 271) being suppressed only under `@media (min-width: 768px)` (lines 285–290). PASS = both rule sets present and well-formed.
+Set a real CSS viewport ≤767px for I10–I15
+(browser-use device metrics / CDP
+`Emulation.setDeviceMetricsOverride`). Do
+not source-verify in lieu of the live
+layout.
+
+- [ ] **I10 — Mobile breakpoint** Set CSS
+  viewport ≤767px. PASS: desktop `.sidebar`
+  is not visible; `.mobile-header` is
+  visible (`display: flex`). Restore ≥768px.
+  PASS: sidebar visible, mobile header
+  hidden.
 - [ ] **I11** Tap/click the hamburger menu. PASS: mobile sidebar sheet slides in from the left with navigation links.
 - [ ] **I12** Tap/click the backdrop or a nav link. PASS: mobile sidebar closes.
 - [ ] **I13** Tap a navigation link in the mobile sidebar. PASS: navigates to the target page and mobile sidebar closes. (Note: the drawer closes implicitly via page navigation — the next page loads in default-hidden state. No explicit close-on-link-click handler is required; navigation is the close trigger.)
@@ -2883,7 +2961,12 @@ depends: A
 
 ### Loading States
 
-- [ ] **I21** Navigate to a data-dependent page with mock data loaded. PASS: loading skeleton (card-grid, card-list, or detail pattern) appears briefly before content renders.
+- [ ] **I21** Navigate to a data-dependent page
+  with mock data loaded. Probe before fetches
+  settle (do not `wait_for_load` first). PASS:
+  loading skeleton (card-grid, card-list, or
+  detail pattern) appears, then content
+  replaces it.
 - [ ] **I22** If an error occurs inside a `loadInto()` fetch path (e.g. a data-dependent page hits a thrown adapter error after the database initialized successfully), the error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading.
 
 ### Toasts
@@ -2911,8 +2994,37 @@ depends: A
 
 ### Accessibility
 
-- [ ] **I29 — Skip link & `<main>` landmark** From a fresh load of any sidebar-layout page, press `Tab` once. PASS: the first focusable element is a "Skip to main content" link (visually hidden until focused via the `.skip-link` translateY rule in `base.css`); pressing `Enter` moves focus past the sidebar and top-bar into the page body. Then confirm via `read_page`/`javascript_tool` that the content wrapper is a `<main id="main-content">` landmark (not a bare `<div class="page-content">`) and that the composed shell (`web-app/app/components-layout.html`) contains exactly one `<main>`. `Tab`/keyboard is MCP-driveable (see I15), so this is a PASS/FAIL case — not BLOCKED. Guards WCAG 2.4.1 Bypass Blocks (Level A).
-- [ ] **I30 — Reduced-motion view-transition guard** (behavioral drive BLOCKED — `prefers-reduced-motion` cannot be emulated via the MCP, the same class of limit as `resize_window`/I10). Structural verification is authoritative and PASS-able: read the `@media (prefers-reduced-motion: reduce)` block in `base.css` (it sits beside the `::view-transition-*` rules there), and confirm a rule neutralizes the page-content transition under reduced motion (e.g. `::view-transition-group(*)` / `::view-transition-old/new(*)` set `animation: none`) — the universal `*, *::before, *::after` reset does NOT reach view-transition pseudo-elements, which live in a separate tree rooted at `::view-transition`. PASS = the neutralizing rule is present and well-formed. Behavioral tier (BLOCKED): confirming `fade-in-up`'s `translateY` slide (`utilities.css:138`) is actually suppressed on navigation requires a human with OS-level reduced-motion enabled. Guards WCAG 2.3.3 Animation from Interactions (AAA).
+- [ ] **I29 — Skip link & `<main>` landmark**
+  From a fresh load of any sidebar-layout
+  page, press `Tab` once. PASS: the first
+  focusable element is a "Skip to main
+  content" link (visually hidden until
+  focused via the `.skip-link` translateY
+  rule in `base.css`); pressing `Enter`
+  moves focus past the sidebar and top-bar
+  into the page body. Then confirm via
+  `js()` that the content wrapper is a
+  `<main id="main-content">` landmark (not
+  a bare `<div class="page-content">`) and
+  that the composed shell
+  (`web-app/app/components-layout.html`)
+  contains exactly one `<main>`. Guards
+  WCAG 2.4.1 Bypass Blocks (Level A).
+- [ ] **I30 — Reduced-motion view-transition
+  guard** Emulate
+  `prefers-reduced-motion: reduce` via CDP
+  (`Emulation.setEmulatedMedia`). PASS: the
+  `@media (prefers-reduced-motion: reduce)`
+  rule in `base.css` sets
+  `::view-transition-group(*)` /
+  `::view-transition-old/new(*)` to
+  `animation: none`, and navigating does
+  not play `fade-in-up`'s `translateY`
+  slide (`utilities.css`). The universal
+  `*, *::before, *::after` reset does NOT
+  reach view-transition pseudo-elements.
+  Guards WCAG 2.3.3 Animation from
+  Interactions (AAA).
 
 ---
 
@@ -2966,8 +3078,12 @@ active to the Archived sub-section, with strikethrough.
 **K5.** Click `Reactivate` on a archived objective; PASS
 if it returns to the active list.
 
-**K6.** Drag an objective to a new position. PASS if the
-new position persists across a page reload.
+**K6.** Drag an objective to a new position.
+Native HTML5 DnD needs a synthetic
+DataTransfer (pointerdown on `.drag-handle`,
+real DataTransfer, drop, dragend). PASS if
+the new position persists across a page
+reload.
 
 **K8.** **Phase 4 case** — runs alone last after Phase 2
 and Phase 3. Catastrophic if run in Phase 2 because it
@@ -3248,8 +3364,12 @@ every other agent, so no write-domain collision.
   pattern editable; the picker no longer offers `regex`
   for that attribute (toy implementation may always offer
   it — accept).
-- [ ] **R8** Drag-reorder attributes — toy may not yet
-  support; MARK BLOCKED if so.
+- [ ] **R8** Open record edit. PASS: each
+  `.record-attribute-edit-row` has no
+  `.drag-handle`. Attribute drag-reorder is
+  later work (TODO.md), not a driver limit.
+  Do not score BLOCKED. Do not attempt a
+  synthetic DataTransfer here.
 - [ ] **R9** Remove an attribute via its trash button.
   PASS: row removed from the editor; not persisted until
   Save.
@@ -3301,9 +3421,9 @@ every other agent, so no write-domain collision.
   own admin chip is FAIL. Delete site data,
   sign in as this slice's admin, wait ≥14s,
   then assert. If the chip names another
-  section's admin: BLOCKED (MCP
-  selected-page). No mint+bind of a new
-  instance. No extra seed row.
+  section's admin: FAIL (wrong jar). No
+  mint+bind of a new instance. No extra
+  seed row.
 - [ ] **R14a** When a node references a `radio`-typed Record attribute, the workbox work-order detail renders it as a radio group — one `<input type="radio">` per option, all sharing the attribute name so only one is selectable — rather than a dropdown; selecting an option and transitioning records that value. NOTE: seeded mock data predates `radio`, so add a radio attribute, reference it Editable on a working node, and create a work order to exercise this.
 - [ ] **R15** Open the R2-created Record's detail
   page — never Customer Profile (R16–R20 read it).
@@ -3364,7 +3484,8 @@ depends: AA, B, C, D, E, F, F2, FS, G, H, I, K, R, SV
   in A3 via the harness-native task stop (not
   `kill`). PASS: process terminates; the trap
   stopped `./serve`. Sandbox EPERM on `kill`
-  is not a reason to mark this BLOCKED.
+  is FAIL if the harness stop itself fails;
+  do not score BLOCKED.
 - [ ] **J2** After J1 PASS, verify crank's temp
   bundle is gone (trap `rm -rf`). PASS:
   directory removed. DEFERRED only if crank
@@ -3470,8 +3591,8 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 | K8 | 1 | | | |
 | J | 3 | | | |
 
-## BLOCKED detail (known MCP limitations — NOT failures)
-- <case ID>: <one-line reason>
+## BLOCKED detail (K7 process prerequisite only)
+- <case ID>: <one-line reason> | (none)
 
 ## FAIL detail
 (none) | <case ID>: <one-line symptom>
@@ -3486,12 +3607,12 @@ Mitigation specs:
 ```
 
 A fully green run with no drift produces zero rows in FAIL
-and Drift Candidates, a one-line BLOCKED list, and fits in
+and Drift Candidates, BLOCKED none, and fits in
 under 50 lines.
 
-`BLOCKED` is reserved for known MCP environmental limits
-(pointer-capture gestures, `resize_window`, file I/O,
-one selected page).
+`BLOCKED` is reserved for a missing process
+prerequisite (K7 waiting on K3). Never a driver
+limit, a missing toy, or a shared jar.
 `FAIL` is for real regressions. A case that "mostly passes
 but one subassertion drifts" is scored PASS with the drift
 noted in the Drift Candidates table — the agent surfaces;
@@ -3517,5 +3638,5 @@ File name:
 - Expected: {from the case PASS line}
 - Observed: {hunter note}
 - Suspected layer:
-  UI | adapter | API | seed | MCP
+  UI | adapter | API | seed | driver
 ```

@@ -138,6 +138,8 @@ export type TestPlanSliceReveal = {
     readonly memberPassword?: string;
     readonly erasableUsername?: string;
     readonly erasablePassword?: string;
+    readonly inviteeUsername?: string;
+    readonly inviteePassword?: string;
     readonly flowId?: string;
 };
 
@@ -3472,6 +3474,9 @@ function fillPasswords(
         const erasablePassword = passwordFor(
             passwords, row.erasableUsername,
         );
+        const inviteePassword = passwordFor(
+            passwords, row.inviteeUsername,
+        );
         return {
             ...row,
             adminPassword,
@@ -3487,6 +3492,9 @@ function fillPasswords(
             ...(erasablePassword === undefined
                 ? {}
                 : { erasablePassword }),
+            ...(inviteePassword === undefined
+                ? {}
+                : { inviteePassword }),
         };
     });
 }
@@ -3592,6 +3600,9 @@ export async function postTestPlanSlices(
                 erasableUsername:
                     'g-erasable@test-plan.example',
                 erasablePassword: '',
+                inviteeUsername:
+                    'r-member@test-plan.example',
+                inviteePassword: '',
             };
         } else if (section === 'SV') {
             extras.push(await formSvExtras(
