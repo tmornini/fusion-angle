@@ -75,10 +75,10 @@ limit. Canvas port-drag, shift-connect,
 marquee, list reorder, mobile drawer,
 loading skeleton, reduced-motion, and
 two-jar SV are driven with browser-use.
-Native HTML5 DnD on D36/D37 and K6 still
-needs a synthetic DataTransfer — that is
-a PASS/FAIL drive, not BLOCKED. BLOCKED
-is reserved for a missing process
+D36/D37 and K6 are compositor-mouse like
+E11 (pointer capture on `.drag-handle`).
+That is a PASS/FAIL drive, not BLOCKED.
+BLOCKED is reserved for a missing process
 prerequisite (K7 waiting on K3). Sandbox
 EPERM on `kill` is not BLOCKED: J1 uses
 the harness task stop of the `./crank`
@@ -174,12 +174,13 @@ For K: skip K8; run K7 last
 after K30.
 
 Drive canvas gestures, CSS
-viewport, skeletons, and
-reduced-motion with compositor
-mouse / real CSS viewport.
-Native HTML5 DnD on D36/D37 and
-K6 still needs a synthetic
-DataTransfer.
+viewport, skeletons, list
+reorder, and reduced-motion
+with compositor mouse / real
+CSS viewport. D36/D37, K6, and
+E11 use pointer capture on
+`.drag-handle`, not HTML5
+`drop`.
 
 Return one line per case:
 ID PASS|FAIL|BLOCKED|DEFERRED|DRIFT
@@ -308,20 +309,17 @@ two-jar SV.
   not BLOCKED. WB5a graph repair is
   pair fixture + reload.
 - **List-row drag-reorders.** E11
-  (projects) is compositor-mouse
-  driveable. D36/D37 (ideas) and K6
-  (objectives) still need a synthetic
-  DataTransfer — CDP mouse does not
-  start that native HTML5 DnD session.
-  Drive them: `pointerdown` on
-  `.drag-handle`, a real
-  `DataTransfer`, two or more
-  `dragover` samples for D37, then
-  `drop` and `dragend`. Verify
-  persistence by reload. Window at or
-  above 768 CSS px; filter All. That
-  synthetic drive is PASS/FAIL, not
-  BLOCKED.
+  (projects), D36/D37 (ideas), and K6
+  (objectives) are compositor-mouse
+  driveable (pointer capture on
+  `.drag-handle`, not HTML5 `drop`).
+  Drive: `pointerdown` on
+  `.drag-handle`, `pointermove` (two
+  or more move samples across the
+  midpoint for D37 hysteresis), then
+  `pointerup`. Verify persistence by
+  reload. Window at or above 768 CSS
+  px; filter All.
 - **CSS viewport.** Set a real CSS
   viewport (not a screenshot-only
   resize). I10–I15 need ≤767px for the
@@ -585,6 +583,10 @@ depends: —
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-angle-server-${SHA}.zip`.
 - [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
+  The 29 are the `PAGE_REGISTRY` HTML files; do
+  **not** count root `index.html` inside the 29
+  (it stays the separate "plus root `index.html`");
+  do **not** count verb/status rooms.
 - [ ] **A3** `./crank --mock-data port` (serial)
   or `./crank --test-plan-slices port`
   (parallel). Crank validates, mints secrets,
@@ -1387,8 +1389,11 @@ depends: A
 - [ ] **D19** Click "Submit for Review". PASS:
   toast "Submitted for review", navigates to
   the ideas list, and the idea's status badge
-  there now reads "In Review". Serial: stay
-  on D18's Stark `active` leftover.
+  there now reads "In Review". The toast is
+  still visible on the ideas list after
+  navigation (it survives `navigateTo`).
+  Serial: stay on D18's Stark `active`
+  leftover.
 
 ### Idea Detail — Sent Back Re-Submit
 
@@ -1474,7 +1479,9 @@ depends: A
 - [ ] **D29** Navigate to `ideas/detail.html?ideaId=<id>` for an in_review idea (entity ids are identifiers, not sequential integers — copy a real id from the Ideas list). PASS: page loads with idea details and Send Back / Approve buttons in the header next to Edit.
 - [ ] **D30** Click "Approve". PASS: success toast,
   navigates to ideas list, idea status is now
-  "approved". This is a second `approved` — not
+  "approved". The success toast (`Idea approved
+  successfully`) is visible on the list the same
+  way. This is a second `approved` — not
   D16's leftover Convert subject.
 - [ ] **D31** Click "Send Back". PASS: confirm dialog opens. Confirm. PASS: idea status changes to "sent_back", navigates to ideas list.
 - [ ] **D32** Navigate to idea detail for a non-in_review idea. PASS: no Send Back / Approve buttons are shown.
@@ -1488,19 +1495,23 @@ depends: A
 
 ### Ideas List — Drag-reorder
 
-- [ ] **D36** On `ideas/index.html`, press and hold on an idea row then
-  drag it upward past another row's midpoint. Native HTML5
-  DnD needs a synthetic DataTransfer (pointerdown on
-  `.drag-handle`, real DataTransfer, drop, dragend).
-  PASS: during the drag a
-  hysteresis indicator appears at the target drop position, the
-  dragged row follows the pointer, and on release the ideas list
-  reorders in place. Reload the page — new order persists.
-- [ ] **D37** During a drag, hover slowly across the midpoint of a
-  neighbouring row. Drive with two or more `dragover`
-  samples. PASS: the drop indicator line only flips to the
-  new target once the pointer crosses the hysteresis threshold, not
-  on the first pixel over the midpoint.
+- [ ] **D36** On `ideas/index.html`, press and hold
+  the `.drag-handle` on an idea row then drag it
+  upward past another row's midpoint. Drive with
+  compositor mouse: `pointerdown` on `.drag-handle`
+  (pointer capture), `pointermove`, `pointerup` —
+  not HTML5 `drop`. PASS: during the drag a
+  hysteresis indicator appears at the target drop
+  position, the dragged row follows the pointer,
+  and on release the ideas list reorders in place.
+  Reload the page — new order persists.
+- [ ] **D37** During a drag, hover slowly across the
+  midpoint of a neighbouring row. Drive with two
+  or more `pointermove` samples across the
+  midpoint. PASS: the drop indicator line only
+  flips to the new target once the pointer crosses
+  the hysteresis threshold, not on the first pixel
+  over the midpoint.
 
 ---
 
@@ -1559,9 +1570,13 @@ depends: A
 
 ### Projects List — Drag-reorder
 
-- [ ] **E11** On `projects/index.html`, press and hold on a project
-  card then drag it to a new position. PASS: drop indicator appears,
-  card follows the pointer, and on release the projects list
+- [ ] **E11** On `projects/index.html`, press and hold
+  the `.drag-handle` on a project card then drag it
+  to a new position. Drive with compositor mouse:
+  `pointerdown` on `.drag-handle` (pointer capture),
+  `pointermove`, `pointerup` — not HTML5 `drop`.
+  PASS: drop indicator appears, card follows the
+  pointer, and on release the projects list
   reorders. Reload the page — new order persists.
 
 ---
@@ -1699,8 +1714,12 @@ opens and renders.)
   (`performAddNodeAtPosition` + `performAddEdge`).
   Drive the port-drag with compositor mouse.)
 - [ ] **F16** Drag a standard node to a new
-  position. PASS: node follows the pointer and
-  can be placed freely on the canvas.
+  position. PASS: the node's `transform`
+  follows the pointer **during** the drag
+  (rAF). F-slice Auto Layout starts ON —
+  drop may snap (F17). For a resting free
+  placement see F34 (toggle Auto Layout off
+  first; F18's first toggle is that off).
 - [ ] **F17** Drag the start node. PASS: it moves
   freely like any standard node (start and
   complete nodes are both draggable; with Auto
@@ -1778,16 +1797,24 @@ opens and renders.)
   updates on the SVG canvas immediately (changes
   auto-save after 800ms debounce).
 - [ ] **F25** Double-click a node to open the
-  properties panel. In the "Attributes" fieldset,
-  click the "+ Add Attribute…" dropdown. PASS:
-  the picker lists available record attributes.
-  Select one. PASS: the attribute appears in the
-  attributes list with mode (Editable / Read-only)
-  and required toggles plus a remove control.
+  properties panel. Open a node that does not
+  already reference every record attribute. On
+  the F slice that is Create, Archive, or a New
+  State — not Capture or Review (both already
+  bind Company Name and Industry; an empty
+  picker there is correct). In the "Attributes"
+  fieldset, click the "+ Add Attribute…"
+  dropdown. PASS: the picker lists available
+  record attributes. Select one. PASS: the
+  attribute appears in the attributes list with
+  mode (Editable / Read-only) and required
+  toggles plus a remove control.
 - [ ] **F26** Click an edge to select it (gold glow).
-  Double-click to open properties panel. PASS:
-  panel shows transition name, from/to state names.
-  Edit the name. PASS: label updates on the canvas.
+  Drive two compositor `pointerdown`s on the edge
+  within 400 ms (there is no `dblclick` listener),
+  same as F11. PASS: panel shows transition name,
+  from/to state names. Edit the name. PASS: label
+  updates on the canvas.
 - [ ] **F27** Select a non-start/non-complete node,
   click the Delete (trash) button in toolbar.
   PASS: node and all connected edges are removed.
@@ -1885,14 +1912,18 @@ re-renders after each step.)
 
 ### Flow Designer — Keyboard Shortcuts
 
-- [ ] **F38** Tab until a node shows the focus
-  outline — it also takes the selection (glow,
-  `aria-current="true"`), panel closed. Press
-  Delete or Backspace. PASS: the focused node
-  is deleted; focus lands on `<body>`.
-- [ ] **F38a** Tab again: focus moves to the next
-  node or edge, never the page top; selection
-  follows the focus. With the panel open the
+- [ ] **F38** Focus a `.flow-node` (Tab through
+  chrome, or `js()` `.focus()` on the node) —
+  do not Tab from document start expecting the
+  first node. Assert `aria-current="true"`; it
+  also takes the selection (glow), panel closed.
+  Press Delete or Backspace. PASS: the focused
+  node is deleted; focus lands on `<body>`.
+- [ ] **F38a** Focus a remaining `.flow-node`
+  first (same chrome-first drive as F38). Next
+  Tab moves to the next node or edge, never
+  the page top; selection follows the focus.
+  With the panel open the
   camera pans to reveal the selection, zoom
   unchanged. Tab across a marquee-selected
   group keeps the group selected only while
@@ -1918,21 +1949,30 @@ re-renders after each step.)
 
 ### Flow Designer — Additional Coverage
 
-- [ ] **F40** Toggle the Locked switch in the designer header.
-  PASS: connection ports disappear from all middle nodes, the
-  Delete toolbar button becomes disabled, and opening a properties
-  panel shows panel controls as read-only (inputs `disabled`, every
-  checkbox in the Members fieldset also `disabled` and
-  unresponsive to clicks). Auto Layout remains enabled because
-  it only repositions nodes without changing structure. Visual
-  confirmation: nodes render with gold strokes regardless of
-  type (Create, Archive, Regular), edges render with gold
-  strokes (cycles remain dashed), edge-label backgrounds gain
-  gold strokes, and the dot-grid background renders unchanged
-  from its unlocked appearance. Untoggle Locked: ports return,
-  the Delete button re-enables, panel controls become editable, the
-  Members checkboxes become interactive again, and per-type
-  colors return (Create green, Archive red, Regular blue,
+- [ ] **F40** Seed starts unlocked. First toggle of
+  the Locked switch in the designer header locks:
+  ports gone, `svg.flow-canvas` has
+  `flow-canvas-locked`, strokes
+  `hsl(var(--accent-text))`. Do not look for a
+  CSS keyword `gold`. PASS: connection ports
+  disappear from all middle nodes, the Delete
+  toolbar button becomes disabled, and opening a
+  properties panel shows panel controls as
+  read-only (inputs `disabled`, every checkbox in
+  the Members fieldset also `disabled` and
+  unresponsive to clicks). Auto Layout remains
+  enabled because it only repositions nodes
+  without changing structure. Visual confirmation:
+  locked strokes apply regardless of type (Create,
+  Archive, Regular); edges use the same stroke
+  (cycles remain dashed); edge-label backgrounds
+  gain the same stroke; the dot-grid background
+  renders unchanged from its unlocked appearance.
+  Untoggle Locked: ports return, the Delete
+  button re-enables, panel controls become
+  editable, the Members checkboxes become
+  interactive again, and per-type colors return
+  (Create green, Archive red, Regular blue,
   Cycle amber).
 - [ ] **F41** With a non-trivial flow loaded, click "Copy Mermaid"
   in the toolbar. PASS: toast confirms the clipboard copy, and the
@@ -1960,31 +2000,38 @@ re-renders after each step.)
   (ZIP round-trip is covered by `tests/zip-guards.test.ts`; this
   case verifies the `.zip` import path through the dialog and the
   preserved-position rendering.)
-- [ ] **F45** Rename 11 nodes one at a time; after each
-  name, wait for that flow's `PUT /api/organizations/
-  :id/flows/:id` in the network log (the save fires
-  `SAVE_DELAY_MS` = 800 ms after the last keystroke)
-  before selecting the next node. Then click Undo 11
-  times, waiting after each click for the canvas
-  (node name / graph) to change — not merely for
-  HTTP 201. PASS: every one of the 11 renames
-  reverts in order — undo walks the flow's own full
-  document-message-pair history (`FLOW_VERSION_CAP`
-  and `flow_versions` are retired; there is no
-  10-edit bound). A further Undo that answers 201
-  with no canvas change, Undo still enabled, is F36
-  exhaustion (graceful server no-op), not a missed
-  step.
-- [ ] **F46** Edit a flow (rename a state), let auto-save complete.
-  Navigate away from the designer to `flows/index.html`. Re-open the
-  same flow. Click Undo. PASS: the rename reverts — the undo history
-  survived navigation because it is the flow's own message-pair
-  history, persisted to the schema, not held in memory. Unlike
-  before Phase 14, this persistence has no 10-edit bound (see F45).
-  Graph and name are undo content; Locked, Auto
-  Layout, and Auto Fit are guards that undo never
-  flips and never counts. Opening a flow writes
-  nothing.
+- [ ] **F45** The 11-step walk is required, not
+  optional. Rename 11 nodes one at a time; after
+  each name, wait for that flow's `PUT /api/
+  organizations/:id/flows/:id` in the network log
+  (the save fires `SAVE_DELAY_MS` = 800 ms after
+  the last keystroke) before selecting the next
+  node. Then click Undo 11 times. After each Undo
+  click, wait for the **canvas name/graph to
+  change**, not merely HTTP 201 (exhaustion 201
+  with no canvas change is F36). PASS: every one
+  of the 11 renames reverts in order — undo walks
+  the flow's own full document-message-pair
+  history (`FLOW_VERSION_CAP` and `flow_versions`
+  are retired; there is no 10-edit bound). A
+  further Undo that answers 201 with no canvas
+  change, Undo still enabled, is F36 exhaustion
+  (graceful server no-op), not a missed step.
+- [ ] **F46** Edit a flow (rename a state), let
+  auto-save complete. Navigate away from the
+  designer to `flows/index.html`. Re-open the
+  same flow. Click Undo. PASS: after the list
+  round-trip, Undo must revert the rename the
+  same way (wait for the canvas name/graph to
+  change, not merely HTTP 201). The undo history
+  survived navigation because it is the flow's
+  own message-pair history, persisted to the
+  schema, not held in memory. Unlike before
+  Phase 14, this persistence has no 10-edit
+  bound (see F45). Graph and name are undo
+  content; Locked, Auto Layout, and Auto Fit
+  are guards that undo never flips and never
+  counts. Opening a flow writes nothing.
 
 ### Flow Designer — Flow Tags (API-only, no UI this phase)
 
@@ -2000,9 +2047,16 @@ concurrency, and the org fence. A designer "tag current" action is tracked in
 
 ### Space Toggle (Pan Mode)
 
-- [ ] **F47** With the canvas focused, tap the spacebar once.
-  PASS: a primary-colored outline appears around the canvas; the
-  cursor becomes `grab` over canvas, nodes, and edges.
+- [ ] **F47** Toggle Auto-Fit **off** before
+  F47–F49 pan (seed Auto-Fit is ON). After
+  touching Auto-Fit (or any header switch), do
+  **not** leave focus on that `button` — Space
+  would activate it. Focus `svg.flow-canvas` via
+  Tab or `js()` with **no** `pointerdown` on the
+  canvas (F56's trap), then send Space. PASS: a
+  primary-colored outline appears around the
+  canvas; the cursor becomes `grab` over canvas,
+  nodes, and edges.
 - [ ] **F48** With pan mode on, tap the spacebar a second time.
   PASS: the outline disappears and the cursor returns to its
   default state.
@@ -2012,22 +2066,38 @@ concurrency, and the org fence. A designer "tag current" action is tracked in
 - [ ] **F50** Hold the spacebar down for two seconds without
   releasing. PASS: pan mode toggles on exactly once; browser
   auto-repeat does not chatter the toggle.
-- [ ] **F51** Begin dragging a node. While the drag is in flight,
-  tap the spacebar. PASS: the drag completes unchanged; pan mode
-  state is unchanged when the drag ends.
-- [ ] **F52** Begin a marquee selection on empty canvas. While the
-  marquee is in flight, tap the spacebar. PASS: the marquee
-  continues; pan mode state is unchanged when pointer-up
-  resolves.
-- [ ] **F53** Shift-drag from a node port to begin a connect
-  gesture. While connecting, tap the spacebar. PASS: the connect
-  gesture continues; pan mode state is unchanged at pointer-up.
+- [ ] **F51** Begin dragging a node — require an
+  in-flight `dragging` gesture. While the drag is
+  in flight, tap the spacebar. PASS: the drag
+  completes unchanged; pan mode state is unchanged
+  when the drag ends. Space mid-gesture must not
+  toggle pan.
+- [ ] **F52** Begin a marquee selection on empty
+  canvas — require an in-flight marquee. While the
+  marquee is in flight, tap the spacebar. PASS:
+  the marquee continues; pan mode state is
+  unchanged when pointer-up resolves. Space
+  mid-gesture must not toggle pan.
+- [ ] **F53** The flow must be unlocked (ports
+  visible); do not start from a locked canvas.
+  Shift-drag from a node port to begin a connect
+  gesture. While connecting, tap the spacebar.
+  PASS: the connect gesture continues; pan mode
+  state is unchanged at pointer-up. Space
+  mid-gesture must not toggle pan.
 - [ ] **F54** With pan mode on and a pan drag in flight, tap the
   spacebar mid-drag. PASS: the pan drag continues; pan mode
   state is unchanged until the drag ends.
-- [ ] **F55** Toggle Auto-Fit on. With pan mode off, tap the
-  spacebar. PASS: an error toast appears ("Disable Auto-Fit to
-  change the view"); pan mode stays off.
+- [ ] **F55** Seed Auto-Fit is ON. Pan must be
+  off first (F48 if pan is on). Auto-Fit must
+  be on (seed ON, or toggle **on** if F47–F49
+  turned it off). After touching the Auto-Fit
+  button, move focus off it: focus
+  `svg.flow-canvas` via Tab or `js()` with
+  **no** `pointerdown` on the canvas (F56's
+  trap). Then send Space once. PASS: an error
+  toast appears ("Disable Auto-Fit to change
+  the view"); pan stays off.
 - [ ] **F56** With pan mode on, toggle Auto-Fit on, then tap the
   spacebar. Do **not** click the canvas first to move focus
   off the Auto-Fit switch — that click starts a pan
@@ -2038,9 +2108,10 @@ concurrency, and the org fence. A designer "tag current" action is tracked in
   with no in-flight gesture. PASS: pan
   mode turns off cleanly with no toast — exiting pan
   mode is always permitted.
-- [ ] **F57** Focus a text input (e.g. node name in the panel).
-  Tap the spacebar. PASS: a literal space character is inserted
-  into the input; pan mode state is unchanged.
+- [ ] **F57** Focus `#prop-node-name` (the input,
+  not a node). Tap the spacebar. PASS: a literal
+  space character is inserted into the input;
+  pan mode state is unchanged.
 - [ ] **F57a** Tab to a node, tap Space. PASS: the
   node's panel opens (Space activates the
   focused item); pan mode stays off.
@@ -2377,10 +2448,13 @@ depends: A
   attempt a value-bearing transition on the stale
   action screen. PASS: same 412 recovery shape as
   WB19a (re-present + warning toast). Conversely,
-  after a successful value-bearing transition, a
-  stale instance edit on record detail also 412s and
-  recovers — both writers share the instance etag
-  covenant.
+  after a successful **value-bearing**
+  transition (set/clear + If-Match — serial Review
+  fills Reviewer Notes), a stale instance Save on
+  record detail 412s and recovers. A **pure move**
+  (no set/clear, no If-Match) does not advance the
+  instance etag; a Save with the held etag is 201,
+  not a FAIL.
 
 ### Workbox — Completion
 
@@ -2965,7 +3039,23 @@ depends: A
 - [ ] **I3** Select "Light" theme. PASS: page returns to light theme.
 - [ ] **I4** Select "System" theme. PASS: theme follows OS preference (matches `prefers-color-scheme`).
 - [ ] **I5** Reload the page. PASS: theme choice persists (stored in `localStorage` key `fusion-angle:theme`).
-- [ ] **I6** Open the app in a second browser tab. Change theme in the first tab. PASS: second tab updates to the new theme without manual reload (cross-tab sync via StorageEvent), including the sun / moon / system toggle icon — not only `data-theme` on `<html>`. An OS `prefers-color-scheme` change while the preference is System updates the icon the same way.
+- [ ] **I6** Open the app in a second browser
+  tab. Change theme in the first tab. PASS:
+  second tab updates to the new theme without
+  manual reload (cross-tab sync via
+  StorageEvent), including the sun / moon /
+  system toggle icon — not only `data-theme`
+  on `<html>`. An OS `prefers-color-scheme`
+  change while preference is System fires the
+  `MediaQueryList` `change` event and updates
+  `data-theme` without reload; the toggle
+  glyph stays the system icon. CDP
+  `Emulation.setEmulatedMedia` that mutates
+  `matches` without `change` is not this case
+  — after emulate, dispatch
+  `new MediaQueryListEvent('change', {
+  matches: mq.matches })` on the query, or
+  use a real OS toggle.
 
 ### Sidebar
 
@@ -3124,11 +3214,11 @@ active to the Archived sub-section, with strikethrough.
 if it returns to the active list.
 
 **K6.** Drag an objective to a new position.
-Native HTML5 DnD needs a synthetic
-DataTransfer (pointerdown on `.drag-handle`,
-real DataTransfer, drop, dragend). PASS if
-the new position persists across a page
-reload.
+Drive with compositor mouse: `pointerdown`
+on `.drag-handle` (pointer capture),
+`pointermove`, `pointerup` — not HTML5
+`drop`. PASS if the new position persists
+across a page reload.
 
 **K8.** **Phase 4 case** — runs alone last after Phase 2
 and Phase 3. Catastrophic if run in Phase 2 because it

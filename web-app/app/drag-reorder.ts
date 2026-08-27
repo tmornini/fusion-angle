@@ -25,7 +25,7 @@ type DragState =
         indicator: HTMLElement | null;
         idx: number | null;
         // Layout snapshot for the active drag.
-        // Measured once (not per dragover) so
+        // Measured once (not per pointermove) so
         // getBoundingClientRect stays off the
         // hot path after the first read.
         rects: readonly CardRect[] | null;
@@ -42,8 +42,6 @@ export function initDragReorder(
 ): void {
     let drag: DragState =
         { kind: 'idle' };
-    let pointerTarget: Element | null =
-        null;
 
     function cards(): HTMLElement[] {
         return $$(cardSelector, container);
@@ -94,7 +92,7 @@ export function initDragReorder(
     }
 
     // Layout cache (Task 20 / Commandment XII):
-    // dragover fires many times per gesture;
+    // pointermove fires many times per gesture;
     // re-reading every card's
     // getBoundingClientRect on each event forced
     // a sync layout pass per event (O(cards)
@@ -142,28 +140,18 @@ export function initDragReorder(
     container.addEventListener(
         'pointerdown',
         (e) => {
-            pointerTarget =
-                e.target as Element;
-        },
-    );
-
-    container.addEventListener(
-        'dragstart',
-        (e) => {
-            const card =
-                (e.target as Element)
-                    .closest<HTMLElement>(
-                        cardSelector,
-                    );
-            if (!card) return;
+            if (e.button !== 0) return;
             const handle =
-                pointerTarget?.closest(
-                    DRAG_HANDLE_SELECTOR,
+                (e.target as Element)
+                    .closest(
+                        DRAG_HANDLE_SELECTOR,
+                    );
+            if (!handle) return;
+            const card = handle
+                .closest<HTMLElement>(
+                    cardSelector,
                 );
-            if (!handle) {
-                e.preventDefault();
-                return;
-            }
+            if (!card) return;
             const id = card.getAttribute(
                 idAttribute,
             );
@@ -175,6 +163,10 @@ export function initDragReorder(
                     + ' attribute',
                 );
             }
+            e.preventDefault();
+            card.setPointerCapture(
+                e.pointerId,
+            );
             drag = {
                 kind: 'active',
                 id,
@@ -184,19 +176,14 @@ export function initDragReorder(
             };
             card.style.opacity =
                 DRAGGING_OPACITY;
-            e.dataTransfer!.effectAllowed =
-                'move';
         },
     );
 
     container.addEventListener(
-        'dragover',
+        'pointermove',
         (e) => {
             if (drag.kind !== 'active')
                 return;
-            e.preventDefault();
-            e.dataTransfer!.dropEffect =
-                'move';
             const newIdx = dropIndex(
                 e.clientY,
                 drag.idx,
@@ -229,25 +216,8 @@ export function initDragReorder(
     );
 
     container.addEventListener(
-        'dragleave',
+        'pointerup',
         (e) => {
-            if (
-                !container.contains(
-                    e.relatedTarget
-                    instanceof Node
-                        ? e.relatedTarget
-                        : null,
-                )
-            ) {
-                clearIndicator();
-            }
-        },
-    );
-
-    container.addEventListener(
-        'drop',
-        (e) => {
-            e.preventDefault();
             if (drag.kind !== 'active')
                 return;
             const draggedId = drag.id;
@@ -270,7 +240,7 @@ export function initDragReorder(
     );
 
     container.addEventListener(
-        'dragend',
+        'pointercancel',
         () => {
             clearIndicator();
             drag = { kind: 'idle' };
@@ -351,14 +321,6 @@ export function initDragReorder(
         },
     );
 
-    function setDraggable(): void {
-        for (const c of cards()) {
-            c.setAttribute(
-                'draggable', 'true',
-            );
-        }
-    }
-
     // The list rebuilds after a reorder
     // commits; put focus back on the moved
     // card's handle so arrow keys keep
@@ -380,11 +342,8 @@ export function initDragReorder(
         handle.focus();
     }
 
-    setDraggable();
-
     const observer =
         new MutationObserver(() => {
-            setDraggable();
             restoreFocus();
         });
     observer.observe(

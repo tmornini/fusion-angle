@@ -56,3 +56,28 @@ test('dashboard is gated and landing is public',
     assert.equal(pageAuthMode('dashboard'), 'gated');
     assert.equal(pageAuthMode('landing'), 'public');
 });
+
+test(
+    'PAGE_REGISTRY is 29 HTML page files including '
+    + 'the api-documentation index',
+    () => {
+        const keys = Object.keys(PAGE_REGISTRY);
+        assert.equal(keys.length, 29);
+        const files = new Set(
+            Object.values(PAGE_REGISTRY).map(
+                (e) =>
+                    e.sourceDir + '/'
+                    + e.sourceFile + '.html',
+            ),
+        );
+        assert.equal(files.size, 29);
+        assert.equal(
+            files.has('api-documentation/index.html'),
+            true,
+        );
+        assert.equal(
+            files.has('index.html'),
+            false,
+        );
+    },
+);

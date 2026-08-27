@@ -19,3 +19,6 @@ export const STORAGE_KEY_SIDEBAR =
 
 export const STORAGE_KEY_LOG_LEVEL =
     'fusion-angle:log-level';
+
+export const STORAGE_KEY_PENDING_TOAST =
+    'fusion-angle:pending-toast';

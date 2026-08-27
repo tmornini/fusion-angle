@@ -64,6 +64,7 @@ import {
     postSessionRefresh,
 } from './adapters/session-refresh.ts';
 import { initErrorSurfacing } from './error-helpers.ts';
+import { replayPendingToast } from './toast.ts';
 import { redirectToLogin } from './auth-redirect.ts';
 import { navigateTo } from './navigation.ts';
 import {
@@ -349,6 +350,7 @@ export async function bootApp(): Promise<void> {
     initErrorSurfacing();
     initState();
     initListeners();
+    replayPendingToast();
 
     const pageName = getPageName();
 

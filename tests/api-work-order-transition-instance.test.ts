@@ -638,6 +638,69 @@ async () => {
     assert.equal(res.status, 400);
 });
 
+test(
+    'pure move does not advance instance etag; '
+    + 'held If-Match PATCH is 201',
+    async () => {
+        const { db, adminToken, etag } =
+            await seededBound();
+        const move = await handleRequest(db, req(
+            'POST', TRANSITION, adminToken,
+            pureMoveBody('te-pure-etag'),
+        ));
+        assert.equal(move.status, 201);
+        const patch = await handleRequest(db, req(
+            'PATCH', INSTANCE_DETAIL, adminToken,
+            {
+                set: [
+                    {
+                        attribute_id: ATTR_ID,
+                        value: 'AfterPure',
+                    },
+                ],
+            },
+            { [IF_MATCH_HEADER]: etag },
+        ));
+        assert.equal(patch.status, 201);
+    },
+);
+
+test(
+    'value-bearing transition then stale instance '
+    + 'PATCH is 412',
+    async () => {
+        const { db, adminToken, etag } =
+            await seededBound();
+        const tx = await handleRequest(db, req(
+            'POST', TRANSITION, adminToken,
+            valueBody({
+                eventId: 'te-val-etag',
+                set: [
+                    {
+                        attribute_id: ATTR_ID,
+                        value: 'ViaTx',
+                    },
+                ],
+            }),
+            { [IF_MATCH_HEADER]: etag },
+        ));
+        assert.equal(tx.status, 201);
+        const patch = await handleRequest(db, req(
+            'PATCH', INSTANCE_DETAIL, adminToken,
+            {
+                set: [
+                    {
+                        attribute_id: ATTR_ID,
+                        value: 'Stale',
+                    },
+                ],
+            },
+            { [IF_MATCH_HEADER]: etag },
+        ));
+        assert.equal(patch.status, 412);
+    },
+);
+
 // --- 3. A2 presence ---
 
 test('set present + missing instance_id → 400',

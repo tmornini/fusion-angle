@@ -8,6 +8,7 @@ import {
     STORAGE_KEY_THEME,
     STORAGE_KEY_SIDEBAR,
     STORAGE_KEY_LOG_LEVEL,
+    STORAGE_KEY_PENDING_TOAST,
 } from '../web-app/app/storage-keys.ts';
 
 test('JWT audience is fusion-angle', () => {
@@ -39,5 +40,9 @@ test('storage keys use the fusion-angle prefix',
     assert.equal(
         STORAGE_KEY_LOG_LEVEL,
         'fusion-angle:log-level',
+    );
+    assert.equal(
+        STORAGE_KEY_PENDING_TOAST,
+        'fusion-angle:pending-toast',
     );
 });

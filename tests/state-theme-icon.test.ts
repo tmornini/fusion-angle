@@ -98,3 +98,61 @@ test(
         }
     },
 );
+
+test(
+    'a prefers-color-scheme change event applies '
+    + 'data-theme while preference is system',
+    () => {
+        const g =
+            globalThis as Record<string, unknown>;
+        const attrs: Record<string, string> = {};
+        const mediaListeners: Array<
+            (e: { matches: boolean }) => void
+        > = [];
+        let matches = false;
+        g.localStorage = {
+            getItem: () => null,
+            setItem: () => {},
+        };
+        g.document = {
+            documentElement: {
+                setAttribute: (
+                    name: string, value: string,
+                ) => { attrs[name] = value; },
+                classList: { toggle: () => {} },
+            },
+            querySelector: () => null,
+        };
+        g.window = {
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            matchMedia: () => ({
+                get matches() { return matches; },
+                addEventListener: (
+                    type: string,
+                    handler: (e: {
+                        matches: boolean;
+                    }) => void,
+                ) => {
+                    if (type === 'change') {
+                        mediaListeners.push(handler);
+                    }
+                },
+                removeEventListener: () => {},
+            }),
+        };
+        try {
+            initListeners();
+            persistThemePreference('system');
+            assert.equal(attrs['data-theme'], 'light');
+            assert.equal(mediaListeners.length, 1);
+            matches = true;
+            mediaListeners[0]!({ matches: true });
+            assert.equal(attrs['data-theme'], 'dark');
+        } finally {
+            delete g.localStorage;
+            delete g.document;
+            delete g.window;
+        }
+    },
+);
