@@ -45,17 +45,18 @@ master session:
    and listens. Read the seed reveal from
    crank's stdout. Red validate aborts with
    no Docker. Red AT4 or later hits the trap.
-5. Parallel: isolated browser-use CDP per
-   hunter (own cookie jar). One hunter per
-   `parallel: yes` section (14), each with
-   that section's `##` body only and that
-   slice's credentials. A second CDP/jar is
-   required for SV6–SV10. Serialize hunters
-   on one daemon only when each hunter
-   deletes site data first; never share a
-   jar across live hunters. Serial: one
-   tenant, document order, headers not
-   consulted.
+5. Parallel: one `*.localhost` alias per
+   hunter on the one crank origin, from
+   the slug table under Protocol. A
+   named browser-use daemon per hunter
+   isolates tabs, not jars. One hunter
+   per `parallel: yes` section (14), each
+   with that section's `##` body only and
+   that slice's credentials. SV6–SV10's
+   second jar is `sv2.localhost`, not a
+   second CDP. Live hunters are safe
+   together. Serial: one tenant, document
+   order, headers not consulted.
 6. Joins in document order. Then K8 (process
    lock), then J. Stopping crank IS J1 and
    J2 (EXIT trap). J3 stays (Desktop ZIP
@@ -105,9 +106,15 @@ Drive with compositor mouse and a real CSS
 viewport (`browser_exec` / `browser_screenshot`,
 or CLI `browser-use`). Do not use
 Claude-in-Chrome or chrome-devtools MCP.
-Delete site data for the origin, then sign
-in as that slice's admin from the credential
-map.
+Clear this origin's cookies with
+`Storage.clearDataForOrigin` (origin =
+your alias, `storageTypes: 'cookies'`);
+never `Network.clearBrowserCookies`.
+Every tab you open is on your alias; a
+chip naming another section's admin
+means you left your alias — FAIL, and
+say so. Then sign in as that slice's
+admin from the credential map.
 
 Return per-case PASS / FAIL / BLOCKED /
 DEFERRED / DRIFT. BLOCKED is only for a
@@ -135,7 +142,7 @@ in full.
 You are the {SECTION} hunter for the
 Fusion Angle TEST-PLAN parallel run.
 
-Origin: http://localhost:{PORT}
+Origin: http://{slug}.localhost:{PORT}
 Admin: {admin_username} / {admin_password}
 Org id: {org_id}
 {extra credential-map fields}
@@ -152,11 +159,19 @@ available. Do not fall back to
 Claude-in-Chrome or
 chrome-devtools MCP.
 
-Delete site data for the origin
-before sign-in. Sign in as the
-admin above. Run the cases in
-document order. For K: skip K8;
-run K7 last after K30.
+Clear this origin's cookies with
+`Storage.clearDataForOrigin`
+(origin = your alias,
+`storageTypes: 'cookies'`);
+never `Network.clearBrowserCookies`.
+Every tab you open is on your
+alias; a chip naming another
+section's admin means you left
+your alias — FAIL, and say so.
+Sign in as the admin above.
+Run the cases in document order.
+For K: skip K8; run K7 last
+after K30.
 
 Drive canvas gestures, CSS
 viewport, skeletons, and
@@ -178,7 +193,7 @@ UI behavior: DOM, CSS, gestures, visual
 rendering. Pure transitions, adapters, and
 HTTP routing live in `./test` / `./validate`.
 Section **SV** is the default origin (A3
-**is** SV1): two cookie jars, two identities,
+**is** SV1): two aliases, two identities,
 one Postgres. Leftover `≥ N` in a case body
 is doc debt, not protocol. Where a case is
 the browser counterpart of an automated area
@@ -198,6 +213,27 @@ prefixes (V inside G, WB* and AA-WB-SETUP inside F2)
 ride the parent hunter. K8 is a process-lock case, not
 a K-hunter case on the parallel path.
 
+Parallel hunters use one `*.localhost` alias
+each on the one crank origin. Serial uses
+bare `localhost`.
+
+| Section | Alias host |
+|---|---|
+| AA | `aa.localhost` |
+| B | `b.localhost` |
+| C | `c.localhost` |
+| D | `d.localhost` |
+| E | `e.localhost` |
+| F | `f.localhost` |
+| F2 | `f2.localhost` |
+| FS | `fs.localhost` |
+| G | `g.localhost` |
+| H | `h.localhost` |
+| I | `i.localhost` |
+| K | `k.localhost` |
+| R | `r.localhost` |
+| SV | `sv.localhost` (second jar: `sv2.localhost`) |
+
 - **Serial (`--serial`)**: A1 `./build` → ZIP; A2 unzip
   or `./build --no-zip`; A3 `./crank --mock-data
   port` (this pin **is** SV1). One
@@ -211,16 +247,17 @@ a K-hunter case on the parallel path.
   browser-use first; refuse if missing. A3
   `./crank --test-plan-slices port`.
   Capture the stdout credential map. Spawn one
-  hunter per `parallel: yes` section. Isolated
-  CDP per hunter (own cookie jar). A second
-  CDP is required for SV6–SV10. Serialize on
-  one daemon only when each hunter deletes
-  site data first. After each hunter: delete
-  site data. Stolen-tab rule as C4/C7/R14:
+  hunter per `parallel: yes` section. One
+  `*.localhost` alias per hunter from the
+  slug table; a named browser-use daemon
+  isolates tabs, not jars. SV6–SV10's
+  second jar is `sv2.localhost`, not a
+  second CDP. Live hunters are safe
+  together. Stolen-tab rule as C4/C7/R14:
   empty bind picker, `data-empty` rows, or
   0/0/1 tiles are stolen-tab paint. If the
   chip names another section's admin: FAIL
-  (wrong jar). Do not treat a shared-jar
+  (wrong alias). Do not treat a shared-alias
   accident as a product bug unless a serial
   C or R pin fails. Then K8 (wipe/reseed of
   the shared DB; no hunter still running).
@@ -233,10 +270,10 @@ DAG edges only:
 
 No UI rebuild. Hunters do not create tenants
 and do not re-seed. Sign-out, org-switch, theme,
-sidebar, command palette, and SV two-jar stay inside
-the hunter's tenant and jar. Assertions inside a job
-are exact. Leftover `≥ N` in a case body is doc debt,
-not protocol.
+sidebar, command palette, and SV two-alias stay
+inside the hunter's tenant and alias. Assertions
+inside a job are exact. Leftover `≥ N` in a case
+body is doc debt, not protocol.
 
 Failure:
 
@@ -301,9 +338,9 @@ two-jar SV.
   assert the view-transition
   neutralizing rule takes effect.
   PASS/FAIL on the live behavior.
-- **Two-jar SV6–SV10:** a second
-  browser-use CDP/jar. Same origin,
-  distinct cookies.
+- **Two-jar SV6–SV10:** the
+  `sv2.localhost` alias in a second
+  tab; same process, distinct host.
 - **Hunter probe discipline.**
   Visibility via `checkVisibility()`
   or `getClientRects()`, never a
@@ -378,18 +415,24 @@ two-jar SV.
   DEFERRED only when crank/serve is
   still up. Do not `rm` a
   still-running bundle.
-- **Stolen-tab.** Isolated CDP per
-  hunter. After each hunter: delete
-  site data. Empty bind picker,
+- **Stolen-tab.** One `*.localhost`
+  alias per hunter. Empty bind picker,
   `data-empty` rows, or 0/0/1 tiles
   on C — or toast "work order has no
   instance binding" on R14's named
   subject — is stolen-tab paint. If
   the chip names another section's
-  admin: FAIL (wrong jar). Do not
-  treat a shared-jar accident as a
+  admin: FAIL (wrong alias). Do not
+  treat a shared-alias accident as a
   product bug unless a serial C or
   R pin fails.
+- **Why aliases.** The session rides
+  one host-only `refresh_token`.
+  Named browser-use daemons share
+  one Chrome; CDP isolation is a
+  tab, not a jar. Two hunters
+  refreshing the same cookie look
+  like theft and revoke the chain.
 - **`getBoundingClientRect` ≠
   click coordinates**: a ~1.19×
   CSS-px ↔ screenshot-px scale
@@ -503,7 +546,7 @@ DRIFT = 0`, where AT2 is the CLI count that run reported
 and the six status counts sum to AT2 + 400.
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL`
 indicates a regression. Never score BLOCKED for a
-driver limit, a missing toy, or a shared jar.
+driver limit, a missing toy, or a shared alias.
 
 ---
 
@@ -1230,12 +1273,13 @@ depends: A
   4 ideas, 3 projects, 1 flow, 4 objectives;
   both approved projects score every objective.
   A `—` Impact or a `data-empty` row is a FAIL.
-  Delete site data, sign in as this slice's
-  admin, wait ≥14s, then assert C4/C7.
+  Clear this alias's cookies, sign in as
+  this slice's admin, wait ≥14s, then
+  assert C4/C7.
   0/0/1 tiles or `data-empty` rows on C
   are stolen-tab paint. If the chip names
   another section's admin: FAIL (wrong
-  jar).
+  alias).
 - [ ] **C5** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
 - [ ] **C6** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
 - [ ] **C7** Check that seed data populates all 4 dashboard
@@ -1258,12 +1302,13 @@ depends: A
   projects, 1 flow, 4 objectives; both approved
   projects score every objective. A `—` Impact or
   a `data-empty` row is a FAIL.
-  Delete site data, sign in as this slice's
-  admin, wait ≥14s, then assert C4/C7.
+  Clear this alias's cookies, sign in as
+  this slice's admin, wait ≥14s, then
+  assert C4/C7.
   0/0/1 tiles or `data-empty` rows on C
   are stolen-tab paint. If the chip names
   another section's admin: FAIL (wrong
-  jar).
+  alias).
 
 ---
 
@@ -3418,10 +3463,11 @@ every other agent, so no write-domain collision.
   `#r1` (already bound). Bind picker "No
   instances available" or toast "work order
   has no instance binding" with this slice's
-  own admin chip is FAIL. Delete site data,
-  sign in as this slice's admin, wait ≥14s,
-  then assert. If the chip names another
-  section's admin: FAIL (wrong jar). No
+  own admin chip is FAIL. Clear this
+  alias's cookies, sign in as this slice's
+  admin, wait ≥14s, then assert. If the
+  chip names another section's admin:
+  FAIL (wrong alias). No
   mint+bind of a new instance. No extra
   seed row.
 - [ ] **R14a** When a node references a `radio`-typed Record attribute, the workbox work-order detail renders it as a radio group — one `<input type="radio">` per option, all sharing the attribute name so only one is selectable — rather than a dropdown; selecting an option and transitioning records that value. NOTE: seeded mock data predates `radio`, so add a radio attribute, reference it Editable on a working node, and create a work order to exercise this.
@@ -3517,9 +3563,9 @@ Operator prerequisites:
 Named residual: the backend emits
 `pg_notify('fusion_events', …)` inside the write
 transaction. There is no LISTEN and no SSE client. A
-second browser looking stale until it navigates is
-**PASS**, not FAIL. BroadcastChannel is same-origin
-same-browser only. Do not file **SV10** as a
+second alias looking stale until it navigates is
+**PASS**, not FAIL. BroadcastChannel is origin-scoped
+(same host only). Do not file **SV10** as a
 regression.
 
 ### Browser against the real server
@@ -3531,13 +3577,13 @@ regression.
 
 ### Two browsers / two identities / one database
 
-- [ ] **SV6** Two cookie jars against the same origin (Chrome + Firefox, or Chrome + a Guest profile). In browser A, sign in as `demo@example.com`. In browser B, sign in as `sarah.chen@company.com` (stdout password; Sarah is Stark, same organization as the admin). PASS: both dashboards load; the sidebar member chips name different people; one Postgres, two sessions.
-- [ ] **SV7** In browser A, create an idea with a unique title (Ideas → Create Idea → required fields → Submit Idea). In browser B, navigate to `ideas/` (or reload if already there). PASS: Sarah's list includes A's new idea — two identities, one database.
+- [ ] **SV6** Two aliases against the one crank origin (`sv.localhost` and `sv2.localhost`; two identities, one Postgres, one Chrome). In browser A (`sv.localhost`), sign in as `demo@example.com`. In browser B (`sv2.localhost`), sign in as `sarah.chen@company.com` (stdout password; Sarah is Stark, same organization as the admin). PASS: both dashboards load; the sidebar member chips name different people; one Postgres, two sessions.
+- [ ] **SV7** In browser A (`sv.localhost`), create an idea with a unique title (Ideas → Create Idea → required fields → Submit Idea). In browser B (`sv2.localhost`), navigate to `ideas/` (or reload if already there). PASS: Sarah's list includes A's new idea — two identities, one database.
 
 ### Two tabs share the refresh cookie
 
-- [ ] **SV8** Same browser profile as the admin session (SV2). In tab A, stay signed in. Open `dashboard/index.html` in a new tab B. PASS: tab B stays authenticated with no second sign-in — both tabs share the `refresh_token` cookie; boot cookie-refreshes.
-- [ ] **SV8b** Two windows of the same profile, both
+- [ ] **SV8** Same alias as the admin session (two tabs of `sv.localhost` share its cookie). In tab A, stay signed in. Open `dashboard/index.html` in a new tab B of `sv.localhost`. PASS: tab B stays authenticated with no second sign-in — both tabs share the `refresh_token` cookie; boot cookie-refreshes.
+- [ ] **SV8b** Two windows of `sv.localhost`, both
   on `ideas/`. Create an idea in window A. PASS:
   window B's list gains the card without a reload
   (BroadcastChannel `fusion-angle:data`).
@@ -3545,7 +3591,7 @@ regression.
 
 ### Named residual — stale-until-navigation
 
-- [ ] **SV10** Re-sign browser A as `demo@example.com` if SV9 cleared that session. With browser B already sitting on `ideas/` (do not reload), create a distinctly titled idea in browser A. PASS / named residual: B's open list does not gain the new card until B navigates or reloads. There is no NOTIFY listener; BroadcastChannel does not cross browsers. A second browser looking stale until navigation is **not FAIL**. After B navigates or reloads, the card from this write is present (same pin as SV7).
+- [ ] **SV10** Re-sign browser A (`sv.localhost`) as `demo@example.com` if SV9 cleared that session. With browser B (`sv2.localhost`) already sitting on `ideas/` (do not reload), create a distinctly titled idea in browser A. PASS / named residual: B's open list does not gain the new card until B navigates or reloads. There is no NOTIFY listener; BroadcastChannel is origin-scoped and does not cross aliases. A second alias looking stale until navigation is **not FAIL**. After B navigates or reloads, the card from this write is present (same pin as SV7).
 
 ---
 
@@ -3612,7 +3658,7 @@ under 50 lines.
 
 `BLOCKED` is reserved for a missing process
 prerequisite (K7 waiting on K3). Never a driver
-limit, a missing toy, or a shared jar.
+limit, a missing toy, or a shared alias.
 `FAIL` is for real regressions. A case that "mostly passes
 but one subassertion drifts" is scored PASS with the drift
 noted in the Drift Candidates table — the agent surfaces;
