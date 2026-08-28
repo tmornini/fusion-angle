@@ -143,8 +143,10 @@ p { line-height: var(--leading-normal); }
     page-content transition here. */
 @media (prefers-reduced-motion: reduce) {
     ::view-transition-group(*),
-        ::view-transition-old(*),
-    ::view-transition-new(*) {
+    ::view-transition-old(*),
+    ::view-transition-new(*),
+    ::view-transition-old(page-content),
+    ::view-transition-new(page-content) {
         animation: none;
     }
 }

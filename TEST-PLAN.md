@@ -389,8 +389,9 @@ two-jar SV.
   focus off the Auto-Fit switch —
   that click starts a pan gesture,
   so Space is ignored. Focus
-  `svg.flow-canvas` via `js()` /
-  Tab, then send Space.
+  `svg.flow-canvas` via `js()`
+  (`tabindex="0"`) / Tab, then
+  send Space.
 - **`kill` syscall against the
   background HTTP server**: the
   sandbox may EPERM `kill -TERM` /
@@ -1838,7 +1839,13 @@ opens and renders.)
 - [ ] **F30** Edit a node name via the properties
   panel, wait 1 second for auto-save. Navigate
   away and return to the designer. PASS: all
-  nodes, edges, attributes, and positions persist.
+  nodes, edges, and attributes persist.
+  Positions persist only when Auto Layout is
+  off (F18's first toggle; wait for the flow
+  PUT before leaving). Seed Auto Layout is ON:
+  boot re-lays-out to the current canvas, so a
+  1-row snake may wrap to 2×2 on return —
+  that is not a fail.
 - [ ] **F31** Navigate to
   `flows/detail.html?flowId=nonexistent`. PASS:
   page handles gracefully — shows error state,
@@ -1921,9 +1928,10 @@ re-renders after each step.)
   node is deleted; focus lands on `<body>`.
 - [ ] **F38a** Focus a remaining `.flow-node`
   first (same chrome-first drive as F38). Next
-  Tab moves to the next node or edge, never
-  the page top; selection follows the focus.
-  With the panel open the
+  Tab moves to the next node or edge; from the
+  last item it wraps to the first (DOM order)
+  and never leaves the canvas. Selection
+  follows the focus. With the panel open the
   camera pans to reveal the selection, zoom
   unchanged. Tab across a marquee-selected
   group keeps the group selected only while
@@ -1952,7 +1960,8 @@ re-renders after each step.)
 - [ ] **F40** Seed starts unlocked. First toggle of
   the Locked switch in the designer header locks:
   ports gone, `svg.flow-canvas` has
-  `flow-canvas-locked`, strokes
+  `flow-canvas-locked`, node `<rect>` and
+  edge vis-path `stroke` attributes are
   `hsl(var(--accent-text))`. Do not look for a
   CSS keyword `gold`. PASS: connection ports
   disappear from all middle nodes, the Delete
@@ -1974,9 +1983,13 @@ re-renders after each step.)
   interactive again, and per-type colors return
   (Create green, Archive red, Regular blue,
   Cycle amber).
-- [ ] **F41** With a non-trivial flow loaded, click "Copy Mermaid"
-  in the toolbar. PASS: toast confirms the clipboard copy, and the
-  clipboard holds Mermaid flowchart syntax for the current graph.
+- [ ] **F41** With a non-trivial flow loaded,
+  click "Copy Mermaid" in the toolbar. PASS: a
+  visible success toast "Mermaid copied to
+  clipboard" confirms the copy (toasts sit on
+  `document.body`, outside `#page-root`), and
+  the clipboard holds Mermaid flowchart syntax
+  for the current graph.
   (Round-trip correctness — `generateMermaid` → `parseMermaid`
   preserving nodes, edges, and attribute references — is covered by
   `tests/mermaid.test.ts`; this case verifies the toolbar action
@@ -2052,8 +2065,9 @@ concurrency, and the org fence. A designer "tag current" action is tracked in
   touching Auto-Fit (or any header switch), do
   **not** leave focus on that `button` — Space
   would activate it. Focus `svg.flow-canvas` via
-  Tab or `js()` with **no** `pointerdown` on the
-  canvas (F56's trap), then send Space. PASS: a
+  Tab or `js()` (`tabindex="0"`) with **no**
+  `pointerdown` on the canvas (F56's trap), then
+  send Space. PASS: a
   primary-colored outline appears around the
   canvas; the cursor becomes `grab` over canvas,
   nodes, and edges.
@@ -2093,9 +2107,10 @@ concurrency, and the org fence. A designer "tag current" action is tracked in
   be on (seed ON, or toggle **on** if F47–F49
   turned it off). After touching the Auto-Fit
   button, move focus off it: focus
-  `svg.flow-canvas` via Tab or `js()` with
-  **no** `pointerdown` on the canvas (F56's
-  trap). Then send Space once. PASS: an error
+  `svg.flow-canvas` via Tab or `js()`
+  (`tabindex="0"`) with **no** `pointerdown`
+  on the canvas (F56's trap). Then send Space
+  once. PASS: an error
   toast appears ("Disable Auto-Fit to change
   the view"); pan stays off.
 - [ ] **F56** With pan mode on, toggle Auto-Fit on, then tap the
@@ -2103,11 +2118,11 @@ concurrency, and the org fence. A designer "tag current" action is tracked in
   off the Auto-Fit switch — that click starts a pan
   gesture, so Space is ignored (`isGestureActive`) and a
   leftover Auto-Fit toast looks like a fail. Focus
-  `svg.flow-canvas` via `js()` or Tab (no
-  `pointerdown` on the canvas), then send Space
-  with no in-flight gesture. PASS: pan
-  mode turns off cleanly with no toast — exiting pan
-  mode is always permitted.
+  `svg.flow-canvas` via `js()` (`tabindex="0"`)
+  or Tab (no `pointerdown` on the canvas), then
+  send Space with no in-flight gesture. PASS:
+  pan mode turns off cleanly with no toast —
+  exiting pan mode is always permitted.
 - [ ] **F57** Focus `#prop-node-name` (the input,
   not a node). Tap the spacebar. PASS: a literal
   space character is inserted into the input;
@@ -2570,19 +2585,21 @@ FSM, unlike `flows/detail`).
   node → re-pins to it.
 - [ ] **FS6 — Hazard severity rendering on the stats
   canvas.** The stats renderer reads `n.memberHazard`
-  emitted by `flow-stats-aggregate.ts`. Confirm:
-    - **Zero members** → red no-entry sign (`iconNoEntry`,
-      `.flow-stats-node-danger`); tooltip "Members
-      required".
-    - **Zero outgoing edges** (non-Archive node) → red no-entry sign;
-      tooltip "Dead end (no outgoing edges)".
-    - **One member AND ≥1 outgoing edge** → yellow triangle
+  emitted by `flow-stats-aggregate.ts`. The FS slice
+  graph has two regular nodes (Data Capture, Review),
+  each one member with an outgoing edge, plus Create
+  and Archive. Confirm on the slice:
+    - Data Capture and Review → yellow triangle
       (`iconAlertTriangle`, `.flow-stats-node-warning`);
       tooltip "Single member assigned (no backup)".
-    - **≥2 members AND ≥1 outgoing edge** → no badge.
-  Create and Archive never display a badge. The
-  card subtitle shows the assigned members' names joined
-  by ", " (or "Unassigned" if `memberIds` is empty).
+      Card subtitle names the member or
+      "Unassigned".
+    - Create and Archive → no badge.
+  Zero-member danger, dead-end danger, and
+  ≥2-member no-badge are the CLI covenants in
+  `tests/flow-stats-aggregate.test.ts` and
+  `tests/flow-graph-hazard.test.ts`; do not fail
+  the slice for lacking those nodes.
 - [ ] **FS7** Path stepper: `Path 1 of M · X% of N work
   orders` with prev/next controls. Clicking next advances;
   the selected path's nodes + edges get an accent stroke and
@@ -3054,7 +3071,9 @@ depends: A
   `matches` without `change` is not this case
   — after emulate, dispatch
   `new MediaQueryListEvent('change', {
-  matches: mq.matches })` on the query, or
+  matches: mq.matches })` on
+  `window.matchMedia('(prefers-color-scheme:
+  dark)')` (one interned list per query), or
   use a real OS toggle.
 
 ### Sidebar
@@ -3152,8 +3171,10 @@ layout.
   `@media (prefers-reduced-motion: reduce)`
   rule in `base.css` sets
   `::view-transition-group(*)` /
-  `::view-transition-old/new(*)` to
-  `animation: none`, and navigating does
+  `::view-transition-old/new(*)` and the
+  named `::view-transition-old/new(page-content)`
+  to `animation: none` (the named rule
+  otherwise beats `*`). Navigating does
   not play `fade-in-up`'s `translateY`
   slide (`utilities.css`). The universal
   `*, *::before, *::after` reset does NOT

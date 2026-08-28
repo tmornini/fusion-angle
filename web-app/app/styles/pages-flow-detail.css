@@ -37,12 +37,12 @@ html[data-page="flow-detail"],
 html[data-page="flow-detail"] body {
     height: 100vh;
     margin: 0;
-    overflow: hidden;
 }
 html[data-page="flow-detail"] #page-root {
     height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 html[data-page="flow-detail"] .flow-designer-header {
     border-bottom:

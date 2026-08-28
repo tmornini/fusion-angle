@@ -307,6 +307,25 @@ export function withCanvasFocusRestore(
 // isRenderedSelected reads the RENDERED aria-current
 // rather than the FSM's own selection — see
 // onCanvasFocus in flow-fsm-reduce.
+export function nextCanvasTabIndex(
+    length: number,
+    current: number,
+    shift: boolean,
+): number | null {
+    if (length < 1) return null;
+    if (current < 0 || current >= length) {
+        return null;
+    }
+    if (shift) {
+        return current === 0
+            ? length - 1
+            : current - 1;
+    }
+    return current === length - 1
+        ? 0
+        : current + 1;
+}
+
 export function canvasFocusInputOf(
     target: Element,
     wrap: Element,
@@ -791,6 +810,39 @@ export function bindInteractions(
     };
     window.addEventListener(
         'keydown', handleSpace,
+        { signal },
+    );
+
+    const handleTab = (
+        ke: KeyboardEvent,
+    ): void => {
+        if (ke.key !== 'Tab') return;
+        const active = document.activeElement;
+        if (
+            !(active instanceof Element)
+            || !wrap.contains(active)
+        ) return;
+        const items = [
+            ...wrap.querySelectorAll(
+                '.flow-node, .flow-edge',
+            ),
+        ];
+        const nextIdx = nextCanvasTabIndex(
+            items.length,
+            items.indexOf(active),
+            ke.shiftKey,
+        );
+        if (nextIdx === null) return;
+        const next = items[nextIdx];
+        if (
+            !(next instanceof SVGElement)
+            && !(next instanceof HTMLElement)
+        ) return;
+        ke.preventDefault();
+        next.focus({ preventScroll: true });
+    };
+    window.addEventListener(
+        'keydown', handleTab,
         { signal },
     );
 

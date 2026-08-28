@@ -47,6 +47,7 @@ export const BLUE = 'hsl(var(--primary))';
 const WARN = 'hsl(var(--warning))';
 const GREEN = 'hsl(var(--success))';
 const RED = 'hsl(var(--error))';
+const LOCKED_STROKE = 'hsl(var(--accent-text))';
 const SURFACE = 'hsl(var(--background))';
 const FOREGROUND = 'hsl(var(--foreground))';
 const MUTED = 'hsl(var(--muted-foreground))';
@@ -458,6 +459,7 @@ function buildNode(
     portPos: {
         x: number; y: number;
     } | null,
+    isLocked: boolean,
 ): SafeHtml {
     const { positionX, positionY } = node;
     const halfW = NODE_WIDTH / 2;
@@ -470,6 +472,9 @@ function buildNode(
     } else if (node.isArchive) {
         borderColor = RED;
         strokeW = STROKE_COMPLETE;
+    }
+    if (isLocked) {
+        borderColor = LOCKED_STROKE;
     }
 
     const selAttr = isSelected
@@ -825,6 +830,7 @@ function buildEdge(
         x: number;
         y: number;
     }[],
+    isLocked: boolean,
 ): SafeHtml {
     const geo = computeEdgeGeometry(
         fromNode, toNode, aimOffset, waypoints,
@@ -847,6 +853,9 @@ function buildEdge(
         color = BLUE;
         markerUrl = 'url(#flow-arrow)';
         dashAttr = '';
+    }
+    if (isLocked) {
+        color = LOCKED_STROKE;
     }
 
     const strokeWidth = EDGE_STROKE;
@@ -1310,6 +1319,7 @@ export function buildGraphSvg(
                 ),
                 edgeWaypoints.get(edge.id)
                     ?? [],
+                isLocked,
             ).toString();
     }
 
@@ -1339,7 +1349,7 @@ export function buildGraphSvg(
         nodeMarkup +=
             buildNode(
                 node, edges, isSelected,
-                portPos,
+                portPos, isLocked,
             ).toString();
     }
 
@@ -1384,6 +1394,7 @@ export function buildGraphSvg(
         + '"http://www.w3.org/2000/svg"'
         + ` class="${svgCls}"`
         + ' role="application"'
+        + ` tabindex="${FOCUSABLE_TABINDEX}"`
         + ` aria-label="${canvasLabel}"`
         + ` viewBox="${vb}"`
         + ' preserveAspectRatio='

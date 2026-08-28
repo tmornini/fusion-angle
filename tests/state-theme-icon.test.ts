@@ -156,3 +156,85 @@ test(
         }
     },
 );
+
+type ThemeMq = {
+    readonly matches: boolean;
+    addEventListener: (
+        type: string,
+        handler: (e: { matches: boolean }) => void,
+    ) => void;
+    removeEventListener: () => void;
+    dispatchChange: () => void;
+};
+
+function makeThemeMq(
+    getMatches: () => boolean,
+): ThemeMq {
+    const listeners: Array<
+        (e: { matches: boolean }) => void
+    > = [];
+    return {
+        get matches() { return getMatches(); },
+        addEventListener(type, handler) {
+            if (type === 'change') {
+                listeners.push(handler);
+            }
+        },
+        removeEventListener() {},
+        dispatchChange() {
+            const m = getMatches();
+            for (const h of listeners) {
+                h({ matches: m });
+            }
+        },
+    };
+}
+
+test(
+    'a MediaQueryList change on a later matchMedia '
+    + 'call applies data-theme while preference is '
+    + 'system',
+    () => {
+        const g =
+            globalThis as Record<string, unknown>;
+        const attrs: Record<string, string> = {};
+        let matches = true;
+        g.localStorage = {
+            getItem: () => null,
+            setItem: () => {},
+        };
+        g.document = {
+            documentElement: {
+                setAttribute: (
+                    name: string, value: string,
+                ) => { attrs[name] = value; },
+                classList: { toggle: () => {} },
+            },
+            querySelector: () => null,
+        };
+        g.window = {
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            matchMedia: () => makeThemeMq(
+                () => matches,
+            ),
+        };
+        try {
+            initListeners();
+            persistThemePreference('system');
+            assert.equal(attrs['data-theme'], 'dark');
+            matches = false;
+            const win = g.window as {
+                matchMedia: (q: string) => ThemeMq;
+            };
+            win.matchMedia(
+                '(prefers-color-scheme: dark)',
+            ).dispatchChange();
+            assert.equal(attrs['data-theme'], 'light');
+        } finally {
+            delete g.localStorage;
+            delete g.document;
+            delete g.window;
+        }
+    },
+);

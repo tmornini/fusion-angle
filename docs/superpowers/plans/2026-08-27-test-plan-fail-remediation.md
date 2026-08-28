@@ -311,19 +311,19 @@ nothing.
   `docs/superpowers/plans/2026-08-27-test-plan-fail-remediation.md`
   (copy of this document)
 
-- [ ] **Step 1: Copy the plan into docs/**
+- [x] **Step 1: Copy the plan into docs/**
 
 Copy this session plan file to
 `docs/superpowers/plans/2026-08-27-test-plan-fail-remediation.md`
 if it is not already there. Do not add a prose body
 beyond what is already in the document.
 
-- [ ] **Step 2: Validate**
+- [x] **Step 2: Validate**
 
 Run: `./validate`
 Expected: green.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-27-test-plan-fail-remediation.md
@@ -354,7 +354,7 @@ Values (no silent `?? ''`).
   `fusion-angle:pending-toast`. `bootApp` calls
   replay after `initListeners`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/fusion-angle-identifiers.test.ts`
 inside the existing `'storage keys use the
@@ -532,7 +532,7 @@ if the closer would clear storage mid-test — stub
 `setTimeout` as `() => 0` so the closer does not
 run during the persist assertion.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 ```
@@ -544,7 +544,7 @@ tests/fusion-angle-identifiers.test.ts
 Expected: FAIL — `STORAGE_KEY_PENDING_TOAST` is
 not exported; `replayPendingToast` is not exported.
 
-- [ ] **Step 3: Minimal implementation**
+- [x] **Step 3: Minimal implementation**
 
 `web-app/app/storage-keys.ts` — add:
 
@@ -679,11 +679,11 @@ UI envelope. Do not invent a second clock.
 
 Import `replayPendingToast` from `./toast.ts`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Same command as Step 2. Expected: PASS.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 Run: `./validate`
 Expected: green.
@@ -721,7 +721,7 @@ Helper, Coupling (no new library).
   on pointerup. No `draggable` attribute. Keyboard
   ArrowUp/ArrowDown path unchanged.
 
-- [ ] **Step 1: Confirm the positions suite is green**
+- [x] **Step 1: Confirm the positions suite is green**
 
 Run:
 ```
@@ -734,7 +734,7 @@ not break. There is no jsdom pin for the pointer
 wiring — next TEST-PLAN run witnesses E11 (run-six
 precedent for DOM wiring).
 
-- [ ] **Step 2: Replace HTML5 DnD with pointer capture**
+- [x] **Step 2: Replace HTML5 DnD with pointer capture**
 
 In `web-app/app/drag-reorder.ts`:
 
@@ -776,11 +776,11 @@ Keep `buildIndicator`, `clearIndicator`,
 Callers that pass `async` functions stay as they
 are (ignored Promise, same as today).
 
-- [ ] **Step 3: Re-run the positions suite**
+- [x] **Step 3: Re-run the positions suite**
 
 Same command as Step 1. Expected: PASS.
 
-- [ ] **Step 4: Validate and commit**
+- [x] **Step 4: Validate and commit**
 
 Run: `./validate`
 
@@ -806,7 +806,7 @@ value-bearing tests), Internal Defense (do not
   (append two tests after the existing
   `'pure move WITH If-Match → 400'` test ~line 630)
 
-- [ ] **Step 1: Write the failing tests (they should
+- [x] **Step 1: Write the failing tests (they should
   actually be GREEN — these pin current law)**
 
 If either is red, STOP. Ruling 12's premise is
@@ -882,7 +882,7 @@ test(
 `seededBound`, `pureMoveBody`, `valueBody`,
 `IF_MATCH_HEADER` are already in the file.
 
-- [ ] **Step 2: Run the file**
+- [x] **Step 2: Run the file**
 
 ```
 TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \
@@ -892,7 +892,7 @@ node --strip-types --import ./tests/hmac-test-key.ts \
 Expected: PASS, including the two new tests.
 Red on the first new test → STOP (Ruling 12).
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 Run: `./validate`
 
@@ -912,7 +912,7 @@ git commit -m "Pin pure-move instance etag covenant" \
 **Files:**
 - Modify: `tests/state-theme-icon.test.ts`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Append. This pin is GREEN if Ruling 13 is true
 (`initListeners` already subscribes to `change`).
@@ -981,7 +981,7 @@ test(
 `persistThemePreference` and `initListeners` are
 already imported from `state.ts` in this file.
 
-- [ ] **Step 2: Run**
+- [x] **Step 2: Run**
 
 ```
 TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \
@@ -990,7 +990,7 @@ node --strip-types --import ./tests/hmac-test-key.ts \
 ```
 Expected: PASS. Red → STOP (Ruling 13).
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 ```bash
 git add tests/state-theme-icon.test.ts
@@ -1009,7 +1009,7 @@ once in the test, matching A2).
 **Files:**
 - Modify: `tests/page-registry.test.ts`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```typescript
 test(
@@ -1038,7 +1038,7 @@ test(
 );
 ```
 
-- [ ] **Step 2: Run**
+- [x] **Step 2: Run**
 
 ```
 TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \
@@ -1048,7 +1048,7 @@ node --strip-types --import ./tests/hmac-test-key.ts \
 Expected: PASS. Red → STOP (Ruling 14); do not
 invent a 30th PAGE_REGISTRY entry.
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 ```bash
 git add tests/page-registry.test.ts
@@ -1070,7 +1070,7 @@ covenant is testable).
   exempt from 78-char lint; still wrap like the
   surrounding cases.
 
-- [ ] **Step 1: A2 count sentence**
+- [x] **Step 1: A2 count sentence**
 
 In **A2**, after "with 29 HTML page files
 (including `api-documentation/index.html`, …)",
@@ -1081,7 +1081,7 @@ The 29 are the `PAGE_REGISTRY` HTML files; do
 (it stays the separate "plus root `index.html`");
 do **not** count verb/status rooms.
 
-- [ ] **Step 2: Protocol list-row reorders**
+- [x] **Step 2: Protocol list-row reorders**
 
 Replace the paragraph that says E11 is
 compositor-driveable and D36/D37/K6 need
@@ -1090,7 +1090,7 @@ K6 are compositor-mouse driveable (pointer
 capture on `.drag-handle`, not HTML5 `drop`).
 Window ≥768 CSS px; filter All; verify by reload.
 
-- [ ] **Step 3: D19/D30**
+- [x] **Step 3: D19/D30**
 
 D19 already says toast then list. Add: the toast
 is still visible on the ideas list after
@@ -1098,7 +1098,7 @@ navigation (it survives `navigateTo`). D30: the
 success toast (`Idea approved successfully`) is
 visible on the list the same way.
 
-- [ ] **Step 4: F drive notes** (one contiguous
+- [x] **Step 4: F drive notes** (one contiguous
   edit pass, do not add cases)
 
 - **F16:** PASS is the node's `transform` following
@@ -1149,7 +1149,7 @@ visible on the list the same way.
   not a node). Space inserts a space character;
   pan unchanged.
 
-- [ ] **Step 5: WB19b converse**
+- [x] **Step 5: WB19b converse**
 
 Replace the converse sentence so it cannot be
 read as a pure Archive:
@@ -1162,7 +1162,7 @@ record detail 412s and recovers. A **pure move**
 instance etag; a Save with the held etag is 201,
 not a FAIL.
 
-- [ ] **Step 6: I6 OS clause**
+- [x] **Step 6: I6 OS clause**
 
 Keep the StorageEvent sentence. Replace the OS
 sentence with: an OS `prefers-color-scheme`
@@ -1177,7 +1177,7 @@ after emulate, dispatch
 mq.matches })` on the query, or use a real OS
 toggle.
 
-- [ ] **Step 7: Validate and commit**
+- [x] **Step 7: Validate and commit**
 
 Run: `./validate`
 
@@ -1199,14 +1199,14 @@ then commit.
 - Modify:
   `docs/superpowers/plans/2026-08-27-test-plan-fail-remediation.md`
 
-- [ ] **Step 1: Tick remaining boxes** including
+- [x] **Step 1: Tick remaining boxes** including
   this task's after the commit is prepared.
 
-- [ ] **Step 2: Validate**
+- [x] **Step 2: Validate**
 
 Run: `./validate`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-27-test-plan-fail-remediation.md
