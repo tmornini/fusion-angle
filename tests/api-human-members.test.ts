@@ -83,3 +83,49 @@ test('POST /human-members is retired 404', async () => {
     ));
     assert.equal(res.status, 404);
 });
+
+// AA9's covenant below the browser: a second identity PUT
+// REPLACES strengths, so an id toggled on in the same save
+// that toggles another off is what the next GET returns.
+test(
+    'a strengths PUT replaces the list — the toggled-on id'
+    + ' persists',
+    async () => {
+        const db = await freshDb();
+        const token = await organizationToken();
+        const path = '/identities/xdaJyuuPyHfffCGLhqDrOQ';
+        const person = (strengths: string[]): unknown => ({
+            kind: 'person',
+            title: 'Admin',
+            department: 'Ops',
+            strengths,
+            team_dimensions: {},
+        });
+        const first = await handleRequest(db, apiRequest({
+            method: 'PUT', path, token,
+            body: person([
+                'Strategic Planning',
+                'Data Analysis',
+                'Stakeholder Management',
+            ]),
+        }));
+        assert.ok(first.status === 201 || first.status === 200);
+        const second = await handleRequest(db, apiRequest({
+            method: 'PUT', path, token,
+            body: person([
+                'Strategic Planning',
+                'Stakeholder Management',
+                'Agile Methods',
+            ]),
+        }));
+        assert.ok(second.status === 201 || second.status === 200);
+        const row = await GET<{ strengths: string[] }>(
+            db, 'identities/xdaJyuuPyHfffCGLhqDrOQ', token,
+        );
+        assert.deepEqual(row.strengths, [
+            'Strategic Planning',
+            'Stakeholder Management',
+            'Agile Methods',
+        ]);
+    },
+);

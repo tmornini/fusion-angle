@@ -184,6 +184,28 @@ E11 use pointer capture on
 `.drag-handle`, not HTML5
 `drop`.
 
+Before every compositor-mouse
+gesture (port drag,
+shift-connect, body drag,
+marquee, pan, list-row drag)
+call `activate_tab(current_tab())`
+and confirm
+`document.visibilityState`
+is `visible`. A hidden tab
+lands every `mouseMoved`
+about 5 s late — past the
+daemon's 5 s timeout — while
+press, release, and keys
+land at once. Never activate
+for anything else. If a
+`mouseMoved` still raises
+`TimeoutError`, send
+`mouseReleased` at the same
+point first (it always lands
+and ends the gesture), then
+re-activate and retry that
+gesture once.
+
 Return one line per case:
 ID PASS|FAIL|BLOCKED|DEFERRED|DRIFT
 — one-line note. BLOCKED only
@@ -325,6 +347,31 @@ two-jar SV.
   `pointerup`. Verify persistence by
   reload. Window at or above 768 CSS
   px; filter All.
+- **Visible tab for continuous mouse.**
+  Chrome aligns `mouseMoved` delivery
+  to the animation frame; a hidden tab
+  paints no frame, so a CDP
+  `Input.dispatchMouseEvent` `mouseMoved`
+  lands about five seconds late — past
+  the daemon's 5 s IPC read timeout —
+  while `mousePressed`, `mouseReleased`,
+  and keys land at once. All hunters
+  share one Chrome and `new_tab()`
+  creates targets in the background, so
+  a hunter's tab is hidden unless it
+  activates it. A helper that raises
+  mid-gesture leaves the canvas FSM in
+  flight with pointer capture held, and
+  every later click, Space, and
+  shortcut on that tab reads as a
+  product FAIL (2026-08-28 AA27–AA40,
+  F16–F67). Gesture hunters call
+  `activate_tab(current_tab())` before
+  every gesture (prompt rule); other
+  hunters never activate. Measured
+  2026-08-28 on a bare `data:` page:
+  hidden 5.001 s per move, visible
+  8 ms.
 - **CSS viewport.** Set a real CSS
   viewport (not a screenshot-only
   resize). I10–I15 need ≤767px for the
@@ -352,10 +399,13 @@ two-jar SV.
   `js()` — the bearer is memory-only;
   read the network log. V7 reads
   grant 403 from the network log.
-  WB16 asserts against a Performance
-  snapshot taken from bind through
-  WB11 submit, never a later
-  `getEntries()` and never `js()`
+  WB16 asserts against the daemon's
+  network events, accumulated by the
+  hunter from before bind through
+  WB11's inbox landing — never a
+  drained ring
+  (`wait_for_network_idle()` drains),
+  never Performance, never `js()`
   `fetch`. Toasts via one `js()` call
   on the Members invite dialog's
   synchronous "Email is required"
@@ -439,6 +489,20 @@ two-jar SV.
   tab, not a jar. Two hunters
   refreshing the same cookie look
   like theft and revoke the chain.
+- **macOS "Allow remote debugging?"
+  sheet.** Each named daemon's first
+  CDP connection raises one; fourteen
+  hunters raise up to fourteen. Chrome
+  holds that daemon's handshake until
+  Allow; after 45 s the daemon fails
+  `permission-blocked` and the hunter
+  crashes (that section FAIL, not
+  product). The sheet does not touch
+  input dispatch — the hidden-tab
+  delay above reproduces with the
+  sheet answered. Answer each sheet at
+  once, or run `browser-use
+  mac-approve`.
 - **`getBoundingClientRect` ≠
   click coordinates**: a ~1.19×
   CSS-px ↔ screenshot-px scale
@@ -1012,6 +1076,9 @@ Project.
   covered by `tests/flow-operations.test.ts`
   (`performAddNodeAtPosition` + `performAddEdge`).
   Drive the port-drag with compositor mouse.)
+  Activate the tab first (prompt rule): a hidden
+  tab lands every `mouseMoved` past the daemon
+  timeout and paints no ghost.
 - [ ] **AA28** Serial: N/A — requires the empty
   Create+Archive graph that serial must not
   mint; do not add nodes; do not JSON-inject.
@@ -1508,7 +1575,8 @@ depends: A
   upward past another row's midpoint. Drive with
   compositor mouse: `pointerdown` on `.drag-handle`
   (pointer capture), `pointermove`, `pointerup` —
-  not HTML5 `drop`. PASS: during the drag a
+  not HTML5 `drop`. Activate the tab first (prompt
+  rule). PASS: during the drag a
   hysteresis indicator appears at the target drop
   position, the dragged row follows the pointer,
   and on release the ideas list reorders in place.
@@ -1583,6 +1651,7 @@ depends: A
   to a new position. Drive with compositor mouse:
   `pointerdown` on `.drag-handle` (pointer capture),
   `pointermove`, `pointerup` — not HTML5 `drop`.
+  Activate the tab first (prompt rule).
   PASS: drop indicator appears, card follows the
   pointer, and on release the projects list
   reorders. Reload the page — new order persists.
@@ -1729,6 +1798,9 @@ opens and renders.)
   drop may snap (F17). For a resting free
   placement see F34 (toggle Auto Layout off
   first; F18's first toggle is that off).
+  Activate the tab first (prompt rule): the
+  rAF paint this PASS observes exists only
+  on the visible tab.
 - [ ] **F17** Drag the start node. PASS: it moves
   freely like any standard node (start and
   complete nodes are both draggable; with Auto
@@ -2419,13 +2491,27 @@ depends: A
   Active tab (unclaimed). Serial: bind an instance,
   fill Company Name and Contact Email, click
   `submit` → Review.
-- [ ] **WB16** Snapshot Performance resource entries
-  from bind through WB11 submit. WB16 asserts
-  against that snapshot. Never a later
-  `getEntries()` and never `js()` `fetch`.
-  Assert the binding PUT, the transition POST
-  (instance shape), and the history GET. Never
-  `js()` `fetch` (bearer is memory-only). PASS:
+- [ ] **WB16** Read the daemon's own network
+  log, accumulated by the hunter: before the
+  bind, and after every step through WB11's
+  inbox landing, append `drain_events()` to a
+  list you keep — the daemon ring holds 500
+  events and `drain_events` empties it. Never
+  call `wait_for_network_idle()` inside that
+  window (it drains and discards). Never
+  `performance.getEntries()`: the inbox
+  navigation destroys the detail document's
+  buffer, and resource entries carry neither
+  body nor headers. Never `js()` `fetch`
+  (bearer is memory-only). Filter
+  `Network.requestWillBeSent` on the attached
+  `session_id`; pair `requestId` with
+  `Network.responseReceived` for status.
+  Assert the binding PUT (201), the transition
+  POST (201; instance shape in
+  `request.postData`; strong `If-Match` in
+  `request.headers`), and the history GET.
+  PASS:
   the work-order
   document message pair head carries `display_id`
   and `flow_graph` JSON; the binding PUT is at
@@ -3286,7 +3372,8 @@ if it returns to the active list.
 Drive with compositor mouse: `pointerdown`
 on `.drag-handle` (pointer capture),
 `pointermove`, `pointerup` — not HTML5
-`drop`. PASS if the new position persists
+`drop`. Activate the tab first (prompt
+rule). PASS if the new position persists
 across a page reload.
 
 **K8.** **Phase 4 case** — runs alone last after Phase 2
