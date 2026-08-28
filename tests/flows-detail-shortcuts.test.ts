@@ -17,13 +17,31 @@ globalThis.window = {
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
 
+class FakeInput {
+    readonly type: string;
+    constructor(type: string) {
+        this.type = type;
+    }
+}
+class FakeTextArea {}
+class FakeSelect {}
+const g = globalThis as Record<
+    string, unknown
+>;
+g.HTMLInputElement = FakeInput;
+g.HTMLTextAreaElement = FakeTextArea;
+g.HTMLSelectElement = FakeSelect;
+
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import type {
     DesignerShortcutInput,
 } from '../web-app/flows/detail.ts';
 
-const { reduceDesignerShortcut } = await import(
+const {
+    reduceDesignerShortcut,
+    isDesignerEditableTarget,
+} = await import(
     '../web-app/flows/detail.ts'
 );
 
@@ -119,3 +137,81 @@ test('Escape closes only an open panel', () => {
         null,
     );
 });
+
+test(
+    'a Members checkbox is not an editable'
+    + ' target',
+    () => {
+        assert.equal(
+            isDesignerEditableTarget(
+                new FakeInput('checkbox'),
+            ),
+            false,
+        );
+        assert.equal(
+            isDesignerEditableTarget(
+                new FakeInput('radio'),
+            ),
+            false,
+        );
+        assert.equal(
+            isDesignerEditableTarget(
+                new FakeInput('button'),
+            ),
+            false,
+        );
+        assert.equal(
+            isDesignerEditableTarget(
+                new FakeInput('submit'),
+            ),
+            false,
+        );
+        assert.equal(
+            isDesignerEditableTarget(
+                new FakeInput('reset'),
+            ),
+            false,
+        );
+    },
+);
+
+test(
+    'texty inputs, textarea, and select are'
+    + ' editable targets',
+    () => {
+        assert.equal(
+            isDesignerEditableTarget(
+                new FakeInput('text'),
+            ),
+            true,
+        );
+        assert.equal(
+            isDesignerEditableTarget(
+                new FakeInput('password'),
+            ),
+            true,
+        );
+        assert.equal(
+            isDesignerEditableTarget(
+                new FakeTextArea(),
+            ),
+            true,
+        );
+        assert.equal(
+            isDesignerEditableTarget(
+                new FakeSelect(),
+            ),
+            true,
+        );
+    },
+);
+
+test(
+    'null is not an editable target',
+    () => {
+        assert.equal(
+            isDesignerEditableTarget(null),
+            false,
+        );
+    },
+);

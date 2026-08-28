@@ -347,8 +347,10 @@ two-jar SV.
   `js()` — the bearer is memory-only;
   read the network log. V7 reads
   grant 403 from the network log.
-  WB16 reads the work-order history
-  from the network log, never a hand
+  WB16 asserts against a Performance
+  snapshot taken from bind through
+  WB11 submit, never a later
+  `getEntries()` and never `js()`
   `fetch`. Toasts via one `js()` call
   on the Members invite dialog's
   synchronous "Email is required"
@@ -1689,10 +1691,11 @@ opens and renders.)
   re-centers so the node sits at the visual center
   of the canvas region not covered by the panel.
   Drive the double-click with compositor mouse.
-- [ ] **F13** While the panel is open, double-click
-  a different node. PASS: panel content updates to
-  the new selection and the canvas re-centers on
-  it.
+- [ ] **F13** While the panel is open, drive two compositor
+  `pointerdown`s on a different node within 400
+  ms (there is no `dblclick` listener), same as
+  F11. PASS: panel content updates to the new
+  node and the canvas re-centers on it.
 - [ ] **F14** Enable Auto Fit, then double-click a
   node. PASS: panel opens and the canvas re-fits to
   the panel-aware visible region (no toast, no
@@ -1819,6 +1822,9 @@ opens and renders.)
 - [ ] **F27** Select a non-start/non-complete node,
   click the Delete (trash) button in toolbar.
   PASS: node and all connected edges are removed.
+  If F15 already created a New State, delete a
+  *different* intermediate (Capture or Review),
+  not that New State — F68–F72 need it.
 - [ ] **F28** Select an edge, click the Delete
   (trash) button in toolbar. PASS: edge is
   removed from the canvas.
@@ -1879,9 +1885,12 @@ re-renders after each step.)
   node, press Cmd+Z (Mac) or Ctrl+Z. PASS: node returns
   to its previous position, pixel-identical (see F37b for
   the auto-layout exception to this promise).
-- [ ] **F35** After deleting a state, undo. PASS:
-  the state and all its connected edges are
-  restored.
+- [ ] **F35** Toolbar Delete (`data-action="delete-selected"`)
+  on a non-Create / non-Archive node, same as F27.
+  Wait until that node is gone, then Undo. Do
+  not use Backspace unless F38's `aria-current`
+  is already true. PASS: the state and all
+  its connected edges are restored.
 - [ ] **F36** Undo and Redo buttons are disabled
   when their respective stacks are empty. PASS:
   buttons show disabled state initially. (Undo
@@ -1906,9 +1915,10 @@ re-renders after each step.)
   412) and the client silently retries with a freshly
   resolved target against the new head — the 412-retry is
   invisible to the tester by design.
-- [ ] **F37b** On a flow with Auto Layout ON, add a node
-  (which auto-lays-out the graph), then Undo. PASS: the
-  canvas restores to the pre-edit graph. Now make ANY new
+- [ ] **F37b** On a flow with Auto Layout ON, add via
+  F15's plain port-drag (no Shift). Wait until node
+  count + 1, then Undo. PASS: the canvas restores
+  to the pre-edit graph. Now make ANY new
   edit (e.g. rename a node). PASS: node positions may
   re-flow to the auto-layout orientation on this next edit —
   this is expected, not a regression (the server-resolved
@@ -1922,18 +1932,28 @@ re-renders after each step.)
 - [ ] **F38** Focus a `.flow-node` (Tab through
   chrome, or `js()` `.focus()` on the node) —
   do not Tab from document start expecting the
-  first node. Assert `aria-current="true"`; it
+  first node. Tab through chrome now lands on
+  `svg.flow-canvas`, then the first `.flow-node`
+  or `.flow-edge` — that is PASS, not a skip.
+  Wait for `aria-current="true"` before Delete /
+  Backspace (F38) or Enter (F38b) / Space
+  (F57a). Assert `aria-current="true"`; it
   also takes the selection (glow), panel closed.
   Press Delete or Backspace. PASS: the focused
   node is deleted; focus lands on `<body>`.
 - [ ] **F38a** Focus a remaining `.flow-node`
-  first (same chrome-first drive as F38). Next
-  Tab moves to the next node or edge; from the
-  last item it wraps to the first (DOM order)
-  and never leaves the canvas. Selection
-  follows the focus. With the panel open the
-  camera pans to reveal the selection, zoom
-  unchanged. Tab across a marquee-selected
+  first (same chrome-first drive as F38). Tab
+  through chrome now lands on `svg.flow-canvas`,
+  then the first `.flow-node` or `.flow-edge`
+  — that is PASS, not a skip. Wait for
+  `aria-current="true"` before Delete /
+  Backspace (F38) or Enter (F38b) / Space
+  (F57a). Next Tab moves to the next node or
+  edge; from the last item it wraps to the first
+  (DOM order) and never leaves the canvas.
+  Selection follows the focus. With the panel
+  open the camera pans to reveal the selection,
+  zoom unchanged. Tab across a marquee-selected
   group keeps the group selected only while
   focus lands on one of its members — Tab
   order is DOM order (render order, not
@@ -2078,7 +2098,9 @@ concurrency, and the org fence. A designer "tag current" action is tracked in
   drag again. PASS: both drags pan the viewport — pan mode
   persists across multiple drags until toggled off.
 - [ ] **F50** Hold the spacebar down for two seconds without
-  releasing. PASS: pan mode toggles on exactly once; browser
+  releasing. The first Space `keydown` must have
+  `repeat: false`; hold may auto-repeat after that.
+  PASS: pan mode toggles on exactly once; browser
   auto-repeat does not chatter the toggle.
 - [ ] **F51** Begin dragging a node — require an
   in-flight `dragging` gesture. While the drag is
@@ -2109,7 +2131,10 @@ concurrency, and the org fence. A designer "tag current" action is tracked in
   button, move focus off it: focus
   `svg.flow-canvas` via Tab or `js()`
   (`tabindex="0"`) with **no** `pointerdown`
-  on the canvas (F56's trap). Then send Space
+  on the canvas (F56's trap). If F29 just
+  toasted the same Auto-Fit message, wait out
+  `WHEEL_TOAST_COOLDOWN_MS` (2000) before the
+  Space that must toast again. Then send Space
   once. PASS: an error
   toast appears ("Disable Auto-Fit to change
   the view"); pan stays off.
@@ -2177,44 +2202,53 @@ concurrency, and the org fence. A designer "tag current" action is tracked in
   via pair fixtures or F67: a `memberIds` change is still
   undoable through that history.
 - [ ] **F67** Tick one checkbox in the Members fieldset,
-  then press Cmd+Z (Mac) / Ctrl+Z (Win/Linux). PASS: the
+  then wait for the `memberIds` PUT (`SAVE_DELAY_MS`
+  800 ms) before Cmd+Z (Mac) / Ctrl+Z (Win/Linux).
+  PASS: the panel stays open on that node and the
   checkbox unticks — `memberIds` changes are undoable
   like name changes.
 
 ### Attribute Editor (Node Panel)
 
-- [ ] **F68** Double-click a regular node (not Create/Archive)
-  to open the properties panel. In the "Attributes"
-  fieldset, click the "+ Add Attribute…" dropdown. PASS:
-  the picker lists available record attributes
+- [ ] **F68** Open F15's New State (not Capture, not
+  Review, not Create/Archive): drive two compositor
+  `pointerdown`s within 400 ms (there is no
+  `dblclick` listener), same as F13. In the
+  "Attributes" fieldset, click the "+ Add Attribute…"
+  dropdown. PASS: the picker lists leftover record
+  attributes (Company Name and/or Industry)
   pre-defined on the bound record-type (loaded via
   `getRecordAttributesByRecord` from the nested
-  `record-types/:id/attributes` collection on the message
-  plane).
+  `record-types/:id/attributes` collection on the
+  message plane).
   (Regression for the captured-presenter bug in the
   attribute-picker handler: this exact click used to do
   nothing because the handler closed over a presenter
   captured at init time, which had no selection.)
-- [ ] **F69** Continuing from F68, select an attribute
-  from the picker (e.g. "Contact Email"). PASS: the row
-  "Contact Email" appears in the list with mode (Editable /
-  Read-only) and required toggles. The dropdown
-  remains available so additional attributes can be
-  added.
+- [ ] **F69** Continuing from F68, select **Company Name**
+  from the picker. PASS: the row "Company Name" appears
+  in the list with mode (Editable / Read-only) and
+  required toggles. The dropdown remains available so
+  additional attributes can be added.
 - [ ] **F70** Continuing from F69, click the remove ("×")
-  control on the "Contact Email" attribute row. PASS: the row
+  control on the "Company Name" attribute row. PASS: the row
   disappears from the attributes list.
 - [ ] **F71** Lock the flow via the designer-header Locked switch.
-  Double-click a regular node. Click the disabled
+  Open the same New State as F68: drive two compositor
+  `pointerdown`s within 400 ms (there is no `dblclick`
+  listener), same as F13. Click the disabled
   "+ Add Attribute…" dropdown in the Attributes
   fieldset. PASS: nothing happens — no panel change,
   no toast, no attribute row appended (a disabled
   `<select>` does not fire `change`).
-- [ ] **F72** Double-click a regular node. Tick one
-  member checkbox in the Members fieldset. Click the
+- [ ] **F72** Open the same New State as F68: drive two
+  compositor `pointerdown`s within 400 ms (there is
+  no `dblclick` listener), same as F13. Tick one
+  Members checkbox on that New State, then click the
   "+ Add Attribute…" dropdown in the same panel. PASS:
-  the dropdown remains functional and lists available
-  attributes. (Regression: a `memberIds` commit
+  the dropdown remains functional and lists leftover
+  record attributes (Company Name and/or Industry).
+  (Regression: a `memberIds` commit
   replaces the presenter, so a click handler that
   captured a stale presenter would have acted on the
   pre-commit snapshot — this case proves the handler
@@ -2284,7 +2318,10 @@ depends: A
   a dropdown opens with up to two labeled
   sections — `READY` (clickable rows, one per
   publishable flow) — Parallel: READY includes
-  `WB Test Flow` as today — Serial: READY is
+  `WB Test Flow` as today — Parallel READY
+  containing WB Test Flow with an empty NOT
+  READY list at this step is PASS. Do not fail
+  for a missing NOT READY row. Serial: READY is
   exactly Customer Onboarding and Lead-to-Close
   (never a third from AA26/E7); NOT READY is
   Fusion Angle Flow (16)
@@ -2377,11 +2414,14 @@ depends: A
   Active tab (unclaimed). Serial: bind an instance,
   fill Company Name and Contact Email, click
   `submit` → Review.
-- [ ] **WB16** On this same load's network log —
-  do not navigate again — assert the binding PUT,
-  the transition POST (instance shape), and the
-  history GET. Never `js()` `fetch`
-  (bearer is memory-only). PASS: the work-order
+- [ ] **WB16** Snapshot Performance resource entries
+  from bind through WB11 submit. WB16 asserts
+  against that snapshot. Never a later
+  `getEntries()` and never `js()` `fetch`.
+  Assert the binding PUT, the transition POST
+  (instance shape), and the history GET. Never
+  `js()` `fetch` (bearer is memory-only). PASS:
+  the work-order
   document message pair head carries `display_id`
   and `flow_graph` JSON; the binding PUT is at
   `work-orders/:id/binding` with
@@ -2466,7 +2506,10 @@ depends: A
   after a successful **value-bearing**
   transition (set/clear + If-Match — serial Review
   fills Reviewer Notes), a stale instance Save on
-  record detail 412s and recovers. A **pure move**
+  record detail 412s and recovers. Review is
+  read-only; do not drive the converse there. The
+  converse is a value-bearing instance Save, not a
+  pure Review→Archive move. A **pure move**
   (no set/clear, no If-Match) does not advance the
   instance etag; a Save with the held etag is 201,
   not a FAIL.

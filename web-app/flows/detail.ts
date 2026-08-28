@@ -1927,6 +1927,33 @@ export function reduceDesignerShortcut(
     return input.shiftKey ? 'redo' : 'undo';
 }
 
+export function isDesignerEditableTarget(
+    active: EventTarget | null,
+): boolean {
+    if (
+        active instanceof HTMLTextAreaElement
+        || active instanceof HTMLSelectElement
+    ) {
+        return true;
+    }
+    if (
+        !(active instanceof HTMLInputElement)
+    ) {
+        return false;
+    }
+    const type = active.type;
+    if (
+        type === 'checkbox'
+        || type === 'radio'
+        || type === 'button'
+        || type === 'submit'
+        || type === 'reset'
+    ) {
+        return false;
+    }
+    return true;
+}
+
 function bindKeyboardShortcuts(
     panelStateRef: PanelStateRef,
     signal: AbortSignal,
@@ -1941,11 +1968,7 @@ function bindKeyboardShortcuts(
                 ctrlKey: e.ctrlKey,
                 shiftKey: e.shiftKey,
                 isEditableFocused:
-                    active instanceof HTMLInputElement
-                    || active instanceof
-                        HTMLTextAreaElement
-                    || active instanceof
-                        HTMLSelectElement,
+                    isDesignerEditableTarget(active),
                 isPanelOpen: panelStateRef.open,
             });
             if (shortcut === null) return;

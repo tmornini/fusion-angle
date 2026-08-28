@@ -313,7 +313,10 @@ export function nextCanvasTabIndex(
     shift: boolean,
 ): number | null {
     if (length < 1) return null;
-    if (current < 0 || current >= length) {
+    if (current < 0) {
+        return shift ? length - 1 : 0;
+    }
+    if (current >= length) {
         return null;
     }
     if (shift) {
@@ -324,6 +327,13 @@ export function nextCanvasTabIndex(
     return current === length - 1
         ? 0
         : current + 1;
+}
+
+export function pointerIsShift(
+    shiftHeld: boolean,
+    eventShiftKey: boolean,
+): boolean {
+    return shiftHeld || eventShiftKey;
 }
 
 export function canvasFocusInputOf(
@@ -430,6 +440,7 @@ export function bindInteractions(
         initialContext.interaction;
     let activePointerId: number | null = null;
     let gestureRect: GestureRect | null = null;
+    let shiftHeld = false;
     if (currentState.isPanMode) {
         wrap.classList.add(
             'flow-pan-cursor',
@@ -590,7 +601,9 @@ export function bindInteractions(
                     isPort,
                     isDraggable:
                         pos.isDraggable,
-                    isShift: e.shiftKey,
+                    isShift: pointerIsShift(
+                        shiftHeld, e.shiftKey,
+                    ),
                     isMeta:
                         e.metaKey
                         || e.ctrlKey,
@@ -670,7 +683,9 @@ export function bindInteractions(
                 svgY: svgPt.y,
                 clientX: e.clientX,
                 clientY: e.clientY,
-                isShift: e.shiftKey,
+                isShift: pointerIsShift(
+                    shiftHeld, e.shiftKey,
+                ),
                 hoverNodeId,
                 svgRectW: rect.w,
                 svgRectH: rect.h,
@@ -727,7 +742,9 @@ export function bindInteractions(
                 svgY: svgPt.y,
                 clientX: e.clientX,
                 clientY: e.clientY,
-                isShift: e.shiftKey,
+                isShift: pointerIsShift(
+                    shiftHeld, e.shiftKey,
+                ),
                 hoverNodeId,
                 fromNodePosition,
                 allNodes,
@@ -777,9 +794,12 @@ export function bindInteractions(
         ke: KeyboardEvent,
     ): void => {
         if (ke.key !== 'Shift') return;
+        shiftHeld = ke.type === 'keydown';
         dispatch({
             kind: 'shift-key',
-            isShift: ke.shiftKey,
+            isShift: pointerIsShift(
+                shiftHeld, ke.shiftKey,
+            ),
         });
     };
     window.addEventListener(

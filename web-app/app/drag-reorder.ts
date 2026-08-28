@@ -2,6 +2,7 @@ import { $$, createElement } from './dom.ts';
 import {
     computeNewPosition,
     dropIndex as computeDropIndex,
+    followTranslateY,
 } from './drag-reorder-positions.ts';
 
 const INDICATOR_HEIGHT = 3;
@@ -29,6 +30,8 @@ type DragState =
         // getBoundingClientRect stays off the
         // hot path after the first read.
         rects: readonly CardRect[] | null;
+        startClientY: number;
+        card: HTMLElement;
     };
 
 export function initDragReorder(
@@ -70,6 +73,8 @@ export function initDragReorder(
             indicator: null,
             idx: null,
             rects: drag.rects,
+            startClientY: drag.startClientY,
+            card: drag.card,
         };
     }
 
@@ -129,6 +134,8 @@ export function initDragReorder(
                     indicator: drag.indicator,
                     idx: drag.idx,
                     rects,
+                    startClientY: drag.startClientY,
+                    card: drag.card,
                 };
             }
         }
@@ -173,6 +180,8 @@ export function initDragReorder(
                 indicator: null,
                 idx: null,
                 rects: null,
+                startClientY: e.clientY,
+                card,
             };
             card.style.opacity =
                 DRAGGING_OPACITY;
@@ -188,6 +197,11 @@ export function initDragReorder(
                 e.clientY,
                 drag.idx,
             );
+            drag.card.style.transform =
+                followTranslateY(
+                    drag.startClientY,
+                    e.clientY,
+                );
             if (
                 newIdx === drag.idx
                 && drag.indicator
@@ -211,6 +225,8 @@ export function initDragReorder(
                 indicator: ind,
                 idx: newIdx,
                 rects: drag.rects,
+                startClientY: drag.startClientY,
+                card: drag.card,
             };
         },
     );
@@ -225,7 +241,9 @@ export function initDragReorder(
                 drag.idx ?? dropIndex(
                     e.clientY, null,
                 );
+            const card = drag.card;
             clearIndicator();
+            card.style.transform = '';
             drag = { kind: 'idle' };
             const items = cards();
             const newPos = computeNewPosition(
@@ -242,7 +260,11 @@ export function initDragReorder(
     container.addEventListener(
         'pointercancel',
         () => {
+            if (drag.kind !== 'active')
+                return;
+            const card = drag.card;
             clearIndicator();
+            card.style.transform = '';
             drag = { kind: 'idle' };
             for (const c of cards()) {
                 c.style.opacity = '';

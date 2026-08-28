@@ -637,6 +637,33 @@ export interface HistoryOpOk {
     readonly newHistory: FlowHistorySnapshot;
 }
 
+function selectionSurvivesRestore(
+    selection: FlowSnapshot[
+        'interaction'
+    ]['selection'],
+    nodes: readonly GraphNode[],
+    edges: readonly GraphEdge[],
+): boolean {
+    if (selection.kind === 'edge') {
+        return edges.some(
+            e => e.id === selection.edgeId,
+        );
+    }
+    if (selection.kind !== 'nodes') {
+        return false;
+    }
+    if (selection.nodeIds.size === 0) {
+        return false;
+    }
+    const ids = new Set(
+        nodes.map(n => n.id),
+    );
+    for (const id of selection.nodeIds) {
+        if (!ids.has(id)) return false;
+    }
+    return true;
+}
+
 function applyServerGraph(
     snap: FlowSnapshot,
     graph: {
@@ -649,6 +676,11 @@ function applyServerGraph(
         edges: GraphEdge[];
     },
 ): FlowSnapshot {
+    const keep = selectionSurvivesRestore(
+        snap.interaction.selection,
+        graph.nodes,
+        graph.edges,
+    );
     return {
         ...snap,
         flowName: graph.name,
@@ -658,10 +690,14 @@ function applyServerGraph(
         lockTimeout: graph.lockTimeout,
         nodes: graph.nodes,
         edges: graph.edges,
-        isPanelOpen: false,
+        isPanelOpen: keep
+            ? snap.isPanelOpen
+            : false,
         interaction: {
             ...snap.interaction,
-            selection: { kind: 'none' },
+            selection: keep
+                ? snap.interaction.selection
+                : { kind: 'none' },
         },
     };
 }

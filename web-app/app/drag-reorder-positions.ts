@@ -66,3 +66,12 @@ export function computeNewPosition(
         positions[idx]!,
     );
 }
+
+export function followTranslateY(
+    startClientY: number,
+    clientY: number,
+): string {
+    return 'translateY('
+        + (clientY - startClientY)
+        + 'px)';
+}

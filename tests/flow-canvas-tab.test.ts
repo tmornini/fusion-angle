@@ -59,6 +59,36 @@ test(
 );
 
 test(
+    'Tab from the canvas SVG enters the first'
+    + ' item',
+    () => {
+        assert.equal(
+            nextCanvasTabIndex(4, -1, false),
+            0,
+        );
+        assert.equal(
+            nextCanvasTabIndex(1, -1, false),
+            0,
+        );
+    },
+);
+
+test(
+    'Shift+Tab from the canvas SVG enters the'
+    + ' last item',
+    () => {
+        assert.equal(
+            nextCanvasTabIndex(4, -1, true),
+            3,
+        );
+        assert.equal(
+            nextCanvasTabIndex(1, -1, true),
+            0,
+        );
+    },
+);
+
+test(
     'Tab outside the canvas ring is a no-op',
     () => {
         assert.equal(
@@ -66,7 +96,7 @@ test(
             null,
         );
         assert.equal(
-            nextCanvasTabIndex(4, -1, false),
+            nextCanvasTabIndex(0, -1, false),
             null,
         );
         assert.equal(

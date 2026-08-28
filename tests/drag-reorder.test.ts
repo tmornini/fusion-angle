@@ -4,6 +4,7 @@ import {
     computeNewPosition,
     dropIndex,
     FIRST_POSITION,
+    followTranslateY,
     nextPosition,
     positionBetween,
     type CardRect,
@@ -169,5 +170,24 @@ test(
     + ' when appending',
     () => {
         assert.equal(nextPosition([7.5]), 8.5);
+    },
+);
+
+test(
+    'followTranslateY writes translateY of the'
+    + ' pointer delta',
+    () => {
+        assert.equal(
+            followTranslateY(100, 130),
+            'translateY(30px)',
+        );
+        assert.equal(
+            followTranslateY(100, 70),
+            'translateY(-30px)',
+        );
+        assert.equal(
+            followTranslateY(50, 50),
+            'translateY(0px)',
+        );
     },
 );

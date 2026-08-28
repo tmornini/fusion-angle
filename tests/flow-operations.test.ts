@@ -1310,6 +1310,112 @@ test(
     },
 );
 
+test(
+    'performUndo: keeps the panel open on a'
+    + ' surviving node and restores memberIds',
+    async () => {
+        const { db, ctx } = await setupFlow();
+        const humanId =
+            'XXZruirZyAOoRpNxaDnpSA';
+        await seedCurrentGraph(ctx, [
+            buildNode(NODE_A, {
+                memberIds: [],
+            }),
+            buildNode(NODE_B),
+        ]);
+        const currentNodes = [
+            buildNode(NODE_A, {
+                memberIds: [humanId],
+            }),
+            buildNode(NODE_B),
+        ];
+        await seedCurrentGraph(
+            ctx, currentNodes,
+        );
+        const snap = {
+            ...withNodeSelection(
+                snapFrom(
+                    buildGraph(currentNodes),
+                ),
+                NODE_A,
+            ),
+            isPanelOpen: true,
+        };
+        const op = await performUndo(
+            createRequestContext(
+                db, DEV_TOKEN,
+            ),
+            snap,
+            buildFlowHistorySnapshot(true),
+        );
+        assert.equal(op.kind, 'ok');
+        if (op.kind !== 'ok') return;
+        assert.equal(
+            op.freshSnap.isPanelOpen, true,
+        );
+        const sel =
+            op.freshSnap.interaction.selection;
+        assert.equal(sel.kind, 'nodes');
+        if (sel.kind !== 'nodes') return;
+        assert.equal(sel.nodeIds.size, 1);
+        assert.equal(
+            sel.nodeIds.has(NODE_A), true,
+        );
+        const restored = op.freshSnap.nodes
+            .find(n => n.id === NODE_A);
+        assert.ok(restored);
+        assert.deepEqual(
+            restored!.memberIds, [],
+        );
+    },
+);
+
+test(
+    'performUndo: closes the panel when the'
+    + ' selected node is gone',
+    async () => {
+        const { db, ctx } = await setupFlow();
+        await seedCurrentGraph(ctx, [
+            buildNode(NODE_A),
+            buildNode(NODE_B),
+        ]);
+        const currentNodes = [
+            buildNode(NODE_A),
+            buildNode(NODE_B),
+            buildNode(NODE_C),
+        ];
+        await seedCurrentGraph(
+            ctx, currentNodes,
+        );
+        const snap = {
+            ...withNodeSelection(
+                snapFrom(
+                    buildGraph(currentNodes),
+                ),
+                NODE_C,
+            ),
+            isPanelOpen: true,
+        };
+        const op = await performUndo(
+            createRequestContext(
+                db, DEV_TOKEN,
+            ),
+            snap,
+            buildFlowHistorySnapshot(true),
+        );
+        assert.equal(op.kind, 'ok');
+        if (op.kind !== 'ok') return;
+        assert.equal(
+            op.freshSnap.isPanelOpen, false,
+        );
+        assert.equal(
+            op.freshSnap.interaction
+                .selection.kind,
+            'none',
+        );
+    },
+);
+
 // -- performRedo ------------------------------
 
 test(
