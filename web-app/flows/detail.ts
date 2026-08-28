@@ -28,6 +28,8 @@ import {
     postClipboardCopy,
     subscribeResize,
     subscribeFlowChanges,
+    awaitFlowSave,
+    putLocation,
     type RequestContext,
 } from '../app/adapters/index.ts';
 import type {
@@ -909,6 +911,27 @@ function bindSwitches(
     );
 }
 
+async function flushPendingSave(
+): Promise<void> {
+    pageState.saveDebouncer().flush();
+    try {
+        await awaitFlowSave(
+            pageState.presenter()
+                .snapshot().flowId,
+        );
+    } catch {
+        return;
+    }
+}
+
+async function leaveTo(
+    page: string,
+    params?: Record<string, string>,
+): Promise<void> {
+    await flushPendingSave();
+    navigateTo(page, params);
+}
+
 function bindBackButton(
     container: HTMLElement,
     signal: AbortSignal,
@@ -920,12 +943,12 @@ function bindBackButton(
                 const pid =
                     pageState.projectId();
                 if (pid) {
-                    navigateTo(
+                    void leaveTo(
                         'project-detail',
                         { projectId: pid },
                     );
                 } else {
-                    navigateTo('flows');
+                    void leaveTo('flows');
                 }
             },
             { signal },
@@ -944,7 +967,7 @@ function bindStatsButton(
         .addEventListener(
             'click',
             () => {
-                navigateTo(
+                void leaveTo(
                     'flow-stats',
                     {
                         flowId,
@@ -1888,6 +1911,42 @@ function bindFlushOnLeave(
             }
         },
         { signal },
+    );
+    document.addEventListener(
+        'click',
+        (e) => {
+            const t = e.target;
+            if (!(t instanceof Element)) {
+                return;
+            }
+            const a = t.closest('a[href]');
+            if (
+                !(a instanceof HTMLAnchorElement)
+            ) {
+                return;
+            }
+            if (a.hasAttribute('download')) {
+                return;
+            }
+            const href = a.getAttribute(
+                'href',
+            );
+            if (
+                !href
+                || href.startsWith('#')
+            ) {
+                return;
+            }
+            if (a.target === '_blank') {
+                return;
+            }
+            e.preventDefault();
+            void (async () => {
+                await flushPendingSave();
+                putLocation(a.href);
+            })();
+        },
+        { capture: true, signal },
     );
 }
 

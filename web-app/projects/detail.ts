@@ -171,6 +171,21 @@ async function loadProjectDetailData(
     };
 }
 
+export function reduceProjectSave(
+    data: Pick<
+        ProjectDetailData,
+        'view' | 'entity' | 'detail' | 'flows'
+    >,
+): Extract<PageState, { kind: 'reading' }> {
+    return {
+        kind: 'reading',
+        view: data.view,
+        entity: data.entity,
+        detail: data.detail,
+        flows: data.flows,
+    };
+}
+
 async function refreshProjectDetail(
 ): Promise<void> {
     if (
@@ -712,6 +727,20 @@ async function handleSave(): Promise<void> {
         }
     }
     showToast('Project saved', 'success');
+    let data;
+    try {
+        data = await loadProjectDetailData(
+            projectId, ctx,
+        );
+    } catch (err) {
+        reportFault(
+            ctx, 'Failed to reload project', err,
+        );
+        return;
+    }
+    state = reduceProjectSave(data);
+    rerender();
+    await paintActionBarAndObjectives(data);
 }
 
 async function handleNewFlowSubmit(

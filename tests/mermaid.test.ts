@@ -399,3 +399,83 @@ test('parseMermaid parses a state diagram pseudo-states',
     assert.ok(names.includes('Archive'));
     assert.equal(result.edges.length, 2);
 });
+
+test('parseMermaid keeps edge label begin', () => {
+    const text = [
+        'flowchart LR',
+        '  s([Create])',
+        '  a[Capture]',
+        '  e(((Archive)))',
+        '  s -->|begin| a',
+        '  a -->|submit| e',
+    ].join('\n');
+    const parsed = parseMermaid(text);
+    assert.equal(parsed.edges.length, 2);
+    assert.equal(
+        parsed.edges[0]?.name, 'begin',
+    );
+    assert.equal(
+        parsed.edges[1]?.name, 'submit',
+    );
+});
+
+test(
+    'generateMermaid round-trip keeps begin',
+    () => {
+        const startId = generateIdentifier();
+        const midId = generateIdentifier();
+        const endId = generateIdentifier();
+        const original = {
+            ...minimalGraph,
+            nodes: [
+                {
+                    id: startId, name: 'Create',
+                    positionX: 0, positionY: 0,
+                    isCreate: true,
+                    isArchive: false,
+                    memberIds: [],
+                    attributes: [],
+                },
+                {
+                    id: midId, name: 'Capture',
+                    positionX: 0, positionY: 0,
+                    isCreate: false,
+                    isArchive: false,
+                    memberIds: [],
+                    attributes: [],
+                },
+                {
+                    id: endId, name: 'Archive',
+                    positionX: 0, positionY: 0,
+                    isCreate: false,
+                    isArchive: true,
+                    memberIds: [],
+                    attributes: [],
+                },
+            ],
+            edges: [
+                {
+                    id: generateIdentifier(),
+                    fromNodeId: startId,
+                    toNodeId: midId,
+                    name: 'begin',
+                },
+                {
+                    id: generateIdentifier(),
+                    fromNodeId: midId,
+                    toNodeId: endId,
+                    name: 'submit',
+                },
+            ],
+        } as never;
+        const text = generateMermaid(original);
+        const parsed = parseMermaid(text);
+        assert.equal(parsed.edges.length, 2);
+        const names = parsed.edges
+            .map(e => e.name)
+            .sort();
+        assert.deepEqual(
+            names, ['begin', 'submit'],
+        );
+    },
+);

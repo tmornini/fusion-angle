@@ -36,9 +36,11 @@ master session:
 3. Executes **A1** and **A2** (ZIP inventory)
    so the tree is already clean for crank's
    `./build --no-zip`.
-4. Starts `./crank --test-plan-slices port`
-   (serial: `./crank --mock-data port`) as
-   the origin. Crank runs `./validate`
+4. Starts `./crank --test-plan-slices 8080`
+   (serial: `./crank --mock-data 8080`) as
+   the origin. Occupied 8080 refuses the
+   run — do not invent a substitute. Crank
+   runs `./validate`
    (AT1–AT3), mints secrets, brings postgres
    up, runs `./test-postgres` (AT4), builds
    `--no-zip` into a temp dir, wipes, seeds,
@@ -142,7 +144,7 @@ in full.
 You are the {SECTION} hunter for the
 Fusion Angle TEST-PLAN parallel run.
 
-Origin: http://{slug}.localhost:{PORT}
+Origin: http://{slug}.localhost:8080
 Admin: {admin_username} / {admin_password}
 Org id: {org_id}
 {extra credential-map fields}
@@ -235,9 +237,12 @@ bare `localhost`.
 | R | `r.localhost` |
 | SV | `sv.localhost` (second jar: `sv2.localhost`) |
 
+- **Origin port.** The master passes `8080`
+  as crank's argv. Occupied 8080 refuses
+  the run. Do not invent a substitute.
 - **Serial (`--serial`)**: A1 `./build` → ZIP; A2 unzip
   or `./build --no-zip`; A3 `./crank --mock-data
-  port` (this pin **is** SV1). One
+  8080` (this pin **is** SV1). One
   process, one mock tenant, one cookie jar. Walk
   document order including K8 inside K, then J.
   Headers are not consulted. Serial does not
@@ -246,7 +251,7 @@ bare `localhost`.
   restore `--mock-data`).
 - **Parallel (default)**: the same A1–A2. Confirm
   browser-use first; refuse if missing. A3
-  `./crank --test-plan-slices port`.
+  `./crank --test-plan-slices 8080`.
   Capture the stdout credential map. Spawn one
   hunter per `parallel: yes` section. One
   `*.localhost` alias per hunter from the
@@ -477,11 +482,11 @@ AT is inside crank, not a master step before A1.
 
 **Parallel (default):** confirm browser-use
 → A1–A2 → A3 `./crank --test-plan-slices
-port` → 14 hunters → join in document
+8080` → 14 hunters → join in document
 order → K8 → J → summary.
 
 **Serial (`--serial`):** A1–A2 → A3
-`./crank --mock-data port` → A → AA → B → C →
+`./crank --mock-data 8080` → A → AA → B → C →
 D → E → F → F2 → FS → G → H → I → K (including
 K8 in document order) → R → SV6–SV10 → J.
 
@@ -590,8 +595,8 @@ depends: —
   **not** count root `index.html` inside the 29
   (it stays the separate "plus root `index.html`");
   do **not** count verb/status rooms.
-- [ ] **A3** `./crank --mock-data port` (serial)
-  or `./crank --test-plan-slices port`
+- [ ] **A3** `./crank --mock-data 8080` (serial)
+  or `./crank --test-plan-slices 8080`
   (parallel). Crank validates, mints secrets,
   starts postgres only, runs `./test-postgres`,
   `./build --no-zip` into a temp dir, wipes,
@@ -601,7 +606,7 @@ depends: —
   reveal).
 
   - **Serial (`--serial`):**
-    `./crank --mock-data port`.
+    `./crank --mock-data 8080`.
     PASS: process listens; seed stdout
     prints `Save your demo sign-ins —
     shown once; copy them now.` plus
@@ -613,7 +618,7 @@ depends: —
     not travel over HTTP. This pin
     **is** SV1.
   - **Parallel (default):**
-    `./crank --test-plan-slices port`.
+    `./crank --test-plan-slices 8080`.
     PASS: process listens; seed stdout
     prints the same reveal header plus
     TSV `section<TAB>field<TAB>value`
@@ -634,7 +639,7 @@ depends: —
     SV1 on the parallel path (listen +
     stdout reveal); the SV hunter
     skips SV1.
-- [ ] **A4** Open `http://localhost:$HTTP_SERVER_PORT/` in the test browser with site data deleted and no `refresh_token` cookie. PASS: unsigned root hops to `landing/index.html` (one hop from the blank root document). Does not open `auth/` and does not open `snapshots/`. Landing remains the public marketing page; it is now also the unsigned root target.
+- [ ] **A4** Open `http://localhost:8080/` in the test browser with site data deleted and no `refresh_token` cookie. PASS: unsigned root hops to `landing/index.html` (one hop from the blank root document). Does not open `auth/` and does not open `snapshots/`. Landing remains the public marketing page; it is now also the unsigned root target.
 - [ ] **A5** Open DevTools Console on that load. PASS: no 501; no JSON parse crash. An anonymous `POST /api/authentication/token` refresh 401 is acceptable.
 
 ---
@@ -3725,7 +3730,7 @@ regression.
 ### Browser against the real server
 
 - [ ] **SV1** Satisfied by A3 — do not re-run. PASS if A3 passed (listen + stdout seed reveal).
-- [ ] **SV2** Open `http://localhost:$HTTP_SERVER_PORT/auth/index.html` (or follow the unsigned root hop to landing, then Sign In). Sign in as `demo@example.com` with the stdout password. PASS: the dashboard loads from this Node origin — pages and API are one process.
+- [ ] **SV2** Open `http://localhost:8080/auth/index.html` (or follow the unsigned root hop to landing, then Sign In). Sign in as `demo@example.com` with the stdout password. PASS: the dashboard loads from this Node origin — pages and API are one process.
 - [ ] **SV3** After SV2, inspect DevTools. PASS: Application → Cookies shows `refresh_token` as HttpOnly, `Path=/api/authentication`, `SameSite=Strict`, `Secure` (always, including `http://localhost` and `http://127.0.0.1`); `localStorage` has no `fusion-angle:authorization` key and no `refresh_token`; the sign-in token response JSON has `access_token` and no `refresh_token`. Access is memory-only; refresh is the cookie.
 - [ ] **SV4** On the signed-in dashboard, reload (Cmd-R). PASS: stays authenticated — no bounce to `auth`. Boot cookie-refreshes via `POST /api/authentication/token` (`grant_type=refresh`, `credentials: 'same-origin'`).
 

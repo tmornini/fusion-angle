@@ -229,19 +229,19 @@ nothing.
   `docs/superpowers/plans/2026-08-28-test-plan-fail-remediation.md`
   (this document)
 
-- [ ] **Step 1: Confirm the plan is on disk**
+- [x] **Step 1: Confirm the plan is on disk**
 
 This file is already at
 `docs/superpowers/plans/2026-08-28-test-plan-fail-remediation.md`.
 Do not add a prose body beyond what is already in
 the document.
 
-- [ ] **Step 2: Validate**
+- [x] **Step 2: Validate**
 
 Run: `./validate`
 Expected: green.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-28-test-plan-fail-remediation.md
@@ -265,7 +265,7 @@ helper).
 - Modify: `web-app/app/drag-reorder.ts`
 - Modify: `tests/drag-reorder.test.ts`
 
-- [ ] **Step 1: Write the failing pins**
+- [x] **Step 1: Write the failing pins**
 
 Append to `tests/drag-reorder.test.ts`. Import
 `followTranslateY` from
@@ -293,7 +293,7 @@ test(
 );
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run:
 ```bash
@@ -304,7 +304,7 @@ node --strip-types --import ./tests/hmac-test-key.ts \
 Expected: FAIL — `followTranslateY` is not
 exported.
 
-- [ ] **Step 3: Implement `followTranslateY`**
+- [x] **Step 3: Implement `followTranslateY`**
 
 Add at the bottom of
 `web-app/app/drag-reorder-positions.ts`:
@@ -320,7 +320,7 @@ export function followTranslateY(
 }
 ```
 
-- [ ] **Step 4: Wire follow into `initDragReorder`**
+- [x] **Step 4: Wire follow into `initDragReorder`**
 
 In `web-app/app/drag-reorder.ts`:
 
@@ -431,7 +431,7 @@ Do not set `draggable`. Do not add a ghost
 clone. Do not set `z-index`. Keyboard arrows
 stay untouched.
 
-- [ ] **Step 5: Run the pin and `./validate`**
+- [x] **Step 5: Run the pin and `./validate`**
 
 Run the single-file test from Step 2.
 Expected: PASS.
@@ -439,7 +439,7 @@ Expected: PASS.
 Run: `./validate`
 Expected: green.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add web-app/app/drag-reorder-positions.ts \
@@ -464,7 +464,7 @@ reduce test that documents the old stomp).
 - Create: `tests/flow-interactions-shift.test.ts`
 - Modify: `web-app/app/flow-interactions.ts`
 
-- [ ] **Step 1: Write the failing pin**
+- [x] **Step 1: Write the failing pin**
 
 Create `tests/flow-interactions-shift.test.ts`:
 
@@ -520,7 +520,7 @@ caller will pass `true`. The existing F23
 `shift-key` scenario in
 `tests/flow-fsm-scenarios.test.ts` stays.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run:
 ```bash
@@ -531,7 +531,7 @@ node --strip-types --import ./tests/hmac-test-key.ts \
 Expected: FAIL — `pointerIsShift` is not
 exported.
 
-- [ ] **Step 3: Export `pointerIsShift`**
+- [x] **Step 3: Export `pointerIsShift`**
 
 In `web-app/app/flow-interactions.ts`, next to
 `nextCanvasTabIndex`:
@@ -545,7 +545,7 @@ export function pointerIsShift(
 }
 ```
 
-- [ ] **Step 4: Own Shift in `bindInteractions`**
+- [x] **Step 4: Own Shift in `bindInteractions`**
 
 Inside `bindInteractions`, next to
 `let gestureRect`:
@@ -591,7 +591,7 @@ Do not change `onShiftKey` in
 copy. Do not remove `button` from
 `isFormFocused`. Do not add a `blur` listener.
 
-- [ ] **Step 5: Run the pin and `./validate`**
+- [x] **Step 5: Run the pin and `./validate`**
 
 Run the single-file test from Step 2.
 Expected: PASS.
@@ -599,7 +599,7 @@ Expected: PASS.
 Run: `./validate`
 Expected: green.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tests/flow-interactions-shift.test.ts \
@@ -628,7 +628,7 @@ covenant; keep `length === 0` and
 - Modify: `web-app/app/flow-interactions.ts`
   (`nextCanvasTabIndex` only)
 
-- [ ] **Step 1: Rewrite the failing / new pins**
+- [x] **Step 1: Rewrite the failing / new pins**
 
 In `tests/flow-canvas-tab.test.ts`, replace the
 combined `'Tab outside the canvas ring is a
@@ -685,7 +685,7 @@ test(
 );
 ```
 
-- [ ] **Step 2: Run the test to verify the SVG-entry
+- [x] **Step 2: Run the test to verify the SVG-entry
   cases fail**
 
 Run:
@@ -697,7 +697,7 @@ node --strip-types --import ./tests/hmac-test-key.ts \
 Expected: FAIL on `nextCanvasTabIndex(4, -1,
 false)` — current code returns `null`.
 
-- [ ] **Step 3: Implement SVG-entry**
+- [x] **Step 3: Implement SVG-entry**
 
 Replace `nextCanvasTabIndex` in
 `web-app/app/flow-interactions.ts`:
@@ -732,7 +732,7 @@ focuses `items[nextIdx]`. `indexOf(active)` is
 `-1` when focus is on `svg.flow-canvas`.
 Do not change `isFormFocused`.
 
-- [ ] **Step 4: Run the pin and `./validate`**
+- [x] **Step 4: Run the pin and `./validate`**
 
 Run the single-file test from Step 2.
 Expected: PASS.
@@ -740,7 +740,7 @@ Expected: PASS.
 Run: `./validate`
 Expected: green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/flow-canvas-tab.test.ts \
@@ -765,7 +765,7 @@ survivors on notify refresh).
 - Modify: `tests/flow-operations.test.ts`
 - Modify: `web-app/app/flow-operations.ts`
 
-- [ ] **Step 1: Write the failing pins**
+- [x] **Step 1: Write the failing pins**
 
 In `tests/flow-operations.test.ts`, after the
 existing `'performUndo: restores the previous
@@ -894,7 +894,7 @@ Do not weaken the existing
 `performUndo: restores the previous save`
 assertions.
 
-- [ ] **Step 2: Run the new tests to verify they
+- [x] **Step 2: Run the new tests to verify they
   fail**
 
 Run:
@@ -907,7 +907,7 @@ Expected: FAIL — `freshSnap.isPanelOpen` is
 `false` on the surviving-node case (today
 `applyServerGraph` always closes).
 
-- [ ] **Step 3: Keep live selection in
+- [x] **Step 3: Keep live selection in
   `applyServerGraph`**
 
 Replace `applyServerGraph` in
@@ -986,7 +986,7 @@ from `flows/detail.ts`. Do not export
 `applyServerGraph`. Do not change
 `performUndo`'s exhaustion branch.
 
-- [ ] **Step 4: Run the pins and `./validate`**
+- [x] **Step 4: Run the pins and `./validate`**
 
 Run the single-file test from Step 2.
 Expected: PASS, including the pre-existing
@@ -995,7 +995,7 @@ undo/redo tests.
 Run: `./validate`
 Expected: green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/flow-operations.test.ts \
@@ -1018,7 +1018,7 @@ shortcut framework).
 - Modify: `tests/flows-detail-shortcuts.test.ts`
 - Modify: `web-app/flows/detail.ts`
 
-- [ ] **Step 1: Stub constructors and write the
+- [x] **Step 1: Stub constructors and write the
   failing pins**
 
 `flows-detail-shortcuts.test.ts` already stubs
@@ -1143,7 +1143,7 @@ unchanged — it still feeds
 `isEditableFocused: true` into
 `reduceDesignerShortcut`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run:
 ```bash
@@ -1154,7 +1154,7 @@ node --strip-types --import ./tests/hmac-test-key.ts \
 Expected: FAIL — `isDesignerEditableTarget` is
 not exported.
 
-- [ ] **Step 3: Export `isDesignerEditableTarget`
+- [x] **Step 3: Export `isDesignerEditableTarget`
   and use it**
 
 In `web-app/flows/detail.ts`, next to
@@ -1201,7 +1201,7 @@ isEditableFocused:
 Do not change `reduceDesignerShortcut`. Do not
 change Delete / Escape behavior.
 
-- [ ] **Step 4: Run the pin and `./validate`**
+- [x] **Step 4: Run the pin and `./validate`**
 
 Run the single-file test from Step 2.
 Expected: PASS.
@@ -1209,7 +1209,7 @@ Expected: PASS.
 Run: `./validate`
 Expected: green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/flows-detail-shortcuts.test.ts \
@@ -1240,7 +1240,7 @@ true only after those pins).
   Protocol already says the row follows the
   pointer.
 
-- [ ] **Step 1: F13**
+- [x] **Step 1: F13**
 
 Replace the F13 case body with:
 
@@ -1250,7 +1250,7 @@ ms (there is no `dblclick` listener), same as
 F11. PASS: panel content updates to the new
 node and the canvas re-centers on it.
 
-- [ ] **Step 2: F27 and F35**
+- [x] **Step 2: F27 and F35**
 
 **F27:** After the existing sentence, add: If
 F15 already created a New State, delete a
@@ -1265,7 +1265,7 @@ not use Backspace unless F38's `aria-current`
 is already true. PASS stays: the state and all
 its connected edges are restored.
 
-- [ ] **Step 3: F37b and F50**
+- [x] **Step 3: F37b and F50**
 
 **F37b:** After "On a flow with Auto Layout
 ON,", add: add via F15's plain port-drag (no
@@ -1276,7 +1276,7 @@ add: The first Space `keydown` must have
 `repeat: false`; hold may auto-repeat after
 that.
 
-- [ ] **Step 4: F38 / F38a / F55 / F57 / F67**
+- [x] **Step 4: F38 / F38a / F55 / F57 / F67**
 
 **F38 / F38a:** Keep `js()` `.focus()` on a
 `.flow-node` as a valid drive. Add: Tab
@@ -1301,7 +1301,7 @@ the `memberIds` PUT (`SAVE_DELAY_MS` 800 ms)
 before Cmd+Z / Ctrl+Z. PASS: the panel stays
 open on that node and the checkbox unticks.
 
-- [ ] **Step 5: F68–F72**
+- [x] **Step 5: F68–F72**
 
 Rewrite the cluster so every case opens F15's
 New State — not Capture, not Review, not
@@ -1319,7 +1319,7 @@ picker.
 
 Do not mention Contact Email in F68–F72.
 
-- [ ] **Step 6: WB4, WB16, WB19b**
+- [x] **Step 6: WB4, WB16, WB19b**
 
 **WB4:** After the Parallel READY sentence,
 add: Parallel READY containing WB Test Flow
@@ -1349,7 +1349,7 @@ converse there. The converse is a
 value-bearing instance Save, not a pure
 Review→Archive move.
 
-- [ ] **Step 7: Validate and commit**
+- [x] **Step 7: Validate and commit**
 
 Run: `./validate`
 Expected: green.
@@ -1372,15 +1372,15 @@ then commit.
 - Modify:
   `docs/superpowers/plans/2026-08-28-test-plan-fail-remediation.md`
 
-- [ ] **Step 1: Tick remaining boxes** including
+- [x] **Step 1: Tick remaining boxes** including
   this task's after the commit is prepared.
 
-- [ ] **Step 2: Validate**
+- [x] **Step 2: Validate**
 
 Run: `./validate`
 Expected: green.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-28-test-plan-fail-remediation.md

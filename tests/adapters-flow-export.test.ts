@@ -24,6 +24,8 @@ import {
 import {
     postFlowFromBackup,
     postFlowFromMermaid,
+    postFlowFromZip,
+    getBackupFromZip,
     getFlowZip,
     type Backup,
 } from '../web-app/app/adapters/flow-export.ts';
@@ -32,6 +34,10 @@ import {
     putFlow,
 } from '../web-app/app/adapters/flow-mutations.ts';
 import {
+    getFlowGraph,
+} from '../web-app/app/adapters/flow-queries.ts';
+import {
+    generateMermaid,
     mermaidIdOf,
 } from '../web-app/app/mermaid-generate.ts';
 import {
@@ -252,6 +258,88 @@ test(
 );
 
 test(
+    'flowchart mmd with begin round-trips'
+    + ' through postFlowFromMermaid',
+    async () => {
+        const { ctx } = await setup();
+        const flowId = generateIdentifier();
+        const startId = generateIdentifier();
+        const midId = generateIdentifier();
+        const endId = generateIdentifier();
+        const mmd = generateMermaid({
+            id: flowId,
+            name: 'Lead',
+            isLocked: false,
+            isAutoLayout: false,
+            isAutoFit: false,
+            lockTimeout: DEFAULT_LOCK_TIMEOUT,
+            nodes: [
+                {
+                    id: startId,
+                    name: 'Create',
+                    positionX: -190,
+                    positionY: 30,
+                    isCreate: true,
+                    isArchive: false,
+                    memberIds: [],
+                    attributes: [],
+                    taskInstructions: '',
+                },
+                {
+                    id: midId,
+                    name: 'Capture',
+                    positionX: 0,
+                    positionY: 30,
+                    isCreate: false,
+                    isArchive: false,
+                    memberIds: [],
+                    attributes: [],
+                    taskInstructions: '',
+                },
+                {
+                    id: endId,
+                    name: 'Archive',
+                    positionX: 190,
+                    positionY: 30,
+                    isCreate: false,
+                    isArchive: true,
+                    memberIds: [],
+                    attributes: [],
+                    taskInstructions: '',
+                },
+            ],
+            edges: [
+                {
+                    id: generateIdentifier(),
+                    name: 'begin',
+                    fromNodeId: startId,
+                    toNodeId: midId,
+                },
+                {
+                    id: generateIdentifier(),
+                    name: 'submit',
+                    fromNodeId: midId,
+                    toNodeId: endId,
+                },
+            ],
+            hasUndoHistory: false,
+        });
+        await postFlowFromMermaid(
+            ctx, flowId, mmd, generateIdentifier(),
+        );
+        const graph = await readPairGraph(
+            ctx, flowId,
+        );
+        const names = graph.edges
+            .map(e => e.name)
+            .sort();
+        assert.deepEqual(
+            names, ['begin', 'submit'],
+        );
+    },
+);
+
+test(
     'zip sidecar mermaid ids stay injective',
     async () => {
         const { ctx } = await setup();
@@ -353,5 +441,210 @@ test(
         const edge = parsed.edges[0];
         assert.equal(edge?.mermaidFrom, dashHex);
         assert.equal(edge?.mermaidTo, underHex);
+    },
+);
+
+test(
+    'zip Create New keeps begin edges and'
+    + ' sidecar positions with Auto Layout off',
+    async () => {
+        const { ctx } = await setup();
+        const sourceId = generateIdentifier();
+        const startId = generateIdentifier();
+        const midId = generateIdentifier();
+        const endId = generateIdentifier();
+        await postFlowCreation(ctx, {
+            flowId: sourceId,
+            linkId: generateIdentifier(),
+            projectId: generateIdentifier(),
+            name: 'Lead',
+        });
+        await putFlow(ctx, sourceId, {
+            name: 'Lead',
+            isLocked: false,
+            isAutoLayout: false,
+            isAutoFit: false,
+            lockTimeout: DEFAULT_LOCK_TIMEOUT,
+            nodes: [
+                {
+                    id: startId,
+                    name: 'Create',
+                    positionX: -190,
+                    positionY: 30,
+                    isCreate: true,
+                    isArchive: false,
+                    memberIds: [],
+                    attributes: [],
+                    taskInstructions: '',
+                },
+                {
+                    id: midId,
+                    name: 'Capture',
+                    positionX: 0,
+                    positionY: 30,
+                    isCreate: false,
+                    isArchive: false,
+                    memberIds: [],
+                    attributes: [],
+                    taskInstructions: '',
+                },
+                {
+                    id: endId,
+                    name: 'Archive',
+                    positionX: 190,
+                    positionY: 30,
+                    isCreate: false,
+                    isArchive: true,
+                    memberIds: [],
+                    attributes: [],
+                    taskInstructions: '',
+                },
+            ],
+            edges: [
+                {
+                    id: generateIdentifier(),
+                    name: 'begin',
+                    fromNodeId: startId,
+                    toNodeId: midId,
+                },
+                {
+                    id: generateIdentifier(),
+                    name: 'submit',
+                    fromNodeId: midId,
+                    toNodeId: endId,
+                },
+            ],
+        });
+        const zip = await getFlowZip(
+            ctx, sourceId,
+        );
+        const backup = await getBackupFromZip(
+            zip.data,
+        );
+        const importedId = generateIdentifier();
+        await postFlowFromBackup(
+            ctx, importedId, backup,
+            generateIdentifier(),
+        );
+        const graph = await getFlowGraph(
+            ctx, importedId,
+        );
+        assert.equal(graph.isAutoLayout, false);
+        const names = graph.edges
+            .map(e => e.name)
+            .sort();
+        assert.deepEqual(
+            names, ['begin', 'submit'],
+        );
+        const capture = graph.nodes.find(
+            n => n.name === 'Capture',
+        );
+        assert.ok(capture);
+        assert.equal(capture.positionX, 0);
+        assert.equal(capture.positionY, 30);
+        const create = graph.nodes.find(
+            n => n.isCreate,
+        );
+        assert.ok(create);
+        assert.equal(create.positionX, -190);
+        assert.equal(create.positionY, 30);
+    },
+);
+
+test(
+    'zip mermaid path reads sidecar.json'
+    + ' positions and begin edges',
+    async () => {
+        const { ctx } = await setup();
+        const sourceId = generateIdentifier();
+        const startId = generateIdentifier();
+        const midId = generateIdentifier();
+        const endId = generateIdentifier();
+        await postFlowCreation(ctx, {
+            flowId: sourceId,
+            linkId: generateIdentifier(),
+            projectId: generateIdentifier(),
+            name: 'Lead',
+        });
+        await putFlow(ctx, sourceId, {
+            name: 'Lead',
+            isLocked: false,
+            isAutoLayout: false,
+            isAutoFit: false,
+            lockTimeout: DEFAULT_LOCK_TIMEOUT,
+            nodes: [
+                {
+                    id: startId,
+                    name: 'Create',
+                    positionX: -190,
+                    positionY: 30,
+                    isCreate: true,
+                    isArchive: false,
+                    memberIds: [],
+                    attributes: [],
+                    taskInstructions: '',
+                },
+                {
+                    id: midId,
+                    name: 'Capture',
+                    positionX: 0,
+                    positionY: 30,
+                    isCreate: false,
+                    isArchive: false,
+                    memberIds: [],
+                    attributes: [],
+                    taskInstructions: '',
+                },
+                {
+                    id: endId,
+                    name: 'Archive',
+                    positionX: 190,
+                    positionY: 30,
+                    isCreate: false,
+                    isArchive: true,
+                    memberIds: [],
+                    attributes: [],
+                    taskInstructions: '',
+                },
+            ],
+            edges: [
+                {
+                    id: generateIdentifier(),
+                    name: 'begin',
+                    fromNodeId: startId,
+                    toNodeId: midId,
+                },
+                {
+                    id: generateIdentifier(),
+                    name: 'submit',
+                    fromNodeId: midId,
+                    toNodeId: endId,
+                },
+            ],
+        });
+        const zip = await getFlowZip(
+            ctx, sourceId,
+        );
+        const importedId = generateIdentifier();
+        await postFlowFromZip(
+            ctx, importedId, zip.data,
+            generateIdentifier(),
+        );
+        const graph = await getFlowGraph(
+            ctx, importedId,
+        );
+        assert.equal(graph.isAutoLayout, false);
+        const names = graph.edges
+            .map(e => e.name)
+            .sort();
+        assert.deepEqual(
+            names, ['begin', 'submit'],
+        );
+        const capture = graph.nodes.find(
+            n => n.name === 'Capture',
+        );
+        assert.ok(capture);
+        assert.equal(capture.positionX, 0);
+        assert.equal(capture.positionY, 30);
     },
 );

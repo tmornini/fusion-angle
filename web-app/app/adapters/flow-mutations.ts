@@ -475,6 +475,13 @@ export function enqueueFlowSave(
     return thisWork;
 }
 
+export function awaitFlowSave(
+    flowId: string,
+): Promise<void> {
+    return saveChains.get(flowId)
+        ?? Promise.resolve();
+}
+
 // Save a flow: the flow row PUT, its 'updated' state event, and
 // the graph delta — written atomically through the locked-class
 // PUT /flows/:id. The client echoes the baseline it just read

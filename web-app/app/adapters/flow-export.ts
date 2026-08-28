@@ -1027,10 +1027,10 @@ export async function postFlowFromZip(
             'ZIP missing flow.mmd',
         );
     }
-    const jsonEntry = entries.find(
-        e => e.name === 'flow.json'
+    const sidecarEntry = entries.find(
+        e => e.name === 'sidecar.json'
             || e.name.endsWith(
-                '/flow.json',
+                '/sidecar.json',
             ),
     );
 
@@ -1047,10 +1047,10 @@ export async function postFlowFromZip(
     }
 
     const sidecar: SidecarData | undefined =
-        jsonEntry
+        sidecarEntry
             ? validateSidecarDataJson(
                 dec.decode(
-                    jsonEntry.data,
+                    sidecarEntry.data,
                 ),
             )
             : undefined;
@@ -1221,8 +1221,12 @@ export async function postFlowFromZip(
         flow: {
             name: flowName,
             is_locked: false,
-            is_auto_layout: true,
-            is_auto_fit: true,
+            is_auto_layout: sidecar
+                ? false
+                : true,
+            is_auto_fit: sidecar
+                ? false
+                : true,
             lock_timeout: DEFAULT_LOCK_TIMEOUT,
         },
         projectFlowId: linkId,

@@ -393,6 +393,55 @@ test(
 );
 
 test(
+    'space-toggle commits isPanMode via'
+    + ' request-update',
+    () => {
+        const r = reduceFsm(buildState(), {
+            kind: 'space-toggle',
+            isAutoFit: false,
+            isFormFocused: false,
+        });
+        const upd = findAction(
+            r.actions, 'request-update',
+        );
+        assert.ok(upd);
+        assert.equal(
+            upd.state.isPanMode, true,
+        );
+        const cursor = findAction(
+            r.actions, 'set-pan-cursor',
+        );
+        assert.equal(cursor?.on, true);
+    },
+);
+
+test(
+    'space-toggle off under autofit still'
+    + ' request-updates',
+    () => {
+        const r = reduceFsm(
+            buildState({ isPanMode: true }),
+            {
+                kind: 'space-toggle',
+                isAutoFit: true,
+                isFormFocused: false,
+            },
+        );
+        const upd = findAction(
+            r.actions, 'request-update',
+        );
+        assert.ok(upd);
+        assert.equal(
+            upd.state.isPanMode, false,
+        );
+        assert.equal(
+            findAction(r.actions, 'show-toast'),
+            undefined,
+        );
+    },
+);
+
+test(
     'space-toggle while dragging is ignored',
     () => {
         const state = buildState({

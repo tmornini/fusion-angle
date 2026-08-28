@@ -699,15 +699,20 @@ function onSpaceToggle(
             ],
         };
     }
+    const next: FsmState = {
+        ...state,
+        isPanMode: turningOn,
+    };
     return {
-        state: {
-            ...state,
-            isPanMode: turningOn,
-        },
+        state: next,
         actions: [
             {
                 kind: 'set-pan-cursor',
                 on: turningOn,
+            },
+            {
+                kind: 'request-update',
+                state: next,
             },
         ],
     };
