@@ -67,7 +67,7 @@ test('favicon.svg embeds the PNG and inverts in light',
 });
 
 test('build copies mark.png next to the favicons', () => {
-    const src = readFileSync('build', 'utf8');
+    const src = readFileSync('build-lib', 'utf8');
     assert.match(
         src,
         /cp web-app\/assets\/mark\.png/,

@@ -63,15 +63,25 @@ import {
     readMeasureServeEnv,
     type MeasureServeEnv,
 } from './measure-cli.ts';
+import {
+    CHROME_READY_MS,
+    CdpClient,
+    chromeBinary,
+    evaluateJson,
+    killProcessTree,
+    launchChrome,
+    pageNavigate,
+    pageWsUrl,
+    pollUntil,
+    sleep,
+    waitDevtoolsPort,
+} from './cdp-client.ts';
+import { login, registryUrl, waitPageReady } from './browser-drive.ts';
 
 const execFile = promisify(execFileCb);
 
-const CHROME_READY_MS = 15_000;
 const SEED_TIMEOUT_MS = 120_000;
-const LOGIN_TIMEOUT_MS = 60_000;
 const PAGE_READY_MS = 120_000;
-const ELEMENT_TIMEOUT_MS = 30_000;
-const POLL_MS = 200;
 const BUDGETS_PATH = 'measurements/budgets.json';
 const HISTORY_PATH = 'measurements/history.jsonl';
 
@@ -164,10 +174,6 @@ function usageText(): string {
 
 // ── Small utils ──────
 
-function sleep(ms: number): Promise<void> {
-    return new Promise((r) => setTimeout(r, ms));
-}
-
 function tmpRoot(): string {
     return process.env.TMPDIR || osTmpdir() || '/tmp';
 }
@@ -199,496 +205,12 @@ async function freePort(): Promise<number> {
     });
 }
 
-async function pollUntil<T>(
-    label: string,
-    timeoutMs: number,
-    fn: () => Promise<T | null | undefined | false>,
-): Promise<T> {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-        const v = await fn();
-        if (
-            v !== null
-            && v !== undefined
-            && v !== false
-        ) {
-            return v as T;
-        }
-        await sleep(POLL_MS);
-    }
-    throw new Error(
-        `${label} timed out after ${timeoutMs}ms`,
-    );
-}
-
-function registryUrl(
-    baseUrl: string,
-    key: string,
-    query?: string,
-): string {
-    const entry = PAGE_REGISTRY[key];
-    if (entry === undefined) {
-        throw new Error(
-            `Unknown page registry key: ${key}`,
-        );
-    }
-    let url = `${baseUrl}/${entry.sourceDir}`
-        + `/${entry.sourceFile}.html`;
-    if (query !== undefined && query.length > 0) {
-        url += `?${query}`;
-    }
-    return url;
-}
-
 function queryOf(url: string): string {
     const i = url.indexOf('?');
     return i >= 0 ? url.slice(i + 1) : '';
 }
 
-function chromeBinary(): string {
-    if (process.env.CHROME) {
-        return process.env.CHROME;
-    }
-    if (platform() === 'darwin') {
-        return '/Applications/Google Chrome.app'
-            + '/Contents/MacOS/Google Chrome';
-    }
-    throw new Error(
-        'Chrome not found: set CHROME to the browser'
-        + ' binary path (no default outside macOS)',
-    );
-}
-
-function killProcessTree(
-    child: ChildProcess | null,
-): void {
-    if (child === null || child.pid === undefined) {
-        return;
-    }
-    try {
-        // Negative PID = process group (spawn detached).
-        process.kill(-child.pid, 'SIGTERM');
-    } catch {
-        try {
-            child.kill('SIGTERM');
-        } catch {
-            // already gone
-        }
-    }
-    try {
-        process.kill(-child.pid, 'SIGKILL');
-    } catch {
-        try {
-            child.kill('SIGKILL');
-        } catch {
-            // already gone
-        }
-    }
-}
-
-// ── CDP client ──────
-
-type CdpMessage = {
-    id?: number;
-    method?: string;
-    params?: unknown;
-    result?: unknown;
-    error?: { message: string; code?: number };
-    sessionId?: string;
-};
-
-class CdpClient {
-    private ws: WebSocket;
-    private nextId = 1;
-    private pending = new Map<number, {
-        resolve: (v: unknown) => void;
-        reject: (e: Error) => void;
-    }>();
-
-    private constructor(ws: WebSocket) {
-        this.ws = ws;
-        ws.addEventListener('message', (ev) => {
-            this.onMessage(String(ev.data));
-        });
-    }
-
-    static async connect(
-        url: string,
-    ): Promise<CdpClient> {
-        const ws = new WebSocket(url);
-        await new Promise<void>((resolve, reject) => {
-            const onOpen = (): void => {
-                cleanup();
-                resolve();
-            };
-            const onErr = (): void => {
-                cleanup();
-                reject(
-                    new Error(
-                        'CDP WebSocket connect failed: '
-                        + url,
-                    ),
-                );
-            };
-            const cleanup = (): void => {
-                ws.removeEventListener(
-                    'open', onOpen,
-                );
-                ws.removeEventListener(
-                    'error', onErr,
-                );
-            };
-            ws.addEventListener('open', onOpen);
-            ws.addEventListener('error', onErr);
-        });
-        return new CdpClient(ws);
-    }
-
-    private onMessage(raw: string): void {
-        const msg = JSON.parse(raw) as CdpMessage;
-        if (msg.id === undefined) {
-            return;
-        }
-        const p = this.pending.get(msg.id);
-        if (p === undefined) {
-            return;
-        }
-        this.pending.delete(msg.id);
-        if (msg.error !== undefined) {
-            p.reject(
-                new Error(
-                    `CDP ${msg.error.message}`,
-                ),
-            );
-            return;
-        }
-        p.resolve(msg.result);
-    }
-
-    send(
-        method: string,
-        params?: Record<string, unknown>,
-    ): Promise<unknown> {
-        const id = this.nextId++;
-        const payload: Record<string, unknown> = {
-            id,
-            method,
-        };
-        if (params !== undefined) {
-            payload.params = params;
-        }
-        return new Promise((resolve, reject) => {
-            this.pending.set(id, {
-                resolve,
-                reject,
-            });
-            this.ws.send(JSON.stringify(payload));
-        });
-    }
-
-    close(): void {
-        try {
-            this.ws.close();
-        } catch {
-            // ignore
-        }
-    }
-}
-
-// ── Page session helpers ──────
-
-async function evaluateJson<T>(
-    cdp: CdpClient,
-    expression: string,
-): Promise<T> {
-    const result = await cdp.send(
-        'Runtime.evaluate',
-        {
-            expression,
-            awaitPromise: true,
-            returnByValue: true,
-        },
-    ) as {
-        result?: {
-            value?: T;
-            type?: string;
-            subtype?: string;
-            description?: string;
-        };
-        exceptionDetails?: {
-            text?: string;
-            exception?: { description?: string };
-        };
-    };
-    if (result.exceptionDetails !== undefined) {
-        const d = result.exceptionDetails;
-        throw new Error(
-            'Runtime.evaluate threw: '
-            + (d.exception?.description
-                ?? d.text
-                ?? 'unknown'),
-        );
-    }
-    return result.result?.value as T;
-}
-
-async function pageNavigate(
-    cdp: CdpClient,
-    url: string,
-): Promise<void> {
-    await cdp.send('Page.navigate', { url });
-}
-
-async function clickSelector(
-    cdp: CdpClient,
-    selector: string,
-): Promise<void> {
-    const ok = await evaluateJson<boolean>(
-        cdp,
-        `(() => {
-            const el = document.querySelector(
-                ${JSON.stringify(selector)}
-            );
-            if (!el) return false;
-            el.click();
-            return true;
-        })()`,
-    );
-    if (!ok) {
-        throw new Error(
-            `click failed: selector not found: `
-            + selector,
-        );
-    }
-}
-
-async function waitForSelector(
-    cdp: CdpClient,
-    selector: string,
-    label: string,
-    timeoutMs: number,
-): Promise<void> {
-    await pollUntil(
-        label,
-        timeoutMs,
-        async () => evaluateJson<boolean>(
-            cdp,
-            `!!document.querySelector(
-                ${JSON.stringify(selector)}
-            )`,
-        ),
-    );
-}
-
-type ReadyHarvest = PageRun & {
-    apiHits: ApiRequestHit[];
-};
-
-async function harvestReady(
-    cdp: CdpClient,
-): Promise<ReadyHarvest | null> {
-    return evaluateJson<ReadyHarvest | null>(
-        cdp,
-        `(() => {
-            const measures =
-                performance.getEntriesByType(
-                    'measure'
-                );
-            const m = measures.find(
-                (e) => e.name === 'page:ready'
-            );
-            if (!m) return null;
-            const phases = {};
-            for (const e of measures) {
-                if (
-                    e.name.startsWith('boot:')
-                    || e.name.startsWith('fetch:')
-                    || e.name.startsWith('render:')
-                ) {
-                    phases[e.name] = e.duration;
-                }
-            }
-            const g = globalThis;
-            const apiHits =
-                typeof g.__fusionApiRequestHits
-                    === 'function'
-                    ? g.__fusionApiRequestHits()
-                    : [];
-            return {
-                readyMs: m.duration,
-                phases,
-                apiHits,
-            };
-        })()`,
-    );
-}
-
-async function waitPageReady(
-    cdp: CdpClient,
-    pageLabel: string,
-    timeoutMs: number,
-): Promise<ReadyHarvest> {
-    return pollUntil(
-        `page:ready on ${pageLabel}`,
-        timeoutMs,
-        () => harvestReady(cdp),
-    );
-}
-
-// ── Chrome launch ──────
-
-async function waitDevtoolsPort(
-    userDataDir: string,
-    timeoutMs: number,
-): Promise<number> {
-    const path = join(
-        userDataDir,
-        'DevToolsActivePort',
-    );
-    return pollUntil(
-        'Chrome DevToolsActivePort',
-        timeoutMs,
-        async () => {
-            if (!existsSync(path)) {
-                return null;
-            }
-            const text = readFileSync(
-                path, 'utf8',
-            ).trim();
-            if (text.length === 0) {
-                return null;
-            }
-            const line = text.split('\n')[0];
-            if (line === undefined) {
-                return null;
-            }
-            const port = Number(line);
-            if (
-                !Number.isFinite(port)
-                || port <= 0
-            ) {
-                return null;
-            }
-            return port;
-        },
-    );
-}
-
-async function pageWsUrl(
-    debugPort: number,
-): Promise<string> {
-    const base =
-        `http://127.0.0.1:${debugPort}`;
-    return pollUntil(
-        'Chrome page target list',
-        CHROME_READY_MS,
-        async () => {
-            try {
-                const res = await fetch(
-                    `${base}/json/list`,
-                );
-                if (!res.ok) return null;
-                const list = await res.json() as
-                    Array<{
-                        type?: string;
-                        webSocketDebuggerUrl?:
-                            string;
-                    }>;
-                const page = list.find(
-                    (t) =>
-                        t.type === 'page'
-                        && t.webSocketDebuggerUrl,
-                );
-                return page?.webSocketDebuggerUrl
-                    ?? null;
-            } catch {
-                return null;
-            }
-        },
-    );
-}
-
 // ── Login / discovery ──────
-
-async function login(
-    cdp: CdpClient,
-    baseUrl: string,
-    password: string,
-): Promise<void> {
-    const authUrl = registryUrl(baseUrl, 'auth');
-    await pageNavigate(cdp, authUrl);
-    await waitForSelector(
-        cdp,
-        '#email',
-        'auth #email',
-        ELEMENT_TIMEOUT_MS,
-    );
-    // page:ready on auth may fire; fill regardless.
-    const filled = await evaluateJson<boolean>(
-        cdp,
-        `(() => {
-            const email =
-                document.querySelector('#email');
-            const password =
-                document.querySelector('#password');
-            if (!email || !password) return false;
-            email.focus();
-            email.value = ${JSON.stringify(MEASURE_DEMO_EMAIL)};
-            email.dispatchEvent(
-                new Event('input', { bubbles: true })
-            );
-            password.focus();
-            password.value =
-                ${JSON.stringify(password)};
-            password.dispatchEvent(
-                new Event('input', { bubbles: true })
-            );
-            return true;
-        })()`,
-    );
-    if (!filled) {
-        throw new Error(
-            'Login failure: #email/#password missing'
-            + ' on auth page',
-        );
-    }
-    await clickSelector(cdp, '#submit-btn');
-    await pollUntil(
-        'login navigation away from auth',
-        LOGIN_TIMEOUT_MS,
-        async () => {
-            const href = await evaluateJson<string>(
-                cdp,
-                'location.href',
-            );
-            if (href.includes('/auth/')) {
-                // Surface invalid-password text if any.
-                const err = await evaluateJson<
-                    string | null
-                >(
-                    cdp,
-                    `document.querySelector(
-                        '#password-error:not(.hidden)'
-                    )?.textContent?.trim() ?? null`,
-                );
-                if (err) {
-                    throw new Error(
-                        `Login failure: ${err}`,
-                    );
-                }
-                return null;
-            }
-            return href;
-        },
-    );
-    // Land wherever return target sent us; wait ready
-    // so the session is fully established.
-    await waitPageReady(
-        cdp,
-        'post-login page',
-        LOGIN_TIMEOUT_MS,
-    );
-}
 
 async function discoverDetailUrls(
     cdp: CdpClient,
@@ -1136,24 +658,7 @@ async function main(): Promise<void> {
         process.stderr.write(
             'Launching headless Chrome …\n',
         );
-        chromeProc = spawn(
-            chromePath,
-            [
-                '--headless=new',
-                '--remote-debugging-port=0',
-                `--user-data-dir=${chromeDir}`,
-                '--no-first-run',
-                '--no-default-browser-check',
-                '--disable-background-networking',
-                '--disable-gpu',
-                'about:blank',
-            ],
-            {
-                stdio: 'ignore',
-                detached: true,
-            },
-        );
-        chromeProc.unref();
+        chromeProc = launchChrome({ userDataDir: chromeDir });
         const debugPort = await waitDevtoolsPort(
             chromeDir,
             CHROME_READY_MS,
@@ -1168,7 +673,7 @@ async function main(): Promise<void> {
         process.stderr.write(
             `Logging in as ${MEASURE_DEMO_EMAIL} …\n`,
         );
-        await login(cdp, baseUrl, password);
+        await login(cdp, baseUrl, MEASURE_DEMO_EMAIL, password);
 
         // 5. Detail-URL discovery
         process.stderr.write(

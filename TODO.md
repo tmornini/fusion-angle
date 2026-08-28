@@ -5,12 +5,27 @@ file by shipping; `## Close protocol` is the exit.
 
 ## Critical path
 
-Twelve items, in this order — each its own brainstorm →
+Thirteen items, in this order — each its own brainstorm →
 spec → plan → ship cycle, implemented sequentially. A
 "Merged:" clause names bullets absorbed from
 `## Later work`; they keep their oracles.
 
-1. Remove the lifecycle trio — fold `state` /
+1. Type-check the whole tree — `./validate` runs one
+   `tsc --noEmit -p web-app/app/tsconfig.json`, whose
+   `include` roots are `web-app/`, `api/`, `shared/`.
+   `server/` (8 files) and `tests/` (421) sit outside
+   them; six Node-only modules sit in `exclude`
+   (`compose.ts`, `generate-schema-svg.ts`,
+   `generate-api-documentation.ts`, `measure.ts`,
+   `measure-viz.ts`, `cdp-client.ts`). So 435 of 735
+   `.ts` files are never checked, and everything runs
+   under `node --strip-types`, which ERASES
+   annotations instead of checking them — the trees
+   that boot the server and assert every covenant
+   learn their type errors at runtime. Needs a second
+   project over `server/`, `tests/`, and the Node-only
+   modules; `@types/node` is its one cost, types-only.
+2. Remove the lifecycle trio — fold `state` /
    `state_at` / `state_event_id` out of every document
    body (Decision 7): the reduction
    (`api/derive-documents.ts:148-157`), the stamp
@@ -22,7 +37,7 @@ spec → plan → ship cycle, implemented sequentially. A
    and the validators' trio-key gates; lifecycle
    becomes its own event rows. Merged: no lifecycle
    transition table at any gate.
-2. Credentials out of the message; views for the app —
+3. Credentials out of the message; views for the app —
    hoist `Authenticate:` (ideally the only plaintext
    credential path) into its own column; a view that
    omits it and omits deleted rows; a schema-owner
@@ -38,16 +53,16 @@ spec → plan → ship cycle, implemented sequentially. A
    `tests/api-pii-tombstone.test.ts`); the in-band
    plaintext comment at `api/mock-data.ts:151-152`
    (owner call).
-3. Cachability — headers, `HEAD`, conditional
+4. Cachability — headers, `HEAD`, conditional
    requests, and the rest; the brainstorm presents its
    questions from most to least desirable. Start:
    `server/http-server.ts` `NO_STORE` and
    `CONTENT_SECURITY_POLICY`.
-4. `/status` — `{ up: boolean, components: {
+5. `/status` — `{ up: boolean, components: {
    postgres: boolean } }`; `up` is true when every
-   component is; built for more components. Item 10's
+   component is; built for more components. Item 11's
    health probe.
-5. Execute TEST-PLAN.md with up to 48 subagents —
+6. Execute TEST-PLAN.md with up to 48 subagents —
    after the run-four remediation ships; the
    Protocol's one-profile, hunters-in-turn contract is
    revisited for 48. BLOCKING precondition CLEARED:
@@ -60,7 +75,7 @@ spec → plan → ship cycle, implemented sequentially. A
    before, 0/300 after; `./test` 15/15 green. Merged:
    the five run-four mitigation stubs (absorbed by the
    remediation spec); the flaky-test bullet.
-6. Re-implement workbox, work orders, and flows —
+7. Re-implement workbox, work orders, and flows —
    nodes become processes; process kinds: record
    modification (current), external process
    synchronization (new), directed cyclic graph (flow
@@ -82,7 +97,7 @@ spec → plan → ship cycle, implemented sequentially. A
    (`api/derive-flows.ts:108`), rotation only on the
    toggle path (`web-app/app/flow-layout.ts:1032-1037`),
    and the mirror trigger.
-7. Headless AI worker — a server-side process that
+8. Headless AI worker — a server-side process that
    watches each AI process-worker's workbox, claims,
    assembles the record definition, the attribute
    values (which — decided in the brainstorm), the
@@ -96,56 +111,56 @@ spec → plan → ship cycle, implemented sequentially. A
    (`FLOW-CANVAS.md:130-132`);
    `withNodeTaskInstructions` already stores the
    instructions.
-8. Chats at `/api/chats` — attachable to any document
+9. Chats at `/api/chats` — attachable to any document
    at `/…/:collection/:id/chat` with as little
    ceremony as the plane allows.
-9. Genericity — DRY, even once (the indulgence); spec
-   away every nit. Merged: `putRecordInstance` PATCHes
-   (name lie —
-   `tests/adapters-record-instances.test.ts`,
-   `tests/api-instances-create.test.ts`); same-body
-   PATCH appends 201
-   (`tests/api-instances-create.test.ts:585-586`);
-   member detail's redundant GET trio
-   (`web-app/members/detail.ts`); two zoom
-   implementations and two constant sets
-   (`web-app/app/flow-fsm-reduce.ts:12-14, 632-656`,
-   `web-app/app/flow-interactions.ts:16-18, 816-850`);
-   `#noteMutation` / `history()` beside
-   `advanceHistory`
-   (`web-app/app/presenters/flow-designer.ts:221-227`);
-   four hand-kept copies of the reveal key set
-   (`api/test-plan-slices.ts:122-139`,
-   `server/seed.ts:174-203`,
-   `tests/pg-seed.test.ts:348-353`); the second
-   instances the remediation added (`formRExtras`'
-   record create, `canvasFocusOf`'s walk); the undo
-   path's duplicated pure helpers
-   (`api/flow-graph-diff.ts:16-26`); the dead
-   `FK_SPECIAL` map
-   (`web-app/app/schema-svg.ts:100-110` — remove the
-   comment at `schema-svg.ts:100-110` when done);
-   `callerOrganizationIds`, zero callers
-   (`api/request-auth.ts:189-197` — remove the comment
-   at `request-auth.ts:189-191` when done); the
-   test-only `deriveRecordStateHistory` alias
-   (`api/derive-record-types.ts:185-189` — remove the
-   comment at `derive-record-types.ts:185-189` when
-   done); the `#flowDesc` stub
-   (`web-app/app/presenters/flow-stats.ts:414-417` —
-   remove the comment at `flow-stats.ts:414-415` when
-   done); `toRecordAttribute`'s `??` ACL default
-   (`web-app/app/adapters/record-attributes.ts:76-79`)
-   and the two readings of an absent role array
-   (`api/routes.ts:843-856, 1000-1005` —
-   `recordAttributeDocumentBodyOf` vs
-   `attributeSchemaOf`); the nested
-   key-set follow-on (`api/validators.ts:705-713` —
-   remove the comment at `validators.ts:705-713` when
-   done); `handleSpace` dispatching
-   `isFormFocused: false` unconditionally; Delete's
-   `preventDefault` with nothing selected.
-10. Production readiness, repository and Render —
+10. Genericity — DRY, even once (the indulgence); spec
+    away every nit. Merged: `putRecordInstance` PATCHes
+    (name lie —
+    `tests/adapters-record-instances.test.ts`,
+    `tests/api-instances-create.test.ts`); same-body
+    PATCH appends 201
+    (`tests/api-instances-create.test.ts:585-586`);
+    member detail's redundant GET trio
+    (`web-app/members/detail.ts`); two zoom
+    implementations and two constant sets
+    (`web-app/app/flow-fsm-reduce.ts:12-14, 632-656`,
+    `web-app/app/flow-interactions.ts:16-18, 816-850`);
+    `#noteMutation` / `history()` beside
+    `advanceHistory`
+    (`web-app/app/presenters/flow-designer.ts:221-227`);
+    four hand-kept copies of the reveal key set
+    (`api/test-plan-slices.ts:122-139`,
+    `server/seed.ts:174-203`,
+    `tests/pg-seed.test.ts:348-353`); the second
+    instances the remediation added (`formRExtras`'
+    record create, `canvasFocusOf`'s walk); the undo
+    path's duplicated pure helpers
+    (`api/flow-graph-diff.ts:16-26`); the dead
+    `FK_SPECIAL` map
+    (`web-app/app/schema-svg.ts:100-110` — remove the
+    comment at `schema-svg.ts:100-110` when done);
+    `callerOrganizationIds`, zero callers
+    (`api/request-auth.ts:189-197` — remove the comment
+    at `request-auth.ts:189-191` when done); the
+    test-only `deriveRecordStateHistory` alias
+    (`api/derive-record-types.ts:185-189` — remove the
+    comment at `derive-record-types.ts:185-189` when
+    done); the `#flowDesc` stub
+    (`web-app/app/presenters/flow-stats.ts:414-417` —
+    remove the comment at `flow-stats.ts:414-415` when
+    done); `toRecordAttribute`'s `??` ACL default
+    (`web-app/app/adapters/record-attributes.ts:76-79`)
+    and the two readings of an absent role array
+    (`api/routes.ts:843-856, 1000-1005` —
+    `recordAttributeDocumentBodyOf` vs
+    `attributeSchemaOf`); the nested
+    key-set follow-on (`api/validators.ts:705-713` —
+    remove the comment at `validators.ts:705-713` when
+    done); `handleSpace` dispatching
+    `isFormFocused: false` unconditionally; Delete's
+    `preventDefault` with nothing selected.
+11. Production readiness, repository and Render —
     block cross-environment connections,
     high-availability app and Postgres, and the rest.
     Merged: the single-mint-process KNOWN seam's
@@ -157,8 +172,8 @@ spec → plan → ship cycle, implemented sequentially. A
     (`tests/http-throttle.test.ts`);
     stale-until-navigation once there are processes to
     notify (`tests/advisory-lock.test.ts`). Consumes
-    item 4.
-11. Fewer JSON parse/stringify — byte-stream header
+    item 5.
+12. Fewer JSON parse/stringify — byte-stream header
     setting, mechanical sympathy and simplicity for
     the processor; measured first
     (`./measure --profile`). Merged: the deferred
@@ -166,7 +181,7 @@ spec → plan → ship cycle, implemented sequentially. A
     (`shared/http-message/body.ts:76-79` and
     `shared/http-message/content-coding.ts:5-7` —
     revise both comments when done).
-12. Simulated latency by environment — when
+13. Simulated latency by environment — when
     `FUSION_ANGLE_ENVIRONMENT` is exactly `local` and
     `FUSION_ANGLE_LATENCY` is a millisecond count,
     both present and non-empty, every API request
@@ -420,12 +435,39 @@ Off the critical path; each with its oracle.
 - Investigate `docker compose up -d --wait` postgres
   only. Not the compose `server` — that would be a
   second origin (`compose.yaml`)
+- Node-only modules by directory — once whole-tree type
+  checking ships, the browser tsconfig's `exclude` is
+  the last hand-kept registry (seven, growing with the
+  tiers plan). Move them out of `web-app/app/` into a
+  top-level tools directory so browser membership is by
+  rule and the top level names the tools. After the
+  tiers plan. Oracle: `web-app/app/tsconfig.json` has
+  no `exclude`
+- A DOM-free server universe — `server/` and the `api/`
+  it reaches type-check only under `lib.dom`, so a
+  `document` in server-side code is invisible to `tsc`.
+  Measured at `8cad9e86`: `server/` alone under `ES2024`
+  + `@types/node` reports 8 errors, all WebCrypto/Fetch
+  names that `lib.webworker` carries without `document`
+  (`api/client-assertion.ts:29-167`,
+  `api/message-pair.ts:540`). A third project over
+  `server/` extending the root with
+  `lib: ["ES2024", "WebWorker"]`; verify `@types/node`
+  coexists. Oracle: a `document` reference in `api/`
+  fails `./validate`
+- The browser tsconfig at `web-app/app/` is the nearest
+  project only for `web-app/app/**`; editors and the
+  LSP open `web-app/flows/**` and the other page
+  directories under the root superset, where `process`
+  resolves. Move it to `web-app/tsconfig.json`. Three
+  live references (`validate`, TEST-PLAN.md AT1, the
+  critical-path item) plus the tiers plan's path
 
 ## Sequencing
 
-- 8 → 6 (the chat clause consumes chats)
-- 4 → 10 (the health probe consumes `/status`)
-- Item 2's token-at-rest hashing and physical PII
+- 9 → 7 (the chat clause consumes chats)
+- 5 → 11 (the health probe consumes `/status`)
+- Item 3's token-at-rest hashing and physical PII
   erasure close their KNOWN seams — the closer removes
   the ARCHITECTURE.md bullet and this file's line in
   one commit

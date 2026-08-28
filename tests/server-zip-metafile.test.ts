@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import * as esbuild from 'esbuild';
 
 const BUILD_SCRIPT = readFileSync('build', 'utf8');
+const BUILD_LIB_SCRIPT = readFileSync('build-lib', 'utf8');
 
 // Deleted names no longer appear in live source. Hunt
 // the live mint symbols too, or a server-core import of
@@ -50,11 +51,11 @@ test('build emits one ZIP from the server-core entry', () => {
         /fusion-angle-browser/,
     );
     assert.match(
-        BUILD_SCRIPT,
+        BUILD_LIB_SCRIPT,
         /web-app\/app\/server-core\.ts/,
     );
     assert.doesNotMatch(
-        BUILD_SCRIPT,
+        BUILD_LIB_SCRIPT,
         /web-app\/app\/core\.ts/,
     );
 });
