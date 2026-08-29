@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Tier 2: deterministic browser tests. Bundles the
+# Layer 2: deterministic browser tests. Bundles the
 # client into $TMPDIR (any tree), then runs
 # tests/browser/*.test.ts serially against an
 # in-process origin on the memory backend. Needs

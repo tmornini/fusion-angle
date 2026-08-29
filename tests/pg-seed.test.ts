@@ -7,7 +7,6 @@ import {
 import {
     assertEmptyDatabase,
     formatSeededCredentials,
-    formatTestPlanSliceCredentials,
     isDatabaseEmpty,
     parseSeedArgv,
     SEED_EXCLUSIVE_FLAGS,
@@ -26,10 +25,6 @@ import { PostgresBackend } from
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import { TABLE_NAMES } from '../api/db.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    PARALLEL_SECTIONS,
-    postTestPlanSlices,
-} from '../api/test-plan-slices.ts';
 import { testHashPassword } from './mock-seed.ts';
 
 function fakeClient(
@@ -96,10 +91,6 @@ test('parseSeedArgv accepts one mode flag', () => {
     assert.deepEqual(
         parseSeedArgv(['--mock-data']),
         { kind: 'ok', mode: 'mock-data' },
-    );
-    assert.deepEqual(
-        parseSeedArgv(['--test-plan-slices']),
-        { kind: 'ok', mode: 'test-plan-slices' },
     );
 });
 
@@ -242,202 +233,6 @@ test('formatSeededCredentials is terminal text', () => {
     assert.doesNotMatch(text, /"level":/);
 });
 
-test('formatTestPlanSliceCredentials is TSV',
-() => {
-    const text = formatTestPlanSliceCredentials([
-        {
-            section: 'AA',
-            organizationId: 'AjdvjuECVZEgZoFajaIEkg',
-            organizationName: 'Stark Industries',
-            adminUsername: 'demo@example.com',
-            adminPassword: 'secret-aa',
-        },
-        {
-            section: 'B',
-            organizationId: 'VdXgVFTbikqjizucMNlnPA',
-            organizationName: 'Stark Industries',
-            adminUsername:
-                'b-admin@test-plan.example',
-            adminPassword: 'secret-b',
-            seatUsername:
-                'b-member@test-plan.example',
-            seatPassword: 'secret-b-seat',
-            flowId: 'UXOPfjdZZohCcyCLlQWnuQ',
-        },
-        {
-            section: 'G',
-            organizationId: 'dsvIECNMaMqrLIswWbTVpg',
-            organizationName: 'Stark Industries',
-            secondOrganizationId: 'WlkfISpndVJfICRnWksipQ',
-            secondOrganizationName: 'Wayne Enterprises',
-            adminUsername:
-                'g-admin@test-plan.example',
-            adminPassword: 'secret-g',
-            unseatedUsername:
-                'g-unseated@test-plan.example',
-            unseatedPassword: 'secret-g-u',
-            memberUsername:
-                'g-member@test-plan.example',
-            memberPassword: 'secret-g-m',
-            erasableUsername:
-                'g-erasable@test-plan.example',
-            erasablePassword: 'secret-g-e',
-            inviteeUsername:
-                'r-member@test-plan.example',
-            inviteePassword: 'secret-g-i',
-        },
-    ]);
-    assert.ok(text.includes(SEED_REVEAL_HEADER));
-    assert.match(
-        text,
-        /^AA\torg_id\tAjdvjuECVZEgZoFajaIEkg$/m,
-    );
-    assert.match(
-        text,
-        /^AA\tadmin_username\tdemo@example.com$/m,
-    );
-    assert.match(
-        text,
-        /^AA\tadmin_password\tsecret-aa$/m,
-    );
-    assert.match(
-        text,
-        /^B\tseat_username\tb-member@test-plan.example$/m,
-    );
-    assert.match(
-        text,
-        /^B\tflow_id\tUXOPfjdZZohCcyCLlQWnuQ$/m,
-    );
-    assert.match(
-        text,
-        /^G\torg2_id\tWlkfISpndVJfICRnWksipQ$/m,
-    );
-    assert.match(
-        text,
-        /^G\torg2_name\tWayne Enterprises$/m,
-    );
-    assert.match(
-        text,
-        /^G\terasable_username\tg-erasable@/m,
-    );
-    assert.match(
-        text,
-        /^G\terasable_password\tsecret-g-e$/m,
-    );
-    assert.match(
-        text,
-        /^G\tinvitee_username\tr-member@test-plan.example$/m,
-    );
-    assert.match(
-        text,
-        /^G\tinvitee_password\tsecret-g-i$/m,
-    );
-    assert.doesNotMatch(text, /"level":/);
-});
-
-test('slice credential map omits absent extras',
-async () => {
-    const db = memoryDbAdapter();
-    const reveal = await postTestPlanSlices(
-        db, { hashPassword: testHashPassword },
-    );
-    const text = formatTestPlanSliceCredentials(
-        reveal,
-    );
-    assert.ok(text.includes(SEED_REVEAL_HEADER));
-    assert.doesNotMatch(text, /"level":/);
-    for (const section of PARALLEL_SECTIONS) {
-        assert.match(
-            text,
-            new RegExp(
-                '^' + section + '\\t',
-                'm',
-            ),
-            section,
-        );
-    }
-    const extraPasswords = [
-        'seat_password',
-        'unseated_password',
-        'member_password',
-        'erasable_password',
-        'invitee_password',
-    ] as const;
-    const omitExtras = [
-        'AA', 'C', 'D', 'E', 'F', 'F2',
-        'FS', 'H', 'I', 'K',
-    ] as const;
-    for (const section of omitExtras) {
-        for (const field of extraPasswords) {
-            assert.doesNotMatch(
-                text,
-                new RegExp(
-                    '^'
-                    + section
-                    + '\\t'
-                    + field
-                    + '\\t',
-                    'm',
-                ),
-                section + ' ' + field,
-            );
-        }
-    }
-    const bSeat = text.match(
-        /^B\tseat_password\t(.+)$/m,
-    );
-    assert.ok(bSeat);
-    assert.ok(
-        (bSeat[1] ?? '').length >= 16,
-    );
-    const gUnseated = text.match(
-        /^G\tunseated_password\t(.+)$/m,
-    );
-    assert.ok(gUnseated);
-    assert.ok(
-        (gUnseated[1] ?? '').length >= 16,
-    );
-    const gMember = text.match(
-        /^G\tmember_password\t(.+)$/m,
-    );
-    assert.ok(gMember);
-    assert.ok(
-        (gMember[1] ?? '').length >= 16,
-    );
-    const gErasable = text.match(
-        /^G\terasable_password\t(.+)$/m,
-    );
-    assert.ok(gErasable);
-    assert.ok(
-        (gErasable[1] ?? '').length >= 16,
-    );
-    const gInvitee = text.match(
-        /^G\tinvitee_password\t(.+)$/m,
-    );
-    assert.ok(gInvitee);
-    assert.ok(
-        (gInvitee[1] ?? '').length >= 16,
-    );
-    assert.match(
-        text,
-        /^G\tinvitee_username\tr-member@test-plan.example$/m,
-    );
-    const rMember = text.match(
-        /^R\tmember_password\t(.+)$/m,
-    );
-    assert.ok(rMember);
-    assert.ok(
-        (rMember[1] ?? '').length >= 16,
-    );
-    const svSeat = text.match(
-        /^SV\tseat_password\t(.+)$/m,
-    );
-    assert.ok(svSeat);
-    assert.ok(
-        (svSeat[1] ?? '').length >= 16,
-    );
-});
-
 test('non-empty refuses without seeding or printing',
 async () => {
     const db = memoryDbAdapter();
@@ -534,38 +329,6 @@ async () => {
     );
     assert.ok(printed.includes(SEED_REVEAL_HEADER));
     assert.equal(await db.hasSchema(), true);
-});
-
-test('slices seed prints the section map',
-async () => {
-    const db = memoryDbAdapter();
-    const empty = fakeClient([{
-        message_pairs: false,
-        marker: false,
-    }]);
-    const chunks: string[] = [];
-    await seedPostgres(
-        empty.sql, db, 'test-plan-slices', {
-            hashPassword: testHashPassword,
-            write: (chunk) => {
-                chunks.push(chunk);
-            },
-        },
-    );
-    const printed = chunks.join('');
-    assert.ok(
-        printed.includes(SEED_REVEAL_HEADER),
-    );
-    assert.match(
-        printed,
-        /^AA\torg_id\tAjdvjuECVZEgZoFajaIEkg$/m,
-    );
-    assert.match(
-        printed,
-        /^SV\tadmin_username\tsv-admin@test-plan.example$/m,
-    );
-    assert.equal(await db.hasSchema(), true);
-    assert.equal(chunks.length, 1);
 });
 
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {

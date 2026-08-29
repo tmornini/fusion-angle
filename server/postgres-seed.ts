@@ -35,8 +35,7 @@ import {
 } from './scrypt-hash.ts';
 
 const USAGE =
-    'Usage: postgres-seed --bootstrap|'
-    + '--mock-data|--test-plan-slices\n';
+    'Usage: postgres-seed --bootstrap|--mock-data\n';
 
 function isMainModule(): boolean {
     const invoked = process.argv[1];

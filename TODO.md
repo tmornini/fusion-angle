@@ -5,7 +5,7 @@ file by shipping; `## Close protocol` is the exit.
 
 ## Critical path
 
-Thirteen items, in this order — each its own brainstorm →
+Twelve items, in this order — each its own brainstorm →
 spec → plan → ship cycle, implemented sequentially. A
 "Merged:" clause names bullets absorbed from
 `## Later work`; they keep their oracles.
@@ -69,28 +69,15 @@ spec → plan → ship cycle, implemented sequentially. A
    `CONTENT_SECURITY_POLICY`.
 5. `/status` — `{ up: boolean, components: {
    postgres: boolean } }`; `up` is true when every
-   component is; built for more components. Item 11's
+   component is; built for more components. Item 10's
    health probe.
-6. Execute TEST-PLAN.md with up to 48 subagents —
-   after the run-four remediation ships; the
-   Protocol's one-profile, hunters-in-turn contract is
-   revisited for 48. BLOCKING precondition CLEARED:
-   the false prophet in the gating suite
-   (`tests/api-flow-document.test.ts` "an undo racing a
-   save", two racers winning where one was expected) is
-   fixed at the root — the undo POST now carries
-   If-Match, so its 412 names a real conflict instead of
-   the server's own resolution timing. Measured 17/100
-   before, 0/300 after; `./test` 15/15 green. Merged:
-   the five run-four mitigation stubs (absorbed by the
-   remediation spec); the flaky-test bullet.
-7. Re-implement workbox, work orders, and flows —
+6. Re-implement workbox, work orders, and flows —
    nodes become processes; process kinds: record
    modification (current), external process
    synchronization (new), directed cyclic graph (flow
    and sub-flow), directed cyclic graph (sub-graph); a
    chat on every record and work order (consumes item
-   9). Merged: READY gate on dangling refs
+   8). Merged: READY gate on dangling refs
    (`tests/adapters-flow-publish.test.ts`); locked
    verbs not executed
    (`tests/family-registry.test.ts`); the flow-tag
@@ -106,7 +93,7 @@ spec → plan → ship cycle, implemented sequentially. A
    (`api/derive-flows.ts:108`), rotation only on the
    toggle path (`web-app/app/flow-layout.ts:1032-1037`),
    and the mirror trigger.
-8. Headless AI worker — a server-side process that
+7. Headless AI worker — a server-side process that
    watches each AI process-worker's workbox, claims,
    assembles the record definition, the attribute
    values (which — decided in the brainstorm), the
@@ -120,56 +107,56 @@ spec → plan → ship cycle, implemented sequentially. A
    (`FLOW-CANVAS.md:130-132`);
    `withNodeTaskInstructions` already stores the
    instructions.
-9. Chats at `/api/chats` — attachable to any document
+8. Chats at `/api/chats` — attachable to any document
    at `/…/:collection/:id/chat` with as little
    ceremony as the plane allows.
-10. Genericity — DRY, even once (the indulgence); spec
-    away every nit. Merged: `putRecordInstance` PATCHes
-    (name lie —
-    `tests/adapters-record-instances.test.ts`,
-    `tests/api-instances-create.test.ts`); same-body
-    PATCH appends 201
-    (`tests/api-instances-create.test.ts:585-586`);
-    member detail's redundant GET trio
-    (`web-app/members/detail.ts`); two zoom
-    implementations and two constant sets
-    (`web-app/app/flow-fsm-reduce.ts:12-14, 632-656`,
-    `web-app/app/flow-interactions.ts:16-18, 816-850`);
-    `#noteMutation` / `history()` beside
-    `advanceHistory`
-    (`web-app/app/presenters/flow-designer.ts:221-227`);
-    four hand-kept copies of the reveal key set
-    (`api/test-plan-slices.ts:122-139`,
-    `server/seed.ts:174-203`,
-    `tests/pg-seed.test.ts:348-353`); the second
-    instances the remediation added (`formRExtras`'
-    record create, `canvasFocusOf`'s walk); the undo
-    path's duplicated pure helpers
-    (`api/flow-graph-diff.ts:16-26`); the dead
-    `FK_SPECIAL` map
-    (`web-app/app/schema-svg.ts:100-110` — remove the
-    comment at `schema-svg.ts:100-110` when done);
-    `callerOrganizationIds`, zero callers
-    (`api/request-auth.ts:189-197` — remove the comment
-    at `request-auth.ts:189-191` when done); the
-    test-only `deriveRecordStateHistory` alias
-    (`api/derive-record-types.ts:185-189` — remove the
-    comment at `derive-record-types.ts:185-189` when
-    done); the `#flowDesc` stub
-    (`web-app/app/presenters/flow-stats.ts:414-417` —
-    remove the comment at `flow-stats.ts:414-415` when
-    done); `toRecordAttribute`'s `??` ACL default
-    (`web-app/app/adapters/record-attributes.ts:76-79`)
-    and the two readings of an absent role array
-    (`api/routes.ts:843-856, 1000-1005` —
-    `recordAttributeDocumentBodyOf` vs
-    `attributeSchemaOf`); the nested
-    key-set follow-on (`api/validators.ts:705-713` —
-    remove the comment at `validators.ts:705-713` when
-    done); `handleSpace` dispatching
-    `isFormFocused: false` unconditionally; Delete's
-    `preventDefault` with nothing selected.
-11. Production readiness, repository and Render —
+9. Genericity — DRY, even once (the indulgence); spec
+   away every nit. Merged: `putRecordInstance` PATCHes
+   (name lie —
+   `tests/adapters-record-instances.test.ts`,
+   `tests/api-instances-create.test.ts`); same-body
+   PATCH appends 201
+   (`tests/api-instances-create.test.ts:585-586`);
+   member detail's redundant GET trio
+   (`web-app/members/detail.ts`); two zoom
+   implementations and two constant sets
+   (`web-app/app/flow-fsm-reduce.ts:12-14, 632-656`,
+   `web-app/app/flow-interactions.ts:16-18, 816-850`);
+   `#noteMutation` / `history()` beside
+   `advanceHistory`
+   (`web-app/app/presenters/flow-designer.ts:221-227`);
+   four hand-kept copies of the reveal key set
+   (`api/test-plan-slices.ts:122-139`,
+   `server/seed.ts:174-203`,
+   `tests/pg-seed.test.ts:348-353`); the second
+   instances the remediation added (`formRExtras`'
+   record create, `canvasFocusOf`'s walk); the undo
+   path's duplicated pure helpers
+   (`api/flow-graph-diff.ts:16-26`); the dead
+   `FK_SPECIAL` map
+   (`web-app/app/schema-svg.ts:100-110` — remove the
+   comment at `schema-svg.ts:100-110` when done);
+   `callerOrganizationIds`, zero callers
+   (`api/request-auth.ts:189-197` — remove the comment
+   at `request-auth.ts:189-191` when done); the
+   test-only `deriveRecordStateHistory` alias
+   (`api/derive-record-types.ts:185-189` — remove the
+   comment at `derive-record-types.ts:185-189` when
+   done); the `#flowDesc` stub
+   (`web-app/app/presenters/flow-stats.ts:414-417` —
+   remove the comment at `flow-stats.ts:414-415` when
+   done); `toRecordAttribute`'s `??` ACL default
+   (`web-app/app/adapters/record-attributes.ts:76-79`)
+   and the two readings of an absent role array
+   (`api/routes.ts:843-856, 1000-1005` —
+   `recordAttributeDocumentBodyOf` vs
+   `attributeSchemaOf`); the nested
+   key-set follow-on (`api/validators.ts:705-713` —
+   remove the comment at `validators.ts:705-713` when
+   done); `handleSpace` dispatching
+   `isFormFocused: false` unconditionally; Delete's
+   `preventDefault` with nothing selected.
+10. Production readiness, repository and Render —
     block cross-environment connections,
     high-availability app and Postgres, and the rest.
     Merged: the single-mint-process KNOWN seam's
@@ -182,7 +169,7 @@ spec → plan → ship cycle, implemented sequentially. A
     stale-until-navigation once there are processes to
     notify (`tests/advisory-lock.test.ts`). Consumes
     item 5.
-12. Fewer JSON parse/stringify — byte-stream header
+11. Fewer JSON parse/stringify — byte-stream header
     setting, mechanical sympathy and simplicity for
     the processor; measured first
     (`./measure --profile`). Merged: the deferred
@@ -190,7 +177,7 @@ spec → plan → ship cycle, implemented sequentially. A
     (`shared/http-message/body.ts:76-79` and
     `shared/http-message/content-coding.ts:5-7` —
     revise both comments when done).
-13. Simulated latency by environment — when
+12. Simulated latency by environment — when
     `FUSION_ANGLE_ENVIRONMENT` is exactly `local` and
     `FUSION_ANGLE_LATENCY` is a millisecond count,
     both present and non-empty, every API request
@@ -324,31 +311,6 @@ Off the critical path; each with its oracle.
   code and 32 test comments describe a past state as
   present; the enumeration is the run-four
   remediation's Evidence
-- C4 / C7 scored FAIL on a foreign paint, not a product
-  regression. The failing tiles — 0 ideas, 0 projects,
-  1 flow, Impact `—`, no objective rows, a chip naming
-  another admin — are the B org's dashboard exactly, and
-  B is the hunter joined just before C; the C org
-  derives 4 / 3 / 1, +56 / −33, four objectives with
-  trendlines (`tests/slices-portfolio-scores.test.ts`).
-  Two leak vectors: the previous hunter's tab is still
-  the globally selected page, or the HttpOnly
-  `refresh_token` survives a JS-side "delete site data"
-  so the next hunter's first boot cookie-refreshes as
-  the previous admin (B20's own covenant). Shelved
-  behind the serial run in flight. The fix is Protocol,
-  not product: a hunter preflight — close every MCP tab,
-  open one, Sign out if boot lands authenticated, sign
-  in, then assert the sidebar chip names this admin and
-  the header names this org before any case; the master
-  closes a joined hunter's tabs; a data-shape FAIL reads
-  the chip in the same `javascript_tool` call and a
-  foreign chip is BLOCKED "foreign paint", never FAIL; a
-  Known MCP limitations bullet for the shared-jar leak;
-  and the C pin extended to `actualMean` and four
-  non-empty trendlines. Spec:
-  `docs/superpowers/test-plan-mitigations/`
-  `2026-08-24-c4-c7-dashboard-gauges.md`
 - Cryptographically verifiable ledger — brainstorm
   hash-and-verify (or sign) of stored pairs. The dropped
   `version` column hashed on write and was never checked
@@ -372,7 +334,7 @@ Off the critical path; each with its oracle.
   `api/types.ts:1007`
 - G/V5 needs a cross-slice identity to verify Decline,
   or the case text should sanction any invited
-  identity — plan defect vs hunter slip, unresolved —
+  identity — plan defect vs explorer slip, unresolved —
   TEST-PLAN.md G/V5
 - Intermittent "flow-marquee" console exceptions on
   non-canvas pages (Billing) — a flow-canvas gesture
@@ -474,20 +436,20 @@ Off the critical path; each with its oracle.
   universes invariant, `tests/tsconfig-covenants.test.ts`,
   and this file's own Node-only-modules-by-directory
   Oracle above) plus the tiers plan's path
-- GPU flag in the Tier-2 launcher — `launchChrome` no
-  longer passes `--disable-gpu` (cargo cult under
-  `--headless=new`; it was required only by old headless
-  on Windows). Its one real effect was forcing software
-  compositing, which made runs more alike across
-  machines. Dropped UNVERIFIED — no `./test-browser` run
-  has happened anywhere yet. Restore it if two machines
-  disagree. Oracle: `./test-browser` green on two
-  machines
+- GPU flag in the Layer 2 launcher — `launchChrome`
+  no longer passes `--disable-gpu` (cargo cult under
+  `--headless=new`; it was required only by old
+  headless on Windows). Its one real effect was
+  forcing software compositing, which made runs more
+  alike across machines. Dropped UNVERIFIED —
+  `./test-browser` has run green on one machine
+  (2026-08-28). Restore it if two machines disagree.
+  Oracle: `./test-browser` green on two machines
 
 ## Sequencing
 
-- 9 → 7 (the chat clause consumes chats)
-- 5 → 11 (the health probe consumes `/status`)
+- 8 → 6 (the chat clause consumes chats)
+- 5 → 10 (the health probe consumes `/status`)
 - Item 3's token-at-rest hashing and physical PII
   erasure close their KNOWN seams — the closer removes
   the ARCHITECTURE.md bullet and this file's line in

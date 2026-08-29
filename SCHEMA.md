@@ -90,8 +90,8 @@ tombstone.
 
 ## Operator tools
 
-`./postgres-seed` (`--bootstrap`, `--mock-data`,
-`--test-plan-slices`) runs in-process on an empty database
+`./postgres-seed` (`--bootstrap`, `--mock-data`) runs
+in-process on an empty database
 and stamps `schema_marker` last. Seed refuses a non-empty
 database. `./postgres-wipe` drops the pair plane
 (`POSTGRES_DROP_SCHEMA`) and does not seed.

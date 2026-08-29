@@ -2,567 +2,157 @@
 
 > **Encoding:** `- [ ]` = pending (not yet executed). Run outcomes are recorded as words in the Summary (PASS / FAIL / BLOCKED / DEFERRED / DRIFT), not by flipping the checkbox. Optional inline annotation: `- [FAIL]` with a note for a failed case.
 
-### How to invoke
+## The walk
 
-Use a fresh local Postgres via Docker.
-Do not set `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`,
-or `HTTP_SERVER_PORT` by hand — `./crank` mints
-them for its children and never prints them.
+Three layers verify this product. Two are gates. The third
+is exploration, and nothing rides on its result.
 
-The browser layer is the **browser-use** plugin
-(MCP `browser-use`, or CLI `browser-use`). If
-that plugin is not connected and the CLI is
-not on PATH, **refuse the run**. Do not fall
-back to Claude-in-Chrome, chrome-devtools
-MCP, or source-only workarounds. Canvas
-gestures, CSS viewport, skeletons,
-reduced-motion, and two-jar SV need
-compositor mouse and a real CSS viewport;
-without browser-use those cases are not
-worth running.
+| Layer | Command | Runs | Standing |
+|---|---|---|---|
+| 1 | `./validate` | AT1–AT3: both `tsc` projects, `./test` in two TZ passes, the lints, the two drift gates. Chrome-free, Postgres-free | Gate: every commit |
+| 2 | `./test-all` | Layer 1, then `./test-browser` (AT5) | Gate: the operator's, before `./build`, a deploy, or a walk; `./crank` enforces it for the walk |
+| 3 | "run the test plan" | `./crank --mock-data 8080` — Layer 1, AT4 `./test-postgres`, AT5 — then one explorer walks A4 through SV | Exploration; nothing rides on its result |
 
-When the user says "run the test plan", the
-master session:
+**A browser observation changes product only through a red
+test at Layer 1 or Layer 2.** The walk finds; the test
+proves. A product commit may cite a mitigation stub only
+when that stub's `Reproduced by` names a red test. The
+ruling is not evidence; the red test is.
 
-1. Confirms browser-use is available (MCP
-   tools `browser_exec` /
-   `browser_screenshot`, or `browser-use`
-   on PATH attached to Chrome with remote
-   debugging). Missing → refuse. Do not
-   dispatch hunters.
-2. Reads this document's `### Protocol` —
-   required context. Default is the section
-   DAG below.
-3. Executes **A1** and **A2** (ZIP inventory)
-   so the tree is already clean for crank's
-   `./build --no-zip`.
-4. Starts `./crank --test-plan-slices 8080`
-   (serial: `./crank --mock-data 8080`) as
-   the origin. Occupied 8080 refuses the
-   run — do not invent a substitute. Crank
-   runs `./validate`
-   (AT1–AT3), mints secrets, brings postgres
-   up, runs `./test-postgres` (AT4), builds
-   `--no-zip` into a temp dir, wipes, seeds,
-   and listens. Read the seed reveal from
-   crank's stdout. Red validate aborts with
-   no Docker. Red AT4 or later hits the trap.
-5. Parallel: one `*.localhost` alias per
-   hunter on the one crank origin, from
-   the slug table under Protocol. A
-   named browser-use daemon per hunter
-   isolates tabs, not jars. One hunter
-   per `parallel: yes` section (14), each
-   with that section's `##` body only and
-   that slice's credentials. SV6–SV10's
-   second jar is `sv2.localhost`, not a
-   second CDP. Live hunters are safe
-   together. Serial: one tenant, document
-   order, headers not consulted.
-6. Joins in document order. Then K8 (process
-   lock), then J. Stopping crank IS J1 and
-   J2 (EXIT trap). J3 stays (Desktop ZIP
-   remains). Then the canonical
-   `## Summary Format` plus one
-   mitigation-spec path per FAIL cluster.
-   The master does not patch FAILs and does
-   not re-dispatch.
+### Invocation
 
-This document is the complete regression
-contract — no other coordination state is
-read or written.
+Use a fresh local Postgres via Docker. Do not set
+`POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, or
+`HTTP_SERVER_PORT` by hand — `./crank` mints them for its
+children and never prints them.
 
-BLOCKED ≠ FAIL. BLOCKED is not a driver
-limit. Canvas port-drag, shift-connect,
-marquee, list reorder, mobile drawer,
-loading skeleton, reduced-motion, and
-two-jar SV are driven with browser-use.
-D36/D37 and K6 are compositor-mouse like
-E11 (pointer capture on `.drag-handle`).
-That is a PASS/FAIL drive, not BLOCKED.
-BLOCKED is reserved for a missing process
-prerequisite (K7 waiting on K3). Sandbox
-EPERM on `kill` is not BLOCKED: J1 uses
-the harness task stop of the `./crank`
-process.
+The browser layer is the **browser-use** plugin (MCP
+`browser-use`, or CLI `browser-use`). If that plugin is not
+connected and the CLI is not on PATH, **refuse the run.** Do
+not fall back to Claude-in-Chrome, chrome-devtools MCP, or
+source-only workarounds. Canvas gestures, the CSS viewport,
+skeletons, reduced-motion, and the two-jar SV cases need a
+compositor mouse and a real CSS viewport.
 
-### Sub-agent invocation contract
+One macOS approval sheet appears per browser-use daemon
+connection. Answer it, or run `browser-use mac-approve`
+first. A 45-second silence fails the walk before it starts,
+not mid-walk.
 
-Every hunter the master dispatches MUST begin its
-turn by invoking the `church-of-code:church-of-code`
-skill and reading `CHURCH-OF-CODE-medium-context.md`
-in full. Subagents inherit no scripture and read no
-AGENTS.md by default (see AGENTS.md § Subagents).
-The first line of every hunter prompt is
-`Go to Medium Church!`.
+### The master's steps
 
-After the scripture, the hunter reads
-`/Users/tmornini/code/fusion-angle/AGENTS.md` in
-full, then **only** its assigned `##` section body
-(G includes V1–V9; F2 includes WB* and AA-WB-SETUP;
-K omits K8). It does not read other sections. It
-does not re-seed.
+1. **A1** `./build` from a clean tree, then **A2** inventory
+   the artifact.
+2. **A3** `./crank --mock-data 8080`. Crank runs Layer 1,
+   `./test-postgres` (AT4), and `./test-browser` (AT5)
+   before it serves. Red anywhere aborts the walk — no
+   explorer is dispatched. Read the seed reveal from stdout;
+   it is shown once. A3 **is** SV1.
+3. Dispatch one explorer with the prompt below. A1–A3
+   are the master's — they run before the origin exists;
+   A4 onward are the explorer's.
+4. Receive one line per case. Write the summary
+   (`## Summary Format`) and one stub per FAIL cluster.
+5. Run **K8** (wipe and reseed — the explorer has returned),
+   then **J1–J3**.
 
-Refuse if browser-use is not available.
-Drive with compositor mouse and a real CSS
-viewport (`browser_exec` / `browser_screenshot`,
-or CLI `browser-use`). Do not use
-Claude-in-Chrome or chrome-devtools MCP.
-Clear this origin's cookies with
-`Storage.clearDataForOrigin` (origin =
-your alias, `storageTypes: 'cookies'`);
-never `Network.clearBrowserCookies`.
-Every tab you open is on your alias; a
-chip naming another section's admin
-means you left your alias — FAIL, and
-say so. Then sign in as that slice's
-admin from the credential map.
+The master does not drive the product and does not patch.
 
-Return per-case PASS / FAIL / BLOCKED /
-DEFERRED / DRIFT. BLOCKED is only for a
-missing process prerequisite (K7 waiting
-on K3). "Sign in as demo@…" means this
-hunter's admin. Stark / Wayne names mean
-this hunter's seeded org names from the
-map.
+### The explorer prompt
 
-K runs K1–K6, then K9–K30, then K7 last. K8 is not
-in this hunter.
-
-The master does not drive the product UI after
-preflight.
-
-Hunter prompt:
+Copy this verbatim, substituting the seed reveal's sign-ins.
 
 ```
 Go to Medium Church!
 
 Then read AGENTS.md at
-/Users/tmornini/code/fusion-angle/AGENTS.md
-in full.
+/Users/tmornini/code/fusion-angle/AGENTS.md in full.
 
-You are the {SECTION} hunter for the
-Fusion Angle TEST-PLAN parallel run.
+You are the explorer for the Fusion Angle TEST-PLAN walk.
 
-Origin: http://{slug}.localhost:8080
+Origin: http://localhost:8080
 Admin: {admin_username} / {admin_password}
-Org id: {org_id}
-{extra credential-map fields}
+{the seed reveal's other sign-ins}
 
-Read TEST-PLAN.md from the `{SECTION}`
-`##` heading through the next `##`
-heading. That body is your entire
-case list. Do not read other
-sections. Do not re-seed. Do not
-patch FAILs.
+Read TEST-PLAN.md from `## The walk` to the end. Every
+case from **A4** through the end of `## SV` is yours, in
+document order. A1–A3 are the master's. Skip K8
+(the master runs it after you return) and J (the
+master's teardown).
 
-Refuse if browser-use is not
-available. Do not fall back to
-Claude-in-Chrome or
-chrome-devtools MCP.
+Refuse if browser-use is not available. Do not fall back
+to Claude-in-Chrome or chrome-devtools MCP.
 
-Clear this origin's cookies with
-`Storage.clearDataForOrigin`
-(origin = your alias,
-`storageTypes: 'cookies'`);
-never `Network.clearBrowserCookies`.
-Every tab you open is on your
-alias; a chip naming another
-section's admin means you left
-your alias — FAIL, and say so.
-Sign in as the admin above.
-Run the cases in document order.
-For K: skip K8; run K7 last
-after K30.
+Setup, once: clear this origin's cookies with
+`Storage.clearDataForOrigin` (`storageTypes: 'cookies'`);
+set `Emulation.setDeviceMetricsOverride` to 1280×800 with
+`deviceScaleFactor: 1` (I10–I15 set ≤767 and restore);
+open one tab and `activate_tab` it. That tab stays
+visible for the whole walk. Open a second tab only where
+a case needs one (SV6–SV10, cross-tab cases); activate
+whichever tab you are driving; confirm
+`document.visibilityState === 'visible'` before every
+gesture and every timing assertion.
 
-Drive canvas gestures, CSS
-viewport, skeletons, list
-reorder, and reduced-motion
-with compositor mouse / real
-CSS viewport. D36/D37, K6, and
-E11 use pointer capture on
-`.drag-handle`, not HTML5
-`drop`.
+Drive with compositor mouse and CDP key events. Never
+`js()` fetch the API — the bearer is memory-only; read
+the network log. Sign-ins are throttled to 5 per 60 s
+per client: pace them, and a 429 inside that window is
+the product working, not a FAIL.
 
-Before every compositor-mouse
-gesture (port drag,
-shift-connect, body drag,
-marquee, pan, list-row drag)
-call `activate_tab(current_tab())`
-and confirm
-`document.visibilityState`
-is `visible`. A hidden tab
-lands every `mouseMoved`
-about 5 s late — past the
-daemon's 5 s timeout — while
-press, release, and keys
-land at once. Never activate
-for anything else. If a
-`mouseMoved` still raises
-`TimeoutError`, send
-`mouseReleased` at the same
-point first (it always lands
-and ends the gesture), then
-re-activate and retry that
-gesture once.
+Do not patch. Do not re-seed. Do not retry the plan.
 
 Return one line per case:
-ID PASS|FAIL|BLOCKED|DEFERRED|DRIFT
-— one-line note. BLOCKED only
-for K7 waiting on K3.
+ID PASS|FAIL|BLOCKED|DEFERRED|DRIFT — one-line note.
 ```
 
-### Scope
+### Driving notes
 
-UI behavior: DOM, CSS, gestures, visual
-rendering. Pure transitions, adapters, and
-HTTP routing live in `./test` / `./validate`.
-Section **SV** is the default origin (A3
-**is** SV1): two aliases, two identities,
-one Postgres. Leftover `≥ N` in a case body
-is doc debt, not protocol. Where a case is
-the browser counterpart of an automated area
-it carries an inline pointer at the test
-file.
+These are product-true. A case that needs one names it; do
+not repeat the note in every case.
 
-### Protocol
+- The canvas `<svg>` is replaced on every commit — query it
+  fresh before each gesture.
+- There is no `dblclick` listener: send two pointerdowns on
+  one element id inside `DBLCLICK_MS` (400).
+- Chords carry the browser's `key`; Shift uppercases it.
+- `.focus()` selects the way Tab does; `.click()` selects
+  nothing.
+- F56: no canvas click before Space.
+- List-row drags are pointer capture on `.drag-handle`.
+- Probe for the skeleton before fetches settle.
+- Reduced motion is `Emulation.setEmulatedMedia`.
+- Downloads are intercepted at `URL.createObjectURL`;
+  uploads are built with `DataTransfer`.
+- List pages wait on the card count — never screenshot
+  early.
+- Authentication is throttled to five hits per 60 seconds
+  per client, counting `authorize` and `token` together.
+- The first click after a reload only focuses the window.
+  This is a product seam, filed in TODO.md; drive a second
+  click.
 
-The automated layer (`## AT`) is crank's fail-fast
-gate, not a master step before A1. Abort on red.
-On green, the browser regression runs against
-**one Node origin** in one of two modes.
+### Scoring
 
-Parse each `##` section's four fields (`tenant`,
-`parallel`, `global_lock`, `depends`). Nested letter
-prefixes (V inside G, WB* and AA-WB-SETUP inside F2)
-ride the parent hunter. K8 is a process-lock case, not
-a K-hunter case on the parallel path.
-
-Parallel hunters use one `*.localhost` alias
-each on the one crank origin. Serial uses
-bare `localhost`.
-
-| Section | Alias host |
+| Outcome | Meaning |
 |---|---|
-| AA | `aa.localhost` |
-| B | `b.localhost` |
-| C | `c.localhost` |
-| D | `d.localhost` |
-| E | `e.localhost` |
-| F | `f.localhost` |
-| F2 | `f2.localhost` |
-| FS | `fs.localhost` |
-| G | `g.localhost` |
-| H | `h.localhost` |
-| I | `i.localhost` |
-| K | `k.localhost` |
-| R | `r.localhost` |
-| SV | `sv.localhost` (second jar: `sv2.localhost`) |
+| PASS | the PASS line was observed |
+| FAIL | the PASS line could not be observed as driven — a finding, not a verdict |
+| BLOCKED | a step could not be performed for a named reason outside the product (driver or environment); the reason is the note |
+| DEFERRED | a prerequisite case did not produce what this case needs |
+| DRIFT | passes in substance; the document or the UI text disagrees — the document changes |
 
-- **Origin port.** The master passes `8080`
-  as crank's argv. Occupied 8080 refuses
-  the run. Do not invent a substitute.
-- **Serial (`--serial`)**: A1 `./build` → ZIP; A2 unzip
-  or `./build --no-zip`; A3 `./crank --mock-data
-  8080` (this pin **is** SV1). One
-  process, one mock tenant, one cookie jar. Walk
-  document order including K8 inside K, then J.
-  Headers are not consulted. Serial does not
-  mint garden rows (AA and E7) and does not
-  wipe to `--bootstrap` except K8 (then
-  restore `--mock-data`).
-- **Parallel (default)**: the same A1–A2. Confirm
-  browser-use first; refuse if missing. A3
-  `./crank --test-plan-slices 8080`.
-  Capture the stdout credential map. Spawn one
-  hunter per `parallel: yes` section. One
-  `*.localhost` alias per hunter from the
-  slug table; a named browser-use daemon
-  isolates tabs, not jars. SV6–SV10's
-  second jar is `sv2.localhost`, not a
-  second CDP. Live hunters are safe
-  together. Stolen-tab rule as C4/C7/R14:
-  empty bind picker, `data-empty` rows, or
-  0/0/1 tiles are stolen-tab paint. If the
-  chip names another section's admin: FAIL
-  (wrong alias). Do not treat a shared-alias
-  accident as a product bug unless a serial
-  C or R pin fails. Then K8 (wipe/reseed of
-  the shared DB; no hunter still running).
-  Then J. Then summary + mitigation paths.
-
-DAG edges only:
-
-- `A` → every `parallel: yes` section
-- those → `global_lock: process` (K8, then J)
-
-No UI rebuild. Hunters do not create tenants
-and do not re-seed. Sign-out, org-switch, theme,
-sidebar, command palette, and SV two-alias stay
-inside the hunter's tenant and alias. Assertions
-inside a job are exact. Leftover `≥ N` in a case
-body is doc debt, not protocol.
-
-Failure:
-
-| Event | Action |
-|---|---|
-| AT red | Abort. Crank exits before Docker. No seed, no hunters. |
-| A3 seed fail | Abort. No hunters. |
-| Hunter crash | That section FAIL. Siblings finish. |
-| Hunter FAIL cases | Join continues. Then one mitigation spec per cluster. |
-| K8 fail | Record FAIL; still attempt J; still write earlier mitigations. |
-| J1 stop fails | J1 FAIL. J2 DEFERRED if the origin is still up. |
-
-Master never re-dispatches a hunter to retry.
-
-#### Browser-use driving
-
-Refuse the run if browser-use is missing. Do
-not fall back to Claude-in-Chrome,
-chrome-devtools MCP, or source-only
-workarounds. Compositor mouse and a real
-CSS viewport drive canvas gestures, CSS
-viewport, skeletons, reduced-motion, and
-two-jar SV.
-
-- **Flow designer gestures** (port drag,
-  shift-drag to connect, marquee select):
-  drive with compositor mouse
-  (AA27–AA34, F15, F19–F23, F50–F54).
-  PASS/FAIL on the live gesture. Pair
-  fixture + reload is a last-resort
-  corroboration, not a substitute and
-  not BLOCKED. WB5a graph repair is
-  pair fixture + reload.
-- **List-row drag-reorders.** E11
-  (projects), D36/D37 (ideas), and K6
-  (objectives) are compositor-mouse
-  driveable (pointer capture on
-  `.drag-handle`, not HTML5 `drop`).
-  Drive: `pointerdown` on
-  `.drag-handle`, `pointermove` (two
-  or more move samples across the
-  midpoint for D37 hysteresis), then
-  `pointerup`. Verify persistence by
-  reload. Window at or above 768 CSS
-  px; filter All.
-- **Visible tab for continuous mouse.**
-  Chrome aligns `mouseMoved` delivery
-  to the animation frame; a hidden tab
-  paints no frame, so a CDP
-  `Input.dispatchMouseEvent` `mouseMoved`
-  lands about five seconds late — past
-  the daemon's 5 s IPC read timeout —
-  while `mousePressed`, `mouseReleased`,
-  and keys land at once. All hunters
-  share one Chrome and `new_tab()`
-  creates targets in the background, so
-  a hunter's tab is hidden unless it
-  activates it. A helper that raises
-  mid-gesture leaves the canvas FSM in
-  flight with pointer capture held, and
-  every later click, Space, and
-  shortcut on that tab reads as a
-  product FAIL (2026-08-28 AA27–AA40,
-  F16–F67). Gesture hunters call
-  `activate_tab(current_tab())` before
-  every gesture (prompt rule); other
-  hunters never activate. Measured
-  2026-08-28 on a bare `data:` page:
-  hidden 5.001 s per move, visible
-  8 ms.
-- **CSS viewport.** Set a real CSS
-  viewport (not a screenshot-only
-  resize). I10–I15 need ≤767px for the
-  mobile drawer. PASS/FAIL on the
-  live layout.
-- **Loading skeletons** (I21): probe
-  before fetches settle (do not wait
-  for `wait_for_load` first). PASS if
-  the skeleton paints, then content
-  replaces it.
-- **`prefers-reduced-motion`** (I30):
-  emulate via CDP
-  (`Emulation.setEmulatedMedia`) and
-  assert the view-transition
-  neutralizing rule takes effect.
-  PASS/FAIL on the live behavior.
-- **Two-jar SV6–SV10:** the
-  `sv2.localhost` alias in a second
-  tab; same process, distinct host.
-- **Hunter probe discipline.**
-  Visibility via `checkVisibility()`
-  or `getClientRects()`, never a
-  descendant's computed `display`.
-  Never hand-`fetch` the API from
-  `js()` — the bearer is memory-only;
-  read the network log. V7 reads
-  grant 403 from the network log.
-  WB16 asserts against the daemon's
-  network events, accumulated by the
-  hunter from before bind through
-  WB11's inbox landing — never a
-  drained ring
-  (`wait_for_network_idle()` drains),
-  never Performance, never `js()`
-  `fetch`. Toasts via one `js()` call
-  on the Members invite dialog's
-  synchronous "Email is required"
-  toast, clicking `.toast-close`
-  after the 300 ms entrance and
-  asserting detachment inside 3 s.
-- **File downloads:** intercept
-  `URL.createObjectURL` (or the
-  browser-use downloads skill) for
-  Blob content. PASS/FAIL.
-- **File uploads:** construct a
-  `DataTransfer` and dispatch a
-  synthetic change event, or use the
-  browser-use uploads skill.
-- **Keyboard events** (arrows,
-  Cmd+K, Delete, Tab, Space) work
-  with compositor/CDP key events.
-- **The canvas `<svg>` is replaced
-  on every commit**: probe
-  `svg.flow-canvas` by fresh query
-  after every click, never through a
-  held element reference.
-- **Chords carry the browser's
-  `key`**: Shift uppercases
-  (Cmd+Shift+Z arrives as
-  `key: 'Z'`); match chords
-  Shift-insensitively.
-- **On canvas nodes and edges,
-  `el.focus()` selects like Tab**
-  (the `focusin` promotion) while
-  `el.click()` fires no
-  `pointerdown` and selects nothing
-  — drive canvas selection with
-  compositor pointer events or
-  `.focus()`.
-- **F56 Space after Auto-Fit:** do
-  **not** click the canvas to move
-  focus off the Auto-Fit switch —
-  that click starts a pan gesture,
-  so Space is ignored. Focus
-  `svg.flow-canvas` via `js()`
-  (`tabindex="0"`) / Tab, then
-  send Space.
-- **`kill` syscall against the
-  background HTTP server**: the
-  sandbox may EPERM `kill -TERM` /
-  `kill -9` against a background
-  PID. **J1 does not use that
-  syscall.** Stop the `./crank`
-  process A3 started with the
-  harness-native task stop (the
-  same handle A3 started). J1 PASS
-  when that process exits; the trap
-  stops serve, downs compose,
-  removes the temp bundle. Do not
-  mark J1 BLOCKED for sandbox
-  EPERM. If the harness stop fails,
-  J1 is FAIL.
-- **Phase 5 build-dir cleanup
-  (J2)**: J2 is the trap's `rm -rf`
-  of crank's temp bundle, verified
-  after crank has exited. J2 is
-  DEFERRED only when crank/serve is
-  still up. Do not `rm` a
-  still-running bundle.
-- **Stolen-tab.** One `*.localhost`
-  alias per hunter. Empty bind picker,
-  `data-empty` rows, or 0/0/1 tiles
-  on C — or toast "work order has no
-  instance binding" on R14's named
-  subject — is stolen-tab paint. If
-  the chip names another section's
-  admin: FAIL (wrong alias). Do not
-  treat a shared-alias accident as a
-  product bug unless a serial C or
-  R pin fails.
-- **Why aliases.** The session rides
-  one host-only `refresh_token`.
-  Named browser-use daemons share
-  one Chrome; CDP isolation is a
-  tab, not a jar. Two hunters
-  refreshing the same cookie look
-  like theft and revoke the chain.
-- **macOS "Allow remote debugging?"
-  sheet.** Each named daemon's first
-  CDP connection raises one; fourteen
-  hunters raise up to fourteen. Chrome
-  holds that daemon's handshake until
-  Allow; after 45 s the daemon fails
-  `permission-blocked` and the hunter
-  crashes (that section FAIL, not
-  product). The sheet does not touch
-  input dispatch — the hidden-tab
-  delay above reproduces with the
-  sheet answered. Answer each sheet at
-  once, or run `browser-use
-  mac-approve`.
-- **`getBoundingClientRect` ≠
-  click coordinates**: a ~1.19×
-  CSS-px ↔ screenshot-px scale
-  exists on the driven tab. Click
-  by the coordinates seen in a
-  screenshot, never by
-  `getBoundingClientRect` (its
-  larger CSS-px values miss).
-- **List pages populate slowly
-  (5–14s)**: org-scoped list reads
-  re-derive each entity's lifecycle
-  from the message-plane pair
-  ledger (`message_pairs`), so
-  cards can take 5–14s to paint
-  (Flows is slowest). Wait ≥14s and
-  assert the container's
-  `childCount` / `data-*-card`
-  count — never an early
-  screenshot, which shows a
-  skeleton or blank mid-render and
-  reads as a false "empty list".
-- **First post-reload mouse click
-  often only focuses**: a page's
-  `init()` wires button handlers
-  asynchronously, so a click
-  landing before init merely
-  focuses the control with no
-  dialog. Use the element's
-  `.click()` or re-click once init
-  has settled.
-
-#### Serial single-tester mode
-
-Document order on one mock tenant. A3 **is** SV1.
-SV6–SV10 run before J as today.
-
-### Execution Order
-
-**A1–A2 ZIP inventory first**, then crank as A3.
-AT is inside crank, not a master step before A1.
-
-**Parallel (default):** confirm browser-use
-→ A1–A2 → A3 `./crank --test-plan-slices
-8080` → 14 hunters → join in document
-order → K8 → J → summary.
-
-**Serial (`--serial`):** A1–A2 → A3
-`./crank --mock-data 8080` → A → AA → B → C →
-D → E → F → F2 → FS → G → H → I → K (including
-K8 in document order) → R → SV6–SV10 → J.
-
-K's product cases on the parallel path run K1–K6,
-K9–K30, K7 last. K8 is skipped by the K hunter and
-run by the master after join.
+Nothing blocks on any outcome. BLOCKED is allowed for a
+driver limit: with no gate riding on the walk, an honest
+BLOCKED costs nothing and a dishonest FAIL costs a day. A
+durable limit earns the case a one-line driving note, added
+by the master.
 
 ## Summary
 
 | Section | Tests |
 |---|--:|
-| AT. Automated Test Suite | 4 |
+| AT. Automated Test Suite | 5 |
 | A. Build & Setup | 5 |
 | AA. Data Entry Workflow | 46 |
 | B. Entry Pages | 31 |
@@ -579,15 +169,15 @@ run by the master after join.
 | K. Objectives & Scoring | 30 |
 | R. Records | 25 |
 | SV. Server (Node + Postgres) | 9 |
-| **Total** | **400** |
+| **Total** | **401** |
 
-A3 **is** SV1 — counted once, in A. The SV hunter
+A3 **is** SV1 — counted once, in A. The explorer
 skips SV1. F is 80 (F1–F75 plus F37a, F37b, F38a,
 F38b, F57a).
 
 ### Combined Totals (CLI + Browser)
 
-The per-section table above counts 400 distinct
+The per-section table above counts 401 distinct
 TEST-PLAN cases (A3 is SV1; not counted twice). The
 CLI count is the most recent `./validate` (AT2)
 report — the main `tests/*.test.ts` suite plus the
@@ -598,41 +188,19 @@ seven run. The number grows as tests land in either
 glob and is not pinned here. Update the case count
 when a case is added or removed.
 
-Outcome categories used by run summaries (see `## Summary
-Format` at the bottom of this file):
-
-| Status   | Meaning                              | Fails? |
-|----------|--------------------------------------|:------:|
-| PASS     | Assertion satisfied                  |   no   |
-| FAIL     | Real regression; investigate         |  YES   |
-| BLOCKED  | Process prerequisite missing (K7)    |   no   |
-| DEFERRED | Skipped — dependency not produced    |   no   |
-| DRIFT    | Passes but doc/UI mismatch surfaced  |   no   |
-| pending  | Default (`- [ ]`); not yet executed  |  n/a   |
-
-A fully green run reports:
-`PASS = AT2 + 400, FAIL = 0, BLOCKED = 0, DEFERRED ≤ j,
-DRIFT = 0`, where AT2 is the CLI count that run reported
-and the six status counts sum to AT2 + 400.
-`BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL`
-indicates a regression. Never score BLOCKED for a
-driver limit, a missing toy, or a shared alias.
+The five outcomes are defined once, in `## The walk`'s
+`### Scoring`. `pending` is the sixth and is not an
+outcome: it is the default `- [ ]`, not yet executed.
 
 ---
 
 ## AT. Automated Test Suite
 
-tenant: none
-parallel: no
-global_lock: none
-depends: —
-
-The automated layer is crank's gate, not a
-master step before A1. AT1–AT3 are crank's one
-`./validate`. AT4 is crank step 6
-(`./test-postgres` after postgres is up). How
-to invoke does not run AT and then crank.
-Abort on any AT red.
+AT1–AT3 are Layer 1, the one `./validate` crank runs
+first. AT5 is Layer 2's browser suite. AT4 is crank's
+`./test-postgres`, run after postgres is up. Layer 3
+runs all five through `./crank`; the walk never invokes
+them separately. Abort on any AT red.
 
 - [ ] **AT1** Run `npx tsc --noEmit -p tsconfig.json`,
   then `npx tsc --noEmit -p web-app/app/tsconfig.json`.
@@ -645,6 +213,13 @@ Abort on any AT red.
   suite creates and drops its own
   `fusion_test_*` schema. PASS: exits 0,
   `fail 0`. `./validate` stays Postgres-free.
+- [ ] **AT5** Crank runs `./test-browser` after AT4 and
+  before `./build --no-zip`. It bundles the client into
+  `$TMPDIR` and runs `tests/browser/*.test.ts` serially
+  against an in-process origin on the memory backend,
+  one Chrome browser context per test. Needs Chrome
+  (`CHROME` or `CHROME_DEBUG_URL`). PASS: exits 0,
+  `fail 0`. `./test-all` runs AT1–AT3 then AT5.
 
 ---
 
@@ -3846,47 +3421,47 @@ regression.
 ## Summary Format
 
 The run produces a single conversational summary in the
-following format. This is the contract `### How to invoke`
+following format. This is the contract `## The walk`
 references. The doc itself is NOT mutated by the run.
 
 ```
 # Test Plan Run — <ISO-8601 timestamp, Zulu>
 
 Build SHA: <git rev-parse --short HEAD>  (clean | dirty: N files)
-Mode: parallel-agents | serial
 
 ## Automated (AT)
 - AT1 tsc: PASS (0 diagnostics)
 - AT2 ./test: PASS (N/N, 0 fail, Xs)
 - AT3 ./validate: PASS (lint clean)
 - AT4 ./test-postgres: PASS (0 fail)
+- AT5 ./test-browser: PASS (0 fail)
 
 ## Manual Browser Regression
-Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
+Total: <N> cases — PASS X · FAIL Y · BLOCKED Z · DEFERRED D · DRIFT R
 
-| Section | Cases | Pass | Blocked | Fail |
-|---------|------:|-----:|--------:|-----:|
-| AT | 4 | | | |
-| A | 5 | | | |
-| AA | 46 | | | |
-| B | 31 | | | |
-| C | 7 | | | |
-| D | 38 | | | |
-| E | 12 | | | |
-| F | 80 | | | |
-| F2 | 31 | | | |
-| FS | 9 | | | |
-| G | 38 | | | |
-| H | 2 | | | |
-| I | 30 | | | |
-| K | 29 (skip K8) | | | |
-| R | 25 | | | |
-| SV | 9 (A3=SV1) | | | |
-| K8 | 1 | | | |
-| J | 3 | | | |
+| Section | Cases | Pass | Fail | Blocked | Deferred | Drift |
+|---------|------:|-----:|-----:|--------:|---------:|------:|
+| AT | 5 | | | | | |
+| A | 5 | | | | | |
+| AA | 46 | | | | | |
+| B | 31 | | | | | |
+| C | 7 | | | | | |
+| D | 38 | | | | | |
+| E | 12 | | | | | |
+| F | 80 | | | | | |
+| F2 | 31 | | | | | |
+| FS | 9 | | | | | |
+| G | 38 | | | | | |
+| H | 2 | | | | | |
+| I | 30 | | | | | |
+| K | 29 (skip K8) | | | | | |
+| R | 25 | | | | | |
+| SV | 9 (A3=SV1) | | | | | |
+| K8 | 1 | | | | | |
+| J | 3 | | | | | |
 
-## BLOCKED detail (K7 process prerequisite only)
-- <case ID>: <one-line reason> | (none)
+## BLOCKED detail
+- <case ID>: <the reason outside the product> | (none)
 
 ## FAIL detail
 (none) | <case ID>: <one-line symptom>
@@ -3895,31 +3470,25 @@ Mitigation specs:
 - <path> | (none)
 
 ## Drift Candidates
-| Case | Mode | Symptom | Likely cause |
-|------|------|---------|--------------|
-(none) | ... | ... | ...
+| Case | Symptom | Likely cause |
+|------|---------|--------------|
+(none) | ... | ...
 ```
 
-A fully green run with no drift produces zero rows in FAIL
-and Drift Candidates, BLOCKED none, and fits in
-under 50 lines.
-
-`BLOCKED` is reserved for a missing process
-prerequisite (K7 waiting on K3). Never a driver
-limit, a missing toy, or a shared alias.
-`FAIL` is for real regressions. A case that "mostly passes
-but one subassertion drifts" is scored PASS with the drift
-noted in the Drift Candidates table — the agent surfaces;
-the user adjudicates.
+The summary reports counts. FAIL rows become stubs; there
+is no arithmetic to satisfy and no run is "fully green".
+`BLOCKED` names a driver or environment limit; `DRIFT`
+names a document that must change. Neither is a
+regression, and neither blocks.
 
 ### Mitigation specs
 
-After join, one markdown file per FAIL cluster under
+After the walk, one markdown file per FAIL cluster under
 `docs/superpowers/test-plan-mitigations/`. Product design
 specs stay in `docs/superpowers/specs/`. Do not create the
 directory until the first cluster exists. The master lists
-paths in the summary. Implementing those specs is
-tracked in `TODO.md`.
+paths in the summary. Dated stubs stay frozen. Implementing
+those specs is tracked in `TODO.md`.
 
 File name:
 `YYYY-MM-DD-{section}-{first-case}.md`
@@ -3929,8 +3498,19 @@ File name:
 
 - Section: {id}
 - Cases: {comma-separated ids}
+- Pin: {the case's Pin clause, copied}
 - Expected: {from the case PASS line}
-- Observed: {hunter note}
+- Observed: {explorer note}
 - Suspected layer:
-  UI | adapter | API | seed | driver
+  UI | adapter | API | seed | driver | doc
+- Reproduced by:
+  tests/{file}.test.ts '{test name}' red at {SHA}
+  | not reproduced — {driver or environment reason}
+  | doc — {the DRIFT correction}
 ```
+
+**A product commit may cite a stub only when
+`Reproduced by` names a red test.** The test sits at the
+lowest layer that can express the covenant — a reducer,
+presenter, or adapter pin at Layer 1, a CDP test at
+Layer 2.

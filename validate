@@ -16,7 +16,7 @@ LONG_LINES=$( {
         ! -path 'web-app/app/compose.ts' \
         -exec awk "$AWK_LINT" {} +
     awk "$AWK_LINT" build build-lib serve test test-postgres \
-        test-browser \
+        test-browser test-all \
         validate generate-schema-svg \
         generate-api-documentation measure \
         postgres-wipe postgres-lib postgres-seed \
@@ -154,6 +154,28 @@ if [ -n "${LATER_HOME_FAIL}${DEFERRAL_PROSE}" ]; then
     if [ -n "${DEFERRAL_PROSE}" ]; then
         echo "${DEFERRAL_PROSE}" >&2
     fi
+    exit 1
+fi
+
+# Every tests/… path TEST-PLAN.md cites must exist. Paths,
+# not test names: a name is the audit's judgment, a path is
+# what rots when a file is renamed or deleted. The trailing
+# `|| true` is this file's idiom for a grep that may
+# legitimately match nothing: under `set -euo pipefail` a
+# no-match grep would otherwise kill the whole script at
+# this assignment, silently and with no diagnostic.
+MISSING_PINS=$(
+    grep -oE 'tests/[A-Za-z0-9._/-]+\.test\.ts' \
+        TEST-PLAN.md \
+    | sort -u \
+    | while read -r PIN_PATH; do
+        [ -f "$PIN_PATH" ] || echo "  ${PIN_PATH}"
+    done || true
+)
+
+if [ -n "$MISSING_PINS" ]; then
+    echo "Error: TEST-PLAN.md cites a missing test:" >&2
+    echo "$MISSING_PINS" >&2
     exit 1
 fi
 

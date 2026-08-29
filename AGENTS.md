@@ -6,21 +6,22 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 
 ```bash
 ./test                 # Run automated tests (memory backend)
-./test-browser         # Tier 2: headless Chrome vs an in-process origin
+./test-browser         # Layer 2's browser half; needs Chrome
+./test-all             # Layer 2: ./validate + ./test-browser
 ./validate             # Type-check + tests + lint (works on dirty tree)
 ./build                # Server ZIP to ~/Desktop/
 ./build --no-zip dir/  # server-core + server.mjs to dir/
 ./build dir/           # Server ZIP to dir/ instead of ~/Desktop/
 ./build --help         # Show usage
-./crank --mock-data|--test-plan-slices|--bootstrap port
+./crank --mock-data|--bootstrap port
 ./serve dir/ port      # node server.mjs from dir/ (no build)
-./postgres-seed --postgres local --bootstrap|--mock-data|--test-plan-slices
+./postgres-seed --postgres local --bootstrap|--mock-data
 ./postgres-seed --postgres render TOKEN \
-    --bootstrap|--mock-data|--test-plan-slices
+    --bootstrap|--mock-data
 ./postgres-wipe --postgres render TOKEN
 ./postgres-wipe --postgres local
 ./postgres-seed --postgres compose \
-    --bootstrap|--mock-data|--test-plan-slices
+    --bootstrap|--mock-data
 docker compose build       # image of the committed tree
 docker compose up --wait   # postgres:18 + server, 127.0.0.1:8080
 docker compose down        # stop; the database dies with it
@@ -82,12 +83,16 @@ tree and runs `tests/browser/*.test.ts` serially. It
 is not part of `./validate`; `./crank` runs it after
 `./test-postgres`.
 
-When an agent runs the full test plan (CLI + browser),
-`./validate` is the gate: a failing type-check, test, or
-line-length lint ABORTS the run automatically. Do not ask
-whether to continue — the bundle is built from the same
-source, so a failing CLI suite makes the browser run
-meaningless. Report the failure, stop, await fix.
+Three layers verify this product. Layer 1 is `./validate`,
+the gate on every commit. Layer 2 is `./test-all` —
+Layer 1 then `./test-browser` — the operator's gate before
+`./build`, a deploy, or a walk. Layer 3 is the serial walk
+(`./crank --mock-data 8080`, then one explorer through
+TEST-PLAN.md); it is exploration and gates nothing. A
+browser observation changes product only through a red
+test at Layer 1 or Layer 2: a product commit may cite a
+TEST-PLAN mitigation stub only when its `Reproduced by`
+names a red test.
 
 `./measure` is not part of `./validate`; it needs
 Chrome. Full ceremony: `--record` + `--write-budgets`
@@ -135,8 +140,8 @@ This governs all work in this repo — the master conducts and
 keeps the complete voice, the subagents fan out and pay the
 Medium price. Even the doctrine audit ([AUDIT.md](AUDIT.md))
 follows this: its orchestrator conducts as master and goes
-Full, while its hunters and refuters fan out as subagents and
-go Medium.
+Full, while its explorer, auditors, and refuters fan out as
+subagents and go Medium.
 
 The scripture is universal; the codebase is local. After
 the proselytization, the dispatching agent MUST also push
@@ -265,7 +270,7 @@ every other op.
 | DESIGN-SYSTEM.md | tokens, heat ramp, breakpoints, CSS |
 | FLOW-CANVAS.md | canvas FSM, camera MUST NOTs, hazards |
 | AUDIT.md | doctrine audit runbook |
-| TEST-PLAN.md | browser regression, Protocol |
+| TEST-PLAN.md | three layers; the serial walk |
 | TODO.md | critical path, later work, sequencing |
 
 ## How we got here

@@ -7,11 +7,11 @@ set -euo pipefail
 usage() {
     cat <<'USAGE'
 Usage: ./postgres-seed --postgres local
-       --bootstrap|--mock-data|--test-plan-slices
+       --bootstrap|--mock-data
        ./postgres-seed --postgres render TOKEN
-       --bootstrap|--mock-data|--test-plan-slices
+       --bootstrap|--mock-data
        ./postgres-seed --postgres compose
-       --bootstrap|--mock-data|--test-plan-slices
+       --bootstrap|--mock-data
 
 Seed an empty Postgres. --postgres is
 required and has no default. --postgres render
@@ -25,7 +25,6 @@ Options:
   --postgres render|local|compose   Target (required)
   --bootstrap   Seed bootstrap identities
   --mock-data   Seed mock data
-  --test-plan-slices   Seed TEST-PLAN slices
   --help       Show this help message
 
 render: TOKEN must see exactly one Postgres and
@@ -42,7 +41,6 @@ POSTGRES_TARGET=''
 TOKEN=''
 BOOTSTRAP=false
 MOCK_DATA=false
-TEST_PLAN_SLICES=false
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -66,10 +64,6 @@ while [ $# -gt 0 ]; do
             ;;
         --mock-data)
             MOCK_DATA=true
-            shift
-            ;;
-        --test-plan-slices)
-            TEST_PLAN_SLICES=true
             shift
             ;;
         -*)
@@ -97,21 +91,17 @@ fi
 if [ "$MOCK_DATA" = true ]; then
     MODE_COUNT=$((MODE_COUNT + 1))
 fi
-if [ "$TEST_PLAN_SLICES" = true ]; then
-    MODE_COUNT=$((MODE_COUNT + 1))
-fi
 
 if [ "$MODE_COUNT" -gt 1 ]; then
-    echo "Error: --bootstrap, --mock-data, and" \
-        "--test-plan-slices are exclusive" >&2
+    echo "Error: --bootstrap and --mock-data are" \
+        "exclusive" >&2
     usage >&2
     exit 1
 fi
 
 if [ "$MODE_COUNT" -eq 0 ]; then
-    echo "Error: exactly one of --bootstrap," \
-        "--mock-data, or --test-plan-slices" \
-        "is required" >&2
+    echo "Error: exactly one of --bootstrap or" \
+        "--mock-data is required" >&2
     usage >&2
     exit 1
 fi
@@ -149,10 +139,8 @@ fi
 
 if [ "$BOOTSTRAP" = true ]; then
     MODE='--bootstrap'
-elif [ "$MOCK_DATA" = true ]; then
-    MODE='--mock-data'
 else
-    MODE='--test-plan-slices'
+    MODE='--mock-data'
 fi
 
 if [ "$POSTGRES_TARGET" = "compose" ]; then

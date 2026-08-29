@@ -10,9 +10,8 @@ import {
     claimToken, devToken, reachableToken,
 } from './token-fixtures.ts';
 import {
-    postTestPlanSlices, sliceEntityId,
-} from '../api/test-plan-slices.ts';
-import { testHashPassword } from './mock-seed.ts';
+    seededMockDb, testHashPassword,
+} from './mock-seed.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { captureConsole } from './console-capture.ts';
@@ -37,6 +36,8 @@ import { bytesToBase64Url } from '../shared/base64url.ts';
 import {
     seedClientRegistration,
     seedClientRegistrationTombstone,
+    seedIdentityCredential,
+    seedPersonIdentity,
 } from './identity-fixtures.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -1056,24 +1057,40 @@ async () => {
     assert.match(body.error, /unknown client/);
 });
 
+// A person identity with a password and no seat anywhere,
+// minted on top of the mock seed. The slice seed used to
+// supply one; the covenant is the token's silence about
+// organizations, not where the identity came from.
 const UNSEATED = 'dtmZgnDBlVcoyjxKzlaKgA';
+const UNSEATED_CREDENTIAL = 'CYr8sAaDTpCQEUSZUqUxOg';
+const UNSEATED_EMAIL = 'unseated@example.com';
+const UNSEATED_PASSWORD = 'unseated-s3cret';
+const STARK = 'AjdvjuECVZEgZoFajaIEkg';
+const STARK_ADMIN = 'XXZruirZyAOoRpNxaDnpSA';
 
 test('unseated password grant has no org claims',
 async () => {
-    const db = memoryDbAdapter();
-    const reveal = await postTestPlanSlices(
-        db, { hashPassword: testHashPassword },
+    const db = await seededMockDb();
+    await seedPersonIdentity(db, UNSEATED, {
+        name: 'Unseated Person',
+        email: UNSEATED_EMAIL,
+        phone: '+1 (555) 000-0000',
+        bio: 'Invited, not yet seated.',
+    });
+    await seedIdentityCredential(
+        db, UNSEATED, UNSEATED_CREDENTIAL, {
+            identity_id: UNSEATED,
+            kind: 'password',
+            status: 'set',
+            secret: await testHashPassword(
+                UNSEATED_PASSWORD,
+            ),
+            at: '2026-06-03T00:00:00.000000Z',
+        },
     );
-    const g = reveal.find(
-        (row) => row.section === 'G',
-    );
-    assert.ok(g);
-    const password = g.unseatedPassword;
-    assert.ok(
-        (password ?? '').length >= 16,
-    );
-    const gOrganization = g.organizationId;
-    const gAdmin = sliceEntityId('g-admin');
+    const password = UNSEATED_PASSWORD;
+    const gOrganization = STARK;
+    const gAdmin = STARK_ADMIN;
     const verifier = 'pkce-verifier-unseated';
     const challenge = await s256Challenge(verifier);
     const authorized = await handleRequest(
@@ -1085,8 +1102,7 @@ async () => {
             },
             body: JSON.stringify({
                 method: 'password',
-                username:
-                    'g-unseated@test-plan.example',
+                username: UNSEATED_EMAIL,
                 password,
                 client_id: 'web',
                 code_challenge: challenge,
@@ -1177,8 +1193,7 @@ async () => {
                 'operation-id': generateIdentifier(),
             },
             body: JSON.stringify({
-                email:
-                    'g-unseated@test-plan.example',
+                email: UNSEATED_EMAIL,
                 invitationId: generateIdentifier(),
                 grantEventId: generateIdentifier(),
                 grantAt: nowUtc(),
