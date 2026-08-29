@@ -136,7 +136,7 @@ const PII = {
 // the raw put this replaces — only the write mechanism changes.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
-    id: string,
+    _id: string,
     organization: string,
     identityId: string,
     at: string,

@@ -94,7 +94,7 @@ test('patch-only synthetic is a write route the walker'
         segments: ['patch-only-synthetic', ':id'],
         // Cast: no live PatchHandler yet; the walker only
         // tests presence, never calls.
-        patch: (async () => ({})) as Route['patch'],
+        patch: (async () => ({})) as NonNullable<Route['patch']>,
     };
     const pattern = writtenPattern(synthetic);
     assert.equal(pattern, 'patch-only-synthetic/:id');

@@ -15,7 +15,6 @@ import {
 // composed POST cannot silently inherit an accidental handler.
 // Mirror of tests/api-records-verb-gaps.test.ts phrasing.
 
-const BASE = 'http://localhost';
 const COLLECTION = '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/';
 const DETAIL = COLLECTION + 'sjWcXwYGlgxxJOHxzMoUow';
 const HISTORY = DETAIL + '/versions/';

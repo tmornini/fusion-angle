@@ -34,7 +34,6 @@ import { seedSeat } from './root-admin-fixture.ts';
 // the bind (A3). Ladder: after ACL 403 and constraint
 // 400.
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const FLOW_ID = generateIdentifier();
@@ -78,7 +77,8 @@ function req(
         path,
         token,
         body,
-        headers: extraHeaders,
+        ...(extraHeaders !== undefined
+            ? { headers: extraHeaders } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }

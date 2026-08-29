@@ -51,8 +51,6 @@ import {
 // temporary observed-value probe before every assertion below
 // was pinned, per Step 0/Step 1 of the task brief.)
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

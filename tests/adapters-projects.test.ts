@@ -7,7 +7,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken, organizationToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
     getProjectEntities,
@@ -29,7 +29,6 @@ import type {
 } from '../api/types.ts';
 import {
     seedCurrentMember,
-    seedHumanMember,
 } from './member-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -38,7 +37,7 @@ import { generateIdentifier } from
 // trio (state/stateAt/stateEventId). GET ProjectEntity carries
 // the stamped trio (Phase A); list/detail read it from the row.
 function buildProject(
-    id: string,
+    _id: string,
     title: string,
     overrides?: Partial<
         Omit<
@@ -322,6 +321,7 @@ test(
                 estimated_cost: 4000,
                 actual_cost: 2000,
             }),
+            ...TRIO,
             id: 'pnXmXrxOWayANgDLdCjuBw',
         }, TRIO);
         const view = new ProjectView(project, [], [], []);
@@ -395,6 +395,7 @@ test(
                 start_date: '2026-01-01',
                 target_end_date: '2026-01-11',
             }),
+            ...TRIO,
             id: 'pnXmXrxOWayANgDLdCjuBw',
         }, TRIO);
         const view = new ProjectView(project, [], [], []);

@@ -43,7 +43,6 @@ import {
 // stays dual-tolerant for the seed's ~859 pure-moves.
 // Gate-path rejection lives ONLY in the dispatch arrow.
 
-const BASE = 'http://localhost';
 const ORGANIZATION = STARK_ORGANIZATION;
 const WO_ID = generateIdentifier();
 const NODE_NEXT = generateIdentifier();

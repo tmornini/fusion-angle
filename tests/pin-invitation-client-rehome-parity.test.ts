@@ -39,8 +39,6 @@ const INV_GHOST = generateIdentifier();
 //    the clients table (rawReadRow + clients store gone;
 //    registration facet is the sole oracle).
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

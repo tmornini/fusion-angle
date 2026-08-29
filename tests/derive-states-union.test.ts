@@ -55,7 +55,6 @@ import { generateIdentifier } from
 // C3; fence force lives on resolveOwningOrganization + family
 // history routes.
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 // Non-current admins need explicit claim roles — organizationToken
@@ -84,7 +83,8 @@ function req(
         path,
         token,
         body,
-        headers,
+        ...(headers !== undefined
+            ? { headers } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }
@@ -211,9 +211,7 @@ async function person(
     });
 }
 
-function ideaDocument(
-    title: string, stateEventId: string, at: string,
-) {
+function ideaDocument(title: string) {
     return {
         title, position: 0,
         problem_statement: '', target_users: '',
@@ -289,26 +287,6 @@ async function createFlowWithNodes(
         },
     ));
     assert.equal(res.status, 201, 'flow creation POST failed');
-}
-
-async function headResponseId(
-    db: MemoryDbAdapter, token: string, organizationA: string,
-    flowId: string,
-): Promise<string> {
-    const got = await handleRequest(
-        db, req(
-            'GET',
-            '/organizations/' + organizationA + '/flows/' + flowId,
-            token,
-        ),
-    );
-    const id = got.headers.get('Response-ID');
-    assert.ok(
-        id,
-        'no Response-ID on GET /organizations/'
-            + organizationA + '/flows/' + flowId,
-    );
-    return id!;
 }
 
 interface GraphSidecar {
@@ -482,10 +460,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     const ideaRes = await handleRequest(db, req(
         'PUT', '/organizations/' + organizationA + '/ideas/' + ideaId,
         tokenA,
-        ideaDocument(
-            'Union Idea', ideaId + '-genesis',
-            '2026-01-02T00:00:00.000000Z',
-        ),
+        ideaDocument('Union Idea'),
     ));
     assert.equal(ideaRes.status, 201);
 
@@ -493,10 +468,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     const foreignIdeaRes = await handleRequest(db, req(
         'PUT', '/organizations/' + organizationB + '/ideas/'
             + foreignIdeaId, tokenB,
-        ideaDocument(
-            'Foreign Idea', generateIdentifier(),
-            '2026-01-02T00:00:00.000001Z',
-        ),
+        ideaDocument('Foreign Idea'),
     ));
     assert.equal(foreignIdeaRes.status, 201);
 

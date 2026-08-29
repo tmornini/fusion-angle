@@ -7,19 +7,14 @@ import {
 } from '../api/db-memory.ts';
 import { PUT } from '../api/api.ts';
 import { postToken } from '../api/authentication.ts';
+import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import {
     mintAccessToken,
     TOKEN_AUDIENCE,
 } from '../api/access-token.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
-import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWriteMessagePair } from '../api/message-pair.ts';
+import { nowUtc } from '../api/types.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -47,6 +42,27 @@ async function tokenFor(sub: string): Promise<string> {
     });
 }
 
+// postToken is called BELOW the HTTP gate here (no handleRequest
+// in this file), so this seed stands in for the one api.ts forms
+// at the dedicated authentication arm for a real POST
+// /authentication/token — same route fields, matching the
+// seedAuthorizationCodeMessagePair idiom (api-shadow-ledger-
+// tokens.test.ts). Every test below fails on revocation before
+// any grant reaches formAuthMessagePair(seed, ...), so the
+// fields never surface in a stored pair — this just satisfies
+// postToken's own required seed parameter honestly.
+function tokenRequestSeed(): AuthMessagePairSeed {
+    return {
+        requestAt: nowUtc(),
+        headerFields: [],
+        method: 'POST',
+        pathname: '/authentication/token',
+        routePattern: 'authentication/token',
+        routeSegments: ['authentication', 'token'],
+        pathSegments: ['authentication', 'token'],
+    };
+}
+
 // Below-facade pair formation (the member-fixtures.ts idiom): the
 // token-exchange grant's own membership check derives from the
 // message plane once memberships flips, so a raw row here would
@@ -55,7 +71,7 @@ async function tokenFor(sub: string): Promise<string> {
 // changes.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
-    id: string,
+    _id: string,
     organization: string,
     identityId: string,
     at: string,
@@ -124,7 +140,7 @@ async () => {
         grant_type: 'token-exchange',
         subject_token: token, actor_token: token,
         organization: ORGANIZATION_A,
-    });
+    }, tokenRequestSeed());
     assert.equal(res.ok, false);
     if (!res.ok) assert.equal(res.status, 401);
 });
@@ -145,7 +161,7 @@ async () => {
         grant_type: 'token-exchange',
         subject_token: subject, actor_token: actor,
         organization: ORGANIZATION_A,
-    });
+    }, tokenRequestSeed());
     assert.equal(res.ok, false);
     if (!res.ok) assert.equal(res.status, 401);
 });
@@ -155,7 +171,7 @@ test('refresh rejects a logged-out token', async () => {
     const token = await tokenFor(USER_1);
     const res = await postToken(db, {
         grant_type: 'refresh', refresh_token: token,
-    });
+    }, tokenRequestSeed());
     assert.equal(res.ok, false);
     if (!res.ok) assert.equal(res.status, 401);
 });
@@ -186,7 +202,7 @@ test('refresh on a logged-out but live jti is the'
     });
     const res = await postToken(db, {
         grant_type: 'refresh', refresh_token: token,
-    });
+    }, tokenRequestSeed());
     assert.equal(res.ok, false);
     if (!res.ok) {
         assert.equal(res.status, 401);

@@ -43,8 +43,8 @@ function ctxFor(db: MemoryDbAdapter) {
 function objectiveDoc(
     position: number,
     state: 'active' | 'archived',
-    eventId: string,
-    at = '2026-01-01T00:00:00.000000Z',
+    _eventId: string,
+    _at = '2026-01-01T00:00:00.000000Z',
 ) {
     return {
         position,

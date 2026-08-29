@@ -94,7 +94,8 @@ export async function claimToken(opts: {
         sub,
         roles: [...opts.roles],
         name: 'Demo',
-        organization: opts.organization,
+        ...(opts.organization !== undefined
+            ? { organization: opts.organization } : {}),
         organizations: [...opts.organizations],
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: opts.jti ?? ('claim-' + sub),

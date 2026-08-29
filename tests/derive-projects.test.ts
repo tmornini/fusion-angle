@@ -4,7 +4,6 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
-    deriveProject,
     deriveProjects,
     deriveProjectStateHistory,
 } from '../api/derive-projects.ts';
@@ -19,7 +18,6 @@ import { generateIdentifier } from
 // lifecycle-reduction guarantees that tests/drift-projects.test.ts
 // (parity-against-old-plane only) does not exercise.
 
-const BASE = 'http://localhost';
 const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 
 function req(
@@ -44,8 +42,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 function projectDocument(
     title: string,
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
 ): Record<string, unknown> {
     return {
         title,

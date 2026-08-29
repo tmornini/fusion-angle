@@ -1,4 +1,3 @@
-// @ts-expect-error — Node global stub
 globalThis.localStorage = (() => {
     const store = new Map<string, string>();
     return {
@@ -196,7 +195,7 @@ async function deriveMembershipsAll(db: DbAdapter) {
     for (const organization of organizations) {
         const seatPrefix = '/organizations/'
             + organization.id + '/members/';
-        const [seatRequests, seatResponses] =
+        const [seatRequests] =
             await Promise.all([
                 db.messagePairs.getAllWhere(
                     'uri_collection', seatPrefix,
@@ -812,7 +811,9 @@ async () => {
                         expires_in: 900,
                     } as T;
                 }
-                return sarah.POST(resource, body);
+                return toccYYkLEABmlbpHJalgtQ.POST(
+                    resource, body,
+                );
             },
         };
         await postInvitationAcceptance(recording, inv.id);

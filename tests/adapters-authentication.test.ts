@@ -15,18 +15,11 @@ import { devToken } from './token-fixtures.ts';
 import {
     postPasswordLogin,
 } from '../web-app/app/adapters/authentication.ts';
-import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWriteMessagePair } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
     seedIdentityCredential,
     seedIdentityPii,
 } from './identity-fixtures.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { sha256Bytes } from '../shared/digest.ts';
 import { bytesToBase64Url } from '../shared/base64url.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -41,7 +34,7 @@ const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 // replace — only the write mechanism changes.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
-    id: string,
+    _id: string,
     body: Record<string, unknown>,
 ): Promise<void> {
     const organization = body.organization_id as string;

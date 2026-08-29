@@ -79,16 +79,17 @@ function req(
     return apiRequest({
         method,
         path,
-        token,
+        ...(token !== undefined ? { token } : {}),
         body,
-        headers,
+        ...(headers !== undefined
+            ? { headers } : {}),
         operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
 function ideaDocument(
     title: string,
-    stateEventId: string,
+    _stateEventId: string,
 ): Record<string, unknown> {
     return {
         title,
@@ -318,9 +319,9 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const liveHead = heads
             .filter((row) => row.uri_id === id)
             .toSorted((a, b) =>
-                a.at < b.at
+                a.response_at < b.response_at
                     ? 1
-                    : a.at > b.at
+                    : a.response_at > b.response_at
                         ? -1
                         : b.id.localeCompare(a.id),
             )[0];

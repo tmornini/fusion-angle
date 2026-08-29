@@ -29,7 +29,6 @@ import {
 // invitations side channel never joins the route table); both
 // are storage-only.
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const INV_DOC_1 = generateIdentifier();
 const INV_DOC_2A = generateIdentifier();
@@ -156,7 +155,6 @@ async () => {
     const res = await grant(db, INV_DOC_1);
     assert.equal(res.status, 200);
     const requests = await db.messagePairs.getAll();
-    const responses = await db.messagePairs.getAll();
     // 6: the fixture's own membership pair (Phase 13 Task 1;
     // role-grant retired), two identities/:id/pii pairs
     // (Phase 15 gate 6), the organizations/:id document
@@ -264,7 +262,6 @@ test('a fresh accept appends its seat document at the'
     );
     assert.equal(res.status, 204);
     const requests = await db.messagePairs.getAll();
-    const responses = await db.messagePairs.getAll();
     const documents = documentMessagePairsAt(
         requests, '/organizations/AjdvjuECVZEgZoFajaIEkg/members/',
     ).filter(

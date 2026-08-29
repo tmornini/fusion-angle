@@ -17,8 +17,6 @@ import {
 // version." The composed POST /ideas retired; it now 405s like
 // any other method-absent route (self-review requirement).
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,
@@ -58,7 +56,7 @@ function ideaFields(title: string) {
 // shape an edit or transition carries — entity fields plus the
 // lifecycle trio. There is no separate "create body" shape.
 function ideaGenesisBody(
-    ideaId: string, title: string, at: string,
+    _ideaId: string, title: string, _at: string,
 ) {
     return {
         ...ideaFields(title),

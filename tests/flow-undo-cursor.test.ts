@@ -91,7 +91,6 @@ globalThis.localStorage = {
     setItem: () => {},
 };
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 function req(
@@ -106,7 +105,8 @@ function req(
         path,
         token,
         body,
-        headers,
+        ...(headers !== undefined
+            ? { headers } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }
@@ -243,19 +243,6 @@ async function createFlow(
         },
     ));
     assert.equal(created.status, 201);
-}
-
-async function headResponseId(
-    db: MemoryDbAdapter, token: string, flowId: string,
-): Promise<string> {
-    const got = await handleRequest(db, req(
-        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
-    ));
-    const id = got.headers.get('Response-ID');
-    assert.ok(id
-        , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-        + '' + flowId);
-    return id!;
 }
 
 // A genuine save, echoing the current head — the ONLY way undo-
@@ -589,7 +576,7 @@ function snapOf(
             isAutoLayout: false,
             isAutoFit: false,
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            createdAt: AT,
+            hasUndoHistory: false,
             nodes,
             edges: [],
         },

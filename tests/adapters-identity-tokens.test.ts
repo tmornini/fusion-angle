@@ -3,25 +3,8 @@ import assert from 'node:assert/strict';
 import {
     validateIdentityTokenEntity,
 } from '../api/validators.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
-import {
-    TokenReuseError,
-} from '../web-app/app/adapters/identity-tokens.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-
-async function adminCtx() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return {
-        db, ctx: createRequestContext(db, await devToken()),
-    };
-}
 
 const goodRow = {
     jti: generateIdentifier(),

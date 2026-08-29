@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { GET, PUT, POST, handleRequest } from
+import { GET, PUT, handleRequest } from
     '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
@@ -90,15 +90,6 @@ function flowDocument(
         graph,
         graphDelta: emptyDelta(),
         revivals: [],
-    };
-}
-
-function detail(name: string) {
-    return {
-        name,
-        description: '',
-        skill_focus: '',
-        model: firstProviderModel().id,
     };
 }
 

@@ -8,11 +8,10 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken, organizationToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
-    buildFlowBody,
 } from
 '../web-app/app/adapters/flow-mutations.ts';
 import {
@@ -200,7 +199,7 @@ test(
     'postWorkOrderCreation freezes flow_graph'
     + ' from the message-plane GET graph',
     async () => {
-        const { db, ctx } = await setupMemDb();
+        const { ctx } = await setupMemDb();
         const flowId = generateIdentifier();
         // Use a graph that satisfies work-order readiness
         // (has isCreate, a post-start node, one outgoing edge).

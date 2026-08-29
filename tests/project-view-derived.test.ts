@@ -10,16 +10,17 @@ import type {
 
 function makeProject(): Project {
     return new Project({
-        id: 'pnXmXrxOWayANgDLdCjuBw', title: 't',
+        id: 'pnXmXrxOWayANgDLdCjuBw',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        title: 't',
         description: 'd', progress: 0,
         start_date: '2026-05-14',
         target_end_date: '2026-05-14',
         estimated_cost: 0, actual_cost: 0,
         position: 0,
+        state: 'approved',
     }, {
         state: 'approved',
-        stateAt: '2026-01-01T00:00:00.000000Z',
-        stateEventId: 'ev-p1',
     });
 }
 
@@ -27,11 +28,26 @@ const T1 = '2026-05-14T00:00:00.000000Z';
 const T2 = '2026-05-15T00:00:00.000000Z';
 
 const oneObjective: ObjectiveEntity[] = [
-    { id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 },
+    {
+        id: 'ohqxgUBEaFQwYbXsonRPmg',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        position: 0,
+        state: 'active',
+    },
 ];
 const twoObjectives: ObjectiveEntity[] = [
-    { id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 },
-    { id: 'o2', position: 1 },
+    {
+        id: 'ohqxgUBEaFQwYbXsonRPmg',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        position: 0,
+        state: 'active',
+    },
+    {
+        id: 'o2',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        position: 1,
+        state: 'active',
+    },
 ];
 
 test(
@@ -53,6 +69,7 @@ test(
         const baseline = [
             { id: 'b1', projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 50, at: T1 },
         ];
         const v = new ProjectView(
@@ -71,9 +88,11 @@ test(
         const baseline = [
             { id: 'b1', projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 50, at: T1 },
             { id: 'b2', projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 60, at: T2 },
         ];
         const v = new ProjectView(
@@ -97,9 +116,11 @@ test(
         const baseline = [
             { id: 'b1', projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'o2',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 40, at: T1 },
             { id: 'b2', projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 60, at: T1 },
         ];
         const v = new ProjectView(
@@ -118,15 +139,18 @@ test(
         const baseline = [
             { id: 'b1', projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 50, at: T1 },
             { id: 'b2', projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'o2',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 40, at: T1 },
         ];
         const actual = [
             { id: 'UQTJZvCoKlFjEoDlDUwekw'
                 , projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 45, at: T2 },
         ];
         const v = new ProjectView(
@@ -149,19 +173,23 @@ test(
         const baseline = [
             { id: 'b1', projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 50, at: T1 },
             { id: 'b2', projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'o2',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 40, at: T1 },
         ];
         const actual = [
             { id: 'UQTJZvCoKlFjEoDlDUwekw'
                 , projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'o2',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 50, at: T2 },
             { id: 'UZgNCkZlSJcSaAmAJuSkcw'
                 , projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 30, at: T2 },
         ];
         const v = new ProjectView(
@@ -183,16 +211,19 @@ test(
         const baseline = [
             { id: 'b1', projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 50, at: T1 },
         ];
         const actual = [
             { id: 'UQTJZvCoKlFjEoDlDUwekw'
                 , projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 70, at: T2 },
             { id: 'UZgNCkZlSJcSaAmAJuSkcw'
                 , projectId: 'pnXmXrxOWayANgDLdCjuBw',
               objectiveId: 'o2',
+              memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               score: 999, at: T2 },
         ];
         const v = new ProjectView(

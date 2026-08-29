@@ -4,7 +4,6 @@ import { GET, POST } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     seedCurrentMember,
-    seedHumanMember,
 } from './member-fixtures.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {

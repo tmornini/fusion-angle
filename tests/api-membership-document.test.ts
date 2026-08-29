@@ -3,7 +3,6 @@ import { strict as assert } from 'node:assert';
 import { PUT, handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
-    type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';

@@ -13,10 +13,6 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import {
     formWriteMessagePair,
     appendMessagePair,
     IF_MATCH_HEADER,
@@ -46,7 +42,6 @@ import {
 // is 405. Pins use deriveInstanceHead for post-create
 // value verification (message plane, not GET).
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const TYPE_ID = 'sleWPUnGznNnXLzcfFswjg';
@@ -74,7 +69,8 @@ function req(
         path,
         token,
         body,
-        headers: extraHeaders,
+        ...(extraHeaders !== undefined
+            ? { headers: extraHeaders } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }

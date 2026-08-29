@@ -9,14 +9,13 @@ let dataPage: string | null = 'dashboard';
 
 // @ts-expect-error — Node global stub
 globalThis.window = { location: fakeLocation };
-// @ts-expect-error — Node global stub
 globalThis.document = {
     documentElement: {
         getAttribute(name: string): string | null {
             return name === 'data-page' ? dataPage : null;
         },
     },
-};
+} as unknown as Document;
 
 const {
     buildPageUrl,

@@ -26,19 +26,12 @@ import {
     seedAdminSchema,
     organizationRow,
 } from './test-fixtures.ts';
-import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWriteMessagePair } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
 function buildProject(
     id: string,
-): Omit<ProjectEntity, 'id'> {
+): Omit<ProjectEntity, 'id' | 'state'> {
     return {
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 'P-' + id,
@@ -54,7 +47,7 @@ function buildProject(
 
 function buildIdea(
     id: string,
-): Omit<IdeaEntity, 'id'> {
+): Omit<IdeaEntity, 'id' | 'state'> {
     return {
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 'I-' + id,
@@ -122,31 +115,6 @@ async function seedMember(
     await seedHumanMember(
         db, id, 'Member ' + id,
     );
-}
-
-// Re-pointed onto the message pair postMembershipDocumentOp
-// appends (finding 18's fixture budget): getOrganization's
-// deriveOrganizationFacts reads ctx.GET('memberships'), which
-// is now ledger-derived, so a raw row here would never surface
-// in the usedSeats() count this file's seat-usage test exercises.
-async function seedMembership(
-    db: MemoryDbAdapter,
-    id: string, identityId: string, at: string,
-): Promise<void> {
-    const body = {
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-        identity_id: identityId,
-        type: identityId === 'XXZruirZyAOoRpNxaDnpSA' ? 'admin' : 'member',
-        at,
-    };
-    await seedSeat(
-        db,
-        String(body['organization_id'] ?? body.organization_id),
-        String(body['identity_id'] ?? body.identity_id),
-        (body['type'] ?? body.type) as 'admin' | 'member',
-        String(body['at'] ?? body.at),
-    );
-
 }
 
 test(

@@ -8,7 +8,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken, organizationToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
@@ -168,7 +168,6 @@ async function messagePairGraphDeltaEvents(
     }[];
 }> {
     const requests = await db.messagePairs.getAll();
-    const responses = await db.messagePairs.getAll();
     const messagePairs = documentMessagePairsAt(
         requests, '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',
     ).filter((p) => p.uriId === flowId);
@@ -453,15 +452,14 @@ test(
             ...ctx,
             PUT: async <T,>(
                 path: string,
-                body?: unknown,
+                body: Record<string, unknown>,
                 headerFields?:
                     readonly (readonly [string, string])[],
             ): Promise<T> => {
                 if (path === 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + flowId
                     && captured === null) {
-                    captured =
-                        body as Record<string, unknown>;
+                    captured = body;
                     capturedHeaders = headerFields;
                 }
                 return origPut<T>(path, body, headerFields);

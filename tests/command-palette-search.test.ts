@@ -20,6 +20,7 @@ function buildIdea(
 ): Idea {
     return new Idea({
         id,
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title,
         position: 1,
         problem_statement: '',
@@ -27,6 +28,7 @@ function buildIdea(
         proposed_solution: '',
         expected_outcome: '',
         success_metrics: '',
+        state,
     }, {
         state,
     });
@@ -37,6 +39,7 @@ function buildProject(
 ): Project {
     return new Project({
         id,
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title,
         description: 'desc',
         progress: 42,
@@ -46,6 +49,7 @@ function buildProject(
         estimated_cost: 0,
         actual_cost: 0,
         position: 1,
+        state: 'approved',
     }, {
         state: 'approved',
     });

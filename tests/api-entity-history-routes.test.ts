@@ -31,8 +31,6 @@ import {
 // derive*StateHistory (ASC) with DESC + missedReadError.
 // Product versions live under organizations/:id/.
 
-const BASE = 'http://localhost';
-
 interface HistoryEvent {
     id: string;
     entity_id: string;
@@ -52,9 +50,9 @@ function req(
     return apiRequest({
         method,
         path,
-        token,
+        ...(token !== undefined ? { token } : {}),
         body,
-        headers,
+        ...(headers !== undefined ? { headers } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }
@@ -84,8 +82,8 @@ function assertDesc(rows: HistoryEvent[]): void {
 function ideaBody(
     title: string,
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
 ) {
     return {
         title,
@@ -309,10 +307,6 @@ test(
             body.error,
             'Not found: ideas/' + foreign.id,
         );
-        assert.equal(
-            STARK_ORGANIZATION !== ORGANIZATION_TWO,
-            true,
-        );
     },
 );
 
@@ -370,8 +364,8 @@ test(
 function projectBody(
     title: string,
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
 ) {
     return {
         title,
@@ -517,8 +511,8 @@ test(
 function recordBody(
     name: string,
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
 ) {
     return {
         name,
@@ -952,8 +946,8 @@ test(
 
 function objectiveBody(
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
 ) {
     return {
         position: 1,

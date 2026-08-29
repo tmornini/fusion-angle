@@ -7,13 +7,11 @@ import {
     postHumanMemberCreation,
     featuredHumanMembers,
     getHumanMemberProfile,
+    type HumanMember,
     type HumanMemberDraft,
 } from '../web-app/app/adapters/members.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import type {
-    HumanMember,
-} from '../web-app/app/presenters/member.ts';
 import {
     seedCurrentMember,
     seedHumanMember,

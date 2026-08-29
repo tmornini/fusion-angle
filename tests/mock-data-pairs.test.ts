@@ -603,10 +603,10 @@ test('a seeded flow-record join pair sits at its org-nested'
 // direct writes mock-data.ts already made).
 
 function transitionRequestForEvent(
-    requests: readonly { message: string; uri_collection: string;
+    requests: readonly { request: string; uri_collection: string;
         requester_identity_id: string }[],
     eventId: string,
-): { message: string; uri_collection: string;
+): { request: string; uri_collection: string;
     requester_identity_id: string } | undefined {
     return requests.find((r) => {
         try {

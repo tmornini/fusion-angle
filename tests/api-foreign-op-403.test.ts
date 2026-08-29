@@ -23,7 +23,6 @@ import { seedSeat } from './root-admin-fixture.ts';
 // and flow undo. The write authorizer never covers these
 // POSTs; a miss at this address is 404.
 
-const BASE = 'http://localhost';
 const ORGANIZATION_A = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2020-01-01T00:00:00.000000Z';
 
@@ -39,7 +38,8 @@ function req(
         path,
         token,
         body,
-        headers: extraHeaders,
+        ...(extraHeaders !== undefined
+            ? { headers: extraHeaders } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }

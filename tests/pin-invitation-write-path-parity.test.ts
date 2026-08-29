@@ -56,8 +56,6 @@ const ID_GRANT = generateIdentifier();
 // transaction shape, both before a membership exists and after
 // one lands.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

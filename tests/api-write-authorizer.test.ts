@@ -22,7 +22,6 @@ import { generateIdentifier } from
 // foreign-id DELETE never-written here is 404; genesis
 // (owner-null) is unaffected.
 
-const BASE = 'http://localhost';
 const ORGANIZATION_A = 'AjdvjuECVZEgZoFajaIEkg';
 
 function req(
@@ -42,7 +41,7 @@ function req(
 
 function ideaDocument(
     title: string,
-    stateEventId: string,
+    _stateEventId: string,
 ) {
     return {
         title,

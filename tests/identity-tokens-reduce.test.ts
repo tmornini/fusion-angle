@@ -9,9 +9,10 @@ import {
     parentJtiByJti,
     planRotation,
 } from '../api/identity-tokens.ts';
+import type { IdentityTokenAction } from '../api/types.ts';
 
 const ev = (
-    jti: string, action: string,
+    jti: string, action: IdentityTokenAction,
     chain: string, at: string,
 ) => ({
     id: jti + '@' + at, jti, identity_id: 'XXZruirZyAOoRpNxaDnpSA',

@@ -45,7 +45,6 @@ import { generateIdentifier } from
 // family without one), so its op/validator/wiring are exercised
 // below-gate only, never through PUT().
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 function req(

@@ -21,7 +21,7 @@ const emptyGraph = {
     isAutoLayout: false,
     isAutoFit: false,
     lockTimeout: 0,
-    createdAt: '2026-05-01T00:00:00.000000Z',
+    hasUndoHistory: false,
     nodes: [],
     edges: [],
 };
@@ -288,7 +288,7 @@ test(
             ],
         };
         const snap = buildInitialFlowSnapshot(
-            graph, 1200, 800, new Map(),
+            graph, 1200, 800, [], [], [],
         );
         const presenter =
             new FlowDesignerPresenter(
@@ -363,7 +363,7 @@ test(
             nodes: [node('n1', 0, 0)],
         };
         const snap = buildInitialFlowSnapshot(
-            graph, 800, 600, new Map(),
+            graph, 800, 600, [], [], [],
         );
         const presenter =
             new FlowDesignerPresenter(
@@ -396,7 +396,7 @@ test(
             nodes: [node('n1', 0, 0)],
         };
         const initial = buildInitialFlowSnapshot(
-            graph, 800, 600, new Map(),
+            graph, 800, 600, [], [], [],
         );
         const initialPresenter =
             new FlowDesignerPresenter(

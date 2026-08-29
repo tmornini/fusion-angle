@@ -1,6 +1,7 @@
-// Node-only scrypt hasher. Isolated so the client bundle
-// never statically imports node:crypto. Excluded from tsc
-// (no @types/node). boot() registers hasher + derive.
+// Node-only scrypt hasher. Isolated so the client
+// bundle never statically imports node:crypto.
+// Outside the browser tsc project.
+// boot() registers hasher + derive.
 
 import { scrypt as scryptCallback } from 'node:crypto';
 import {

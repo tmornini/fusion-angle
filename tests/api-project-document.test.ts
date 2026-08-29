@@ -40,8 +40,6 @@ function messagePairJsonOf(message: string): {
 // the state trio. G1: stored PUT body is projectEntityOf of
 // the same chain (trio included). GET streams that body.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

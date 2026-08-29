@@ -3,9 +3,10 @@
 // on routes[], it does not exist. Run via
 // ./generate-api-documentation [--check].
 //
-// Dev tooling, like generate-schema-svg.ts: run with
-// `node --strip-types`, excluded from tsc (Node APIs,
-// no @types/node), kept under the 78-char lint.
+// Dev tooling, like generate-schema-svg.ts: run
+// with `node --strip-types`, Node APIs, on the
+// browser exclude list, kept under the 78-char
+// lint.
 // Output is deterministic — no clocks, no randomness,
 // stable ordering — so `--check` can gate staleness.
 import {

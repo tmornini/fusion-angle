@@ -5,7 +5,6 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { nowUtc } from '../api/types.ts';
 import { deriveObjectiveStateHistory } from
     '../api/derive-objectives.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -24,8 +23,6 @@ import { generateIdentifier } from
 // seedAdminSchema (not postMockDataLoad) so the suite stays
 // self-contained; seeded genesis lives in mock-data/drift
 // pins. Writes go through the live gate.
-
-const BASE = 'http://localhost';
 
 function req(
     method: string,
@@ -53,14 +50,12 @@ test('deriveObjectiveStateHistory returns the trio walk in'
     const db = await seededDb();
     const token = await organizationToken();
     const id = generateIdentifier();
-    const genesisAt = nowUtc();
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
             , token, {
             position: 1, state: 'active',
         },
     ));
-    const archiveAt = nowUtc();
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
             , token, {
@@ -89,14 +84,12 @@ test('GET organizations/:id/objectives/:id/versions carries the objective'
     const db = await seededDb();
     const token = await organizationToken();
     const id = generateIdentifier();
-    const genesisAt = nowUtc();
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
             , token, {
             position: 1, state: 'active',
         },
     ));
-    const archiveAt = nowUtc();
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
             , token, {

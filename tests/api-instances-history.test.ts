@@ -14,10 +14,6 @@ import {
     seedOrganizationDocument,
 } from './test-fixtures.ts';
 import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import {
     formWriteMessagePair,
     appendMessagePair,
     strongEtagOf,
@@ -27,7 +23,6 @@ import {
     INSTANCE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
 import {
-    nowUtc,
     SYSTEM_MEMBER_ID,
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
@@ -47,7 +42,6 @@ import {
 // Wire DESC; each entry full state projected by CURRENT read
 // ACL; miss → missedReadError (R2).
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const TYPE_ID = generateIdentifier();
@@ -78,7 +72,8 @@ function req(
         path,
         token,
         body,
-        headers: extraHeaders,
+        ...(extraHeaders !== undefined
+            ? { headers: extraHeaders } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }

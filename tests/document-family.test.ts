@@ -65,7 +65,6 @@ const SL_2 = generateIdentifier();
 const SL_3 = generateIdentifier();
 const SL_4 = generateIdentifier();
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 function req(
@@ -80,7 +79,8 @@ function req(
         path,
         token,
         body,
-        headers,
+        ...(headers !== undefined
+            ? { headers } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }
@@ -215,6 +215,7 @@ test('documentEntityRoute (simple arm) PUTs through the'
     const written = await route.put!(
         db, ['AjdvjuECVZEgZoFajaIEkg', 'gZsGVjTnvrgHQLzbKnQckg'], body
             , 'XXZruirZyAOoRpNxaDnpSA', messagePair,
+        'AjdvjuECVZEgZoFajaIEkg', [], AT, TEST_OPERATION_ID,
     );
     assert.equal(
         (written as { title: string }).title, 'Generic',
@@ -222,6 +223,7 @@ test('documentEntityRoute (simple arm) PUTs through the'
     const got = await route.get!(
         db, ['AjdvjuECVZEgZoFajaIEkg', 'gZsGVjTnvrgHQLzbKnQckg']
             , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
+        [],
     );
     assert.deepEqual(got, await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg'
         , 'gZsGVjTnvrgHQLzbKnQckg'));
@@ -282,7 +284,7 @@ async function testDocumentOp(
 function testEntityOf(
     document: { uriId: string; body: Record<string, unknown> },
     organization: Id,
-): unknown {
+): object {
     return {
         id: document.uriId,
         organization_id: organization,
@@ -823,7 +825,7 @@ const STATELESS_TABLE = 'stateless_storage_table';
 function statelessEntityOf(
     document: { uriId: string; body: Record<string, unknown> },
     organization: Id,
-): unknown {
+): object {
     return {
         id: document.uriId,
         organization_id: organization,
@@ -893,7 +895,7 @@ test('stateless lifecycle: a trio-less document PUT derives'
     await putStatelessDocumentMessagePair(db, SL_1, { v: 'first' });
     const got = await documentGetHandler(statelessWiring)(
         db, ['AjdvjuECVZEgZoFajaIEkg', SL_1], 'XXZruirZyAOoRpNxaDnpSA'
-            , 'AjdvjuECVZEgZoFajaIEkg',
+            , 'AjdvjuECVZEgZoFajaIEkg', [],
     );
     assert.deepEqual(got, {
         id: SL_1, organization_id: 'AjdvjuECVZEgZoFajaIEkg', v: 'first',
@@ -907,7 +909,7 @@ test('stateless lifecycle: documentCollectionGetHandler skips'
     await putStatelessDocumentMessagePair(db, SL_2, { v: 'listed' });
     const rows = await documentCollectionGetHandler(
         statelessWiring,
-    )(db, [], 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
+    )(db, [], 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg', []);
     assert.deepEqual(rows, [
         { id: SL_2, organization_id: 'AjdvjuECVZEgZoFajaIEkg'
             , v: 'listed' },
@@ -923,7 +925,7 @@ test('stateless lifecycle: a DELETE head 404s carrying'
     await assert.rejects(
         documentGetHandler(statelessWiring)(
             db, ['AjdvjuECVZEgZoFajaIEkg', SL_3], 'XXZruirZyAOoRpNxaDnpSA'
-                , 'AjdvjuECVZEgZoFajaIEkg',
+                , 'AjdvjuECVZEgZoFajaIEkg', [],
         ),
         (error: unknown) => {
             assert.ok(error instanceof EntityNotFoundError);
@@ -944,6 +946,6 @@ test('stateless lifecycle: a DELETE head is absent from the'
     await deleteStatelessDocumentMessagePair(db, SL_4);
     const rows = await documentCollectionGetHandler(
         statelessWiring,
-    )(db, [], 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
+    )(db, [], 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg', []);
     assert.deepEqual(rows, []);
 });

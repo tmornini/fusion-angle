@@ -233,8 +233,8 @@ async () => {
 
     const ordered = [...requestById.values()]
         .sort((a, b) =>
-            a.at < b.at ? -1
-                : a.at > b.at ? 1
+            a.response_at < b.response_at ? -1
+                : a.response_at > b.response_at ? 1
                     : a.id < b.id ? -1
                         : a.id > b.id ? 1
                             : 0,

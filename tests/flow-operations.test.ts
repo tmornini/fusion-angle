@@ -139,7 +139,7 @@ function buildGraph(
         isAutoLayout: true,
         isAutoFit: true,
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
-        createdAt: '2026-01-01T00:00:00.000000Z',
+        hasUndoHistory: false,
         nodes,
         edges,
     };

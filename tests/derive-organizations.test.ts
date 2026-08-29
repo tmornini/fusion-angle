@@ -31,8 +31,6 @@ import {
 // wire-body / derive agreement and message-plane address proofs.
 // Every pair is still built through the live PUT route.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

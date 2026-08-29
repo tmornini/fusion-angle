@@ -34,7 +34,7 @@ function revisionFields(id: string, name: string) {
     };
 }
 
-function genesisTrio(id: string) {
+function genesisTrio(_id: string) {
     return {
         initialState: 'active',
         initialStateEventId: generateIdentifier(),

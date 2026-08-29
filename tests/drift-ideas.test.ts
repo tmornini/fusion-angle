@@ -55,8 +55,6 @@ const IDEAID_SKEWED = generateIdentifier();
 // non-lexical live fixtures (oldest live head (at, id)
 // first; insertion diverges from id-lex).
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,
@@ -75,8 +73,8 @@ function req(
 function ideaDocument(
     title: string,
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
     position = 1,
 ) {
     return {
@@ -119,8 +117,8 @@ function wireIdeaGet(
     id: string,
     title: string,
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
     position = 1,
     organization = 'AjdvjuECVZEgZoFajaIEkg',
 ) {

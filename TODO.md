@@ -10,21 +10,30 @@ spec → plan → ship cycle, implemented sequentially. A
 "Merged:" clause names bullets absorbed from
 `## Later work`; they keep their oracles.
 
-1. Type-check the whole tree — `./validate` runs one
-   `tsc --noEmit -p web-app/app/tsconfig.json`, whose
-   `include` roots are `web-app/`, `api/`, `shared/`.
-   `server/` (8 files) and `tests/` (421) sit outside
-   them; six Node-only modules sit in `exclude`
-   (`compose.ts`, `generate-schema-svg.ts`,
-   `generate-api-documentation.ts`, `measure.ts`,
-   `measure-viz.ts`, `cdp-client.ts`). So 435 of 735
-   `.ts` files are never checked, and everything runs
-   under `node --strip-types`, which ERASES
-   annotations instead of checking them — the trees
-   that boot the server and assert every covenant
-   learn their type errors at runtime. Needs a second
-   project over `server/`, `tests/`, and the Node-only
-   modules; `@types/node` is its one cost, types-only.
+1. Restore the genesis-wins-under-skew covenant — five
+   drift/derive tests name a clock-skew case they never
+   construct, so they pass for the wrong reason.
+   `tests/drift-ideas.test.ts:600` ('GET idea trio is
+   lifecycle-current under clock skew') seeds a genesis PUT
+   at `2026-05-01`, then a later-arriving PUT at
+   `2020-01-01`, and asserts the trio keeps the genesis
+   `state_at` / `state_event_id`. But its fixture
+   `ideaDocument(title, state, stateAt, stateEventId,
+   position)` never writes `stateAt` or `stateEventId` into
+   the body — the whole-tree type check flagged both unused
+   (TS6133), and they now carry the `_` prefix that records
+   the omission. No skew is ever built, so nothing the name
+   claims is exercised. Same shape in
+   `tests/drift-objectives.test.ts:1199`,
+   `tests/drift-projects.test.ts:558`,
+   `tests/drift-records.test.ts:1093`,
+   `tests/drift-states.test.ts:1436`, and
+   `tests/derive-projects.test.ts`. Two exits per the Office
+   of Verification: make the PUT path accept caller-supplied
+   trio values so the skew is real, or rename the tests to
+   the arrival-order covenant they actually keep. The first
+   is a validator change; neither is confined to one test's
+   subject. Found by the whole-tree type check.
 2. Remove the lifecycle trio — fold `state` /
    `state_at` / `state_event_id` out of every document
    body (Decision 7): the reduction
@@ -81,7 +90,7 @@ spec → plan → ship cycle, implemented sequentially. A
    synchronization (new), directed cyclic graph (flow
    and sub-flow), directed cyclic graph (sub-graph); a
    chat on every record and work order (consumes item
-   8). Merged: READY gate on dangling refs
+   9). Merged: READY gate on dangling refs
    (`tests/adapters-flow-publish.test.ts`); locked
    verbs not executed
    (`tests/family-registry.test.ts`); the flow-tag
@@ -459,9 +468,11 @@ Off the critical path; each with its oracle.
   project only for `web-app/app/**`; editors and the
   LSP open `web-app/flows/**` and the other page
   directories under the root superset, where `process`
-  resolves. Move it to `web-app/tsconfig.json`. Three
-  live references (`validate`, TEST-PLAN.md AT1, the
-  critical-path item) plus the tiers plan's path
+  resolves. Move it to `web-app/tsconfig.json`. Five
+  live references (`validate`, TEST-PLAN.md AT1,
+  AGENTS.md's Gates paragraph, AGENTS.md's Two type
+  universes invariant, `tests/tsconfig-covenants.test.ts`)
+  plus the tiers plan's path
 - GPU flag in the Tier-2 launcher — `launchChrome` no
   longer passes `--disable-gpu` (cargo cult under
   `--headless=new`; it was required only by old headless

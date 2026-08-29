@@ -33,8 +33,6 @@ const NO_SUCH_IDENTITY = generateIdentifier();
 // message-plane pins (counts, multi-org set, order, presence,
 // accept/remove lifecycle, echoed-id resilience).
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

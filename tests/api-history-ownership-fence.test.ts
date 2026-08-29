@@ -7,12 +7,6 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
-import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
@@ -28,7 +22,6 @@ import { generateIdentifier } from
 // pins live in api-write-authorizer. Unknown-route 404
 // lives in api.test.ts.
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 function req(

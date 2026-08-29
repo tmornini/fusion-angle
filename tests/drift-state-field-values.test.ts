@@ -52,7 +52,6 @@ const FV_M = generateIdentifier();
 // history. Task 8 CUT: legacy fieldValues appends stay
 // BELOW the gate (SFV census is STORED-data truth).
 
-const BASE = 'http://localhost';
 const LOCK_TIMEOUT_SECONDS = 300;
 const TRANSITION_PATTERN = 'organizations/:id/work-orders/:id/transition';
 

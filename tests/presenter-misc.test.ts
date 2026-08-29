@@ -25,7 +25,7 @@ import { toggleStatusFilter } from
 import { orderedKeys } from
     '../web-app/app/presenters/ordered-keys.ts';
 import {
-    HumanMember, AIMember, nowUtc,
+    HumanMember, AIMember,
 } from '../api/types.ts';
 import type {
     GraphNode, GraphEdge,

@@ -38,7 +38,6 @@ import {
 // validator. Legacy path must stay byte-identical to
 // today's pool + latestByKey head-reduce.
 
-const BASE = 'http://localhost';
 const ORGANIZATION = STARK_ORGANIZATION;
 const TRANSITION_PATTERN = 'organizations/:id/work-orders/:id/transition';
 const NODE_START = generateIdentifier();

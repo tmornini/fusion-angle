@@ -42,8 +42,6 @@ function messagePairJsonOf(message: string): {
 // G1: stored PUT body is ideaEntityOf of the same chain
 // (trio included). GET streams that stored body.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

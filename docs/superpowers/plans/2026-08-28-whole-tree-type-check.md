@@ -33,16 +33,18 @@ least judgment first. Root `tsc` stays out of
 
 ## Global Constraints
 
-- **Base:** master at `afb16a4f` (or later, if
-  linear). Work on master; never branch, never
-  merge, never push. No worktrees.
-- **Pause:** do not interleave file-by-file with
-  the verification-tiers plan. Land this item at
-  that plan's next pause, before its Task 12
-  (`tests/browser-globals.ts`) and Task 13 (`req()`
-  helpers). Preferred pause: after Task 4 (current
-  HEAD). If that plan has moved past Task 4, wait
-  until its next pause still before Task 12.
+- **Base:** master, linear descendant of
+  `afb16a4f`. At Task 1 start, record
+  `git rev-parse HEAD` as BASE_SHA (Task 19
+  reviews that SHA..HEAD). Work on master;
+  never branch, never merge, never push. No
+  worktrees.
+- **Pause:** verification-tiers Tasks 1–11 have
+  shipped. Tasks 12 (`tests/browser-globals.ts`)
+  and 13 (`req()` helpers) have not. Execute this
+  plan now, before those two. Do not interleave
+  file-by-file. Do not start tiers Task 12 until
+  this series is green.
 - **One concern per commit.** Subject ≈50 chars,
   present-tense imperative, no body prose. Every
   commit message ends with exactly this trailer
@@ -64,9 +66,14 @@ least judgment first. Root `tsc` stays out of
   **BLOCKED**: pause for its own brainstorm. Do not
   paper over.
 - **Families never interleave within a commit.**
-- **Counts are a snapshot** (699 at `afb16a4f`, 196
-  files). Re-measure at the start of every family
-  task. The idioms are the contract.
+- **Counts are a snapshot** (699 at `afb16a4f`,
+  still 699 after verification-tiers Tasks 1–11,
+  196 files). Re-measure
+  at the start of every family task. The idioms
+  are the contract. `tests/browser/*.ts` (12
+  files) plus `tests/cdp-client.test.ts` and
+  `tests/browser-origin.test.ts` sit in the root
+  program and currently emit 0 diagnostics.
 - **Frozen:** dated specs and plans before this
   one. Do not edit the verification-tiers spec or
   plan except as that plan itself names.
@@ -100,7 +107,9 @@ The master session is the implementer.
 2. Partition files into batches of at most 20
    files. Prefer prefix groups (`tests/adapters-*`,
    `tests/api-*`, `tests/drift-*`, `tests/derive-*`,
-   remainder).
+   remainder). `tests/browser/` is type-clean;
+   include it in remainder only if re-measure
+   names a file there.
 3. Dispatch one general-purpose subagent per batch,
    **in parallel only when the batches share no
    files**. Each prompt MUST begin with
@@ -186,6 +195,14 @@ Expected at Task 2 after configs land: 699 total
 
 - [ ] **Step 1: Install the types package exact**
 
+Record BASE_SHA for Task 19:
+
+```bash
+git rev-parse HEAD
+```
+
+Then:
+
 ```bash
 npm install --save-dev --save-exact @types/node@24.13.3
 ```
@@ -194,13 +211,20 @@ Expected: `package.json` `devDependencies` gains
 `"@types/node": "24.13.3"` beside `esbuild`,
 `postgres`, `typescript`. Lockfile follows.
 Dockerfile `npm ci` will pick it up as types only.
+`node_modules/@types/node` may already be 24.13.3
+from a prior probe; it is not in `package.json`
+or the lockfile. Still run the install so the
+lock records it.
 
 - [ ] **Step 2: Validate**
 
 Run: `./validate`
 Expected: exit 0. Browser tsc still does not see
-`@types/node` (no `types` key yet; TS 6 defaults
-`types` to `[]`).
+`process` (TS2591) with no `types` key, even with
+the package present. `tsc --showConfig` omits
+`types` rather than printing `[]`; the
+behavioral pin is TS2591, not the printed
+default.
 
 - [ ] **Step 3: Commit**
 
@@ -506,8 +530,9 @@ writes the live counts into the Task 5–13 reports.
 If a family has 0 remaining at its turn, skip its
 commit and note the skip.
 
-Snapshot at `afb16a4f` (do not treat as the live
-list):
+Snapshot at `afb16a4f`, re-measured identical
+after verification-tiers Tasks 1–11 (do not
+treat as the live list):
 
 | family | codes | n |
 |---|---|---|
@@ -539,7 +564,8 @@ and the crank/serve `stamp` sites.
 **Codes:** TS6133, TS6192.
 **Files:** re-measure; snapshot is 140 files, all
 under `tests/` except `web-app/app/measure.ts:76`
-(`sleep` unused).
+(unused `sleep` import from `./cdp-client.ts`;
+the local function moved in verification-tiers).
 
 **Idiom:** Delete unused imports, unused locals,
 and whole unused import declarations. If the unused
@@ -671,10 +697,10 @@ git commit -m "Drop unused @ts-expect-error directives"
 name so the line executes. Do not stub. What
 happens next is a finding.
 
-`seedSeat`: if Task 5 deleted unused
-`seedMembership`, this site is gone — skip it.
-If it remains, import from the module that exports
-it:
+`seedSeat`: `seedMembership` is unused
+(definition only). Task 5 deletes it and this
+site is gone — skip it. If it remains,
+import from the module that exports it:
 
 ```ts
 import { seedSeat } from './root-admin-fixture.ts';
@@ -1035,10 +1061,13 @@ Object.assign(err, { code: '42P01' });
 
 4. `tests/api-entity-history-routes.test.ts:313`
    and `tests/api-work-order-history.test.ts:322`
-   — impossible literal comparison (TS2367). Dead
-   branches. Findings: delete the dead branch, or
-   fix the comparison to the values the test
-   actually has. Do not `as string` to silence it.
+   — TS2367: `STARK_ORGANIZATION !==
+   ORGANIZATION_TWO` compares two distinct string
+   literal types. Tautological assert, not a
+   runtime branch. Finding: delete the assert
+   (tsc already knows they differ), or compare
+   values the test actually has. Do not `as
+   string` to silence it.
 
 5. `tests/presenter-flow-stats.test.ts:16` —
    duplicated `id` (TS2783). Spread first, then
@@ -1287,9 +1316,11 @@ web-app/app/tsconfig.json` (the browser subset,
 `types: []`), then `./test` (two
 ```
 
-Keep the rest of the Gates paragraph. Wrap at 78.
-AGENTS.md ceiling is 300 lines; it is 247 today.
-This edit must stay under 300 (`wc -l AGENTS.md`).
+Keep the rest of the Gates paragraph (including
+the `./test-browser` sentence Task 11 added).
+Wrap at 78. AGENTS.md ceiling is 300 lines; it
+is 254 today. This edit must stay under 300
+(`wc -l AGENTS.md`).
 
 - [ ] **Step 3: Validate**
 
@@ -1410,14 +1441,26 @@ git commit -m "Name both tsc projects in AT1"
 
 ### Task 17: Stale Node-only banners
 
-**Files:** re-grep at execution:
+**Files:** re-grep at execution, then rewrite
+every file on the known list — grep is not
+complete.
 
 ```bash
 grep -nE 'excluded from tsc|no @types/node' \
     server/*.ts web-app/app/*.ts
 ```
 
-Known at spec time (line numbers drift):
+That pattern misses four banners already
+rewritten to "Excluded from browser tsc" (no
+"no `@types/node`"): `measure.ts`,
+`cdp-client.ts`, `browser-drive.ts`,
+`measure-viz.ts`. Rewrite those from the list
+below. Four hits still carry the false "no
+`@types/node`" clause: `server/boot.ts`,
+`server/http-server.ts`, `server/scrypt-hash.ts`,
+`web-app/app/generate-api-documentation.ts`.
+
+Known list (line numbers drift):
 `web-app/app/browser-drive.ts`,
 `web-app/app/cdp-client.ts`,
 `web-app/app/generate-api-documentation.ts`,
@@ -1476,7 +1519,8 @@ Examples:
 replace "Excluded from (browser) tsc (no
 `@types/node`)" with "On the browser exclude list".
 
-- [ ] **Step 1: Re-grep and rewrite every hit**
+- [ ] **Step 1: Re-grep, then rewrite every
+  known-list file**
 
 - [ ] **Step 2: Validate and commit**
 
@@ -1542,7 +1586,9 @@ the tiers plan's path. AGENTS.md now also names
 `web-app/app/tsconfig.json` in Gates and the new
 invariant — mention those if they are now live
 references, still under the 500-line ceiling
-(TODO.md is 490 today).
+(TODO.md is 499 today). Delete item 1 first
+(~15 lines) before adding any AGENTS.md
+mention.
 
 - [ ] **Step 4: Confirm ceilings**
 
@@ -1592,9 +1638,10 @@ Expected: 3/3.
   whole series**
 
 Dispatch a code-quality reviewer over
-`git log --oneline afb16a4f..HEAD` with
-BASE_SHA=`afb16a4f` (or the SHA this plan started
-from) and HEAD_SHA=`HEAD`. Fix Critical and
+`git log --oneline $BASE_SHA..HEAD` with the
+BASE_SHA recorded at Task 1 start (not
+`afb16a4f`, which includes 14 verification-tiers
+commits) and HEAD_SHA=`HEAD`. Fix Critical and
 Important issues. Do not start verification-tiers
 Task 12 until this review is clean.
 

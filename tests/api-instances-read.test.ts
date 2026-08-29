@@ -14,10 +14,6 @@ import {
     seedOrganizationDocument,
 } from './test-fixtures.ts';
 import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import {
     formWriteMessagePair,
     appendMessagePair,
     strongEtagOf,
@@ -29,7 +25,6 @@ import {
     deriveInstanceHead,
 } from '../api/derive-record-instances.ts';
 import {
-    nowUtc,
     SYSTEM_MEMBER_ID,
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
@@ -48,7 +43,6 @@ import {
 // caller. List embeds etag sans quotes. Full-state head
 // only (R5 — no fold).
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const AT2 = '2026-01-02T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
@@ -457,7 +451,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    const genesisId = await appendInstanceMessagePair(
+    await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_A,
         'PUT', {
             set: [
@@ -471,7 +465,7 @@ async () => {
     );
     await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_A,
-        'DELETE', undefined, AT2, genesisId,
+        'DELETE', undefined, AT2,
     );
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
@@ -540,7 +534,6 @@ async () => {
         ],
     );
     assert.equal(putB.status, 201);
-    const messagePairB = putB.headers.get('Response-ID')!;
     const putA = await putInstance(
         db, memberToken, INSTANCE_A, [
             {
@@ -550,8 +543,7 @@ async () => {
         ],
     );
     assert.equal(putA.status, 201);
-    const messagePairA = putA.headers.get('Response-ID')!;
-    const genesisC = await appendInstanceMessagePair(
+    await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_C,
         'PUT', {
             set: [
@@ -565,7 +557,7 @@ async () => {
     );
     await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_C,
-        'DELETE', undefined, AT2, genesisC,
+        'DELETE', undefined, AT2,
     );
     const list = await handleRequest(db, req(
         'GET', INSTANCES, memberToken,
@@ -656,7 +648,7 @@ async () => {
     await putLiveType(db, adminToken);
     await seedPublicAndSecretAttrs(db, adminToken);
     // Genesis delta (set only) — incomplete vs later head.
-    const genesisId = await appendInstanceMessagePair(
+    await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_A,
         'PUT', {
             set: [
@@ -686,7 +678,6 @@ async () => {
             ],
         },
         AT2,
-        genesisId,
     );
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), adminToken,

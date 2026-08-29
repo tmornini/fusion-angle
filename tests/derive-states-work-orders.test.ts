@@ -9,17 +9,12 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import type { StateEntity } from '../api/types.ts';
 import {
-    MS_PER_SECOND, nowUtc, SYSTEM_MEMBER_ID,
+    MS_PER_SECOND, nowUtc,
     setClockForTest, resetClock,
 } from '../api/types.ts';
 import {
     deriveWorkOrderLifecycle,
 } from '../api/derive-states.ts';
-import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
@@ -55,7 +50,6 @@ const WORKORDERID_GENESIS = generateIdentifier();
 // births are gone). Seeded traces reshape into transition
 // ops, so this reader also covers historical births.
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 function workOrderPath(id: string, rest = ''): string {

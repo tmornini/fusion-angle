@@ -67,7 +67,7 @@ function whoName(id: string): string {
     return memberNames.get(id) ?? id;
 }
 
-function resolver(objId: string, atTime: string) {
+function resolver(_objId: string, atTime: string) {
     const eligible = revisions
         .filter(r => r.at <= atTime);
     if (eligible.length === 0) return undefined;

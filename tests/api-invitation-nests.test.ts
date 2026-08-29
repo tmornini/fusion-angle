@@ -189,7 +189,7 @@ async function membershipsFor(
     for (const organization of organizations) {
         const seatPrefix = '/organizations/'
             + organization.id + '/members/';
-        const [seatRequests, seatResponses] =
+        const [seatRequests] =
             await Promise.all([
                 db.messagePairs.getAllWhere(
                     'uri_collection', seatPrefix,

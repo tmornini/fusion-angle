@@ -14,13 +14,6 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWriteMessagePair } from '../api/message-pair.ts';
-import {
-    nowUtc,
-    SYSTEM_MEMBER_ID,
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
 import {
@@ -32,7 +25,6 @@ import { seedSeat } from './root-admin-fixture.ts';
 // instances exist. Tombstoned instances do not block;
 // live heads do (voice: N instance(s)).
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const TYPE_ID = generateIdentifier();
@@ -58,7 +50,8 @@ function req(
         path,
         token,
         body,
-        headers: extraHeaders,
+        ...(extraHeaders !== undefined
+            ? { headers: extraHeaders } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }

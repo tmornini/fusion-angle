@@ -26,8 +26,6 @@ import { generateIdentifier } from
 // answered (pending) and never-granted (unknown id) cases. No
 // write path reads this core yet — Task 1 flips nothing.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

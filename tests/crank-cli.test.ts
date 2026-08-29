@@ -8,7 +8,10 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import {
+    spawnSync,
+    type SpawnSyncReturns,
+} from 'node:child_process';
 
 function pathWithDockerStub(stamp: string): string {
     const dir = mkdtempSync(
@@ -26,7 +29,7 @@ function pathWithDockerStub(stamp: string): string {
 
 function runCrank(
     args: string[],
-): ReturnType<typeof spawnSync> {
+): SpawnSyncReturns<string> & { stamp: string } {
     const stamp = join(
         mkdtempSync(join(tmpdir(), 'fusion-stamp-')),
         'called',

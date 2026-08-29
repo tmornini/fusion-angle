@@ -259,7 +259,7 @@ test(
     + ' → full state from NEW head (no fold)',
     async () => {
         const db = await emptyDb();
-        const genesisId = await appendInstancePair(
+        await appendInstancePair(
             db, INST_A, 'PUT',
             {
                 set: [
@@ -281,7 +281,6 @@ test(
                 ],
             },
             '2026-01-01T00:00:01.000000Z',
-            genesisId,
         );
         const head = await deriveInstanceHead(
             db, ORGANIZATION, TYPE_ID, INST_A,
@@ -302,7 +301,7 @@ test(
     + ' → undefined',
     async () => {
         const db = await emptyDb();
-        const genesisId = await appendInstancePair(
+        await appendInstancePair(
             db, INST_A, 'PUT',
             { set: [val('a', 'AjdvjuECVZEgZoFajaIEkg')] },
             '2026-01-01T00:00:00.000000Z',
@@ -311,7 +310,6 @@ test(
             db, INST_A, 'DELETE',
             {},
             '2026-01-01T00:00:02.000000Z',
-            genesisId,
         );
         const head = await deriveInstanceHead(
             db, ORGANIZATION, TYPE_ID, INST_A,
@@ -343,7 +341,7 @@ test(
             { set: [val('x', 'c')] },
             '2026-01-01T00:00:00.000000Z',
         );
-        const bId = await appendInstancePair(
+        await appendInstancePair(
             db, INST_B, 'PUT',
             { set: [val('x', 'b')] },
             '2026-01-01T00:00:01.000000Z',
@@ -357,7 +355,6 @@ test(
             db, INST_B, 'DELETE',
             {},
             '2026-01-01T00:00:03.000000Z',
-            bId,
         );
         const rows = await deriveInstanceCollection(
             db, ORGANIZATION, TYPE_ID,
@@ -395,7 +392,6 @@ test(
                 ],
             },
             '2026-01-01T00:00:01.000000Z',
-            g0,
         );
         const r2 = await appendInstancePair(
             db, INST_A, 'PUT',
@@ -403,7 +399,6 @@ test(
                 values: [val('a', '3')],
             },
             '2026-01-01T00:00:02.000000Z',
-            rOEPOcVMQdJiiiMuiiEhlg,
         );
         const revisions = await deriveInstanceRevisions(
             db, ORGANIZATION, TYPE_ID, INST_A,
@@ -448,7 +443,7 @@ test(
     'deriveInstanceRevisions empty when tombstoned',
     async () => {
         const db = await emptyDb();
-        const g0 = await appendInstancePair(
+        await appendInstancePair(
             db, INST_A, 'PUT',
             { set: [val('a', 'AjdvjuECVZEgZoFajaIEkg')] },
             '2026-01-01T00:00:00.000000Z',
@@ -457,7 +452,6 @@ test(
             db, INST_A, 'DELETE',
             {},
             '2026-01-01T00:00:01.000000Z',
-            g0,
         );
         const revisions = await deriveInstanceRevisions(
             db, ORGANIZATION, TYPE_ID, INST_A,

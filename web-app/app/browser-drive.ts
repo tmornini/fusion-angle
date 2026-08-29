@@ -1,7 +1,7 @@
 // Node-only product-aware driving on top of cdp-client:
 // page URLs, page:ready, and the auth-page sign-in.
-// Shared by ./measure and ./test-browser. Excluded from
-// the browser tsc like measure.ts.
+// Shared by ./measure and ./test-browser. On the
+// browser exclude list like measure.ts.
 
 import { PAGE_REGISTRY } from './page-registry.ts';
 import type { PageRun } from './measure-core.ts';

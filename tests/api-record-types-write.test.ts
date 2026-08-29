@@ -15,9 +15,7 @@ import {
     seedOrganizationDocument,
 } from './test-fixtures.ts';
 import {
-    postMembershipDocumentOp,
     postRecordDocumentOp,
-    WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
@@ -42,7 +40,6 @@ import { seedSeat } from './root-admin-fixture.ts';
 // RESTRICT, write authorizer, and byte-identical DELETE
 // replay. Composed POST create-with-attributes is Task 9.
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const AT2 = '2026-01-02T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';

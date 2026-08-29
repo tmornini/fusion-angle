@@ -58,8 +58,6 @@ const WORKORDERID_EV3 = generateIdentifier();
 // land in a later task. documentStateHeadFor pins retired with
 // C5 (the helper itself is gone).
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

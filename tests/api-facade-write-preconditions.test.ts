@@ -37,7 +37,7 @@ function ideaFields(title: string) {
     };
 }
 
-function ideaPutBody(ideaId: string, title: string) {
+function ideaPutBody(_ideaId: string, title: string) {
     return {
         ...ideaFields(title),
         state: 'active',

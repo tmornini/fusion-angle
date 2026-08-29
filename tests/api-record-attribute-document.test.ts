@@ -19,7 +19,6 @@ import {
 } from '../api/message-pair.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
-    RECORD_TYPE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
 import {
     deriveDocumentsAt,
@@ -301,7 +300,7 @@ test('a DELETE-head derives absent on the nested attributes'
     await deleteDocumentMessagePair(db, deletedId, typeId);
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
         + typeId + '/attributes/';
-    const [requests, responses] = await Promise.all([
+    const [requests] = await Promise.all([
         db.messagePairs.getAllWhere('uri_collection', prefix),
         db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);

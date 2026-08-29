@@ -399,7 +399,7 @@ async () => {
             (s) => s.section === section,
         );
         assert.ok(row, section);
-        const [requests, responses] =
+        const [requests] =
             await Promise.all([
                 db.messagePairs.getAll(),
                 db.messagePairs.getAll(),

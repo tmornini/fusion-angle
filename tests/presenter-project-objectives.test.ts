@@ -4,8 +4,18 @@ import { ProjectObjectivesPresenter } from
     '../web-app/app/presenters/project-objectives.ts';
 
 const activeObjs = [
-    { id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 },
-    { id: 'o2', position: 1 },
+    {
+        id: 'ohqxgUBEaFQwYbXsonRPmg',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        position: 0,
+        state: 'active',
+    },
+    {
+        id: 'o2',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        position: 1,
+        state: 'active',
+    },
 ];
 const defs = new Map([
     ['ohqxgUBEaFQwYbXsonRPmg', { name: 'Revenue', description: 'd1' }],
@@ -18,6 +28,7 @@ test('renders one row per active objective', () => {
         [{ id: 'b1',
            projectId: 'pnXmXrxOWayANgDLdCjuBw'
                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
@@ -36,6 +47,7 @@ test('shows "none yet" when no actuals',
         [{ id: 'b1',
            projectId: 'pnXmXrxOWayANgDLdCjuBw'
                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
@@ -52,11 +64,13 @@ test('shows latest actual with sign', () => {
         [{ id: 'b1',
            projectId: 'pnXmXrxOWayANgDLdCjuBw'
                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [{ id: 'UQTJZvCoKlFjEoDlDUwekw',
            projectId: 'pnXmXrxOWayANgDLdCjuBw'
                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            score: -10,
            at: '2026-05-15T00:00:00.000000Z' }],
         'approved',
@@ -92,6 +106,7 @@ test(
         [{ id: 'b1',
            projectId: 'pnXmXrxOWayANgDLdCjuBw'
                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
@@ -116,6 +131,7 @@ test(
         [{ id: 'b1',
            projectId: 'pnXmXrxOWayANgDLdCjuBw'
                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
@@ -140,6 +156,7 @@ test(
         [{ id: 'b1',
            projectId: 'pnXmXrxOWayANgDLdCjuBw'
                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
@@ -163,11 +180,13 @@ test(
         [{ id: 'b1',
            projectId: 'pnXmXrxOWayANgDLdCjuBw'
                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [{ id: 'UQTJZvCoKlFjEoDlDUwekw',
            projectId: 'pnXmXrxOWayANgDLdCjuBw'
                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            score: 30,
            at: '2026-05-15T00:00:00.000000Z' }],
         'archived',
@@ -191,6 +210,7 @@ test(
         [{ id: 'b1',
            projectId: 'pnXmXrxOWayANgDLdCjuBw'
                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
@@ -239,11 +259,13 @@ test(
         [{ id: 'b1',
            projectId: 'pnXmXrxOWayANgDLdCjuBw'
                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [{ id: 'UQTJZvCoKlFjEoDlDUwekw',
            projectId: 'pnXmXrxOWayANgDLdCjuBw'
                , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            score: 30,
            at: '2026-05-15T00:00:00.000000Z' }],
         'archived',

@@ -140,8 +140,10 @@ test('readListenEnv requires the three secrets', () => {
 
 test('hasSchemaMarker treats 42P01 as absent',
 async () => {
-    const err = new Error('undefined_table');
-    (err as { code: string }).code = '42P01';
+    const err = Object.assign(
+        new Error('undefined_table'),
+        { code: '42P01' },
+    );
     const sql: SqlClient = {
         query: () => Promise.reject(err),
         begin: async (fn) => fn(sql),

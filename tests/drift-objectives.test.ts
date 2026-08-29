@@ -59,7 +59,6 @@ const OBJ_DRIFT_Z = generateIdentifier();
 const OBJ_DRIFT_A = generateIdentifier();
 const OBJ_DRIFT_M = generateIdentifier();
 const OBJ_DRIFT_SKEW_1_GENESIS = generateIdentifier();
-const OBJ_DRIFT_SKEW_1_SKEWED = generateIdentifier();
 
 // Phase Final Task 2: objectives(+objective_revisions)
 // dual-write stripped. This file no longer compares derive
@@ -78,8 +77,6 @@ const OBJ_DRIFT_SKEW_1_SKEWED = generateIdentifier();
 // reads exercise the ACTUAL generic handlers. Nested
 // revisions/scores ride bespoke derives (no generic family
 // wiring for nests).
-
-const BASE = 'http://localhost';
 
 function req(
     method: string,
@@ -118,7 +115,6 @@ const OBJECTIVES_TEST_WIRING: DocumentFamilyWiring = {
 };
 
 const READER_ACTOR: Id = generateIdentifier();
-const ID_ACTIVE = generateIdentifier();
 const OBJECTIVEID_REV_1 = generateIdentifier();
 const OBJECTIVEID_ACTIVE = generateIdentifier();
 const OBJECTIVEID_REV_2 = generateIdentifier();
@@ -128,7 +124,7 @@ async function derivedObjectives(
     db: MemoryDbAdapter, organization: Id,
 ): Promise<ObjectiveEntity[]> {
     return documentCollectionGetHandler(OBJECTIVES_TEST_WIRING)(
-        db, [], READER_ACTOR, organization,
+        db, [], READER_ACTOR, organization, [],
     ) as Promise<ObjectiveEntity[]>;
 }
 
@@ -136,7 +132,7 @@ async function derivedObjective(
     db: MemoryDbAdapter, organization: Id, id: Id,
 ): Promise<ObjectiveEntity> {
     return documentGetHandler(OBJECTIVES_TEST_WIRING)(
-        db, [organization, id], READER_ACTOR, organization,
+        db, [organization, id], READER_ACTOR, organization, [],
     ) as Promise<ObjectiveEntity>;
 }
 
@@ -162,31 +158,14 @@ function wireObjectiveGet(
     id: string,
     position: number,
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
     organization = STARK_ORGANIZATION,
 ): ObjectiveEntity {
     return {
         ...wireObjectivePut(id, position, organization),
         state,
     };
-}
-
-// Seeded genesis trio (objectiveSeedBody): state active,
-// at MOCK_SEED_TIMESTAMP, event id seed-objective-${id}-active.
-function wireSeededObjective(
-    id: string,
-    position: number,
-    organization = STARK_ORGANIZATION,
-): ObjectiveEntity {
-    return wireObjectiveGet(
-        id,
-        position,
-        'active',
-        '2026-01-01T00:00:00.000000Z',
-        'seed-objective-' + ID_ACTIVE,
-        organization,
-    );
 }
 
 function decodeRequestMessage(message: string): {
@@ -982,7 +961,7 @@ test('the create-op POST pair is not read as a document message pair —'
         STARK_ORGANIZATION
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
     );
-    const [requests, responses] = await Promise.all([
+    const [requests] = await Promise.all([
         db.messagePairs.getAllWhere('uri_collection', prefix),
         db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);
@@ -1136,6 +1115,7 @@ async () => {
     const derivedById = await derivedObjective(
         db, STARK_ORGANIZATION, objectiveId,
     );
+    assert.equal(derivedById.state, 'archived');
     assert.equal(
         await getRes.text(),
         await storedPutBodyText(
@@ -1175,7 +1155,7 @@ async () => {
             wireObjectiveGet(
                 f.id, f.position, 'active',
                 '2026-06-13T00:00:00.000000Z',
-                f.ID_ACTIVE,
+                f.id,
             ),
         );
     }
@@ -1222,8 +1202,6 @@ test('GET objective trio is lifecycle-current under clock skew'
     const objectiveId = generateIdentifier();
     const genesisAt = '2026-06-01T00:00:00.000000Z';
     const genesisEv = OBJ_DRIFT_SKEW_1_GENESIS;
-    const skewedAt = '2020-01-01T00:00:00.000000Z';
-    const skewedEv = OBJ_DRIFT_SKEW_1_SKEWED;
 
     const genesis = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'

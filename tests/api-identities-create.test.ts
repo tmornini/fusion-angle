@@ -19,7 +19,6 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-const BASE = 'http://localhost';
 const MEMBER = generateIdentifier();
 
 async function freshDb() {

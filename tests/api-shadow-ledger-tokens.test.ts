@@ -231,7 +231,6 @@ test('a rotation appends its pair at an operation address:'
     );
     assert.ok(row);
     assert.equal(row!.uri_id, '');
-    const responses = await db.messagePairs.getAll();
 
     const stored = await db.messagePairs.getById(row!.id);
     const storedBody = await responseFromStored(stored).json();
@@ -266,7 +265,6 @@ async () => {
     const rows = await deriveIdentityTokens(db);
     assert.equal(latestActionForJti(rows, ROOT_JTI), 'revoked');
     const requests = await db.messagePairs.getAll();
-    const responses = await db.messagePairs.getAll();
 
     // +2: the chain's two distinct jtis (the seeded root, the
     // first rotation's successor) each gain a fresh 'revoked'
@@ -354,7 +352,6 @@ async () => {
     ));
     assert.equal(second.status, 201);
     const requests = await db.messagePairs.getAll();
-    const responses = await db.messagePairs.getAll();
 
     const rows = requests.filter(
         r => r.uri_collection
@@ -415,7 +412,7 @@ test('request and response counts stay equal across a mix'
     assert.equal(failed.status, 400);
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
-
+    assert.equal(requests.length, responses.length);
 });
 
 // ── synthesized event pairs: the issued-root writers (Phase 13
@@ -741,9 +738,6 @@ test('two concurrent rotations of one jti: exactly one'
     for (const row of newRows) {
         await assertEventMessagePairForRow(db, row.id);
     }
-    const requests = await db.messagePairs.getAll();
-    const responses = await db.messagePairs.getAll();
-
 });
 
 // ── the org-exchange hop: issueTokenPair's SEEDLESS branch
@@ -847,9 +841,6 @@ test('revokeTokenChain racing a concurrent rotateRefreshJti on'
             'token chain revoked',
         );
     }
-    const requests = await db.messagePairs.getAll();
-    const responses = await db.messagePairs.getAll();
-
 });
 
 // ── fault discrimination — the retry catch names ONLY the

@@ -9,7 +9,7 @@ import {
 } from '../api/validators.ts';
 import { createRequestContext }
     from '../web-app/app/adapters/shared.ts';
-import { devToken, organizationToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import {
     getArchivedObjectiveIds,
     getObjectives,

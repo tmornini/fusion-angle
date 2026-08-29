@@ -20,7 +20,7 @@ import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { buildMembers } from '../api/mock-data/members.ts';
-import { organizationToken, devToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import { organizationRow } from './test-fixtures.ts';
 import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
@@ -44,8 +44,6 @@ import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
 // identity's live seats on GET
 // /identities/:id/organizations/, or the pre-dispatch
 // membership guard in handleRequest (the :id read).
-
-const BASE = 'http://localhost';
 
 function req(
     method: string,
@@ -298,8 +296,8 @@ test('leg 4: PUT /organizations/:id then wire + derive agree'
 
 test('leg 5: SEED-STATE — no organizations states event'
 + ' exists for either seeded organization', async () => {
-    const db = await seededDb();
-    for (const organizationId of [
+    await seededDb();
+    for (const _organizationId of [
         STARK_ORGANIZATION, ORGANIZATION_TWO,
     ]) {
         assert.deepEqual(

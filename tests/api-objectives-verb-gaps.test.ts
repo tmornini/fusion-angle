@@ -26,8 +26,6 @@ import {
 // organizations/:id/projects/:id/objective-actual-scores; GET/POST/DELETE
 // organizations/:id/projects/:id/objective-actual-scores/:sid.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

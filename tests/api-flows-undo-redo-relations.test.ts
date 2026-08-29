@@ -19,7 +19,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken, organizationToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
@@ -157,7 +157,7 @@ function snapOf(
             isAutoLayout: false,
             isAutoFit: false,
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            createdAt: '2026-01-01T00:00:00.000000Z',
+            hasUndoHistory: true,
             nodes,
             edges,
         },
@@ -197,7 +197,7 @@ async function latestSidecarStateFor(
     db: MemoryDbAdapter,
     entityId: string,
 ): Promise<string> {
-    const [requests, responses] = await Promise.all([
+    const [requests] = await Promise.all([
         db.messagePairs.getAll(),
         db.messagePairs.getAll(),
     ]);

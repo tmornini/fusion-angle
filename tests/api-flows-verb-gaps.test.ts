@@ -23,8 +23,6 @@ import {
 // statuses must re-derive the covenant deliberately,
 // not by accident of refactoring.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

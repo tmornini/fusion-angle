@@ -7,29 +7,11 @@ import type { DbAdapter } from '../api/db.ts';
 import type {
     Id,
     MembershipEntity,
-    AIMemberEntity,
-    HumanMemberEntity,
 } from '../api/types.ts';
 import { nowUtc } from
     '../api/types.ts';
 import { canonicalUriCollection } from '../api/message-pair.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
-import {
-    documentGetHandler,
-    documentCollectionGetHandler,
-    type DocumentFamilyWiring,
-} from '../api/document-family.ts';
-import {
-    validateMembershipDocumentBody,
-    validateAiMemberDocumentBody,
-    validateHumanMemberDocumentBody,
-} from '../api/validators.ts';
-import {
-    postMembershipDocumentOp,
-    postAiMemberDocumentOp,
-    postHumanMemberDocumentOp,
-    postIdentityCreationOp,
-} from '../api/routes.ts';
 import {
     deriveOrganizationMemberSeat,
     deriveOrganizationMemberSeats,
@@ -40,13 +22,9 @@ import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { parseWire } from '../shared/http-message/wire-codec.ts';
-import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
-    storedPutBodyText,
-    storedCollectionText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -100,8 +78,6 @@ const HUMAN_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 // derived-plane parity holds
 // throughout every case below.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,
@@ -128,60 +104,6 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
 }
 
-// -- test-side wiring mirrors (routes.ts's private rows, by ----
-// -- content — every family's wiring row is module-private) -----
-
-const MEMBERSHIPS_TEST_WIRING: DocumentFamilyWiring = {
-    family: 'memberships',
-    httpNest: 'organization',
-    lifecycle: 'stateless',
-    notFoundTable: 'memberships',
-    validateDocument: validateMembershipDocumentBody,
-    documentOp: postMembershipDocumentOp,
-    entityOf: (document, _organization) => ({
-        id: document.uriId,
-        ...document.body,
-    }),
-};
-
-const AI_MEMBERS_TEST_WIRING: DocumentFamilyWiring = {
-    family: 'ai-members',
-    httpNest: 'organization',
-    lifecycle: 'stateless',
-    notFoundTable: 'ai_members',
-    validateDocument: validateAiMemberDocumentBody,
-    documentOp: postAiMemberDocumentOp,
-    entityOf: (document, _organization) => ({
-        id: document.uriId,
-        ...document.body,
-    }),
-};
-
-const HUMAN_MEMBERS_TEST_WIRING: DocumentFamilyWiring = {
-    family: 'human-members',
-    httpNest: 'organization',
-    lifecycle: 'stateless',
-    notFoundTable: 'human_members',
-    validateDocument: validateHumanMemberDocumentBody,
-    documentOp: postHumanMemberDocumentOp,
-    entityOf: (document, _organization) => ({
-        id: document.uriId,
-        ...document.body,
-    }),
-};
-
-// Any Id works here — every generic read path ignores its
-// `actor` argument entirely.
-const READER_ACTOR: Id = generateIdentifier();
-
-// members/ai-members/human-members are GLOBAL plane (family-
-// registry.ts: organizationNested:false) — canonicalUriCollection
-// ignores whatever organization value a caller passes for these
-// three families, so this fixed placeholder is never load-
-// bearing; requireOrganization (document-family.ts) merely
-// demands a defined value to dispatch through.
-const GLOBAL_PLANE_PLACEHOLDER: Id = STARK_ORGANIZATION;
-
 async function derivedMemberships(
     db: DbAdapter, organization: Id,
 ): Promise<MembershipEntity[]> {
@@ -192,61 +114,6 @@ async function derivedMembership(
     db: DbAdapter, organization: Id, id: Id,
 ): Promise<MembershipEntity> {
     return deriveOrganizationMemberSeat(db, organization, id);
-}
-
-async function derivedAiMembers(
-    db: DbAdapter, organization: Id,
-): Promise<AIMemberEntity[]> {
-    return documentCollectionGetHandler(AI_MEMBERS_TEST_WIRING)(
-        db, [], READER_ACTOR, organization,
-    ) as Promise<AIMemberEntity[]>;
-}
-
-async function derivedAiMember(
-    db: DbAdapter, organization: Id, id: Id,
-): Promise<AIMemberEntity> {
-    return documentGetHandler(AI_MEMBERS_TEST_WIRING)(
-        db, [organization, id], READER_ACTOR, organization,
-    ) as Promise<AIMemberEntity>;
-}
-
-async function derivedHumanMembers(
-    db: DbAdapter, organization: Id,
-): Promise<HumanMemberEntity[]> {
-    return documentCollectionGetHandler(HUMAN_MEMBERS_TEST_WIRING)(
-        db, [], READER_ACTOR, organization,
-    ) as Promise<HumanMemberEntity[]>;
-}
-
-async function derivedHumanMember(
-    db: DbAdapter, organization: Id, id: Id,
-): Promise<HumanMemberEntity> {
-    return documentGetHandler(HUMAN_MEMBERS_TEST_WIRING)(
-        db, [organization, id], READER_ACTOR, organization,
-    ) as Promise<HumanMemberEntity>;
-}
-
-// -- decode helper (mirrors tests/drift-records.test.ts's own ---
-// -- decodeRequestMessage) ---------------------------------------
-
-function decodeRequestMessage(message: string): {
-    readonly method: string;
-    readonly body: Record<string, unknown>;
-} {
-    const model = parseWire(message);
-    if (model.startLine.kind !== 'request') {
-        throw new Error(
-            'stored message carries no request line',
-        );
-    }
-    const body = HttpMessage.fromModel(model).body();
-    return {
-        method: model.startLine.method,
-        body: body.exists()
-            ? JSON.parse(body.toText()) as
-                Record<string, unknown>
-            : {},
-    };
 }
 
 // -- shared live-write body builders -----------------------------
@@ -875,7 +742,7 @@ async () => {
     const aiPrefix = canonicalUriCollection(
         undefined, '/ai-agents/',
     );
-    const [aiRequests, aiResponses] = await Promise.all([
+    const [aiRequests] = await Promise.all([
         db.messagePairs.getAllWhere('uri_collection', aiPrefix),
         db.messagePairs.getAllWhere('uri_collection', aiPrefix),
     ]);
@@ -899,7 +766,7 @@ async () => {
     const humanPrefix = canonicalUriCollection(
         undefined, '/identities/',
     );
-    const [humanRequests, humanResponses] = await Promise.all([
+    const [humanRequests] = await Promise.all([
         db.messagePairs.getAllWhere('uri_collection', humanPrefix),
         db.messagePairs.getAllWhere('uri_collection', humanPrefix),
     ]);

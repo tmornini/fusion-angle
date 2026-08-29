@@ -17,8 +17,6 @@ import {
 // /organizations/:org/records re-enters flat and 404s.
 // Member schema mutation on nested attributes is admin-only.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,
@@ -28,7 +26,7 @@ function req(
     return apiRequest({
         method,
         path,
-        token,
+        ...(token !== undefined ? { token } : {}),
         body,
         operationId: TEST_OPERATION_ID,
     });

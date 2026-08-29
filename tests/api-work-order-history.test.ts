@@ -39,7 +39,6 @@ import {
 // release rows carry []. Miss posture: empty lifecycle →
 // missedReadError → 404 miss at this address / 404 absent.
 
-const BASE = 'http://localhost';
 const WORK_ORDER_ID = generateIdentifier();
 const NODE_START = generateIdentifier();
 const NODE_MIDDLE = generateIdentifier();
@@ -63,7 +62,7 @@ function req(
     return apiRequest({
         method,
         path,
-        token,
+        ...(token !== undefined ? { token } : {}),
         body,
         operationId: TEST_OPERATION_ID,
     });
@@ -316,11 +315,6 @@ test(
         assert.equal(
             body.error,
             'Not found: work_orders/' + foreignId,
-        );
-        // Stark still owns the seed WO (sanity).
-        assert.equal(
-            STARK_ORGANIZATION !== ORGANIZATION_TWO,
-            true,
         );
     },
 );

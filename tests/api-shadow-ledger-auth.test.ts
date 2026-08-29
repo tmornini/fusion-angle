@@ -27,7 +27,6 @@ import {
     seedIdentityPii,
 } from './identity-fixtures.ts';
 import {
-    TEST_OPERATION_ID,
     refreshTokenFromSetCookie,
     setCookieHeader,
 } from './http-fixtures.ts';
@@ -622,7 +621,6 @@ test('a reused (already-rotated-away) refresh token grant is a'
         }, { [REQUEST_ID_HEADER]: 'replay-attemptAAAAAAAAAw' }));
     assert.equal(reused.status, 401);
     const requests = await db.messagePairs.getAll();
-    const responses = await db.messagePairs.getAll();
 
     const operationMessagePairsAfter = requests.filter(
         r => r.uri_collection === '/authentication/token/'

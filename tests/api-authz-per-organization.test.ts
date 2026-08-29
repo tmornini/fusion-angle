@@ -17,8 +17,6 @@ import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-const BASE = 'http://localhost';
-
 function req(
     method: string, path: string, token: string,
     body?: unknown,

@@ -80,7 +80,6 @@ const FLOWID_EV = generateIdentifier();
 // Coverage re-homes to wire-byte handleRequest assertions
 // and non-lexical live fixtures.
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 function req(
@@ -95,7 +94,8 @@ function req(
         path,
         token,
         body,
-        headers,
+        ...(headers !== undefined
+            ? { headers } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }
@@ -330,29 +330,6 @@ async function wireFlowsText(
     return res.text();
 }
 
-function normalizedGraph(graph: unknown): unknown {
-    const parsed = graph as {
-        nodes: {
-            id: string;
-            memberIds: string[];
-            attributes: { attribute_id: string }[];
-        }[];
-        edges: { id: string }[];
-    };
-    return {
-        nodes: sortById(parsed.nodes).map((node) => ({
-            ...node,
-            memberIds: [...node.memberIds].sort(),
-            attributes: sortById(
-                node.attributes.map((a) => ({
-                    ...a, id: a.attribute_id,
-                })),
-            ),
-        })),
-        edges: sortById(parsed.edges),
-    };
-}
-
 function assertWireEqualsDerived(
     wireText: string,
     derived: FlowWithGraph,
@@ -368,7 +345,7 @@ async function derivedHeadMessagePairId(
     db: MemoryDbAdapter, organization: string, flowId: string,
 ): Promise<string> {
     const prefix = canonicalUriCollection(organization, '/flows/');
-    const [requests, responses] = await Promise.all([
+    const [requests] = await Promise.all([
         db.messagePairs.getAllWhere('uri_collection', prefix),
         db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);
@@ -598,7 +575,7 @@ test('live-write chain: create, save, node delete, undo, '
     );
 
     // Plain save: rename only, no graph change.
-    let headId = await headResponseId(db, token, flowId);
+    await headResponseId(db, token, flowId);
     const saveAt = '2026-03-02T00:00:00.000000Z';
     const saved = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
@@ -608,7 +585,6 @@ test('live-write chain: create, save, node delete, undo, '
         { 'if-match': await headEtag(db, token, flowId) },
     ));
     assert.equal(saved.status, 201);
-    headId = saved.headers.get('Response-ID')!;
     derived = await assertStep();
 
     // Further save (versions POST retired Phase 15 Task 7).
@@ -623,7 +599,6 @@ test('live-write chain: create, save, node delete, undo, '
         { 'if-match': await headEtag(db, token, flowId) },
     ));
     assert.equal(versionedSave.status, 201);
-    headId = versionedSave.headers.get('Response-ID')!;
     derived = await assertStep();
 
     // Node delete via save: n2 and YiJPbufDpkyrZcZCYbUJpg are tombstoned.
@@ -654,7 +629,6 @@ test('live-write chain: create, save, node delete, undo, '
         { 'if-match': await headEtag(db, token, flowId) },
     ));
     assert.equal(deletedSave.status, 201);
-    headId = deletedSave.headers.get('Response-ID')!;
     derived = await assertStep();
     assert.equal(
         (derived.graph as { nodes: { id: string }[] })
@@ -673,7 +647,7 @@ test('live-write chain: create, save, node delete, undo, '
         { 'if-match': await headEtag(db, token, flowId) },
     ));
     assert.equal(undone.status, 201);
-    headId = await headResponseId(db, token, flowId);
+    await headResponseId(db, token, flowId);
     derived = await assertStep();
     assert.equal(
         (derived.graph as { nodes: { id: string }[] })
@@ -705,7 +679,6 @@ test('live-write chain: create, save, node delete, undo, '
         { 'if-match': await headEtag(db, token, flowId) },
     ));
     assert.equal(redone.status, 201);
-    headId = redone.headers.get('Response-ID')!;
     derived = await assertStep();
 
     // Terminal: a state-'deleted' document PUT — vanishes from

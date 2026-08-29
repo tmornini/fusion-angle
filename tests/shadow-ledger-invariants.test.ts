@@ -59,7 +59,6 @@ function messagePairJsonOf(message: string): {
 // full: a seeded idea's create-pair request must reproduce the
 // entity's actual genesis row.
 
-const BASE = 'http://localhost';
 const AT = '2026-02-01T00:00:00.000000Z';
 
 function req(
@@ -95,7 +94,7 @@ function ideaFields(title: string) {
 // the
 // entity fields plus the state trio. One fixed trio per idea
 // id keeps both PUTs below a same-state edit.
-function ideaPutBody(ideaId: string, title: string) {
+function ideaPutBody(_ideaId: string, title: string) {
     return {
         ...ideaFields(title),
         state: 'active',
@@ -115,7 +114,7 @@ function recordFields(name: string, organization: string) {
 // the entity fields plus the state trio. A fixed trio keeps
 // this PUT below a same-state edit.
 function recordPutBody(
-    recordId: string, name: string, organization: string,
+    _recordId: string, name: string, organization: string,
 ) {
     return {
         ...recordFields(name, organization),
@@ -250,7 +249,6 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
         ideaPutBody('hwpssRPdIjwzeMdYPAhqrw', 'Invariant Idea'),
     ));
     assert.equal(firstIdea.status, 201);
-    const firstIdeaId = firstIdea.headers.get('Response-ID');
     const secondIdea = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'hwpssRPdIjwzeMdYPAhqrw', org1Token,

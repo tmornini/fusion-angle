@@ -16,7 +16,7 @@ import {
     seedAdminSchema,
     seedOrganizationDocument,
 } from './test-fixtures.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from
+import { SYSTEM_MEMBER_ID } from
     '../api/types.ts';
 import {
     seedIdentityCredential,
@@ -24,14 +24,10 @@ import {
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import {
-    postMembershipDocumentOp,
     postWorkOrderTransitionOp,
-    WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
-    type MessagePair,
 } from '../api/message-pair.ts';
 import {
     deriveIdentityPii,
@@ -646,7 +642,7 @@ async function seedChain(
 // mechanism changes.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
-    membershipId: string,
+    _membershipId: string,
     organization: string,
     identityId: string,
     asAdmin = identityId === 'XXZruirZyAOoRpNxaDnpSA',

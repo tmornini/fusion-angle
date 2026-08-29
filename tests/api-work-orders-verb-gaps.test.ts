@@ -24,8 +24,6 @@ import {
 // binding is create-only PUT (POST gone); release POST is
 // gone. Transition GET/PUT/DELETE stay 405.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

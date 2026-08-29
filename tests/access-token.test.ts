@@ -14,6 +14,7 @@ import {
     decodeAccessToken,
 } from '../shared/access-token-decode.ts';
 import { base64UrlEncode } from '../shared/base64url.ts';
+import { generateIdentifier } from '../shared/identifier.ts';
 
 async function token(over: Partial<{
     sub: string; iat: number; ttlSeconds: number;
@@ -249,9 +250,12 @@ test('decodeAccessToken rejects non-string roles elements',
 
 test('latestRevocationAt returns the most recent stamp', () => {
     const rows = [
-        { identity_id: 'a', at: '2021-01-01T00:00:00.000000Z' },
-        { identity_id: 'a', at: '2023-06-01T00:00:00.000000Z' },
-        { identity_id: 'a', at: '2022-01-01T00:00:00.000000Z' },
+        { id: generateIdentifier(), identity_id: 'a',
+          at: '2021-01-01T00:00:00.000000Z' },
+        { id: generateIdentifier(), identity_id: 'a',
+          at: '2023-06-01T00:00:00.000000Z' },
+        { id: generateIdentifier(), identity_id: 'a',
+          at: '2022-01-01T00:00:00.000000Z' },
     ];
     assert.equal(
         latestRevocationAt(rows, 'a'),
@@ -261,15 +265,18 @@ test('latestRevocationAt returns the most recent stamp', () => {
 
 test('latestRevocationAt isolates identities; null when none', () => {
     const rows = [
-        { identity_id: 'a', at: '2023-06-01T00:00:00.000000Z' },
+        { id: generateIdentifier(), identity_id: 'a',
+          at: '2023-06-01T00:00:00.000000Z' },
     ];
     assert.equal(latestRevocationAt(rows, 'b'), null);
 });
 
 test('revokedThroughSeconds converts the latest stamp', () => {
     const rows = [
-        { identity_id: 'a', at: '2021-01-01T00:00:00.000000Z' },
-        { identity_id: 'a', at: '2023-06-01T00:00:00.000000Z' },
+        { id: generateIdentifier(), identity_id: 'a',
+          at: '2021-01-01T00:00:00.000000Z' },
+        { id: generateIdentifier(), identity_id: 'a',
+          at: '2023-06-01T00:00:00.000000Z' },
     ];
     assert.equal(
         revokedThroughSeconds(rows, 'a'),

@@ -30,16 +30,17 @@ function req(
     return apiRequest({
         method,
         path,
-        token,
+        ...(token !== undefined ? { token } : {}),
         body,
-        headers,
+        ...(headers !== undefined
+            ? { headers } : {}),
         operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
 function ideaDocument(
     title: string,
-    stateEventId: string,
+    _stateEventId: string,
 ): Record<string, unknown> {
     return {
         title,
@@ -53,20 +54,9 @@ function ideaDocument(
     };
 }
 
-function membershipDocument(
-    identityId: string,
-): Record<string, unknown> {
-    return {
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-        identity_id: identityId,
-        type: 'member',
-        at: AT,
-    };
-}
-
 function projectDocument(
     title: string,
-    stateEventId: string,
+    _stateEventId: string,
 ): Record<string, unknown> {
     return {
         title,

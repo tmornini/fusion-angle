@@ -60,8 +60,6 @@ const WORKORDERID_FV2 = generateIdentifier();
 // oracle. No write path reads this core yet — Task 1 flips
 // nothing.
 
-const BASE = 'http://localhost';
-
 // A real seeded flow carrying zero work-order joins (drift-work-
 // orders.test.ts's own EMPTY_FLOW_ID) — the join itself is
 // irrelevant to a states-log replay, but the create route

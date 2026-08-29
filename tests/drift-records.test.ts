@@ -65,7 +65,6 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
-    storedPutBodyText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -87,8 +86,6 @@ const REC_DRIFT_DUP_1_B_EV = generateIdentifier();
 const REC_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 const REC_DRIFT_METHOD_FILTER_1_ATTR = generateIdentifier();
 const REC_DRIFT_METHOD_FILTER_1_EV = generateIdentifier();
-const REC_DRIFT_SKEW_1_GENESIS = generateIdentifier();
-const REC_DRIFT_SKEW_1_SKEWED = generateIdentifier();
 const REC_DRIFT_Z = generateIdentifier();
 const EV_DRIFT_Z = generateIdentifier();
 const REC_DRIFT_A = generateIdentifier();
@@ -107,8 +104,6 @@ const N_MIDDLE = generateIdentifier();
 // Coverage re-homes to wire-byte handleRequest assertions and
 // non-lexical live fixtures. Records is a TRIO family with a
 // live DELETE on :id (Author gate 9).
-
-const BASE = 'http://localhost';
 
 function req(
     method: string,
@@ -166,7 +161,7 @@ async function derivedRecords(
     db: DbAdapter, organization: Id,
 ): Promise<RecordEntity[]> {
     return documentCollectionGetHandler(RECORDS_TEST_WIRING)(
-        db, [], READER_ACTOR, organization,
+        db, [], READER_ACTOR, organization, [],
     ) as Promise<RecordEntity[]>;
 }
 
@@ -175,6 +170,7 @@ async function derivedRecord(
 ): Promise<RecordEntity> {
     return documentGetHandler(RECORDS_TEST_WIRING)(
         db, [organization, id], READER_ACTOR, organization,
+        [],
     ) as Promise<RecordEntity>;
 }
 
@@ -350,8 +346,8 @@ function editRecordBody(
     attributes: readonly Record<string, unknown>[],
     removedAttributeIds: readonly string[],
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
 ): Record<string, unknown> {
     return {
         kind: 'edit',
@@ -1034,7 +1030,7 @@ async () => {
     const recordsPrefix = canonicalUriCollection(
         STARK_ORGANIZATION, '/record-types/',
     );
-    const [recordRequests, recordResponses] = await Promise.all([
+    const [recordRequests] = await Promise.all([
         db.messagePairs.getAllWhere('uri_collection', recordsPrefix),
         db.messagePairs.getAllWhere('uri_collection', recordsPrefix),
     ]);
@@ -1069,7 +1065,7 @@ async () => {
     const attributesPrefix =
         '/organizations/' + STARK_ORGANIZATION
         + '/record-types/' + recordId + '/attributes/';
-    const [attributeRequests, attributeResponses] =
+    const [attributeRequests] =
         await Promise.all([
             db.messagePairs.getAllWhere(
                 'uri_collection', attributesPrefix,
@@ -1099,10 +1095,6 @@ test('GET record trio is lifecycle-current under clock skew'
     const db = await seededDb();
     const token = await organizationToken();
     const recordId = generateIdentifier();
-    const genesisAt = '2026-06-01T00:00:00.000000Z';
-    const genesisEv = REC_DRIFT_SKEW_1_GENESIS;
-    const skewedAt = '2020-01-01T00:00:00.000000Z';
-    const skewedEv = REC_DRIFT_SKEW_1_SKEWED;
 
     const genesis = await handleRequest(db, req(
         'PUT', '/organizations/' + STARK_ORGANIZATION

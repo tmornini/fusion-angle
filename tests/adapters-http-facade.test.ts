@@ -129,12 +129,11 @@ test(
 test(
     '401 through the fetch facade is UnauthorizedError',
     async () => {
-        // @ts-expect-error — Node stub for navigateTo
         globalThis.document = {
             documentElement: {
                 getAttribute: () => 'dashboard',
             },
-        };
+        } as unknown as Document;
         // @ts-expect-error — Node stub for navigateTo
         globalThis.window = { location: { href: '' } };
         await withMockFetch(async () => new Response(
@@ -164,16 +163,14 @@ test(
     '401 on authentication/authorize does not'
     + ' refresh or bounce',
     async () => {
-        // @ts-expect-error — Node stub
         globalThis.document = {
             documentElement: {
                 getAttribute: () => 'auth',
             },
-        };
-        // @ts-expect-error — Node stub
+        } as unknown as Document;
         globalThis.window = {
             location: { href: '' },
-        };
+        } as unknown as Window & typeof globalThis;
         const urls: string[] = [];
         await withMockFetch(async (input) => {
             urls.push(String(input));
@@ -214,16 +211,14 @@ test(
     'postPasswordLogin wrong password is'
     + ' one fetch and null',
     async () => {
-        // @ts-expect-error — Node stub
         globalThis.document = {
             documentElement: {
                 getAttribute: () => 'auth',
             },
-        };
-        // @ts-expect-error — Node stub
+        } as unknown as Document;
         globalThis.window = {
             location: { href: '' },
-        };
+        } as unknown as Window & typeof globalThis;
         const urls: string[] = [];
         await withMockFetch(async (input) => {
             urls.push(String(input));

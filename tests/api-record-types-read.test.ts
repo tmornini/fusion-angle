@@ -13,9 +13,7 @@ import { seedOrganizationDocument } from
 import { nowUtc, SYSTEM_MEMBER_ID } from
     '../api/types.ts';
 import {
-    postMembershipDocumentOp,
     postRecordDocumentOp,
-    WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
@@ -31,7 +29,6 @@ import { seedSeat } from './root-admin-fixture.ts';
 // org-match fence arm. Seeds via below-gate formWriteMessagePair +
 // postRecordDocumentOp at the nested detail address.
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const PATH_ORGANIZATION_MISMATCH_ERROR =
     'forbidden: path organization does '

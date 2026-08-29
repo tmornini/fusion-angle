@@ -9,11 +9,10 @@ globalThis.localStorage = {
     getItem: () => null,
     setItem: () => {},
 };
-// @ts-expect-error — Node global stub
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
-};
+} as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
 
@@ -112,6 +111,7 @@ function makeProject(overrides: {
 }) {
     return new Project({
         id: overrides.id ?? 'pr-1',
+        organization_id: 'org-1',
         title: overrides.title ?? 'Apollo',
         description:
             overrides.description ?? 'Go to space.',
@@ -122,6 +122,7 @@ function makeProject(overrides: {
             overrides.estimatedCost ?? 50000,
         actual_cost: 25000,
         position: overrides.position ?? 0,
+        state: overrides.state ?? 'approved',
     }, {
         state: overrides.state ?? 'approved',
     });

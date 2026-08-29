@@ -14,7 +14,7 @@ import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc, type StateEntity } from '../api/types.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
@@ -29,8 +29,6 @@ import { workOrderClaimHistoryFor } from
     '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
-
-const BASE = 'http://localhost';
 
 function req(
     method: string,
@@ -98,7 +96,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 // DELETE organizations/:id/work-orders/:id/claim (states/:id retired).
 function claimEventsFor(
     db: MemoryDbAdapter,
-): Promise<{ state: string; member_id: string }[]> {
+): Promise<StateEntity[]> {
     return workOrderClaimHistoryFor(
         db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
     );

@@ -13,7 +13,7 @@ import { DISPLAY_ABSENT } from
 function model(): FlowStatsModel {
     const node =
         (over: Partial<NodeStat> & { id: string }): NodeStat => ({
-            id: over.id, displayName: over.id.toUpperCase(),
+            displayName: over.id.toUpperCase(),
             isCreate: false, isArchive: false,
             positionX: 0, positionY: 0,
             outgoingEdgeIds: [], heatPct: 0, heatT: 0,

@@ -5,11 +5,10 @@ globalThis.localStorage = {
     getItem: () => null,
     setItem: () => {},
 };
-// @ts-expect-error — Node global stub
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
-};
+} as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
 
@@ -74,6 +73,7 @@ function makeRecordingContainer(): {
 function makeProject() {
     return new Project({
         id: 'pr-1',
+        organization_id: 'org-1',
         title: 'Apollo',
         description: 'Go to space.',
         progress: 0,
@@ -82,23 +82,28 @@ function makeProject() {
         estimated_cost: 100000,
         actual_cost: 50000,
         position: 0,
+        state: 'approved',
     }, {
         state: 'approved',
     });
 }
 
 const objectives: ObjectiveEntity[] = [
-    { id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 },
-    { id: 'o2', position: 1 },
+    { id: 'ohqxgUBEaFQwYbXsonRPmg', organization_id: 'org-1',
+      position: 0, state: 'active' },
+    { id: 'o2', organization_id: 'org-1',
+      position: 1, state: 'active' },
 ];
 
 const baselineFull = [
     { id: 'b1', projectId: 'pr-1',
       objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
-      score: 50, at: '2026-01-02T00:00:00.000000Z' },
+      score: 50, memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
+      at: '2026-01-02T00:00:00.000000Z' },
     { id: 'b2', projectId: 'pr-1',
       objectiveId: 'o2',
-      score: 30, at: '2026-01-02T00:00:00.000000Z' },
+      score: 30, memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
+      at: '2026-01-02T00:00:00.000000Z' },
 ];
 
 test(
@@ -165,11 +170,11 @@ test(
         const actuals = [
             { id: 'UQTJZvCoKlFjEoDlDUwekw', projectId: 'pr-1',
               objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
-              score: 60,
+              score: 60, memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               at: '2026-02-01T00:00:00.000000Z' },
             { id: 'UZgNCkZlSJcSaAmAJuSkcw', projectId: 'pr-1',
               objectiveId: 'o2',
-              score: 40,
+              score: 40, memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
               at: '2026-02-01T00:00:00.000000Z' },
         ];
         const view = new ProjectView(

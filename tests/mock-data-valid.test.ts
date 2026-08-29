@@ -455,7 +455,7 @@ async () => {
     const db = await seededDb();
     const derived = await documentCollectionGetHandler(
         WORK_ORDERS_WIRING,
-    )(db, [], 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION) as
+    )(db, [], 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION, []) as
         WorkOrderEntity[];
     assert.ok(derived.length > 0, 'work orders empty');
     for (const wo of derived) {
@@ -548,8 +548,9 @@ test(
         // Phase Final Task 2: WO org from message plane.
         const workOrders = await documentCollectionGetHandler(
             WORK_ORDERS_WIRING,
-        )(db, [], 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION) as
-            WorkOrderEntity[];
+        )(
+            db, [], 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION, [],
+        ) as WorkOrderEntity[];
         // C3: bulk deriveStates retired — WO lifecycle
         // from the message-plane work-order derive.
         const states = await deriveWorkOrderLifecycle(db);
@@ -574,7 +575,7 @@ test(
                 new Set(rows.map(m => m.organization_id)),
             );
         }
-        const [agentRequests, agentResponses] =
+        const [agentRequests] =
             await Promise.all([
                 db.messagePairs.getAllWhere(
                     'uri_collection', '/ai-agents/',

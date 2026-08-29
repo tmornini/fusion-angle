@@ -53,8 +53,6 @@ const EV_DRIFT_CONVERSION_PROJECT = generateIdentifier();
 const PROJECTID_GENESIS = generateIdentifier();
 const PROJECTID_SKEWED = generateIdentifier();
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,
@@ -73,8 +71,8 @@ function req(
 function projectDocument(
     title: string,
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
     position = 1,
 ) {
     return {
@@ -121,8 +119,8 @@ function wireProjectGet(
     id: string,
     title: string,
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
     position = 1,
     organization = 'AjdvjuECVZEgZoFajaIEkg',
     overrides: Record<string, unknown> = {},

@@ -28,7 +28,6 @@ import { generateIdentifier } from
 // organizations/AjdvjuECVZEgZoFajaIEkg/ideas/projects skew tests
 // use.
 
-const BASE = 'http://localhost';
 const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -44,7 +43,8 @@ function req(
         path,
         token,
         body,
-        headers,
+        ...(headers !== undefined
+            ? { headers } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }

@@ -5,6 +5,7 @@ import {
     type IdeaEntity,
     type IdeaState,
     type IdeaStateDetail,
+    type ObjectiveEntity,
 } from '../api/types.ts';
 import {
     DISPLAY_ABSENT,
@@ -118,6 +119,7 @@ function makeIdeaEntity(
 ): IdeaEntity {
     return {
         id: 'gVvtDIaqhnkXZQcxZeSuiw',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 'Self-serve onboarding',
         position: 3,
         problem_statement:
@@ -129,6 +131,7 @@ function makeIdeaEntity(
             'Higher 7-day activation rate',
         success_metrics:
             '20% lift in activation',
+        state: 'active',
         ...overrides,
     };
 }
@@ -162,6 +165,18 @@ function makeWithSubmitter(
         entity,
         submitterName,
         submittedAt,
+    };
+}
+
+function makeObjective(
+    id: string,
+    position: number,
+): ObjectiveEntity {
+    return {
+        id,
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        position,
+        state: 'active',
     };
 }
 
@@ -1038,7 +1053,7 @@ test(
             baselines: new Map(),
         };
         const objectives = [
-            { id: 'obj-1', position: 0 },
+            makeObjective('obj-1', 0),
         ];
         assert.equal(
             conversionIsReady(draft, objectives),
@@ -1091,8 +1106,8 @@ test(
             idea,
         );
         const objectives = [
-            { id: 'obj-1', position: 0 },
-            { id: 'obj-2', position: 1 },
+            makeObjective('obj-1', 0),
+            makeObjective('obj-2', 1),
         ];
         const defs = new Map([
             ['obj-1', {
@@ -1136,8 +1151,8 @@ test(
     () => {
         const idea = makeIdea();
         const objectives = [
-            { id: 'obj-1', position: 0 },
-            { id: 'obj-2', position: 1 },
+            makeObjective('obj-1', 0),
+            makeObjective('obj-2', 1),
         ];
         const defs = new Map([
             ['obj-1', {

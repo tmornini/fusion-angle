@@ -130,8 +130,6 @@ const WO_DRIFT_RETRY_B_EV3 = generateIdentifier();
 // assertions and non-lexical live fixtures. Work-orders is a
 // SIMPLE, STATELESS family — DOCUMENT-head-only.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,
@@ -266,7 +264,7 @@ async function derivedWorkOrders(
     const rows = await documentCollectionGetHandler(
         WORK_ORDERS_TEST_WIRING,
     )(
-        db, [], READER_ACTOR, organization,
+        db, [], READER_ACTOR, organization, [],
     ) as WorkOrderEntity[];
     const out: (WorkOrderEntity & {
         instance_id?: string;
@@ -289,7 +287,7 @@ async function derivedWorkOrder(
     const row = await documentGetHandler(
         WORK_ORDERS_TEST_WIRING,
     )(
-        db, [organization, id], READER_ACTOR, organization,
+        db, [organization, id], READER_ACTOR, organization, [],
     ) as WorkOrderEntity;
     return withBindingEmbed(db, organization, row);
 }
@@ -940,7 +938,7 @@ async () => {
         STARK_ORGANIZATION
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
     );
-    const [requests, responses] = await Promise.all([
+    const [requests] = await Promise.all([
         db.messagePairs.getAllWhere('uri_collection', prefix),
         db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);
@@ -1287,7 +1285,7 @@ async function replayWorkOrderStates(
     const woPrefix = canonicalUriCollection(
         organization, '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
     );
-    const [woRequests, woResponses] = await Promise.all([
+    const [woRequests] = await Promise.all([
         db.messagePairs.getAllWhere('uri_collection', woPrefix),
         db.messagePairs.getAllWhere('uri_collection', woPrefix),
     ]);
@@ -1309,7 +1307,7 @@ async function replayWorkOrderStates(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/claim/',
     );
-    const [claimRequests, claimResponses] = await Promise.all([
+    const [claimRequests] = await Promise.all([
         db.messagePairs.getAllWhere('uri_collection', claimPrefix),
         db.messagePairs.getAllWhere('uri_collection', claimPrefix),
     ]);
@@ -1327,7 +1325,7 @@ async function replayWorkOrderStates(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/release/',
     );
-    const [releaseRequests, releaseResponses] =
+    const [releaseRequests] =
         await Promise.all([
             db.messagePairs.getAllWhere(
                 'uri_collection', releasePrefix,
@@ -1349,7 +1347,7 @@ async function replayWorkOrderStates(
             + '/transition/',
     );
     const [
-        transitionRequests, transitionResponses,
+        transitionRequests,
     ] = await Promise.all([
         db.messagePairs.getAllWhere('uri_collection', transitionPrefix),
         db.messagePairs.getAllWhere('uri_collection', transitionPrefix),

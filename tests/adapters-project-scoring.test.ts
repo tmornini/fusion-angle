@@ -8,7 +8,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken, organizationToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import {
     getBaselineScoresForProject,
     getActualScoresForProject,
@@ -136,7 +136,7 @@ test('getProjectScoring returns both lists',
 // organizations/:id/projects/:id/objective-baseline-
 // scores routes now derive from the ledger, not the old tables.
 async function seedTwoApprovedProjects(
-    db: MemoryDbAdapter,
+    _db: MemoryDbAdapter,
     ctx: RequestContext,
 ): Promise<void> {
     const projectBody = {

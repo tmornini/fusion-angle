@@ -7,22 +7,27 @@ import {
     toneForScore,
 } from '../web-app/app/scoring-format.ts';
 import type { ObjectiveId } from '../api/types.ts';
+import { generateIdentifier } from '../shared/identifier.ts';
 
 test('latestPerPair keeps the latest by at',
     () => {
         const rows = [
-            { projectId: 'pnXmXrxOWayANgDLdCjuBw'
+            { id: generateIdentifier(),
+              projectId: 'pnXmXrxOWayANgDLdCjuBw'
                 , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
               score: 50,
               at: '2026-05-14T00:00:00.000000Z' },
-            { projectId: 'pnXmXrxOWayANgDLdCjuBw'
+            { id: generateIdentifier(),
+              projectId: 'pnXmXrxOWayANgDLdCjuBw'
                 , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
               score: 60,
               at: '2026-05-15T00:00:00.000000Z' },
-            { projectId: 'pnXmXrxOWayANgDLdCjuBw', objectiveId: 'o2',
+            { id: generateIdentifier(),
+              projectId: 'pnXmXrxOWayANgDLdCjuBw', objectiveId: 'o2',
               score: -20,
               at: '2026-05-14T00:00:00.000000Z' },
-            { projectId: 'prBESZPjJDiuXCeZLmbiVw'
+            { id: generateIdentifier(),
+              projectId: 'prBESZPjJDiuXCeZLmbiVw'
                 , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
               score: 10,
               at: '2026-05-14T00:00:00.000000Z' },

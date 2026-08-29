@@ -33,7 +33,7 @@ function req(
     return apiRequest({
         method,
         path,
-        token,
+        ...(token !== undefined ? { token } : {}),
         body,
         operationId: operationId ?? TEST_OPERATION_ID,
     });
@@ -41,8 +41,8 @@ function req(
 
 function objectiveBody(
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
 ) {
     return {
         position: 1,

@@ -17,7 +17,6 @@ import {
 import { documentHeadAt } from '../api/message-pair.ts';
 import {
     seedAdminSchema,
-    organizationRow,
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';

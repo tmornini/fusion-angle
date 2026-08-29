@@ -75,17 +75,17 @@ test('buildFlowGraphDelta matches buildSaveEvents'
                 attributes: [
                     {
                         attributeId: 'a-keep',
-                        mode: 'display',
+                        mode: 'readonly',
                         isRequired: false,
                     },
                     {
                         attributeId: 'a-drop',
-                        mode: 'edit',
+                        mode: 'editable',
                         isRequired: true,
                     },
                     {
                         attributeId: 'a-change',
-                        mode: 'display',
+                        mode: 'readonly',
                         isRequired: false,
                     },
                 ],
@@ -105,17 +105,17 @@ test('buildFlowGraphDelta matches buildSaveEvents'
                 attributes: [
                     {
                         attributeId: 'a-keep',
-                        mode: 'display',
+                        mode: 'readonly',
                         isRequired: false,
                     },
                     {
                         attributeId: 'a-change',
-                        mode: 'edit',
+                        mode: 'editable',
                         isRequired: true,
                     },
                     {
                         attributeId: 'a-new',
-                        mode: 'display',
+                        mode: 'readonly',
                         isRequired: false,
                     },
                 ],

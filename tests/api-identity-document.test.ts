@@ -251,12 +251,12 @@ test('a PUT chain Supersedes-chains and the head derives the'
     const wiring = documentFamilyWiring('identities')!;
     const first = identityFields();
     const id = generateIdentifier();
-    const firstId = await putDocumentMessagePair(
+    await putDocumentMessagePair(
         db, id, first,
         '2026-02-01T00:00:00.000000Z',
     );
     const headAfterFirst = await documentGetHandler(wiring)(
-        db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored',
+        db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored', [],
     );
     assert.deepEqual(headAfterFirst, {
         id, ...first,
@@ -265,13 +265,13 @@ test('a PUT chain Supersedes-chains and the head derives the'
     const second = { kind: 'service' as const };
     const secondId = await putDocumentMessagePair(
         db, id, second,
-        '2026-02-02T00:00:00.000000Z', firstId,
+        '2026-02-02T00:00:00.000000Z',
     );
     const secondResponse = await db.messagePairs.getById(secondId);
     assert.equal('supersedes' in secondResponse, false);
 
     const headAfterSecond = await documentGetHandler(wiring)(
-        db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored',
+        db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored', [],
     );
     assert.deepEqual(headAfterSecond, {
         id, ...second,
@@ -293,7 +293,7 @@ test('a DELETE-head derives absent through the generic document'
     );
     await assert.rejects(
         documentGetHandler(wiring)(
-            db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored',
+            db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored', [],
         ),
         (error: unknown) => {
             assert.ok(error instanceof EntityNotFoundError);

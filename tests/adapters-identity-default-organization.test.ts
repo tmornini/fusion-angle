@@ -12,14 +12,7 @@ import {
     putIdentityDefaultOrganization,
     getIdentityDefaultOrganization,
 } from '../web-app/app/adapters/identity-default-organization.ts';
-import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWriteMessagePair } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
 const AT = '2026-06-04T00:00:00.000000Z';
@@ -34,7 +27,7 @@ const AT = '2026-06-04T00:00:00.000000Z';
 // mechanism changes.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
-    id: string,
+    _id: string,
     organization: string,
     identityId: string,
 ): Promise<void> {

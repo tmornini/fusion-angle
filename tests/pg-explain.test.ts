@@ -23,7 +23,6 @@ const IDEA_COLLECTION = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const FILLER_COLLECTION = '/filler/';
 const AUTH_COLLECTION = '/authentication/authorize/';
 const VERSION_COLLECTION = '/versioned/';
-const IDEA_URI_ID = 'AjdvjuECVZEgZoFajaIEkg';
 const IDEA_N = 1;
 const AUTH_N = 9;
 const AUTH_OTHER_START = 10;

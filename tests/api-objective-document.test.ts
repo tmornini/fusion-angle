@@ -46,8 +46,6 @@ import { generateIdentifier } from
 // document address. The states/:id event-append path for
 // objectives is dead.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,
@@ -341,6 +339,7 @@ async () => {
     const got = await documentGetHandler(wiring)(
         db, ['AjdvjuECVZEgZoFajaIEkg', id]
             , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
+        [],
     );
     assert.deepEqual(got, {
         id,
@@ -369,6 +368,7 @@ test('a DELETE-head derives absent through the generic'
         documentGetHandler(wiring)(
             db, ['AjdvjuECVZEgZoFajaIEkg', id]
                 , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
+            [],
         ),
         (error: unknown) => {
             assert.ok(error instanceof EntityNotFoundError);
@@ -408,6 +408,7 @@ test('stored PUT body equals objectiveDocumentEntityOf of'
     const derived = await documentGetHandler(wiring)(
         db, ['AjdvjuECVZEgZoFajaIEkg', id], 'XXZruirZyAOoRpNxaDnpSA'
             , 'AjdvjuECVZEgZoFajaIEkg',
+        [],
     );
     assert.deepEqual(stored, derived);
     const later = await handleRequest(db, req(
@@ -424,8 +425,17 @@ test('stored PUT body equals objectiveDocumentEntityOf of'
         await documentGetHandler(wiring)(
             db, ['AjdvjuECVZEgZoFajaIEkg', id], 'XXZruirZyAOoRpNxaDnpSA'
                 , 'AjdvjuECVZEgZoFajaIEkg',
+            [],
         ),
     );
+    if (
+        typeof after !== 'object'
+        || after === null
+        || !('state' in after)
+        || !('position' in after)
+    ) {
+        throw new Error('expected document body');
+    }
     assert.equal(after.state, 'archived');
     assert.equal(after.position, 99);
     assert.equal('state_at' in after, false);

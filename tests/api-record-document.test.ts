@@ -37,7 +37,6 @@ import {
 // for its Task-2-era commit); case 3 rides the live gate now
 // that the fold commit has landed.
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 function req(
@@ -66,8 +65,8 @@ function recordFields(name: string) {
 function recordDocument(
     name: string,
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt: string,
+    _stateEventId: string,
 ) {
     return {
         ...recordFields(name),

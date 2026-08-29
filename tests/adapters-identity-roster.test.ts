@@ -16,16 +16,6 @@ import {
 import {
     getTokenChainsFor,
 } from '../web-app/app/adapters/identity-tokens.ts';
-import {
-    firstProviderModel,
-} from './member-fixtures.ts';
-import {
-    postAiMemberDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWriteMessagePair } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -82,7 +72,7 @@ async () => {
 test('getIdentityRoster leaves a service unnamed'
 + ' (agents are not identities)',
 async () => {
-    const { db, ctx } = await setup();
+    const { ctx } = await setup();
     const serviceId = generateIdentifier();
     await postIdentityCreation(ctx, serviceId, {
         kind: 'service', secret: 'shh',

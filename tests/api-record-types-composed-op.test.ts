@@ -8,7 +8,6 @@ import {
 } from '../api/db-memory.ts';
 import {
     handleRequest,
-    POST,
     PUT,
 } from '../api/api.ts';
 import {
@@ -18,13 +17,10 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import {
-    postMembershipDocumentOp,
     postWorkOrderTransitionOp,
-    WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
-    nowUtc,
     SYSTEM_MEMBER_ID,
 } from '../api/types.ts';
 import { STARK_ORGANIZATION } from
@@ -39,7 +35,6 @@ import { seedSeat } from './root-admin-fixture.ts';
 // document/attribute addresses. RESTRICT edit rolls the whole
 // batch back; forged organization_id loses to the path org.
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const COLLECTION =

@@ -16,7 +16,6 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-const BASE = 'http://localhost';
 const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 
 function req(

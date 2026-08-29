@@ -9,7 +9,6 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import {
-    nowUtc,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import type {

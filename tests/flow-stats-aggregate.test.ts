@@ -12,6 +12,7 @@ import type {
 } from '../api/types.ts';
 import type {
     TransitionEvent,
+    StepTransition,
 } from '../web-app/app/adapters/work-orders-queries.ts';
 
 export function makeFixture(): FlowStatsInput {
@@ -21,22 +22,22 @@ export function makeFixture(): FlowStatsInput {
               positionX: 0,   positionY: 0,
               isCreate: true,  isArchive: false,
               memberIds: [],
-              attributes: [] },
+              attributes: [], taskInstructions: '' },
             { id: 'a', name: 'Data Capture',
               positionX: 200, positionY: 0,
               isCreate: false, isArchive: false,
               memberIds: [],
-              attributes: [] },
+              attributes: [], taskInstructions: '' },
             { id: 'b', name: 'Review',
               positionX: 400, positionY: 0,
               isCreate: false, isArchive: false,
               memberIds: [],
-              attributes: [] },
+              attributes: [], taskInstructions: '' },
             { id: 'z', name: 'Archive',
               positionX: 600, positionY: 0,
               isCreate: false, isArchive: true,
               memberIds: [],
-              attributes: [] },
+              attributes: [], taskInstructions: '' },
         ],
         edges: [
             { id: 'YiJPbufDpkyrZcZCYbUJpg', name: '',
@@ -521,7 +522,7 @@ test(
         const H = 3600 * 1000;
         // b has two outgoing edges (e3 approve→z,
         // e4 revise→a).  8 OUT from b: 6 to z, 2 to a.
-        const enters = Array.from(
+        const enters: StepTransition[] = Array.from(
             { length: 8 },
             (_, i) => ({
                 id:'in'+i, workOrderId:'w'+i,
@@ -531,7 +532,7 @@ test(
                 at:t((20-i) * H),
             }),
         );
-        const outs = [
+        const outs: StepTransition[] = [
             { id:'ohqxgUBEaFQwYbXsonRPmg', workOrderId:'w0',
               kind: 'step',
               fromNodeId:'b',
@@ -689,7 +690,7 @@ test(
         const H = 3600 * 1000;
         function happyTrans(
             woId: string, startMs: number,
-        ) {
+        ): TransitionEvent[] {
             return [
                 { id:woId+'A', workOrderId:woId,
                   kind: 'creation',
@@ -712,7 +713,7 @@ test(
                   at:t(startMs - 2*H) },
             ];
         }
-        const loopTrans = [
+        const loopTrans: TransitionEvent[] = [
             { id:'lA', workOrderId:'wl',
               kind: 'creation',
               toNodeId:'c', memberId:'pnXmXrxOWayANgDLdCjuBw',

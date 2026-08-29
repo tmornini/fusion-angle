@@ -75,7 +75,7 @@ async function freshDb(): Promise<{
     return { db, token: await organizationToken() };
 }
 
-function ideaDocument(title: string, ev: string) {
+function ideaDocument(title: string, _ev: string) {
     return {
         title,
         position: 1,

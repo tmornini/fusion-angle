@@ -30,7 +30,6 @@ import { seedSeat } from './root-admin-fixture.ts';
 // deliberate divergence so a foreign-WO bind with a
 // malformed body is 403, never 400 (fence before body).
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const ORGANIZATION_B = generateIdentifier();
@@ -56,7 +55,6 @@ const TYPE_DETAIL =
     + '/record-types/' + TYPE_ID;
 const ATTRS = TYPE_DETAIL + '/attributes/';
 const INSTANCES = TYPE_DETAIL + '/instances/';
-const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
 const BINDING =
     '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID + '/binding';
 
@@ -72,7 +70,8 @@ function req(
         path,
         token,
         body,
-        headers: extraHeaders,
+        ...(extraHeaders !== undefined
+            ? { headers: extraHeaders } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }

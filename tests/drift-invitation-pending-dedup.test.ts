@@ -28,8 +28,6 @@ const INV_DEDUP_STEP0_SECOND_ACCEPT = generateIdentifier();
 // DECLINED invitation must never be mistaken for the
 // outstanding pending one.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

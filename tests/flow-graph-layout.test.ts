@@ -31,6 +31,7 @@ function node(id: string, o: NodeOpts = {}): GraphNode {
         isArchive: o.isArchive ?? false,
         memberIds: [],
         attributes: [],
+        taskInstructions: '',
     };
 }
 
@@ -57,7 +58,7 @@ function flowGraph(o: {
         isAutoLayout: o.isAutoLayout ?? false,
         isAutoFit: true,
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
-        createdAt: '2026-01-01T00:00:00.000000Z',
+        hasUndoHistory: false,
         nodes: o.nodes,
         edges: o.edges,
     };

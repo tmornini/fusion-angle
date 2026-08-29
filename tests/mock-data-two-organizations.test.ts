@@ -66,8 +66,6 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
         ),
         position: Number(document.body['position'] ?? 0),
         state: current!.state,
-        state_at: current!.at,
-        state_event_id: current!.id,
     }),
 };
 
@@ -75,7 +73,7 @@ async function derivedRecords(
     db: MemoryDbAdapter, organization: string,
 ): Promise<RecordEntity[]> {
     return documentCollectionGetHandler(RECORDS_WIRING)(
-        db, [], 'XXZruirZyAOoRpNxaDnpSA', organization,
+        db, [], 'XXZruirZyAOoRpNxaDnpSA', organization, [],
     ) as Promise<RecordEntity[]>;
 }
 
@@ -147,8 +145,6 @@ const OBJECTIVES_WIRING: DocumentFamilyWiring = {
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
         state: current!.state,
-        state_at: current!.at,
-        state_event_id: current!.id,
     }),
 };
 
@@ -156,7 +152,7 @@ async function derivedObjectives(
     db: MemoryDbAdapter, organization: string,
 ): Promise<ObjectiveEntity[]> {
     return documentCollectionGetHandler(OBJECTIVES_WIRING)(
-        db, [], 'XXZruirZyAOoRpNxaDnpSA', organization,
+        db, [], 'XXZruirZyAOoRpNxaDnpSA', organization, [],
     ) as Promise<ObjectiveEntity[]>;
 }
 
@@ -173,7 +169,7 @@ async function seed() {
 async function liveIdentityIds(
     db: MemoryDbAdapter,
 ): Promise<string[]> {
-    const [requests, responses] = await Promise.all([
+    const [requests] = await Promise.all([
         db.messagePairs.getAllWhere(
             'uri_collection', '/identities/',
         ),

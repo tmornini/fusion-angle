@@ -16,8 +16,6 @@ import {
 // stay. Nested type verb gaps live in
 // api-record-types-verb-gaps.test.ts.
 
-const BASE = 'http://localhost';
-
 function req(
     method: string,
     path: string,

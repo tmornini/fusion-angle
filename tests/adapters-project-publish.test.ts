@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
-import { devToken, organizationToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import {
     validateProjectForApproval,
     validateProjectForArchival,
@@ -37,8 +37,20 @@ const SAMPLE_PROJECT_BODY = {
 test('validator: not ready when objectives unscored',
     () => {
         const r = validateProjectForApproval(
-            [{ id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 },
-             { id: generateIdentifier(), position: 1 }],
+            [
+                {
+                    id: 'ohqxgUBEaFQwYbXsonRPmg',
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                    position: 0,
+                    state: 'active',
+                },
+                {
+                    id: generateIdentifier(),
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                    position: 1,
+                    state: 'active',
+                },
+            ],
             [],
         );
         assert.equal(r.ready, false);
@@ -47,7 +59,12 @@ test('validator: not ready when objectives unscored',
 
 test('validator: ready when all scored', () => {
     const r = validateProjectForApproval(
-        [{ id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 }],
+        [{
+            id: 'ohqxgUBEaFQwYbXsonRPmg',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            position: 0,
+            state: 'active',
+        }],
         [{ id: generateIdentifier(),
            projectId: 'pnXmXrxOWayANgDLdCjuBw',
            objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: 50,

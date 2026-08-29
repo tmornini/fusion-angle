@@ -42,6 +42,7 @@ function buildIdea(
         proposed_solution: 's',
         expected_outcome: 'o',
         success_metrics: 'm',
+        state: 'active',
     };
 }
 
@@ -54,8 +55,11 @@ async function seedIdea(
     id: string,
     state: IdeaState,
 ): Promise<void> {
-    const { organization_id: _organizationId, ...entity } =
-        buildIdea(id);
+    const {
+        organization_id: _organizationId,
+        state: _state,
+        ...entity
+    } = buildIdea(id);
     await postIdeaCreation(ctx, id, entity, state);
 }
 
@@ -73,11 +77,9 @@ function buildProject(
         estimated_cost: 1000,
         actual_cost: 500,
         position: 1,
+        state: 'submitted',
     };
-    const { id: _drop, ...rest } = {
-        ...base, ...overrides, id,
-    } as ProjectEntity;
-    return rest;
+    return { ...base, ...overrides };
 }
 
 // Seeds a project through the SAME document PUT the live route
@@ -227,7 +229,7 @@ test(
 test(
     'getDashboardStats counts tombstoned out',
     async () => {
-        const { db, ctx } = await adminContext();
+        const { ctx } = await adminContext();
         await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'approved');
         await seedProject(ctx, 'prBESZPjJDiuXCeZLmbiVw', 'approved');
         // NAMED re-pin (Phase 3 Task 6, Step 2b): physical row

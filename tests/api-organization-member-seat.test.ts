@@ -15,7 +15,6 @@ import { ORGANIZATION_TWO } from
     '../api/mock-data/seed-constants.ts';
 import {
     postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWriteMessagePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from
@@ -96,7 +95,7 @@ test('accept writes the seat at the invitation'
     assert.equal(accept.status, 204);
 
     const prefix = seatsPrefix(ORGANIZATION_TWO);
-    const [requests, responses] = await Promise.all([
+    const [requests] = await Promise.all([
         db.messagePairs.getAllWhere(
             'uri_collection', prefix),
         db.messagePairs.getAllWhere(

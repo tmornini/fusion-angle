@@ -29,6 +29,7 @@ const node = (id: string, x = 0, y = 0) => ({
     isArchive: false,
     memberIds: [] as string[],
     attributes: [],
+    taskInstructions: '',
 });
 
 const edge = (

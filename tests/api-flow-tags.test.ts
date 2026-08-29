@@ -25,7 +25,6 @@ import {
 // and two-tag concurrency — the api-flow-document.test.ts
 // precedent, re-nested one level deeper.
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 function req(
@@ -40,7 +39,7 @@ function req(
         path,
         token,
         body,
-        headers,
+        ...(headers !== undefined ? { headers } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }
@@ -246,7 +245,6 @@ test('e2e: DELETE marks the tag — GET 404s after, and the'
         { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
     ));
     assert.equal(put.status, 201);
-    const putId = put.headers.get('Response-ID');
 
     const del = await handleRequest(db, req(
         'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'

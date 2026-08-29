@@ -4,8 +4,6 @@ import {
     deriveInvitationStates,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
-import { currentInvitationState } from
-    '../api/invitations-domain.ts';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -66,7 +64,7 @@ async function allMemberships(db: MemoryDbAdapter) {
     for (const organization of organizations) {
         const seatPrefix = '/organizations/'
             + organization.id + '/members/';
-        const [seatRequests, seatResponses] =
+        const [seatRequests] =
             await Promise.all([
                 db.messagePairs.getAllWhere(
                     'uri_collection', seatPrefix,
@@ -90,7 +88,6 @@ async function allMemberships(db: MemoryDbAdapter) {
     return rows;
 }
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 // Below-facade pair formation (the member-fixtures.ts idiom,

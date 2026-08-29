@@ -11,7 +11,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken, organizationToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import {
     validateFlowForCreation,
     getFlowsForCreation,
@@ -83,6 +83,7 @@ function buildFlowEntity(
         is_auto_fit: true,
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
         graph: storedGraph(graph),
+        hasUndoHistory: false,
         ...overrides,
     };
 }

@@ -1,6 +1,6 @@
 // Node-only CDP page-load benchmark harness.
 // Run via ./measure from the repo root (see that wrapper).
-// Excluded from browser tsc; uses Node APIs + global WebSocket.
+// On the browser exclude list; uses Node APIs + global WebSocket.
 //
 // Flow: optional bare --visualize (disk only) → clean-tree
 // gate → (build → ./postgres-seed → node server.mjs) or
@@ -42,6 +42,7 @@ import {
     type PageRun,
     type PageStats,
     type Budgets,
+    type BudgetOffender,
 } from './measure-core.ts';
 import { generateMeasureViz } from './measure-viz.ts';
 import {
@@ -73,7 +74,6 @@ import {
     pageNavigate,
     pageWsUrl,
     pollUntil,
-    sleep,
     waitDevtoolsPort,
 } from './cdp-client.ts';
 import { login, registryUrl, waitPageReady } from './browser-drive.ts';
@@ -821,13 +821,15 @@ async function main(): Promise<void> {
             const verdict = compareBudgets(
                 stats, budgetsForCompare,
             );
-            const offenders = [
-                ...staleBudgetKeys.map((page) => ({
+            const staleOffenders: BudgetOffender[] =
+                staleBudgetKeys.map((page) => ({
                     page,
-                    reason: 'unknown-page' as const,
+                    reason: 'unknown-page',
                     budgetReadyMs:
                         budgets[page]!.readyMs,
-                })),
+                }));
+            const offenders: BudgetOffender[] = [
+                ...staleOffenders,
                 ...(verdict.ok
                     ? []
                     : verdict.offenders),

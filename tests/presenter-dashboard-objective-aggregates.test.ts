@@ -4,10 +4,15 @@ import { DashboardObjectiveAggregatesPresenter } from
     '../web-app/app/presenters/dashboard-objective-aggregates.ts';
 import type { TrendPoint } from
     '../web-app/app/adapters/project-scoring.ts';
+import type { ObjectiveEntity } from '../api/types.ts';
 
-const activeObjs = [
-    { id: 'ohqxgUBEaFQwYbXsonRPmg', position: 0 },
-    { id: 'o2', position: 1 },
+const ORGANIZATION_ID = 'AjdvjuECVZEgZoFajaIEkg';
+
+const activeObjs: ObjectiveEntity[] = [
+    { id: 'ohqxgUBEaFQwYbXsonRPmg', organization_id: ORGANIZATION_ID,
+      position: 0, state: 'active' },
+    { id: 'o2', organization_id: ORGANIZATION_ID,
+      position: 1, state: 'active' },
 ];
 const defs = new Map([
     ['ohqxgUBEaFQwYbXsonRPmg', { name: 'Increase incomes'

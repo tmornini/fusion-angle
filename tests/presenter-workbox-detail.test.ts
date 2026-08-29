@@ -79,7 +79,6 @@ function makeNode(
     return {
         id: 'n-1',
         name: 'Triage',
-        description: '',
         positionX: 0,
         positionY: 0,
         isCreate: false,
@@ -97,7 +96,6 @@ function makeEdge(
     return {
         id: 'e-1',
         name: 'Approve',
-        description: '',
         fromNodeId: 'n-1',
         toNodeId: 'n-2',
         ...overrides,
@@ -108,9 +106,7 @@ function makeFlowGraph(
     overrides: Partial<WorkOrderFlowGraph> = {},
 ): WorkOrderFlowGraph {
     return {
-        flowId: 'aEsGMmBEFaVdWihhHXwCbw',
         name: 'Expense approval',
-        description: '',
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
         nodes: [
             makeNode({

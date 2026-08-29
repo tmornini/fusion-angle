@@ -36,7 +36,7 @@ async function freshDb() {
 // this helper feeds stay byte-identical.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
-    id: string,
+    _id: string,
     organizationId: string,
     identityId: string,
     at: string,

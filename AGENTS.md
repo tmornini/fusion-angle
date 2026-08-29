@@ -63,7 +63,10 @@ Chrome MCP tools can drive the page normally.
 
 ## Gates
 
-`./validate` composes `tsc --noEmit`, then `./test` (two
+`./validate` composes `tsc --noEmit -p tsconfig.json`
+(the whole tree, Node + DOM) then `tsc --noEmit -p
+web-app/app/tsconfig.json` (the browser subset,
+`types: []`), then `./test` (two
 TZ passes: `TZ=UTC` on `tests/*.test.ts`, then
 `TZ=Pacific/Honolulu` on `tests/tz/*.test.ts`), then
 78-character lint of code and scripts (not `.md`),
@@ -214,6 +217,25 @@ record-attribute document id, never a table named
 
 tsconfig enables this — array / object index access
 returns `T | undefined`, requiring a `!` or a guard.
+
+### Two type universes
+
+The root `tsconfig.json` is the superset and the
+editor's catch-all (`types: ["node"]`, DOM lib,
+`verbatimModuleSyntax`, `erasableSyntaxOnly`).
+`web-app/app/tsconfig.json` extends it and
+overrides only `types: []` — the pure browser
+subset, whose `include` globs reach only
+`web-app/`, `api/`, and `shared/`. A Node-only
+module under that reach goes on the file's
+`exclude` list and nowhere else; missing from the
+list fails the browser project on its Node
+imports. `server/` sits outside those globs
+entirely — `exclude` only prunes what `include`
+already selected, so nothing under `server/` needs
+an entry. `erasableSyntaxOnly` and
+`verbatimModuleSyntax` are what `node --strip-types`
+requires at runtime, enforced at `tsc`.
 
 ### Required env is never logged
 

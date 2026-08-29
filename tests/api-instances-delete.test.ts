@@ -12,9 +12,7 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import {
-    postMembershipDocumentOp,
     postInstancePatchOp,
-    WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
     formWriteMessagePair,
@@ -38,7 +36,6 @@ import {
 } from '../api/derive-documents.ts';
 import {
     nowUtc,
-    SYSTEM_MEMBER_ID,
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
 import {
@@ -52,7 +49,6 @@ import { generateIdentifier } from
 // Absent → missedReadError; live OR already-tombstoned →
 // append tombstone (ledger-complete, not a no-append case).
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const TYPE_ID = generateIdentifier();
@@ -81,7 +77,8 @@ function req(
         path,
         token,
         body,
-        headers: extraHeaders,
+        ...(extraHeaders !== undefined
+            ? { headers: extraHeaders } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }
@@ -204,7 +201,7 @@ async function countDeleteMessagePairs(
     const prefix = instancesUriPrefix(
         ORGANIZATION, TYPE_ID,
     );
-    const [requests, responses] = await Promise.all([
+    const [requests] = await Promise.all([
         db.messagePairs.getAllWhere('uri_collection', prefix),
         db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);

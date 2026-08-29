@@ -1,7 +1,7 @@
 // Node-only generator for ./measure --visualize.
 // Reads history + budgets from disk; embeds a versioned
 // payload in self-contained dashboard + page HTML.
-// Excluded from browser tsc (Node APIs).
+// On the browser exclude list (Node APIs).
 
 import {
     existsSync,

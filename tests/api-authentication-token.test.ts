@@ -21,14 +21,10 @@ import {
 } from './client-assertion-fixtures.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
 import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import {
     putMessagePair, formAuthMessagePair, formWriteMessagePair,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { nowUtc } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
     authorizationCodeSpent, deriveAuthorizationCodeId,
@@ -100,7 +96,7 @@ async function seedAuthorizationCodeMessagePair(
 // only the write mechanism changes.
 async function seedMembershipMessagePair(
     db: MemoryDbAdapter,
-    id: string,
+    _id: string,
     body: Record<string, unknown>,
 ): Promise<void> {
     const organization = body.organization_id as string;

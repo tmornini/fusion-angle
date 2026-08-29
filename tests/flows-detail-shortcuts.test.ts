@@ -9,22 +9,34 @@ globalThis.localStorage = {
     getItem: () => null,
     setItem: () => {},
 };
-// @ts-expect-error — Node global stub
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
-};
+} as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
 
-class FakeInput {
+// A real EventTarget (never a cast) so instanceof narrowing
+// in isDesignerEditableTarget sees a genuine match — the DOM
+// hierarchy these fakes stand in for extends EventTarget too
+// (composition over inheritance, except where the platform
+// itself demands the hierarchy).
+class FakeEventTarget implements EventTarget {
+    addEventListener(): void {}
+    removeEventListener(): void {}
+    dispatchEvent(): boolean {
+        return true;
+    }
+}
+class FakeInput extends FakeEventTarget {
     readonly type: string;
     constructor(type: string) {
+        super();
         this.type = type;
     }
 }
-class FakeTextArea {}
-class FakeSelect {}
+class FakeTextArea extends FakeEventTarget {}
+class FakeSelect extends FakeEventTarget {}
 const g = globalThis as Record<
     string, unknown
 >;

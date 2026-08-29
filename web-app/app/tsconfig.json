@@ -1,25 +1,14 @@
 {
+    "extends": "../../tsconfig.json",
     "compilerOptions": {
-        "target": "ES2024",
-        "module": "ES2022",
-        "moduleResolution": "bundler",
-        "strict": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true,
-        "resolveJsonModule": true,
-        "isolatedModules": true,
-        "allowImportingTsExtensions": true,
-        "noEmit": true,
-        "noFallthroughCasesInSwitch": true,
-        "noUncheckedIndexedAccess": true,
-        "noImplicitReturns": true,
-        "noUnusedLocals": true,
-        "noUnusedParameters": true,
-        "exactOptionalPropertyTypes": true,
-        "lib": ["ES2024", "DOM", "DOM.Iterable"]
+        "types": []
     },
-    "include": ["./**/*.ts", "../**/*.ts", "../../api/**/*.ts", "../../shared/**/*.ts"],
+    "include": [
+        "./**/*.ts",
+        "../**/*.ts",
+        "../../api/**/*.ts",
+        "../../shared/**/*.ts"
+    ],
     "exclude": [
         "./compose.ts",
         "./generate-schema-svg.ts",

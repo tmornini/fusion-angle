@@ -1,6 +1,6 @@
 // Node-only CDP transport, Chrome launch, and waits.
-// Shared by ./measure and ./test-browser. Excluded from
-// the browser tsc (Node APIs + global WebSocket), like
+// Shared by ./measure and ./test-browser. On the browser
+// exclude list (Node APIs + global WebSocket), like
 // measure.ts.
 
 import { spawn, type ChildProcess } from 'node:child_process';

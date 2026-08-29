@@ -3,7 +3,6 @@ import { strict as assert } from 'node:assert';
 import { PUT, handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
-    type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
@@ -435,7 +434,6 @@ test('a duplicate work-order create\'s own OPERATION pair'
         await db.messagePairs.getAll(), ENTITY_PREFIX, WO_C3,
     );
     assert.ok(firstDocumentRow);
-    const firstDocumentId = firstDocumentRow!.id;
 
     const second = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'

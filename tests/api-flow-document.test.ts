@@ -43,7 +43,6 @@ import { messageStore } from '../api/message-store.ts';
 // synthetic
 // families in tests/document-family.test.ts).
 
-const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 
 function req(
@@ -58,7 +57,7 @@ function req(
         path,
         token,
         body,
-        headers,
+        ...(headers !== undefined ? { headers } : {}),
         operationId: TEST_OPERATION_ID,
     });
 }
@@ -232,7 +231,6 @@ test('postFlowDocumentOp returns the entity, exactly one'
             + 'bgwNLywXomEwlIMSFlkukQ', token, createBody,
     ));
     assert.equal(create.status, 201);
-    const headId = create.headers.get('Response-ID')!;
     const update = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'bgwNLywXomEwlIMSFlkukQ', token,
@@ -307,7 +305,6 @@ test('postFlowDocumentOp with revivals posts the restored'
             + 'biDOZCyZATKcAVVOCbegTw', token, createBody,
     ));
     assert.equal(create.status, 201);
-    const headId = create.headers.get('Response-ID')!;
     const update = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'biDOZCyZATKcAVVOCbegTw', token,
@@ -328,7 +325,7 @@ test('postFlowDocumentOp with revivals posts the restored'
     // on the flow document message pairs — no bulk states derive.
     const prefix = canonicalUriCollection('AjdvjuECVZEgZoFajaIEkg', '/flows/'
         + '');
-    const [requests, responses] = await Promise.all([
+    const [requests] = await Promise.all([
         db.messagePairs.getAllWhere('uri_collection', prefix),
         db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);
@@ -499,7 +496,7 @@ test('e2e: a byte-identical resend converges (one event, one'
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'bZXXOWeDHCowVkWMhrZGgg');
-    const headId = await headResponseId(db, token, 'bZXXOWeDHCowVkWMhrZGgg');
+    await headResponseId(db, token, 'bZXXOWeDHCowVkWMhrZGgg');
     const body = documentBody('Resend', generateIdentifier());
     const headers = {
         'if-match': await headEtag(db, token, 'bZXXOWeDHCowVkWMhrZGgg'),
@@ -547,7 +544,7 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'bACksPDpiYvefaEzSXoaZg');
-    const headId = await headResponseId(db, token, 'bACksPDpiYvefaEzSXoaZg');
+    await headResponseId(db, token, 'bACksPDpiYvefaEzSXoaZg');
 
     const noEcho = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
