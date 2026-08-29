@@ -296,15 +296,20 @@ One concern each:
   the document later and inherits it).
 - Stale comments that say "excluded from tsc (no
   `@types/node`)" become false at the flip. Per the
-  Office of Commentary the *why* survives
-  ("Node APIs; on the browser exclude list") and
-  the false clause goes. The plan re-greps at
-  execution. Known at design time:
-  `browser-drive.ts:3-4`, `cdp-client.ts:2-3`,
+  Office of Commentary the *why* survives, naming
+  the actual mechanism. For the five files under
+  `web-app/app/` — `browser-drive.ts:3-4`,
+  `cdp-client.ts:2-3`,
   `generate-api-documentation.ts:6-8`,
-  `measure-viz.ts:4`, `measure.ts:3`,
-  `server/http-server.ts:3`, `server/boot.ts:5`,
-  `server/scrypt-hash.ts:2-3`.
+  `measure-viz.ts:4`, `measure.ts:3` — it becomes
+  "Node APIs; on the browser exclude list". For the
+  three under `server/` — `server/http-server.ts:3`,
+  `server/boot.ts:5`, `server/scrypt-hash.ts:2-3` —
+  those sit outside the browser project's `include`
+  entirely, so it becomes "Node APIs; outside the
+  browser project" (no `exclude` entry applies). The
+  false clause goes either way. The plan re-greps at
+  execution.
 - `api/document-family.ts:47` and `api/routes.ts:338`
   stay: their claim (type-only imports are erased)
   remains true and is now `tsc`-guaranteed.
@@ -325,11 +330,25 @@ One concern each:
   commit before the configs and at the flip; `cmp`
   on `server.mjs`, `assets/app.js`,
   `assets/theme-init.js`, `assets/root-redirect.js`.
-  Expected byte-identical (`verbatimModuleSyntax`
-  only alters elision of unused imports, which
-  `noUnusedLocals` forbids); any difference is
-  explained before the commit lands, or the commit
-  is wrong.
+  Measured, not predicted: the artifacts are
+  equivalent, not identical. The byte-identical
+  prediction — `verbatimModuleSyntax` "only alters
+  elision of unused imports, which `noUnusedLocals`
+  forbids" — was wrong: the flag alters elision of
+  type-only imports, which `noUnusedLocals` permits;
+  `noUnusedLocals` is a `tsc` setting esbuild never
+  reads; and the real cause is that esbuild resolves
+  the nearest `tsconfig.json` per file, and `api/`
+  and `shared/` had no ancestor config at all before
+  this series — a config appeared where there was
+  none. `assets/app.js` grew ~963 bytes; `server.mjs`
+  grew 62 bytes, from `server/boot.ts`'s conditional
+  spread, not the config. Equivalence was established
+  structurally — 204 esbuild module wrappers before
+  and after, none added or dropped, and 2893 distinct
+  human-readable string literals with identical sets
+  — and behaviourally: `./test-browser` 19/19 passing
+  against a bundle built from post-config source.
 - **Green at every commit.** `./validate` after
   each family; root diagnostics counted down per
   task in the plan.
