@@ -462,6 +462,15 @@ Off the critical path; each with its oracle.
   resolves. Move it to `web-app/tsconfig.json`. Three
   live references (`validate`, TEST-PLAN.md AT1, the
   critical-path item) plus the tiers plan's path
+- GPU flag in the Tier-2 launcher — `launchChrome` no
+  longer passes `--disable-gpu` (cargo cult under
+  `--headless=new`; it was required only by old headless
+  on Windows). Its one real effect was forcing software
+  compositing, which made runs more alike across
+  machines. Dropped UNVERIFIED — no `./test-browser` run
+  has happened anywhere yet. Restore it if two machines
+  disagree. Oracle: `./test-browser` green on two
+  machines
 
 ## Sequencing
 

@@ -6,6 +6,7 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 
 ```bash
 ./test                 # Run automated tests (memory backend)
+./test-browser         # Tier 2: headless Chrome vs an in-process origin
 ./validate             # Type-check + tests + lint (works on dirty tree)
 ./build                # Server ZIP to ~/Desktop/
 ./build --no-zip dir/  # server-core + server.mjs to dir/
@@ -71,6 +72,12 @@ the `org` identifier ban under `api/`,
 `generate-schema-svg --check` and
 `generate-api-documentation --check`. Clean tree for
 `./build`, `./crank`, and `./measure`.
+
+`./test-browser` needs Chrome (`CHROME` or
+`CHROME_DEBUG_URL`); it bundles into `$TMPDIR` on any
+tree and runs `tests/browser/*.test.ts` serially. It
+is not part of `./validate`; `./crank` runs it after
+`./test-postgres`.
 
 When an agent runs the full test plan (CLI + browser),
 `./validate` is the gate: a failing type-check, test, or

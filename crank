@@ -124,6 +124,7 @@ trap cleanup EXIT INT TERM
 
 docker compose up -d --wait postgres
 ./test-postgres
+./test-browser
 BUILD_DIR="$(mktemp -d \
     "${TMPDIR:-/tmp}/fusion-crank.XXXXXX")"
 ./build --no-zip "${BUILD_DIR}/"

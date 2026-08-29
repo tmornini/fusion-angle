@@ -46,6 +46,26 @@ export function initDragReorder(
     let drag: DragState =
         { kind: 'idle' };
 
+    // A captured drag ends with a click the browser
+    // targets at the card — the common ancestor of the
+    // handle that took pointerdown and the card that
+    // took the captured pointerup — so a page's
+    // `.drag-handle` exclusion cannot see it. Consume
+    // exactly that one click here, where the capture
+    // lives. A new pointerdown clears a stale flag so
+    // a click that never arrives cannot eat a later one.
+    let suppressClick = false;
+    container.addEventListener(
+        'click',
+        (e) => {
+            if (!suppressClick) return;
+            suppressClick = false;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        },
+        { capture: true },
+    );
+
     function cards(): HTMLElement[] {
         return $$(cardSelector, container);
     }
@@ -147,6 +167,7 @@ export function initDragReorder(
     container.addEventListener(
         'pointerdown',
         (e) => {
+            suppressClick = false;
             if (e.button !== 0) return;
             const handle =
                 (e.target as Element)
@@ -236,6 +257,7 @@ export function initDragReorder(
         (e) => {
             if (drag.kind !== 'active')
                 return;
+            suppressClick = true;
             const draggedId = drag.id;
             const committedIdx =
                 drag.idx ?? dropIndex(

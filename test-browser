@@ -1,0 +1,52 @@
+#!/bin/bash
+set -euo pipefail
+
+# Tier 2: deterministic browser tests. Bundles the
+# client into $TMPDIR (any tree), then runs
+# tests/browser/*.test.ts serially against an
+# in-process origin on the memory backend. Needs
+# Chrome: CHROME (binary) or CHROME_DEBUG_URL (a
+# running Chrome's browser WebSocket URL).
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+
+# shellcheck source=build-lib
+source ./build-lib
+
+if [ -z "${CHROME_DEBUG_URL:-}" ]; then
+    CHROME="${CHROME:-/Applications/Google Chrome.app}"
+    CHROME="${CHROME%/}"
+    if [ -d "$CHROME" ]; then
+        CHROME="$CHROME/Contents/MacOS/Google Chrome"
+    fi
+    if [ ! -x "$CHROME" ]; then
+        echo "Error: Chrome not found; set CHROME to" \
+            "the binary or CHROME_DEBUG_URL to a" \
+            "running Chrome" >&2
+        exit 1
+    fi
+    export CHROME
+fi
+
+export JWT_HMAC_SIGNING_KEY="${JWT_HMAC_SIGNING_KEY:-test-hmac-signing-key}"
+
+BUNDLE="$(mktemp -d "${TMPDIR:-/tmp}/fusion-browser.XXXXXX")"
+trap 'rm -rf "$BUNDLE"' EXIT
+bundle_client "$BUNDLE" > /dev/null
+export FUSION_ANGLE_STATIC_ROOT="$BUNDLE"
+
+# node:test's default per-test timeout is infinite, and a
+# dead CDP socket strands every in-flight send — CdpClient
+# never rejects its pending map on close. This command
+# gates ./crank, where a hang is strictly worse than a
+# failure: a failure names the test, a hang names nothing
+# and takes the whole checkpoint with it. 120s clears the
+# largest single legitimate wait (the 60s page:ready)
+# twice over, so an internal timeout fires first and
+# reports itself by name.
+TZ=UTC node --strip-types \
+    --import ./tests/hmac-test-key.ts \
+    --test --test-concurrency=1 \
+    --test-timeout=120000 \
+    tests/browser/*.test.ts

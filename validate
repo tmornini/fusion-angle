@@ -15,6 +15,7 @@ LONG_LINES=$( {
         ! -path 'web-app/app/compose.ts' \
         -exec awk "$AWK_LINT" {} +
     awk "$AWK_LINT" build build-lib serve test test-postgres \
+        test-browser \
         validate generate-schema-svg \
         generate-api-documentation measure \
         postgres-wipe postgres-lib postgres-seed \

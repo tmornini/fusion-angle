@@ -33,6 +33,23 @@ type Sent = {
     sessionId?: string;
 };
 
+// The regression these last two tests guard against IS a
+// promise that never settles, and a bare `assert.rejects`
+// on one would hang the suite instead of failing it. Race
+// a deadline so a pending promise fails, and fails loudly.
+const SETTLE_DEADLINE_MS = 1_000;
+
+function withinDeadline<T>(promise: Promise<T>): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((_resolve, reject) => {
+            setTimeout(() => {
+                reject(new Error('still pending'));
+            }, SETTLE_DEADLINE_MS).unref();
+        }),
+    ]);
+}
+
 test('send carries the session id and resolves by id',
 async () => {
     const ws = new FakeSocket();
@@ -102,4 +119,31 @@ test('events reach listeners by method with a session',
         params: { requestId: 'r2' },
     });
     assert.deepEqual(seen, [[{ requestId: 'r1' }, 'S1']]);
+});
+
+test('closing rejects every send still awaiting a reply',
+async () => {
+    const ws = new FakeSocket();
+    const cdp = CdpClient.fromSocket(ws);
+    const first = cdp.send('Page.enable');
+    const second = cdp.send('Runtime.enable', {}, 'S1');
+    cdp.close();
+    await assert.rejects(
+        withinDeadline(first), /CDP socket closed/,
+    );
+    await assert.rejects(
+        withinDeadline(second), /CDP socket closed/,
+    );
+});
+
+test('a send after close rejects instead of orphaning',
+async () => {
+    const ws = new FakeSocket();
+    const cdp = CdpClient.fromSocket(ws);
+    cdp.close();
+    await assert.rejects(
+        withinDeadline(cdp.send('Page.enable')),
+        /CDP socket closed/,
+    );
+    assert.deepEqual(ws.sent, []);
 });

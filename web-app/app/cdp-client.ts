@@ -10,6 +10,7 @@ import { join } from 'node:path';
 
 export const CHROME_READY_MS = 15_000;
 export const POLL_MS = 200;
+const SOCKET_CLOSED = 'CDP socket closed';
 
 export function sleep(ms: number): Promise<void> {
     return new Promise((r) => setTimeout(r, ms));
@@ -110,6 +111,7 @@ export class CdpClient {
     }>();
     private listeners = new Map<string,
         Set<CdpEventListener>>();
+    private closed = false;
 
     private constructor(ws: CdpSocket) {
         this.ws = ws;
@@ -186,6 +188,11 @@ export class CdpClient {
         params?: Record<string, unknown>,
         sessionId?: string,
     ): Promise<unknown> {
+        if (this.closed) {
+            return Promise.reject(
+                new Error(SOCKET_CLOSED),
+            );
+        }
         const id = this.nextId++;
         const payload: Record<string, unknown> = {
             id,
@@ -222,10 +229,22 @@ export class CdpClient {
     }
 
     close(): void {
+        this.closed = true;
         try {
             this.ws.close();
         } catch {
             // ignore
+        }
+        // Every caller still awaiting a reply must learn
+        // the socket died. send() is not wrapped in a
+        // timeout, so an entry left in the map is a
+        // promise that can never settle — the caller
+        // waits forever. Snapshot and clear before
+        // rejecting so no handler can re-enter the map.
+        const orphans = [...this.pending.values()];
+        this.pending.clear();
+        for (const orphan of orphans) {
+            orphan.reject(new Error(SOCKET_CLOSED));
         }
     }
 }
@@ -356,7 +375,6 @@ export function launchChrome(options: {
         '--no-first-run',
         '--no-default-browser-check',
         '--disable-background-networking',
-        '--disable-gpu',
     ];
     if (options.windowSize !== undefined) {
         args.push(`--window-size=${options.windowSize}`);

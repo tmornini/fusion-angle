@@ -247,6 +247,7 @@ one. All five reorderable lists inherit it.
 
 | File | Covenants |
 |---|---|
+| `sign-in` | the auth page signs the seeded admin in over the loopback origin; a wrong password stays with the inline error |
 | `list-reorder` | pointer-capture reorder; no click-through; keyboard reorder |
 | `canvas-gestures` | port drag adds node + auto-edge; shift-connect commits an edge and hides the ghost; body drag moves; marquee selects |
 | `canvas-pan` | Space toggles `flow-pan-cursor`; second Space clears; drag pans `viewBox`; Space under Auto-Fit toasts |
