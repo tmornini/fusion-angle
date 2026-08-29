@@ -384,9 +384,8 @@ async () => {
     }
 });
 
-test('request and response counts stay equal across a mix'
-+ ' including one failed identity-token-revocations PUT and'
-+ ' one failed (reuse) rotation', async () => {
+test('a reused rotation 409s and a token-revocations PUT'
++ ' missing required at 400s', async () => {
     const db = await seededDb();
     await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
@@ -410,9 +409,6 @@ test('request and response counts stay equal across a mix'
         { identity_id: 'XXZruirZyAOoRpNxaDnpSA' }, // missing required `at`
     ));
     assert.equal(failed.status, 400);
-    const requests = await db.messagePairs.getAll();
-    const responses = await db.messagePairs.getAll();
-    assert.equal(requests.length, responses.length);
 });
 
 // ── synthesized event pairs: the issued-root writers (Phase 13

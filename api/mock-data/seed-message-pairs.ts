@@ -2161,10 +2161,13 @@ export async function formDefaultOrganizationSeedMessagePair(
 
 // The instance chain cannot ride formSeedMessagePair: its
 // revisions share an address and its head depends on
-// (at, id) order — so this pass mints DISTINCT
-// ascending requestAt values (a named deviation from
-// the seed's shared-arrival-moment covenant) and forms
-// sequentially. headerFields stays [] for every link
+// (response_at, id) order, made deterministic by forming
+// sequentially — response_at is minted (nowUtc(), at
+// append) in that same order, not by requestAt. This pass
+// also mints its own DISTINCT ascending requestAt values
+// (a named deviation from the seed's shared-arrival-moment
+// covenant), so each revision's arrival stamp reads as its
+// own event. headerFields stays [] for every link
 // — the seed's no-bearer carve-out extends to If-Match
 // on seed revision pairs (never hoist If-Match onto
 // synthetic revisions; the wire operation message pair's
@@ -2389,8 +2392,9 @@ export async function formInstanceChainMessagePairs():
 // minted once by the caller (the seed's arrival moment) and
 // shared by every pair this seed forms — except the instance
 // chain (formInstanceChainMessagePairs), which mints its own
-// ascending requestAt values so instance-head order is
-// deterministic.
+// ascending requestAt values and forms them sequentially —
+// response_at, not requestAt, is what makes instance-head
+// order deterministic.
 export async function formMockDataMessagePairs(
     requestAt: string,
 ): Promise<ReadonlyMap<string, MessagePair>> {

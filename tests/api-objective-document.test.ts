@@ -417,7 +417,7 @@ test('stored PUT body equals objectiveDocumentEntityOf of'
         documentFields(99, 'archived'),
     ));
     assert.equal(later.status, 201);
-    const after = JSON.parse(
+    const after: Record<string, unknown> = JSON.parse(
         await storedPutBodyText(db, prefix, id),
     );
     assert.deepEqual(
@@ -428,14 +428,6 @@ test('stored PUT body equals objectiveDocumentEntityOf of'
             [],
         ),
     );
-    if (
-        typeof after !== 'object'
-        || after === null
-        || !('state' in after)
-        || !('position' in after)
-    ) {
-        throw new Error('expected document body');
-    }
     assert.equal(after.state, 'archived');
     assert.equal(after.position, 99);
     assert.equal('state_at' in after, false);

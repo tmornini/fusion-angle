@@ -468,11 +468,12 @@ Off the critical path; each with its oracle.
   project only for `web-app/app/**`; editors and the
   LSP open `web-app/flows/**` and the other page
   directories under the root superset, where `process`
-  resolves. Move it to `web-app/tsconfig.json`. Five
+  resolves. Move it to `web-app/tsconfig.json`. Six
   live references (`validate`, TEST-PLAN.md AT1,
   AGENTS.md's Gates paragraph, AGENTS.md's Two type
-  universes invariant, `tests/tsconfig-covenants.test.ts`)
-  plus the tiers plan's path
+  universes invariant, `tests/tsconfig-covenants.test.ts`,
+  and this file's own Node-only-modules-by-directory
+  Oracle above) plus the tiers plan's path
 - GPU flag in the Tier-2 launcher — `launchChrome` no
   longer passes `--disable-gpu` (cargo cult under
   `--headless=new`; it was required only by old headless

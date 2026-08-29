@@ -527,11 +527,10 @@ test('case 2: GET <family>/:id/history parity — one entity'
             const cur = wire[i]!;
             const prevAt = prev.at;
             const curAt = cur.at;
-            if (
-                prevAt === undefined || curAt === undefined
-            ) {
-                throw new Error('state row missing at');
-            }
+            assert.ok(
+                prevAt !== undefined && curAt !== undefined,
+                family + ' history row missing at@' + i,
+            );
             assert.ok(
                 prevAt > curAt
                 || (prevAt === curAt
