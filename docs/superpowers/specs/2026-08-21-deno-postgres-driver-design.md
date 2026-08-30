@@ -3,9 +3,10 @@
 Date: 2026-08-21
 Status: outline (authored beside the roadmap on
 2026-08-21; optional; reconciled 2026-08-23 against the
-tree at `eaa73075`; re-validated against the tree and
-brainstormed to full depth before its implementation
-plan). Spec only; no implementation lives here.
+tree at `eaa73075` and again 2026-08-30 at `c6d078c3`;
+re-validated against the tree and brainstormed to full
+depth before its implementation plan). Spec only; no
+implementation lives here.
 
 This scroll is Spec 6 of the Deno migration roadmap
 and follows
@@ -96,9 +97,10 @@ new driver reads. Nothing above `SqlClient` notices.
 
 ## The Gates
 
-- `./test-postgres` against the compose Postgres — the
-  acceptance, races, boot, seed, explain,
-  identifier-order, and schema-lifecycle suites.
+- `./test-postgres` against the compose Postgres
+  (`./crank` brings it up) — the acceptance, races,
+  boot, seed, explain, identifier-order, and
+  schema-lifecycle suites.
 - `./validate`.
 - `./measure` full ceremony; `--check` against the
   committed budgets, and the phase mix compared with the

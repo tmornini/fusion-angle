@@ -3,9 +3,10 @@
 Date: 2026-08-21
 Status: outline (authored beside the roadmap on
 2026-08-21; reconciled 2026-08-23 against the tree at
-`eaa73075`; re-validated against the tree and
-brainstormed to full depth before its implementation
-plan). Spec only; no implementation lives here.
+`eaa73075` and again 2026-08-30 at `c6d078c3`;
+re-validated against the tree and brainstormed to full
+depth before its implementation plan). Spec only; no
+implementation lives here.
 
 This scroll is Spec 4 of the Deno migration roadmap
 and follows
@@ -21,24 +22,44 @@ git show 9620d38c:docs/superpowers/specs/\
 
 ## The Goal
 
-The five entrypoints — `compose.ts`,
+The seven Node-only modules under `web-app/app/` — the
+five entrypoints `compose.ts`,
 `generate-schema-svg.ts`,
 `generate-api-documentation.ts`, `measure.ts`,
-`measure-viz.ts` — and `postgres-lib`'s eight inline
-programs speak Deno. `process` and `node:` imports leave
-`web-app/app/*.ts` and the root scripts.
+`measure-viz.ts`, plus `cdp-client.ts` and
+`browser-drive.ts` (the browser tsconfig's `exclude`
+list, which Spec 1 deletes; this sentence is the
+roll-call after that) — and `postgres-lib`'s eight
+inline programs speak Deno. `process` and `node:`
+imports leave `web-app/app/*.ts` and the root scripts.
 
 ## Context
 
-- `measure.ts` uses `node:child_process` (`spawn`,
-  `execFile` for the server, the seed, Chrome, and git),
-  `node:net` (a free port), `node:os` (`cpus`,
+- `measure.ts` (961 lines at `c6d078c3`) uses
+  `node:child_process` (`spawn` for the server;
+  `execFile` for git, `./build --no-zip`, and the
+  seed), `node:net` (a free port), `node:os` (`cpus`,
   `platform`, `arch`, `tmpdir`), `node:fs`,
   `node:path`, `node:util`'s `promisify`, and
-  `process.env`/`argv`/`stdout`/`stderr`/`exitCode`.
-- `measure-viz.ts`, both generators, and `compose.ts`
-  use `node:fs`, `node:path`, `import.meta.url`, and
-  `process.argv`/`exit`/`stdout`/`stderr`.
+  `process.env`/`argv`/`stdout`/`stderr`/`exitCode`
+  (33 sites). The CDP transport and Chrome launcher
+  left it for `cdp-client.ts` (`474ca62e`,
+  `8cad9e86`): `node:child_process` (`spawn` detached
+  and `unref`'d; `killProcessTree` signals the process
+  group), `node:fs` (the `DevToolsActivePort` file),
+  `node:os` (`platform`), `node:path`, and
+  `process.env.CHROME`. The UI drive helpers left for
+  `browser-drive.ts` (`20a6f845`), pure over
+  `cdp-client.ts` with no Node surface of its own.
+  `tests/browser/fixtures.ts` imports both;
+  `./test-browser` is their second caller.
+- Both generators and `compose.ts` use `node:fs`,
+  `node:path` (not the schema generator), and
+  `process.argv`/`exit`/`stdout`/`stderr`;
+  `compose.ts` alone reads `import.meta.url`, for the
+  repository root. `measure-viz.ts` is a library
+  `measure.ts` calls for `--visualize`: `node:fs`,
+  `node:path`, no `process`.
 - `postgres-lib` runs `node --input-type=module -e`
   eight times: the Render error-message reader, the
   job-body writer, the log flattener, the reveal
@@ -47,18 +68,24 @@ programs speak Deno. `process` and `node:` imports leave
   inline wipe already left for `server/postgres-wipe.ts`
   (Spec 2 turns its `node -e` Render start command into
   the operator tool).
-- After Spec 1 the entrypoints are type-checked; after
-  Spec 2 `measure.ts` spawns the binary.
+- After Spec 1 the seven modules are type-checked under
+  `deno check` (the root `tsc` already checks them
+  today); after Spec 2 `measure.ts` spawns the binary
+  and `./test-browser` runs `cdp-client.ts` under
+  `deno test`.
 
 ## The Decisions
 
 1. **Process:** `Deno.Command` replaces `spawn` and
-   `execFile`; `Deno.listen({ port: 0 })` yields the
-   free port; `navigator.hardwareConcurrency`,
-   `Deno.build.os`, and `Deno.build.arch` replace
-   `node:os`; `Deno.makeTempDirSync` replaces the
-   `TMPDIR` fallback chain; `Deno.exit` and
-   `Deno.exitCode` replace `process.exit`/`exitCode`.
+   `execFile` in `measure.ts` and `cdp-client.ts` —
+   the detached, `unref`'d server and Chrome children
+   and the process-group kill are the Risk below;
+   `Deno.listen({ port: 0 })` yields the free port;
+   `navigator.hardwareConcurrency`, `Deno.build.os`,
+   and `Deno.build.arch` replace `node:os`;
+   `Deno.makeTempDirSync` replaces the `TMPDIR`
+   fallback chain; `Deno.exit` and `Deno.exitCode`
+   replace `process.exit`/`exitCode`.
 2. **Files:** `Deno.readTextFileSync`,
    `writeTextFileSync`, `mkdirSync`, `readDirSync`,
    `removeSync`, `statSync`; `import.meta.dirname` for
@@ -80,7 +107,9 @@ programs speak Deno. `process` and `node:` imports leave
 7. **Permissions on the wrappers:** `./measure` names
    read, write (its temp dir and `measurements/`), net,
    run (the binary, `./postgres-seed`, Chrome, `git`),
-   env; the generators keep Spec 1's flags.
+   env; the generators keep Spec 1's flags;
+   `./test-browser` keeps Spec 2's — it is
+   `cdp-client.ts`'s second runtime and must stay green.
 
 ## Decisions Deferred to This Spec's Brainstorm
 
@@ -90,8 +119,11 @@ programs speak Deno. `process` and `node:` imports leave
 
 ## The Gates
 
-- `./validate` — the entrypoints are type-checked with
-  no `node:` or `process` reference left.
+- `./validate` — the seven modules are type-checked
+  with no `node:` or `process` reference left.
+- `./test-browser` — the ported `cdp-client.ts` and
+  `browser-drive.ts` under real Chrome, ten files
+  green (Layer 2, `./test-all`).
 - `./generate-schema-svg --check` and
   `./generate-api-documentation --check` — byte parity
   with the committed outputs.
@@ -106,5 +138,7 @@ programs speak Deno. `process` and `node:` imports leave
 ## Risks
 
 - `Deno.Command` with `detached`-style semantics for the
-  measured server; `measure.ts` today `unref`s a
-  detached child. The plan measures the replacement.
+  measured server and for Chrome; `measure.ts` and
+  `cdp-client.ts` today `unref` detached children, and
+  `killProcessTree` signals the process group. The plan
+  measures the replacement.

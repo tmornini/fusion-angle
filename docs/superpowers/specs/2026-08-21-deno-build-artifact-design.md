@@ -3,9 +3,10 @@
 Date: 2026-08-21
 Status: outline (authored beside the roadmap on
 2026-08-21; reconciled 2026-08-23 against the tree at
-`eaa73075`; re-validated against the tree and
-brainstormed to full depth before its implementation
-plan). Spec only; no implementation lives here.
+`eaa73075` and again 2026-08-30 at `c6d078c3`;
+re-validated against the tree and brainstormed to full
+depth before its implementation plan). Spec only; no
+implementation lives here.
 
 This scroll is Spec 2 of the Deno migration roadmap
 and follows
@@ -30,34 +31,55 @@ leave the repository.
 
 ## Context
 
-- `./build` today: the clean-tree gate; `node
-  --strip-types compose.ts`; six `npx esbuild` runs —
-  `app.js` (iife, minify, keep-names, es2024),
-  `theme-init.js`, `root-redirect.js`, `styles.css`
-  from a concatenated stream with `--loader=css
-  --minify`, every `pages-*.css`, and `server.mjs`
-  (`--platform=node --format=esm`); copies of fonts,
-  `index.html`, favicons, `mark.png`; a ZIP named
-  `fusion-angle-server-${SHA}.zip`.
+- `./build` today: the clean-tree gate, then
+  `build-lib`'s `bundle_client` (sourced; `28836ad9`,
+  `83d18b38`) — `node --strip-types compose.ts` and
+  five `npx esbuild` runs: `app.js` (iife, minify,
+  keep-names, es2024), `theme-init.js`,
+  `root-redirect.js`, `styles.css` from a concatenated
+  stream with `--loader=css --minify`, every
+  `pages-*.css`; copies of fonts, `index.html`,
+  favicons, `mark.png` — then the sixth esbuild run,
+  `server.mjs` (`--platform=node --format=esm`), and a
+  ZIP named `fusion-angle-server-${SHA}.zip`.
+  `./test-browser` sources the same `build-lib` and
+  serves `bundle_client`'s output from `$TMPDIR` to
+  real Chrome through an in-process `listenHttp`
+  (`tests/browser/fixtures.ts` reads
+  `FUSION_ANGLE_STATIC_ROOT`); `./test-all` is
+  `./validate` then `./test-browser`.
 - Pins that move with the build:
   `tests/server-zip-metafile.test.ts` (ZIP name, the
-  `server-core.ts` entry, the esbuild metafile
-  client-graph pin), `tests/fusion-angle-mark.test.ts`
-  (reads `build` for `mark.png`),
-  `tests/measure-cli.test.ts` (`server.mjs` entry and
-  spawn args), `tests/pg-boot.test.ts` (argv fixture),
+  `server-core.ts` entry in `build-lib`, the esbuild
+  metafile client-graph pin, and `build`'s `--no-zip`
+  help naming `server.mjs` and `./crank`),
+  `tests/fusion-angle-mark.test.ts` (reads `build-lib`
+  for `mark.png`), `tests/measure-cli.test.ts`
+  (`MEASURE_SERVER_ENTRY` is `server.mjs`;
+  `measureServerArgs()` is `['server.mjs']`),
+  `tests/serve-cli.test.ts` (`serve` runs `node
+  server.mjs` and never `./build`),
+  `tests/crank-cli.test.ts` (`crank` owns the local
+  stack), `tests/pg-boot.test.ts` (argv fixture),
   `tests/fusion-angle-live-name.test.ts` (walks
   `package-lock.json`).
 - `measure.ts` spawns `node server.mjs` through
-  `measureServerArgs()`. `server/postgres-wipe.ts` is
-  the operator wipe already: `./postgres-wipe
-  --postgres local` runs it under `node --strip-types`,
-  and for Render its `renderWipeStartCommand()` prints
-  a `node -e` program (importing `postgres`) as the
-  job's `startCommand`. `./postgres-seed` has three
-  modes — `--bootstrap`, `--mock-data`,
-  `--test-plan-slices` — and a `compose` target that
-  runs the `seed` service.
+  `measureServerArgs()`. `./serve dir/ port` no longer
+  builds (`ae590dab`): it `exec`s `node server.mjs` in
+  `dir/`. `./crank --mock-data|--bootstrap port`
+  (`0f289810`) owns the local stack: `./validate`,
+  minted secrets, the compose Postgres alone,
+  `./test-postgres`, `./test-browser`, `./build
+  --no-zip` into a temp dir, wipe, seed, `./serve`.
+  `server/postgres-wipe.ts` is the operator wipe
+  already: `./postgres-wipe --postgres local` runs it
+  under `node --strip-types`, and for Render its
+  `renderWipeStartCommand()` prints a `node -e`
+  program (importing `postgres`) as the job's
+  `startCommand`. `./postgres-seed` has two modes —
+  `--bootstrap`, `--mock-data` (`--test-plan-slices`
+  left with the slice seeder, `8bd9defb`) — and a
+  `compose` target that runs the `seed` service.
 - Measured: `deno bundle` output sizes equal esbuild's;
   `--format iife`, `--minify`, `--keep-names`, and
   `--external '*.woff2'` work; `deno compile` embeds
@@ -70,21 +92,27 @@ leave the repository.
 
 ## The Decisions
 
-1. **`./build` stays bash** and keeps the clean-tree
-   gate, the `emitted` voice, and `--no-zip`.
-2. **Composition:** `deno run --frozen --allow-read
-   --allow-write="$BUILD_DIR" web-app/app/compose.ts
-   "$BUILD_DIR/site"`. Under `deno run`, `process.argv`
+1. **`./build` and `build-lib` stay bash.** `./build`
+   keeps the clean-tree gate and `--no-zip`;
+   `build-lib` keeps `bundle_client` and the `emitted`
+   voice; `./test-browser` keeps sourcing it.
+2. **Composition,** inside `bundle_client`: `deno run
+   --frozen --allow-read --allow-write="$dest"
+   web-app/app/compose.ts "$dest"` — `"$BUILD_DIR/site"`
+   under `./build`, the `$TMPDIR` bundle under
+   `./test-browser`. Under `deno run`, `process.argv`
    keeps Node's shape, so `compose.ts` is unchanged here
    and ported in Spec 4.
-3. **Bundles:** `deno bundle --frozen --platform browser
-   --format iife --minify` for `theme-init.js` and
-   `root-redirect.js`, plus `--keep-names` for `app.js`.
-   CSS: the same concatenation written to
-   `"$BUILD_DIR/styles.concat.css"`, then `deno bundle
-   --minify --external '*.woff2'`; each `pages-*.css`
-   likewise. Byte identity with esbuild is not a goal;
-   the DOM, TEST-PLAN, and `./measure` are the oracles.
+3. **Bundles,** inside `bundle_client`: `deno bundle
+   --frozen --platform browser --format iife --minify`
+   for `theme-init.js` and `root-redirect.js`, plus
+   `--keep-names` for `app.js`. CSS: the same
+   concatenation written to `"$dest/styles.concat.css"`,
+   then `deno bundle --minify --external '*.woff2'`;
+   each `pages-*.css` likewise. Byte identity with
+   esbuild is not a goal; the DOM, `./test-browser` (the
+   same bundle under real Chrome — the deterministic
+   oracle), the walk, and `./measure` are the oracles.
 4. **The site layout:** `"$BUILD_DIR/site/"` holds what
    the ZIP root holds today — `index.html`, the composed
    pages, `assets/`.
@@ -133,13 +161,28 @@ leave the repository.
    `api/access-token.ts` and the forbidden mint names
    are absent from the code-reachable inputs. The
    `esbuild` import-map entry leaves with the old pin;
-   the test gains `--allow-run=deno` in `./test`'s
-   permission list and `--allow-run` otherwise drops.
-10. **`./serve`** builds `--no-zip` and `exec`s the
-    binary with `HTTP_SERVER_PORT` as today.
+   its `--no-zip` help pin follows the new help text.
+   `./test`'s `--allow-run` narrows to what the suite
+   still spawns — `deno` here, `./serve` and `./crank`
+   in their CLI pins.
+10. **`./serve dir/ port`** `exec`s the binary in
+    `dir/` with `HTTP_SERVER_PORT` as today; its pin
+    (`serve-cli.test.ts`) names the binary instead of
+    `node server.mjs`. **`./crank`** is unchanged: it
+    builds `--no-zip` and calls `./serve`.
     **`./measure`** spawns the binary directly;
     `MEASURE_SERVER_ENTRY` names it and
     `measureServerArgs()` returns `[]`; the pin updates.
+    **`./test-browser`** runs `bundle_client` (now
+    `deno bundle`), then `tests/browser/*.test.ts` under
+    `deno test --frozen --no-check` with Spec 1's
+    preload and permissions, serially (no
+    `--parallel`), `--allow-run` unscoped (Chrome's path
+    is the operator's), and `--allow-env` covering
+    `CHROME`, `CHROME_DEBUG_URL`, `TMPDIR`, and
+    `FUSION_ANGLE_STATIC_ROOT`; the files keep
+    `node:test` until Spec 5. `./test-all` is
+    unchanged.
 11. **Dockerfile.** Builder `FROM denoland/deno:2.9.5`,
     `COPY . .`, `RUN ./build --no-zip render-out/`.
     Runtime `FROM denoland/deno:2.9.5`, the binary
@@ -171,15 +214,19 @@ leave the repository.
 15. **Root docs.** The root docs were rewritten after
     this outline; each pins the Node artifact by name
     and moves with it: AGENTS.md's command block
-    (`./build`, `./serve`, the `TMPDIR` sandbox note)
-    and § Operator seed and wipe; README.md § Modules
-    (the ZIP line) and § Getting Started (the `npm ci`
-    paragraph); ARCHITECTURE.md § One origin, one ZIP
-    (`server.mjs`, the ZIP name, "Node serves",
-    postgres.js bundled); TEST-PLAN.md A1–A3 and the
-    other `server.mjs` / `node server.mjs` lines (18
-    today). `./validate` gates AGENTS.md at 300 lines
-    and README.md at 150.
+    (`./build --no-zip`, `./serve` — "node server.mjs
+    from dir/" — `./crank`, the `TMPDIR` sandbox note),
+    § Gates (`./test-browser` "bundles into `$TMPDIR`"),
+    § HTTP only ("One origin (`node server.mjs`)"), and
+    § Operator seed and wipe; README.md § Modules (the
+    ZIP line, "Node + Postgres") and § Getting Started
+    (the `npm ci` paragraph); ARCHITECTURE.md § One
+    origin, one ZIP (`server.mjs`, the ZIP name, "Node
+    serves", postgres.js bundled); TEST-PLAN.md A1–A3,
+    AT5, and the three other `server.mjs` lines (A2's
+    pin and K8's `node server.mjs`). `./validate` gates
+    AGENTS.md at 300 lines (281 today) and README.md at
+    150.
 
 ## Decisions Deferred to This Spec's Brainstorm
 
@@ -219,6 +266,16 @@ leave the repository.
   function names `app.js` relies on, as esbuild's does.
 - The binary's start-up time against `node server.mjs`;
   `./measure`'s `boot:*` phases record it.
+- `node --test`'s `--test-timeout=120000` — the guard
+  `./test-browser` carries so a dead CDP socket fails
+  by name instead of hanging `./crank` — has no
+  `deno test` flag. Where the bound lives under Deno
+  (the fixtures, or an option the plan finds) is
+  verified before the runner line changes.
+- That the `deno bundle` output keeps the ten browser
+  pins green — the deterministic check on
+  `--keep-names` parity and the CSS concatenation,
+  ahead of the walk.
 
 ## The Gates
 
@@ -229,6 +286,11 @@ leave the repository.
   `docker compose up --wait`, the landing page, and
   `./measure --base-url http://127.0.0.1:8080 --password
   "$PW" --runs 1 --pages organization`.
+- `./test-all`: Spec 1's `./validate`, then
+  `./test-browser` on the `deno bundle` output — ten
+  files green before the ZIP is cut.
+- `./crank --mock-data 8080` end to end: the binary
+  listens, and the walk's A3 passes against it.
 - `./test-postgres`, unchanged.
 - The ZIP unzips to one executable that runs the boot
   gates on a Linux host.

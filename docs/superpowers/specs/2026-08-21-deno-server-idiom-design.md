@@ -3,9 +3,10 @@
 Date: 2026-08-21
 Status: outline (authored beside the roadmap on
 2026-08-21; reconciled 2026-08-23 against the tree at
-`eaa73075`; re-validated against the tree and
-brainstormed to full depth before its implementation
-plan). Spec only; no implementation lives here.
+`eaa73075` and again 2026-08-30 at `c6d078c3`;
+re-validated against the tree and brainstormed to full
+depth before its implementation plan). Spec only; no
+implementation lives here.
 
 This scroll is Spec 3 of the Deno migration roadmap
 and follows
@@ -28,7 +29,9 @@ except `node:crypto` scrypt, the one named exception.
 The HTTP covenant pinned by `http-server.test.ts`,
 `http-throttle.test.ts`,
 `http-static-directory-index.test.ts`, and
-`pg-boot.test.ts` holds without a changed assertion.
+`pg-boot.test.ts` holds without a changed assertion —
+and so does the one `tests/browser/fixtures.ts` pins
+through real Chrome.
 
 ## Context
 
@@ -61,6 +64,19 @@ are the operator tools, each with its own
 runtime-neutral apart from `postgres-gate.ts`'s
 `process.env` default.
 
+`listenHttp` has a fifth consumer since 2026-08-28
+(`28836ad9`): `tests/browser/fixtures.ts`'s
+`startOrigin()` listens on `host: '127.0.0.1'`,
+`port: 0`, the memory adapter seeded by
+`postMockDataLoad`, and a `staticRoot` read from
+`FUSION_ANGLE_STATIC_ROOT` — the client bundle
+`./test-browser` wrote to `$TMPDIR`. The ten browser
+files ride it under real Chrome, and
+`tests/browser-origin.test.ts` (in `./test`) proves
+the origin serves the seeded API. Spec 2 moves
+`./test-browser` to `deno test`; this spec ports the
+listener beneath it.
+
 Deno offers `Deno.serve({ port, hostname, onListen,
 signal })` with a handler `(request, info)` where
 `info.remoteAddr` carries the peer; `server.shutdown()`
@@ -74,7 +90,12 @@ verified first.
 
 1. **`listenHttp(options)` keeps its signature** and the
    `HttpListener` contract (`port`, `close()`), so
-   `boot.ts` and the four test files do not move.
+   `boot.ts`, the three HTTP test files, and
+   `tests/browser/fixtures.ts` do not move. `host` and
+   `port: 0` (the fixtures' ephemeral loopback) map
+   onto `Deno.serve`'s `hostname` and `port`, and
+   `listener.port` reads the bound port from
+   `onListen`.
 2. **The handler is `(request: Request, info) =>
    Promise<Response>`.** `incomingToRequest`,
    `writeFetchResponse`, and `writeJson`'s
@@ -84,7 +105,11 @@ verified first.
 3. **Static serving:** `Deno.stat` plus `Deno.open`
    streaming, the same MIME table, cache-control rules,
    404/405/HEAD semantics, and `safeStaticPath` (pure,
-   unchanged).
+   unchanged). One path serves both roots — the
+   compiled file system in the binary and the real
+   directory `./test-browser` hands the fixtures; the
+   browser suite gates the directory, the compose smoke
+   the binary.
 4. **Drain:** `server.shutdown()`, a timer that aborts
    the serve signal after `drainMs`, and `close()`
    resolving on `server.finished`.
@@ -107,7 +132,9 @@ verified first.
    day it may leave (a `Deno` or `@std` scrypt).
 9. **Permissions are unchanged** — `--allow-net` and the
    env list. Still no `--allow-read`: the site is in the
-   binary.
+   binary. (`./test-browser` already carries
+   `--allow-read`; the directory root is the tests',
+   never the binary's.)
 
 ## Decisions Deferred to This Spec's Brainstorm
 
@@ -130,15 +157,19 @@ verified first.
 
 ## The Gates
 
-- `./validate`; `./test-postgres`.
+- `./validate`; `./test-postgres`; `./test-browser` —
+  the ported listener under real Chrome, ten files
+  green (Layer 2, `./test-all`).
 - The compose smoke and `./measure --base-url` (the
   request path, now native).
-- TEST-PLAN slices that exercise navigation, 404s, and
-  static caching, run against the compose origin.
+- The walk's cases that exercise navigation, 404s, and
+  static caching (Layer 3, `./crank --mock-data 8080`),
+  and the same against the compose origin.
 
 ## Risks
 
 - A behavior the `node:http` adapter had and no test
-  names. The four test files are the covenant
-  (`http-server.test.ts` pins the CSP header); what
-  they do not pin, the compose smoke and TEST-PLAN must.
+  names. The four test files and the browser suite are
+  the covenant (`http-server.test.ts` pins the CSP
+  header); what they do not pin, the compose smoke and
+  the walk must.
