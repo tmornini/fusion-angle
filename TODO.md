@@ -1184,11 +1184,14 @@ Off the critical path; each with its oracle.
   `tests/flow-operations.test.ts` asserting the bottom-of-stack
   undo is refused.
 - The first click after a page reload only focuses the window
-  — every driven case must click twice after a reload. Named
-  by the 2026-08-29 three-layers audit and carried as a
-  driving note in TEST-PLAN.md's `## The walk`. Oracle: a
-  Layer 2 test under `tests/browser/` asserting one click
-  after reload reaches the element.
+  — the focusing click is the viewport center, never the
+  top-left brand (that is the Apple menu when Chrome is
+  fullscreen or flush with the menu bar; the next click
+  opens About This Mac). Then click the intended control
+  once. Named by the 2026-08-29 three-layers audit and
+  carried as a driving note in TEST-PLAN.md's `## The
+  walk`. Oracle: a Layer 2 test under `tests/browser/`
+  asserting one click after reload reaches the element.
 
 ## Sequencing
 

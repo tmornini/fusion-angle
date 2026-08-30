@@ -12,11 +12,17 @@ import {
 import type { RequestContext } from './shared.ts';
 import {
     buildHumanMemberMap,
+    getHumanMemberProfile,
 } from './members.ts';
 import {
     buildAIAgentMap,
 } from './ai-members.ts';
 import { getMemberPii } from './identities.ts';
+import {
+    RequestError,
+    HTTP_NOT_FOUND,
+    HTTP_FORBIDDEN,
+} from '../../../api/http-errors.ts';
 
 export {
     SystemMember,
@@ -83,6 +89,40 @@ export async function fillHumanMemberPii(
             member.profile(),
             pii,
         );
+    }));
+}
+
+// Members list only. Other rosters (ideas, workbox,
+// designer) paint names from PII and never GET
+// identities/:id for title/department.
+export async function fillHumanMemberProfile(
+    ctx: RequestContext,
+    members: readonly Member[],
+): Promise<Member[]> {
+    return Promise.all(members.map(async member => {
+        if (member.kind !== 'human') {
+            return member;
+        }
+        const id = member.idForLink();
+        try {
+            const profile =
+                await getHumanMemberProfile(
+                    ctx, id,
+                );
+            return new HumanMember(
+                { id, type: 'human' },
+                profile,
+                member.pii(),
+            );
+        } catch (error) {
+            if (error instanceof RequestError
+                && (error.status === HTTP_NOT_FOUND
+                    || error.status
+                        === HTTP_FORBIDDEN)) {
+                return member;
+            }
+            throw error;
+        }
     }));
 }
 

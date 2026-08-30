@@ -66,6 +66,44 @@ test(
         assert.ok(findAction(
             r.actions, 'capture-pointer',
         ));
+        assert.deepEqual(
+            r.state.viewBox, state.viewBox,
+        );
+    },
+);
+
+test(
+    'empty canvas click keeps a zoomed viewBox',
+    () => {
+        const zoomed = {
+            x: 40, y: 20, w: 400, h: 300,
+        };
+        const state = buildState({
+            viewBox: zoomed,
+            zoom: 1.1,
+        });
+        const down: FsmInput = {
+            kind: 'pointer-down-on-canvas',
+            svgX: 100, svgY: 100,
+            clientX: 0, clientY: 0,
+        };
+        const afterDown = reduceFsm(state, down);
+        const up: FsmInput = {
+            kind: 'pointer-up',
+            svgX: 100, svgY: 100,
+            clientX: 0, clientY: 0,
+            isShift: false,
+            hoverNodeId: null,
+            fromNodePosition: null,
+            allNodes: [],
+        };
+        const afterUp = reduceFsm(
+            afterDown.state, up,
+        );
+        assert.deepEqual(
+            afterUp.state.viewBox, zoomed,
+        );
+        assert.equal(afterUp.state.zoom, 1.1);
     },
 );
 

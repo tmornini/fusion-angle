@@ -13,6 +13,8 @@ import { putSessionToken } from './session-token.ts';
 import { runSingleFlightRefresh } from
     './session-refresh-mutex.ts';
 import { navigateTo } from '../navigation.ts';
+import { principalFromToken } from
+    '../../../shared/access-token-decode.ts';
 
 // Fetch transport for the server ZIP. Same RequestContext
 // verbs as the in-page facade, over real HTTP. No import of
@@ -101,6 +103,19 @@ function isCredentialDoor(
 ): boolean {
     return resource === 'authentication/authorize'
         || resource === 'authentication/token';
+}
+
+function organizationToRestore(
+    deadToken: string,
+): string | undefined {
+    try {
+        const principal =
+            principalFromToken(deadToken);
+        return principal.organization
+            ?? principal.organizations?.[0];
+    } catch {
+        return undefined;
+    }
 }
 
 function etagFromHeader(
@@ -204,6 +219,50 @@ export function createHttpFacade(
             : null;
     }
 
+    async function postOrganizationExchange(
+        flat: string,
+        organization: string,
+    ): Promise<string | null> {
+        const response = await fetch(
+            origin + '/api/authentication/token', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type':
+                        'application/json',
+                },
+                body: JSON.stringify({
+                    grant_type: 'token-exchange',
+                    subject_token: flat,
+                    actor_token: flat,
+                    organization,
+                }),
+            },
+        );
+        if (!response.ok) return null;
+        const body = await response.json() as {
+            access_token?: unknown;
+        };
+        return typeof body.access_token === 'string'
+            ? body.access_token
+            : null;
+    }
+
+    async function refreshAndScope(
+        deadToken: string,
+    ): Promise<string | null> {
+        const flat = await postCookieRefresh();
+        if (flat === null) return null;
+        const organization =
+            organizationToRestore(deadToken);
+        if (organization === undefined) {
+            return flat;
+        }
+        return await postOrganizationExchange(
+            flat, organization,
+        ) ?? flat;
+    }
+
     async function exchangeOnce(
         method: string,
         resource: string,
@@ -225,7 +284,7 @@ export function createHttpFacade(
             return first;
         }
         const access = await runSingleFlightRefresh(
-            postCookieRefresh,
+            () => refreshAndScope(token),
         );
         if (access === null) {
             navigateTo('auth');

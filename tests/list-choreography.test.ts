@@ -31,6 +31,19 @@ test('buildStateFilterBadges marks the active group', () => {
     assert.match(out, /data-g="y" data-a="true"/);
 });
 
+test('buildStateFilterBadges omits groups outside order',
+    () => {
+        const items = [
+            { g: 'x' }, { g: 'promoted' }, { g: 'y' },
+        ];
+        const out = buildStateFilterBadges(
+            items, i => i.g, ['x', 'y'], null, badge,
+        ).toString();
+        assert.match(out, /data-g="x"/);
+        assert.match(out, /data-g="y"/);
+        assert.ok(!out.includes('data-g="promoted"'));
+    });
+
 test('filteredSortedList filters, sorts, then renders', () => {
     const items = [{ n: 3, s: 'b' }, { n: 1, s: 'a' },
         { n: 2, s: 'b' }];

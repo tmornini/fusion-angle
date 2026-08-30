@@ -385,3 +385,20 @@ test('applyPanelTransition saves the viewBox on open', () => {
     assert.equal(opened!.shouldPanToReveal, true);
     assert.equal(opened!.savedViewBox.kind, 'saved');
 });
+
+test('applyPanelTransition restores the viewBox on close',
+    () => {
+        const pre = { x: 5, y: 6, w: 800, h: 600 };
+        const opened = applyPanelTransition(
+            false, true, { kind: 'none' }, pre);
+        assert.ok(opened !== null);
+        const panned = {
+            x: 50, y: 60, w: 800, h: 600,
+        };
+        const closed = applyPanelTransition(
+            false, false, opened!.savedViewBox, panned);
+        assert.ok(closed !== null);
+        assert.equal(closed!.savedViewBox.kind, 'none');
+        assert.deepEqual(closed!.viewBox, pre);
+        assert.equal(closed!.shouldPanToReveal, false);
+    });

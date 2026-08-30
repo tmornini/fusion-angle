@@ -1,5 +1,4 @@
 import { html, type SafeHtml } from '../safe-html.ts';
-import { orderedKeys } from './ordered-keys.ts';
 import type { StatusFilter } from './list-filter.ts';
 
 // The list presenters' shared badge choreography: group the
@@ -16,7 +15,7 @@ export function buildStateFilterBadges<T, S extends string>(
     buildBadge: (item: T, isActive: boolean | null) => SafeHtml,
 ): SafeHtml {
     const groups = Object.groupBy(items, groupOf);
-    const badges = orderedKeys(groups, order)
+    const badges = order
         .map(s => ({ state: s, items: groups[s] }))
         .filter(g => g.items && g.items.length > 0)
         .map(g => buildBadge(

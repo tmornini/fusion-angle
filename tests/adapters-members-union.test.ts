@@ -23,6 +23,7 @@ import {
     isHumanMember,
     isAIMember,
     MEMBER_WITHOUT_PII_NAME,
+    fillHumanMemberProfile,
 } from '../web-app/app/adapters/members-union.ts';
 import type {
     MemberId,
@@ -328,5 +329,46 @@ test(
         assert.equal(
             memberName(map, aliceId), 'Alice Test',
         );
+    },
+);
+
+test(
+    'fillHumanMemberProfile copies identity title'
+    + ' and department onto list rows',
+    async () => {
+        const { db, ctx } = await adminContext();
+        const aliceId = generateIdentifier();
+        await seedHumanMember(
+            db, aliceId, 'Alice Test',
+        );
+        const filled = await fillHumanMemberProfile(
+            ctx, await getMembers(ctx),
+        );
+        const alice = filled.find(
+            m => m.idForLink() === aliceId,
+        );
+        assert.ok(alice && isHumanMember(alice));
+        const profile = alice.profile();
+        assert.equal(profile.present, true);
+        if (profile.present) {
+            assert.equal(
+                profile.title, 'product_manager',
+            );
+            assert.equal(
+                profile.department, 'Product',
+            );
+        }
+    },
+);
+
+test(
+    'fillHumanMemberProfile does not throw when an'
+    + ' identity document is absent',
+    async () => {
+        const { ctx } = await adminContext();
+        const filled = await fillHumanMemberProfile(
+            ctx, await getMembers(ctx),
+        );
+        assert.ok(filled.some(isHumanMember));
     },
 );

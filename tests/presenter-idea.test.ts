@@ -753,6 +753,60 @@ test(
     },
 );
 
+test(
+    'IdeaListPresenter.renderBadges omits promoted'
+    + ' and archived even when those ideas exist',
+    () => {
+        const ideas = [
+            makeWithSubmitter(
+                { id: 'fndCYAsXazdzMUlEGMNIZw' },
+                'Ada', '2026-01-15T10:00:00Z',
+                'in_review',
+            ),
+            makeWithSubmitter(
+                { id: 'fxysGbBPBsnCwJNJsyZnkA' },
+                'Ada', '2026-01-15T10:00:00Z',
+                'approved',
+            ),
+            makeWithSubmitter(
+                { id: 'gBbNAWlPwMfXZvevoUPhFQ' },
+                'Ada', '2026-01-15T10:00:00Z',
+                'promoted',
+            ),
+            makeWithSubmitter(
+                { id: 'hCcOBXmQxNgYawfwpVQiGR' },
+                'Ada', '2026-01-15T10:00:00Z',
+                'archived',
+            ),
+        ];
+        const presenter = new IdeaListPresenter(
+            buildInitialIdeaListState(ideas),
+        );
+        const slot = makeStubEl();
+        presenter.renderBadges(
+            slot as unknown as HTMLElement,
+        );
+        assert.match(
+            slot.captured,
+            /data-state="in_review"/,
+        );
+        assert.match(
+            slot.captured,
+            /data-state="approved"/,
+        );
+        assert.ok(
+            !slot.captured.includes(
+                'data-state="promoted"',
+            ),
+        );
+        assert.ok(
+            !slot.captured.includes(
+                'data-state="archived"',
+            ),
+        );
+    },
+);
+
 // IdeaCreatePresenter
 
 test(

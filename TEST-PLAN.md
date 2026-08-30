@@ -88,15 +88,22 @@ Setup, once: clear this origin's cookies with
 set `Emulation.setDeviceMetricsOverride` to 1280×800 with
 `deviceScaleFactor: 1` (I10–I15 set ≤767 and restore);
 open one tab and `activate_tab` it. That tab stays
-visible for the whole walk. Open a second tab of the
-same context only where a same-jar case needs one
-(SV8, SV8b, SV9); open a second browser context — a
-separate cookie jar — where a case needs a second
-identity (SV6, SV7, SV10), recording BLOCKED with the
-reason named if the driver offers no multi-context
-support; activate whichever tab you are driving;
-confirm `document.visibilityState === 'visible'`
-before every gesture and every timing assertion.
+visible for the whole walk. Leave Chrome out of
+fullscreen: `Browser.getWindowForTarget` then
+`Browser.setWindowBounds` with `windowState`
+"normal" and `top` at least 80 so the page sits
+below the macOS menu bar. A focusing click at the
+top-left of a fullscreen or flush window is the
+Apple menu; the next click opens About This Mac.
+Open a second tab of the same context only where a
+same-jar case needs one (SV8, SV8b, SV9); open a
+second browser context — a separate cookie jar —
+where a case needs a second identity (SV6, SV7,
+SV10), recording BLOCKED with the reason named if
+the driver offers no multi-context support; activate
+whichever tab you are driving; confirm
+`document.visibilityState === 'visible'` before
+every gesture and every timing assertion.
 
 Drive with compositor mouse and CDP key events. Never
 `js()` fetch the API — the bearer is memory-only; read
@@ -132,9 +139,31 @@ not repeat the note in every case.
   early.
 - Authentication is throttled to five hits per 60 seconds
   per client, counting `authorize` and `token` together.
-- The first click after a reload only focuses the window.
-  This is a product seam, filed in TODO.md; drive a second
-  click.
+- The first click after a reload only focuses the window
+  (TODO.md). The focusing click is the viewport center,
+  never the top-left brand — that is the Apple menu when
+  Chrome is fullscreen or flush with the menu bar, and
+  the next click opens About This Mac. Then click the
+  intended control once.
+- Shift-drag (AA32/F19): if the compositor does not
+  deliver Shift on pointer-up, the FSM emits add-node
+  instead of add-edge. Record BLOCKED naming that; do
+  not FAIL. Layer 1 and Layer 2 pins decide add-edge.
+- B21: the access JWT is memory-only. There is no
+  public `putSessionToken` on the production bundle.
+  If the in-memory token cannot be replaced without
+  `js()` of the API, record BLOCKED. The Layer 1 pin
+  decides cookie refresh.
+- WB16: snapshot Performance *before* inbox
+  navigation. A transition POST dropped by navigation
+  is BLOCKED, not FAIL. The Layer 1 pins decide the
+  instance-shape body and If-Match.
+- Canvas `viewBox`: read `svg.getAttribute('viewBox')`,
+  never `clientWidth` / `clientHeight`. 1102×549 is the
+  wrap's pixel size, not a camera value.
+- F29 empty-canvas click: close the properties panel
+  first. An open panel's close restores the F14 saved
+  viewBox — that is not this case.
 
 ### Scoring
 
@@ -906,7 +935,10 @@ the second organization.
   and drag from "Review" onto "Archive". PASS: preview
   is a solid-blue curved bezier (no return path).
   Release to create the edge; rename it "approve".
-  Drive the shift-drag with compositor mouse.
+  Drive the shift-drag with compositor mouse. If Shift
+  is not observed (release still port-add-node),
+  record BLOCKED naming that — an honest BLOCKED
+  costs nothing. Do not FAIL the compositor.
   Pin: tests/flow-cycle-edges.test.ts 'a back-edge to
        an ancestor is a cycle edge' (decides
        "Review"→"Data Capture" classifies as a cycle
@@ -1190,7 +1222,7 @@ the second organization.
        duplicates almost exactly; exploratory — the
        live open and the painted chip in tab B (same
        as SV8)
-- [ ] **B21** Silent refresh: after signing in, replace the in-memory access token with an expired JWT (keep the live `refresh_token` cookie), then navigate to `members/`. PASS: the page loads with no bounce and no error card — the dead access token was cookie-refreshed transparently.
+- [ ] **B21** Silent refresh: after signing in, replace the in-memory access token with an expired JWT (keep the live `refresh_token` cookie), then navigate to `members/`. PASS: the page loads with no bounce and no error card — the dead access token was cookie-refreshed transparently. The production bundle does not export `putSessionToken`; the access JWT is memory-only by design. If the token cannot be replaced without `js()` of the API, record BLOCKED naming that — an honest BLOCKED costs nothing.
   Pin: tests/adapters-refresh-mutex.test.ts 'two
        concurrent 401s cause one refresh POST' (a dead
        access token against `members` under a cookie
@@ -1855,13 +1887,16 @@ covering the D20–D24 run between them.
        badge renders per present status from the
        four candidates — active/in_review/sent_back/
        approved — proven here with two present, two
-       absent); exploratory — the live current status
-       mix, and that `promoted`/`archived` get no
-       badge even when present (source-confirmed at
-       `web-app/app/presenters/idea.ts:926`'s
-       hardcoded candidate list; no fixture in the
-       cited test uses a `promoted` or `archived`
-       idea, so this half is not test-decided)
+       absent); tests/presenter-idea.test.ts
+       'IdeaListPresenter.renderBadges omits promoted
+       and archived even when those ideas exist'
+       (decides promoted and archived never become
+       filter badges); tests/list-choreography.test.ts
+       'buildStateFilterBadges omits groups outside
+       order' (decides the shared helper honors
+       `order` as the candidate list, not as a
+       prefix); exploratory — the live current status
+       mix
 - [ ] **D26** Click a status badge. PASS: list filters to show only ideas with that status, badge is highlighted (`aria-pressed="true"`), others are dimmed (`data-dimmed="true"`); badges carry label + icon only (no per-badge count).
   Pin: tests/presenter-idea.test.ts
        'applyIdeaFilterToggle sets, replaces, and
@@ -2433,11 +2468,16 @@ opens and renders.)
        null'; exploratory — the live retarget paint
 - [ ] **F14** Turn Auto Fit on, then double-click a node.
   PASS: the panel opens and the canvas re-fits to the
-  panel-aware visible region — no toast, no blocking. Turn
-  Auto Fit off and double-click again. PASS: the panel
-  opens, the canvas pans to keep the node visible, and the
-  previous viewBox is saved for restoration when the panel
-  closes.
+  panel-aware visible region — no toast, no blocking.
+  Close the panel. Turn Auto Fit off. Click Zoom in
+  once, then read `svg.getAttribute('viewBox')` — that
+  is the distinctive pre-open camera. Double-click the
+  node. PASS: the panel opens and the canvas pans to
+  keep the node visible. Close the panel. PASS: the
+  viewBox attribute equals the post-zoom pre-open
+  value. Turning Auto Fit off does not un-fit: without
+  the zoom step there is no distinctive camera to
+  restore.
   Pin: tests/flow-designer-actions.test.ts
        'applyPanelTransition saves the viewBox on open'
        (decides both halves: under Auto Fit the panel
@@ -2445,11 +2485,15 @@ opens and renders.)
        Auto Fit off a just-opened panel returns
        `shouldPanToReveal: true` with
        `savedViewBox.kind === 'saved'`);
-       tests/flow-zoom-to-fit.test.ts 'fitBoxToCanvas with
+       tests/flow-designer-actions.test.ts
+       'applyPanelTransition restores the viewBox on
+       close' (decides close writes the saved x/y/w/h
+       back and clears the save); tests/flow-zoom-to-fit.test.ts
+       'fitBoxToCanvas with
        panel offset centers content in the right visible
        region (panel is on the left)' (decides the Auto Fit
        re-fit is panel-aware); exploratory — the live
-       restore when the panel closes
+       zoom-then-open-then-close restore
 - [ ] **F15** Drag from a middle node's port into empty
   canvas past 20 pixels, without holding Shift. PASS:
   during the drag a faint bezier preview plus a "New State"
@@ -2700,9 +2744,12 @@ opens and renders.)
        'performDeleteSelectedEdge: a node selection is a
        no-op'; exploratory — the toolbar click and the
        canvas repaint
-- [ ] **F29** Turn Auto Fit ON first — the seed loads
-  with it on but F14 left it off. Click Zoom in
-  (icon-only buttons; `title` /
+- [ ] **F29** Close the properties panel if it is
+  open (empty-canvas click with a panel open
+  restores the F14 saved viewBox — that is not
+  this case). Turn Auto Fit ON first — the seed
+  loads with it on but F14 left it off. Click Zoom
+  in (icon-only buttons; `title` /
   `aria-label` "Zoom in" / "Zoom out") — an
   error toast "Disable Auto-Fit to change the
   view" appears and `viewBox` stands. Toggle
@@ -2712,7 +2759,8 @@ opens and renders.)
   `viewBox` width and height
   shrink then restore (zoom steps ±0.1,
   clamped 0.25–2.0). Click the empty canvas
-  once — `viewBox` keeps the zoomed value.
+  once — `svg.getAttribute('viewBox')` keeps the
+  zoomed value (never the wrap's client size).
   Toggle Auto Fit ON — the canvas re-fits to
   all nodes.
   Pin: tests/flow-designer-presenter.test.ts 'withZoomedIn
@@ -2726,8 +2774,10 @@ opens and renders.)
        through the shared `MAX_ZOOM`); exploratory — the
        0.25 LOWER clamp, which no cited test asserts; the
        Auto-Fit refusal toast on the zoom BUTTONS (only the
-       wheel path carries a test); and the viewBox standing
-       across an empty-canvas click
+       wheel path carries a test); tests/flow-fsm-reduce.test.ts
+       'empty canvas click keeps a zoomed viewBox'
+       (decides pointer-down + pointer-up on empty
+       canvas leaves viewBox and zoom untouched)
 - [ ] **F30** Edit a node name via the properties
   panel, wait 1 second for auto-save. Navigate
   away and return to the designer. PASS: all
@@ -3113,8 +3163,14 @@ that the canvas re-renders after each step.)
        (decides the same archive's `flow.mmd` and
        `sidecar.json` both read back — the import path
        parses them straight out of `getFlowZip`'s output);
-       exploratory — the download itself, `flow.json` and
-       `flow.txt`, and the four-entry manifest as a set
+       tests/adapters-refresh-mutex.test.ts
+       'cookie refresh re-scopes the session to the
+       dead token org' (decides a cookie refresh
+       exchanges the flat successor onto the dead
+       token's org before `getFlowZip` reads
+       `activeOrganization`); exploratory — the
+       download itself, `flow.json` and `flow.txt`,
+       and the four-entry manifest as a set
 - [ ] **F43** On `flows/index.html` click "Import Flow", choose a
   project, click "Choose File", and select a `.mmd` file taken
   from a known flow — unzip F42's archive and use its
@@ -3504,7 +3560,8 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   assignment is captured only in the flow's own
   document-message-pair history (`message_pairs`) — F67
   confirms a `memberIds` change is still undoable through
-  it.
+  it. Record PASS (MOOT). Do not score DRIFT: the
+  document already names the deleted table.
   Pin: tests/api-flows-versions-retired.test.ts 'pair-chain
        GET flow versions; table-backed vid 404' (decides
        the retired route 404s rather than serving a version
@@ -3952,7 +4009,13 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        live form fill and the navigation back to the inbox
 - [ ] **WB16** Read the network log across WB11's bind
   and transition (never `js()` fetch — the bearer is
-  memory-only, per the explorer prompt). PASS: the
+  memory-only, per the explorer prompt). Snapshot
+  Performance *before* the inbox navigation lands;
+  a later `getEntries()` after navigation is not
+  this case. If the transition POST is missing from
+  the buffer because navigation dropped it, record
+  BLOCKED naming that — an honest BLOCKED costs
+  nothing. PASS: the
   binding PUT lands at `work-orders/:id/binding` with
   `{instance_id, record_type_id}` (201); the transition
   POST is `work-orders/:id/transition` (201) whose body
@@ -4456,10 +4519,15 @@ FSM, unlike `flows/detail`).
        excludes the current member' (decides the HUMANS
        block itself excludes the signed-in human —
        together with the prior pin, the "third header,
-       not a row inside HUMANS" claim); exploratory —
-       the live page header text, the Add Member button,
-       the search input, the filter chips, and the
-       title/model-name/department columns
+       not a row inside HUMANS" claim);
+       tests/adapters-members-union.test.ts
+       'fillHumanMemberProfile copies identity title
+       and department onto list rows' (decides the
+       list row's title badge and department come
+       from GET identities/:id, not the empty seat
+       profile); exploratory — the live page header
+       text, the Add Member button, the search input,
+       and the filter chips
 - [ ] **G12** Click the sidebar member chip (lower-left:
   name/avatar in the sidebar footer). PASS: navigates to
   the current human member's `member-detail` page
