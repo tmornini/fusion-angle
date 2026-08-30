@@ -169,9 +169,9 @@ by the master.
 | G. Admin Pages | 38 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 30 |
-| J. Teardown | 3 |
 | K. Objectives & Scoring | 30 |
 | R. Records | 25 |
+| J. Teardown | 3 |
 | SV. Server (Node + Postgres) | 9 |
 | **Total** | **401** |
 
@@ -1240,7 +1240,7 @@ the second organization.
 
 ### Zero-membership landing (org gate)
 
-> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The seed gives every login-capable identity a membership, and the walk has no instrument to strip one: there is no member-removal affordance under `web-app/members/` or `web-app/identities/`, the explorer may not `js()` fetch the API to fake it, and `POSTGRES_URL` is minted by `./crank` for its children and never printed, so a direct message-plane insert is out of reach too. If the zero-membership state cannot be produced through the running origin, record BLOCKED for B25–B29 naming that reason — an honest BLOCKED costs nothing. `getOrganizations` is fenced to the derived membership ledger, so an identity that truly reaches no org lands here regardless of how it got there.
+> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The seed gives every login-capable identity a membership, and the walk has no instrument to strip one: there is no member-removal affordance under `web-app/members/` or `web-app/identities/`, the explorer may not `js()` fetch the API to fake it, and `POSTGRES_URL` is minted by `./crank` for its children and never printed, so a direct message-plane insert is out of reach too. If the zero-membership state cannot be produced through the running origin, record BLOCKED for B25–B27 and B29 naming that reason — an honest BLOCKED costs nothing. B28 still drives: its own text offers an untouched seeded member as the alternative. `getOrganizations` is fenced to the derived membership ledger, so an identity that truly reaches no org lands here regardless of how it got there.
 
 - [ ] **B25** From the zero-membership state, click "Sign out", then sign in again with that member's credentials. PASS: the `refresh_token` cookie is cleared (`Set-Cookie` `Max-Age=0`) — sign-out is not org-fenced; a zero-membership identity must still revoke. Lands directly on `invitations/index.html` — NOT the `?return=` target and NOT the dashboard "Something went wrong" card; no flash of the dashboard shell (the auth-page short-circuit decides before the first navigation). Sidebar renders the member chip from token claims with NO org switcher. Navigating Back after sign-out does not boot into the account.
   Pin: tests/api-identity-token-revocations-self.test.ts
@@ -1390,10 +1390,11 @@ the second organization.
   gauges show that org's portion — not global totals. Counts
   are tolerant lower bounds, not equalities (the seed
   grows): for active-org Stark expect ~6 ideas, ~16
-  projects, ~4 flows, 4 objectives, plus the roster (6
+  projects, ~4 flows, 4 objectives, plus the roster (~6
   humans — 5 single-org seeded members + Tony Stark, the
   both-org admin; the System member authors seed events but
-  is excluded from the roster — and 4 AIs).
+  is excluded from the roster — and ~4 AIs; AA5 and AA7a
+  each add one before C runs).
   Global raw mock totals are larger (~11 ideas, ~17
   projects, ~5 flows across both orgs). A `—` Impact or a
   `data-empty` row is a FAIL.
@@ -3759,9 +3760,9 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        91/100 — computed from `buildWorkOrders()` +
        `buildLeadToCloseWorkload()` and each work order's
        own embedded `flow_graph`'s `isArchive` node, the
-       same test `curNode.isArchive` in web-app/app/
-       presenters/workbox-inbox.ts applies live) carries
-       no CLI test pinning these numbers
+       same test `curNode.isArchive` in
+       web-app/app/presenters/workbox-inbox.ts applies
+       live) carries no CLI test pinning these numbers
 
 ### Workbox — Create Work Order
 
@@ -3864,17 +3865,19 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   attribute type in the flow definition.
   Pin: tests/presenter-workbox-detail.test.ts
        'buildAttributeInputHtml renders a text input
-       carrying the attribute id'; tests/presenter-
-       workbox-detail.test.ts 'buildAttributeInputHtml
-       renders a number input for the number attribute
-       type'; tests/presenter-workbox-detail.test.ts
+       carrying the attribute id';
+       tests/presenter-workbox-detail.test.ts
+       'buildAttributeInputHtml renders a number input for
+       the number attribute type';
+       tests/presenter-workbox-detail.test.ts
        'buildAttributeInputHtml renders a date input for
-       the date attribute type'; tests/presenter-workbox-
-       detail.test.ts 'buildAttributeInputHtml renders a
-       select with one option per choice plus a
-       placeholder'; tests/presenter-workbox-detail.test.ts
-       'buildAttributeInputHtml renders a radio group
-       with one collectable input per option';
+       the date attribute type';
+       tests/presenter-workbox-detail.test.ts
+       'buildAttributeInputHtml renders a select with one
+       option per choice plus a placeholder';
+       tests/presenter-workbox-detail.test.ts
+       'buildAttributeInputHtml renders a radio group with
+       one collectable input per option';
        tests/presenter-workbox-detail.test.ts
        'buildAttributeInputHtml renders a bare checkbox
        input for the checkbox type'
@@ -3896,11 +3899,12 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   relative timestamp.
   Pin: tests/presenter-workbox-detail.test.ts 'buildPage
        shows a single Created -> Triage history row for a
-       freshly created work order'; tests/presenter-
-       workbox-detail.test.ts 'buildPage history lists
-       transitions newest first with their attribute
-       values'; exploratory — the collapsible interaction
-       and the relative-timestamp formatting live
+       freshly created work order';
+       tests/presenter-workbox-detail.test.ts 'buildPage
+       history lists transitions newest first with their
+       attribute values'; exploratory — the collapsible
+       interaction and the relative-timestamp formatting
+       live
 - [ ] **WB10a — Bind picker on an unbound WO.** Open an
   unbound work order on a flow that has a record-type
   join and at least one instance. PASS: header shows an
@@ -3914,12 +3918,13 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   the instance head.
   Pin: tests/presenter-workbox-detail.test.ts 'buildPage
        unbound disables fields, shows bind prompt and
-       picker button'; tests/presenter-workbox-detail.test.ts
-       'buildPage pre-fills inputs from instance values
-       and shows a bound badge'; tests/api-work-order-
-       binding.test.ts 'fresh bind → 201; detail + list
-       embed; unbound omits keys'; exploratory — the live
-       dialog open/close and the click-to-pick gesture
+       picker button';
+       tests/presenter-workbox-detail.test.ts 'buildPage
+       pre-fills inputs from instance values and shows a
+       bound badge'; tests/api-work-order-binding.test.ts
+       'fresh bind → 201; detail + list embed; unbound
+       omits keys'; exploratory — the live dialog
+       open/close and the click-to-pick gesture
 - [ ] **WB10b — Disabled fields + bind prompt.** On an
   unbound work order with current-node attribute refs.
   PASS: every attribute input is disabled/readonly with
@@ -3927,9 +3932,10 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   bind button from WB10a is the path to enable editing.
   Pin: tests/presenter-workbox-detail.test.ts
        'buildAttributeInputHtml force-disables with bind
-       prompt title when unbound'; tests/presenter-
-       workbox-detail.test.ts 'buildPage unbound disables
-       fields, shows bind prompt and picker button'
+       prompt title when unbound';
+       tests/presenter-workbox-detail.test.ts 'buildPage
+       unbound disables fields, shows bind prompt and
+       picker button'
 
 ### Workbox — Transitions
 
@@ -4077,21 +4083,21 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   advance the instance etag; a Save with the held etag is
   201, not a FAIL.
   Pin: tests/adapters-work-orders.test.ts
-       'postWorkOrderTransition 412s when the snapshot
-       etag is stale against a concurrent PATCH' (decides
-       the forward direction: an instance PATCH advances
-       the etag, so a stale-etag transition afterward
-       412s); tests/api-work-order-transition-instance.test.ts
-       'value-bearing transition then stale instance
-       PATCH is 412' (the converse direction);
+       'postWorkOrderTransition 412s when the snapshot etag
+       is stale against a concurrent PATCH' (decides the
+       forward direction: an instance PATCH advances the
+       etag, so a stale-etag transition afterward 412s);
+       tests/api-work-order-transition-instance.test.ts
+       'value-bearing transition then stale instance PATCH
+       is 412' (the converse direction);
        tests/api-work-order-transition-instance.test.ts
        'pure move does not advance instance etag; held
-       If-Match PATCH is 201'; tests/presenter-record-
-       instances.test.ts 'edit form surfaces 412 conflict
-       notice' (record detail's own conflict-notice
-       render); exploratory — the live re-present and
-       warning toast on the workbox action screen
-       specifically
+       If-Match PATCH is 201';
+       tests/presenter-record-instances.test.ts 'edit form
+       surfaces 412 conflict notice' (record detail's own
+       conflict-notice render); exploratory — the live
+       re-present and warning toast on the workbox action
+       screen specifically
 
 ### Workbox — Completion
 
@@ -4134,12 +4140,13 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   derived `GET work-orders/:id/history` (DESC; claim rows
   carry `field_values: []`).
   Pin: tests/api-work-order-claim.test.ts 'a live claim by
-       another member is a 409'; tests/api-work-order-
-       claim.test.ts 'two-actor contention: exactly one
-       claimed event lands and exactly one request gets
-       the byte-exact 409 body — never which actor wins';
-       tests/api-work-order-claim.test.ts 'an expired
-       claim is superseded atomically' (the general
+       another member is a 409';
+       tests/api-work-order-claim.test.ts 'two-actor
+       contention: exactly one claimed event lands and
+       exactly one request gets the byte-exact 409 body —
+       never which actor wins';
+       tests/api-work-order-claim.test.ts 'an expired claim
+       is superseded atomically' (the general
        never-overwritten-in-place invariant, though this
        specific live two-tab drive is unlikely to trigger
        an actual expiry); exploratory — tab 2's rendered
@@ -4162,10 +4169,10 @@ per-user visibility filter.
   the inbox).
   Pin: tests/workbox-inbox.test.ts 'buildInboxItems
        surfaces a claimed, unfinished work order as an
-       active item naming its claimant'; tests/workbox-
-       inbox.test.ts 'buildInboxItems surfaces an
-       unclaimed, in-progress work order as an active
-       item'; exploratory — the live rendering for
+       active item naming its claimant';
+       tests/workbox-inbox.test.ts 'buildInboxItems
+       surfaces an unclaimed, in-progress work order as an
+       active item'; exploratory — the live rendering for
        AI-only-member and zero-member nodes specifically
        (no fixture in tests/workbox-inbox.test.ts uses
        either)
@@ -4177,8 +4184,9 @@ per-user visibility filter.
        it from active'; exploratory — that the member(s)
        the final transition referenced do not affect
        Archive-tab visibility (no fixture varies this)
-- [ ] **WB22** Inspect `web-app/app/presenters/workbox-
-  inbox.ts`. PASS: `buildInboxItems` takes
+- [ ] **WB22** Inspect
+  `web-app/app/presenters/workbox-inbox.ts`. PASS:
+  `buildInboxItems` takes
   `(workOrders, transitions, claims, memberMap, mode)`
   with no scope parameter. The presenter exports nothing
   related to per-user visibility — the workbox shows all
@@ -4376,20 +4384,21 @@ FSM, unlike `flows/detail`).
        'OrganizationPresenter.buildPage renders the org
        name, domain, and an Edit action' (decides the
        Overview card's Name/Domain and the header Edit
-       action); tests/presenter-projects-
-       organization.test.ts 'OrganizationPresenter
-       .buildPage renders overview stats and usage bars
-       with XXZruirZyAOoRpNxaDnpSA/limit values' (decides
-       the Active People stat cell and a "current /
-       limit" Usage Overview bar; "Projects" and "Ideas"
-       each render twice — a stat cell AND a usage-bar
-       label — so this same assertion is satisfied by
-       the usage bars alone and decides nothing about
-       the Projects/Ideas stat CELLS specifically);
-       exploratory — the sidebar + top-bar layout, the
-       Objectives box placement, the Projects/Ideas stat
-       cells distinct from their usage-bar labels, and
-       the Next Billing cell (no test asserts it)
+       action);
+       tests/presenter-projects-organization.test.ts
+       'OrganizationPresenter.buildPage renders overview
+       stats and usage bars with
+       XXZruirZyAOoRpNxaDnpSA/limit values' (decides the
+       Active People stat cell and a "current / limit"
+       Usage Overview bar; "Projects" and "Ideas" each
+       render twice — a stat cell AND a usage-bar label —
+       so this same assertion is satisfied by the usage
+       bars alone and decides nothing about the
+       Projects/Ideas stat CELLS specifically); exploratory
+       — the sidebar + top-bar layout, the Objectives box
+       placement, the Projects/Ideas stat cells distinct
+       from their usage-bar labels, and the Next Billing
+       cell (no test asserts it)
 - [ ] **G10** In the page header, click Edit.
   PASS: page header swaps Edit for Save/Cancel; the
   Overview card's identity region switches the read-only
@@ -4437,8 +4446,8 @@ FSM, unlike `flows/detail`).
   title (humans) or the model name (AIs), and department
   (humans only). The YOU group is a third header, not a
   row inside HUMANS.
-  Pin: tests/presenter-members.test.ts 'ManagedMembers
-       Presenter renders three sections with YOU above
+  Pin: tests/presenter-members.test.ts 'ManagedMembersPresenter
+       renders three sections with YOU above
        HUMANS above AIs' (decides the YOU/HUMANS/AIs
        group order); tests/presenter-members.test.ts
        'YOU section contains only the current member'
@@ -4484,16 +4493,16 @@ FSM, unlike `flows/detail`).
        applies to all three sections' (decides a search
        term narrows YOU/HUMANS/AIs alike);
        tests/presenter-members.test.ts 'kind=human filter
-       hides AIs but keeps YOU'; tests/presenter-
-       members.test.ts 'kind=ai filter hides YOU and
-       HUMANS' (together decide the Humans/AIs/All chip
-       behavior — the second test is also why the
-       corrected Humans-chip PASS line above names YOU
-       explicitly); exploratory — the live keystroke-by-
-       keystroke filtering and the name/email/title/
-       department match fields (Layer-1 pinnable via
-       `HumanMember.matchesSearch`; see Unpinned but
-       pinnable)
+       hides AIs but keeps YOU';
+       tests/presenter-members.test.ts 'kind=ai filter
+       hides YOU and HUMANS' (together decide the
+       Humans/AIs/All chip behavior — the second test is
+       also why the corrected Humans-chip PASS line above
+       names YOU explicitly); exploratory — the live
+       keystroke-by-keystroke filtering and the
+       name/email/title/department match fields (Layer-1
+       pinnable via `HumanMember.matchesSearch`; see
+       Unpinned but pinnable)
 - [ ] **G43** Navigate to `identities/index.html` (or
   click "Identities" in the sidebar). PASS: the header
   reads "Identities" with an "Add Identity" button
@@ -4611,16 +4620,15 @@ FSM, unlike `flows/detail`).
   while still pending returns the same pending invitation
   (no duplicate, no error). Source: `handleInviteSubmit`,
   `postInvitationGrant`, `grantInvitation`.
-  Pin: tests/adapters-invitations.test.ts 'grant by
-       email appends a pending invitation'; tests/
-       adapters-invitations.test.ts 'grant stamps the
-       org from the verified token' (decides the
-       invitation lands in Stark, the org Tony's token
-       is scoped to); tests/adapters-invitations.test.ts
-       'granting the same email twice is idempotent';
-       exploratory — the live dialog affordance, the
-       "Invitation sent" toast, and the field-clear/
-       dialog-close behavior
+  Pin: tests/adapters-invitations.test.ts 'grant by email
+       appends a pending invitation';
+       tests/adapters-invitations.test.ts 'grant stamps the
+       org from the verified token' (decides the invitation
+       lands in Stark, the org Tony's token is scoped to);
+       tests/adapters-invitations.test.ts 'granting the
+       same email twice is idempotent'; exploratory — the
+       live dialog affordance, the "Invitation sent" toast,
+       and the field-clear/dialog-close behavior
 - [ ] **V2 — Invite rejects empty / unknown /
   already-member** Open the Invite dialog. Submit with
   the Email blank → an "Email is required" toast and no
@@ -4638,14 +4646,13 @@ FSM, unlike `flows/detail`).
   consume invitation A (V1). Source:
   `setInviteEmailError` in `web-app/members/index.ts`;
   `grantInvitation` guards in `api/invitations-domain.ts`.
-  Pin: tests/adapters-invitations.test.ts 'grant by
-       unknown email returns no-identity'; tests/
-       adapters-invitations.test.ts 'grant for an
-       existing member returns already-member';
-       exploratory — the live toast/inline-error text
-       mapping (`setInviteEmailError` carries no CLI or
-       browser test) and the dialog staying open in all
-       three cases
+  Pin: tests/adapters-invitations.test.ts 'grant by unknown
+       email returns no-identity';
+       tests/adapters-invitations.test.ts 'grant for an
+       existing member returns already-member'; exploratory
+       — the live toast/inline-error text mapping
+       (`setInviteEmailError` carries no CLI or browser
+       test) and the dialog staying open in all three cases
 - [ ] **V6 — Org fence: a pending invite is invisible
   until accepted** While the V1 invitation is still
   PENDING (before V4), confirm the org fence holds: the
@@ -4660,10 +4667,10 @@ FSM, unlike `flows/detail`).
   (`resolveOwningOrganization` via `writeAuthorizerFor`),
   `acceptInvitation`.
   Pin: tests/api-invitations-fence.test.ts 'a pending
-       invite writes no membership'; tests/api-
-       invitations-fence.test.ts 'a pending invitee is
-       absent from the roster'; exploratory — the live
-       sidebar org `<select>` reachability check
+       invite writes no membership';
+       tests/api-invitations-fence.test.ts 'a pending
+       invitee is absent from the roster'; exploratory —
+       the live sidebar org `<select>` reachability check
 - [ ] **V3 — Top-bar pending-invitations bell →
   invitations page** As the V1 invitee (David Martinez,
   signed in with ≥1 pending invitation), confirm the top
@@ -4743,17 +4750,17 @@ FSM, unlike `flows/detail`).
   disappears (V3). Decline is idempotent (re-decline →
   204). Source: `postInvitationDecline`,
   `declineInvitation`.
-  Pin: tests/adapters-invitations.test.ts 'decline
-       records declined and writes no membership';
-       tests/api-invitations-fence.test.ts 'decline:
-       replay of fixed body is a no-op (two events
-       total)' (decides re-decline is idempotent, 204,
-       no extra event); tests/presenter-invitation-
-       list.test.ts 'an empty invitee list shows the
-       empty state' (decides the "No invitations."
-       copy); exploratory — the live "Invitation sent"/
-       "Invitation declined" toasts and the sidebar
-       switcher staying absent for the declined org
+  Pin: tests/adapters-invitations.test.ts 'decline records
+       declined and writes no membership';
+       tests/api-invitations-fence.test.ts 'decline: replay
+       of fixed body is a no-op (two events total)'
+       (decides re-decline is idempotent, 204, no extra
+       event); tests/presenter-invitation-list.test.ts 'an
+       empty invitee list shows the empty state' (decides
+       the "No invitations." copy); exploratory — the live
+       "Invitation sent"/"Invitation declined" toasts and
+       the sidebar switcher staying absent for the declined
+       org
 - [ ] **V8 — Organization "Sent invitations" section +
   Revoke (admin)** Grant invitation C if none is pending
   (V4 consumed A; V5 declined B). On
@@ -4778,23 +4785,22 @@ FSM, unlike `flows/detail`).
   Source: `web-app/organization/index.ts`
   (`renderSentInvitations` / `onSentInvitationClick`),
   `SentInvitationsPresenter`, `revokeInvitation`.
-  Pin: tests/adapters-invitations.test.ts 'sent
-       invitations list the active org pending only';
-       tests/adapters-invitations.test.ts 'revoke
-       records revoked (admin only)'; tests/api-
-       invitations-fence.test.ts 'revoke: replay of
-       fixed body is a no-op (two events total)'
+  Pin: tests/adapters-invitations.test.ts 'sent invitations
+       list the active org pending only';
+       tests/adapters-invitations.test.ts 'revoke records
+       revoked (admin only)';
+       tests/api-invitations-fence.test.ts 'revoke: replay
+       of fixed body is a no-op (two events total)'
        (decides re-revoke is idempotent, 204, no extra
-       event); tests/presenter-invitation-list.test.ts
-       'a sent invitation shows the invitee email and
-       Revoke'; tests/presenter-invitation-list.test.ts
-       'an empty sent list shows the empty state'
-       (decides the "No outstanding invitations."
-       copy); exploratory — the live "Invitation sent"/
-       "Invitation revoked" toasts, the section's
-       hidden-until-success reveal, and the "Invited
-       {date}" sub-line and state badge on a sent row
-       (claimed by nothing today; see Unpinned but
+       event); tests/presenter-invitation-list.test.ts 'a
+       sent invitation shows the invitee email and Revoke';
+       tests/presenter-invitation-list.test.ts 'an empty
+       sent list shows the empty state' (decides the "No
+       outstanding invitations." copy); exploratory — the
+       live "Invitation sent"/"Invitation revoked" toasts,
+       the section's hidden-until-success reveal, and the
+       "Invited {date}" sub-line and state badge on a sent
+       row (claimed by nothing today; see Unpinned but
        pinnable)
 - [ ] **V7 — Authz: non-admin grant/revoke rejected;
   invitee may still read & accept** Sign in as a
@@ -4820,24 +4826,23 @@ FSM, unlike `flows/detail`).
   `authorizeRequest` (`api/request-auth.ts`), which 403s
   before any handler; the invitee read/accept/decline
   paths ride the identity nest.
-  Pin: tests/api-invitations-fence.test.ts 'a non-admin
-       is forbidden from granting' (decides the exact
-       403 body: "forbidden: POST /organizations/…
+  Pin: tests/api-invitations-fence.test.ts 'a non-admin is
+       forbidden from granting' (decides the exact 403
+       body: "forbidden: POST /organizations/…
        /invitations/ requires a role this principal
        lacks"); tests/api-invitations-fence.test.ts 'a
-       non-admin is forbidden from revoking' (decides
-       the same shape for PUT revoke); tests/api-
-       invitations-fence.test.ts 'a role-less invitee
-       may read their invitations'; tests/adapters-
-       invitations.test.ts 'accept writes a membership
-       in the invitation org' (decides a non-admin
-       invitee can accept); tests/adapters-
-       invitations.test.ts 'decline records declined and
-       writes no membership' (decides a role-less
-       invitee can decline); exploratory — the live
-       grant-dialog submission as a non-admin and the
-       Organization page's hidden Sent-invitations
-       section
+       non-admin is forbidden from revoking' (decides the
+       same shape for PUT revoke);
+       tests/api-invitations-fence.test.ts 'a role-less
+       invitee may read their invitations';
+       tests/adapters-invitations.test.ts 'accept writes a
+       membership in the invitation org' (decides a
+       non-admin invitee can accept);
+       tests/adapters-invitations.test.ts 'decline records
+       declined and writes no membership' (decides a
+       role-less invitee can decline); exploratory — the
+       live grant-dialog submission as a non-admin and the
+       Organization page's hidden Sent-invitations section
 - [ ] **V9 — Sent-invitations section is admin-only**
   Sign in as a non-admin Stark member (e.g. Sarah Chen)
   and open `organization/index.html`. PASS: the admin
@@ -5055,22 +5060,21 @@ FSM, unlike `flows/detail`).
   shows a "Credentials" card and NO erase button (only
   persons carry erasable PII). Source:
   `web-app/identities/index.ts` (`onListClick`),
-  `web-app/identities/detail.ts`, `web-app/app/
-  presenters/identity-detail.ts`.
+  `web-app/identities/detail.ts`,
+  `web-app/app/presenters/identity-detail.ts`.
   Pin: tests/presenter-identity-detail.test.ts 'person
-       detail renders id, Person badge, and personal-
-       info fields' (decides the back button, the
-       Personal Information card, and the Providers/
-       Tokens links for a person); tests/presenter-
-       identity-detail.test.ts 'named service detail
-       shows its name and Service badge, never the
-       secret' (decides a service instead shows a
-       Credentials card, no Personal Information card,
-       and never the secret); exploratory — the live
+       detail renders id, Person badge, and personal-info
+       fields' (decides the back button, the Personal
+       Information card, and the Providers/Tokens links for
+       a person); tests/presenter-identity-detail.test.ts
+       'named service detail shows its name and Service
+       badge, never the secret' (decides a service instead
+       shows a Credentials card, no Personal Information
+       card, and never the secret); exploratory — the live
        click-through navigation and the erase button's
        presence for a person versus its absence for a
-       service (neither test asserts
-       `#identity-erase-btn` directly)
+       service (neither test asserts `#identity-erase-btn`
+       directly)
 - [ ] **G46** On Jessica Park's identity detail (any
   Stark-visible person row other than the signed-in admin
   works, but never Sarah Chen — R21 and SV6/SV7/SV10
@@ -5104,20 +5108,19 @@ FSM, unlike `flows/detail`).
   needed.
   Pin: tests/adapters-identities.test.ts 'getMemberPii is
        present, then erased after delete';
-       tests/adapters-identities.test.ts 'erasing PII
-       keeps identity and person kind' (together decide
-       the erase call blanks PII while the identity and
-       its kind survive); tests/presenter-identity-
-       detail.test.ts 'erased person shows
-       IDENTITY_WITHOUT_PII_NAME and the absent marker
-       for the blanked fields' (decides the name fallback
-       and that AT LEAST ONE "—" absent marker renders;
-       `assert.match(out, /—/)` proves one such marker
-       exists, not that Email, Phone, AND Bio each
-       individually show one); exploratory — the live
+       tests/adapters-identities.test.ts 'erasing PII keeps
+       identity and person kind' (together decide the erase
+       call blanks PII while the identity and its kind
+       survive); tests/presenter-identity-detail.test.ts
+       'erased person shows IDENTITY_WITHOUT_PII_NAME and
+       the absent marker for the blanked fields' (decides
+       the name fallback and that AT LEAST ONE "—" absent
+       marker renders; `assert.match(out, /—/)` proves one
+       such marker exists, not that Email, Phone, AND Bio
+       each individually show one); exploratory — the live
        native `<dialog>` confirm/cancel interaction, the
-       toast, the in-place re-render, and whether Email/
-       Phone/Bio each independently read "—"
+       toast, the in-place re-render, and whether
+       Email/Phone/Bio each independently read "—"
 - [ ] **G47** On the system service identity's detail
   page (admin session), a "Client registration" card
   renders before Credentials showing "Not registered."
@@ -5150,20 +5153,19 @@ FSM, unlike `flows/detail`).
   realm; kind gate 404/400).
   Pin: tests/adapters-client-registration.test.ts 'an
        unregistered service reads as registered: false';
-       tests/adapters-client-registration.test.ts 'put
-       then get round-trips through the camelCase domain
-       shape'; tests/adapters-client-
-       registration.test.ts 'delete deregisters back to
-       registered: false' (together decide the PUT/GET/
-       DELETE round trip); tests/presenter-identity-
-       detail.test.ts 'a service identity renders an
-       unregistered registration card'; tests/presenter-
-       identity-detail.test.ts 'a registered service
-       renders status tone and fields'; exploratory —
-       the live dialog fill/save/re-open cycle, the
-       toasts, the Disabled warning-tone pill, and the
-       "Grant types, audience, and JWKS are required"
-       validation
+       tests/adapters-client-registration.test.ts 'put then
+       get round-trips through the camelCase domain shape';
+       tests/adapters-client-registration.test.ts 'delete
+       deregisters back to registered: false' (together
+       decide the PUT/GET/DELETE round trip);
+       tests/presenter-identity-detail.test.ts 'a service
+       identity renders an unregistered registration card';
+       tests/presenter-identity-detail.test.ts 'a
+       registered service renders status tone and fields';
+       exploratory — the live dialog fill/save/re-open
+       cycle, the toasts, the Disabled warning-tone pill,
+       and the "Grant types, audience, and JWKS are
+       required" validation
 
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
 
@@ -5183,31 +5185,29 @@ FSM, unlike `flows/detail`).
   `parent: —`. A non-canonical `identityId` (any value
   that is not a 22-character identifier) 400s at the
   route gate; an absent one bounces to `identities/`.
-  Source: `GET identities/:id/tokens` via `web-app/app/
-  adapters/identity-tokens.ts` (`TokenEvent`),
+  Source: `GET identities/:id/tokens` via
+  `web-app/app/adapters/identity-tokens.ts` (`TokenEvent`),
   `web-app/app/presenters/identity-tokens.ts`.
   Pin: tests/presenter-identity-tokens.test.ts 'renders a
        card per chain with each jti event' (decides the
        chain id, jti, and issued/rotated badges render;
-       deleting the fixture's `parentJti` from the
-       rotated event leaves all five assertions green,
-       since `assert.match(out, /jmvogLnzTmiQlAkVvDHrvQ/)`
-       is already satisfied by the FIRST event's own jti
-       — confirmed by mutating a scratch copy — so this
-       test decides nothing about the `parent: {jti}`
-       rendering); tests/presenter-identity-
-       tokens.test.ts 'renders an empty state when no
-       chains' (decides "No tokens."); tests/adapters-
-       identity-roster.test.ts 'getTokenChainsFor groups
-       one identity\'s tokens' (decides tokens group by
-       chain id and each chain's event count — the
-       mechanism behind multiple chains, and not the
-       `parentJti` field either); exploratory — the live
-       page title/subtitle, the local-time stamp, the
-       `parent: {jti}` vs `parent: —` rendering itself
+       deleting the fixture's `parentJti` from the rotated
+       event leaves all five assertions green, since
+       `assert.match(out, /jmvogLnzTmiQlAkVvDHrvQ/)` is
+       already satisfied by the FIRST event's own jti —
+       confirmed by mutating a scratch copy — so this test
+       decides nothing about the `parent: {jti}`
+       rendering); tests/presenter-identity-tokens.test.ts
+       'renders an empty state when no chains' (decides "No
+       tokens."); tests/adapters-identity-roster.test.ts
+       'getTokenChainsFor groups one identity\'s tokens'
+       (decides tokens group by chain id and each chain's
+       event count — the mechanism behind multiple chains,
+       and not the `parentJti` field either); exploratory —
+       the live page title/subtitle, the local-time stamp,
+       the `parent: {jti}` vs `parent: —` rendering itself
        (see Unpinned but pinnable), and the
-       non-canonical/absent identityId route-gate
-       behavior
+       non-canonical/absent identityId route-gate behavior
 - [ ] **G26** From the same detail, click its
   "Providers" link (`data-identity-link="providers"`).
   PASS: the page title is "Identity Providers" with
@@ -5220,28 +5220,27 @@ FSM, unlike `flows/detail`).
   providers list is empty). The presenter consumes the
   adapter's camelCase `ProviderEvent` shape (`provider`,
   `providerSubject`, `action`, `at`). Source: `GET
-  identities/:id/providers` via `web-app/app/adapters/
-  identity-providers.ts` (`ProviderEvent`), `web-app/
-  app/presenters/identity-providers.ts`.
-  Pin: tests/presenter-identity-providers.test.ts
-       'renders a row per provider event' (decides the
-       provider and providerSubject render, and that an
-       `unlinked` badge renders; `assert.match(out,
-       /linked/)` is satisfied by the SAME "unlinked"
-       string as a substring, so this test alone does not
-       independently decide that a plain `linked` badge
-       — distinct from `unlinked` — renders too);
-       tests/presenter-identity-
-       providers.test.ts 'renders an empty state when no
-       events' (decides "No linked providers.");
-       tests/adapters-identity-roster.test.ts
-       'getProviderEvents returns one identity\'s link
-       log' (decides events are scoped to the target
-       identity — the mechanism behind Tony's empty
-       list); exploratory — the live page title/subtitle,
-       the local-time stamp rendering, and a `linked`
-       badge distinct from `unlinked` (see Unpinned but
-       pinnable)
+  identities/:id/providers` via
+  `web-app/app/adapters/identity-providers.ts`
+  (`ProviderEvent`),
+  `web-app/app/presenters/identity-providers.ts`.
+  Pin: tests/presenter-identity-providers.test.ts 'renders
+       a row per provider event' (decides the provider and
+       providerSubject render, and that an `unlinked` badge
+       renders; `assert.match(out, /linked/)` is satisfied
+       by the SAME "unlinked" string as a substring, so
+       this test alone does not independently decide that a
+       plain `linked` badge — distinct from `unlinked` —
+       renders too);
+       tests/presenter-identity-providers.test.ts 'renders
+       an empty state when no events' (decides "No linked
+       providers."); tests/adapters-identity-roster.test.ts
+       'getProviderEvents returns one identity\'s link log'
+       (decides events are scoped to the target identity —
+       the mechanism behind Tony's empty list); exploratory
+       — the live page title/subtitle, the local-time stamp
+       rendering, and a `linked` badge distinct from
+       `unlinked` (see Unpinned but pinnable)
 
 ### Sidebar org-switcher
 
@@ -5272,11 +5271,10 @@ FSM, unlike `flows/detail`).
   chip. The top bar shows neither the switcher nor a
   greeting; its only org-aware affordance is the
   pending-invitations bell (V3). Source of truth:
-  `web-app/app/organization-switcher.ts`, `web-app/app/
-  sidebar-member.ts`, `web-app/app/adapters/
-  organization-session.ts`,
-  `web-app/app/app-boot.ts::
-  scopeBootToActiveOrganization`.
+  `web-app/app/organization-switcher.ts`,
+  `web-app/app/sidebar-member.ts`,
+  `web-app/app/adapters/organization-session.ts`,
+  `web-app/app/app-boot.ts::scopeBootToActiveOrganization`.
   Pin: tests/adapters-organization-session-exchange.test.ts
        'shouldShowOrganizationSwitcher only at two or
        more orgs' (decides the ≥2-orgs visibility gate);
@@ -5699,10 +5697,11 @@ layout.
 
 ## K. Objectives & Scoring
 
-Every case below assumes the active organization is
-Stark Industries — if the sidebar org-switcher still
-shows Wayne Enterprises (a G36 leftover), switch back
-first. K8 is the master's: it wipes and reseeds after
+Select Stark Industries in the sidebar `.org-switcher`
+before K1: G36 leaves another organization active and
+G40 renames it, so no leftover name identifies it. Every
+case below assumes the active organization is Stark
+Industries. K8 is the master's: it wipes and reseeds after
 the explorer returns (`## The walk` step 5), not in
 document order with the rest of this section.
 
@@ -5725,15 +5724,15 @@ document order with the rest of this section.
   "Test desc"; click Add. PASS if the new objective
   appears at the bottom of the active list.
   Pin: tests/presenter-organization-objectives.test.ts
-       'renders add-objective affordance'; tests/drag-
-       reorder.test.ts 'nextPosition appends one
-       POSITION_GAP past the last integer entry' (decides
-       a new objective's position lands after every
-       existing one); tests/adapters-objectives.test.ts
-       'postObjectiveCreation writes via GET the
-       objective and its first revision through POST
-       /objectives'; exploratory — the live modal and the
-       visual bottom-of-list placement
+       'renders add-objective affordance';
+       tests/drag-reorder.test.ts 'nextPosition appends one
+       POSITION_GAP past the last integer entry' (decides a
+       new objective's position lands after every existing
+       one); tests/adapters-objectives.test.ts
+       'postObjectiveCreation writes via GET the objective
+       and its first revision through POST /objectives';
+       exploratory — the live modal and the visual
+       bottom-of-list placement
 - [ ] **K3** Click `Edit` on "Lower expenses"; confirm
   modal opens pre-filled. Change the name to "Cut costs";
   click Save. PASS if the list re-renders with the new
@@ -5848,19 +5847,20 @@ NPS", and "Improve employee morale" are not.
        button's absence and Approve's presence on
        `sent_back` — Decline and Send back are pinned for
        `submitted` in that file's sibling test, not for
-       `sent_back` itself); exploratory — Decline/Send-
-       back's presence and View history's absence on
-       `sent_back` specifically (the nearest real
-       decider, 'lifecycle actions empty on
+       `sent_back` itself); exploratory —
+       Decline/Send-back's presence and View history's
+       absence on `sent_back` specifically (the nearest
+       real decider, 'lifecycle actions empty on
        under_review', tests a different state —
        `under_review`, not `sent_back` — and a different
-       presenter method, `buildLifecycleActions`); the
-       live header actions slot and the inline sliders on
-       a `sent_back` project (the presenter's
+       presenter method, `buildLifecycleActions`); the live
+       header actions slot and the inline sliders on a
+       `sent_back` project (the presenter's
        editable-baseline branch is exercised only for
-       `under_review` in tests/presenter-project-
-       objectives.test.ts; `sent_back` shares the same
-       code but carries no direct test)
+       `under_review` in
+       tests/presenter-project-objectives.test.ts;
+       `sent_back` shares the same code but carries no
+       direct test)
 - [ ] **K10** Transition status to `under_review` via the
   edit form (resubmitting after being sent back). PASS if
   the baseline sliders remain editable inline — there is
@@ -5880,20 +5880,20 @@ NPS", and "Improve employee morale" are not.
   followed by the comma-joined names of every
   still-unscored objective. The convert-time gating
   STILL HOLDS even though the modal is gone.
-  Pin: tests/adapters-project-publish.test.ts
-       'validator: not ready when objectives unscored'
-       (decides the gate itself returns `ready: false`
-       while any active objective lacks a baseline);
+  Pin: tests/adapters-project-publish.test.ts 'validator:
+       not ready when objectives unscored' (decides the
+       gate itself returns `ready: false` while any active
+       objective lacks a baseline);
        tests/presenter-project-action-bar.test.ts
        'under_review with no scores: Approve disabled'
        (decides the rendered `disabled` attribute follows
-       from `ready: false`); tests/presenter-project-
-       action-bar.test.ts 'Approve tooltip enumerates
-       unscored objective names' (decides the exact
-       tooltip prefix and comma-joined format — proven
-       there with two names, not however many are live
-       here); exploratory — the live enumeration's exact
-       membership
+       from `ready: false`);
+       tests/presenter-project-action-bar.test.ts 'Approve
+       tooltip enumerates unscored objective names'
+       (decides the exact tooltip prefix and comma-joined
+       format — proven there with two names, not however
+       many are live here); exploratory — the live
+       enumeration's exact membership
 - [ ] **K12** Inspect the objective rows; PASS if
   "Cut costs" (K3's rename of "Lower expenses") shows
   its seeded baseline value and every other active
