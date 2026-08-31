@@ -51,8 +51,10 @@ git show 9620d38c:docs/superpowers/specs/\
 
 ## Global Constraints
 
-- **Base:** master at `e1cbeac9`. Ride a worktree; never
-  merge, never push (AGENTS.md § Worktrees).
+- **Base:** master at `e1cbeac9`. Ride
+  `.worktrees/2026-08-30-deno-migration`; never merge,
+  never push (AGENTS.md § Worktrees). Subagents work in
+  that worktree and never create their own.
 - **Deno 2.9.5, pinned.** Every `deno` invocation in a root
   script passes `--frozen`. Never `-A`; permissions are
   always named.
