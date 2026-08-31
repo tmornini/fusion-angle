@@ -1,6 +1,6 @@
 // Preimages of reminted seed ids. Hash keys in scores.ts
 // use these so deterministicScore draws match the pinned
-// 92 actuals / 1448 pairs. T4 leftover. Do not use as
+// 92 actuals / 1453 pairs. T4 leftover. Do not use as
 // domain identifiers.
 
 export const SEED_HASH_PREIMAGE: Readonly<
@@ -753,6 +753,7 @@ export const SEED_HASH_PREIMAGE: Readonly<
     'pYmalQFqpoXdbpYAJfOswA': 'ojOEXtdzdtTZtpM81TxVca',
     'PzckmcTqryfhbtVgGKmcsg': 'g-state-record-customer',
     'PZyZSbqHsXiBXwMGATiIng': 'PxLFPaM23m2rQXIzeJIywN',
+    'QacaZo3vrtz5vlkyE9Z3bA': 'seed-cred-riley-okafor-password',
     'QACKgBkYKXEWUSrgcEZCVw': 'QXnnDlwCXKN12k4oUPse4B',
     'QANQObhucYYsFlnPjIdLug': 'QnMQPkZbvU0IPt6XODVj2K',
     'QAqUhtlDTALiQzGcLRmpyg': 'QsV9mE5GIUpMXGh3SVTCB7',
@@ -1167,6 +1168,7 @@ export const SEED_HASH_PREIMAGE: Readonly<
     'xxvsxkSMOocjMRcIKZxNdA': 'e-project-submitted-state',
     'XXZruirZyAOoRpNxaDnpSA': 'current',
     'XzsBTUrqoijPRVPskGmYbA': 'f-attr-2',
+    'Y9RaCmZFXXb2Kbk8ugJb3w': 'seed-invitation-riley-stark',
     'yAeThKEXWIucbhaNLFueGQ': 'b-edge-submit',
     'yAhMcJGxllmQkLemOQjCmA': 'wo-doc-op-1',
     'YAmKFSHvzqFEztADuqZqJg': 'fs-wo-archive',
@@ -1192,6 +1194,7 @@ export const SEED_HASH_PREIMAGE: Readonly<
     'YiJPbufDpkyrZcZCYbUJpg': 'e1',
     'YiTfnydHjXVkotLACabXeQ': 'eJEybxfXaf3sjwFilZnunU',
     'YIuEjXvCwXAgrpyvcvLJjg': 'doc-3',
+    'YJFHEn7knODIJLHy6rQTRQ': 'seed-invitation-riley-stark-grant',
     'yjsYYXruOryrZjnfLsgSJg': 'ws-same',
     'YKtyCizelcaUAaHGwetojA': 'doc-4',
     'YLbPBVpBLImxPQRqLKPKLw': 'doc-5',
@@ -1281,6 +1284,7 @@ export const SEED_HASH_PREIMAGE: Readonly<
     'ZYPnpoVUPJKoePxYWowmpQ': 'f78pCgCBuvzSIHNSiksOY3',
     'zYRdPmRsZkzkaYLCOlKTHg': 'fs-idea-approved',
     'zzluLcEOsVDYQCDtbhlVSw': 'i-project-approved-2',
+    '_CgIO8a_dKa_WNNUSWlA2A': 'seed-identity-riley-okafor',
 };
 
 export function seedHashKey(id: string): string {

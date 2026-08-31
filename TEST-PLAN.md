@@ -1276,7 +1276,7 @@ the second organization.
 
 ### Zero-membership landing (org gate)
 
-> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The seed gives every login-capable identity a membership, and the walk has no instrument to strip one: there is no member-removal affordance under `web-app/members/` or `web-app/identities/`, the explorer may not `js()` fetch the API to fake it, and `POSTGRES_URL` is minted by `./crank` for its children and never printed, so a direct message-plane insert is out of reach too. If the zero-membership state cannot be produced through the running origin, record BLOCKED for B25–B27 and B29 naming that reason — an honest BLOCKED costs nothing. B28 still drives: its own text offers an untouched seeded member as the alternative. `getOrganizations` is fenced to the derived membership ledger, so an identity that truly reaches no org lands here regardless of how it got there.
+> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The mock seed provides that identity: Riley Okafor, `riley.okafor@example.net` — login-capable (its `username<TAB>password` line prints on crank stdout with the other demo sign-ins), holder of ZERO membership rows, with one seeded PENDING invitation from Stark Industries. Sign in as Riley with the stdout credentials to enter the zero-membership state. Do NOT accept (or decline) the pending invitation while B25–B29 are in flight — accepting grants the first membership and breaks B26/B29 on the same pass — and leave it pending for the rest of the walk (G43, V8). `getOrganizations` is fenced to the derived membership ledger, so an identity that truly reaches no org lands here regardless of how it got there.
 
 - [ ] **B25** From the zero-membership state, click "Sign out", then sign in again with that member's credentials. PASS: the `refresh_token` cookie is cleared (`Set-Cookie` `Max-Age=0`) — sign-out is not org-fenced; a zero-membership identity must still revoke. Lands directly on `invitations/index.html` — NOT the `?return=` target and NOT the dashboard "Something went wrong" card; no flash of the dashboard shell (the auth-page short-circuit decides before the first navigation). Sidebar renders the member chip from token claims with NO org switcher. Navigating Back after sign-out does not boot into the account.
   Pin: tests/api-identity-token-revocations-self.test.ts
@@ -1300,15 +1300,22 @@ the second organization.
        bounce-to-invitations branch); exploratory —
        the live reload and the absence of an error
        card or retry loop
-- [ ] **B27** As the zero-membership identity, land on `invitations/index.html`. PASS: the page renders and STAYS — no redirect loop (the gate's self-guard exempts the invitations page); it shows pending invitations, or the "No invitations." empty state when none exist.
+- [ ] **B27** As the zero-membership identity, land on `invitations/index.html`. PASS: the page renders and STAYS — no redirect loop (the gate's self-guard exempts the invitations page); it shows the seeded pending invitation card — Stark Industries, an "Invited by Tony Stark · {date}" sub-line, a Pending state badge, and Accept / Decline buttons. Click neither — B29 still needs the zero-membership state.
   Pin: tests/boot-organization-gate.test.ts
        'invitations page keeps an empty organization
        list' (its `resolveOrganizationGate([],
        'invitations')` assertion returns the empty
        list itself, not `null` — the self-guard);
-       exploratory — the live stay, the rendered
-       invitations, and the empty state
-- [ ] **B28** Restore the deleted membership row (or repeat with an untouched seeded member), then sign in. PASS: lands on the `?return=` target / dashboard as before — the org gate does not fire for an identity that reaches an org (B16/B18 unaffected by the new gate).
+       tests/mock-data-unaffiliated-identity.test.ts
+       'the invitee view carries the org name and the
+       inviting admin (TEST-PLAN B27 card)' (decides
+       the seeded pending row this card renders);
+       tests/presenter-invitation-list.test.ts 'a
+       pending invitation shows the org, inviter, and
+       Accept / Decline' (decides the card's shape);
+       exploratory — the live stay and the rendered
+       seeded card
+- [ ] **B28** Sign in as an untouched seeded member (any non-Riley credential from crank stdout, e.g. the demo admin), then load a gated page. PASS: lands on the `?return=` target / dashboard as before — the org gate does not fire for an identity that reaches an org (B16/B18 unaffected by the new gate). After PASS, sign back in as Riley for B29.
   Pin: exploratory — the live landing on the target;
        no test exercises `resolveOrganizationGate`
        with a non-empty organization list against a
@@ -1320,7 +1327,7 @@ the second organization.
        `invitations` as the page, so it cannot tell
        "fires for any page" from "fires only for
        invitations" apart)
-- [ ] **B29** As the zero-membership identity, open `design-system/`. PASS: renders normally with NO redirect to invitations — the org gate guards auth-gated pages; public pages degrade to the unscoped sidebar (B19).
+- [ ] **B29** As the zero-membership identity, open `design-system/`. PASS: renders normally with NO redirect to invitations — the org gate guards auth-gated pages; public pages degrade to the unscoped sidebar (B19). After PASS, sign back in as the demo admin before section C.
   Pin: tests/page-registry.test.ts 'public pages are
        auth-exempt only' (`design-system` carries
        `requiresAuth: false`, so `bootApp` never runs
@@ -4585,10 +4592,14 @@ FSM, unlike `flows/detail`).
   plus "Service account" + "—" (agents are not
   identities), then a "Service" badge. The nested PII
   fence (viaMembership, need-to-know) hides Wayne-only
-  members from Stark admin Tony: the list renders 6
+  members from Stark admin Tony: the list renders 7
   named person rows (Emily Rodriguez, Sarah Chen, Lisa
-  Wang, Marcus Johnson, Tony Stark, Jessica Park), plus a
-  7th, Jordan Rivera, if AA5's create held; 5 "Identity
+  Wang, Marcus Johnson, Tony Stark, Jessica Park, and
+  Riley Okafor — the zero-membership identity is a
+  genuine ORPHAN, and the viaMembership fence hides only
+  identities that belong to a DIFFERENT org, so an
+  orphan's PII is visible), plus an 8th, Jordan Rivera,
+  if AA5's create held; 5 "Identity
   without PII" person rows (the Wayne-only members:
   David Martinez, Alex Kim, Mike Thompson, David Kim,
   James Miller); and 1 service row (the system service
@@ -4834,8 +4845,8 @@ FSM, unlike `flows/detail`).
        the sidebar switcher staying absent for the declined
        org
 - [ ] **V8 — Organization "Sent invitations" section +
-  Revoke (admin)** Grant invitation C if none is pending
-  (V4 consumed A; V5 declined B). On
+  Revoke (admin)** Grant invitation C (V4 consumed A; V5
+  declined B). On
   `members/index.html` as Tony Stark, Invite member:
   `mike.thompson@company.com` (Wayne-only). PASS:
   "Invitation sent" toast. Then on
@@ -4845,15 +4856,24 @@ FSM, unlike `flows/detail`).
   one row per PENDING org invitation (`#sent-
   invitations-list`) — each row shows the invitee EMAIL,
   an "Invited {date}" sub-line, a state badge, and a
-  Revoke button. PASS: the section is VISIBLE only when
+  Revoke button.
+  TWO rows are pending here: invitation C and the SEEDED
+  pending invitation to `riley.okafor@example.net`
+  (present from boot — B25–B29's fixture; do NOT revoke
+  it).
+  PASS: the section is VISIBLE only when
   the admin read succeeds (it boots hidden and reveals on
   success). Click Revoke on C. PASS: an "Invitation
   revoked" toast fires and the row leaves the pending
   list (a 'revoked' event supersedes the pending; the
   invitation row persists as audit, and the invitee's
-  pending list — V3/V4 — no longer shows it). With no
-  outstanding invitations, the list shows "No outstanding
-  invitations." Revoke is idempotent (re-revoke → 204).
+  pending list — V3/V4 — no longer shows it).
+  Riley's seeded row remains pending after C is revoked,
+  so the live empty state is not reachable on this walk;
+  tests/presenter-invitation-list.test.ts 'an empty sent
+  list shows the empty state' alone decides the "No
+  outstanding invitations." copy.
+  Revoke is idempotent (re-revoke → 204).
   Source: `web-app/organization/index.ts`
   (`renderSentInvitations` / `onSentInvitationClick`),
   `SentInvitationsPresenter`, `revokeInvitation`.
@@ -6537,32 +6557,42 @@ K30 only describes.
   instance form's per-attribute access
   (`data-access="writable"` / `"readonly"` / omitted)
   follows each attribute's `read_roles`/`write_roles`,
-  with admin bypassing both. The mock seed sets no Record
-  attribute's ACL away from the default
-  (`['member','admin']` for both read and write), so on
-  Customer Profile every attribute already renders
-  identically for admin and member. As the demo admin,
-  click New instance on Customer Profile: every field
-  renders `data-access="writable"`. Sign in as Sarah Chen
+  with admin bypassing both. Default half (Customer
+  Profile, Stark — every attribute keeps the default
+  `['member','admin']` ACL): as the demo admin, click New
+  instance on Customer Profile — every field renders
+  `data-access="writable"`; sign in as Sarah Chen
   (`sarah.chen@company.com`, a Stark member) and open New
-  instance: PASS if every field still renders
-  `data-access="writable"` (the default-ACL case). Setting
-  a restricted ACL (e.g. `read_roles: ['admin']`) is
-  `PUT …/attributes/:id` only — no UI reaches it, and the
-  explorer may not script the API — so the readonly/absent
-  branches are not walk-driveable; BLOCKED (reason: no
-  ACL-editing UI, API-only write) is correct if attempted,
-  and the CLI pin below is the sole record of that branch.
+  instance — every field still renders
+  `data-access="writable"`. Restricted half (Project
+  Brief, Wayne — the seed sets Priority to
+  `read_roles: ['admin']` / `write_roles: ['admin']` and
+  Approved to `write_roles: ['admin']`): as the demo
+  admin switched to Wayne Enterprises, click New instance
+  on Project Brief — every field, Priority and Approved
+  included, renders `data-access="writable"` (admin
+  bypass); sign in as Mike Thompson
+  (`mike.thompson@company.com`, a Wayne-only member) and
+  open New instance on Project Brief — Approved renders
+  `data-access="readonly"`, Priority is ABSENT from the
+  form, and Project Name / Description stay writable.
+  Setting an ACL remains `PUT …/attributes/:id` only — no
+  UI reaches it; the seed, not the walk, produced the
+  restricted state (TODO.md names the ACL-editing UI).
   Pin: tests/presenter-record-instances.test.ts
        'projectInstanceFields drops unreadable and
        marks write vs read';
        tests/presenter-record-instances.test.ts
        'projectInstanceFields: admin bypasses ACL';
+       tests/mock-data-records.test.ts 'Project Brief
+       Priority and Approved carry the restricted seed
+       ACLs; the rest keep the default' (decides the
+       seeded ACL world this case walks);
        tests/adapters-record-attributes.test.ts
        'getRecordAttributesByRecord maps storage rows
        to the camelCase domain shape'; exploratory —
-       the live default-ACL comparison across the two
-       sign-ins
+       the live four-way comparison across the two
+       record types and the two sign-ins
 
 ## J. Teardown
 

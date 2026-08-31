@@ -47,7 +47,10 @@ import {
     assignOrganization,
 } from './mock-data/seed-constants.ts';
 import { buildAiMembers } from './mock-data/ai-members.ts';
-import { buildMembers } from './mock-data/members.ts';
+import {
+    buildMembers,
+    buildUnaffiliatedIdentity,
+} from './mock-data/members.ts';
 import {
     buildIdeas,
     buildIdeaSubmissions,
@@ -108,6 +111,7 @@ import {
     identityCredentialSeedBody,
     VALUE_BEARING_TRANSITION_EVENT_IDS,
     SEED_INSTANCE_ID,
+    UNAFFILIATED_INVITATION_ID,
     WO01_ID,
     WO01_REVIEW_EVENT_ID,
     WO01_COMPLETE_EVENT_ID,
@@ -218,7 +222,8 @@ const SEED_PASSWORD_CREDENTIAL_BY_IDENTITY:
     'RlVXjLbPPTsOimpvwqwLsA': 'HRmZCqpEiBfirOXNJkpRAA',
     'JfHbTXkOyLzJSNWFWFGrMg': 'QzqHjTvgpVUPAEDdaIHAUQ',
     'zuIFDMrBwxTWqLJpRrQWog': 'ljBZzdcZWOSvCekzDQwlOA',
-    'hPrdaZfedPOJYevSaGziHw': 'yUTTGOBIUIRXFLdXmPmFGA'
+    'hPrdaZfedPOJYevSaGziHw': 'yUTTGOBIUIRXFLdXmPmFGA',
+    '_CgIO8a_dKa_WNNUSWlA2A': 'QacaZo3vrtz5vlkyE9Z3bA'
 };
 
 function seedPasswordCredentialId(
@@ -361,11 +366,15 @@ export async function postMockDataLoad(
         TABLE_NAMES,
         (view) => postMockDataLoadIn(view, messagePairs),
     );
-    // Task 1(d): same buildMembers enumeration that pass 2
-    // used for PII — no row read after strip.
+    // Task 1(d): same buildMembers (+ the unaffiliated
+    // identity) enumeration that pass 2 used for PII — no
+    // row read after strip.
     const creds = await seedHumanCredentials(
         adapter,
-        buildMembers().map((member) => ({
+        [
+            ...buildMembers(),
+            buildUnaffiliatedIdentity(),
+        ].map((member) => ({
             identityId: member.id,
             email: member.email,
         })),
@@ -380,6 +389,7 @@ async function postMockDataLoadIn(
     messagePairs: ReadonlyMap<string, MessagePair>,
 ): Promise<void> {
     const members = buildMembers();
+    const unaffiliated = buildUnaffiliatedIdentity();
 
     await Promise.all([
         ...members.flatMap((member, index) => {
@@ -453,6 +463,54 @@ async function postMockDataLoadIn(
                 seedMessagePairKey('identities/:id', SYSTEM_MEMBER_ID),
             ),
         ),
+        postIdentityDocumentOp(
+            adapter,
+            unaffiliated.id,
+            identityPersonSeedBody(unaffiliated),
+            SYSTEM_MEMBER_ID,
+            requireMessagePair(
+                messagePairs,
+                seedMessagePairKey(
+                    'identities/:id', unaffiliated.id,
+                ),
+            ),
+        ),
+        postIdentityPiiDocumentOp(
+            adapter,
+            unaffiliated.id,
+            humanMemberPiiSeedBody(unaffiliated),
+            SYSTEM_MEMBER_ID,
+            requireMessagePair(
+                messagePairs,
+                seedMessagePairKey(
+                    'identities/:id/pii', unaffiliated.id,
+                ),
+            ),
+        ),
+        (async () => {
+            // Live grant order: operation, then document
+            // (grantInvitation, invitations-domain.ts).
+            await appendMessagePair(
+                adapter,
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
+                        'invitations',
+                        UNAFFILIATED_INVITATION_ID,
+                    ),
+                ),
+            );
+            await appendMessagePair(
+                adapter,
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
+                        'invitations/:id',
+                        UNAFFILIATED_INVITATION_ID,
+                    ),
+                ),
+            );
+        })(),
         // Role grants retired: membership `type` (admin for
         // current, member otherwise) seeds privilege; mint
         // bakes claim roles from those memberships.

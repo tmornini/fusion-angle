@@ -325,7 +325,7 @@ async () => {
         printed.split('\n').filter((line) =>
             line.includes('\t'),
         ).length,
-        11,
+        12,
     );
     assert.ok(printed.includes(SEED_REVEAL_HEADER));
     assert.equal(await db.hasSchema(), true);

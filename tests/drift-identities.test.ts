@@ -38,6 +38,9 @@ import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
+import {
+    buildUnaffiliatedIdentity,
+} from '../api/mock-data/members.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedIdentityCredential } from './identity-fixtures.ts';
 import { identityByEmail } from '../api/authentication.ts';
@@ -279,7 +282,7 @@ async function assertPiiFenceLeg(
 
 // -- 1. identities collection parity + getById + 404 bytes ------
 
-test('identities collection wire equals derive (12 incl.'
+test('identities collection wire equals derive (13 incl.'
 + ' system; agents are not identities) + getById + 404-byte'
 + ' parity', async () => {
     const db = await seededDb();
@@ -288,7 +291,7 @@ test('identities collection wire equals derive (12 incl.'
     const derived = await derivedIdentities(
         db, GLOBAL_PLANE_PLACEHOLDER,
     );
-    assert.equal(derived.length, 12);
+    assert.equal(derived.length, 13);
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
@@ -327,7 +330,7 @@ test('identities collection wire equals derive (12 incl.'
 // -- viaMembership fence legs + leaf parity + 404 bytes ---------
 // -- Flat GET /identity-pii is retired (router 404). ------------
 
-test('identity-pii derive (11 seeded slots) fenced both'
+test('identity-pii derive (12 seeded slots) fenced both'
 + ' orgs + the THREE-WAY viaMembership fence legs (co-member'
 + ' visible, FOREIGN-org hidden — orphan visible) + leaf +'
 + ' 404 bytes', async () => {
@@ -336,7 +339,8 @@ test('identity-pii derive (11 seeded slots) fenced both'
 
     // -- unfenced collection (every live slot) --
     const derivedRows = sortById(await deriveIdentityPiiRows(db));
-    assert.equal(derivedRows.length, 11);
+    assert.equal(derivedRows.length, 12);
+    const unaffiliated = buildUnaffiliatedIdentity();
 
     // -- fenced collection both orgs (message-plane fence) --
     for (const organization of [
@@ -351,6 +355,13 @@ test('identity-pii derive (11 seeded slots) fenced both'
         for (const row of derivedFenced) {
             assert.ok(unfencedIds.has(row.id));
         }
+        // Orphan Riley (member of NO org) is VISIBLE in
+        // BOTH orgs' fenced PII collections.
+        assert.ok(
+            derivedFenced.some(
+                (row) => row.id === unaffiliated.id,
+            ),
+        );
     }
 
     // -- per-identity leaf + 404 --
@@ -453,7 +464,7 @@ test('by-email login-shape: identityByEmail resolves every'
 async () => {
     const db = await seededDb();
     const derivedRows = await deriveIdentityPiiRows(db);
-    assert.equal(derivedRows.length, 11);
+    assert.equal(derivedRows.length, 12);
     // Phase Final Stage B: identity spine tables retired.
     for (const row of derivedRows) {
         assert.equal(
@@ -469,7 +480,7 @@ async () => {
 // -- 3. credentials parity per identity + per cid + the ---------
 // -- withoutSecret projection pin + 404 bytes --------------------
 
-test('credentials per identity + per cid (12 seeded) + the'
+test('credentials per identity + per cid (13 seeded) + the'
 + ' withoutSecret projection pin + 404 bytes', async () => {
     const db = await seededDb();
     // Phase Final Stage B: identity spine tables retired.
@@ -495,7 +506,7 @@ test('credentials per identity + per cid (12 seeded) + the'
             );
         }
     }
-    assert.equal(allDerived.length, 12);
+    assert.equal(allDerived.length, 13);
 
     const someIdentityId = allDerived[0]!.identity_id;
     const missingCid = generateIdentifier();

@@ -273,3 +273,39 @@ export function buildMembers():
         },
     ];
 }
+
+// The zero-membership identity: login-capable (password
+// credential, PII email) yet holding no seat anywhere —
+// TEST-PLAN B25–B29 sign in as this identity to walk the
+// boot/login org gate, and one seeded PENDING Stark
+// invitation awaits it (seed-message-pairs.ts). NOT in
+// buildMembers(): that loop seeds a membership per entry
+// and assignOrganization is index-sensitive; this
+// identity's whole point is the empty membership ledger.
+// Outside email domain — every @company.com identity is a
+// seeded member. id preimage: seed-identity-riley-okafor
+// (seed-hash-preimage.ts).
+export function buildUnaffiliatedIdentity():
+    SeedHumanMember {
+    return {
+        id: '_CgIO8a_dKa_WNNUSWlA2A',
+        name: 'Riley Okafor',
+        email: 'riley.okafor@example.net',
+        title: 'Consultant',
+        department: 'Advisory',
+        strengths: [
+            'Process Design',
+            'Facilitation',
+        ],
+        team_dimensions: {
+            driver: 60,
+            analytical: 70,
+            expressive: 65,
+            amiable: 72,
+        },
+        phone: '+1 (555) 310-6642',
+        bio: 'Independent consultant'
+            + ' awaiting a first'
+            + ' organization membership.',
+    };
+}

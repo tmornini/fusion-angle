@@ -18,6 +18,7 @@ import {
     validateRecordDocumentBody,
 } from '../api/validators.ts';
 import {
+    loadAttributeSchemaById,
     postRecordDocumentOp,
 } from '../api/routes.ts';
 import {
@@ -32,6 +33,10 @@ import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
+import {
+    customerProfileRecordId,
+    projectBriefRecordId,
+} from '../api/mock-data/records.ts';
 import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: records(+attributes+flow_records) seed
@@ -420,5 +425,54 @@ test(
             ),
             ORGANIZATION_TWO,
         );
+    },
+);
+
+test(
+    'Project Brief Priority and Approved carry the'
+    + ' restricted seed ACLs; the rest keep the default',
+    async () => {
+        const db = await seeded();
+        const projectBrief = await loadAttributeSchemaById(
+            db, ORGANIZATION_TWO, projectBriefRecordId,
+        );
+        const priority = projectBrief.get(
+            'pwjGSoPQMbsjmEJLDAgbaA',
+        );
+        assert.ok(priority, 'Priority attribute exists');
+        assert.deepEqual(priority.readRoles, ['admin']);
+        assert.deepEqual(priority.writeRoles, ['admin']);
+        const approved = projectBrief.get(
+            'qDgLYtdgNBjEEoPqCoMATg',
+        );
+        assert.ok(approved, 'Approved attribute exists');
+        assert.deepEqual(
+            approved.readRoles, ['member', 'admin'],
+        );
+        assert.deepEqual(approved.writeRoles, ['admin']);
+        const projectName = projectBrief.get(
+            'ptlpsUrQssxuTLkouUAnNw',
+        );
+        assert.ok(projectName, 'Project Name exists');
+        assert.deepEqual(
+            projectName.readRoles, ['member', 'admin'],
+        );
+        assert.deepEqual(
+            projectName.writeRoles, ['member', 'admin'],
+        );
+        const customerProfile =
+            await loadAttributeSchemaById(
+                db, STARK_ORGANIZATION,
+                customerProfileRecordId,
+            );
+        assert.ok(customerProfile.size >= 3);
+        for (const row of customerProfile.values()) {
+            assert.deepEqual(
+                row.readRoles, ['member', 'admin'],
+            );
+            assert.deepEqual(
+                row.writeRoles, ['member', 'admin'],
+            );
+        }
     },
 );

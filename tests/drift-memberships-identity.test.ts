@@ -13,7 +13,10 @@ import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
-import { buildMembers } from '../api/mock-data/members.ts';
+import {
+    buildMembers,
+    buildUnaffiliatedIdentity,
+} from '../api/mock-data/members.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
@@ -59,13 +62,16 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
 }
 
-// Every seeded identity that can hold a seat: the 11
-// seeded humans (buildMembers, 'XXZruirZyAOoRpNxaDnpSA' included) and the
-// system actor (holds none — see leg 8). Agents are not
+// Every seeded identity that can hold a seat: the 12
+// seeded humans, the zero-membership identity included
+// (buildMembers + buildUnaffiliatedIdentity,
+// 'XXZruirZyAOoRpNxaDnpSA' included) and the system
+// actor (holds none — see leg 8). Agents are not
 // identities and are not seated.
 function allSeededIdentityIds(): readonly Id[] {
     return [
         ...buildMembers().map((m) => m.id),
+        buildUnaffiliatedIdentity().id,
         SYSTEM_MEMBER_ID,
     ];
 }
@@ -97,11 +103,11 @@ function primaryOrganizationOf(
 // -- leg 1: per-identity derive for EVERY seeded identity ------
 
 test('leg 1: per-identity derive for EVERY seeded identity'
-+ ' (11 humans + system) — 12 seat documents total',
++ ' (12 humans + system) — 12 seat documents total',
 async () => {
     const db = await seededDb();
     const ids = allSeededIdentityIds();
-    assert.equal(ids.length, 12);
+    assert.equal(ids.length, 13);
 
     let total = 0;
     for (const identityId of ids) {

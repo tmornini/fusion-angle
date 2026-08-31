@@ -176,7 +176,7 @@ HTTP nest. Validators, crypto, hash, and
 ## Seed pair formation
 
 Mock seed
-`EXPECTED_MESSAGE_PAIR_COUNT = 1448`; bootstrap
+`EXPECTED_MESSAGE_PAIR_COUNT = 1453`; bootstrap
 exactly 8. Pinned by `tests/mock-data-pairs.test.ts`.
 
 ## How we got here

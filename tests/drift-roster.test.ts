@@ -309,7 +309,7 @@ test('ai-agents + identities wire equals GET (GLOBAL)'
     assert.equal(
         identities.filter((row) => row.kind === 'person')
             .length,
-        11,
+        12,
     );
 
     for (const row of agents) {

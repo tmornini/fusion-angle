@@ -124,8 +124,8 @@ function messagePairJsonOf(message: string): {
 // (Phase 10 Task 6: the 4 AI members + the system member each
 // form their OWN identities/:id document message pair too — a
 // standalone invocation, not a bundle-widening, since neither
-// create-time bundle ever carried one) + 12 identity-credential
-// document message pairs (Phase 10 Task 6: 11 human password
+// create-time bundle ever carried one) + 13 identity-credential
+// document message pairs (Phase 10 Task 6: 12 human password
 // credentials + the system client-secret credential, one
 // identities/:id/credentials/:cid pair per row — formed by
 // seedHumanCredentials' OWN local pass-1/pass-2 split,
@@ -147,9 +147,15 @@ function messagePairJsonOf(message: string): {
 // strips the identity_default_organizations ROW half — pairs
 // alone remain) + 1 gate0001 Capture step (R1-FIX-A re-home)
 // Task 55 retires leftover members / memberships /
-// ai-members / human-members seed pairs. Measure after
+// ai-members / human-members seed pairs. + 2
+// unaffiliated-identity documents (identities/:id +
+// identities/:id/pii for the zero-membership identity —
+// no membership, no default-organization pair) + 2
+// invitation pairs (the seeded pending Stark
+// invitation's operation + document,
+// formInvitationSeedMessagePairs). Measure after
 // seed — do not invent. Bootstrap absolute is 8.
-const EXPECTED_MESSAGE_PAIR_COUNT = 1448;
+const EXPECTED_MESSAGE_PAIR_COUNT = 1453;
 
 test('a mock-data seed populates pairs',
 async () => {

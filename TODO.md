@@ -1192,6 +1192,20 @@ Off the critical path; each with its oracle.
   carried as a driving note in TEST-PLAN.md's `## The
   walk`. Oracle: a Layer 2 test under `tests/browser/`
   asserting one click after reload reaches the element.
+- ACL-editing UI for record attributes (`read_roles` /
+  `write_roles`) — R21's restricted branches are
+  seed-produced today; setting an ACL is
+  `PUT …/attributes/:id` only, and no page reaches it.
+  Oracle: an admin edits an ACL through the UI and a
+  member-perspective New-instance form flips live;
+  TEST-PLAN R21 gains the write path as a user gesture
+- Member-removal affordance under members/identities —
+  zero-membership is seed-produced today (Riley Okafor);
+  no page deletes a membership row. Oracle: removing a
+  member's last seat lands that identity on
+  `invitations/index.html` at next boot (TEST-PLAN
+  B25–B29 driven live); restores B28's original
+  "restore the deleted membership row" branch
 
 ## Sequencing
 

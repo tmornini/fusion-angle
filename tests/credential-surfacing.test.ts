@@ -61,15 +61,16 @@ async () => {
 });
 
 // Phase Final Task 1(d): SeededCredentials count is
-// row-independent — 11 human passwords (buildMembers) for
-// mock-data; 1 for bootstrap. System client_secret is not
-// surfaced in the reveal list.
-test('mock-data surfaces exactly eleven human credentials',
+// row-independent — 12 human passwords (buildMembers +
+// buildUnaffiliatedIdentity) for mock-data; 1 for
+// bootstrap. System client_secret is not surfaced in
+// the reveal list.
+test('mock-data surfaces exactly twelve human credentials',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const creds = await postMockDataLoad(db);
-    assert.equal(creds.identities.length, 11);
+    assert.equal(creds.identities.length, 12);
     assert.ok(
         creds.identities.every((c) => c.password.length >= 16),
     );

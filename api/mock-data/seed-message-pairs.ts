@@ -78,12 +78,12 @@
 // OWN role-grants/:id document message pair. Every invocation
 // here (as always) forms through the SAME formSeedMessagePair
 // pipeline, UNTOUCHED — formSeedMessagePair is genesis
-// by construction. The 12 identity-credential document
-// message pairs (11 human passwords + the system client
+// by construction. The 13 identity-credential document
+// message pairs (12 human passwords + the system client
 // secret) are the ONE exception: a credential's
 // hashed secret is unknown until PBKDF2 resolves inside
 // seedHumanCredentials (api/mock-data.ts), which runs AFTER this
-// file's shared pre-tx pass already completed — so those 12 pairs
+// file's shared pre-tx pass already completed — so those 13 pairs
 // are formed by seedHumanCredentials' OWN local pass-1/pass-2
 // split, calling formSeedMessagePair directly
 // (formSeedCredentialMessagePairs, below) rather than
@@ -188,7 +188,10 @@ import {
     pickHumanMember,
     seedIdentifier,
 } from './seed-kit.ts';
-import { buildMembers } from './members.ts';
+import {
+    buildMembers,
+    buildUnaffiliatedIdentity,
+} from './members.ts';
 import type { SeedHumanMember } from './members.ts';
 import { buildIdeas, buildIdeaSubmissions } from './ideas.ts';
 import { buildFlows, buildFlowGraphRelations } from './flows.ts';
@@ -532,6 +535,15 @@ export const SEED_INSTANCE_ID =
 export const SEED_RECORD_TYPE_ID =
     customerProfileRecordId;
 export const WO01_ID = 'xqcXYHXBJJXcLkRYkRngKA';
+
+// The unaffiliated identity's pending Stark invitation —
+// exported so pass 2 (mock-data.ts) appends the SAME two
+// pairs pass 1 forms. Preimages registered in
+// seed-hash-preimage.ts.
+export const UNAFFILIATED_INVITATION_ID =
+    seedIdentifier('seed-invitation-riley-stark');
+const UNAFFILIATED_INVITATION_GRANT_EVENT_ID =
+    seedIdentifier('seed-invitation-riley-stark-grant');
 
 export const mockStateFieldValues: StateFieldValueEntity[] = [
     {
@@ -1163,7 +1175,7 @@ export function roleGrantSeedBody(
 
 // The wire body a live PUT identities/:id/credentials/:cid would
 // carry for this SAME write: {identity_id, kind, status, secret,
-// at} — the ONE shape every seeded credential (11 human
+// at} — the ONE shape every seeded credential (12 human
 // passwords + the system client secret, both mock-data and
 // bootstrap) shares. Hoisted (Phase 10 Task 6) so
 // formSeedCredentialMessagePairs (this file) and seedHumanCredentials
@@ -1508,6 +1520,39 @@ export function buildMockDataInvocations():
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: humanMemberPiiSeedBody(member),
         });
+    });
+    // The unaffiliated identity
+    // (buildUnaffiliatedIdentity): identity + PII
+    // documents only — NO membership and NO
+    // default-organization invocation; the empty
+    // membership ledger IS the point (TEST-PLAN
+    // B25–B29). Its credential pair rides
+    // seedHumanCredentials' own pass, like every human.
+    // Its invitation pairs are formed by
+    // formInvitationSeedMessagePairs below — the
+    // invitations side channel has no
+    // WRITE_RESPONSE_SPECS entry, so they cannot ride
+    // formSeedMessagePair.
+    const unaffiliated = buildUnaffiliatedIdentity();
+    invocations.push({
+        key: seedMessagePairKey(
+            'identities/:id', unaffiliated.id,
+        ),
+        routePattern: 'identities/:id',
+        idParams: [unaffiliated.id],
+        organization: undefined,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        body: identityPersonSeedBody(unaffiliated),
+    });
+    invocations.push({
+        key: seedMessagePairKey(
+            'identities/:id/pii', unaffiliated.id,
+        ),
+        routePattern: 'identities/:id/pii',
+        idParams: [unaffiliated.id],
+        organization: undefined,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        body: humanMemberPiiSeedBody(unaffiliated),
     });
     // The system identity's OWN identities/:id document
     // message pair — the last raw identities.put site the
@@ -2159,6 +2204,92 @@ export async function formDefaultOrganizationSeedMessagePair(
     });
 }
 
+// The seeded pending invitation's own pair former:
+// mirrors grantInvitation's fresh outcome
+// (api/invitations-domain.ts) — the operation message
+// pair at the flat 'invitations' collection (uri_id
+// resolves from the body's invitationId via
+// CREATE_BODY_ID_FIELDS, api/message-pair.ts) and the
+// document message pair at invitations/:id, both HTTP_OK
+// with the live handler's own response bodies, so the
+// stored pair can never drift from what the live grant
+// would have stored for the identical request. The
+// granter is the Stark admin ('XXZruirZyAOoRpNxaDnpSA')
+// — invitationIdentityView resolves invited_by_name from
+// the operation pair's requesterIdentityId. One
+// operationId spans both pairs, exactly as the live
+// grant threads one Operation-ID through its bundle.
+export async function formInvitationSeedMessagePairs(
+    requestAt: string,
+): Promise<ReadonlyMap<string, MessagePair>> {
+    const invitationId = UNAFFILIATED_INVITATION_ID;
+    const identityId = buildUnaffiliatedIdentity().id;
+    const granterId = 'XXZruirZyAOoRpNxaDnpSA';
+    const grantAt = MOCK_SEED_TIMESTAMP;
+    const operationId = generateIdentifier();
+    const grantEventId =
+        UNAFFILIATED_INVITATION_GRANT_EVENT_ID;
+    const messagePairs = new Map<string, MessagePair>();
+    messagePairs.set(
+        seedMessagePairKey('invitations', invitationId),
+        await formWriteMessagePair({
+            method: 'POST',
+            pathname: '/invitations',
+            routePattern: 'invitations',
+            routeSegments: ['invitations'],
+            pathSegments: ['invitations'],
+            headerFields: [],
+            body: {
+                invitationId,
+                grantEventId,
+                grantAt,
+                identity_id: identityId,
+            },
+            requesterIdentityId: granterId,
+            requestAt,
+            organization: undefined,
+            responseStatus: HTTP_OK,
+            responseBody: {
+                id: invitationId,
+                organization_id: STARK_ORGANIZATION,
+                identity_id: identityId,
+                at: grantAt,
+                state: 'pending',
+            },
+            operationId,
+        }),
+    );
+    const documentBody = {
+        organization_id: STARK_ORGANIZATION,
+        identity_id: identityId,
+        at: grantAt,
+    };
+    messagePairs.set(
+        seedMessagePairKey(
+            'invitations/:id', invitationId,
+        ),
+        await formWriteMessagePair({
+            method: 'PUT',
+            pathname: '/invitations/' + invitationId,
+            routePattern: 'invitations/:id',
+            routeSegments: ['invitations', ':id'],
+            pathSegments: ['invitations', invitationId],
+            headerFields: [],
+            body: documentBody,
+            requesterIdentityId: granterId,
+            requestAt,
+            organization: undefined,
+            responseStatus: HTTP_OK,
+            responseBody: {
+                id: invitationId,
+                ...documentBody,
+            },
+            operationId,
+        }),
+    );
+    return messagePairs;
+}
+
 // The instance chain cannot ride formSeedMessagePair: its
 // revisions share an address and its head depends on
 // (response_at, id) order, made deterministic by forming
@@ -2419,6 +2550,13 @@ export async function formMockDataMessagePairs(
             ),
         );
     }
+    // The unaffiliated identity's pending Stark
+    // invitation (operation + document pairs).
+    for (const [key, messagePair] of
+        await formInvitationSeedMessagePairs(requestAt)
+    ) {
+        messagePairs.set(key, messagePair);
+    }
     // WO-instance SoT Task 6: instance genesis + binding +
     // Review/Complete new-shape ops and revision pairs.
     for (const [key, messagePair] of
@@ -2430,7 +2568,7 @@ export async function formMockDataMessagePairs(
 }
 
 // Pass 1 for seedHumanCredentials (mock-data.ts), called for
-// BOTH seed paths: the 12 (mock-data) / 2 (bootstrap) identity-
+// BOTH seed paths: the 13 (mock-data) / 2 (bootstrap) identity-
 // credential document message pairs, formed from their OWN
 // post-hash bodies — content unknown until PBKDF2 resolves
 // inside seedHumanCredentials, which runs AFTER

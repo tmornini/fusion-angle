@@ -4,6 +4,18 @@ import type {
     Constraint,
 } from '../types.ts';
 
+// Seed attribute rows may carry an explicit ACL. Where the
+// arrays are absent, recordAttributeDocumentBodyOf
+// (api/routes.ts) stamps DEFAULT_ATTRIBUTE_ACL_ROLES into
+// the stored attribute document — storage always carries
+// both arrays explicitly, so absence here means "default",
+// never "unset".
+export type SeedRecordAttribute =
+    Omit<RecordAttributeEntity, 'organization_id'> & {
+        read_roles?: string[];
+        write_roles?: string[];
+    };
+
 // The seeded Records and their stable ids. The id consts are
 // shared with the record attributes, flow-record bindings, and
 // record state events, so they are exported. Fixed data; the
@@ -62,7 +74,7 @@ const foundedOnRangeMaxConstraint:
 }];
 
 export function buildRecordAttributes():
-    Omit<RecordAttributeEntity, 'organization_id'>[] {
+    SeedRecordAttribute[] {
     return [
         {
             id: 'CPJmMPXRaBIiNdGBofUPVg',
@@ -191,6 +203,13 @@ export function buildRecordAttributes():
                 'Critical',
             ],
             constraints: [],
+            // TEST-PLAN R21's restricted half: admin-only
+            // read AND write — ABSENT from a member's New
+            // instance form. Write tightens with read:
+            // what a member cannot read a member must not
+            // write.
+            read_roles: ['admin'],
+            write_roles: ['admin'],
         },
         {
             id: 'qDgLYtdgNBjEEoPqCoMATg',
@@ -200,6 +219,10 @@ export function buildRecordAttributes():
             sort_order: 4,
             options: [],
             constraints: [],
+            // TEST-PLAN R21's restricted half: default
+            // read, admin-only write — data-access=
+            // "readonly" for a member.
+            write_roles: ['admin'],
         },
     ];
 }
