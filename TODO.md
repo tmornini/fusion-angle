@@ -192,6 +192,8 @@ spec → plan → ship cycle, implemented sequentially. A
 
 Off the critical path; each with its oracle.
 
+- A full TEST-PLAN.md walk using serial subagents, so
+  session context stays short — TEST-PLAN.md `## The walk`
 - One client 401-recovery voice through
   `redirectToLogin()` with `?return=` —
   `tests/adapters-http-facade.test.ts`
