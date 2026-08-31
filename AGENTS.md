@@ -289,12 +289,12 @@ every other op.
 | DESIGN-SYSTEM.md | tokens, heat ramp, breakpoints, CSS |
 | FLOW-CANVAS.md | canvas FSM, camera MUST NOTs, hazards |
 | AUDIT.md | doctrine audit runbook |
+| COST-ESTIMATION.md | pre-AI replacement-cost runbook |
 | TEST-PLAN.md | three layers; the serial walk |
 | TODO.md | critical path, later work, sequencing |
 
 ## How we got here
 
-This was a Claude-only file that every migration
-appended pins to. It is now a cross-tool router
-behind the `CLAUDE.md` stub: commands, gates, and
-pointers. The maps live in the docs named above.
+A Claude-only file that every migration appended
+pins to; now a cross-tool router behind the
+`CLAUDE.md` stub. Maps live in the docs above.

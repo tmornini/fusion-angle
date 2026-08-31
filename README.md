@@ -58,6 +58,7 @@ needs no `npm install`.
 | DESIGN-SYSTEM.md | tokens and CSS |
 | FLOW-CANVAS.md | designer canvas |
 | AUDIT.md | doctrine audit |
+| COST-ESTIMATION.md | pre-AI replacement-cost runbook |
 | TEST-PLAN.md | three layers; the serial walk |
 | TODO.md | critical path, later work, sequencing |
 
