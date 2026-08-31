@@ -116,10 +116,26 @@ doctrine):
 
 ## Worktrees
 
-Do not use git worktrees. Work directly in the main checkout.
-Worktrees fragment review surface, hide state from the
-working tree, and add ceremony without buying isolation that
-small focused commits don't already provide.
+Every spec rides its own worktree — spec, plan, and each
+execution commit — created once the slug is known and
+before the first file. The slug names branch, directory,
+plan (`<slug>.md`), and spec (`<slug>-design.md`).
+
+```bash
+git worktree add .worktrees/<slug> -b <slug>
+cd .worktrees/<slug> && npm ci
+git rebase master     # amend until every commit is green
+./validate            # ./test-all before a build or walk
+cd -                  # the main checkout
+git merge --ff-only <slug>
+git worktree remove .worktrees/<slug> && git branch -d <slug>
+```
+
+`.worktrees/` is gitignored. Red on the branch is fine;
+red on landing is not. `--ff-only` fails if master moved
+— rebase again; `-d` refuses stranded work. Never `-D`,
+never force-push: rebase rewrites hashes, so branches
+stay local. One worker per worktree; master owns 8080.
 
 ## Subagents
 
@@ -164,6 +180,9 @@ cannot know:
 
 Proselytize first, then brief — the scripture loads via the
 skill, the patterns load via the prompt.
+
+Subagents work in the dispatching agent's worktree and never
+create their own — never pass the Agent tool `isolation`.
 
 ## Where things live
 
