@@ -1,6 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
+# If the SHA fits, you can't validate. A clean HEAD that
+# already passed is not run again. The stamp lives in the
+# shared git dir so every worktree of this clone sees it.
+STAMP="${VALIDATE_OK:-$(
+    git rev-parse --git-common-dir
+)/validate-ok}"
+HEAD_SHA=$(git rev-parse HEAD)
+PORCELAIN="${VALIDATE_PORCELAIN-$(git status --porcelain)}"
+if [ -z "$PORCELAIN" ] \
+    && [ -f "$STAMP" ] \
+    && [ "$(tr -d '[:space:]' < "$STAMP")" = "$HEAD_SHA" ]
+then
+    echo "already validated $HEAD_SHA"
+    exit 0
+fi
+
 npx --no-install tsc --noEmit -p tsconfig.json
 npx --no-install tsc --noEmit -p web-app/app/tsconfig.json
 
@@ -185,3 +201,7 @@ fi
 # API.svg and rooms are derived from routes[];
 # fail if they have drifted.
 ./generate-api-documentation --check
+
+if [ -z "$PORCELAIN" ]; then
+    printf '%s\n' "$HEAD_SHA" > "$STAMP"
+fi

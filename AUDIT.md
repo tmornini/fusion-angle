@@ -43,6 +43,9 @@ Dated specs and plans under `docs/superpowers/` are
 history after the run. They are not edited by later
 audits; a new run writes a new pair.
 
+An audit run rides one worktree — spec, plan, and report —
+across all three sessions.
+
 ## Scope
 
 - The unit of audit is the scripture section; the surface

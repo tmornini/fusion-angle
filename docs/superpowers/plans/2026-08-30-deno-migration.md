@@ -3,8 +3,8 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > superpowers:subagent-driven-development to implement this
 > plan task-by-task. Steps use checkbox (`- [ ]`) syntax for
-> tracking. Do not use git worktrees (AGENTS.md). Work on
-> master.
+> tracking. Ride this spec's worktree (AGENTS.md
+> § Worktrees).
 
 **Goal:** Retire Node from this repository. Deno 2.9.5 runs
 the gates, builds one self-contained executable, serves the
@@ -51,9 +51,8 @@ git show 9620d38c:docs/superpowers/specs/\
 
 ## Global Constraints
 
-- **Base:** master at `e1cbeac9`. Work on master; never
-  branch, never merge, never push, never use a worktree
-  (AGENTS.md § Worktrees).
+- **Base:** master at `e1cbeac9`. Ride a worktree; never
+  merge, never push (AGENTS.md § Worktrees).
 - **Deno 2.9.5, pinned.** Every `deno` invocation in a root
   script passes `--frozen`. Never `-A`; permissions are
   always named.

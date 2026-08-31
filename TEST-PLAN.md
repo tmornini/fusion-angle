@@ -26,6 +26,10 @@ Use a fresh local Postgres via Docker. Do not set
 `HTTP_SERVER_PORT` by hand — `./crank` mints them for its
 children and never prints them.
 
+The walk runs in the checkout under test. If another
+checkout holds 8080, crank on a free port; every
+`localhost:8080` below reads as that port.
+
 The browser layer is the **browser-use** plugin (MCP
 `browser-use`, or CLI `browser-use`). If that plugin is not
 connected and the CLI is not on PATH, **refuse the run.** Do

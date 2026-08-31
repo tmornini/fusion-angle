@@ -8,7 +8,7 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 ./test                 # Run automated tests (memory backend)
 ./test-browser         # Layer 2's browser half; needs Chrome
 ./test-all             # Layer 2: ./validate + ./test-browser
-./validate             # Type-check + tests + lint (works on dirty tree)
+./validate             # tsc + tests + lint (dirty ok; SHA-fit skips)
 ./build                # Server ZIP to ~/Desktop/
 ./build --no-zip dir/  # server-core + server.mjs to dir/
 ./build dir/           # Server ZIP to dir/ instead of ~/Desktop/
