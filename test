@@ -1,16 +1,29 @@
 #!/bin/bash
 set -euo pipefail
 
-# Instants render in LOCAL time, so date-formatting output shifts
-# with the runner's zone — a false prophet on a non-UTC machine.
-# Pin UTC for the main suite (deterministic), then verify the
-# instant-vs-calendar distinction under a fixed offset zone in
-# tests/tz/ (Honolulu, UTC-10, no DST). The tests/*.test.ts glob
+# Instants render in LOCAL time, so date-formatting
+# output shifts with the runner's zone — a false prophet
+# on a non-UTC machine. Pin UTC for the main suite
+# (deterministic), then verify the instant-vs-calendar
+# distinction under a fixed offset zone in tests/tz/
+# (Honolulu, UTC-10, no DST). The tests/*.test.ts glob
 # is non-recursive, so it excludes tests/tz/.
+#
+# --no-check: deno check covers tests/ in ./validate;
+# checking again at run time buys nothing.
+# Permissions, named: env (signing key, TZ, POSTGRES_URL
+# skips), read (fixtures, scripts, source walkers),
+# write (temp dirs for the HTTP tests), net (127.0.0.1
+# listeners), run (the metafile test's esbuild binary;
+# the serve and crank CLI pins spawn their scripts).
 export JWT_HMAC_SIGNING_KEY="${JWT_HMAC_SIGNING_KEY:-test-hmac-signing-key}"
-TZ=UTC node --strip-types \
-    --import ./tests/hmac-test-key.ts \
-    --test tests/*.test.ts
-TZ=Pacific/Honolulu node --strip-types \
-    --import ./tests/hmac-test-key.ts \
-    --test tests/tz/*.test.ts
+DENO_TEST=(
+    deno test --frozen --parallel --no-check
+    --allow-env --allow-read --allow-write
+    --allow-net --allow-run
+    --preload ./tests/hmac-test-key.ts
+    --preload ./tests/local-storage-stub.ts
+    --preload ./tests/session-storage-stub.ts
+)
+TZ=UTC "${DENO_TEST[@]}" tests/*.test.ts
+TZ=Pacific/Honolulu "${DENO_TEST[@]}" tests/tz/*.test.ts

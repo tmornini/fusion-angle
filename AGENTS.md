@@ -8,7 +8,7 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 ./test                 # Run automated tests (memory backend)
 ./test-browser         # Layer 2's browser half; needs Chrome
 ./test-all             # Layer 2: ./validate + ./test-browser
-./validate             # tsc + tests + lint (dirty ok; SHA-fit skips)
+./validate             # deno check + tests + lint (dirty ok; SHA skips)
 ./build                # Server ZIP to ~/Desktop/
 ./build --no-zip dir/  # server-core + server.mjs to dir/
 ./build dir/           # Server ZIP to dir/ instead of ~/Desktop/
@@ -38,6 +38,11 @@ docker compose down        # stop; the database dies with it
 ./measure --base-url URL  # Hit a running origin (needs --password)
 ```
 
+Deno 2.9.6 runs `./validate`, `./test`, `./test-postgres`,
+and both generators. `npm ci` installs what `./build`,
+`build-lib`, `./test-browser`, and `./crank` need —
+esbuild and postgres.js.
+
 **Commit before building.** `./build` and `./crank`
 require a clean working directory.
 Run `./validate` to catch type errors and lint issues;
@@ -62,20 +67,30 @@ bundle into the sandbox-allowed path.
 `localhost` is reachable from the sandbox, so the
 Chrome MCP tools can drive the page normally.
 
+The sandbox cannot write `~/Library/Caches/deno`
+either, so `export DENO_DIR="$TMPDIR/deno-dir"` before
+any `deno` command and before `./validate`. Both are
+agent-environment accommodations, never baked into a
+repo script: the operator's machine writes both
+defaults.
+
 ## Gates
 
-`./validate` composes `tsc --noEmit -p tsconfig.json`
-(the whole tree, Node + DOM) then `tsc --noEmit -p
-web-app/app/tsconfig.json` (the browser subset,
-`types: []`), then `./test` (two
-TZ passes: `TZ=UTC` on `tests/*.test.ts`, then
-`TZ=Pacific/Honolulu` on `tests/tz/*.test.ts`), then
+`./validate` composes `deno check --frozen api shared
+server tests web-app`, then `./test` — `deno test
+--frozen --parallel --no-check` with three preloads,
+in two TZ passes: `TZ=UTC` on `tests/*.test.ts`, then
+`TZ=Pacific/Honolulu` on `tests/tz/*.test.ts` — then
 78-character lint of code and scripts (not `.md`),
 the `org` identifier ban under `api/`,
 `web-app/`, `tests/`, and `shared/`, then
 `generate-schema-svg --check` and
-`generate-api-documentation --check`. Clean tree for
-`./build`, `./crank`, and `./measure`.
+`generate-api-documentation --check`, both `deno run`.
+Clean tree for `./build`, `./crank`, and `./measure`.
+
+`./test` takes 9.6 s where Node took 16.2 s.
+`--no-check` costs nothing: `deno check` has already
+covered `tests/`.
 
 `./test-browser` needs Chrome (`CHROME` or
 `CHROME_DEBUG_URL`); it bundles into `$TMPDIR` on any
@@ -239,27 +254,55 @@ record-attribute document id, never a table named
 
 ### `noUncheckedIndexedAccess`
 
-tsconfig enables this — array / object index access
+deno.json enables this — array / object index access
 returns `T | undefined`, requiring a `!` or a guard.
 
-### Two type universes
+### One type universe, no browser fence
 
-The root `tsconfig.json` is the superset and the
-editor's catch-all (`types: ["node"]`, DOM lib,
-`verbatimModuleSyntax`, `erasableSyntaxOnly`).
-`web-app/app/tsconfig.json` extends it and
-overrides only `types: []` — the pure browser
-subset, whose `include` globs reach only
-`web-app/`, `api/`, and `shared/`. A Node-only
-module under that reach goes on the file's
-`exclude` list and nowhere else; missing from the
-list fails the browser project on its Node
-imports. `server/` sits outside those globs
-entirely — `exclude` only prunes what `include`
-already selected, so nothing under `server/` needs
-an entry. `erasableSyntaxOnly` and
-`verbatimModuleSyntax` are what `node --strip-types`
-requires at runtime, enforced at `tsc`.
+`deno.json` is the only project: `strict`, DOM plus
+`deno.ns`, `verbatimModuleSyntax`, `erasableSyntaxOnly`.
+The `deno check --frozen api shared server tests
+web-app` roots succeed the root project's `include`. The
+browser project's `exclude` registry has no successor,
+and neither does the fence it served.
+
+Ambient Node globals unlock per INVOCATION, not per
+file: one `node:` specifier anywhere in the checked
+graph gives `process` to every file in that check, and a
+type-only `import type … from 'node:fs'` is enough.
+`npm:` does not unlock — `npm:postgres` and the bare
+`postgres` mapping both still reject `process`.
+`web-app` carries six `node:` importers of its own, so
+`deno check … web-app` passes a file whose only line
+is `process.env.HOME`. Nothing under `web-app/` is
+type-fenced against `process` today, and `Deno.*` never
+was: `deno.ns` sits in the lib array.
+`tests/browser-fence.test.ts` checks a hermetically
+isolated file, so it passes whatever the real property
+is — a green run is not evidence of a fence.
+
+The browser is what catches a stray `process` or `Deno.*`
+in client code now — a runtime `ReferenceError` that
+`./test-browser` (Layer 2) and the walk (Layer 3) see
+only on a path they exercise. TODO.md carries the oracle
+for a gate that would restore the fence.
+
+`erasableSyntaxOnly` and `verbatimModuleSyntax` are what
+`node --strip-types` requires at runtime, and `deno check`
+enforces both — an enum or namespace is TS1294. They
+still bind: `build-lib`, `test-browser`, `measure`,
+`postgres-seed`, `postgres-wipe`, and `compose.yaml` all
+still run `node --strip-types`, so a lapse breaks a build,
+a seed, or a wipe rather than the gate.
+
+### `localStorage` is real under Deno
+
+Deno ships a live Web Storage global whose store
+persists across processes, so assigning
+`globalThis.localStorage` is ignored.
+`tests/local-storage-stub.ts` installs the writable
+in-memory fake the tests then stub. `./test` loads it
+as a `--preload`, not an import.
 
 ### Required env is never logged
 

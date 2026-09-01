@@ -158,8 +158,17 @@ test(
             poster.postMessage({ kind: 'full' });
             // BroadcastChannel delivery and the
             // re-run init's fetch/render pipeline
-            // are asynchronous; drain generously.
-            for (let i = 0; i < 25; i++) {
+            // are asynchronous and not fixed in
+            // length, so a tick count is a guess;
+            // wait for the condition instead,
+            // bounded by a deadline.
+            const deadline = Date.now() + 5000;
+            while (
+                !listStub.innerHTML.includes(
+                    'Cross-tab idea',
+                )
+                && Date.now() < deadline
+            ) {
                 await new Promise(
                     r => setImmediate(r),
                 );

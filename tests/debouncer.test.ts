@@ -18,6 +18,7 @@ test(
     'schedule waits the delay; the last scheduled'
     + ' save wins the burst',
     (t) => {
+        t.after(() => { t.mock.timers.reset(); });
         t.mock.timers.enable({
             apis: ['setTimeout'],
         });
@@ -36,6 +37,7 @@ test(
     'flush runs the pending save immediately and'
     + ' cancels the timer — no double fire',
     (t) => {
+        t.after(() => { t.mock.timers.reset(); });
         t.mock.timers.enable({
             apis: ['setTimeout'],
         });
@@ -52,6 +54,7 @@ test(
 test(
     'flush with nothing pending is a no-op',
     (t) => {
+        t.after(() => { t.mock.timers.reset(); });
         t.mock.timers.enable({
             apis: ['setTimeout'],
         });
@@ -71,6 +74,7 @@ test(
     'a fired save clears pending — a later flush'
     + ' does not replay it',
     (t) => {
+        t.after(() => { t.mock.timers.reset(); });
         t.mock.timers.enable({
             apis: ['setTimeout'],
         });
@@ -87,6 +91,7 @@ test(
 test(
     'schedule after a fire starts a fresh burst',
     (t) => {
+        t.after(() => { t.mock.timers.reset(); });
         t.mock.timers.enable({
             apis: ['setTimeout'],
         });
@@ -104,6 +109,7 @@ test(
     'isPending tracks a scheduled save until fire'
     + ' or flush',
     (t) => {
+        t.after(() => { t.mock.timers.reset(); });
         t.mock.timers.enable({
             apis: ['setTimeout'],
         });

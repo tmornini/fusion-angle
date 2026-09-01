@@ -5,4 +5,5 @@ set -euo pipefail
 # (api/db.ts, api/types.ts, api/schema-postgres.ts).
 # Pass --check to fail instead of write when the SVG
 # is stale; ./validate uses that to gate drift.
-node --strip-types web-app/app/generate-schema-svg.ts "$@"
+deno run --frozen --allow-read --allow-write=SCHEMA.svg \
+    web-app/app/generate-schema-svg.ts "$@"

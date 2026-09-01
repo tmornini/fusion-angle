@@ -1,4 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-node --strip-types \
+deno run --frozen --allow-read \
+    --allow-write=web-app/api-documentation \
     web-app/app/generate-api-documentation.ts "$@"

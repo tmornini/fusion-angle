@@ -42,6 +42,8 @@ function runServe(
             PATH: pathWithDockerStub(stamp),
             HOME: process.env['HOME'] ?? '',
             TMPDIR: process.env['TMPDIR'] ?? '/tmp',
+            POSTGRES_URL: '',
+            JWT_HMAC_SIGNING_KEY: '',
             ...extraEnv,
         },
     });

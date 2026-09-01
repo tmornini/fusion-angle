@@ -127,11 +127,8 @@ export type MeasureCli = MeasureCliFlags & {
     budgetSigmas: number;
 };
 
-export type MeasureEnv = {
-    MEASURE_PASSWORD?: string;
-    POSTGRES_URL?: string;
-    JWT_HMAC_SIGNING_KEY?: string;
-};
+export type MeasureEnv =
+    Readonly<Record<string, string | undefined>>;
 
 export type ParseMeasureResult =
     | { kind: 'ok'; cli: MeasureCli }

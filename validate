@@ -17,8 +17,8 @@ then
     exit 0
 fi
 
-npx --no-install tsc --noEmit -p tsconfig.json
-npx --no-install tsc --noEmit -p web-app/app/tsconfig.json
+deno --version
+deno check --frozen api shared server tests web-app
 
 ./test
 
@@ -52,8 +52,9 @@ DOC_LINE_FAIL=
 # TODO.md is exempt too: it is the single home for later
 # work, and the backlog grows.
 # CLAUDE.md is the one-line stub and is not gated.
-# AUDIT.md and FLOW-CANVAS.md sit above the original
-# estimate; the ceiling follows the rewritten size.
+# AGENTS.md, AUDIT.md, and FLOW-CANVAS.md sit above the
+# original estimate; the ceiling follows the rewritten
+# size.
 while read -r FILE MAX; do
     [ -z "${FILE}" ] && continue
     N=$(wc -l < "${FILE}" | tr -d ' ')
@@ -62,7 +63,7 @@ while read -r FILE MAX; do
 "
     fi
 done <<'EOF'
-AGENTS.md 300
+AGENTS.md 350
 README.md 150
 ARCHITECTURE.md 450
 SCHEMA.md 200

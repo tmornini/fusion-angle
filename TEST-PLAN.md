@@ -9,7 +9,7 @@ is exploration, and nothing rides on its result.
 
 | Layer | Command | Runs | Standing |
 |---|---|---|---|
-| 1 | `./validate` | AT1–AT3: both `tsc` projects, `./test` in two TZ passes, the lints, the two drift gates. Chrome-free, Postgres-free | Gate: every commit |
+| 1 | `./validate` | AT1–AT3: the one `deno check`, `./test` in two TZ passes, the lints, the two drift gates. Chrome-free, Postgres-free | Gate: every commit |
 | 2 | `./test-all` | Layer 1, then `./test-browser` (AT5) | Gate: the operator's, before `./build`, a deploy, or a walk; `./crank` enforces it for the walk |
 | 3 | "run the test plan" | `./crank --mock-data 8080` — Layer 1, AT4 `./test-postgres`, AT5 — then one explorer walks A4 through SV | Exploration; nothing rides on its result |
 
@@ -239,20 +239,21 @@ first. AT5 is Layer 2's browser suite. AT4 is crank's
 runs all five through `./crank`; the walk never invokes
 them separately. Abort on any AT red.
 
-- [ ] **AT1** Run `npx tsc --noEmit -p tsconfig.json`,
-  then `npx tsc --noEmit -p web-app/app/tsconfig.json`.
-  PASS: both exit 0; no diagnostics emitted.
+- [ ] **AT1** Run `deno check --frozen api shared server
+  tests web-app`. PASS: exits 0; no diagnostics emitted.
   Pin: exploratory — the command is its own witness
-- [ ] **AT2** Run `./test` (delegates to `TZ=UTC node --test --strip-types tests/*.test.ts` for the main suite, then `TZ=Pacific/Honolulu node --test --strip-types tests/tz/*.test.ts` for the timezone suite). PASS: exits 0; the runner's final summary reports `pass N` with `fail 0` for both suites.
+- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check tests/*.test.ts` for the main suite, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; both suites report `ok | N passed | 0 failed`, today `ok | 3475 passed | 0 failed | 7 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite.
   Pin: exploratory — the command is its own witness
-- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `build`, `serve`, `crank`, `test`, `test-postgres`, `validate`, `generate-schema-svg`, `generate-api-documentation`, `measure`, `postgres-wipe`, `postgres-lib`, and `postgres-seed`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
+- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1's `deno check --frozen api shared server tests web-app` and AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `build`, `serve`, `crank`, `test`, `test-postgres`, `validate`, `generate-schema-svg`, `generate-api-documentation`, `measure`, `postgres-wipe`, `postgres-lib`, and `postgres-seed`, plus `deno.json`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
   Pin: exploratory — the command is its own witness
 - [ ] **AT4** Crank sets `POSTGRES_URL` and
   runs `./test-postgres` after postgres is
   up and before `./build --no-zip`. The
   suite creates and drops its own
   `fusion_test_*` schema. PASS: exits 0,
-  `fail 0`. `./validate` stays Postgres-free.
+  `ok | 51 passed | 0 failed` across the
+  seven files. `./validate` stays
+  Postgres-free.
   Pin: exploratory — the command is its own witness
 - [ ] **AT5** Crank runs `./test-browser` after AT4 and
   before `./build --no-zip`. It bundles the client into

@@ -28,3 +28,12 @@ Object.defineProperty(globalThis, 'localStorage', {
     writable: true,
     configurable: true,
 });
+
+// Force module scope: this file and
+// session-storage-stub.ts each declare a top-level
+// `store` with no import or export. Deno loads both as ES
+// modules regardless, but TypeScript tooling outside the
+// Deno gate — the editor's language server, which has no
+// tsconfig.json to read since the cutover — treats them as
+// one global script and rejects the second `store`.
+export {};

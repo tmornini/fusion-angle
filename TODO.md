@@ -436,8 +436,8 @@ Off the critical path; each with its oracle.
   directories under the root superset, where `process`
   resolves. Move it to `web-app/tsconfig.json`. Six
   live references (`validate`, TEST-PLAN.md AT1,
-  AGENTS.md's Gates paragraph, AGENTS.md's Two type
-  universes invariant, `tests/tsconfig-covenants.test.ts`,
+  AGENTS.md's Gates paragraph, AGENTS.md's one type
+  universe invariant, `tests/tsconfig-covenants.test.ts`,
   and this file's own Node-only-modules-by-directory
   Oracle above) plus the tiers plan's path
 - GPU flag in the Layer 2 launcher — `launchChrome`
@@ -1224,6 +1224,19 @@ Off the critical path; each with its oracle.
   `invitations/index.html` at next boot (TEST-PLAN
   B25–B29 driven live); restores B28's original
   "restore the deleted membership row" branch
+- The browser type fence is gone, not weakened. Ambient
+  Node globals unlock per `deno check` invocation: one
+  `node:` specifier anywhere in the checked graph gives
+  `process` to every file in it, and `web-app` carries
+  six of its own, so no arrangement of the gate's roots
+  fences it. `npm:` does not unlock; `Deno.*` never
+  fenced at all, via `deno.ns`.
+  `tests/browser-fence.test.ts` checks an isolated file,
+  so it passes while the property is false. Restoring
+  the fence needs a second `deno check` over the
+  browser-reachable subset alone, excluding the
+  Node-only modules the retired `exclude` named. Oracle:
+  that invocation rejects `process` with TS2591.
 
 ## Sequencing
 

@@ -5,7 +5,14 @@ if [ -z "${POSTGRES_URL:-}" ]; then
     exit 1
 fi
 export SCHEMA_NAME="fusion_test_$(date +%s)_$$"
-TZ=UTC node --test --strip-types \
+# No --parallel: the seven files share one Postgres and
+# run serially. No preloads: the files bring their own
+# fixtures. Permissions match ./test minus write.
+DENO_PG_TEST=(
+    deno test --frozen --no-check
+    --allow-env --allow-read --allow-net --allow-run
+)
+TZ=UTC "${DENO_PG_TEST[@]}" \
     tests/pg-acceptance.test.ts \
     tests/pg-races.test.ts \
     tests/pg-boot.test.ts \
