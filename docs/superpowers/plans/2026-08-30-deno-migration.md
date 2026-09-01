@@ -6,7 +6,7 @@
 > tracking. Ride this spec's worktree (AGENTS.md
 > § Worktrees).
 
-**Goal:** Retire Node from this repository. Deno 2.9.5 runs
+**Goal:** Retire Node from this repository. Deno 2.9.6 runs
 the gates, builds one self-contained executable, serves the
 product, drives the tooling, runs the suite, and — if the
 gate in Part 6 opens — talks to Postgres without an `npm:`
@@ -19,17 +19,17 @@ while every artifact stays Node. Part 2 replaces the ZIP of
 `package.json`. Part 3 ports `server/` from `node:http` to
 `Deno.serve`. Part 4 ports the seven Node-only modules under
 `web-app/app/` and `postgres-lib`'s eight inline programs.
-Part 5 converts 408 test files from `node:test` to
+Part 5 converts 409 test files from `node:test` to
 `Deno.test`. Part 6 is optional and opens only if its
 decision gate says so. Each part ends green: `./validate`,
 `./test-postgres`, and `./test-all` all pass before the next
 part begins.
 
-**Tech Stack:** Deno 2.9.5 (`deno check`, `deno test`,
+**Tech Stack:** Deno 2.9.6 (`deno check`, `deno test`,
 `deno bundle`, `deno compile`, `deno info`, `deno eval`),
 TypeScript ES2024 strict, Bash, `npm:postgres@3.4.9`,
 `jsr:@std/path`, `jsr:@std/assert`, `jsr:@std/testing`,
-Docker (`denoland/deno:2.9.5`), Postgres 18.
+Docker (`denoland/deno:2.9.6`), Postgres 18.
 
 **Spec:** six scrolls, read in this order — each part of this
 plan names its own:
@@ -51,28 +51,34 @@ git show 9620d38c:docs/superpowers/specs/\
 
 ## Global Constraints
 
-- **Base:** master at `e1cbeac9`. Ride
+- **Base:** master at `86b079e6`. Ride
   `.worktrees/2026-08-30-deno-migration`; never merge,
   never push (AGENTS.md § Worktrees). Subagents work in
   that worktree and never create their own.
-- **Deno 2.9.5, pinned.** Every `deno` invocation in a root
+- **Deno 2.9.6, pinned.** Every `deno` invocation in a root
   script passes `--frozen`. Never `-A`; permissions are
-  always named.
-- **The oracle.** Measured at `e1cbeac9` under Node
-  v26.7.0, `./test`:
+  always named. The operator ruled 2.9.6 acceptable on
+  2026-08-30. Specs 1 and 2 name 2.9.5 and are frozen, so
+  this pin supersedes them.
+- **The oracle.** Measured at `86b079e6` under Node
+  v26.8.1, `./test`:
 
   | Suite | tests | pass | fail | skipped | duration |
   |---|--:|--:|--:|--:|--:|
-  | `tests/*.test.ts` (TZ=UTC) | 3476 | 3469 | 0 | 7 | 17.2 s |
+  | `tests/*.test.ts` (TZ=UTC) | 3484 | 3477 | 0 | 7 | 16.2 s |
   | `tests/tz/*.test.ts` (Honolulu) | 8 | 8 | 0 | 0 | 0.16 s |
 
   Under Deno the skipped tests report as **ignored** and the
-  summary reads `ok | 3469 passed | 0 failed | 7 ignored`.
+  summary reads `ok | 3477 passed | 0 failed | 7 ignored`.
   A count that moves is a finding, never a rounding. Task 1
   re-measures and any later task that changes the counts
   must name which tests moved and why.
-  `./test-browser`'s ten files are green at `e1cbeac9` and
-  must stay green.
+  `./test-browser`'s ten files are green at `86b079e6` and
+  must stay green. Re-cut from `e1cbeac9` (3476 / 3469) on
+  2026-08-30: master advanced 20 commits, five of which add
+  8 tests and remove none; `skipped` is unchanged. The R6
+  family split is corrected too — it was miscounted, not
+  moved (`api-*` and `validators-*` total 113 at both).
 - **One concern per commit.** Subject one line, ≈50 chars,
   present-tense imperative, no body prose. Every commit
   message ends with exactly these two trailer lines:
@@ -149,11 +155,11 @@ it.
 | # | Ruling | Cost if wrong |
 |---|---|---|
 | R1 | **Spec 2, operator tools:** one `fusion-angle` binary whose first argument selects `serve`, `seed`, or `wipe`. The spec recommends this; the ZIP becomes `fusion-angle-${SHA}.zip` and is self-sufficient (unzip, seed, serve). | Three compiles and three ~100 MB binaries instead of one. Task 21's dispatcher and Task 22's ZIP name are re-cut; nothing else moves. |
-| R2 | **Spec 2, runtime image:** `denoland/deno:2.9.5` for both stages. The spec recommends this; the healthcheck cannot lie about the runtime. | A larger runtime image. Swap to `debian:bookworm-slim` plus `curl` and re-cut the healthcheck — Task 25 only. |
+| R2 | **Spec 2, runtime image:** `denoland/deno:2.9.6` for both stages. The spec recommends this; the healthcheck cannot lie about the runtime. | A larger runtime image. Swap to `debian:bookworm-slim` plus `curl` and re-cut the healthcheck — Task 25 only. |
 | R3 | **Spec 3, the 500 body:** an explicit `onError` handler, never `Deno.serve`'s default. `http-server.test.ts` pins `{"error":"internal error"}` with `Cache-Control: no-store`; a framework default is not a covenant. | None. The explicit handler is strictly more controlled than the default. |
 | R4 | **Spec 3, the navigate tests:** `http-static-directory-index.test.ts` keeps `node:http` until Part 5. `Sec-*` is a forbidden request header name, so `fetch` cannot set `sec-fetch-mode`. Task 29 probes it; if Deno permits it, the change is Part 5's, not Part 3's. | One test file ports a part later than it could have. |
 | R5 | **Spec 4, `jsr:@std/path`:** adopt it — the repository's first `jsr:` dependency, pinned in the import map and `deno.lock`. `measure.ts` and `cdp-client.ts` do real path work (`join`, `dirname`, `resolve`, `extname`, `relative`); hand-rolled `URL` arithmetic for `relative` and `extname` is string code nobody asked for. | One dependency. Removing it means hand-rolling five helpers in one module. |
-| R6 | **Spec 5, codemod commits:** one commit per test family, each green. The spec recommends this. The families measured at `e1cbeac9` are `api-*` 109, `adapters-*` 50, `flow-*` 26, `presenter-*` 24, `http-*` 17, `drift-*` 16, `mock-*` 13, `derive-*` 13, `validators-*` 6, `pg-*` 6, `backend-*` 5, and 111 unprefixed. | Eleven review surfaces instead of one. Reversible by squashing. |
+| R6 | **Spec 5, codemod commits:** one commit per test family, each green. The spec recommends this. The families measured at `86b079e6` are `api-*` 108, `adapters-*` 50, `flow-*` 26, `presenter-*` 24, `http-*` 17, `drift-*` 16, `mock-*` 13, `derive-*` 13, `validators-*` 5, `pg-*` 6, `backend-*` 5, and 114 unprefixed. | Eleven review surfaces instead of one. Reversible by squashing. |
 | R7 | **Spec 5, `hmac-test-key.ts`:** survives as a preload. Converting 400 files to import it explicitly is churn against a preload that already works under both runtimes. | The preload stays where an explicit import would have been clearer. One later commit converts it. |
 | R8 | **Spec 6, whether at all:** not pre-committed. Task 56 is a decision gate with named criteria, run after Part 5. If it says no, this plan ends at Task 55 and the spec stays an outline. | None. The gate is the spec's own instruction. |
 | R9 | **TODO.md placement:** the migration appends as critical-path **item 13**, and one `## Sequencing` line records that it runs ahead of items 1–12. Items are NOT renumbered: `## Sequencing` cross-references items by number (`8 → 6`, `5 → 10`, `Item 3's token-at-rest hashing`), and inserting at position 1 would silently break all three. | The critical path reads in an order it is not executed in, corrected only by the Sequencing line. A renumber pass touching `## Sequencing` undoes it. |
@@ -253,14 +259,14 @@ Node until Part 2.
 
 ---
 
-### Task 1: Install Deno 2.9.5 and record the Node oracle
+### Task 1: Install Deno 2.9.6 and record the Node oracle
 
 **Files:** none. This task commits nothing. Its deliverable
 is two recorded measurements every later task reads.
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `deno` on `PATH` at exactly 2.9.5, and the
+- Produces: `deno` on `PATH` at exactly 2.9.6, and the
   Node baseline counts written into the task report.
 
 **This task needs the operator.** Installing a toolchain
@@ -278,15 +284,15 @@ deno --version 2>/dev/null || echo "DENO ABSENT"
 If absent, the operator runs:
 
 ```bash
-curl -fsSL https://deno.land/install.sh | sh -s v2.9.5
+curl -fsSL https://deno.land/install.sh | sh -s v2.9.6
 ```
 
 - [ ] **Step 2: Verify the exact version**
 
 Run: `deno --version`
-Expected: the first line reads `deno 2.9.5` exactly. A
+Expected: the first line reads `deno 2.9.6` exactly. A
 different patch is a BLOCKED report, not a shrug — every
-measurement in this plan is against 2.9.5.
+measurement in this plan is against 2.9.6.
 
 - [ ] **Step 3: Record the Node oracle**
 
@@ -297,18 +303,18 @@ measurement in this plan is against 2.9.5.
 Expected, and what the report must contain verbatim:
 
 ```
-ℹ tests 3476
-ℹ pass 3469
+ℹ tests 3484
+ℹ pass 3477
 ℹ fail 0
 ℹ skipped 7
-ℹ duration_ms 17210.856625      (yours will differ)
+ℹ duration_ms 16226.231      (yours will differ)
 ℹ tests 8
 ℹ pass 8
 ℹ fail 0
 ℹ skipped 0
 ```
 
-If `tests` is not 3476 or `pass` is not 3469, STOP and
+If `tests` is not 3484 or `pass` is not 3477, STOP and
 report: the tree moved since this plan was written, and the
 oracle in Global Constraints must be re-cut before any task
 proceeds.
@@ -381,19 +387,19 @@ Append after item 12, before the `## Later work` heading:
     strictly 1 → 6 (3 and 4 may swap after Spec 2's
     measurements; Spec 6 is optional and opens only if
     its decision gate says so). Spec 1 moves `./validate`
-    and `./test` to Deno 2.9.5; Spec 2 replaces the
+    and `./test` to Deno 2.9.6; Spec 2 replaces the
     `server.mjs` ZIP with one `deno compile` binary and
     deletes `package.json`; Spec 3 puts `server/` on
     `Deno.serve`; Spec 4 ports the seven Node-only
     modules under `web-app/app/` and `postgres-lib`'s
-    eight inline programs; Spec 5 moves 408 test files
+    eight inline programs; Spec 5 moves 409 test files
     to `Deno.test`; Spec 6 would replace
     `npm:postgres@3.4.9` with `jsr:@db/postgres`. The
     six specs are `docs/superpowers/specs/2026-08-21-deno-*`;
     the plan is
     `docs/superpowers/plans/2026-08-30-deno-migration.md`;
     the roadmap they inherit is `9620d38c`. Oracle: the
-    suite counts hold at every step — 3469 passing,
+    suite counts hold at every step — 3477 passing,
     7 ignored, `tests/tz/` 8, `./test-browser` ten files
     green.
 ```
@@ -452,7 +458,7 @@ MSG
 - Modify: `validate` (the second `awk "$AWK_LINT"` list)
 
 **Interfaces:**
-- Consumes: Deno 2.9.5 from Task 1.
+- Consumes: Deno 2.9.6 from Task 1.
 - Produces: the import map (`postgres`, `esbuild`) and the
   compiler options every later `deno` invocation resolves
   against. **Also produces four measurements** Tasks 6, 9,
@@ -1174,12 +1180,12 @@ time ./test 2>&1 | tail -20
 Expected, from Global Constraints:
 
 ```
-ok | 3469 passed | 0 failed | 7 ignored
+ok | 3477 passed | 0 failed | 7 ignored
 ```
 
 for the main suite, and `8 passed | 0 failed` for
 `tests/tz/`. Record the wall time — Task 15 puts it in
-AGENTS.md beside Node's 17.2 s.
+AGENTS.md beside Node's 16.2 s.
 
 **If any count differs from the oracle, STOP.** Name every
 test that moved. Do not weaken a test to reach the number:
@@ -1433,7 +1439,7 @@ deno --version
 deno check --frozen api shared server tests web-app
 ```
 
-`deno --version` is evidence, not a gate: the pinned 2.9.5
+`deno --version` is evidence, not a gate: the pinned 2.9.6
 is visible in every transcript.
 
 - [ ] **Step 3: Verify**
@@ -1443,7 +1449,7 @@ is visible in every transcript.
 ```
 
 Expected: exits 0, and the transcript opens with
-`deno 2.9.5` followed by a clean `deno check`.
+`deno 2.9.6` followed by a clean `deno check`.
 
 - [ ] **Step 4: Commit**
 
@@ -1647,7 +1653,7 @@ become about 8, since there is one universe now.
 
 - [ ] **Step 1: AGENTS.md — the command block**
 
-Add one line stating that Deno 2.9.5 is the toolchain for
+Add one line stating that Deno 2.9.6 is the toolchain for
 `./validate` and `./test`, and that `./build`,
 `./test-browser`, and `./crank` still need `npm ci` until
 Part 2 lands.
@@ -1660,7 +1666,7 @@ paragraph (lines 67–70) with
 Name `./test` as `deno test --parallel` with the two
 preloads and `--no-check`, and both generator gates as
 `deno run`. Add the measured wall time from Task 9 beside
-Node's 17.2 s baseline.
+Node's 16.2 s baseline.
 
 - [ ] **Step 3: AGENTS.md — § `noUncheckedIndexedAccess`**
 
@@ -1701,7 +1707,7 @@ not an import.
 - [ ] **Step 6: README.md — § Getting Started**
 
 Today's paragraph says `npm ci` installs tsc. After Task 14
-it does not. Rewrite the section to install Deno 2.9.5 and
+it does not. Rewrite the section to install Deno 2.9.6 and
 to say plainly that `npm ci` remains for `./build`,
 `build-lib`, and `./test-browser` until Part 2, and what it
 still installs (esbuild, postgres.js 3.4.9).
@@ -1761,7 +1767,7 @@ Before Part 2 begins, all of these hold. The controller
 runs the first three and asks the operator for the rest.
 
 ```bash
-deno --version                     # 2.9.5
+deno --version                     # 2.9.6
 ./validate                         # exit 0, Node called nowhere
 grep -c node validate test test-postgres \
     generate-schema-svg generate-api-documentation   # 0 ×5
@@ -1773,7 +1779,7 @@ grep -c node validate test test-postgres \
   boot under Node (operator).
 - `./test-browser` still passes under Node — ten files
   green (operator, `!`).
-- The oracle holds: `3469 passed | 0 failed | 7 ignored`,
+- The oracle holds: `3477 passed | 0 failed | 7 ignored`,
   `tests/tz/` 8 passed. If Task 13 took branch 2b, the
   count is 3 lower and the controller has recorded the new
   oracle.
@@ -1794,7 +1800,7 @@ argument selects `serve`, `seed`, or `wipe`. The ZIP becomes
 `fusion-angle-${SHA}.zip` and is self-sufficient — unzip,
 seed, serve.
 
-**Ruling R2 applies:** `denoland/deno:2.9.5` for both Docker
+**Ruling R2 applies:** `denoland/deno:2.9.6` for both Docker
 stages.
 
 ---
@@ -1814,7 +1820,7 @@ The spec's `## Open Items` says "the plan's first tasks
 verify". This is that task. Each probe names what changes if
 the answer is not the expected one.
 
-- [ ] **Step 1: PROBE 1 — is `git` in `denoland/deno:2.9.5`?**
+- [ ] **Step 1: PROBE 1 — is `git` in `denoland/deno:2.9.6`?**
 
 The builder stage runs `./build`, which gates on a clean
 tree (`git status --porcelain`) and reads
@@ -1823,7 +1829,7 @@ tree (`git status --porcelain`) and reads
 Operator runs, with `!`:
 
 ```bash
-docker run --rm denoland/deno:2.9.5 \
+docker run --rm denoland/deno:2.9.6 \
     sh -c 'git --version || echo "GIT ABSENT"'
 ```
 
@@ -3265,19 +3271,19 @@ MSG
   executable. Task 27 posts Render jobs against the same
   entry.
 
-**Ruling R2 applies:** `denoland/deno:2.9.5` for both
+**Ruling R2 applies:** `denoland/deno:2.9.6` for both
 stages. One image family, and the healthcheck cannot lie
 about the runtime.
 
 - [ ] **Step 1: Rewrite the Dockerfile**
 
 ```dockerfile
-FROM denoland/deno:2.9.5 AS builder
+FROM denoland/deno:2.9.6 AS builder
 WORKDIR /srv
 COPY . .
 RUN ./build --no-zip render-out/
 
-FROM denoland/deno:2.9.5 AS runtime
+FROM denoland/deno:2.9.6 AS runtime
 WORKDIR /srv
 COPY --from=builder /srv/render-out ./render-out
 USER deno
@@ -4539,7 +4545,7 @@ time deno run --allow-run "$TMPDIR/unrefprobe.ts"
 ```
 
 Expected: returns immediately, not after 5 s. Record
-whether `unref()` exists on `Deno.ChildProcess` at 2.9.5
+whether `unref()` exists on `Deno.ChildProcess` at 2.9.6
 and whether the parent exits. If it does not, Task 42 keeps
 the child referenced and closes it explicitly in a
 `finally` — which is better practice anyway, and Part 5's
@@ -5246,7 +5252,7 @@ nowhere — confirm that here rather than assuming it.
 
 - [ ] **Step 2: Write the changes**
 
-State plainly in AGENTS.md that Deno 2.9.5 is the only
+State plainly in AGENTS.md that Deno 2.9.6 is the only
 runtime, that `npm` is not installed and not needed, and
 that `node:crypto` scrypt in `server/scrypt-hash.ts` is the
 one named import from Node's namespace — with the day it
@@ -5303,7 +5309,7 @@ Operator, with `!`:
 
 **Spec:** `docs/superpowers/specs/2026-08-21-deno-test-idiom-design.md`
 
-The 408 test files speak Deno: `Deno.test` and
+The 409 test files speak Deno: `Deno.test` and
 `jsr:@std/assert` replace `node:test` and `node:assert`;
 per-test fixtures that restore replace module-level stubs;
 the resource and op sanitizers are on.
@@ -5316,16 +5322,16 @@ explicitly added (Tasks 17, 22, and possibly 21) or removed
 reason is a finding.
 
 **Ruling R6 applies:** one commit per family, each green.
-The families measured at `e1cbeac9`:
+The families measured at `86b079e6`:
 
 | Family | Files | Family | Files |
 |---|--:|---|--:|
-| `api-*` | 109 | `mock-*` | 13 |
+| `api-*` | 108 | `mock-*` | 13 |
 | `adapters-*` | 50 | `derive-*` | 13 |
-| `flow-*` | 26 | `validators-*` | 6 |
+| `flow-*` | 26 | `validators-*` | 5 |
 | `presenter-*` | 24 | `pg-*` | 6 |
 | `http-*` | 17 | `backend-*` | 5 |
-| `drift-*` | 16 | unprefixed | 111 |
+| `drift-*` | 16 | unprefixed | 114 |
 
 Plus `tests/tz/` (2) and `tests/browser/` (10).
 
@@ -5556,11 +5562,11 @@ Expected: the oracle, unchanged.
 
 ---
 
-### Task 47: Convert the 111 unprefixed files and `tests/tz/`
+### Task 47: Convert the 114 unprefixed files and `tests/tz/`
 
 **Files:**
 - Modify: every `tests/*.test.ts` not matched by a family
-  prefix (111), and `tests/tz/*.test.ts` (2)
+  prefix (114), and `tests/tz/*.test.ts` (2)
 
 **Interfaces:**
 - Consumes: Task 45's codemod.
@@ -5591,11 +5597,11 @@ ls tests/*.test.ts | grep -vE \
 wc -l "$TMPDIR/unprefixed.txt"
 ```
 
-Expected: 111.
+Expected: 114.
 
 - [ ] **Step 2: Convert in three batches of about 37**
 
-A 111-file diff is not a review surface. Three commits,
+A 114-file diff is not a review surface. Three commits,
 each green:
 
 ```bash
@@ -6152,7 +6158,7 @@ Expected: the oracle, no sanitizer diagnostics anywhere.
 { time ./test > /dev/null 2>&1 ; } 2>&1 | grep real
 ```
 
-Compare against Part 1's Deno figure and Node's 17.2 s
+Compare against Part 1's Deno figure and Node's 16.2 s
 baseline. Task 55 documents all three.
 
 - [ ] **Step 5: Commit**
@@ -6185,7 +6191,7 @@ MSG
 
 - **AGENTS.md § Gates:** the suite is `Deno.test` with
   `@std/assert`, the sanitizers on, two preloads, and the
-  two TZ passes. Record the wall time beside Node's 17.2 s
+  two TZ passes. Record the wall time beside Node's 16.2 s
   and Part 1's compat figure — three numbers, all measured.
 - **AGENTS.md § Where things live:** `tests/` gains
   `tests/fixtures/`; say what it holds.

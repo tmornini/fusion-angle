@@ -36,7 +36,7 @@ LONG_LINES=$( {
         validate generate-schema-svg \
         generate-api-documentation measure \
         postgres-wipe postgres-lib postgres-seed \
-        crank \
+        crank deno.json \
         Dockerfile compose.yaml .dockerignore
 } )
 

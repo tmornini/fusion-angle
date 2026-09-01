@@ -5,7 +5,7 @@ file by shipping; `## Close protocol` is the exit.
 
 ## Critical path
 
-Twelve items, in this order — each its own brainstorm →
+Thirteen items, in this order — each its own brainstorm →
 spec → plan → ship cycle, implemented sequentially. A
 "Merged:" clause names bullets absorbed from
 `## Later work`; they keep their oracles.
@@ -188,6 +188,26 @@ spec → plan → ship cycle, implemented sequentially. A
     `api/db-backed.ts:31-32`, `api/api.ts:2133-2134` —
     revise the three comments when done).
 
+13. Retire Node — the Deno migration, six specs run
+    strictly 1 → 6 (3 and 4 may swap after Spec 2's
+    measurements; Spec 6 is optional and opens only if
+    its decision gate says so). Spec 1 moves `./validate`
+    and `./test` to Deno 2.9.6; Spec 2 replaces the
+    `server.mjs` ZIP with one `deno compile` binary and
+    deletes `package.json`; Spec 3 puts `server/` on
+    `Deno.serve`; Spec 4 ports the seven Node-only
+    modules under `web-app/app/` and `postgres-lib`'s
+    eight inline programs; Spec 5 moves 409 test files
+    to `Deno.test`; Spec 6 would replace
+    `npm:postgres@3.4.9` with `jsr:@db/postgres`. The
+    six specs are `docs/superpowers/specs/2026-08-21-deno-*`;
+    the plan is
+    `docs/superpowers/plans/2026-08-30-deno-migration.md`;
+    the roadmap they inherit is `9620d38c`. Oracle: the
+    suite counts hold at every step — 3477 passing,
+    7 ignored, `tests/tz/` 8, `./test-browser` ten files
+    green.
+
 ## Later work
 
 Off the critical path; each with its oracle.
@@ -303,10 +323,6 @@ Off the critical path; each with its oracle.
   unchanged. The sentence it falsifies is "onFlowLoaded
   keeps its explicit first fit" — the run-four
   remediation design spec, second-commit paragraph
-- The Deno migration as one block — six specs, strict
-  1 → 6, 3 and 4 may swap after Spec 2's measurements,
-  Spec 6 optional (the measurements after Spec 5
-  decide); the roadmap is `9620d38c`
 - Stale-history comment cleanup as one pass — about 35
   code and 32 test comments describe a past state as
   present; the enumeration is the run-four
@@ -1223,6 +1239,11 @@ Off the critical path; each with its oracle.
   2026-09-13
 - The Deno specs run strictly 1 → 6 (3 and 4 may swap
   after Spec 2's measurements; Spec 6 optional)
+- Item 13 runs ahead of items 1–12 — the toolchain moves
+  before the product changes, so every later item is
+  written once, in the new idiom. The numbering is
+  positional, not chronological; renumbering would break
+  this section's references to items 3, 5, 6, 8, and 10
 - `api/derive-states.ts:811-823` (claim-expiry as its
   own event) lands before any multi-process deployment
 
