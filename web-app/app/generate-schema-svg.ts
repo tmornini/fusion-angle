@@ -1,34 +1,40 @@
 // Read the schema of record and write or `--check`
 // SCHEMA.svg. Picture logic lives in schema-svg.ts.
-import { readFileSync, writeFileSync } from 'node:fs';
 import { renderSchemaSvg } from './schema-svg.ts';
 
 const TYPES_PATH = 'api/types.ts';
 const DB_PATH = 'api/db.ts';
 const SCHEMA_PATH = 'api/schema-postgres.ts';
 const SVG_PATH = 'SCHEMA.svg';
+const enc = new TextEncoder();
 
 const svg = renderSchemaSvg({
-    typesSrc: readFileSync(TYPES_PATH, 'utf8'),
-    dbSrc: readFileSync(DB_PATH, 'utf8'),
-    schemaSrc: readFileSync(SCHEMA_PATH, 'utf8'),
+    typesSrc: Deno.readTextFileSync(TYPES_PATH),
+    dbSrc: Deno.readTextFileSync(DB_PATH),
+    schemaSrc: Deno.readTextFileSync(SCHEMA_PATH),
 });
-if (process.argv.includes('--check')) {
+if (Deno.args.includes('--check')) {
     let current = '';
     try {
-        current = readFileSync(SVG_PATH, 'utf8');
-    } catch {
-        current = '';
+        current = Deno.readTextFileSync(SVG_PATH);
+    } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) {
+            throw error;
+        }
     }
     if (current !== svg) {
-        process.stderr.write(
+        Deno.stderr.writeSync(enc.encode(
             'SCHEMA.svg is stale — run '
             + './generate-schema-svg\n',
-        );
-        process.exit(1);
+        ));
+        Deno.exit(1);
     }
-    process.stdout.write('SCHEMA.svg is up to date\n');
+    Deno.stdout.writeSync(enc.encode(
+        'SCHEMA.svg is up to date\n',
+    ));
 } else {
-    writeFileSync(SVG_PATH, svg);
-    process.stdout.write('wrote ' + SVG_PATH + '\n');
+    Deno.writeTextFileSync(SVG_PATH, svg);
+    Deno.stdout.writeSync(enc.encode(
+        'wrote ' + SVG_PATH + '\n',
+    ));
 }

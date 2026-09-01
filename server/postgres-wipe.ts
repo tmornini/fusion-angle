@@ -1,5 +1,5 @@
-// Operator wipe. Drops the message plane and leftover
-// retired objects. Node-only. No seed.
+// Operator wipe verb. A drop that does not seed,
+// so genesis cannot ride the plane's removal.
 
 import { POSTGRES_DROP_SCHEMA } from
     '../api/backend-postgres.ts';
@@ -10,9 +10,11 @@ import {
 import {
     POOL_ACQUIRE_TIMEOUT_MS,
     STATEMENT_TIMEOUT_MS,
-    requiredEnv,
+    requiredEnvBy,
     safeErrorMessage,
 } from './postgres-gate.ts';
+
+const enc = new TextEncoder();
 
 const USAGE =
     'Usage: postgres-wipe [--print-start-command]\n';
@@ -45,14 +47,19 @@ export async function wipeMain(
     try {
         if (args.includes('--help')
             || args.includes('-h')) {
-            process.stdout.write(USAGE);
+            Deno.stdout.writeSync(enc.encode(USAGE));
             return 0;
         }
         if (args.includes(PRINT_START)) {
-            process.stdout.write(renderWipeStartCommand());
+            Deno.stdout.writeSync(enc.encode(
+                renderWipeStartCommand(),
+            ));
             return 0;
         }
-        const postgresUrl = requiredEnv('POSTGRES_URL');
+        const postgresUrl = requiredEnvBy(
+            'POSTGRES_URL',
+            (name) => Deno.env.get(name),
+        );
         const sql = connectPostgres(
             postgresUrl,
             {
@@ -67,13 +74,13 @@ export async function wipeMain(
         }
         return 0;
     } catch (error: unknown) {
-        process.stderr.write(
+        Deno.stderr.writeSync(enc.encode(
             JSON.stringify({
                 at: new Date().toISOString(),
                 level: 'error',
                 message: wipeErrorMessage(error),
             }) + '\n',
-        );
+        ));
         return 1;
     }
 }

@@ -20,19 +20,6 @@ export const LEGACY_MESSAGE_TABLES =
     'legacy message tables present; wipe with '
     + './postgres-wipe';
 
-export type EnvBag = Record<string, string | undefined>;
-
-export function requiredEnv(
-    name: string,
-    env: EnvBag = process.env,
-): string {
-    const value = env[name];
-    if (value === undefined || value === '') {
-        throw new Error('missing required env ' + name);
-    }
-    return value;
-}
-
 export function requiredEnvBy(
     name: string,
     read: (name: string) => string | undefined,

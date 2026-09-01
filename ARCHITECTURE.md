@@ -12,7 +12,10 @@ canvas lives in `FLOW-CANVAS.md`. The URI catalog lives at
 Vanilla TypeScript. `./build` emits one artifact from one
 source tree (clean tree required):
 `fusion-angle-${SHA}.zip`. The `fusion-angle` executable
-serves composed pages and the API on one origin. The
+serves composed pages and the API on one origin via
+`Deno.serve`. Drain is `shutdown()` + `finished` with
+the `drainMs` abort. Static files stream from
+`Deno.open`, which reads the compiled file system. The
 site and postgres.js 3.4.9 are embedded at compile
 time; the permission covenant (`--allow-net` and a
 scoped `--allow-env`, no `--allow-read`) is baked in

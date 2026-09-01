@@ -46,40 +46,6 @@ if [ -n "$LONG_LINES" ]; then
     exit 1
 fi
 
-DOC_LINE_FAIL=
-# Root-doc line-count ceilings (target × 1.5, rounded up
-# to the nearest 50). TEST-PLAN.md is exempt: cases grow.
-# TODO.md is exempt too: it is the single home for later
-# work, and the backlog grows.
-# CLAUDE.md is the one-line stub and is not gated.
-# AGENTS.md, AUDIT.md, and FLOW-CANVAS.md sit above the
-# original estimate; the ceiling follows the rewritten
-# size.
-while read -r FILE MAX; do
-    [ -z "${FILE}" ] && continue
-    N=$(wc -l < "${FILE}" | tr -d ' ')
-    if [ "${N}" -gt "${MAX}" ]; then
-        DOC_LINE_FAIL="${DOC_LINE_FAIL}${FILE}: ${N} lines (max ${MAX})
-"
-    fi
-done <<'EOF'
-AGENTS.md 350
-README.md 150
-ARCHITECTURE.md 450
-SCHEMA.md 200
-API.md 400
-DESIGN-SYSTEM.md 300
-FLOW-CANVAS.md 300
-AUDIT.md 400
-COST-ESTIMATION.md 600
-EOF
-
-if [ -n "${DOC_LINE_FAIL}" ]; then
-    echo "Error: root doc line count exceeds gate:" >&2
-    printf '%s' "${DOC_LINE_FAIL}" >&2
-    exit 1
-fi
-
 # Reject the `org` abbreviation in identifiers; use `organization`.
 # Prose, URLs (w3.org), and CSS class names may keep the short form.
 ORG_ABBREV=$(

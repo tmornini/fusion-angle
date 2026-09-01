@@ -1,24 +1,13 @@
-// Node-only HTTP adapter. node:http → Request →
-// handleRequest → ServerResponse. Static files from
-// composed output. Outside the browser tsc project.
+// HTTP adapter. Deno.serve (Request, info) →
+// handleRequest → Response. Static files from the
+// composed site root.
 
-import {
-    createReadStream,
-} from 'node:fs';
-import { stat } from 'node:fs/promises';
-import {
-    createServer,
-    type IncomingMessage,
-    type Server,
-    type ServerResponse,
-} from 'node:http';
 import {
     extname,
     relative,
     resolve,
-    sep,
-} from 'node:path';
-import { pipeline } from 'node:stream/promises';
+    SEPARATOR,
+} from '@std/path';
 import { handleRequest } from '../api/api.ts';
 import type { GuardedDbAdapter } from '../api/db.ts';
 import {
@@ -67,6 +56,8 @@ const MIME_BY_EXT: Readonly<Record<string, string>> = {
     '.png': 'image/png',
 };
 
+const LOG_ENCODER = new TextEncoder();
+
 export type RequestHandler = (
     adapter: GuardedDbAdapter,
     request: Request,
@@ -93,7 +84,10 @@ export interface HttpListener {
 }
 
 type BodyRead =
-    | { readonly kind: 'bytes'; readonly bytes: Buffer }
+    | {
+        readonly kind: 'bytes';
+        readonly bytes: Uint8Array<ArrayBuffer>;
+    }
     | { readonly kind: 'empty' }
     | { readonly kind: 'too-large' };
 
@@ -112,11 +106,6 @@ export function staticCacheControl(name: string): string {
     return NO_STORE;
 }
 
-function pathWithoutQuery(raw: string): string {
-    const q = raw.indexOf('?');
-    return q === -1 ? raw : raw.slice(0, q);
-}
-
 function stripApiMount(
     pathname: string,
 ): string | undefined {
@@ -126,20 +115,11 @@ function stripApiMount(
     return pathname.slice('/api'.length);
 }
 
-function queryOf(raw: string): string {
-    const q = raw.indexOf('?');
-    return q === -1 ? '' : raw.slice(q);
-}
-
 function headerLine(
-    value: string | string[] | undefined,
+    value: string | null,
 ): string | undefined {
-    if (value === undefined) return undefined;
-    if (Array.isArray(value)) {
-        if (value.length === 0) return undefined;
-        return value.join(',');
-    }
-    return value === '' ? undefined : value;
+    if (value === null || value === '') return undefined;
+    return value;
 }
 
 export function safeStaticPath(
@@ -161,16 +141,18 @@ export function safeStaticPath(
     if (rel === '' || rel.startsWith('..')) {
         return undefined;
     }
-    if (rel.split(sep).includes('..')) return undefined;
+    if (rel.split(SEPARATOR).includes('..')) {
+        return undefined;
+    }
     return full;
 }
 
 function isDocumentNavigation(
-    req: IncomingMessage,
+    request: Request,
 ): boolean {
-    return (req.method ?? 'GET') === 'GET'
+    return request.method === 'GET'
         && headerLine(
-            req.headers['sec-fetch-mode'],
+            request.headers.get('sec-fetch-mode'),
         ) === 'navigate';
 }
 
@@ -181,236 +163,211 @@ async function existingStaticFile(
     const filePath = safeStaticPath(root, urlPath);
     if (filePath === undefined) return undefined;
     try {
-        const info = await stat(filePath);
-        if (info.isFile()) return filePath;
-    } catch {
-        return undefined;
+        const info = await Deno.stat(filePath);
+        if (info.isFile) return filePath;
+    } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+            return undefined;
+        }
+        throw error;
     }
     return undefined;
 }
 
 function contentLengthOf(
-    req: IncomingMessage,
+    request: Request,
 ): number | undefined {
-    const raw = req.headers['content-length'];
-    if (raw === undefined) return undefined;
+    const raw = request.headers.get('content-length');
+    if (raw === null) return undefined;
     const n = Number(raw);
     if (!Number.isFinite(n) || n < 0) return undefined;
     return n;
 }
 
-function drain(req: IncomingMessage): void {
-    req.resume();
+function concatBytes(
+    chunks: readonly Uint8Array[],
+    size: number,
+): Uint8Array<ArrayBuffer> {
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+    return bytes;
 }
 
-function readCappedBody(
-    req: IncomingMessage,
+async function readCappedBody(
+    request: Request,
 ): Promise<BodyRead> {
-    const declared = contentLengthOf(req);
+    const declared = contentLengthOf(request);
     if (declared !== undefined
         && declared > REQUEST_BODY_MAX_BYTES) {
-        drain(req);
-        return Promise.resolve({ kind: 'too-large' });
-    }
-    return new Promise((resolveRead, reject) => {
-        const chunks: Buffer[] = [];
-        let size = 0;
-        let settled = false;
-        const finish = (result: BodyRead): void => {
-            if (settled) return;
-            settled = true;
-            resolveRead(result);
-        };
-        req.on('data', (chunk: Buffer) => {
-            if (settled) return;
-            size += chunk.length;
-            if (size > REQUEST_BODY_MAX_BYTES) {
-                drain(req);
-                finish({ kind: 'too-large' });
-                return;
-            }
-            chunks.push(chunk);
-        });
-        req.on('end', () => {
-            if (settled) return;
-            if (size === 0) {
-                finish({ kind: 'empty' });
-                return;
-            }
-            finish({
-                kind: 'bytes',
-                bytes: Buffer.concat(chunks),
-            });
-        });
-        req.on('error', (error: Error) => {
-            if (settled) return;
-            settled = true;
-            reject(error);
-        });
-    });
-}
-
-function requestHost(req: IncomingMessage): string {
-    const host = req.headers.host;
-    if (typeof host === 'string' && host !== '') {
-        return host;
-    }
-    return '127.0.0.1';
-}
-
-function incomingToRequest(
-    req: IncomingMessage,
-    body: Buffer | undefined,
-    pathOverride?: string,
-): Request {
-    const path = pathOverride ?? (req.url ?? '/');
-    const url = 'http://' + requestHost(req) + path;
-    const headers = new Headers();
-    for (const [name, value] of Object.entries(
-        req.headers,
-    )) {
-        if (value === undefined) continue;
-        if (Array.isArray(value)) {
-            for (const item of value) {
-                headers.append(name, item);
-            }
-        } else {
-            headers.set(name, value);
+        if (request.body !== null) {
+            await request.body.cancel();
         }
+        return { kind: 'too-large' };
     }
-    const method = req.method ?? 'GET';
-    const init: RequestInit = { method, headers };
+    if (request.body === null) {
+        return { kind: 'empty' };
+    }
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > REQUEST_BODY_MAX_BYTES) {
+            await reader.cancel();
+            return { kind: 'too-large' };
+        }
+        chunks.push(value);
+    }
+    reader.releaseLock();
+    if (size === 0) return { kind: 'empty' };
+    return {
+        kind: 'bytes',
+        bytes: concatBytes(chunks, size),
+    };
+}
+
+function apiRequest(
+    request: Request,
+    body: Uint8Array<ArrayBuffer> | undefined,
+    pathOverride: string,
+): Request {
+    const url = new URL(pathOverride, request.url);
+    const method = request.method;
+    const init: RequestInit = {
+        method,
+        headers: request.headers,
+    };
     if (body !== undefined
         && method !== 'GET'
         && method !== 'HEAD') {
-        init.body = new Uint8Array(body);
+        init.body = body;
     }
     return new Request(url, init);
 }
 
-function writeJson(
-    res: ServerResponse,
+function jsonResponse(
     status: number,
     body: { readonly error: string },
     extra?: Readonly<Record<string, string>>,
-): void {
-    const payload = Buffer.from(JSON.stringify(body));
-    res.statusCode = status;
-    res.setHeader(
-        'Content-Type',
-        'application/json; charset=utf-8',
-    );
-    res.setHeader('Cache-Control', NO_STORE);
-    res.setHeader(
-        'Content-Length',
-        String(payload.byteLength),
-    );
-    if (extra !== undefined) {
-        for (const [name, value] of Object.entries(
-            extra,
-        )) {
-            res.setHeader(name, value);
-        }
-    }
-    res.end(payload);
+): Response {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: {
+            'Content-Type':
+                'application/json; charset=utf-8',
+            'Cache-Control': NO_STORE,
+            ...(extra ?? {}),
+        },
+    });
 }
 
-async function writeFetchResponse(
-    res: ServerResponse,
-    response: Response,
-): Promise<void> {
-    res.statusCode = response.status;
-    response.headers.forEach((value, name) => {
-        res.setHeader(name, value);
-    });
-    if (!res.hasHeader('cache-control')) {
-        res.setHeader('Cache-Control', NO_STORE);
-    }
-    const buf = Buffer.from(await response.arrayBuffer());
-    if (!res.hasHeader('content-length')) {
-        res.setHeader(
-            'Content-Length',
-            String(buf.byteLength),
-        );
-    }
-    res.end(buf);
+function internalError(): Response {
+    return jsonResponse(
+        HTTP_INTERNAL_ERROR,
+        { error: 'internal error' },
+    );
 }
 
 async function serveStatic(
-    req: IncomingMessage,
-    res: ServerResponse,
+    request: Request,
     filePath: string,
-): Promise<number> {
-    const method = req.method ?? 'GET';
+): Promise<Response> {
+    const method = request.method;
     if (method !== 'GET' && method !== 'HEAD') {
-        writeJson(
-            res,
+        return jsonResponse(
             HTTP_METHOD_NOT_ALLOWED,
             { error: 'Method not allowed' },
             { Allow: 'GET, HEAD' },
         );
-        return HTTP_METHOD_NOT_ALLOWED;
     }
-    let info: { isFile(): boolean; size: number };
+    let info: Deno.FileInfo;
     try {
-        info = await stat(filePath);
-    } catch {
-        writeJson(
-            res, HTTP_NOT_FOUND, { error: 'Not found' },
-        );
-        return HTTP_NOT_FOUND;
+        info = await Deno.stat(filePath);
+    } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+            return jsonResponse(
+                HTTP_NOT_FOUND, { error: 'Not found' },
+            );
+        }
+        throw error;
     }
-    if (!info.isFile()) {
-        writeJson(
-            res, HTTP_NOT_FOUND, { error: 'Not found' },
+    if (!info.isFile) {
+        return jsonResponse(
+            HTTP_NOT_FOUND, { error: 'Not found' },
         );
-        return HTTP_NOT_FOUND;
     }
     const ext = extname(filePath).toLowerCase();
     const mime = MIME_BY_EXT[ext]
         ?? 'application/octet-stream';
-    const name = filePath.split(sep).pop() ?? '';
-    res.statusCode = 200;
-    res.setHeader('Content-Type', mime);
-    res.setHeader('Content-Length', String(info.size));
-    res.setHeader('Cache-Control', staticCacheControl(name));
+    const name = filePath.split(SEPARATOR).pop() ?? '';
+    const headers: Record<string, string> = {
+        'Content-Type': mime,
+        'Content-Length': String(info.size),
+        'Cache-Control': staticCacheControl(name),
+    };
     if (ext === '.html') {
-        res.setHeader(
-            'Content-Security-Policy',
-            CONTENT_SECURITY_POLICY,
-        );
+        headers['Content-Security-Policy'] =
+            CONTENT_SECURITY_POLICY;
     }
     if (method === 'HEAD') {
-        res.end();
-        return 200;
+        return new Response(null, {
+            status: 200,
+            headers,
+        });
     }
-    await pipeline(createReadStream(filePath), res);
-    return 200;
+    let file: Deno.FsFile;
+    try {
+        file = await Deno.open(filePath, { read: true });
+    } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+            return jsonResponse(
+                HTTP_NOT_FOUND, { error: 'Not found' },
+            );
+        }
+        throw error;
+    }
+    try {
+        return new Response(file.readable, {
+            status: 200,
+            headers,
+        });
+    } catch (error) {
+        file.close();
+        throw error;
+    }
 }
 
 async function serveMiss(
-    req: IncomingMessage,
-    res: ServerResponse,
+    request: Request,
     root: string,
-): Promise<number> {
-    if (isDocumentNavigation(req)) {
+): Promise<Response> {
+    if (isDocumentNavigation(request)) {
         const notFound = await existingStaticFile(
             root, '/not-found/index.html',
         );
         if (notFound !== undefined) {
-            return serveStatic(req, res, notFound);
+            return serveStatic(request, notFound);
         }
     }
-    writeJson(
-        res, HTTP_NOT_FOUND, { error: 'Not found' },
+    return jsonResponse(
+        HTTP_NOT_FOUND, { error: 'Not found' },
     );
-    return HTTP_NOT_FOUND;
 }
 
-function grantTypeOf(bytes: Buffer): string | undefined {
+function grantTypeOf(
+    bytes: Uint8Array<ArrayBuffer>,
+): string | undefined {
     let parsed: unknown;
     try {
-        parsed = JSON.parse(bytes.toString('utf8'));
+        parsed = JSON.parse(
+            new TextDecoder().decode(bytes),
+        );
     } catch {
         return undefined;
     }
@@ -440,90 +397,98 @@ function levelFor(
 }
 
 function operationIdOf(
-    req: IncomingMessage,
+    request: Request,
     method: string,
 ): string | undefined {
     if (!isWriteMethod(method)) return undefined;
-    const raw = req.headers[OPERATION_ID_HEADER];
-    if (typeof raw !== 'string' || raw === '') {
-        return undefined;
-    }
+    const raw = request.headers.get(OPERATION_ID_HEADER);
+    if (raw === null || raw === '') return undefined;
     return raw;
 }
 
 function defaultLog(fields: Record<string, unknown>): void {
-    process.stdout.write(JSON.stringify(fields) + '\n');
+    Deno.stdout.writeSync(
+        LOG_ENCODER.encode(JSON.stringify(fields) + '\n'),
+    );
 }
 
 function logRequest(
     log: RequestLog,
-    req: IncomingMessage,
+    request: Request,
     status: number,
     started: number,
 ): void {
-    const method = req.method ?? 'GET';
+    const method = request.method;
     const fields: Record<string, unknown> = {
         at: new Date().toISOString(),
         level: levelFor(status),
         method,
-        path: pathWithoutQuery(req.url ?? '/'),
+        path: new URL(request.url).pathname,
         status,
         latencyMs: Math.max(0, Date.now() - started),
     };
-    const operationId = operationIdOf(req, method);
+    const operationId = operationIdOf(request, method);
     if (operationId !== undefined) {
         fields['operationId'] = operationId;
     }
     log(fields);
 }
 
+function remoteHostname(
+    addr: Deno.Addr,
+): string | undefined {
+    if (addr.transport !== 'tcp'
+        && addr.transport !== 'udp') {
+        return undefined;
+    }
+    return addr.hostname;
+}
+
 async function dispatch(
-    req: IncomingMessage,
-    res: ServerResponse,
+    request: Request,
+    info: Deno.ServeHandlerInfo,
     options: HttpListenOptions,
     handle: RequestHandler,
     log: RequestLog,
     throttle: AuthThrottle,
-): Promise<void> {
+): Promise<Response> {
     const started = Date.now();
     let status = HTTP_INTERNAL_ERROR;
     try {
-        const body = await readCappedBody(req);
+        const body = await readCappedBody(request);
         if (body.kind === 'too-large') {
-            writeJson(
-                res,
+            status = HTTP_PAYLOAD_TOO_LARGE;
+            return jsonResponse(
                 HTTP_PAYLOAD_TOO_LARGE,
                 { error: 'payload too large' },
             );
-            status = HTTP_PAYLOAD_TOO_LARGE;
-            return;
         }
-        const rawPath = req.url ?? '/';
-        const pathname = pathWithoutQuery(rawPath);
+        const url = new URL(request.url);
+        const pathname = url.pathname;
 
         if (pathname === '/' || pathname === '') {
             const filePath = await existingStaticFile(
                 options.staticRoot, '/index.html',
             );
             if (filePath !== undefined) {
-                status = await serveStatic(
-                    req, res, filePath,
+                const response = await serveStatic(
+                    request, filePath,
                 );
-                return;
+                status = response.status;
+                return response;
             }
-            status = await serveMiss(
-                req, res, options.staticRoot,
+            const response = await serveMiss(
+                request, options.staticRoot,
             );
-            return;
+            status = response.status;
+            return response;
         }
 
         const resourcePath = stripApiMount(pathname);
         if (resourcePath !== undefined) {
             const requestPathname = new URL(
-                'http://'
-                    + requestHost(req)
-                    + resourcePath
-                    + queryOf(rawPath),
+                resourcePath + url.search,
+                request.url,
             ).pathname;
             let grantType: string | undefined;
             if (isAuthTokenPath(requestPathname)
@@ -534,88 +499,99 @@ async function dispatch(
                 && grantType !== 'refresh'
                 && grantType !== 'token-exchange'
                 && throttle.limited(
-                    req.socket.remoteAddress,
-                    headerLine(req.headers['forwarded']),
+                    remoteHostname(info.remoteAddr),
                     headerLine(
-                        req.headers['x-forwarded-for'],
+                        request.headers.get('forwarded'),
+                    ),
+                    headerLine(
+                        request.headers.get(
+                            'x-forwarded-for',
+                        ),
                     ),
                 )) {
-                writeJson(
-                    res,
+                status = HTTP_TOO_MANY_REQUESTS;
+                return jsonResponse(
                     HTTP_TOO_MANY_REQUESTS,
                     { error: 'too many requests' },
                 );
-                status = HTTP_TOO_MANY_REQUESTS;
-                return;
             }
             const bytes = body.kind === 'bytes'
                 ? body.bytes
                 : undefined;
-            const request = incomingToRequest(
-                req, bytes, resourcePath + queryOf(rawPath),
-            );
             const response = await handle(
-                options.adapter, request,
+                options.adapter,
+                apiRequest(
+                    request,
+                    bytes,
+                    resourcePath + url.search,
+                ),
             );
-            await writeFetchResponse(res, response);
+            if (!response.headers.has('cache-control')) {
+                response.headers.set(
+                    'Cache-Control', NO_STORE,
+                );
+            }
             status = response.status;
-            return;
+            return response;
         }
 
         if (pathname.endsWith('/')) {
             const filePath = await existingStaticFile(
-                options.staticRoot, pathname + 'index.html',
+                options.staticRoot,
+                pathname + 'index.html',
             );
             if (filePath !== undefined) {
-                status = await serveStatic(
-                    req, res, filePath,
+                const response = await serveStatic(
+                    request, filePath,
                 );
-                return;
+                status = response.status;
+                return response;
             }
-            status = await serveMiss(
-                req, res, options.staticRoot,
+            const response = await serveMiss(
+                request, options.staticRoot,
             );
-            return;
+            status = response.status;
+            return response;
         }
 
         const filePath = await existingStaticFile(
             options.staticRoot, pathname,
         );
         if (filePath !== undefined) {
-            status = await serveStatic(req, res, filePath);
-            return;
-        }
-        status = await serveMiss(
-            req, res, options.staticRoot,
-        );
-    } catch {
-        if (!res.headersSent) {
-            writeJson(
-                res,
-                HTTP_INTERNAL_ERROR,
-                { error: 'internal error' },
+            const response = await serveStatic(
+                request, filePath,
             );
-            status = HTTP_INTERNAL_ERROR;
+            status = response.status;
+            return response;
         }
+        const response = await serveMiss(
+            request, options.staticRoot,
+        );
+        status = response.status;
+        return response;
+    } catch {
+        status = HTTP_INTERNAL_ERROR;
+        return internalError();
     } finally {
-        logRequest(log, req, status, started);
+        logRequest(log, request, status, started);
     }
 }
 
-function closeHttpServer(
-    server: Server,
+async function closeServer(
+    server: Deno.HttpServer,
+    controller: AbortController,
     drainMs: number,
 ): Promise<void> {
-    return new Promise((resolveClose, reject) => {
-        const timer = setTimeout(() => {
-            server.closeAllConnections();
-        }, drainMs);
-        server.close((error?: Error) => {
-            clearTimeout(timer);
-            if (error) reject(error);
-            else resolveClose();
-        });
-    });
+    const timer = setTimeout(
+        () => { controller.abort(); },
+        drainMs,
+    );
+    try {
+        await server.shutdown();
+        await server.finished;
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 export function listenHttp(
@@ -627,32 +603,30 @@ export function listenHttp(
     const throttle = createAuthThrottle(
         options.trustedProxyHops,
     );
-    const server = createServer((req, res) => {
-        void dispatch(
-            req, res, options, handle, log, throttle,
-        );
-    });
+    const controller = new AbortController();
     return new Promise((resolveListen, reject) => {
-        server.once('error', reject);
-        const onListening = (): void => {
-            const addr = server.address();
-            if (addr === null || typeof addr === 'string') {
-                reject(new Error('HTTP bind failed'));
-                return;
-            }
-            resolveListen({
-                port: addr.port,
-                close: () => closeHttpServer(
-                    server, drainMs,
-                ),
-            });
-        };
-        if (options.host !== undefined) {
-            server.listen(
-                options.port, options.host, onListening,
-            );
-        } else {
-            server.listen(options.port, onListening);
+        try {
+            const server = Deno.serve({
+                port: options.port,
+                ...(options.host !== undefined
+                    ? { hostname: options.host }
+                    : {}),
+                signal: controller.signal,
+                onListen: (addr) => {
+                    resolveListen({
+                        port: addr.port,
+                        close: () => closeServer(
+                            server, controller, drainMs,
+                        ),
+                    });
+                },
+                onError: internalError,
+            }, (request, info) => dispatch(
+                request, info, options, handle, log,
+                throttle,
+            ));
+        } catch (error) {
+            reject(error);
         }
     });
 }

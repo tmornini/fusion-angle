@@ -10,4 +10,27 @@ set -euo pipefail
 #   --base-url URL (existing origin; skip spawn/seed),
 #   --password SECRET (or MEASURE_PASSWORD),
 #   --help / -h
-node --strip-types web-app/app/measure.ts "$@"
+#
+# Permissions, named: read (the module graph, the Chrome
+# binary, measurements/, Chrome's DevToolsActivePort);
+# write (the temp build and Chrome-profile directories,
+# plus budgets, history, and the visualizer HTML); net
+# (the measured origin, Chrome's debug port, and the
+# free-port probe); env (the four variables measure.ts
+# and cdp-client.ts read by name).
+#
+# --allow-run is unscoped, as in ./test-browser, because
+# two of its targets are known only at run time: Chrome's
+# path comes from CHROME, and ./fusion-angle is spawned
+# with cwd set to a fresh mktemp directory — Deno checks
+# a scoped entry against THIS process's cwd, where no
+# such file exists. The rest of the list is git,
+# ./build, ./postgres-seed, and the ps that
+# killProcessTree walks.
+deno run --frozen \
+    --allow-read \
+    --allow-write="${TMPDIR:-/tmp}",measurements \
+    --allow-net \
+    --allow-run \
+    --allow-env=CHROME,JWT_HMAC_SIGNING_KEY,MEASURE_PASSWORD,POSTGRES_URL \
+    web-app/app/measure.ts "$@"

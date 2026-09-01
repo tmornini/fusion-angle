@@ -1,7 +1,6 @@
-// Node-only scrypt hasher. Isolated so the client
-// bundle never statically imports node:crypto.
-// Outside the browser tsc project.
-// boot() registers hasher + derive.
+// Web Crypto has no scrypt, and neither does Deno's
+// namespace, so this module imports node:crypto
+// deliberately. A Deno or @std scrypt landing retires it.
 
 import { scrypt as scryptCallback } from 'node:crypto';
 import {

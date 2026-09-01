@@ -1,6 +1,6 @@
-// Node-only CDP page-load benchmark harness.
+// Deno-only CDP page-load benchmark harness.
 // Run via ./measure from the repo root (see that wrapper).
-// On the browser exclude list; uses Node APIs + global WebSocket.
+// Uses Deno APIs + global WebSocket; never runs in a browser.
 //
 // Flow: optional bare --visualize (disk only) → clean-tree
 // gate → (build → ./postgres-seed → ./fusion-angle serve) or
@@ -9,28 +9,7 @@
 // --check / --record / --visualize. Cleanup always in
 // finally.
 
-import {
-    appendFileSync,
-    existsSync,
-    mkdtempSync,
-    readFileSync,
-    rmSync,
-    writeFileSync,
-} from 'node:fs';
-import {
-    spawn,
-    execFile as execFileCb,
-    type ChildProcess,
-} from 'node:child_process';
-import { createServer } from 'node:net';
-import {
-    cpus,
-    platform,
-    arch,
-    tmpdir as osTmpdir,
-} from 'node:os';
-import { join } from 'node:path';
-import { promisify } from 'node:util';
+import { join } from '@std/path';
 
 import { PAGE_REGISTRY } from './page-registry.ts';
 import {
@@ -63,11 +42,13 @@ import {
     parseMeasureArgv,
     passwordFromSeedReveal,
     readMeasureServeEnv,
+    type MeasureEnv,
     type MeasureServeEnv,
 } from './measure-cli.ts';
 import {
     CHROME_READY_MS,
     CdpClient,
+    type KillableChild,
     chromeBinary,
     evaluateJson,
     killProcessTree,
@@ -79,12 +60,25 @@ import {
 } from './cdp-client.ts';
 import { login, registryUrl, waitPageReady } from './browser-drive.ts';
 
-const execFile = promisify(execFileCb);
+const enc = new TextEncoder();
+const dec = new TextDecoder();
 
 const SEED_TIMEOUT_MS = 120_000;
 const PAGE_READY_MS = 120_000;
+const STDERR_DRAIN_MS = 2_000;
 const BUDGETS_PATH = 'measurements/budgets.json';
 const HISTORY_PATH = 'measurements/history.jsonl';
+
+// The history file's existing records define the machine
+// vocabulary, and measure-viz renders arch straight from
+// them, so the runtime's tongue stops at this adapter
+// rather than letting a second word into one ledger.
+// Keyed by Deno.build.arch, so a new architecture fails
+// `deno check` instead of recording an unknown word.
+const RECORDED_ARCH: Record<typeof Deno.build.arch, string> = {
+    aarch64: 'arm64',
+    x86_64: 'x64',
+};
 
 // Detail pages whose URL must be scraped from a list page.
 const DETAIL_FROM_LIST: Record<string, string> = {
@@ -175,35 +169,27 @@ function usageText(): string {
 
 // ── Small utils ──────
 
-function tmpRoot(): string {
-    return process.env.TMPDIR || osTmpdir() || '/tmp';
+function exists(path: string): boolean {
+    try {
+        Deno.statSync(path);
+        return true;
+    } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+            return false;
+        }
+        throw error;
+    }
 }
 
 async function freePort(): Promise<number> {
-    return new Promise((resolve, reject) => {
-        const s = createServer();
-        s.listen(0, '127.0.0.1', () => {
-            const addr = s.address();
-            if (
-                addr === null
-                || typeof addr === 'string'
-            ) {
-                s.close();
-                reject(
-                    new Error(
-                        'freePort: could not bind',
-                    ),
-                );
-                return;
-            }
-            const port = addr.port;
-            s.close((err) => {
-                if (err) reject(err);
-                else resolve(port);
-            });
-        });
-        s.on('error', reject);
+    // Loopback, as the spawned server's URL will be.
+    const listener = Deno.listen({
+        hostname: '127.0.0.1',
+        port: 0,
     });
+    const { port } = listener.addr as Deno.NetAddr;
+    listener.close();
+    return port;
 }
 
 function queryOf(url: string): string {
@@ -368,40 +354,60 @@ async function measurePage(
 // ── Main ──────
 
 async function main(): Promise<void> {
+    // Deno.env.toObject() is forbidden under a scoped
+    // --allow-env, so name every variable read here.
+    const measureEnv: MeasureEnv = {
+        MEASURE_PASSWORD: Deno.env.get('MEASURE_PASSWORD'),
+        POSTGRES_URL: Deno.env.get('POSTGRES_URL'),
+        JWT_HMAC_SIGNING_KEY: Deno.env.get(
+            'JWT_HMAC_SIGNING_KEY',
+        ),
+    };
     const parsed = parseMeasureArgv(
-        process.argv.slice(2),
-        process.env,
+        Deno.args,
+        measureEnv,
     );
     if (parsed.kind === 'help') {
-        process.stdout.write(usageText());
+        Deno.stdout.writeSync(enc.encode(usageText()));
         return;
     }
     if (parsed.kind === 'error') {
-        process.stderr.write(
+        Deno.stderr.writeSync(enc.encode(
             `measure: ${parsed.message}\n\n`,
-        );
-        process.stderr.write(usageText());
-        process.exitCode = 1;
+        ));
+        Deno.stderr.writeSync(enc.encode(usageText()));
+        Deno.exitCode = 1;
         return;
     }
     const cli = parsed.cli;
-    const repoRoot = process.cwd();
+    const repoRoot = Deno.cwd();
 
     if (isVisualizeOnly(cli)) {
         const out = generateMeasureViz(repoRoot);
-        process.stderr.write(
+        Deno.stderr.writeSync(enc.encode(
             `Wrote visualizer → ${out}\n`,
-        );
+        ));
         return;
     }
 
     // Clean tree: measure committed bytes only.
     {
-        const { stdout } = await execFile(
-            'git',
-            ['status', '--porcelain'],
-            { cwd: repoRoot },
-        );
+        // Deno.Command resolves a non-zero exit rather
+        // than rejecting the way execFile did, so every
+        // child below is checked for success by hand.
+        const status = await new Deno.Command('git', {
+            args: ['status', '--porcelain'],
+            cwd: repoRoot,
+            stdout: 'piped',
+            stderr: 'piped',
+        }).output();
+        if (!status.success) {
+            throw new Error(
+                'git status failed: '
+                + dec.decode(status.stderr).trim(),
+            );
+        }
+        const stdout = dec.decode(status.stdout);
         if (stdout.trim().length > 0) {
             throw new Error(
                 'Working tree is dirty; commit before'
@@ -414,7 +420,7 @@ async function main(): Promise<void> {
     let localServe: MeasureServeEnv | null = null;
     if (needsLocalMeasureServer(cli)) {
         const serveEnv = readMeasureServeEnv(
-            process.env,
+            measureEnv,
         );
         if (serveEnv.kind === 'error') {
             throw new Error(serveEnv.message);
@@ -440,24 +446,27 @@ async function main(): Promise<void> {
     }
 
     const chromePath = chromeBinary();
-    if (!existsSync(chromePath)) {
+    if (!exists(chromePath)) {
         throw new Error(
             `Chrome not found at: ${chromePath}`
             + ' (set CHROME env to override)',
         );
     }
 
-    const root = tmpRoot();
+    // makeTempDirSync honours TMPDIR itself, so the
+    // fallback chain the Node harness carried is gone.
     const useOrigin = cli.baseUrl !== null;
     const buildDir = useOrigin
         ? null
-        : mkdtempSync(join(root, 'fusion-measure.'));
-    const chromeDir = mkdtempSync(
-        join(root, 'fusion-measure-chrome.'),
-    );
+        : Deno.makeTempDirSync({
+            prefix: 'fusion-measure.',
+        });
+    const chromeDir = Deno.makeTempDirSync({
+        prefix: 'fusion-measure-chrome.',
+    });
 
-    let serverProc: ChildProcess | null = null;
-    let chromeProc: ChildProcess | null = null;
+    let serverProc: Deno.ChildProcess | null = null;
+    let chromeProc: KillableChild | null = null;
     let cdp: CdpClient | null = null;
 
     try {
@@ -472,9 +481,9 @@ async function main(): Promise<void> {
             }
             password = cli.password;
             baseUrl = cli.baseUrl;
-            process.stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 `Using origin ${baseUrl} …\n`,
-            );
+            ));
             await pollUntil(
                 `origin ${baseUrl}`,
                 10_000,
@@ -494,30 +503,23 @@ async function main(): Promise<void> {
             );
         } else {
             // 1. Build
-            process.stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 `Building to ${buildDir}/ …\n`,
-            );
-            try {
-                await execFile(
-                    './build',
-                    ['--no-zip', buildDir + '/'],
-                    {
-                        cwd: repoRoot,
-                        maxBuffer: 16 * 1024 * 1024,
-                    },
-                );
-            } catch (err: unknown) {
-                const e = err as {
-                    message?: string;
-                    stderr?: string | Buffer;
-                    stdout?: string | Buffer;
-                };
-                const stderr = e.stderr
-                    ? String(e.stderr).trim()
-                    : '';
-                const stdout = e.stdout
-                    ? String(e.stdout).trim()
-                    : '';
+            ));
+            const built = await new Deno.Command(
+                './build',
+                {
+                    args: ['--no-zip', buildDir + '/'],
+                    cwd: repoRoot,
+                    stdout: 'piped',
+                    stderr: 'piped',
+                },
+            ).output();
+            if (!built.success) {
+                const stderr = dec
+                    .decode(built.stderr).trim();
+                const stdout = dec
+                    .decode(built.stdout).trim();
                 throw new Error(
                     'Build failed'
                     + (stderr ? `: ${stderr}` : '')
@@ -525,7 +527,7 @@ async function main(): Promise<void> {
                         ? `: ${stdout}`
                         : '')
                     + (!stderr && !stdout
-                        ? `: ${e.message ?? err}`
+                        ? `: exit ${built.code}`
                         : ''),
                 );
             }
@@ -537,46 +539,49 @@ async function main(): Promise<void> {
                     'missing required env POSTGRES_URL',
                 );
             }
-            process.stderr.write('Seeding Postgres …\n');
-            let seedOut = '';
-            let seedErr = '';
-            try {
-                const seeded = await execFile(
-                    MEASURE_SEED_COMMAND,
-                    measureSeedArgs(),
-                    {
-                        cwd: repoRoot,
-                        timeout: SEED_TIMEOUT_MS,
-                        env: {
-                            ...process.env,
-                            POSTGRES_URL:
-                                localServe.postgresUrl,
-                            JWT_HMAC_SIGNING_KEY:
-                                localServe
-                                    .jwtHmacSigningKey,
-                        },
-                        maxBuffer: 16 * 1024 * 1024,
+            Deno.stderr.writeSync(enc.encode('Seeding Postgres …\n'));
+            const seeded = await new Deno.Command(
+                MEASURE_SEED_COMMAND,
+                {
+                    args: measureSeedArgs(),
+                    cwd: repoRoot,
+                    // Deno.CommandOptions has no
+                    // `timeout`; the abort signal is the
+                    // bound, and it SIGTERMs the child
+                    // instead of rejecting — so a hung
+                    // seed surfaces below as !success.
+                    signal: AbortSignal.timeout(
+                        SEED_TIMEOUT_MS,
+                    ),
+                    // Named overlay, not a spread:
+                    // clearEnv defaults to false, so the
+                    // child still inherits PATH and the
+                    // operator's PG* tuning, and no
+                    // Deno.env.toObject() is needed.
+                    env: {
+                        POSTGRES_URL:
+                            localServe.postgresUrl,
+                        JWT_HMAC_SIGNING_KEY:
+                            localServe.jwtHmacSigningKey,
                     },
-                );
-                seedOut = String(seeded.stdout);
-                seedErr = String(seeded.stderr);
-            } catch (err: unknown) {
-                const e = err as {
-                    stderr?: string | Buffer;
-                    stdout?: string | Buffer;
-                    message?: string;
-                };
-                seedErr = e.stderr
-                    ? String(e.stderr)
-                    : '';
+                    stdout: 'piped',
+                    stderr: 'piped',
+                },
+            ).output();
+            const seedOut = dec.decode(seeded.stdout);
+            const seedErr = dec.decode(seeded.stderr);
+            if (!seeded.success) {
                 const logged = lastJsonLogMessage(
                     seedErr,
                 );
                 throw new Error(
                     logged
                     ?? (seedErr.trim()
-                        || e.message
-                        || 'seed failed'),
+                        || 'seed failed: '
+                            + (seeded.signal === null
+                                ? `exit ${seeded.code}`
+                                : 'signal '
+                                    + seeded.signal)),
                 );
             }
             const parsed = passwordFromSeedReveal(
@@ -593,43 +598,82 @@ async function main(): Promise<void> {
 
             const port = await freePort();
             baseUrl = `http://127.0.0.1:${port}`;
-            process.stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 `Starting ${MEASURE_SERVER_ENTRY} serve on ${baseUrl}`
                 + ' …\n',
-            );
-            serverProc = spawn(
+            ));
+            const server = new Deno.Command(
                 MEASURE_SERVER_ENTRY,
-                measureServerArgs(),
                 {
-                    cwd: buildDir ?? undefined,
+                    args: measureServerArgs(),
+                    // Non-null on this branch: buildDir
+                    // is made whenever --base-url is not.
+                    cwd: buildDir!,
+                    // Named overlay, not a spread; see
+                    // the seed above.
                     env: {
-                        ...process.env,
                         POSTGRES_URL:
                             localServe.postgresUrl,
                         JWT_HMAC_SIGNING_KEY:
                             localServe.jwtHmacSigningKey,
                         HTTP_SERVER_PORT: String(port),
                     },
-                    stdio: ['ignore', 'ignore', 'pipe'],
+                    stdin: 'null',
+                    stdout: 'null',
+                    stderr: 'piped',
                     detached: true,
                 },
-            );
-            serverProc.unref();
+            ).spawn();
+            serverProc = server;
+            server.unref();
+            // A piped stderr MUST be read: the poll below
+            // reports the server's last JSON log line
+            // when it dies during boot, and an undrained
+            // pipe would lose that line and stall the
+            // child once the buffer filled.
             let stderrText = '';
-            const errStream = serverProc.stderr;
-            if (errStream !== null) {
-                errStream.setEncoding('utf8');
-                errStream.on('data', (chunk: string) => {
+            const stderrDrained = (async () => {
+                // TextDecoderStream owns the partial-
+                // sequence state a chunked decode needs,
+                // so the shared decoder never carries it
+                // into an unrelated one.
+                const text = server.stderr.pipeThrough(
+                    new TextDecoderStream(),
+                );
+                for await (const chunk of text) {
                     stderrText += chunk;
-                });
-            }
+                }
+            })();
+            // Deno.ChildProcess has no synchronous exit
+            // code, so record the status when it settles.
+            let exited: Deno.CommandStatus | null = null;
+            server.status.then((status) => {
+                exited = status;
+            });
             await pollUntil(
                 `${MEASURE_SERVER_ENTRY} serve on port ${port}`,
                 SEED_TIMEOUT_MS,
                 async () => {
-                    if (serverProc?.exitCode !== null
-                        && serverProc?.exitCode
-                            !== undefined) {
+                    if (exited !== null) {
+                        // The child is gone, so the
+                        // drain should finish at once; a
+                        // grandchild that inherited fd 2
+                        // holds the pipe open and EOF
+                        // never comes, so bound the wait
+                        // and report what has arrived.
+                        let drainTimer:
+                            | ReturnType<typeof setTimeout>
+                            | undefined;
+                        await Promise.race([
+                            stderrDrained,
+                            new Promise<void>((done) => {
+                                drainTimer = setTimeout(
+                                    done,
+                                    STDERR_DRAIN_MS,
+                                );
+                            }),
+                        ]);
+                        clearTimeout(drainTimer);
                         const boot = lastJsonLogMessage(
                             stderrText,
                         );
@@ -656,9 +700,9 @@ async function main(): Promise<void> {
         }
 
         // 3. Launch Chrome
-        process.stderr.write(
+        Deno.stderr.writeSync(enc.encode(
             'Launching headless Chrome …\n',
-        );
+        ));
         chromeProc = launchChrome({ userDataDir: chromeDir });
         const debugPort = await waitDevtoolsPort(
             chromeDir,
@@ -671,15 +715,15 @@ async function main(): Promise<void> {
 
         // 4. Login (seed is ./postgres-seed --mock-data,
         // or --password against --base-url).
-        process.stderr.write(
+        Deno.stderr.writeSync(enc.encode(
             `Logging in as ${MEASURE_DEMO_EMAIL} …\n`,
-        );
+        ));
         await login(cdp, baseUrl, MEASURE_DEMO_EMAIL, password);
 
         // 5. Detail-URL discovery
-        process.stderr.write(
+        Deno.stderr.writeSync(enc.encode(
             'Discovering detail URLs …\n',
-        );
+        ));
         const discovered = await discoverDetailUrls(
             cdp,
             baseUrl,
@@ -687,10 +731,10 @@ async function main(): Promise<void> {
         );
 
         // 7. Sweep
-        process.stderr.write(
+        Deno.stderr.writeSync(enc.encode(
             `Sweeping ${pageKeys.length} page(s)`
             + ` × ${cli.runs} run(s) …\n`,
-        );
+        ));
         const stats: Record<string, PageStats> = {};
         // Per-page readyMs samples (for --write-budgets).
         const readySamples: Record<string, number[]> = {};
@@ -707,9 +751,9 @@ async function main(): Promise<void> {
             const url = resolvePageUrl(
                 baseUrl, key, discovered,
             );
-            process.stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 `  ${key} ← ${url}\n`,
-            );
+            ));
             const runs = await measurePage(
                 cdp, key, url, cli.runs,
             );
@@ -729,21 +773,21 @@ async function main(): Promise<void> {
 
         // 8. Report
         const report = formatReport(stats);
-        process.stdout.write(report + '\n');
+        Deno.stdout.writeSync(enc.encode(report + '\n'));
 
         // 8a. --profile: API route counts + residual
         if (cli.profile) {
             for (const key of pageKeys) {
                 const row = profileHits[key];
                 if (row === undefined) continue;
-                process.stdout.write(
+                Deno.stdout.writeSync(enc.encode(
                     formatRequestProfileReport(
                         key,
                         row.readyMs,
                         row.phases,
                         row.apiHits,
                     ),
-                );
+                ));
             }
         }
 
@@ -764,16 +808,15 @@ async function main(): Promise<void> {
             const budgetsFile = join(
                 repoRoot, BUDGETS_PATH,
             );
-            writeFileSync(
+            Deno.writeTextFileSync(
                 budgetsFile,
                 JSON.stringify(budgets, null, 4)
                     + '\n',
-                'utf8',
             );
-            process.stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 `Wrote budgets → ${budgetsFile}`
                 + ` (mean + ${cli.budgetSigmas}σ)\n`,
-            );
+            ));
         }
 
         // 9. --check
@@ -781,16 +824,14 @@ async function main(): Promise<void> {
             const budgetsFile = join(
                 repoRoot, BUDGETS_PATH,
             );
-            if (!existsSync(budgetsFile)) {
+            if (!exists(budgetsFile)) {
                 throw new Error(
                     `--check: budgets file missing: `
                     + budgetsFile,
                 );
             }
             const budgets = JSON.parse(
-                readFileSync(
-                    budgetsFile, 'utf8',
-                ),
+                Deno.readTextFileSync(budgetsFile),
             ) as Budgets;
             // Budget keys must name registry pages
             // (stale key drift). Unmeasured pages in a
@@ -836,9 +877,9 @@ async function main(): Promise<void> {
                     : verdict.offenders),
             ];
             if (offenders.length > 0) {
-                process.stderr.write(
+                Deno.stderr.writeSync(enc.encode(
                     'Budget check FAILED:\n',
-                );
+                ));
                 for (const o of offenders) {
                     const bits = [
                         o.page,
@@ -860,41 +901,51 @@ async function main(): Promise<void> {
                             `budget=${o.budgetReadyMs}`,
                         );
                     }
-                    process.stderr.write(
+                    Deno.stderr.writeSync(enc.encode(
                         `  ${bits.join(' ')}\n`,
-                    );
+                    ));
                 }
-                process.exitCode = 1;
+                Deno.exitCode = 1;
                 return;
             }
-            process.stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 'Budget check OK.\n',
-            );
+            ));
         }
 
         // 10. --record
         if (cli.record) {
-            const { stdout: shaOut } =
-                await execFile(
-                    'git',
-                    [
-                        'rev-parse',
-                        '--short=7',
-                        'HEAD',
-                    ],
-                    { cwd: repoRoot },
+            const sha = await new Deno.Command('git', {
+                args: [
+                    'rev-parse',
+                    '--short=7',
+                    'HEAD',
+                ],
+                cwd: repoRoot,
+                stdout: 'piped',
+                stderr: 'piped',
+            }).output();
+            if (!sha.success) {
+                throw new Error(
+                    'git rev-parse failed: '
+                    + dec.decode(sha.stderr).trim(),
                 );
-            const cpu = cpus();
+            }
             const line = shapeHistoryLine({
                 at: new Date().toISOString(),
-                sha: shaOut.trim(),
+                sha: dec.decode(sha.stdout).trim(),
                 machine: {
-                    platform: platform(),
-                    arch: arch(),
-                    cpuModel:
-                        cpu[0]?.model
-                        ?? 'unknown',
-                    cpuCount: cpu.length,
+                    // Deno.build.os already speaks the
+                    // recorded vocabulary ('darwin').
+                    platform: Deno.build.os,
+                    arch: RECORDED_ARCH[Deno.build.arch],
+                    // Deno exposes a core count but no
+                    // CPU model, so records from here on
+                    // carry the absence marker this
+                    // field already fell back to.
+                    cpuModel: 'unknown',
+                    cpuCount:
+                        navigator.hardwareConcurrency,
                 },
                 runs: cli.runs,
                 stats,
@@ -902,29 +953,29 @@ async function main(): Promise<void> {
             const historyFile = join(
                 repoRoot, HISTORY_PATH,
             );
-            appendFileSync(
+            Deno.writeTextFileSync(
                 historyFile,
                 JSON.stringify(line) + '\n',
-                'utf8',
+                { append: true },
             );
-            process.stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 `Recorded history → ${historyFile}\n`,
-            );
+            ));
         }
 
         // 11. --visualize (always from disk after run)
         if (cli.visualize) {
             if (!cli.record) {
-                process.stderr.write(
+                Deno.stderr.writeSync(enc.encode(
                     'Note: this run is not in history; '
                     + 'visualizer regenerated from disk '
                     + 'only.\n',
-                );
+                ));
             }
             const out = generateMeasureViz(repoRoot);
-            process.stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 `Wrote visualizer → ${out}\n`,
-            );
+            ));
         }
     } finally {
         if (cdp !== null) {
@@ -934,18 +985,16 @@ async function main(): Promise<void> {
         killProcessTree(serverProc);
         if (buildDir !== null) {
             try {
-                rmSync(buildDir, {
+                Deno.removeSync(buildDir, {
                     recursive: true,
-                    force: true,
                 });
             } catch {
                 // best-effort
             }
         }
         try {
-            rmSync(chromeDir, {
+            Deno.removeSync(chromeDir, {
                 recursive: true,
-                force: true,
             });
         } catch {
             // best-effort
@@ -957,6 +1006,6 @@ main().catch((err: unknown) => {
     const msg = err instanceof Error
         ? err.message
         : String(err);
-    process.stderr.write(`measure failed: ${msg}\n`);
-    process.exitCode = 1;
+    Deno.stderr.writeSync(enc.encode(`measure failed: ${msg}\n`));
+    Deno.exitCode = 1;
 });

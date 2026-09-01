@@ -94,15 +94,19 @@ if [ "$POSTGRES_TARGET" = "local" ] \
     exit 1
 fi
 
-if ! command -v node >/dev/null; then
-    echo "Error: node is required" >&2
+if ! command -v deno >/dev/null; then
+    echo "Error: deno is required" >&2
     exit 1
 fi
 
 if [ "$POSTGRES_TARGET" = "local" ]; then
     assert_loopback_postgres_url
     ROOT="$(cd "$(dirname "$0")" && pwd)"
-    exec node --strip-types \
+    exec deno run --frozen --allow-net \
+        --allow-env=POSTGRES_URL,PGPORT,PGSSL,PGSSLNEGOTIATION,\
+PGIDLE_TIMEOUT,PGCONNECT_TIMEOUT,PGMAX_LIFETIME,PGMAX_PIPELINE,PGBACKOFF,\
+PGKEEP_ALIVE,PGPREPARE,PGDEBUG,PGFETCH_TYPES,PGPUBLICATIONS,\
+PGTARGET_SESSION_ATTRS,PGAPPNAME,PGTARGETSESSIONATTRS,JWT_HMAC_SIGNING_KEY \
         "$ROOT/server/postgres-wipe.ts"
 fi
 

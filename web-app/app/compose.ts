@@ -1,17 +1,26 @@
-import {
-    readFileSync,
-    writeFileSync,
-    existsSync,
-    mkdirSync,
-    readdirSync,
-    cpSync,
-} from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
+import { join, resolve } from '@std/path';
+import { copySync } from '@std/fs';
 import { PAGE_REGISTRY } from './page-registry.ts';
 import { buildSidebarNavItemsHtml } from './nav-items.ts';
 
-const ROOT = join(dirname(new URL(import.meta.url).pathname), '..');
-const outArg = process.argv[2];
+function exists(path: string): boolean {
+    try {
+        Deno.statSync(path);
+        return true;
+    } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+            return false;
+        }
+        throw error;
+    }
+}
+
+const composeDir = import.meta.dirname;
+if (composeDir === undefined) {
+    throw new Error('import.meta.dirname is undefined');
+}
+const ROOT = join(composeDir, '..');
+const outArg = Deno.args[0];
 const OUT = outArg !== undefined ? outArg : ROOT;
 
 const sidebarPages = Object.entries(PAGE_REGISTRY)
@@ -74,7 +83,7 @@ function compose(): void {
     ];
     const missing = allPages
         .filter(({ sourceDir, sourceFile }) =>
-            !existsSync(join(ROOT, sourceDir, `${sourceFile}.html`)))
+            !exists(join(ROOT, sourceDir, `${sourceFile}.html`)))
         .map(({ name }) => name);
     if (missing.length > 0) {
         const count = missing.length;
@@ -82,15 +91,14 @@ function compose(): void {
         console.error(
                 `ERROR: ${count} page(s) not found:\n  ${list}`
         );
-        process.exit(1);
+        Deno.exit(1);
     }
 
-    let layout = readFileSync(
+    let layout = Deno.readTextFileSync(
         join(appDir, 'components-layout.html'),
-        'utf-8',
     );
     for (const { placeholder, file } of COMPONENTS) {
-        const content = readFileSync(join(appDir, file), 'utf-8');
+        const content = Deno.readTextFileSync(join(appDir, file));
         layout = layout.replace(placeholder, content);
     }
 
@@ -103,7 +111,7 @@ function compose(): void {
     for (const page of sidebarPages) {
         const { name, title, sourceDir, sourceFile } = page;
         const pageHtmlPath = join(ROOT, sourceDir, `${sourceFile}.html`);
-        const pageContent = readFileSync(pageHtmlPath, 'utf-8');
+        const pageContent = Deno.readTextFileSync(pageHtmlPath);
 
         const html = layout
             .replace('{{PAGE_NAME}}', name)
@@ -115,10 +123,10 @@ function compose(): void {
             );
 
         const outDir = join(OUT, sourceDir);
-        if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
+        if (!exists(outDir)) Deno.mkdirSync(outDir, { recursive: true });
 
         const outPath = join(outDir, `${sourceFile}.html`);
-        writeFileSync(outPath, html, 'utf-8');
+        Deno.writeTextFileSync(outPath, html);
     }
 
     console.log(`Composed ${sidebarPages.length} sidebar pages.`);
@@ -126,16 +134,16 @@ function compose(): void {
     for (const page of standalonePages) {
         const { sourceDir, sourceFile } = page;
         const srcPath = join(ROOT, sourceDir, `${sourceFile}.html`);
-        const content = readFileSync(srcPath, 'utf-8');
+        const content = Deno.readTextFileSync(srcPath);
         const html = content.replace(
             PAGE_CSS_PLACEHOLDER,
             buildPageCssLinks(page.cssBundles),
         );
 
         const outDir = join(OUT, sourceDir);
-        if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
+        if (!exists(outDir)) Deno.mkdirSync(outDir, { recursive: true });
 
-        writeFileSync(join(outDir, `${sourceFile}.html`), html, 'utf-8');
+        Deno.writeTextFileSync(join(outDir, `${sourceFile}.html`), html);
     }
 
     console.log(`Composed ${standalonePages.length} standalone pages.`);
@@ -147,20 +155,20 @@ function copyApiDocumentationRooms(): void {
     const src = join(ROOT, 'api-documentation');
     const dest = join(OUT, 'api-documentation');
     if (resolve(src) === resolve(dest)) return;
-    if (!existsSync(dest)) {
-        mkdirSync(dest, { recursive: true });
+    if (!exists(dest)) {
+        Deno.mkdirSync(dest, { recursive: true });
     }
-    for (const name of readdirSync(src)) {
+    for (const name of [...Deno.readDirSync(src)].map((e) => e.name)) {
         if (
             name === 'index.html'
             || name === 'index.ts'
         ) {
             continue;
         }
-        cpSync(
+        copySync(
             join(src, name),
             join(dest, name),
-            { recursive: true },
+            { overwrite: true },
         );
     }
 }

@@ -231,7 +231,12 @@ namespace. Genuine absence still 404s. See
 
 Page URLs use relative paths (`/ideas/` or
 `/ideas/index.html`). The API is `/api/…`. One origin
-(the `fusion-angle` executable). Testing is HTTP-only.
+(`Deno.serve` inside the compiled binary). Testing is HTTP-only.
+
+### node:crypto scrypt
+
+`server/scrypt-hash.ts` is the one product-process `node:` import
+(`node:crypto` scrypt). A Deno or `@std` scrypt landing retires it.
 
 ### Operator seed and wipe
 

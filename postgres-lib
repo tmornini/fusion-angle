@@ -12,12 +12,12 @@ fail_http() {
     local code="$1"
     local file="$2"
     local msg
-    msg=$(node --input-type=module -e '
-        import { readFileSync } from "node:fs";
-        const path = process.argv[1];
+    msg=$(printf '%s' '
+        const enc = new TextEncoder();
+        const path = Deno.args[0];
         let msg = "";
         try {
-            const raw = readFileSync(path, "utf8");
+            const raw = Deno.readTextFileSync(path);
             const json = JSON.parse(raw);
             if (
                 json
@@ -28,8 +28,8 @@ fail_http() {
         } catch {
             msg = "";
         }
-        process.stdout.write(msg);
-    ' "$file")
+        Deno.stdout.writeSync(enc.encode(msg));
+    ' | deno run --frozen --allow-read="$file" - "$file")
     if [ -n "$msg" ]; then
         echo "Error: Render HTTP ${code}: ${msg}" >&2
     else
@@ -69,15 +69,14 @@ http_json() {
 write_job_body() {
     local dest="$1"
     local cmd="$2"
-    node --input-type=module -e '
-        import { writeFileSync } from "node:fs";
-        writeFileSync(
-            process.argv[1],
+    printf '%s' '
+        Deno.writeTextFileSync(
+            Deno.args[0],
             JSON.stringify({
-                startCommand: process.argv[2],
+                startCommand: Deno.args[1],
             }),
         );
-    ' "$dest" "$cmd"
+    ' | deno run --frozen --allow-write="$dest" - "$dest" "$cmd"
 }
 
 start_rfc3339() {
@@ -117,12 +116,9 @@ fetch_logs() {
 flatten_render_logs() {
     local src="$1"
     local dest="$2"
-    node --input-type=module -e '
-        import { readFileSync, writeFileSync } from
-            "node:fs";
-        import { argv } from "node:process";
+    printf '%s' '
         const data = JSON.parse(
-            readFileSync(argv[1], "utf8"),
+            Deno.readTextFileSync(Deno.args[0]),
         );
         const logs = Array.isArray(data.logs)
             ? data.logs
@@ -137,8 +133,12 @@ flatten_render_logs() {
                 lines.push(line);
             }
         }
-        writeFileSync(argv[2], lines.join("\n"));
-    ' "$src" "$dest"
+        Deno.writeTextFileSync(
+            Deno.args[1],
+            lines.join("\n"),
+        );
+    ' | deno run --frozen \
+        --allow-read="$src" --allow-write="$dest" - "$src" "$dest"
 }
 
 # Print the reveal from the header through the last
@@ -147,17 +147,15 @@ flatten_render_logs() {
 # tab-bearing line follows it.
 print_reveal_lines() {
     local file="$1"
-    node --input-type=module -e '
-        import { readFileSync } from "node:fs";
-        import { argv, stdout, exit } from
-            "node:process";
-        const header = argv[2];
-        const text = readFileSync(argv[1], "utf8");
+    printf '%s' '
+        const enc = new TextEncoder();
+        const header = Deno.args[1];
+        const text = Deno.readTextFileSync(Deno.args[0]);
         const lines = text.split("\n");
         const idx = lines.findIndex(
             (line) => line.includes(header),
         );
-        if (idx < 0) exit(10);
+        if (idx < 0) Deno.exit(10);
         let lastTab = -1;
         for (let i = idx + 1; i < lines.length;
             i++) {
@@ -165,12 +163,12 @@ print_reveal_lines() {
                 lastTab = i;
             }
         }
-        if (lastTab < 0) exit(11);
-        stdout.write(
-            lines.slice(idx, lastTab + 1)
-                .join("\n") + "\n",
-        );
-    ' "$file" "$REVEAL_HEADER"
+        if (lastTab < 0) Deno.exit(11);
+        const out = lines.slice(idx, lastTab + 1)
+            .join("\n") + "\n";
+        Deno.stdout.writeSync(enc.encode(out));
+    ' | deno run --frozen --allow-read="$file" \
+        - "$file" "$REVEAL_HEADER"
 }
 
 assert_loopback_postgres_url() {
@@ -180,18 +178,19 @@ assert_loopback_postgres_url() {
         exit 1
     fi
     local host
-    host=$(node --input-type=module -e '
-        const url = process.env.POSTGRES_URL
+    host=$(printf '%s' '
+        const enc = new TextEncoder();
+        const url = Deno.env.get("POSTGRES_URL")
             ?? "";
-        if (url === "") process.exit(2);
+        if (url === "") Deno.exit(2);
         try {
-            process.stdout.write(
+            Deno.stdout.writeSync(enc.encode(
                 new URL(url).hostname,
-            );
+            ));
         } catch {
-            process.exit(3);
+            Deno.exit(3);
         }
-    ') || {
+    ' | deno run --frozen --allow-env=POSTGRES_URL -) || {
         echo "Error: POSTGRES_URL host is not" \
             "loopback" >&2
         exit 1
@@ -210,37 +209,37 @@ assert_loopback_postgres_url() {
 job_id_from() {
     local file="$1"
     local label="$2"
-    node --input-type=module -e '
-        import { readFileSync } from "node:fs";
+    printf '%s' '
+        const enc = new TextEncoder();
         const job = JSON.parse(
-            readFileSync(process.argv[1], "utf8"),
+            Deno.readTextFileSync(Deno.args[0]),
         );
         if (typeof job.id !== "string"
             || job.id === "") {
-            process.stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 "Error: "
-                + process.argv[2]
+                + Deno.args[1]
                 + " job id missing\n",
-            );
-            process.exit(1);
+            ));
+            Deno.exit(1);
         }
-        process.stdout.write(job.id);
-    ' "$file" "$label"
+        Deno.stdout.writeSync(enc.encode(job.id));
+    ' | deno run --frozen --allow-read="$file" - "$file" "$label"
 }
 
 job_status_from() {
     local file="$1"
-    node --input-type=module -e '
-        import { readFileSync } from "node:fs";
+    printf '%s' '
+        const enc = new TextEncoder();
         const job = JSON.parse(
-            readFileSync(process.argv[1], "utf8"),
+            Deno.readTextFileSync(Deno.args[0]),
         );
-        process.stdout.write(
+        Deno.stdout.writeSync(enc.encode(
             typeof job.status === "string"
                 ? job.status
                 : "",
-        );
-    ' "$file"
+        ));
+    ' | deno run --frozen --allow-read="$file" - "$file"
 }
 
 wait_for_job() {
@@ -280,40 +279,40 @@ discover_render_ids() {
         '/services?type=web_service&limit=100' \
         "$TMP/services.json"
 
-    node --input-type=module -e '
-        import { readFileSync } from "node:fs";
-        import { argv, stdout, stderr, exit } from
-            "node:process";
+    printf '%s' '
+        const enc = new TextEncoder();
 
         function load(path) {
             const json = JSON.parse(
-                readFileSync(path, "utf8"),
+                Deno.readTextFileSync(path),
             );
             if (!Array.isArray(json)) {
-                stderr.write(
+                Deno.stderr.writeSync(enc.encode(
                     "Error: Render list is not an array\n",
-                );
-                exit(1);
+                ));
+                Deno.exit(1);
             }
             return json;
         }
 
         function refuse(kind, lines) {
-            stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 "Error: expected exactly one "
                 + kind
                 + ", found "
                 + String(lines.length)
                 + "\n",
-            );
+            ));
             for (const line of lines) {
-                stderr.write("  " + line + "\n");
+                Deno.stderr.writeSync(
+                    enc.encode("  " + line + "\n"),
+                );
             }
-            exit(1);
+            Deno.exit(1);
         }
 
-        const postgres = load(argv[1]);
-        const services = load(argv[2]);
+        const postgres = load(Deno.args[0]);
+        const services = load(Deno.args[1]);
         const pgLines = postgres.map((row) => {
             const item = row && row.postgres;
             const name = item && item.name;
@@ -344,20 +343,25 @@ discover_render_ids() {
         const serviceId = services[0].service
             && services[0].service.id;
         if (typeof owner !== "string" || owner === "") {
-            stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 "Error: Postgres owner id missing\n",
-            );
-            exit(1);
+            ));
+            Deno.exit(1);
         }
         if (typeof serviceId !== "string"
             || serviceId === "") {
-            stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 "Error: web service id missing\n",
-            );
-            exit(1);
+            ));
+            Deno.exit(1);
         }
-        stdout.write(owner + "\n" + serviceId + "\n");
-    ' "$TMP/postgres.json" "$TMP/services.json" \
+        Deno.stdout.writeSync(
+            enc.encode(owner + "\n" + serviceId + "\n"),
+        );
+    ' | deno run --frozen \
+        --allow-read="$TMP/postgres.json" \
+        --allow-read="$TMP/services.json" \
+        - "$TMP/postgres.json" "$TMP/services.json" \
         > "$TMP/ids.txt"
 
     OWNER_ID=$(sed -n '1p' "$TMP/ids.txt")

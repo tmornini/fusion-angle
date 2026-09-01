@@ -85,7 +85,7 @@ cat > "$BUILD_DIR/main.ts" <<ENTRY
 import { dispatch } from '${SERVER_IMPORT}';
 Deno.exit(await dispatch(
     new URL('./site/', import.meta.url),
-    process.argv.slice(2),
+    Deno.args,
 ));
 ENTRY
 

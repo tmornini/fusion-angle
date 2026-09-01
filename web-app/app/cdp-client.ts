@@ -1,12 +1,9 @@
-// Node-only CDP transport, Chrome launch, and waits.
-// Shared by ./measure and ./test-browser. On the browser
-// exclude list (Node APIs + global WebSocket), like
-// measure.ts.
+// CDP transport, Chrome launcher, and waits, shared by
+// ./measure and ./test-browser. killProcessTree takes a
+// structural KillableChild, not Deno.ChildProcess, so it
+// stays indifferent to which runtime spawned the child.
 
-import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { platform } from 'node:os';
-import { join } from 'node:path';
+import { join } from '@std/path';
 
 export const CHROME_READY_MS = 15_000;
 export const POLL_MS = 200;
@@ -39,10 +36,11 @@ export async function pollUntil<T>(
 }
 
 export function chromeBinary(): string {
-    if (process.env.CHROME) {
-        return process.env.CHROME;
+    const chrome = Deno.env.get('CHROME');
+    if (chrome) {
+        return chrome;
     }
-    if (platform() === 'darwin') {
+    if (Deno.build.os === 'darwin') {
         return '/Applications/Google Chrome.app'
             + '/Contents/MacOS/Google Chrome';
     }
@@ -52,27 +50,85 @@ export function chromeBinary(): string {
     );
 }
 
+export type KillableChild = {
+    readonly pid?: number | undefined;
+    kill(signal: 'SIGTERM' | 'SIGKILL'): unknown;
+};
+
+// Deno.Command never makes a spawned child a process-
+// group leader, so a negative-pid kill always fails here.
+// Walk descendants from one ps snapshot instead.
+function descendantPids(rootPid: number): number[] {
+    let output: Deno.CommandOutput;
+    try {
+        output = new Deno.Command('ps', {
+            args: ['-A', '-o', 'pid=,ppid='],
+            stdout: 'piped',
+            stderr: 'null',
+        }).outputSync();
+    } catch (error) {
+        if (
+            error instanceof Deno.errors.PermissionDenied
+            || error instanceof Deno.errors.NotFound
+        ) {
+            return [];
+        }
+        throw error;
+    }
+    if (!output.success) {
+        return [];
+    }
+    const childrenOf = new Map<number, number[]>();
+    const text = new TextDecoder().decode(output.stdout);
+    for (const line of text.split('\n')) {
+        const fields = line.trim().split(/\s+/);
+        const pidText = fields[0];
+        const ppidText = fields[1];
+        if (pidText === undefined || ppidText === undefined) {
+            continue;
+        }
+        const pid = Number(pidText);
+        const ppid = Number(ppidText);
+        if (!Number.isFinite(pid) || !Number.isFinite(ppid)) {
+            continue;
+        }
+        const siblings = childrenOf.get(ppid);
+        if (siblings === undefined) {
+            childrenOf.set(ppid, [pid]);
+        } else {
+            siblings.push(pid);
+        }
+    }
+    const pids: number[] = [];
+    const stack = [rootPid];
+    while (stack.length > 0) {
+        const pid = stack.pop();
+        if (pid === undefined) continue;
+        for (const kid of childrenOf.get(pid) ?? []) {
+            pids.push(kid);
+            stack.push(kid);
+        }
+    }
+    return pids;
+}
+
 export function killProcessTree(
-    child: ChildProcess | null,
+    child: KillableChild | null,
 ): void {
     if (child === null || child.pid === undefined) {
         return;
     }
-    try {
-        // Negative PID = process group (spawn detached).
-        process.kill(-child.pid, 'SIGTERM');
-    } catch {
-        try {
-            child.kill('SIGTERM');
-        } catch {
-            // already gone
+    const descendants = descendantPids(child.pid);
+    for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
+        for (const pid of descendants) {
+            try {
+                Deno.kill(pid, signal);
+            } catch {
+                // best-effort: don't let one pid block the rest
+            }
         }
-    }
-    try {
-        process.kill(-child.pid, 'SIGKILL');
-    } catch {
         try {
-            child.kill('SIGKILL');
+            child.kill(signal);
         } catch {
             // already gone
         }
@@ -367,7 +423,7 @@ export class CdpSession {
 export function launchChrome(options: {
     readonly userDataDir: string;
     readonly windowSize?: string;
-}): ChildProcess {
+}): Deno.ChildProcess {
     const args = [
         '--headless=new',
         '--remote-debugging-port=0',
@@ -380,10 +436,11 @@ export function launchChrome(options: {
         args.push(`--window-size=${options.windowSize}`);
     }
     args.push('about:blank');
-    const child = spawn(
-        chromeBinary(), args,
-        { stdio: 'ignore', detached: true },
-    );
+    const child = new Deno.Command(chromeBinary(), {
+        args,
+        stdout: 'null',
+        stderr: 'null',
+    }).spawn();
     child.unref();
     return child;
 }
@@ -411,6 +468,18 @@ export async function browserWsUrl(
     return info.webSocketDebuggerUrl;
 }
 
+function exists(path: string): boolean {
+    try {
+        Deno.statSync(path);
+        return true;
+    } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+            return false;
+        }
+        throw error;
+    }
+}
+
 export async function waitDevtoolsPort(
     userDataDir: string,
     timeoutMs: number,
@@ -423,12 +492,10 @@ export async function waitDevtoolsPort(
         'Chrome DevToolsActivePort',
         timeoutMs,
         async () => {
-            if (!existsSync(path)) {
+            if (!exists(path)) {
                 return null;
             }
-            const text = readFileSync(
-                path, 'utf8',
-            ).trim();
+            const text = Deno.readTextFileSync(path).trim();
             if (text.length === 0) {
                 return null;
             }

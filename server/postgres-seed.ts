@@ -1,6 +1,6 @@
-// Operator seed. One mode flag. Writes DDL,
-// seeds an empty database, prints credentials
-// once on stdout. Node-only.
+// Operator seed verb. Serve has no DDL; genesis
+// lives outside HTTP so credentials print once
+// on an empty database only.
 
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import { PostgresBackend } from
@@ -15,7 +15,7 @@ import {
     STATEMENT_TIMEOUT_MS,
     assertNoLegacyMessageTables,
     assertUtf8,
-    requiredEnv,
+    requiredEnvBy,
 } from './postgres-gate.ts';
 import {
     parseSeedArgv,
@@ -31,6 +31,8 @@ import {
     scryptHash,
     scryptDerive,
 } from './scrypt-hash.ts';
+
+const enc = new TextEncoder();
 
 const USAGE =
     'Usage: postgres-seed --bootstrap|--mock-data\n';
@@ -52,18 +54,21 @@ export async function seedMain(
     try {
         const parsed = parseSeedArgv(args);
         if (parsed.kind === 'help') {
-            process.stdout.write(USAGE);
+            Deno.stdout.writeSync(enc.encode(USAGE));
             return 0;
         }
         if (parsed.kind === 'error') {
-            process.stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 parsed.message + '\n' + USAGE,
-            );
+            ));
             return 1;
         }
         setPasswordHasher(scryptHash);
         setScryptDerive(scryptDerive);
-        const postgresUrl = requiredEnv('POSTGRES_URL');
+        const postgresUrl = requiredEnvBy(
+            'POSTGRES_URL',
+            (name) => Deno.env.get(name),
+        );
         const sql: SqlClient = connectPostgres(
             postgresUrl,
             {
@@ -85,16 +90,20 @@ export async function seedMain(
                 sql, adapter, parsed.mode, {
                     hashPassword: serialPasswordHasher(),
                     write: (chunk) => {
-                        process.stdout.write(chunk);
+                        Deno.stdout.writeSync(
+                            enc.encode(chunk),
+                        );
                     },
                 },
             );
-            process.stderr.write(JSON.stringify({
-                at: new Date().toISOString(),
-                level: 'info',
-                message: 'seeded',
-                mode: parsed.mode,
-            }) + '\n');
+            Deno.stderr.writeSync(enc.encode(
+                JSON.stringify({
+                    at: new Date().toISOString(),
+                    level: 'info',
+                    message: 'seeded',
+                    mode: parsed.mode,
+                }) + '\n',
+            ));
         } finally {
             await sql.end();
         }
@@ -116,9 +125,13 @@ export async function seedMain(
             && code !== undefined) {
             rec.code = code;
         }
-        process.stderr.write(
+        Deno.stderr.writeSync(enc.encode(
             JSON.stringify(rec) + '\n',
-        );
+        ));
         return 1;
     }
+}
+
+if (import.meta.main) {
+    Deno.exit(await seedMain(Deno.args));
 }

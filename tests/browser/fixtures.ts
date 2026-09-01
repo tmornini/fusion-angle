@@ -4,7 +4,6 @@
 // under ./test-browser (FUSION_ANGLE_STATIC_ROOT).
 
 import { after, before } from 'node:test';
-import type { ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -29,6 +28,7 @@ import {
     CHROME_READY_MS,
     CdpClient,
     CdpSession,
+    type KillableChild,
     browserWsUrl,
     killProcessTree,
     launchChrome,
@@ -339,12 +339,12 @@ function keyCodeOf(name: string): [string, number] {
 
 export class Browser {
     readonly client: CdpClient;
-    private readonly chrome: ChildProcess | null;
+    private readonly chrome: KillableChild | null;
     private readonly userDataDir: string | null;
 
     private constructor(
         client: CdpClient,
-        chrome: ChildProcess | null,
+        chrome: KillableChild | null,
         userDataDir: string | null,
     ) {
         this.client = client;
@@ -367,7 +367,7 @@ export class Browser {
         // orphan outlives this process and holds its
         // profile. Release both on every failure path,
         // then rethrow — the caller must still see why.
-        let chrome: ChildProcess | null = null;
+        let chrome: KillableChild | null = null;
         try {
             chrome = launchChrome({
                 userDataDir,

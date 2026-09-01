@@ -1,24 +1,9 @@
 // Derive API.svg and verb/status rooms from the live
 // route table. The table is the surface: if it is not
-// on routes[], it does not exist. Run via
-// ./generate-api-documentation [--check].
-//
-// Dev tooling, like generate-schema-svg.ts: run
-// with `node --strip-types`, Node APIs, on the
-// browser exclude list, kept under the 78-char
-// lint.
+// on routes[], it does not exist.
 // Output is deterministic — no clocks, no randomness,
 // stable ordering — so `--check` can gate staleness.
-import {
-    existsSync,
-    mkdirSync,
-    readdirSync,
-    readFileSync,
-    rmSync,
-    statSync,
-    writeFileSync,
-} from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join } from '@std/path';
 import { routes } from '../../api/routes.ts';
 import type { Route } from '../../api/routes.ts';
 import {
@@ -48,6 +33,7 @@ const KEPT_ROOT_NAMES = new Set([
     'index.html',
     'index.ts',
 ]);
+const enc = new TextEncoder();
 
 function wrapLine(line: string): string[] {
     if (line.length <= LINE_MAX) return [line];
@@ -959,11 +945,25 @@ function generateAll(): Map<string, string> {
     return out;
 }
 
+function exists(path: string): boolean {
+    try {
+        Deno.statSync(path);
+        return true;
+    } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+            return false;
+        }
+        throw error;
+    }
+}
+
 function readTree(root: string): Map<string, string> {
     const out = new Map<string, string>();
-    if (!existsSync(root)) return out;
+    if (!exists(root)) return out;
     const walk = (abs: string, rel: string): void => {
-        const names = readdirSync(abs).sort();
+        const names = [...Deno.readDirSync(abs)]
+            .map((e) => e.name)
+            .sort();
         for (const name of names) {
             if (name.startsWith('.')) continue;
             if (
@@ -976,12 +976,12 @@ function readTree(root: string): Map<string, string> {
                 ? name
                 : rel + '/' + name;
             const childAbs = join(abs, name);
-            if (statSync(childAbs).isDirectory()) {
+            if (Deno.statSync(childAbs).isDirectory) {
                 walk(childAbs, childRel);
             } else {
                 out.set(
                     childRel,
-                    readFileSync(childAbs, 'utf8'),
+                    Deno.readTextFileSync(childAbs),
                 );
             }
         }
@@ -1005,46 +1005,45 @@ function writeTree(
     root: string,
     files: Map<string, string>,
 ): void {
-    mkdirSync(root, { recursive: true });
+    Deno.mkdirSync(root, { recursive: true });
     const disk = readTree(root);
     for (const path of disk.keys()) {
         if (!files.has(path)) {
-            rmSync(join(root, path));
+            Deno.removeSync(join(root, path));
         }
     }
     const paths = [...files.keys()].sort();
     for (const path of paths) {
         const abs = join(root, path);
-        mkdirSync(dirname(abs), { recursive: true });
-        writeFileSync(abs, files.get(path)!);
+        Deno.mkdirSync(dirname(abs), { recursive: true });
+        Deno.writeTextFileSync(abs, files.get(path)!);
     }
 }
 
 function isCliEntry(): boolean {
-    const entry = process.argv[1];
-    return typeof entry === 'string'
-        && /generate-api-documentation\.ts$/
-            .test(entry);
+    return import.meta.main;
 }
 
 function runCli(): void {
-    if (process.argv.includes('--check')) {
+    if (Deno.args.includes('--check')) {
         const next = generateAll();
         const disk = readTree(OUT_ROOT);
         if (!mapsEqual(next, disk)) {
-            process.stderr.write(
+            Deno.stderr.writeSync(enc.encode(
                 'api-documentation is stale — run'
                 + ' ./generate-api-documentation\n',
-            );
-            process.exit(1);
+            ));
+            Deno.exit(1);
         }
-        process.stdout.write(
+        Deno.stdout.writeSync(enc.encode(
             'api-documentation is up to date\n',
-        );
+        ));
         return;
     }
     writeTree(OUT_ROOT, generateAll());
-    process.stdout.write('wrote ' + OUT_ROOT + '\n');
+    Deno.stdout.writeSync(enc.encode(
+        'wrote ' + OUT_ROOT + '\n',
+    ));
 }
 
 if (isCliEntry()) runCli();

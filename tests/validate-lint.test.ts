@@ -6,9 +6,9 @@ const VALIDATE = readFileSync('validate', 'utf8');
 
 function longLineBlock(src: string): string {
     const start = src.indexOf('LONG_LINES=');
-    const end = src.indexOf('DOC_LINE_FAIL=');
+    const end = src.indexOf('if [ -n "$LONG_LINES"');
     assert.ok(start >= 0, 'LONG_LINES missing');
-    assert.ok(end > start, 'DOC_LINE_FAIL missing');
+    assert.ok(end > start, 'LONG_LINES guard missing');
     return src.slice(start, end);
 }
 

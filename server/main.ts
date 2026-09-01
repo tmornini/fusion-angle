@@ -6,6 +6,8 @@ import { main as serve } from './boot.ts';
 import { seedMain } from './postgres-seed.ts';
 import { wipeMain } from './postgres-wipe.ts';
 
+const enc = new TextEncoder();
+
 export const USAGE =
     'Usage: fusion-angle serve|seed|wipe\n';
 
@@ -21,6 +23,6 @@ export async function dispatch(
     }
     if (verb === 'seed') return seedMain(rest);
     if (verb === 'wipe') return wipeMain(rest);
-    process.stderr.write(USAGE);
+    Deno.stderr.writeSync(enc.encode(USAGE));
     return 2;
 }

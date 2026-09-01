@@ -30,7 +30,7 @@ Options:
 render: TOKEN must see exactly one Postgres and
 one web service. HTTP only (curl).
 local: assert loopback, then
-node --strip-types server/postgres-seed.ts.
+deno run --frozen server/postgres-seed.ts.
 compose: docker compose run --rm seed MODE — the
 Render job command inside the builder image.
 Development gun.
@@ -153,15 +153,19 @@ if [ "$POSTGRES_TARGET" = "compose" ]; then
         run --rm seed "$MODE"
 fi
 
-if ! command -v node >/dev/null; then
-    echo "Error: node is required" >&2
+if ! command -v deno >/dev/null; then
+    echo "Error: deno is required" >&2
     exit 1
 fi
 
 if [ "$POSTGRES_TARGET" = "local" ]; then
     assert_loopback_postgres_url
     ROOT="$(cd "$(dirname "$0")" && pwd)"
-    exec node --strip-types \
+    exec deno run --frozen --allow-net \
+        --allow-env=POSTGRES_URL,PGPORT,PGSSL,PGSSLNEGOTIATION,\
+PGIDLE_TIMEOUT,PGCONNECT_TIMEOUT,PGMAX_LIFETIME,PGMAX_PIPELINE,PGBACKOFF,\
+PGKEEP_ALIVE,PGPREPARE,PGDEBUG,PGFETCH_TYPES,PGPUBLICATIONS,\
+PGTARGET_SESSION_ATTRS,PGAPPNAME,PGTARGETSESSIONATTRS,JWT_HMAC_SIGNING_KEY \
         "$ROOT/server/postgres-seed.ts" "$MODE"
 fi
 

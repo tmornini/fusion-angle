@@ -1,15 +1,10 @@
-// Node-only generator for ./measure --visualize.
+// Generator for ./measure --visualize.
 // Reads history + budgets from disk; embeds a versioned
 // payload in self-contained dashboard + page HTML.
-// On the browser exclude list (Node APIs).
+// Synchronous Deno file calls have no browser
+// equivalent, so this generator runs only under Deno.
 
-import {
-    existsSync,
-    mkdirSync,
-    readFileSync,
-    writeFileSync,
-} from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join } from '@std/path';
 
 import {
     buildPayload,
@@ -18,6 +13,18 @@ import {
     VIZ_PAYLOAD_VERSION,
     type VizPayload,
 } from './measure-viz-core.ts';
+
+function exists(path: string): boolean {
+    try {
+        Deno.statSync(path);
+        return true;
+    } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+            return false;
+        }
+        throw error;
+    }
+}
 
 export const HISTORY_PATH =
     'measurements/history.jsonl';
@@ -39,13 +46,13 @@ export function generateMeasureViz(
     const budgetsFile = join(repoRoot, BUDGETS_PATH);
     const outFile = join(repoRoot, VIZ_OUTPUT_PATH);
 
-    if (!existsSync(historyFile)) {
+    if (!exists(historyFile)) {
         throw new Error(
             `visualize: missing history file: `
             + historyFile,
         );
     }
-    if (!existsSync(budgetsFile)) {
+    if (!exists(budgetsFile)) {
         throw new Error(
             `visualize: missing budgets file: `
             + budgetsFile,
@@ -55,8 +62,8 @@ export function generateMeasureViz(
     let historyText: string;
     let budgetsText: string;
     try {
-        historyText = readFileSync(
-            historyFile, 'utf8',
+        historyText = Deno.readTextFileSync(
+            historyFile,
         );
     } catch (err: unknown) {
         const msg = err instanceof Error
@@ -68,8 +75,8 @@ export function generateMeasureViz(
         );
     }
     try {
-        budgetsText = readFileSync(
-            budgetsFile, 'utf8',
+        budgetsText = Deno.readTextFileSync(
+            budgetsFile,
         );
     } catch (err: unknown) {
         const msg = err instanceof Error
@@ -88,8 +95,8 @@ export function generateMeasureViz(
     );
     const html = renderVizHtml(payload);
 
-    mkdirSync(dirname(outFile), { recursive: true });
-    writeFileSync(outFile, html, 'utf8');
+    Deno.mkdirSync(dirname(outFile), { recursive: true });
+    Deno.writeTextFileSync(outFile, html);
     return outFile;
 }
 
