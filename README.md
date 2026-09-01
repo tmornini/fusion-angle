@@ -43,9 +43,11 @@ cd fusion-angle
 
 [Deno](https://deno.com) 2.9.6 runs `./validate`,
 `./test`, `./test-postgres`, `./build`,
-`./test-browser`, `./crank`, and both generators,
+`./test-browser`, `./measure`, and both generators,
 resolving its own dependencies from `deno.json` and
-`deno.lock`.
+`deno.lock`. `./crank` composes those scripts, and
+`./serve` execs the `deno compile` binary; neither
+calls `deno` itself.
 
 ## Docs
 

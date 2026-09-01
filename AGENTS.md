@@ -39,8 +39,25 @@ docker compose down        # stop; the database dies with it
 ```
 
 Deno 2.9.6 runs `./validate`, `./test`, `./test-postgres`,
-`./build`, `./test-browser`, `./crank`, and both
-generators.
+`./build`, `./test-browser`, `./measure`, and both
+generators, each invoking the `deno` CLI directly. The
+local `./postgres-seed` and `./postgres-wipe` paths
+`exec deno run` under named permissions, and
+`postgres-lib`'s eight inline programs pipe into
+`deno run --frozen` on stdin. `./crank` composes those
+scripts, and `./serve` execs the `deno compile` binary,
+which embeds the runtime — neither calls `deno` itself.
+
+Deno is the only server-side runtime this repository uses;
+the browser is the other, and runs the pages. No script
+invokes `node` or `npm`; there is no `package.json` and no
+`node_modules`, and `deno.json` sets `nodeModulesDir:
+none`. `deno.json` and `deno.lock` are the whole dependency
+surface, and Deno resolves the `node:` and `npm:`
+specifiers in them itself. A `node:` specifier is
+therefore not a `node` process: `npm:postgres@3.4.9`
+needs no npm CLI, and a `node:path` import resolves with
+no `node` binary on `PATH` at all.
 
 **Commit before building.** `./build` and `./crank`
 require a clean working directory.
@@ -236,7 +253,39 @@ Page URLs use relative paths (`/ideas/` or
 ### node:crypto scrypt
 
 `server/scrypt-hash.ts` is the one product-process `node:` import
-(`node:crypto` scrypt). A Deno or `@std` scrypt landing retires it.
+(`node:crypto` scrypt). A Deno or `@std` scrypt landing retires
+the import, not the algorithm: credentials written since the
+scrypt cutover read `$scrypt$ln=17,r=8,p=1$…`, so scrypt
+verification must outlive the swap. Older `$pbkdf2-sha256$`
+secrets still exist and rehash on login
+(`api/authentication.ts:1544`). `shared/password-hash.ts`
+dispatches on the PHC algo-id, so a second algorithm can take
+new passwords without touching the old ones.
+
+Anchor the specifier on its quote, and match `process` as a
+word — `process\.` cannot see `process?.`:
+
+```bash
+grep -rnE "['\"]node:|\bprocess\b" web-app/app/*.ts \
+    server/ api/ shared/
+```
+
+Twelve lines. One is the `node:crypto` import above. Two are
+`api/access-token.ts:31` and `:35`, where the Node-compat
+`process` global is typed and then read through optional
+chaining (`runtime.process?.env?.[…]`) — a real reader that
+the narrower `process\.` pattern silently clears, leaving a
+one-line false all-clear. The remaining nine are the English
+word: eight in comments, one in the page keyword string
+`'flow, process,'` at `web-app/app/page-registry.ts:177`.
+
+Dropping the quote anchor adds nine more non-specifier hits:
+`node: GraphNode`, a domain property name, in `flow-graph.ts`
+(×3), `flow-operations.ts` (×3), `mermaid-generate.ts`, and
+`api/types.ts`, plus the comment naming `node:crypto` at
+`server/scrypt-hash.ts:2`. The identifier is right and the
+pattern is wrong. `tests/` is outside the sweep on purpose:
+its files still import `node:test`.
 
 ### Operator seed and wipe
 
@@ -279,9 +328,14 @@ graph gives `process` to every file in that check, and a
 type-only `import type … from 'node:fs'` is enough.
 `npm:` does not unlock — `npm:postgres` and the bare
 `postgres` mapping both still reject `process`.
-`web-app` carries six `node:` importers of its own, so
-`deno check … web-app` passes a file whose only line
-is `process.env.HOME`. Nothing under `web-app/` is
+`web-app` no longer carries a `node:` importer of its
+own — the Deno port took the last one — but the gate
+checks it in one invocation with `server` and `tests`,
+and either alone suffices: `server/scrypt-hash.ts`'s
+`node:crypto` unlocks it even with `tests` excluded. So
+`deno check --frozen api shared server tests web-app`
+passes a file under `web-app/app/` whose only line is
+`process.env.HOME`. Nothing under `web-app/` is
 type-fenced against `process` today, and `Deno.*` never
 was: `deno.ns` sits in the lib array.
 `tests/browser-fence.test.ts` checks a hermetically
@@ -294,13 +348,17 @@ in client code now — a runtime `ReferenceError` that
 only on a path they exercise. TODO.md carries the oracle
 for a gate that would restore the fence.
 
-`erasableSyntaxOnly` and `verbatimModuleSyntax` are what
-`node --strip-types` requires at runtime, and `deno check`
-enforces both — an enum or namespace is TS1294. The gate
-binds them. `./postgres-seed --postgres local` and
-`./postgres-wipe --postgres local` still exec
-`node --strip-types`; `postgres-lib`'s JSON helpers still
-run `node -e`.
+`erasableSyntaxOnly` and `verbatimModuleSyntax` were
+adopted because `node --strip-types` required them at
+runtime. Deno requires neither: with no config at all it
+both runs and checks an enum and a namespace. They stay a
+deliberate repo choice, and `deno check` and `./build`'s
+`deno compile` bind them now — `deno compile` type-checks
+unless told not to, and `build` passes no `--no-check`, so
+an enum or namespace is TS1294 at either gate under this
+`deno.json`. What the choice buys is that every `.ts`
+file here stays strippable rather than compiled, so type
+erasure alone is enough to run this source.
 
 ### `localStorage` is real under Deno
 

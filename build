@@ -71,15 +71,16 @@ ABS_BUILD="$(cd "$BUILD_DIR" && pwd)"
 # disk at runtime, so the generated entry must be
 # relative for the binary to run without the source tree.
 SERVER_IMPORT=$(
-    deno eval --frozen \
-        "import path from 'node:path';
-         let rel = path.posix.relative(
-             Deno.args[0],
-             Deno.args[1],
-         );
-         if (!rel.startsWith('.')) rel = './' + rel;
-         console.log(rel);" \
-        -- "$ABS_BUILD" "$ROOT/server/main.ts"
+    printf '%s' '
+        import { relative } from "@std/path/posix";
+        let rel = relative(
+            Deno.args[0],
+            Deno.args[1],
+        );
+        if (!rel.startsWith(".")) rel = "./" + rel;
+        console.log(rel);
+    ' | deno run --frozen --config "$ROOT/deno.json" \
+        - "$ABS_BUILD" "$ROOT/server/main.ts"
 )
 cat > "$BUILD_DIR/main.ts" <<ENTRY
 import { dispatch } from '${SERVER_IMPORT}';

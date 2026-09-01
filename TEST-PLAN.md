@@ -1644,8 +1644,8 @@ covering the D20–D24 run between them.
        reach them — `makeRecordingContainer` in
        tests/presenter-project-detail-impact.test.ts
        renders an equivalent DOM-slot shell under
-       Node, so this is a Layer 1 gap, not a Layer 2
-       one)
+       `deno test`, so this is a Layer 1 gap, not a
+       Layer 2 one)
 - [ ] **D12** Click "Edit" button. PASS: text fields become editable inputs/textareas, Save and Cancel buttons appear, Edit button hides.
   Pin: exploratory — the live edit-mode toggle (the
        page's `handleIdeaActions` click switch has no
