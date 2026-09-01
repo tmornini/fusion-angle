@@ -14,7 +14,7 @@ async function getHeaderData(
         sessionContext,
         getOrganization,
         getDashboardStats,
-    } = await import('./adapters');
+    } = await import('./adapters/index.ts');
     const ctx = sessionContext();
     const [organization, stats] =
         await Promise.all([
@@ -37,7 +37,7 @@ export async function mutateHeaderInfo(
 ): Promise<void> {
     const headerInfo = await getHeaderData();
     const { html, setHtml } =
-        await import('./safe-html');
+        await import('./safe-html.ts');
     const statsEl =
         $('#header-stats', document);
     if (statsEl) {

@@ -5,8 +5,8 @@ import {
     mkdirSync,
     readdirSync,
     cpSync,
-} from 'fs';
-import { join, dirname, resolve } from 'path';
+} from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
 import { PAGE_REGISTRY } from './page-registry.ts';
 import { buildSidebarNavItemsHtml } from './nav-items.ts';
 

@@ -41,7 +41,7 @@ async function getSidebarMember(
     bootOrganizations:
         readonly OrganizationEntity[] | null = null,
 ): Promise<SidebarMember> {
-    const { sessionContext } = await import('./adapters');
+    const { sessionContext } = await import('./adapters/index.ts');
     const ctx = sessionContext();
     // The chip is the caller's own row, drawn from role-independent
     // sources: id + display name from the verified token

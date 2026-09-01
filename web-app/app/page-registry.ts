@@ -51,7 +51,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'index',
         icon: iconHome,
         keywords: 'home overview',
-        loader: () => import('../dashboard/index'),
+        loader: () => import('../dashboard/index.ts'),
     },
     organization: {
         title: 'Organization',
@@ -63,7 +63,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'organization billing plan',
         cssBundles: ['pages-organization'],
-        loader: () => import('../organization/index'),
+        loader: () => import('../organization/index.ts'),
     },
     ideas: {
         title: 'Ideas',
@@ -74,7 +74,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconLightbulb,
         keywords: 'ideas list innovation',
         cssBundles: ['pages-ideas'],
-        loader: () => import('../ideas/index'),
+        loader: () => import('../ideas/index.ts'),
     },
     'idea-detail': {
         title: 'Idea Detail',
@@ -85,7 +85,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconLightbulb,
         searchable: false,
         cssBundles: ['pages-ideas'],
-        loader: () => import('../ideas/detail'),
+        loader: () => import('../ideas/detail.ts'),
     },
     'idea-create': {
         title: 'Create Idea',
@@ -96,7 +96,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconLightbulb,
         keywords: 'new idea submit',
         cssBundles: ['pages-ideas'],
-        loader: () => import('../ideas/create'),
+        loader: () => import('../ideas/create.ts'),
     },
     'idea-convert': {
         title: 'Convert Idea',
@@ -107,7 +107,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconLightbulb,
         searchable: false,
         cssBundles: ['pages-ideas'],
-        loader: () => import('../ideas/convert'),
+        loader: () => import('../ideas/convert.ts'),
     },
     projects: {
         title: 'Projects',
@@ -119,7 +119,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'projects list kanban',
         cssBundles: ['pages-projects'],
-        loader: () => import('../projects/index'),
+        loader: () => import('../projects/index.ts'),
     },
     'project-detail': {
         title: 'Project Detail',
@@ -130,7 +130,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconFolderKanban,
         searchable: false,
         cssBundles: ['pages-projects'],
-        loader: () => import('../projects/detail'),
+        loader: () => import('../projects/detail.ts'),
     },
     records: {
         title: 'Records',
@@ -142,7 +142,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'records data shape attribute',
         cssBundles: ['pages-records'],
-        loader: () => import('../records/index'),
+        loader: () => import('../records/index.ts'),
     },
     'record-create': {
         title: 'Create Record',
@@ -153,7 +153,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconDatabase,
         keywords: 'new record create',
         cssBundles: ['pages-records'],
-        loader: () => import('../records/create'),
+        loader: () => import('../records/create.ts'),
     },
     'record-detail': {
         title: 'Record',
@@ -164,7 +164,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconDatabase,
         searchable: false,
         cssBundles: ['pages-records'],
-        loader: () => import('../records/detail'),
+        loader: () => import('../records/detail.ts'),
     },
     flows: {
         title: 'Flows',
@@ -176,7 +176,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'flow, process,'
             + ' state machine',
-        loader: () => import('../flows/index'),
+        loader: () => import('../flows/index.ts'),
     },
     'flow-detail': {
         title: 'Flow Designer',
@@ -187,7 +187,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconGitBranch,
         searchable: false,
         cssBundles: ['pages-flow-detail'],
-        loader: () => import('../flows/detail'),
+        loader: () => import('../flows/detail.ts'),
     },
     'flow-stats': {
         title: 'Flow Statistics',
@@ -198,7 +198,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconBarChart,
         searchable: false,
         cssBundles: ['pages-flow-stats'],
-        loader: () => import('../flows/stats'),
+        loader: () => import('../flows/stats.ts'),
     },
     workbox: {
         title: 'Workbox',
@@ -210,7 +210,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'workbox inbox work order',
         cssBundles: ['pages-workbox'],
-        loader: () => import('../workbox/index'),
+        loader: () => import('../workbox/index.ts'),
     },
     'workbox-detail': {
         title: 'Work Order',
@@ -221,7 +221,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconMail,
         searchable: false,
         cssBundles: ['pages-workbox'],
-        loader: () => import('../workbox/detail'),
+        loader: () => import('../workbox/detail.ts'),
     },
     members: {
         title: 'Members',
@@ -233,7 +233,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'members humans AI manage admin',
         cssBundles: ['pages-members'],
-        loader: () => import('../members/index'),
+        loader: () => import('../members/index.ts'),
     },
     'member-detail': {
         title: 'Member',
@@ -244,7 +244,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconPerson,
         searchable: false,
         cssBundles: ['pages-members'],
-        loader: () => import('../members/detail'),
+        loader: () => import('../members/detail.ts'),
     },
     invitations: {
         title: 'Invitations',
@@ -254,7 +254,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'index',
         icon: iconMail,
         searchable: false,
-        loader: () => import('../invitations/index'),
+        loader: () => import('../invitations/index.ts'),
     },
     identities: {
         title: 'Identities',
@@ -267,7 +267,7 @@ export const PAGE_REGISTRY: Record<
             'identities person service'
             + ' credentials providers tokens',
         cssBundles: ['pages-identities'],
-        loader: () => import('../identities/index'),
+        loader: () => import('../identities/index.ts'),
     },
     'identity-detail': {
         title: 'Identity',
@@ -278,7 +278,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconShield,
         searchable: false,
         cssBundles: ['pages-identities'],
-        loader: () => import('../identities/detail'),
+        loader: () => import('../identities/detail.ts'),
     },
     'identity-providers': {
         title: 'Identity Providers',
@@ -290,7 +290,7 @@ export const PAGE_REGISTRY: Record<
         searchable: false,
         cssBundles: ['pages-identities'],
         loader: () =>
-            import('../identity-providers/index'),
+            import('../identity-providers/index.ts'),
     },
     'identity-tokens': {
         title: 'Tokens',
@@ -302,7 +302,7 @@ export const PAGE_REGISTRY: Record<
         searchable: false,
         cssBundles: ['pages-identities'],
         loader: () =>
-            import('../identity-tokens/index'),
+            import('../identity-tokens/index.ts'),
     },
     billing: {
         title: 'Billing',
@@ -314,7 +314,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'billing plan invoices'
             + ' payment',
-        loader: () => import('../billing/index'),
+        loader: () => import('../billing/index.ts'),
     },
     'api-documentation': {
         title: 'API',
@@ -326,7 +326,7 @@ export const PAGE_REGISTRY: Record<
         keywords: 'api http routes documentation',
         requiresAuth: false,
         cssBundles: ['pages-api-documentation'],
-        loader: () => import('../api-documentation/index'),
+        loader: () => import('../api-documentation/index.ts'),
     },
     'design-system': {
         title: 'Design System',
@@ -339,7 +339,7 @@ export const PAGE_REGISTRY: Record<
             'components ui reference',
         requiresAuth: false,
         cssBundles: ['pages-design-system'],
-        loader: () => import('../design-system/index'),
+        loader: () => import('../design-system/index.ts'),
     },
     auth: {
         title: 'Authentication',
@@ -349,7 +349,7 @@ export const PAGE_REGISTRY: Record<
         searchable: false,
         requiresAuth: false,
         cssBundles: ['pages-auth'],
-        loader: () => import('../auth/index'),
+        loader: () => import('../auth/index.ts'),
     },
     landing: {
         title: 'Landing',
@@ -359,7 +359,7 @@ export const PAGE_REGISTRY: Record<
         searchable: false,
         requiresAuth: false,
         cssBundles: ['pages-landing'],
-        loader: () => import('../landing/index'),
+        loader: () => import('../landing/index.ts'),
     },
     'not-found': {
         title: '404 Not Found',
@@ -368,7 +368,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'index',
         searchable: false,
         requiresAuth: false,
-        loader: () => import('../not-found/index'),
+        loader: () => import('../not-found/index.ts'),
     },
 };
 

@@ -82,7 +82,7 @@ import {
 } from './page-performance.ts';
 
 async function loadAndInitCommandPalette(): Promise<void> {
-    const cp = await import('./command-palette');
+    const cp = await import('./command-palette.ts');
     cp.initCommandPalette();
 }
 
