@@ -101,7 +101,7 @@ test('serve missing JWT exits 1', () => {
 test('serve does not invoke ./build', () => {
     const src = readFileSync('serve', 'utf8');
     assert.doesNotMatch(src, /\.\/build/);
-    assert.match(src, /node server\.mjs/);
+    assert.match(src, /exec \.\/fusion-angle serve/);
     assert.doesNotMatch(src, /DEFAULT_PORT/);
     assert.doesNotMatch(src, /mktemp/);
 });

@@ -9,7 +9,7 @@ Options:
   path/      Output directory (trailing / required)
              Default: ~/Desktop/
   --no-zip   Create bundle directory without zipping
-             (server-core + server.mjs — for ./crank)
+             (the fusion-angle executable — for ./crank)
   --help     Show this help message
 
 Examples:
@@ -57,26 +57,59 @@ else
     trap 'rm -rf "$BUILD_DIR"' EXIT
 fi
 
-bundle_client "$BUILD_DIR"
+bundle_client "$BUILD_DIR/site"
 
-npx --no-install esbuild \
-    server/boot.ts \
-    --bundle \
-    --platform=node \
-    --format=esm \
-    --target=es2024 \
-    --keep-names \
-    --outfile="$BUILD_DIR/server.mjs"
+if [ "$NO_ZIP" = true ]; then
+    TARGET_FLAG=""
+else
+    TARGET_FLAG="--target x86_64-unknown-linux-gnu"
+fi
 
-emitted "Server process created" \
-    "$BUILD_DIR/server.mjs"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+ABS_BUILD="$(cd "$BUILD_DIR" && pwd)"
+# deno compile looks up absolute file:// specifiers on
+# disk at runtime, so the generated entry must be
+# relative for the binary to run without the source tree.
+SERVER_IMPORT=$(
+    deno eval --frozen \
+        "import path from 'node:path';
+         let rel = path.posix.relative(
+             Deno.args[0],
+             Deno.args[1],
+         );
+         if (!rel.startsWith('.')) rel = './' + rel;
+         console.log(rel);" \
+        -- "$ABS_BUILD" "$ROOT/server/main.ts"
+)
+cat > "$BUILD_DIR/main.ts" <<ENTRY
+import { dispatch } from '${SERVER_IMPORT}';
+Deno.exit(await dispatch(
+    new URL('./site/', import.meta.url),
+    process.argv.slice(2),
+));
+ENTRY
+
+deno compile --frozen --exclude-unused-npm \
+    --config "$ROOT/deno.json" \
+    --include "$BUILD_DIR/site" \
+    --allow-net \
+    --allow-env=POSTGRES_URL,PGPORT,PGSSL,PGSSLNEGOTIATION,PGIDLE_TIMEOUT,\
+PGCONNECT_TIMEOUT,PGMAX_LIFETIME,PGMAX_PIPELINE,PGBACKOFF,\
+PGKEEP_ALIVE,PGPREPARE,PGDEBUG,PGFETCH_TYPES,PGPUBLICATIONS,\
+PGTARGET_SESSION_ATTRS,PGAPPNAME,PGTARGETSESSIONATTRS,\
+JWT_HMAC_SIGNING_KEY,HTTP_SERVER_PORT,TRUSTED_PROXY_HOPS \
+    ${TARGET_FLAG} \
+    -o "$BUILD_DIR/fusion-angle" \
+    "$BUILD_DIR/main.ts"
+
+emitted "Executable created" "$BUILD_DIR/fusion-angle"
 
 if [ "$NO_ZIP" = true ]; then
     echo "Bundle: $BUILD_DIR"
 else
     SHA=$(git rev-parse --short=7 HEAD)
     DEST_DIR="${DEST:-$HOME/Desktop/}"
-    SERVER_ZIP="${DEST_DIR}fusion-angle-server-${SHA}.zip"
+    SERVER_ZIP="${DEST_DIR}fusion-angle-${SHA}.zip"
     (cd "$BUILD_DIR" && zip -r "$SERVER_ZIP" .)
     echo "Distribution: $SERVER_ZIP" \
         "($(wc -c < "$SERVER_ZIP" | xargs) bytes)"

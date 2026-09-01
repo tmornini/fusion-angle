@@ -27,9 +27,10 @@ sign-in credentials once on stdout from
 `./postgres-seed --mock-data`.
 
 **Demo-grade security.** `./build` emits one artifact:
-`fusion-angle-server-${SHA}.zip` (Node + Postgres, pages and
-API on one origin, `JWT_HMAC_SIGNING_KEY` from the
-environment). See [ARCHITECTURE.md](ARCHITECTURE.md)
+`fusion-angle-${SHA}.zip` (the `fusion-angle` executable,
+Deno + Postgres, pages and API on one origin,
+`JWT_HMAC_SIGNING_KEY` from the environment). See
+[ARCHITECTURE.md](ARCHITECTURE.md)
 `## One origin, one ZIP`.
 
 ## Getting Started
@@ -38,21 +39,13 @@ environment). See [ARCHITECTURE.md](ARCHITECTURE.md)
 curl -fsSL https://deno.land/install.sh | sh -s v2.9.6
 git clone <repo-url>
 cd fusion-angle
-npm ci
 ```
 
 [Deno](https://deno.com) 2.9.6 runs `./validate`,
-`./test`, `./test-postgres`, and both generators,
+`./test`, `./test-postgres`, `./build`,
+`./test-browser`, `./crank`, and both generators,
 resolving its own dependencies from `deno.json` and
 `deno.lock`.
-
-`npm ci` installs esbuild and postgres.js 3.4.9 at the
-exact versions pinned in `package-lock.json`, for
-`./build`, `build-lib`, `./test-browser`, and `./crank`.
-The ZIP bundles postgres.js into `server.mjs`
-(`api/postgres-client.ts` is the only importer) — the
-named exception. The unzipped artifact needs no
-`npm install`.
 
 ## Docs
 

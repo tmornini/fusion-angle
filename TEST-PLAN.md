@@ -205,7 +205,7 @@ by the master.
 | K. Objectives & Scoring | 30 |
 | R. Records | 25 |
 | J. Teardown | 3 |
-| SV. Server (Node + Postgres) | 9 |
+| SV. Server (Deno + Postgres) | 9 |
 | **Total** | **401** |
 
 A3 **is** SV1 — counted once, in A. The explorer
@@ -242,7 +242,7 @@ them separately. Abort on any AT red.
 - [ ] **AT1** Run `deno check --frozen api shared server
   tests web-app`. PASS: exits 0; no diagnostics emitted.
   Pin: exploratory — the command is its own witness
-- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check tests/*.test.ts` for the main suite, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; both suites report `ok | N passed | 0 failed`, today `ok | 3475 passed | 0 failed | 7 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite.
+- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check tests/*.test.ts` for the main suite, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; both suites report `ok | N passed | 0 failed`, today `ok | 3485 passed | 0 failed | 7 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite.
   Pin: exploratory — the command is its own witness
 - [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1's `deno check --frozen api shared server tests web-app` and AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `build`, `serve`, `crank`, `test`, `test-postgres`, `validate`, `generate-schema-svg`, `generate-api-documentation`, `measure`, `postgres-wipe`, `postgres-lib`, and `postgres-seed`, plus `deno.json`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
   Pin: exploratory — the command is its own witness
@@ -256,22 +256,26 @@ them separately. Abort on any AT red.
   Postgres-free.
   Pin: exploratory — the command is its own witness
 - [ ] **AT5** Crank runs `./test-browser` after AT4 and
-  before `./build --no-zip`. It bundles the client into
-  `$TMPDIR` and runs `tests/browser/*.test.ts` serially
-  against an in-process origin on the memory backend,
-  one Chrome browser context per test. Needs Chrome
-  (`CHROME` or `CHROME_DEBUG_URL`). PASS: exits 0,
-  `fail 0`. `./test-all` runs AT1–AT3 then AT5.
+  before `./build --no-zip`. It bundles the client with
+  `deno bundle` into `$TMPDIR` and runs `TZ=UTC deno
+  test --frozen --no-check --allow-env --allow-read
+  --allow-write --allow-net --allow-run --preload
+  ./tests/hmac-test-key.ts --preload
+  ./tests/local-storage-stub.ts tests/browser/*.test.ts`
+  serially against an in-process origin on the memory
+  backend, one Chrome browser context per test. Needs
+  Chrome (`CHROME` or `CHROME_DEBUG_URL`). PASS: exits
+  0, `fail 0`. `./test-all` runs AT1–AT3 then AT5.
   Pin: exploratory — the command is its own witness
 
 ---
 
 ## A. Build & Setup
 
-- [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-angle-server-${SHA}.zip`.
+- [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-angle-${SHA}.zip`.
   Pin: exploratory — the exit code and the ZIP
        file appearing on disk
-- [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
+- [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains the `fusion-angle` executable and `site/` with `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
   The 29 are the `PAGE_REGISTRY` HTML files; do
   **not** count root `index.html` inside the 29
   (it stays the separate "plus root `index.html`");
@@ -280,10 +284,10 @@ them separately. Abort on any AT red.
        HTML page files including the api-documentation
        index'; exploratory — that a real `./build` run
        actually emits those 29 files (the eight named
-       above included) into the artifact, the 18
-       directories, `server.mjs`, `assets/app.js`,
-       `assets/styles.css`, the fonts, and the
-       generated verb/status rooms
+       above included) into `site/`, the 18
+       directories, the `fusion-angle` executable,
+       `site/assets/app.js`, `site/assets/styles.css`,
+       the fonts, and the generated verb/status rooms
 - [ ] **A3** `./crank --mock-data 8080`. Crank
   validates, mints secrets, starts postgres
   only, runs `./test-postgres`, `./build
@@ -5877,8 +5881,8 @@ document order with the rest of this section.
 - [ ] **K8** Empty state: stop the A3 process.
   `./postgres-wipe --postgres local` then
   `./postgres-seed --postgres local --bootstrap` then
-  start `node server.mjs`. Sign in with the stdout admin
-  credential. Open Organization. PASS: the empty-state
+  start `./fusion-angle serve`. Sign in with the stdout
+  admin credential. Open Organization. PASS: the empty-state
   copy "No objectives yet. Add one to get started."
   renders (bootstrap seeds org 1 with no objectives).
   Restore the mock garden by stopping again,
@@ -6616,10 +6620,10 @@ them after K8, once the explorer has returned.
        absence on disk after teardown
 - [ ] **J3** Verify the ZIP file remains on
   `~/Desktop` for archival. PASS:
-  `fusion-angle-server-${SHA}.zip` exists.
+  `fusion-angle-${SHA}.zip` exists.
   Pin: exploratory — the ZIP file's presence on disk
 
-## SV. Server (Node + Postgres)
+## SV. Server (Deno + Postgres)
 
 This is the default origin, not a second ceremony —
 A3 **is** SV1, on the same crank process every other
@@ -6653,7 +6657,7 @@ Do not file **SV10** as a regression.
   (or follow the unsigned root hop to landing,
   then Sign In). Sign in as `demo@example.com`
   with the stdout password. PASS: the dashboard
-  loads from this Node origin — pages and API are
+  loads from this Deno origin — pages and API are
   one process.
   Pin: tests/browser/sign-in.test.ts 'sign-in
        lands on the dashboard as the seeded

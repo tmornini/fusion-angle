@@ -1,8 +1,7 @@
 {
     "nodeModulesDir": "none",
     "imports": {
-        "postgres": "npm:postgres@3.4.9",
-        "esbuild": "npm:esbuild@0.28.0"
+        "postgres": "npm:postgres@3.4.9"
     },
     "compilerOptions": {
         "strict": true,

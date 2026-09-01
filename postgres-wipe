@@ -124,7 +124,7 @@ trap cleanup EXIT
 discover_render_ids
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-WIPE_START=$(node --strip-types \
+WIPE_START=$(deno run --frozen \
     "$ROOT/server/postgres-wipe.ts" \
     --print-start-command)
 write_job_body "$TMP/wipe-job.json" "$WIPE_START"

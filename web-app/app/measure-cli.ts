@@ -7,7 +7,7 @@ import { DEFAULT_PROFILE_PAGES } from
 export const DEFAULT_RUNS = 25;
 export const DEFAULT_BUDGET_SIGMAS = 1.5;
 export const MEASURE_DEMO_EMAIL = 'demo@example.com';
-export const MEASURE_SERVER_ENTRY = 'server.mjs';
+export const MEASURE_SERVER_ENTRY = './fusion-angle';
 export const MEASURE_SEED_COMMAND = './postgres-seed';
 
 export type MeasureServeEnv = {
@@ -20,7 +20,7 @@ export function measureSeedArgs(): string[] {
 }
 
 export function measureServerArgs(): string[] {
-    return [MEASURE_SERVER_ENTRY];
+    return ['serve'];
 }
 
 export function isVisualizeOnly(

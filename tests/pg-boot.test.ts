@@ -100,42 +100,63 @@ async () => {
 
 test('readListenEnv requires the three secrets', () => {
     assert.throws(
-        () => readListenEnv({
+        () => readListenEnv((name) => ({
             JWT_HMAC_SIGNING_KEY: 'k',
             HTTP_SERVER_PORT: '8080',
-        }),
+        }[name])),
         /missing required env POSTGRES_URL/,
     );
     assert.throws(
-        () => readListenEnv({
+        () => readListenEnv((name) => ({
             POSTGRES_URL: 'postgres://x',
             HTTP_SERVER_PORT: '8080',
-        }),
+        }[name])),
         /missing required env JWT_HMAC_SIGNING_KEY/,
     );
     assert.throws(
-        () => readListenEnv({
+        () => readListenEnv((name) => ({
             POSTGRES_URL: 'postgres://x',
             JWT_HMAC_SIGNING_KEY: 'k',
-        }),
+        }[name])),
         /missing required env HTTP_SERVER_PORT/,
     );
     assert.throws(
-        () => readListenEnv({
+        () => readListenEnv((name) => ({
             POSTGRES_URL: 'postgres://x',
             JWT_HMAC_SIGNING_KEY: 'k',
             HTTP_SERVER_PORT: 'nope',
-        }),
+        }[name])),
         /HTTP_SERVER_PORT must be an integer/,
     );
-    const env = readListenEnv({
+    const env = readListenEnv((name) => ({
         POSTGRES_URL: 'postgres://x',
         JWT_HMAC_SIGNING_KEY: 'k',
         HTTP_SERVER_PORT: '8080',
         TRUSTED_PROXY_HOPS: '10.0.0.1',
-    });
+    }[name]));
     assert.equal(env.port, 8080);
     assert.equal(env.trustedProxyHops, '10.0.0.1');
+});
+
+test('readListenEnv reads by name, never the bag', () => {
+    const seen: string[] = [];
+    const read = (name: string): string | undefined => {
+        seen.push(name);
+        return {
+            POSTGRES_URL: 'postgres://u@h/d',
+            JWT_HMAC_SIGNING_KEY: 'k',
+            HTTP_SERVER_PORT: '8080',
+        }[name];
+    };
+    const env = readListenEnv(read);
+    assert.equal(env.port, 8080);
+    assert.equal(env.trustedProxyHops, undefined);
+    assert.deepEqual(seen.sort(), [
+        'HTTP_SERVER_PORT',
+        'JWT_HMAC_SIGNING_KEY',
+        'POSTGRES_URL',
+        'TRUSTED_PROXY_HOPS',
+    ]);
 });
 
 test('hasSchemaMarker treats 42P01 as absent',
@@ -241,11 +262,15 @@ async () => {
 
 test('boot refuses argv before connecting', async () => {
     await assert.rejects(
-        () => boot({
-            POSTGRES_URL: 'postgres://user:pw@h/db',
-            JWT_HMAC_SIGNING_KEY: 'k',
-            HTTP_SERVER_PORT: '8080',
-        }, ['node', 'server.mjs', '--seed-mock-data']),
+        () => boot(
+            (name) => ({
+                POSTGRES_URL: 'postgres://user:pw@h/db',
+                JWT_HMAC_SIGNING_KEY: 'k',
+                HTTP_SERVER_PORT: '8080',
+            }[name]),
+            ['--seed-mock-data'],
+            '/unused',
+        ),
         (error: unknown) =>
             error instanceof Error
             && error.message === NO_ARGUMENTS,

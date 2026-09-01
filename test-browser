@@ -36,17 +36,12 @@ trap 'rm -rf "$BUNDLE"' EXIT
 bundle_client "$BUNDLE" > /dev/null
 export FUSION_ANGLE_STATIC_ROOT="$BUNDLE"
 
-# node:test's default per-test timeout is infinite, and a
-# dead CDP socket strands every in-flight send — CdpClient
-# never rejects its pending map on close. This command
-# gates ./crank, where a hang is strictly worse than a
-# failure: a failure names the test, a hang names nothing
-# and takes the whole checkpoint with it. 120s clears the
-# largest single legitimate wait (the 60s page:ready)
-# twice over, so an internal timeout fires first and
-# reports itself by name.
-TZ=UTC node --strip-types \
-    --import ./tests/hmac-test-key.ts \
-    --test --test-concurrency=1 \
-    --test-timeout=120000 \
+# Per-test bound lives in tests/browser/fixtures.ts
+# (withTimeout). deno test has no per-test timeout flag.
+# --allow-env is unscoped: Chrome spawn copies the env bag.
+TZ=UTC deno test --frozen --no-check \
+    --allow-env --allow-read --allow-write \
+    --allow-net --allow-run \
+    --preload ./tests/hmac-test-key.ts \
+    --preload ./tests/local-storage-stub.ts \
     tests/browser/*.test.ts

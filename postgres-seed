@@ -183,7 +183,7 @@ trap cleanup EXIT
 discover_render_ids
 
 write_job_body "$TMP/seed-job.json" \
-    "node --strip-types server/postgres-seed.ts ${MODE}"
+    "./render-out/fusion-angle seed ${MODE}"
 http_json POST \
     "/services/${SERVICE_ID}/jobs" \
     "$TMP/seed-created.json" \

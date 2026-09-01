@@ -1,8 +1,6 @@
 // Operator wipe. Drops the message plane and leftover
 // retired objects. Node-only. No seed.
 
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { POSTGRES_DROP_SCHEMA } from
     '../api/backend-postgres.ts';
 import {
@@ -28,18 +26,7 @@ export async function wipePostgres(
 }
 
 export function renderWipeStartCommand(): string {
-    const script =
-        "import postgres from 'postgres';"
-        + 'const url = process.env.POSTGRES_URL;'
-        + 'if (!url) throw new Error('
-        + "'missing POSTGRES_URL');"
-        + 'const sql = postgres(url, { max: 1 });'
-        + 'await sql.unsafe('
-        + JSON.stringify(POSTGRES_DROP_SCHEMA)
-        + ');'
-        + 'await sql.end();';
-    return 'node --input-type=module -e '
-        + JSON.stringify(script);
+    return './render-out/fusion-angle wipe';
 }
 
 export function wipeErrorMessage(
@@ -52,42 +39,34 @@ export function wipeErrorMessage(
     );
 }
 
-function isMainModule(): boolean {
-    const invoked = process.argv[1];
-    if (invoked === undefined) return false;
-    return resolve(invoked)
-        === fileURLToPath(import.meta.url);
-}
-
-async function run(
-    argv: readonly string[],
-): Promise<void> {
-    if (argv.includes('--help')
-        || argv.includes('-h')) {
-        process.stdout.write(USAGE);
-        return;
-    }
-    if (argv.includes(PRINT_START)) {
-        process.stdout.write(renderWipeStartCommand());
-        return;
-    }
-    const postgresUrl = requiredEnv('POSTGRES_URL');
-    const sql = connectPostgres(
-        postgresUrl,
-        {
-            statementTimeoutMs: STATEMENT_TIMEOUT_MS,
-            acquireTimeoutMs: POOL_ACQUIRE_TIMEOUT_MS,
-        },
-    );
+export async function wipeMain(
+    args: readonly string[],
+): Promise<number> {
     try {
-        await wipePostgres(sql);
-    } finally {
-        await sql.end();
-    }
-}
-
-if (isMainModule()) {
-    run(process.argv).catch((error: unknown) => {
+        if (args.includes('--help')
+            || args.includes('-h')) {
+            process.stdout.write(USAGE);
+            return 0;
+        }
+        if (args.includes(PRINT_START)) {
+            process.stdout.write(renderWipeStartCommand());
+            return 0;
+        }
+        const postgresUrl = requiredEnv('POSTGRES_URL');
+        const sql = connectPostgres(
+            postgresUrl,
+            {
+                statementTimeoutMs: STATEMENT_TIMEOUT_MS,
+                acquireTimeoutMs: POOL_ACQUIRE_TIMEOUT_MS,
+            },
+        );
+        try {
+            await wipePostgres(sql);
+        } finally {
+            await sql.end();
+        }
+        return 0;
+    } catch (error: unknown) {
         process.stderr.write(
             JSON.stringify({
                 at: new Date().toISOString(),
@@ -95,6 +74,10 @@ if (isMainModule()) {
                 message: wipeErrorMessage(error),
             }) + '\n',
         );
-        process.exit(1);
-    });
+        return 1;
+    }
+}
+
+if (import.meta.main) {
+    Deno.exit(await wipeMain(Deno.args));
 }

@@ -2,35 +2,42 @@
 # Sourced by ./build and ./test-browser from the repo
 # root. Not a command. bundle_client composes the pages
 # and bundles the client into DEST; ./build owns the
-# clean-tree gate, server.mjs, and the ZIP.
+# clean-tree gate, the executable, and the ZIP.
 
 # Fail when the artifact is empty or absent; report its
 # size otherwise — one voice for every emitted artifact.
 emitted() {
     local label="$1" artifact="$2"
-    local name
+    local name rel prefix
     name=$(basename "$artifact")
     if [ ! -s "$artifact" ]; then
         echo "ERROR: $name is empty or missing" >&2
         exit 1
     fi
-    echo "$label: assets/$name" \
+    prefix="${dest:-${BUILD_DIR:-}}"
+    if [ -n "$prefix" ]; then
+        rel="${artifact#"$prefix"/}"
+    else
+        rel="$name"
+    fi
+    echo "$label: $rel" \
         "($(wc -c < "$artifact" | xargs) bytes)"
 }
 
 bundle_client() {
     local dest="$1"
-    node --strip-types web-app/app/compose.ts "$dest"
+    deno run --frozen --allow-read \
+        --allow-write="$dest" \
+        web-app/app/compose.ts "$dest"
 
     mkdir -p "$dest/assets"
-    npx --no-install esbuild \
-        web-app/app/server-core.ts \
-        --bundle \
+    deno bundle --frozen \
+        --platform browser \
+        --format iife \
         --minify \
         --keep-names \
-        --target=es2024 \
-        --format=iife \
-        --outfile="$dest/assets/app.js"
+        -o "$dest/assets/app.js" \
+        web-app/app/server-core.ts
 
     emitted "Server bundle created" \
         "$dest/assets/app.js"
@@ -38,21 +45,21 @@ bundle_client() {
     # Pre-app bootstrap scripts: extracted from former inline
     # <script> blocks so the page can run with a strict
     # Content-Security-Policy (script-src 'self').
-    npx --no-install esbuild web-app/app/theme-init.ts \
-        --bundle \
+    deno bundle --frozen \
+        --platform browser \
+        --format iife \
         --minify \
-        --target=es2024 \
-        --format=iife \
-        --outfile="$dest/assets/theme-init.js"
+        -o "$dest/assets/theme-init.js" \
+        web-app/app/theme-init.ts
 
     emitted "Bundle created" "$dest/assets/theme-init.js"
 
-    npx --no-install esbuild web-app/app/root-redirect.ts \
-        --bundle \
+    deno bundle --frozen \
+        --platform browser \
+        --format iife \
         --minify \
-        --target=es2024 \
-        --format=iife \
-        --outfile="$dest/assets/root-redirect.js"
+        -o "$dest/assets/root-redirect.js" \
+        web-app/app/root-redirect.ts
 
     emitted "Bundle created" "$dest/assets/root-redirect.js"
 
@@ -66,16 +73,23 @@ bundle_client() {
         web-app/app/styles/utilities.css \
         web-app/app/styles/responsive.css \
         web-app/app/styles/command-palette.css \
-        | npx --no-install esbuild --loader=css --minify \
-        > "$dest/assets/styles.css"
+        > "$dest/styles.concat.css"
+
+    deno bundle --frozen --minify \
+        --external '*.woff2' \
+        -o "$dest/assets/styles.css" \
+        "$dest/styles.concat.css"
+
+    rm -f "$dest/styles.concat.css"
 
     emitted "Styles created" "$dest/assets/styles.css"
 
     for f in web-app/app/styles/pages-*.css; do
         [ -f "$f" ] || continue
         name=$(basename "$f" .css)
-        npx --no-install esbuild --minify "$f" \
-            --outfile="$dest/assets/$name.css"
+        deno bundle --frozen --minify \
+            --external '*.woff2' \
+            -o "$dest/assets/$name.css" "$f"
         emitted "Styles created" "$dest/assets/$name.css"
     done
     cp web-app/assets/*.woff2 "$dest/assets/"

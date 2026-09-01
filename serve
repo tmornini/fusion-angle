@@ -48,4 +48,4 @@ export HTTP_SERVER_PORT="$PORT"
 
 echo
 echo "Serving on http://localhost:$PORT/"
-cd "$DIR" && exec node server.mjs
+cd "$DIR" && exec ./fusion-angle serve

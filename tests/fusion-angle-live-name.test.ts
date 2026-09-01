@@ -8,7 +8,6 @@ import {
 import { join } from 'node:path';
 
 const SKIP_DIRS = new Set([
-    'node_modules',
     '.git',
 ]);
 
@@ -27,7 +26,7 @@ const ROOT_FILES = [
     'validate',
     'test',
     'measure',
-    'package-lock.json',
+    'deno.json',
     'postgres-wipe',
     'postgres-lib',
     'postgres-seed',

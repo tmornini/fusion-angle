@@ -2,9 +2,7 @@
 // marker → listen. No DDL; seed with
 // ./postgres-seed.
 // One mint process: do not run two of these.
-// Node-only; outside the browser tsc project.
 
-import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import { PostgresBackend } from
@@ -16,12 +14,10 @@ import {
     STATEMENT_TIMEOUT_MS,
     POOL_ACQUIRE_TIMEOUT_MS,
     NO_ARGUMENTS,
-    requiredEnv,
+    requiredEnvBy,
     assertUtf8,
     assertNoLegacyMessageTables,
     assertSchemaMarker,
-    bootErrorMessage,
-    type EnvBag,
 } from './postgres-gate.ts';
 import {
     setPasswordHasher,
@@ -53,18 +49,17 @@ export interface ListenEnv {
     readonly trustedProxyHops: string | undefined;
 }
 
+export type EnvReader =
+    (name: string) => string | undefined;
+
 export function readListenEnv(
-    env: EnvBag = process.env,
+    read: EnvReader,
 ): ListenEnv {
-    const postgresUrl = requiredEnv(
-        'POSTGRES_URL', env,
+    const postgresUrl = requiredEnvBy('POSTGRES_URL', read);
+    const jwtHmacSigningKey = requiredEnvBy(
+        'JWT_HMAC_SIGNING_KEY', read,
     );
-    const jwtHmacSigningKey = requiredEnv(
-        'JWT_HMAC_SIGNING_KEY', env,
-    );
-    const portRaw = requiredEnv(
-        'HTTP_SERVER_PORT', env,
-    );
+    const portRaw = requiredEnvBy('HTTP_SERVER_PORT', read);
     const port = Number(portRaw);
     if (!Number.isInteger(port)
         || port < 1
@@ -73,7 +68,7 @@ export function readListenEnv(
             'HTTP_SERVER_PORT must be an integer 1-65535',
         );
     }
-    const hops = env['TRUSTED_PROXY_HOPS'];
+    const hops = read('TRUSTED_PROXY_HOPS');
     return {
         postgresUrl,
         jwtHmacSigningKey,
@@ -85,27 +80,22 @@ export function readListenEnv(
     };
 }
 
-function staticRootFromMeta(): string {
-    return resolve(
-        fileURLToPath(new URL('.', import.meta.url)),
-    );
-}
-
 export interface RunningHttp {
     readonly port: number;
     close(): Promise<void>;
 }
 
 export async function boot(
-    env: EnvBag = process.env,
-    argv: readonly string[] = process.argv,
+    read: EnvReader,
+    argv: readonly string[],
+    staticRoot: string,
 ): Promise<RunningHttp> {
-    if (argv.slice(2).length > 0) {
+    if (argv.length > 0) {
         throw new Error(NO_ARGUMENTS);
     }
     setPasswordHasher(scryptHash);
     setScryptDerive(scryptDerive);
-    const listenEnv = readListenEnv(env);
+    const listenEnv = readListenEnv(read);
     const sql = connectPostgres(listenEnv.postgresUrl, {
         statementTimeoutMs: STATEMENT_TIMEOUT_MS,
         acquireTimeoutMs: POOL_ACQUIRE_TIMEOUT_MS,
@@ -121,7 +111,7 @@ export async function boot(
     );
     const listener = await listenHttp({
         adapter,
-        staticRoot: staticRootFromMeta(),
+        staticRoot,
         port: listenEnv.port,
         ...(listenEnv.trustedProxyHops !== undefined
             ? {
@@ -139,13 +129,6 @@ export async function boot(
     };
 }
 
-function isMainModule(): boolean {
-    const invoked = process.argv[1];
-    if (invoked === undefined) return false;
-    return resolve(invoked)
-        === fileURLToPath(import.meta.url);
-}
-
 function installSigterm(
     close: () => Promise<void>,
 ): void {
@@ -157,21 +140,22 @@ function installSigterm(
     });
 }
 
-if (isMainModule()) {
-    boot().then((running) => {
-        process.stdout.write(JSON.stringify({
-            at: new Date().toISOString(),
-            level: 'info',
-            message: 'listening',
-            port: running.port,
-        }) + '\n');
-        installSigterm(() => running.close());
-    }).catch((error: unknown) => {
-        process.stderr.write(JSON.stringify({
-            at: new Date().toISOString(),
-            level: 'error',
-            message: bootErrorMessage(error),
-        }) + '\n');
-        process.exit(1);
-    });
+export async function main(
+    siteRoot: URL,
+    args: readonly string[],
+): Promise<void> {
+    const running = await boot(
+        (name) => process.env[name],
+        args,
+        fileURLToPath(siteRoot),
+    );
+    process.stdout.write(JSON.stringify({
+        at: new Date().toISOString(),
+        level: 'info',
+        message: 'listening',
+        port: running.port,
+    }) + '\n');
+    installSigterm(() => running.close());
+    // Returning would Deno.exit the compiled binary.
+    await new Promise<never>(() => {});
 }

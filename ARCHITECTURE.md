@@ -11,32 +11,47 @@ canvas lives in `FLOW-CANVAS.md`. The URI catalog lives at
 
 Vanilla TypeScript. `./build` emits one artifact from one
 source tree (clean tree required):
-`fusion-angle-server-${SHA}.zip`. Node serves composed
-pages and the API on one origin. The process is
-`server/boot.ts` / `server.mjs`. The client is a fetch
-facade (`web-app/app/server-core.ts`). Postgres is the
-store. The page talks `fetch`.
+`fusion-angle-${SHA}.zip`. The `fusion-angle` executable
+serves composed pages and the API on one origin. The
+site and postgres.js 3.4.9 are embedded at compile
+time; the permission covenant (`--allow-net` and a
+scoped `--allow-env`, no `--allow-read`) is baked in
+then too. The process is `server/boot.ts` behind
+`fusion-angle serve`. The client is a fetch facade
+(`web-app/app/server-core.ts`). Postgres is the store.
+The page talks `fetch`.
 
 Required env, never logged and never defaulted:
 `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`,
 `HTTP_SERVER_PORT`. Optional `TRUSTED_PROXY_HOPS`. Body
 over 1 MiB is 413 (`server/http-server.ts`
-`REQUEST_BODY_MAX_BYTES`). The server neither seeds nor
-applies DDL and takes no argv (`server.mjs` takes no
-arguments; seed with `./postgres-seed`). Missing
-`schema_marker` refuses with `schema_marker absent; seed
-with ./postgres-seed`. One mint process — do not run two
-replicas.
+`REQUEST_BODY_MAX_BYTES`). `serve` neither seeds nor
+applies DDL and takes no further argv; `seed` and
+`wipe` are the other two verbs of the same binary
+(wrappers: `./postgres-seed`, `./postgres-wipe`).
+Missing `schema_marker` refuses with `schema_marker
+absent; seed with ./postgres-seed`. One mint process —
+do not run two replicas.
 
-postgres.js 3.4.9 is bundled behind
+postgres.js 3.4.9 is embedded behind
 `api/postgres-client.ts` only (named exception).
 localStorage holds UI preferences only — theme, sidebar,
 log level, active organization id — never data.
 
+Measured (do not round away): retired Node start-up
+0.065s, 674741 bytes; host `fusion-angle` median
+0.186s, 73441154 bytes. The Linux binary is 110767200
+bytes; the image is 419MB virtual; a cold
+`docker compose build` is ~13s. Example ZIP on Desktop:
+`fusion-angle-348710d.zip`, 36722188 bytes.
+
+Render builds from the Dockerfile. The compose-stack
+spec's "no Render config change" is retired.
+
 ## Layers
 
 Four directories. `api/` is the server REST and schema
-handlers (Node over Postgres on the product path; memory
+handlers (Deno over Postgres on the product path; memory
 in `./test`). `shared/` is the one-way chasm: the HTTP
 wire schema (`http-message/`, with its own `types.ts`)
 plus pure utilities (`base64url.ts`, `identifier.ts`,

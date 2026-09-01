@@ -14,13 +14,14 @@ set -euo pipefail
 # Permissions, named: env (signing key, TZ, POSTGRES_URL
 # skips), read (fixtures, scripts, source walkers),
 # write (temp dirs for the HTTP tests), net (127.0.0.1
-# listeners), run (the metafile test's esbuild binary;
-# the serve and crank CLI pins spawn their scripts).
+# listeners), run (the metafile test now spawns deno;
+# serve, crank, and validate CLI pins spawn those
+# scripts; validate-cli's git SHA skip uses sh).
 export JWT_HMAC_SIGNING_KEY="${JWT_HMAC_SIGNING_KEY:-test-hmac-signing-key}"
 DENO_TEST=(
     deno test --frozen --parallel --no-check
     --allow-env --allow-read --allow-write
-    --allow-net --allow-run
+    --allow-net --allow-run=deno,./serve,./crank,sh,./validate
     --preload ./tests/hmac-test-key.ts
     --preload ./tests/local-storage-stub.ts
     --preload ./tests/session-storage-stub.ts

@@ -38,30 +38,10 @@ async () => {
     ]);
 });
 
-test('render wipe command embeds the drop list',
+test('render wipe command names the operator tool',
 () => {
-    const command = renderWipeStartCommand();
-    const prefix = 'node --input-type=module -e ';
-    assert.equal(command.startsWith(prefix), true);
-    assert.equal(command.includes('\n'), false);
-    const script = JSON.parse(
-        command.slice(prefix.length),
-    );
-    assert.equal(typeof script, 'string');
     assert.equal(
-        script.includes(
-            JSON.stringify(POSTGRES_DROP_SCHEMA),
-        ),
-        true,
-    );
-    assert.equal(
-        script.includes(
-            'DROP TABLE IF EXISTS message_pairs',
-        ),
-        true,
-    );
-    assert.equal(
-        script.includes('DROP TABLE IF EXISTS pairs'),
-        true,
+        renderWipeStartCommand(),
+        './render-out/fusion-angle wipe',
     );
 });

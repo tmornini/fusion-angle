@@ -192,9 +192,9 @@ spec → plan → ship cycle, implemented sequentially. A
     strictly 1 → 6 (3 and 4 may swap after Spec 2's
     measurements; Spec 6 is optional and opens only if
     its decision gate says so). Spec 1 moves `./validate`
-    and `./test` to Deno 2.9.6; Spec 2 replaces the
+    and `./test` to Deno 2.9.6; Spec 2 replaced the
     `server.mjs` ZIP with one `deno compile` binary and
-    deletes `package.json`; Spec 3 puts `server/` on
+    deleted `package.json`; Spec 3 puts `server/` on
     `Deno.serve`; Spec 4 ports the seven Node-only
     modules under `web-app/app/` and `postgres-lib`'s
     eight inline programs; Spec 5 moves 409 test files
@@ -458,9 +458,10 @@ Off the critical path; each with its oracle.
     writes, and that ZIP surviving the walk, plus the
     artifact's contents: the 29 `PAGE_REGISTRY` files
     (the eight A2 names, `api-documentation/index.html`
-    among them), `server.mjs`, `assets/app.js`,
-    `assets/styles.css`, the woff2 fonts, the 18 page
-    directories, and the verb/status rooms generated
+    among them), the `fusion-angle` executable,
+    `site/assets/app.js`, `site/assets/styles.css`, the
+    woff2 fonts, the 18 page directories, and the
+    verb/status rooms generated
     separately from `PAGE_REGISTRY` (A1, A2, J3) — Layer
     1, an integration test in the shape of
     `tests/crank-cli.test.ts` that spawns `./build

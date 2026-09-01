@@ -33,6 +33,17 @@ export function requiredEnv(
     return value;
 }
 
+export function requiredEnvBy(
+    name: string,
+    read: (name: string) => string | undefined,
+): string {
+    const value = read(name);
+    if (value === undefined || value === '') {
+        throw new Error('missing required env ' + name);
+    }
+    return value;
+}
+
 export async function assertUtf8(
     sql: SqlClient,
 ): Promise<void> {

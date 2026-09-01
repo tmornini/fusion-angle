@@ -9,12 +9,12 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 ./test-browser         # Layer 2's browser half; needs Chrome
 ./test-all             # Layer 2: ./validate + ./test-browser
 ./validate             # deno check + tests + lint (dirty ok; SHA skips)
-./build                # Server ZIP to ~/Desktop/
-./build --no-zip dir/  # server-core + server.mjs to dir/
-./build dir/           # Server ZIP to dir/ instead of ~/Desktop/
+./build                # executable ZIP to ~/Desktop/
+./build --no-zip dir/  # fusion-angle + site/ to dir/
+./build dir/           # executable ZIP to dir/ instead of ~/Desktop/
 ./build --help         # Show usage
 ./crank --mock-data|--bootstrap port
-./serve dir/ port      # node server.mjs from dir/ (no build)
+./serve dir/ port      # ./fusion-angle serve from dir/
 ./postgres-seed --postgres local --bootstrap|--mock-data
 ./postgres-seed --postgres render TOKEN \
     --bootstrap|--mock-data
@@ -39,9 +39,8 @@ docker compose down        # stop; the database dies with it
 ```
 
 Deno 2.9.6 runs `./validate`, `./test`, `./test-postgres`,
-and both generators. `npm ci` installs what `./build`,
-`build-lib`, `./test-browser`, and `./crank` need —
-esbuild and postgres.js.
+`./build`, `./test-browser`, `./crank`, and both
+generators.
 
 **Commit before building.** `./build` and `./crank`
 require a clean working directory.
@@ -93,10 +92,11 @@ Clean tree for `./build`, `./crank`, and `./measure`.
 covered `tests/`.
 
 `./test-browser` needs Chrome (`CHROME` or
-`CHROME_DEBUG_URL`); it bundles into `$TMPDIR` on any
-tree and runs `tests/browser/*.test.ts` serially. It
-is not part of `./validate`; `./crank` runs it after
-`./test-postgres`.
+`CHROME_DEBUG_URL`); it bundles with `deno bundle`
+into `$TMPDIR` on any tree and runs
+`tests/browser/*.test.ts` under `deno test` serially.
+It is not part of `./validate`; `./crank` runs it
+after `./test-postgres`.
 
 Three layers verify this product. Layer 1 is `./validate`,
 the gate on every commit. Layer 2 is `./test-all` —
@@ -138,7 +138,7 @@ plan (`<slug>.md`), and spec (`<slug>-design.md`).
 
 ```bash
 git worktree add .worktrees/<slug> -b <slug>
-cd .worktrees/<slug> && npm ci
+cd .worktrees/<slug>
 git rebase master     # amend until every commit is green
 ./validate            # ./test-all before a build or walk
 cd -                  # the main checkout
@@ -231,13 +231,15 @@ namespace. Genuine absence still 404s. See
 
 Page URLs use relative paths (`/ideas/` or
 `/ideas/index.html`). The API is `/api/…`. One origin
-(`node server.mjs`). Testing is HTTP-only.
+(the `fusion-angle` executable). Testing is HTTP-only.
 
 ### Operator seed and wipe
 
-`./postgres-seed` runs in-process on an empty database
-and refuses a non-empty one. `./postgres-wipe` drops
-the message plane; it does not seed.
+The `fusion-angle` executable has three verbs: `serve`,
+`seed`, and `wipe`. `./postgres-seed` runs in-process
+on an empty database and refuses a non-empty one.
+`./postgres-wipe` drops the message plane; it does
+not seed.
 
 ### Same-tab refresh; other browsers stale
 
@@ -289,11 +291,11 @@ for a gate that would restore the fence.
 
 `erasableSyntaxOnly` and `verbatimModuleSyntax` are what
 `node --strip-types` requires at runtime, and `deno check`
-enforces both — an enum or namespace is TS1294. They
-still bind: `build-lib`, `test-browser`, `measure`,
-`postgres-seed`, `postgres-wipe`, and `compose.yaml` all
-still run `node --strip-types`, so a lapse breaks a build,
-a seed, or a wipe rather than the gate.
+enforces both — an enum or namespace is TS1294. The gate
+binds them. `./postgres-seed --postgres local` and
+`./postgres-wipe --postgres local` still exec
+`node --strip-types`; `postgres-lib`'s JSON helpers still
+run `node -e`.
 
 ### `localStorage` is real under Deno
 

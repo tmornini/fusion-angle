@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import * as esbuild from 'esbuild';
+import { relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const BUILD_SCRIPT = readFileSync('build', 'utf8');
 const BUILD_LIB_SCRIPT = readFileSync('build-lib', 'utf8');
@@ -40,7 +42,7 @@ function clientGraphHits(
 test('build emits one ZIP from the server-core entry', () => {
     assert.match(
         BUILD_SCRIPT,
-        /fusion-angle-server-\$\{SHA\}\.zip/,
+        /fusion-angle-\$\{SHA\}\.zip/,
     );
     assert.doesNotMatch(
         BUILD_SCRIPT,
@@ -85,27 +87,50 @@ test('client-graph pin matches mint and deleted names',
 
 test(
     'client graph omits token mint and signing key',
-    async () => {
-        const result = await esbuild.build({
-            entryPoints: [
-                'web-app/app/server-core.ts',
-            ],
-            bundle: true,
-            write: false,
-            metafile: true,
-            format: 'iife',
-            target: 'es2024',
-            absWorkingDir: process.cwd(),
+    () => {
+        const info = spawnSync('deno', [
+            'info', '--frozen', '--json',
+            'web-app/app/server-core.ts',
+        ], {
+            encoding: 'utf8',
+            env: process.env,
         });
-        const meta = result.metafile;
-        assert.ok(meta !== undefined);
+        assert.equal(info.status, 0, info.stderr);
+        const graph = JSON.parse(info.stdout) as {
+            roots: string[];
+            modules: {
+                specifier: string;
+                dependencies?: {
+                    code?: { specifier: string };
+                }[];
+            }[];
+        };
+        const bySpecifier = new Map(
+            graph.modules.map((m) => [m.specifier, m]),
+        );
+        const seen = new Set<string>();
+        const queue = [...graph.roots];
+        while (queue.length > 0) {
+            const at = queue.pop()!;
+            if (seen.has(at)) continue;
+            seen.add(at);
+            const mod = bySpecifier.get(at);
+            if (mod === undefined) continue;
+            for (const dep of mod.dependencies ?? []) {
+                if (dep.code === undefined) continue;
+                queue.push(dep.code.specifier);
+            }
+        }
         const hits: string[] = [];
-        for (const input of Object.keys(meta.inputs)) {
-            const path = input.includes('?')
-                ? input.slice(0, input.indexOf('?'))
-                : input;
-            const src = readFileSync(path, 'utf8');
-            hits.push(...clientGraphHits(input, src));
+        for (const specifier of seen) {
+            if (!specifier.startsWith('file://')) continue;
+            const path = relative(
+                process.cwd(),
+                fileURLToPath(specifier),
+            );
+            hits.push(...clientGraphHits(
+                path, readFileSync(path, 'utf8'),
+            ));
         }
         assert.deepEqual(hits, []);
     },
@@ -114,7 +139,7 @@ test(
 test('build --no-zip help names crank', () => {
     assert.match(
         BUILD_SCRIPT,
-        /server-core \+ server\.mjs — for \.\/crank/,
+        /the fusion-angle executable — for \.\/crank/,
     );
     assert.doesNotMatch(
         BUILD_SCRIPT,
