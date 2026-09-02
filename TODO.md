@@ -186,6 +186,30 @@ Off the critical path; each with its oracle.
 
 - A full TEST-PLAN.md walk using serial subagents, so
   session context stays short — TEST-PLAN.md `## The walk`
+- 2026-09-02 walk F23/AA32: compositor cannot hold
+  Shift across a mouse gesture. Layer 1 pins and
+  `tests/browser/canvas-gestures.test.ts` 'Shift held
+  mid port-drag commits an edge and adds no node
+  (F23)' decide the product. Score BLOCKED when
+  Shift is missing on pointer-up — TEST-PLAN.md
+  Driving notes
+- 2026-09-02 walk AA33/AA34: DEFERRED on AA32 stray
+  nodes. Attribute-ref writes:
+  `tests/presenter-misc.test.ts` R12 pins +
+  `tests/browser/canvas-gestures.test.ts`
+  'Shift-drag adds an edge and Review accepts two
+  attribute refs (AA32/AA33/AA34)'
+- 2026-09-02 walk F37b: re-activate tab A after F37a;
+  Layer 2 pin `tests/browser/canvas-gestures.test.ts`
+  'plain port-drag on an auto-layout flow adds a
+  node and Undo restores (F37b)'
+- 2026-09-02 walk R12: driver (panel never opened).
+  `buildAttributeRefRow` Layer 1 pin is green —
+  `tests/presenter-misc.test.ts`
+- 2026-09-02 walk F26/F28/F14: compositor mis-hit /
+  missed Zoom-in. Layer 2 pins in
+  `tests/browser/canvas-gestures.test.ts` and
+  `tests/browser/canvas-pan.test.ts`
 - Toast pause on hover and focus
 - Mock seed's fixed 2026-06-15 anchor — after
   2026-09-13 serial-mode FS3 carries in-flight heat

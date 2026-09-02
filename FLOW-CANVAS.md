@@ -16,7 +16,12 @@ canvas with pan, marquee, drag, and edge connection.
   machines (discriminated unions). Pan toggles via Space:
   one tap on, one tap off; the toggle is ignored
   mid-gesture; focus promotes to selection via
-  `canvas-focus`
+  `canvas-focus`. Space toggles pan whenever the canvas
+  or a node/edge inside it has focus. Enter opens the
+  properties panel for the focused node or edge. Nodes
+  carry `role="button"`; this overrides the ARIA
+  Space-as-activate default deliberately — pan is the
+  canvas Space binding.
 - `mermaid-{generate,parse}.ts` — round-trip text format
 - `zip.ts` — in-browser ZIP
 - `adapters/flow-export.ts` — integration point

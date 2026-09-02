@@ -610,6 +610,52 @@ Deno.test(
 );
 
 Deno.test(
+    'zero-delta node click emits no move-nodes',
+    () => {
+        const startPositions = new Map([
+            ['n1', { x: 100, y: 100 }],
+        ]);
+        const r = drive(buildState(), [
+            {
+                kind: 'pointer-down-on-node',
+                nodeId: 'n1',
+                isPort: false,
+                isDraggable: true,
+                isShift: false,
+                isMeta: false,
+                isLocked: false,
+                svgX: 110, svgY: 110,
+                now: 1000,
+                selectedPositions: startPositions,
+            },
+            {
+                kind: 'pointer-up',
+                svgX: 110, svgY: 110,
+                clientX: 0, clientY: 0,
+                isShift: false,
+                hoverNodeId: 'n1',
+                fromNodePosition: null,
+                allNodes: [],
+            },
+        ]);
+        assertStrictEquals(r.state.drag.kind, 'idle');
+        assertStrictEquals(
+            findAction(r.actions, 'move-nodes'),
+            undefined,
+        );
+        assert(findAction(
+            r.actions, 'release-pointer',
+        ));
+        assertStrictEquals(
+            r.state.selection.kind, 'nodes',
+        );
+        if (r.state.selection.kind === 'nodes') {
+            assert(r.state.selection.nodeIds.has('n1'));
+        }
+    },
+);
+
+Deno.test(
     'drag start node also emits move-nodes (F17)',
     () => {
         const startPositions = new Map([

@@ -3,14 +3,17 @@ import { STARK_ORGANIZATION } from
     '../../api/mock-data/seed-constants.ts';
 import { registryUrl } from
     '../../web-app/app/browser-drive.ts';
-import { adminToken, type Origin, type Page } from
-    './fixtures.ts';
+import {
+    adminToken, type Origin, type Page, type Point,
+} from './fixtures.ts';
 
 export const CANVAS = 'svg.flow-canvas';
 export const WRAP = '.flow-canvas-wrap';
 export const NODE = '.flow-node';
 export const EDGE = '.flow-edge';
 export const ONBOARDING = 'Customer Onboarding';
+export const LAYOUT_TEST =
+    'Layout Test: Proposal Review Cycle';
 
 type FlowRow = { id: string; name: string };
 export type GraphNode = {
@@ -91,4 +94,24 @@ export function portSelector(nodeId: string): string {
 
 export function nodeSelector(nodeId: string): string {
     return `${NODE}[data-node-id="${nodeId}"]`;
+}
+
+export function edgeLabelSelector(): string {
+    return `${EDGE} rect`;
+}
+
+export async function doubleClick(
+    page: Page, selector: string,
+): Promise<void> {
+    const p = await page.center(selector);
+    await doubleClickAt(page, p);
+}
+
+export async function doubleClickAt(
+    page: Page, pt: Point,
+): Promise<void> {
+    await page.press(pt);
+    await page.release(pt);
+    await page.press(pt);
+    await page.release(pt);
 }

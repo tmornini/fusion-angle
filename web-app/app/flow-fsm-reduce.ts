@@ -466,6 +466,22 @@ function onPointerUp(
         const dy =
             state.drag.currentPointerY
             - state.drag.startPointerY;
+        const next: FsmState = {
+            ...state,
+            drag: { kind: 'idle' },
+        };
+        if (dx === 0 && dy === 0) {
+            return {
+                state: next,
+                actions: [
+                    { kind: 'release-pointer' },
+                    {
+                        kind: 'request-update',
+                        state: next,
+                    },
+                ],
+            };
+        }
         const updates: {
             nodeId: string;
             x: number;
@@ -480,10 +496,6 @@ function onPointerUp(
                 y: init.y + dy,
             });
         }
-        const next: FsmState = {
-            ...state,
-            drag: { kind: 'idle' },
-        };
         return {
             state: next,
             actions: [

@@ -21,6 +21,7 @@ import { WorkingStylesPresenter } from
     '../web-app/app/presenters/working-styles.ts';
 import {
     bindableRecords,
+    buildAttributeRefRow,
     buildFlowNameHeader,
     buildNodePanel,
     buildEdgePanel,
@@ -36,7 +37,10 @@ import {
 } from '../api/types.ts';
 import type {
     GraphNode, GraphEdge, RecordEntity,
+    NodeAttribute,
 } from '../api/types.ts';
+import type { RecordAttribute } from
+    '../web-app/app/adapters/index.ts';
 import {
     makeHumanMember as buildHumanMember,
     makeAIMember as buildAIMember,
@@ -808,6 +812,131 @@ Deno.test(
             [], [], [],
         ).toString();
         assertMatch(none, /None/);
+    },
+);
+
+function makeRecordAttribute(
+    over: Partial<RecordAttribute> = {},
+): RecordAttribute {
+    return {
+        id: 'attr-company',
+        organizationId: 'AjdvjuECVZEgZoFajaIEkg',
+        recordId: 'rbfHGatkwQzGZJVXKJEeyw',
+        name: 'Company Name',
+        attributeType: 'text',
+        sortOrder: 0,
+        options: [],
+        constraints: [],
+        readRoles: ['member', 'admin'],
+        writeRoles: ['member', 'admin'],
+        ...over,
+    };
+}
+
+Deno.test(
+    'buildAttributeRefRow renders name, mode,'
+    + ' required, and remove (R12)',
+    () => {
+        const ref: NodeAttribute = {
+            attributeId: 'attr-company',
+            mode: 'readonly',
+            isRequired: true,
+        };
+        const out = buildAttributeRefRow(
+            ref, makeRecordAttribute(), false,
+        ).toString();
+        assertMatch(
+            out, /class="[^"]*flow-attribute-ref-row/,
+        );
+        assertMatch(
+            out, /data-attribute-id="attr-company"/,
+        );
+        assertMatch(out, /Company Name/);
+        assertMatch(
+            out,
+            /data-action="update-attribute-mode"/,
+        );
+        assertMatch(
+            out,
+            /<option value="readonly"[^>]*selected/,
+        );
+        assertMatch(
+            out,
+            /data-action="update-attribute-required"[^>]*checked/,
+        );
+        assertMatch(
+            out,
+            /data-action="remove-attribute-ref"/,
+        );
+        assertNotMatch(out, / disabled/);
+    },
+);
+
+Deno.test(
+    'buildAttributeRefRow disables controls'
+    + ' when the flow is locked (R12)',
+    () => {
+        const ref: NodeAttribute = {
+            attributeId: 'attr-company',
+            mode: 'editable',
+            isRequired: false,
+        };
+        const out = buildAttributeRefRow(
+            ref, makeRecordAttribute(), true,
+        ).toString();
+        assertMatch(
+            out,
+            /data-action="update-attribute-mode"[^>]*disabled/,
+        );
+        assertMatch(
+            out,
+            /data-action="update-attribute-required"[^>]*disabled/,
+        );
+        assertMatch(
+            out,
+            /data-action="remove-attribute-ref"[^>]*disabled/,
+        );
+    },
+);
+
+Deno.test(
+    'buildNodePanel picker lists only'
+    + ' unreferenced attributes (R12)',
+    () => {
+        const referenced = makeRecordAttribute({
+            id: 'attr-company',
+            name: 'Company Name',
+        });
+        const free = makeRecordAttribute({
+            id: 'attr-industry',
+            name: 'Industry',
+        });
+        const node = makeNode({
+            attributes: [{
+                attributeId: 'attr-company',
+                mode: 'editable',
+                isRequired: true,
+            }],
+        });
+        const out = buildNodePanel(
+            node, [], false, [], [],
+            [referenced, free],
+        ).toString();
+        assertMatch(
+            out, /data-attribute-id="attr-company"/,
+        );
+        assertMatch(
+            out,
+            /id="prop-node-attribute-picker"/,
+        );
+        assertMatch(
+            out,
+            /option[^>]*value="attr-industry"/,
+        );
+        assertNotMatch(
+            out,
+            /option[^>]*value="attr-company"/,
+        );
     },
 );
 

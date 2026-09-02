@@ -149,10 +149,19 @@ not repeat the note in every case.
   Chrome is fullscreen or flush with the menu bar, and
   the next click opens About This Mac. Then click the
   intended control once.
-- Shift-drag (AA32/F19): if the compositor does not
+- Shift-drag (AA32/F19/F23): if the compositor does not
   deliver Shift on pointer-up, the FSM emits add-node
   instead of add-edge. Record BLOCKED naming that; do
   not FAIL. Layer 1 and Layer 2 pins decide add-edge.
+  F23's mid-gesture Shift is the same compositor limit.
+- AA33/AA34: DEFERRED on AA32 when AA32's stray
+  "New State" nodes re-flow the graph and a
+  double-click misses Data Capture.
+- F37b: after F37a opens a second tab (born hidden),
+  re-activate tab A and confirm
+  `document.visibilityState === 'visible'` before
+  the port-drag. Driving the hidden tab is BLOCKED,
+  not FAIL.
 - B21: the access JWT is memory-only. There is no
   public `putSessionToken` on the production bundle.
   If the in-memory token cannot be replaced without
@@ -178,6 +187,10 @@ not repeat the note in every case.
 | BLOCKED | a step could not be performed for a named reason outside the product (driver or environment); the reason is the note |
 | DEFERRED | a prerequisite case did not produce what this case needs |
 | DRIFT | passes in substance; the document or the UI text disagrees — the document changes |
+
+Walk-specific: F23 scores BLOCKED like AA32 when
+Shift is missing on pointer-up. AA33/AA34 score
+DEFERRED on AA32 when stray nodes block targeting.
 
 Nothing blocks on any outcome. BLOCKED is allowed for a
 driver limit: with no gate riding on the walk, an honest
@@ -313,8 +326,9 @@ them separately. Abort on any AT red.
        stdout/HTTP boundary, and that
        `demo@example.com` and
        `sarah.chen@company.com` are specifically
-       among the 11 printed lines (the test
-       counts lines, not names)
+       among the 12 printed lines, including
+       Riley Okafor (the test counts lines, not
+       names)
 - [ ] **A4** Open `http://localhost:8080/` in the test browser with site data deleted and no `refresh_token` cookie. PASS: unsigned root hops to `landing/index.html` (one hop from the blank root document). Does not open `auth/` and does not open `snapshots/`. Landing remains the public marketing page; it is now also the unsigned root target.
   Pin: tests/apex-destination.test.ts 'a dead session
        hops to landing'; tests/root-redirect.test.ts
@@ -967,7 +981,10 @@ the second organization.
        tests/flow-designer-actions.test.ts
        'applyUpdateEdge patches matching id' (decides
        the "needs revision" and "approve" edge-rename
-       mechanics); exploratory — the live
+       mechanics); tests/browser/canvas-gestures.test.ts
+       'Shift-drag adds an edge and Review accepts
+       two attribute refs (AA32/AA33/AA34)';
+       exploratory — the live
        dashed-orange vs. solid-blue preview rendering
 - [ ] **AA33** In the flow header, set the "Record:"
   dropdown to "Customer Profile" (Stark's seeded record
@@ -986,7 +1003,11 @@ the second organization.
        binding persists); tests/flow-operations.test.ts
        'performAddAttributeRef: appends a ref to the
        single selected node' (decides the
-       attribute-ref write); exploratory — the picker
+       attribute-ref write);
+       tests/browser/canvas-gestures.test.ts
+       'Shift-drag adds an edge and Review accepts
+       two attribute refs (AA32/AA33/AA34)';
+       exploratory — the picker
        rendering and the mode/required-toggle UI only
 - [ ] **AA34** Add more attributes to "Data Capture":
   select 2–3 attributes from the picker, each with a
@@ -2193,8 +2214,10 @@ covering the D20–D24 run between them.
        interaction restoring the original data
 - [ ] **E10a** On a project whose state shows action-bar buttons (`submitted` → Approve / Decline / Send back, or `approved` → Archive / View history), click "Edit". PASS: those action-bar buttons are hidden; only the State select, editable fields, and Cancel / Save remain. Click Cancel: the action-bar buttons reappear.
   Observable: `#project-review-actions` /
-  `#project-lifecycle-actions` carry `hidden`
-  while the inner `.action-bar` keeps its own
+  `#project-lifecycle-actions` gain the
+  `.hidden` class (`display: none` from
+  utilities.css), not the HTML `hidden`
+  attribute. The inner `.action-bar` keeps
   `display:flex`. The objectives section and
   flows sidebar stay visible in edit mode.
   Pin: exploratory — the action-bar buttons hiding
@@ -2463,6 +2486,9 @@ opens and renders.)
        (decides that the pan tracks the selected node —
        moving the node 100 to the right moves the viewBox
        origin by 100 — and that no selection means no pan);
+       tests/browser/canvas-pan.test.ts
+       'Space on a focused node toggles pan off
+       and does not open the panel (F12)';
        exploratory — the ~200 ms slide and the
        panel-aware half of the re-centre. This case turns
        Auto Fit OFF, and `reconcileFitFromDom` — the only
@@ -2512,7 +2538,11 @@ opens and renders.)
        tests/flow-designer-actions.test.ts
        'applyPanelTransition restores the viewBox on
        close' (decides close writes the saved x/y/w/h
-       back and clears the save); tests/flow-zoom-to-fit.test.ts
+       back and clears the save);
+       tests/browser/canvas-pan.test.ts
+       'Zoom-in viewBox survives panel open and close
+       with Auto Fit off (F14)';
+       tests/flow-zoom-to-fit.test.ts
        'fitBoxToCanvas with
        panel offset centers content in the right visible
        region (panel is on the left)' (decides the Auto Fit
@@ -2680,6 +2710,9 @@ opens and renders.)
        then shift-key toggles connect.isShift (F23)'
        (decides a bare shift-key input flips the in-flight
        connect gesture's `isShift` with no pointer move);
+       tests/browser/canvas-gestures.test.ts
+       'Shift held mid port-drag commits an edge
+       and adds no node (F23)';
        tests/flow-interactions-shift.test.ts 'pointerIsShift
        is true when the window tracks Shift even if the
        pointer event reports false' (decides the held key
@@ -2734,6 +2767,9 @@ opens and renders.)
        selects edge and opens panel (F26)' (decides two
        edge pointerdowns inside the window select that edge
        and emit exactly one open-panel with open=true);
+       tests/browser/canvas-gestures.test.ts
+       'an edge-label click selects and a double-click
+       opens Transition Properties (F26)';
        tests/flow-fsm-scenarios.test.ts 'single edge click
        selects but does not open panel (F26 single)';
        tests/presenter-misc.test.ts 'buildEdgePanel shows
@@ -2766,8 +2802,10 @@ opens and renders.)
        edge' (decides the selected edge leaves the
        persisted graph); tests/flow-operations.test.ts
        'performDeleteSelectedEdge: a node selection is a
-       no-op'; exploratory — the toolbar click and the
-       canvas repaint
+       no-op'; tests/browser/canvas-gestures.test.ts
+       'an edge selection enables Delete and
+       removes the edge (F28)'; exploratory — the
+       toolbar click and the canvas repaint
 - [ ] **F29** Close the properties panel if it is
   open (empty-canvas click with a panel open
   restores the F14 saved viewBox — that is not
@@ -2988,8 +3026,11 @@ that the canvas re-renders after each step.)
        lays out an auto-layout flow whose stored positions
        are placeholders' (decides an auto-layout flow's
        positions are recomputed rather than read back
-       verbatim); exploratory — the re-flow landing on the
-       next edit rather than on the undo
+       verbatim); tests/browser/canvas-gestures.test.ts
+       'plain port-drag on an auto-layout flow adds a
+       node and Undo restores (F37b)'; exploratory —
+       the re-flow landing on the next edit rather
+       than on the undo
 
 ### Flow Designer — Keyboard Shortcuts
 
@@ -4142,6 +4183,12 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   notice and a warning toast ("This instance changed
   underneath you — values refreshed; re-apply your
   edit"), and does **not** auto-retry the transition.
+  After PASS, restore the mutated instance's
+  Company Name to "Acme Corp" (and any other
+  field this case changed). WB19a overwrites
+  the only seeded Customer Profile instance;
+  R14's bind picker and R16's instance list
+  read that value.
   Pin: tests/api-work-order-transition-instance.test.ts
        'value-bearing stale If-Match → 412' (decides the
        server 412 when a transition's held etag is
@@ -6426,24 +6473,28 @@ K30 only describes.
   ref row shows attribute name + Editable/Read-only picker
   + Required checkbox + remove (×) button; picker dropdown
   lists unreferenced attributes only.
-  Pin: exploratory — the whole node-panel ref-row
-       rendering; `buildAttributeRefRow` carries no CLI
-       test today
+  Pin: tests/presenter-misc.test.ts
+       'buildAttributeRefRow renders name, mode,
+       required, and remove (R12)';
+       tests/presenter-misc.test.ts
+       'buildAttributeRefRow disables controls
+       when the flow is locked (R12)';
+       tests/presenter-misc.test.ts
+       'buildNodePanel picker lists only
+       unreferenced attributes (R12)';
+       exploratory — the live node-panel paint
 - [ ] **R13** From workbox, open the gate-violation work
   order (`#gate0001`, `eOlNZpGQfmCdpSFWXGkzFQ`) at Data
   Capture, unbound. PASS: current node is Data Capture;
-  the action screen shows Company Name and Contact Email
-  inputs (fillable path); empty submit is blocked — the
-  page-module empty-required pre-check toasts "Please fill
-  all required attributes" before the POST. The typed
-  gate (`validateRecordTransition` on CURRENT-node refs)
-  is the durable covenant; CLI pins it; constraint
-  failures still surface via
+  every attribute input is disabled/readonly behind the
+  bind prompt (WB10b) — there is no fillable-while-unbound
+  path. The typed gate (`validateRecordTransition` on
+  CURRENT-node refs) is the durable covenant; CLI pins
+  it; constraint failures still surface via
   `WorkboxDetailPresenter.buildViolations` banner. Only
   WO01 (`a7c3e1f9`) is instance-bound — do not bind
   `#gate0001` here (the seeded Customer Profile instance,
-  Acme, already has values set), or the empty-submit toast
-  can no longer be observed.
+  Acme, already has values set).
   Pin: tests/adapters-record-transitions.test.ts
        'validateRecordTransition returns a required
        violation when the CURRENT node has a required
@@ -6455,15 +6506,17 @@ K30 only describes.
        gate-violation work order has a current node
        with at least one required attribute with a
        null stored value'; exploratory — the action
-       screen's rendered inputs and the pre-check
-       toast text
-- [ ] **R14** Fill Company Name + Contact Email, click
-  submit. PASS: transition succeeds; work order advances
-  to Review (does NOT demand Reviewer Notes — that is
-  current-node only when leaving Review). The work order
-  is still `#gate0001`; if it is still unbound, bind the
-  seeded Customer Profile instance (Acme) via the bind
-  picker — an existing instance, never a minted one.
+       screen's disabled inputs and the bind prompt
+- [ ] **R14** Bind `#gate0001` to the seeded Customer
+  Profile instance (Company Name "Acme Corp") via the
+  bind picker — an existing instance, never a minted
+  one — then fill Company Name + Contact Email and
+  click submit. PASS: transition succeeds; work order
+  advances to Review (does NOT demand Reviewer Notes —
+  that is current-node only when leaving Review). A
+  value-bearing transition while still unbound is
+  refused with 400 (`ValidationError` →
+  `HTTP_BAD_REQUEST`), not 409; 409 is rebind.
   Pin: tests/adapters-record-transitions.test.ts
        'validateRecordTransition does not require
        TARGET-node attributes when the current node is
@@ -6505,7 +6558,9 @@ K30 only describes.
   Instances section lists the seeded instances (id +
   readable values) — at least one seeded instance
   (Company Name "Acme Corp") — with a "New instance"
-  control. The empty "No instances yet" state is a
+  control. WB19a must have restored that name; a leftover
+  "Walk Co B" is this walk's hygiene failure, not
+  a missing seed. The empty "No instances yet" state is a
   real UI branch the CLI pin below decides; Customer
   Profile is never empty on this seed, so the
   explorer will not see it live.

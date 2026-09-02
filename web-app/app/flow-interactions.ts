@@ -817,8 +817,9 @@ export function bindInteractions(
         if (ke.key !== ' ') return;
         // auto-repeat would chatter the toggle
         if (ke.repeat) return;
-        // the activation listener (document phase)
-        // claims Space for a focused node or edge
+        // a focused node or edge claims Enter,
+        // not Space; Space falls through so pan
+        // still toggles
         if (ke.defaultPrevented) return;
         if (isFormFocused()) return;
         ke.preventDefault();
@@ -869,10 +870,7 @@ export function bindInteractions(
     document.addEventListener(
         'keydown',
         (e) => {
-            if (
-                e.key !== 'Enter'
-                && e.key !== ' '
-            ) return;
+            if (e.key !== 'Enter') return;
             const active =
                 document.activeElement;
             if (
