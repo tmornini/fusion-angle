@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     composeClaimRole,
     projectClaimRolesForOrganization,
@@ -7,9 +6,9 @@ import {
     matchesOnSegmentBoundary,
 } from '../api/authorization.ts';
 
-test('a :id segment in a prefix matches any path segment',
+Deno.test('a :id segment in a prefix matches any path segment',
 () => {
-    assert.equal(
+    assertStrictEquals(
         matchesOnSegmentBoundary(
             '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'ZOousbbnzpqlxJExVAruYQ/versions/xDyDkxEPwtcNmJVknUHDsg',
@@ -17,8 +16,8 @@ test('a :id segment in a prefix matches any path segment',
         ), true);
 });
 
-test('a nested prefix does not match a shallower path', () => {
-    assert.equal(
+Deno.test('a nested prefix does not match a shallower path', () => {
+    assertStrictEquals(
         matchesOnSegmentBoundary(
             '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'ZOousbbnzpqlxJExVAruYQ',
@@ -26,58 +25,58 @@ test('a nested prefix does not match a shallower path', () => {
         ), false);
 });
 
-test('a prefix matches only on a segment boundary', () => {
-    assert.equal(
+Deno.test('a prefix matches only on a segment boundary', () => {
+    assertStrictEquals(
         matchesOnSegmentBoundary('/memberships', '/members'),
         false);
-    assert.equal(
+    assertStrictEquals(
         matchesOnSegmentBoundary('/members/mFNSxZqywTSMXhgUTdTqtA'
             , '/members'),
         true);
-    assert.equal(
+    assertStrictEquals(
         matchesOnSegmentBoundary('/anything', '/'), true);
 });
 
-test('composeClaimRole joins type and organization', () => {
-    assert.equal(composeClaimRole('admin', 'AjdvjuECVZEgZoFajaIEkg')
+Deno.test('composeClaimRole joins type and organization', () => {
+    assertStrictEquals(composeClaimRole('admin', 'AjdvjuECVZEgZoFajaIEkg')
         , 'admin:AjdvjuECVZEgZoFajaIEkg');
-    assert.equal(composeClaimRole('member', 'A'), 'member:A');
+    assertStrictEquals(composeClaimRole('member', 'A'), 'member:A');
 });
 
-test('projectClaimRolesForOrganization keeps only the'
+Deno.test('projectClaimRolesForOrganization keeps only the'
 + ' fenced org bases', () => {
-    assert.deepEqual(
+    assertEquals(
         projectClaimRolesForOrganization(
             ['admin:A', 'member:B'], 'A',
         ),
         ['admin']);
-    assert.deepEqual(
+    assertEquals(
         projectClaimRolesForOrganization(
             ['admin:A', 'member:B'], 'B',
         ),
         ['member']);
-    assert.deepEqual(
+    assertEquals(
         projectClaimRolesForOrganization(
             ['admin:A', 'member:B'], 'C',
         ),
         []);
 });
 
-test('projectClaimRolesForOrganization ignores unknown'
+Deno.test('projectClaimRolesForOrganization ignores unknown'
 + ' bases', () => {
-    assert.deepEqual(
+    assertEquals(
         projectClaimRolesForOrganization(
             ['viewer:A', 'admin:A'], 'A',
         ),
         ['admin']);
 });
 
-test('admin is permitted on every verb at root', () => {
+Deno.test('admin is permitted on every verb at root', () => {
     for (const verb of ['GET', 'PUT', 'POST', 'DELETE']) {
-        assert.equal(
+        assertStrictEquals(
             isPermitted(verb, '/memberships/x', ['admin']),
             true);
-        assert.equal(
+        assertStrictEquals(
             isPermitted(
                 verb, '/organizations/AjdvjuECVZEgZoFajaIEkg/members'
                     , ['admin'],
@@ -85,89 +84,89 @@ test('admin is permitted on every verb at root', () => {
     }
 });
 
-test('deny-by-default: no held role is forbidden', () => {
-    assert.equal(
+Deno.test('deny-by-default: no held role is forbidden', () => {
+    assertStrictEquals(
         isPermitted(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members', [],
         ), false);
-    assert.equal(
+    assertStrictEquals(
         isPermitted(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members'
                 , ['viewer'],
         ), false);
 });
 
-test('member tier: content surfaces are permitted', () => {
-    assert.equal(
+Deno.test('member tier: content surfaces are permitted', () => {
+    assertStrictEquals(
         isPermitted(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas', ['member'],
         ), true);
-    assert.equal(
+    assertStrictEquals(
         isPermitted('PUT'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'fndCYAsXazdzMUlEGMNIZw', ['member']), true);
-    assert.equal(
+    assertStrictEquals(
         isPermitted(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'xdaJyuuPyHfffCGLhqDrOQ/claim', ['member']),
         true);
-    assert.equal(
+    assertStrictEquals(
         isPermitted(
             'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'xdaJyuuPyHfffCGLhqDrOQ/claim', ['member']),
         true);
-    assert.equal(
+    assertStrictEquals(
         isPermitted(
             'POST', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
                 + 'jmvogLnzTmiQlAkVvDHrvQ/rotation',
             ['member']),
         true);
-    assert.equal(
+    assertStrictEquals(
         isPermitted('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg'
             , ['member']),
         true);
 });
 
-test('member tier: admin surfaces stay denied', () => {
-    assert.equal(
+Deno.test('member tier: admin surfaces stay denied', () => {
+    assertStrictEquals(
         isPermitted('PUT', '/memberships/mFNSxZqywTSMXhgUTdTqtA', ['member']),
         false);
-    assert.equal(
+    assertStrictEquals(
         isPermitted('GET', '/memberships', ['member']),
         false);
-    assert.equal(
+    assertStrictEquals(
         isPermitted('GET', '/identities', ['member']),
         false);
-    assert.equal(
+    assertStrictEquals(
         isPermitted('PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg'
             , ['member']),
         false);
-    assert.equal(
+    assertStrictEquals(
         isPermitted('PUT', '/members/mFNSxZqywTSMXhgUTdTqtA', ['member']),
         false);
-    assert.equal(
+    assertStrictEquals(
         isPermitted(
             'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens', ['member'],
         ),
         false);
 });
 
-test('prefixes match on segment boundaries only', () => {
+Deno.test('prefixes match on segment boundaries only', () => {
     // '/members' grants the member read tier; it must never
     // half-match '/memberships' — a different, admin-only
     // surface that merely shares the leading characters.
-    assert.equal(
+    assertStrictEquals(
         isPermitted(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members'
                 , ['member'],
         ), true);
-    assert.equal(
+    assertStrictEquals(
         isPermitted('GET', '/members/mFNSxZqywTSMXhgUTdTqtA', ['member']),
         false);
-    assert.equal(
+    assertStrictEquals(
         isPermitted('GET', '/memberships', ['member']),
         false);
-    assert.equal(
+    assertStrictEquals(
         isPermitted('GET', '/memberships/mFNSxZqywTSMXhgUTdTqtA', ['member']),
         false);
 });

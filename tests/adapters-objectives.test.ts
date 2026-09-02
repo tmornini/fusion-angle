@@ -1,5 +1,11 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -52,7 +58,7 @@ function objectiveDoc(
     };
 }
 
-test('getObjectives returns all', async () => {
+Deno.test('getObjectives returns all', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const ctx = ctxFor(db);
@@ -68,7 +74,7 @@ test('getObjectives returns all', async () => {
         objectiveDoc(1, 'active', 'ev-o2'),
     );
     const rows = await getObjectives(ctx);
-    assert.equal(rows.length, 2);
+    assertStrictEquals(rows.length, 2);
 });
 
 function revision(
@@ -85,7 +91,7 @@ function revision(
     };
 }
 
-test(
+Deno.test(
     'getObjectiveRevisionsByObjective groups one read',
     async () => {
         const db = memoryDbAdapter();
@@ -125,12 +131,12 @@ test(
             await getObjectiveRevisionsByObjective(
                 ctx, ['ohqxgUBEaFQwYbXsonRPmg', o2],
             );
-        assert.equal(grouped.size, 2);
-        assert.equal(
+        assertStrictEquals(grouped.size, 2);
+        assertStrictEquals(
             grouped.get('ohqxgUBEaFQwYbXsonRPmg')!.length, 2,
         );
-        assert.equal(grouped.get(o2)!.length, 1);
-        assert.deepEqual(grouped.get(o2)![0], {
+        assertStrictEquals(grouped.get(o2)!.length, 1);
+        assertEquals(grouped.get(o2)![0], {
             id: r2t0,
             objectiveId: o2,
             name: 'C',
@@ -141,7 +147,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'getCurrentObjectiveDefinitions picks the latest'
     + ' revision per requested id',
     async () => {
@@ -180,38 +186,34 @@ test(
             await getCurrentObjectiveDefinitions(
                 ctx, ['ohqxgUBEaFQwYbXsonRPmg', o2],
             );
-        assert.equal(defs.get('ohqxgUBEaFQwYbXsonRPmg')!.name, 'New');
-        assert.equal(
+        assertStrictEquals(defs.get('ohqxgUBEaFQwYbXsonRPmg')!.name, 'New');
+        assertStrictEquals(
             defs.get('ohqxgUBEaFQwYbXsonRPmg')!.description, 'd:New',
         );
-        assert.equal(defs.get(o2)!.name, 'Other');
+        assertStrictEquals(defs.get(o2)!.name, 'Other');
     },
 );
 
-test(
+Deno.test(
     'getCurrentObjectiveDefinitions throws on an'
     + ' objective with no revisions',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ghost = generateIdentifier();
-        await assert.rejects(
-            getCurrentObjectiveDefinitions(
+        const err = await assertRejects(
+            () => getCurrentObjectiveDefinitions(
                 ctxFor(db), [ghost],
             ),
-            (err: unknown) => {
-                assert.ok(err instanceof Error);
-                assert.equal(
-                    err.message,
-                    'no revisions for objective ' + ghost,
-                );
-                return true;
-            },
+        ) as Error;
+        assertInstanceOf(err, Error);
+        assertStrictEquals(
+            err.message, 'no revisions for objective ' + ghost,
         );
     },
 );
 
-test('getArchivedObjectiveIds returns a Set', async () => {
+Deno.test('getArchivedObjectiveIds returns a Set', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const ctx = ctxFor(db);
@@ -224,11 +226,11 @@ test('getArchivedObjectiveIds returns a Set', async () => {
         objectiveDoc(0, 'archived', 'ev-o1-arch'),
     );
     const ids = await getArchivedObjectiveIds(ctx);
-    assert.ok(ids.has('ohqxgUBEaFQwYbXsonRPmg'));
-    assert.equal(ids.size, 1);
+    assert(ids.has('ohqxgUBEaFQwYbXsonRPmg'));
+    assertStrictEquals(ids.size, 1);
 });
 
-test(
+Deno.test(
     'getObjectiveLifecycleEvents streams dated'
     + ' transitions oldest-first',
     async () => {
@@ -252,7 +254,7 @@ test(
         );
         const events =
             await getObjectiveLifecycleEvents(ctx);
-        assert.deepEqual(
+        assertEquals(
             events.map(e => e.kind),
             [
                 'archival',
@@ -261,19 +263,19 @@ test(
             ],
         );
         for (const e of events) {
-            assert.equal(
+            assertStrictEquals(
                 e.objectiveId,
                 'ohqxgUBEaFQwYbXsonRPmg',
             );
-            assert.notEqual(e.memberId, '');
-            assert.notEqual(e.at, '');
+            assertNotStrictEquals(e.memberId, '');
+            assertNotStrictEquals(e.at, '');
         }
-        assert.ok(events[0]!.at <= events[1]!.at);
-        assert.ok(events[1]!.at <= events[2]!.at);
+        assert(events[0]!.at <= events[1]!.at);
+        assert(events[1]!.at <= events[2]!.at);
     },
 );
 
-test(
+Deno.test(
     'a position echo while archived adds no'
     + ' lifecycle event',
     async () => {
@@ -305,12 +307,12 @@ test(
         );
         const events =
             await getObjectiveLifecycleEvents(ctx);
-        assert.equal(events.length, 1);
-        assert.equal(events[0]!.kind, 'archival');
+        assertStrictEquals(events.length, 1);
+        assertStrictEquals(events[0]!.kind, 'archival');
     },
 );
 
-test(
+Deno.test(
     'postObjectiveCreation writes via GET the objective'
     + ' and its first revision through POST /objectives',
     async () => {
@@ -325,32 +327,32 @@ test(
         // Phase Final Task 2: row halves stripped — assert via
         // adapter GETs (message plane).
         const objectives = await getObjectives(ctx);
-        assert.equal(objectives.length, 1);
-        assert.equal(objectives[0]!.id, 'ohqxgUBEaFQwYbXsonRPmg');
-        assert.equal(objectives[0]!.position, 1);
-        assert.equal(objectives[0]!.organization_id
+        assertStrictEquals(objectives.length, 1);
+        assertStrictEquals(objectives[0]!.id, 'ohqxgUBEaFQwYbXsonRPmg');
+        assertStrictEquals(objectives[0]!.position, 1);
+        assertStrictEquals(objectives[0]!.organization_id
             , 'AjdvjuECVZEgZoFajaIEkg');
         // GET stamps lifecycle-current genesis trio.
-        assert.equal(objectives[0]!.state, 'active');
+        assertStrictEquals(objectives[0]!.state, 'active');
 
         const revisions =
             await getObjectiveRevisionsByObjective(
                 ctx, ['ohqxgUBEaFQwYbXsonRPmg'],
             );
         const revs = revisions.get('ohqxgUBEaFQwYbXsonRPmg')!;
-        assert.equal(revs.length, 1);
-        assert.equal(revs[0]!.objectiveId, 'ohqxgUBEaFQwYbXsonRPmg');
-        assert.equal(revs[0]!.name, 'Revenue');
-        assert.equal(revs[0]!.description, 'Top line');
-        assert.equal(revs[0]!.memberId, 'XXZruirZyAOoRpNxaDnpSA');
+        assertStrictEquals(revs.length, 1);
+        assertStrictEquals(revs[0]!.objectiveId, 'ohqxgUBEaFQwYbXsonRPmg');
+        assertStrictEquals(revs[0]!.name, 'Revenue');
+        assertStrictEquals(revs[0]!.description, 'Top line');
+        assertStrictEquals(revs[0]!.memberId, 'XXZruirZyAOoRpNxaDnpSA');
 
         const archived = await getArchivedObjectiveIds(ctx);
-        assert.equal(archived.size, 0);
+        assertStrictEquals(archived.size, 0);
         // Phase Final Stage B: objectives table retired.
     },
 );
 
-test(
+Deno.test(
     'computeNewPosition + putObjectivePosition'
     + ' wedge an item into the middle without'
     + ' renumbering anyone',
@@ -389,13 +391,13 @@ test(
         const map = new Map(
             all.map(o => [o.id, o.position]),
         );
-        assert.equal(map.get(o3), 1.5);
-        assert.equal(map.get('ohqxgUBEaFQwYbXsonRPmg'), 1);
-        assert.equal(map.get(o2), 2);
+        assertStrictEquals(map.get(o3), 1.5);
+        assertStrictEquals(map.get('ohqxgUBEaFQwYbXsonRPmg'), 1);
+        assertStrictEquals(map.get(o2), 2);
     },
 );
 
-test(
+Deno.test(
     'putObjectivePosition preserves adjacent'
     + ' fractional values across sequential'
     + ' reorders',
@@ -429,9 +431,9 @@ test(
         const map = new Map(
             all.map(o => [o.id, o.position]),
         );
-        assert.equal(map.get('ohqxgUBEaFQwYbXsonRPmg'), 1);
-        assert.equal(map.get(o3), 1.25);
-        assert.equal(map.get(o2), 1.5);
+        assertStrictEquals(map.get('ohqxgUBEaFQwYbXsonRPmg'), 1);
+        assertStrictEquals(map.get(o3), 1.25);
+        assertStrictEquals(map.get(o2), 1.5);
     },
 );
 
@@ -491,13 +493,13 @@ function recordingCtx(
     return { ctx, calls };
 }
 
-test(
+Deno.test(
     'postObjectiveArchival PUTs the document with an'
     + ' archived trio and the current position',
     async () => {
         const { ctx, calls } = recordingCtx({
             GET: async (path) => {
-                assert.equal(path
+                assertStrictEquals(path
                     , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
                     + 'ohqxgUBEaFQwYbXsonRPmg');
                 return {
@@ -510,23 +512,23 @@ test(
             PUT: async () => ({}),
         });
         await postObjectiveArchival(ctx, 'ohqxgUBEaFQwYbXsonRPmg');
-        assert.equal(calls.length, 2);
-        assert.equal(calls[0]!.method, 'GET');
-        assert.equal(calls[0]!.path
+        assertStrictEquals(calls.length, 2);
+        assertStrictEquals(calls[0]!.method, 'GET');
+        assertStrictEquals(calls[0]!.path
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg');
-        assert.equal(calls[1]!.method, 'PUT');
-        assert.equal(calls[1]!.path
+        assertStrictEquals(calls[1]!.method, 'PUT');
+        assertStrictEquals(calls[1]!.path
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg');
         const body = calls[1]!.body!;
-        assert.equal(body['position'], 3);
-        assert.equal(body['state'], 'archived');
-        assert.equal('state_at' in body, false);
+        assertStrictEquals(body['position'], 3);
+        assertStrictEquals(body['state'], 'archived');
+        assertStrictEquals('state_at' in body, false);
     },
 );
 
-test(
+Deno.test(
     'putObjectivePosition echoes the supplied trio'
     + ' verbatim',
     async () => {
@@ -538,12 +540,12 @@ test(
                 state: 'active',
             },
         );
-        assert.equal(calls.length, 1);
-        assert.equal(calls[0]!.method, 'PUT');
-        assert.equal(calls[0]!.path
+        assertStrictEquals(calls.length, 1);
+        assertStrictEquals(calls[0]!.method, 'PUT');
+        assertStrictEquals(calls[0]!.path
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg');
-        assert.deepEqual(calls[0]!.body, {
+        assertEquals(calls[0]!.body, {
             position: 1.5,
             state: 'active',
         });

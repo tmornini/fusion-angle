@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -51,31 +50,31 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 }
 
 for (const path of RETIRED_PATHS) {
-    test('GET ' + path + ' (authenticated) → 404',
+    Deno.test('GET ' + path + ' (authenticated) → 404',
     async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const res = await handleRequest(
             db, req('GET', path, token),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as {
             error: string;
         };
-        assert.equal(body.error, 'Not found: ' + path);
+        assertStrictEquals(body.error, 'Not found: ' + path);
     });
 
-    test('GET ' + path + ' (unauthenticated) → 401',
+    Deno.test('GET ' + path + ' (unauthenticated) → 401',
     async () => {
         const db = await freshDb();
         const res = await handleRequest(
             db, req('GET', path),
         );
-        assert.equal(res.status, 401);
+        assertStrictEquals(res.status, 401);
     });
 }
 
-test('seat collection stays live', async () => {
+Deno.test('seat collection stays live', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -86,5 +85,5 @@ test('seat collection stays live', async () => {
             token,
         ),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
 });

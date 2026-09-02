@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assertEquals,
+    assertInstanceOf,
+    assertMatch,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -137,7 +142,7 @@ async function putLiveType(
     const put = await handleRequest(db, req(
         'PUT', TYPE_DETAIL, adminToken, typeBody(),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function putAttribute(
@@ -149,7 +154,7 @@ async function putAttribute(
     const put = await handleRequest(db, req(
         'PUT', ATTRS + attrId, adminToken, body,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedWritableTextAttr(
@@ -213,7 +218,7 @@ async function countDeleteMessagePairs(
     ).length;
 }
 
-test('DELETE live instance → 204; then collection omit, '
+Deno.test('DELETE live instance → 204; then collection omit, '
 + 'detail 404, PATCH+pin 404, PATCH no pin 409, second '
 + 'DELETE appends tombstone (R4)',
 async () => {
@@ -224,24 +229,24 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const before = await countInstanceMessagePairs(db);
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
-    assert.equal(del.status, 204);
-    assert.equal(
+    assertStrictEquals(del.status, 204);
+    assertStrictEquals(
         await countInstanceMessagePairs(db),
         before + 1,
     );
-    assert.equal(await countDeleteMessagePairs(db), 1);
+    assertStrictEquals(await countDeleteMessagePairs(db), 1);
 
     const list = await handleRequest(db, req(
         'GET', INSTANCES, memberToken,
     ));
-    assert.equal(list.status, 200);
+    assertStrictEquals(list.status, 200);
     const rows = await list.json() as { id: string }[];
-    assert.equal(
+    assertStrictEquals(
         rows.some((r) => r.id === INSTANCE_ID),
         false,
         'tombstoned instance omitted from collection',
@@ -250,8 +255,8 @@ async () => {
     const detail = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
-    assert.equal(detail.status, 404);
-    assert.deepEqual(await detail.json(), {
+    assertStrictEquals(detail.status, 404);
+    assertEquals(await detail.json(), {
         error: 'Not found: record_instances/'
             + INSTANCE_ID,
     });
@@ -261,8 +266,8 @@ async () => {
     const history = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, memberToken,
     ));
-    assert.equal(history.status, 404);
-    assert.deepEqual(await history.json(), {
+    assertStrictEquals(history.status, 404);
+    assertEquals(await history.json(), {
         error: 'Not found: record_instances/'
             + INSTANCE_ID,
     });
@@ -274,8 +279,8 @@ async () => {
             [IF_MATCH_HEADER]: put.headers.get('ETag')!,
         },
     ));
-    assert.equal(patch.status, 404);
-    assert.deepEqual(await patch.json(), {
+    assertStrictEquals(patch.status, 404);
+    assertEquals(await patch.json(), {
         error: 'Not found: record_instances/'
             + INSTANCE_ID,
     });
@@ -291,8 +296,8 @@ async () => {
             ],
         },
     ));
-    assert.equal(putAgain.status, 409);
-    assert.deepEqual(await putAgain.json(), {
+    assertStrictEquals(putAgain.status, 409);
+    assertEquals(await putAgain.json(), {
         error: 'instance already exists at '
             + INSTANCE_DETAIL,
     });
@@ -304,23 +309,23 @@ async () => {
     const del2 = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, adminToken,
     ));
-    assert.equal(del2.status, 204);
-    assert.equal(
+    assertStrictEquals(del2.status, 204);
+    assertStrictEquals(
         await countInstanceMessagePairs(db),
         messagePairsBeforeSecond,
         'already-gone DELETE does not append',
     );
-    assert.equal(
+    assertStrictEquals(
         await countDeleteMessagePairs(db),
         deletesBefore,
     );
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assert.equal(head, undefined);
+    assertStrictEquals(head, undefined);
 });
 
-test('DELETE never-existed id → 404 missedReadError (R2)',
+Deno.test('DELETE never-existed id → 404 missedReadError (R2)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -328,14 +333,14 @@ async () => {
     const res = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error: 'Not found: ' + INSTANCE_DETAIL,
     });
-    assert.equal(await countInstanceMessagePairs(db), 0);
+    assertStrictEquals(await countInstanceMessagePairs(db), 0);
 });
 
-test('DELETE byte-identical replay → 204 (replay fast path)',
+Deno.test('DELETE byte-identical replay → 204 (replay fast path)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -344,20 +349,20 @@ async () => {
     const first = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
-    assert.equal(first.status, 204);
+    assertStrictEquals(first.status, 204);
     const afterFirst = await countInstanceMessagePairs(db);
     const second = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
-    assert.equal(second.status, 204);
-    assert.equal(
+    assertStrictEquals(second.status, 204);
+    assertStrictEquals(
         await countInstanceMessagePairs(db),
         afterFirst,
         'byte-identical replay does not append',
     );
 });
 
-test('DELETE member with zero write roles → 204 '
+Deno.test('DELETE member with zero write roles → 204 '
 + '(path-tier only)',
 async () => {
     const { db, adminToken, memberToken } =
@@ -375,40 +380,40 @@ async () => {
         write_roles: [],
     });
     const put = await putInstance(db, memberToken, []);
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assert.equal(head, undefined);
+    assertStrictEquals(head, undefined);
 });
 
-test('DELETE with If-Match header → 204 (header ignored)',
+Deno.test('DELETE with If-Match header → 204 (header ignored)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
     const put = await putInstance(db, memberToken, []);
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
         undefined,
         { [IF_MATCH_HEADER]: '"stale-or-anything"' },
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assert.equal(head, undefined);
+    assertStrictEquals(head, undefined);
 });
 
 // R9 resurrect-hole: tombstone interleaved after a PATCH
 // wire pair was formed (gate-equivalent) but before its tx.
 // PATCH must 412 (or honest miss) — never revive the head.
-test('R9 resurrect-hole: DELETE between PATCH form and '
+Deno.test('R9 resurrect-hole: DELETE between PATCH form and '
 + 'append → 412; head stays tombstoned',
 async () => {
     const { db, adminToken, memberToken } =
@@ -418,7 +423,7 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'live' },
     ]);
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const h0 = parseIfMatch(put.headers.get('ETag')!)!;
     const patchBody = {
         set: [
@@ -463,14 +468,14 @@ async () => {
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
-    assert.equal(del.status, 204);
-    assert.equal(
+    assertStrictEquals(del.status, 204);
+    assertStrictEquals(
         await deriveInstanceHead(
             db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
         ),
         undefined,
     );
-    await assert.rejects(
+    const err = await assertRejects(
         () => postInstancePatchOp(
             db,
             [ORGANIZATION, TYPE_ID, INSTANCE_ID],
@@ -480,23 +485,14 @@ async () => {
             ORGANIZATION,
             ['member'],
         ),
-        (error: unknown) => {
-            assert.ok(error instanceof ApiError);
-            assert.equal(
-                error.status,
-                HTTP_PRECONDITION_FAILED,
-            );
-            assert.match(
-                error.message,
-                /If-Match does not match/,
-            );
-            return true;
-        },
-    );
+    ) as ApiError;
+    assertInstanceOf(err, ApiError);
+    assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
+    assertMatch(err.message, /If-Match does not match/);
     const after = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assert.equal(
+    assertStrictEquals(
         after,
         undefined,
         'PATCH must never revive a tombstoned head',

@@ -1,7 +1,11 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import { deriveRecordStateHistory } from
     '../api/derive-record-types.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -82,31 +86,31 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 
 // -- 1. validateRecordDocumentBody --------------------------
 
-test('validateRecordDocumentBody accepts entity fields plus'
+Deno.test('validateRecordDocumentBody accepts entity fields plus'
 + ' the trio, organization_id omitted', () => {
     const doc = validateRecordDocumentBody(
         recordDocument('Fresh', 'active', AT, 'ev-1'),
     );
-    assert.deepEqual(doc.entity, {
+    assertEquals(doc.entity, {
         name: 'Fresh', description: 'd', position: 1,
     });
-    assert.equal(doc.state, 'active');
-    assert.equal(doc.state, 'active');
-    assert.equal('state_at' in doc, false);
+    assertStrictEquals(doc.state, 'active');
+    assertStrictEquals(doc.state, 'active');
+    assertStrictEquals('state_at' in doc, false);
 });
 
-test('validateRecordDocumentBody tolerates a caller-forged'
+Deno.test('validateRecordDocumentBody tolerates a caller-forged'
 + ' organization_id', () => {
     const doc = validateRecordDocumentBody({
         ...recordDocument('Fresh', 'active', AT, 'ev-1'),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     });
-    assert.equal(doc.entity.name, 'Fresh');
+    assertStrictEquals(doc.entity.name, 'Fresh');
 });
 
-test('validateRecordDocumentBody rejects a stray key',
+Deno.test('validateRecordDocumentBody rejects a stray key',
 () => {
-    assert.throws(
+    assertThrows(
         () => validateRecordDocumentBody({
             ...recordDocument(
                 'Fresh', 'active', AT, 'ev-1',
@@ -117,9 +121,9 @@ test('validateRecordDocumentBody rejects a stray key',
     );
 });
 
-test('validateRecordDocumentBody rejects a trio-less body',
+Deno.test('validateRecordDocumentBody rejects a trio-less body',
 () => {
-    assert.throws(
+    assertThrows(
         () => validateRecordDocumentBody(
             recordFields('Fresh'),
         ),
@@ -131,7 +135,7 @@ test('validateRecordDocumentBody rejects a trio-less body',
 
 // Phase Final Task 2: records ROW half stripped — op return
 // + states event are the oracles (row plane empty).
-test('postRecordDocumentOp genesis (head-absent) returns the'
+Deno.test('postRecordDocumentOp genesis (head-absent) returns the'
 + ' entity and posts exactly one event authored by the actor',
 async () => {
     const db = await freshDb();
@@ -159,14 +163,14 @@ async () => {
         db, 'rbfHGatkwQzGZJVXKJEeyw', body,
         'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
-    assert.equal(written.name, 'Fresh');
-    assert.equal(written.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
+    assertStrictEquals(written.name, 'Fresh');
+    assertStrictEquals(written.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
     // Phase Final Stage B: records table retired.
     const events = await deriveRecordStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'rbfHGatkwQzGZJVXKJEeyw');
-    assert.equal(events.length, 1);
-    assert.equal(events[0]!.state, 'active');
-    assert.equal(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(events.length, 1);
+    assertStrictEquals(events[0]!.state, 'active');
+    assertStrictEquals(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
 // The MEMBER_ID CAVEAT: the head event is authored by
@@ -185,7 +189,7 @@ async () => {
 // cannot; the pair is formed via formWriteMessagePair, the
 // SAME helper document-family.test.ts's below-facade
 // convention test uses.
-test('postRecordDocumentOp with an echoed trio writes NO new'
+Deno.test('postRecordDocumentOp with an echoed trio writes NO new'
 + ' event, replaying the stored head\'s member_id',
 async () => {
     const db = await freshDb();
@@ -221,13 +225,13 @@ async () => {
     );
     const events = await deriveRecordStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'rcaSzEaORBkezCxyhLhecA');
-    assert.equal(events.length, 1);
-    assert.equal(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
-    assert.equal(second.name, 'Second');
+    assertStrictEquals(events.length, 1);
+    assertStrictEquals(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(second.name, 'Second');
     // Phase Final Stage B: records table retired.
 });
 
-test('postRecordDocumentOp with a fresh trio posts a'
+Deno.test('postRecordDocumentOp with a fresh trio posts a'
 + ' transition authored by the actor', async () => {
     const db = await freshDb();
     // Phase Final Task 2: both writes carry pairs so the
@@ -284,11 +288,11 @@ test('postRecordDocumentOp with a fresh trio posts a'
     );
     const events = await deriveRecordStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'rlBnfIvzDVVZeVSjBECxGg');
-    assert.deepEqual(
+    assertEquals(
         events.map(e => e.state).toSorted(),
         ['active', 'archived'],
     );
-    assert.ok(events.every(e => e.member_id === 'XXZruirZyAOoRpNxaDnpSA'));
+    assert(events.every(e => e.member_id === 'XXZruirZyAOoRpNxaDnpSA'));
 });
 
 // -- 3. the fast-path sibling pin (added at the fold commit,
@@ -299,7 +303,7 @@ test('postRecordDocumentOp with a fresh trio posts a'
 // to the op — sibling of api-idea-document.test.ts's own "a
 // byte-identical resend converges: one event, one pair".
 
-test('a byte-identical resend replays the stored response:'
+Deno.test('a byte-identical resend replays the stored response:'
 + ' one event, one pair', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -324,9 +328,9 @@ test('a byte-identical resend replays the stored response:'
     );
     const events = await deriveRecordStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'sBdXBQtlujsRkbzspdvfFg');
-    assert.equal(events.length, 1);
-    assert.equal((await db.messagePairs.getAll()).length, 3);
-    assert.equal((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals(events.length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
 });
 
 // -- 4. the DELETE-pair walk filter (Author gate 9) ----------
@@ -380,7 +384,7 @@ async function storedMessagePairAt(
     };
 }
 
-test('documentLifecycleEvents skips a DELETE-method pair,'
+Deno.test('documentLifecycleEvents skips a DELETE-method pair,'
 + ' yielding the two PUT trios across a delete-then-recreate'
 + ' history', async () => {
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/';
@@ -403,9 +407,9 @@ test('documentLifecycleEvents skips a DELETE-method pair,'
         [first, deleted, second], prefix,
     )
         .filter(messagePair => messagePair.uriId === 'rec-x');
-    assert.equal(messagePairs.length, 3);
+    assertStrictEquals(messagePairs.length, 3);
     const events = documentLifecycleEvents(messagePairs);
-    assert.deepEqual(
+    assertEquals(
         events.map(e => e.state),
         ['active', 'active'],
     );

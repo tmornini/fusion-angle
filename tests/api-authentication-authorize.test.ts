@@ -1,6 +1,10 @@
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import './hmac-test-key.ts';
-import { test, afterEach, beforeEach } from 'node:test';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -31,12 +35,12 @@ import { testHashPassword } from './mock-seed.ts';
 
 const BASE = 'http://localhost';
 
-afterEach(() => {
+Deno.test.afterEach(() => {
     setPasswordHasher(testHashPassword);
     setScryptDerive(null);
 });
 
-beforeEach(() => {
+Deno.test.beforeEach(() => {
     setPasswordHasher(testHashPassword);
 });
 
@@ -101,7 +105,7 @@ async function dbWithPasswordUser(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('password login issues a code exchangeable for a token',
+Deno.test('password login issues a code exchangeable for a token',
 async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);   // 'XXZruirZyAOoRpNxaDnpSA' is admin
@@ -112,17 +116,17 @@ async () => {
         code_challenge: pkce.code_challenge,
         code_challenge_method: pkce.code_challenge_method,
     }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const { code } = await res.json() as { code: string };
-    assert.ok(code.length > 0);
+    assert(code.length > 0);
     const tok = await handleRequest(db, token({
         grant_type: 'authorization_code', code,
         client_id: 'web',
         code_verifier: pkce.verifier,
     }));
-    assert.equal(tok.status, 201);
+    assertStrictEquals(tok.status, 201);
     const body = await tok.json() as { access_token: string };
-    assert.ok(Array.isArray(
+    assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , body.access_token)));
 });
@@ -131,7 +135,7 @@ async () => {
 // AUTHORIZATION_CODE_TTL_SECONDS (10 min) is the same shared
 // 401 as unknown/spent — grant-first, no mint, no append.
 // Clock seam (Task 1) advances past the TTL without sleeping.
-test('an expired authorization code is a 401', async () => {
+Deno.test('an expired authorization code is a 401', async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
     const pkce = await s256Fields();
@@ -141,7 +145,7 @@ test('an expired authorization code is a 401', async () => {
         code_challenge: pkce.code_challenge,
         code_challenge_method: pkce.code_challenge_method,
     }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const { code } = await res.json() as { code: string };
     // 10 min TTL + 1 s past the bound.
     setClockForTest(() =>
@@ -151,8 +155,8 @@ test('an expired authorization code is a 401', async () => {
             grant_type: 'authorization_code', code,
             client_id: 'web',
         }));
-        assert.equal(tok.status, 401);
-        assert.deepEqual(
+        assertStrictEquals(tok.status, 401);
+        assertEquals(
             await tok.json(),
             { error: 'invalid_grant' },
         );
@@ -161,7 +165,7 @@ test('an expired authorization code is a 401', async () => {
     }
 });
 
-test('a wrong password is a 401 with no code issued',
+Deno.test('a wrong password is a 401 with no code issued',
 async () => {
     const db = await dbWithPasswordUser();
     const pkce = await s256Fields();
@@ -171,13 +175,13 @@ async () => {
         code_challenge: pkce.code_challenge,
         code_challenge_method: pkce.code_challenge_method,
     }));
-    assert.equal(res.status, 401);
-    assert.deepEqual(
+    assertStrictEquals(res.status, 401);
+    assertEquals(
         await res.json(), { error: 'invalid_grant' });
-    assert.ok(await noStoredAuthorizeResponse(db));
+    assert(await noStoredAuthorizeResponse(db));
 });
 
-test('an unknown username is the same 401 (no enumeration)',
+Deno.test('an unknown username is the same 401 (no enumeration)',
 async () => {
     const db = await dbWithPasswordUser();
     const pkce = await s256Fields();
@@ -187,7 +191,7 @@ async () => {
         code_challenge: pkce.code_challenge,
         code_challenge_method: pkce.code_challenge_method,
     }));
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
 });
 
 // A KNOWN user whose only password credential is revoked has
@@ -196,7 +200,7 @@ async () => {
 // miss path (the second arm of the no-enumeration timing
 // equalizer) that the identity_id credential narrow flows
 // through.
-test('a revoked password credential is the same 401',
+Deno.test('a revoked password credential is the same 401',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -218,46 +222,46 @@ async () => {
         code_challenge: pkce.code_challenge,
         code_challenge_method: pkce.code_challenge_method,
     }));
-    assert.equal(res.status, 401);
-    assert.ok(await noStoredAuthorizeResponse(db));
+    assertStrictEquals(res.status, 401);
+    assert(await noStoredAuthorizeResponse(db));
 });
 
-test('passkey, provider, and oidc are 501 seams', async () => {
+Deno.test('passkey, provider, and oidc are 501 seams', async () => {
     const db = await dbWithPasswordUser();
     for (const method of ['passkey', 'provider', 'oidc']) {
         const res = await handleRequest(db, authorize({
             method, client_id: 'web',
         }));
-        assert.equal(res.status, 501);
+        assertStrictEquals(res.status, 501);
     }
 });
 
-test('an unknown authorize method is a 400', async () => {
+Deno.test('an unknown authorize method is a 400', async () => {
     const db = await dbWithPasswordUser();
     const res = await handleRequest(db, authorize({
         method: 'telepathy',
     }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
 // Authorize without S256 is a request fault (400),
 // grant-first — no code, no stored pair.
-test('authorize without S256 is rejected',
+Deno.test('authorize without S256 is rejected',
 async () => {
     const db = await dbWithPasswordUser();
     const res = await handleRequest(db, authorize({
         method: 'password', username: 'demo@example.com',
         password: 's3cret', client_id: 'web',
     }));
-    assert.equal(res.status, 400);
-    assert.deepEqual(
+    assertStrictEquals(res.status, 400);
+    assertEquals(
         await res.json(),
         { error: 'S256 code_challenge is required' },
     );
-    assert.ok(await noStoredAuthorizeResponse(db));
+    assert(await noStoredAuthorizeResponse(db));
 });
 
-test('authorize with S256 issues a code',
+Deno.test('authorize with S256 issues a code',
 async () => {
     const db = await dbWithPasswordUser();
     const verifier = 'pkce-verifier-server-tier';
@@ -269,12 +273,12 @@ async () => {
         ),
         code_challenge_method: 'S256',
     }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const { code } = await res.json() as { code: string };
-    assert.ok(code.length > 0);
+    assert(code.length > 0);
 });
 
-test('PBKDF2 login appends a scrypt secret',
+Deno.test('PBKDF2 login appends a scrypt secret',
 async () => {
     const db = await dbWithPasswordUser();
     setPasswordHasher(scryptHash);
@@ -288,19 +292,19 @@ async () => {
         ),
         code_challenge_method: 'S256',
     }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const rows = await deriveCredentialsFor(db, 'XXZruirZyAOoRpNxaDnpSA');
     const passwords = rows.filter(
         row => row.kind === 'password',
     );
-    assert.ok(passwords.length > 0);
+    assert(passwords.length > 0);
     const latest = passwords.reduce((a, b) => {
         if (a.at > b.at) return a;
         if (a.at < b.at) return b;
         return a.id > b.id ? a : b;
     });
-    assert.match(latest.secret, /^\$scrypt\$/);
-    assert.ok(passwords.some(
+    assertMatch(latest.secret, /^\$scrypt\$/);
+    assert(passwords.some(
         row => row.secret.startsWith('$pbkdf2-sha256$'),
     ));
 });

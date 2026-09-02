@@ -1,5 +1,9 @@
-import { test, afterEach } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     createHttpFacade,
 } from '../web-app/app/adapters/http-facade.ts';
@@ -26,9 +30,17 @@ import {
 } from './token-fixtures.ts';
 import { principalFromToken } from
     '../shared/access-token-decode.ts';
+import { deleteRefreshChannel } from
+    '../web-app/app/adapters/session-refresh-mutex.ts';
 
-afterEach(() => {
+// The single-flight mutex opens ONE refresh channel per
+// process, lazily, and a test process has no unload to
+// reclaim it. Release after each test, so the handle never
+// outlives the test that opened it; the next refresh
+// reopens it.
+Deno.test.afterEach(() => {
     setCookieSession(false);
+    deleteRefreshChannel();
 });
 
 async function withMockFetch(
@@ -44,7 +56,7 @@ async function withMockFetch(
     }
 }
 
-test('two concurrent 401s cause one refresh POST',
+Deno.test('two concurrent 401s cause one refresh POST',
 async () => {
     setCookieSession(true);
     putSessionToken('dead-access');
@@ -82,13 +94,13 @@ async () => {
             facade.GET('organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 , 'dead-access'),
         ]);
-        assert.ok(Array.isArray(a));
-        assert.ok(Array.isArray(b));
+        assert(Array.isArray(a));
+        assert(Array.isArray(b));
     });
-    assert.equal(refreshPosts, 1);
+    assertStrictEquals(refreshPosts, 1);
 });
 
-test('cookie-session recover after a failed facade refresh'
+Deno.test('cookie-session recover after a failed facade refresh'
 + ' does not POST again',
 async () => {
     globalThis.document = {
@@ -121,15 +133,15 @@ async () => {
         );
         const ctx = createRecoveringRequestContext(
             facade, deadAccess);
-        await assert.rejects(
+        await assertRejects(
             () => ctx.GET('members'),
             UnauthorizedError,
         );
     });
-    assert.equal(refreshPosts, 1);
+    assertStrictEquals(refreshPosts, 1);
 });
 
-test('idle tab ignores a peer refresh broadcast',
+Deno.test('idle tab ignores a peer refresh broadcast',
 async () => {
     let posts = 0;
     await runSingleFlightRefresh(async () => {
@@ -146,11 +158,11 @@ async () => {
         posts += 1;
         return 'second';
     });
-    assert.equal(posts, 2);
-    assert.equal(result, 'second');
+    assertStrictEquals(posts, 2);
+    assertStrictEquals(result, 'second');
 });
 
-test('cookie refresh re-scopes the session to the'
+Deno.test('cookie refresh re-scopes the session to the'
 + ' dead token org',
 async () => {
     setCookieSession(true);
@@ -189,7 +201,7 @@ async () => {
                         organization?: string;
                     }
                 ).organization;
-                assert.equal(asked, org);
+                assertStrictEquals(asked, org);
                 return new Response(
                     JSON.stringify({
                         access_token: rescoped,
@@ -236,15 +248,15 @@ async () => {
             'organizations/' + org + '/flows/x',
             scoped,
         );
-        assert.ok(Array.isArray(rows));
+        assert(Array.isArray(rows));
     });
-    assert.deepEqual(
+    assertEquals(
         grants, ['refresh', 'token-exchange'],
     );
-    assert.equal(
+    assertStrictEquals(
         sessionIsOrganizationScoped(), true,
     );
-    assert.equal(
+    assertStrictEquals(
         principalFromToken(getSessionToken())
             .organization,
         org,

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     SafeHtml,
     trusted,
@@ -7,93 +6,93 @@ import {
     html,
 } from '../web-app/app/safe-html.ts';
 
-test('escapeForHtml escapes &', () => {
-    assert.equal(
+Deno.test('escapeForHtml escapes &', () => {
+    assertStrictEquals(
         escapeForHtml('a & b'),
         'a &amp; b',
     );
 });
 
-test('escapeForHtml escapes < and >', () => {
-    assert.equal(
+Deno.test('escapeForHtml escapes < and >', () => {
+    assertStrictEquals(
         escapeForHtml('<script>'),
         '&lt;script&gt;',
     );
 });
 
-test('escapeForHtml escapes quotes', () => {
-    assert.equal(
+Deno.test('escapeForHtml escapes quotes', () => {
+    assertStrictEquals(
         escapeForHtml(`"hello" 'world'`),
         '&quot;hello&quot; &#39;world&#39;',
     );
 });
 
-test('escapeForHtml escapes & first to avoid double-escape', () => {
-    assert.equal(
+Deno.test('escapeForHtml escapes & first to avoid double-escape', () => {
+    assertStrictEquals(
         escapeForHtml('&amp;'),
         '&amp;amp;',
     );
 });
 
-test('trusted returns SafeHtml without escaping', () => {
+Deno.test('trusted returns SafeHtml without escaping', () => {
     const safe = trusted('<b>bold</b>');
-    assert.ok(safe instanceof SafeHtml);
-    assert.equal(
+    assert(safe instanceof SafeHtml);
+    assertStrictEquals(
         safe.toString(),
         '<b>bold</b>',
     );
 });
 
-test('html escapes interpolated strings', () => {
+Deno.test('html escapes interpolated strings', () => {
     const userInput = '<script>alert(1)</script>';
     const result = html`<p>${userInput}</p>`;
-    assert.equal(
+    assertStrictEquals(
         result.toString(),
         '<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>',
     );
 });
 
-test('html preserves SafeHtml without re-escaping', () => {
+Deno.test('html preserves SafeHtml without re-escaping', () => {
     const inner = trusted('<b>bold</b>');
     const result = html`<p>${inner}</p>`;
-    assert.equal(
+    assertStrictEquals(
         result.toString(),
         '<p><b>bold</b></p>',
     );
 });
 
-test('html joins arrays without separator', () => {
+Deno.test('html joins arrays without separator', () => {
     const items = [
         trusted('<li>a</li>'),
         trusted('<li>b</li>'),
     ];
     const result = html`<ul>${items}</ul>`;
-    assert.equal(
+    assertStrictEquals(
         result.toString(),
         '<ul><li>a</li><li>b</li></ul>',
     );
 });
 
-test('html renders null and undefined as empty', () => {
+Deno.test('html renders null and undefined as empty', () => {
     const result = html`a${null}b${undefined}c`;
-    assert.equal(result.toString(), 'abc');
+    assertStrictEquals(result.toString(), 'abc');
 });
 
-test('html escapes interpolation even with concatenation', () => {
+Deno.test('html escapes interpolation even with concatenation', () => {
     const userInput = '<script>';
     const result = html`<p>${
         'before ' + userInput + ' after'
     }</p>`;
-    assert.equal(
+    assertStrictEquals(
         result.toString(),
         '<p>before &lt;script&gt; after</p>',
     );
 });
 
-test('html stringifies non-string values and escapes', () => {
+Deno.test('html stringifies non-string values and escapes', () => {
     const num = 42;
     const result = html`<n>${num}</n>`;
-    assert.equal(
+    assertStrictEquals(
         result.toString(),
         '<n>42</n>',
     );

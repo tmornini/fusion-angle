@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assertEquals, assertMatch, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -170,7 +169,7 @@ const DETAIL =
 const COLLECTION =
     '/organizations/' + ORGANIZATION + '/record-types/';
 
-test('PUT .../record-types/:id admin → 200, body echoes '
+Deno.test('PUT .../record-types/:id admin → 200, body echoes '
 + 'entity; GET sees trio',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -180,9 +179,9 @@ async () => {
     const put = await handleRequest(db, req(
         'PUT', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken, body,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const echo = await put.json() as RecordTypePutEcho;
-    assert.deepEqual(echo, {
+    assertEquals(echo, {
         id: 'sjWcXwYGlgxxJOHxzMoUow',
         organization_id: ORGANIZATION,
         name: 'Rental',
@@ -193,12 +192,12 @@ async () => {
     const get = await handleRequest(db, req(
         'GET', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
     ));
-    assert.equal(get.status, 200);
+    assertStrictEquals(get.status, 200);
     const row = await get.json() as RecordTypeGetRow;
-    assert.deepEqual(row, echo);
+    assertEquals(row, echo);
 });
 
-test('PUT .../record-types/:id member token → 403',
+Deno.test('PUT .../record-types/:id member token → 403',
 async () => {
     const { db, memberToken } = await adminDb();
     const put = await handleRequest(db, req(
@@ -207,10 +206,10 @@ async () => {
             'Rental', 1, 'active', AT, 'rt-1-genesis',
         ),
     ));
-    assert.equal(put.status, 403);
+    assertStrictEquals(put.status, 403);
 });
 
-test('PUT foreign type id under own org path geneses '
+Deno.test('PUT foreign type id under own org path geneses '
 + '(write authorizer)',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -231,16 +230,16 @@ async () => {
             generateIdentifier(),
         ),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const got = await handleRequest(db, req(
         'GET', DETAIL + foreignId, adminToken,
     ));
-    assert.equal(got.status, 200);
+    assertStrictEquals(got.status, 200);
     const wire = await got.json() as { name: string };
-    assert.equal(wire.name, 'Stolen');
+    assertStrictEquals(wire.name, 'Stolen');
 });
 
-test('DELETE unreferenced type, admin → 204; detail 404; '
+Deno.test('DELETE unreferenced type, admin → 204; detail 404; '
 + 'omitted from collection',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -250,23 +249,23 @@ async () => {
             'Rental', 1, 'active', AT, 'rt-1-genesis',
         ),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const detail = await handleRequest(db, req(
         'GET', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
     ));
-    assert.equal(detail.status, 404);
+    assertStrictEquals(detail.status, 404);
     const collection = await handleRequest(db, req(
         'GET', COLLECTION, adminToken,
     ));
-    assert.equal(collection.status, 200);
-    assert.deepEqual(await collection.json(), []);
+    assertStrictEquals(collection.status, 200);
+    assertEquals(await collection.json(), []);
 });
 
-test('DELETE .../record-types/:id member → 403',
+Deno.test('DELETE .../record-types/:id member → 403',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -279,10 +278,10 @@ async () => {
     const del = await handleRequest(db, req(
         'DELETE', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', memberToken,
     ));
-    assert.equal(del.status, 403);
+    assertStrictEquals(del.status, 403);
 });
 
-test('DELETE type with a live flow join → 409 naming '
+Deno.test('DELETE type with a live flow join → 409 naming '
 + 'flow(s)',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -320,7 +319,7 @@ async () => {
             },
         },
     ));
-    assert.equal(flowCreate.status, 201);
+    assertStrictEquals(flowCreate.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/bkFJmupdSmbjaPnvwFKnbA/'
@@ -333,17 +332,17 @@ async () => {
             at: AT,
         },
     ));
-    assert.equal(join.status, 201);
+    assertStrictEquals(join.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
     ));
-    assert.equal(del.status, 409);
+    assertStrictEquals(del.status, 409);
     const body = await del.json() as { error: string };
-    assert.match(
+    assertMatch(
         body.error,
         /flow\(s\) bkFJmupdSmbjaPnvwFKnbA/,
     );
-    assert.match(
+    assertMatch(
         body.error,
         /record type sjWcXwYGlgxxJOHxzMoUow is referenced by/,
     );
@@ -351,10 +350,10 @@ async () => {
     const still = await handleRequest(db, req(
         'GET', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
     ));
-    assert.equal(still.status, 200);
+    assertStrictEquals(still.status, 200);
 });
 
-test('DELETE replay (byte-identical) → 204',
+Deno.test('DELETE replay (byte-identical) → 204',
 async () => {
     const { db, adminToken } = await adminDb();
     await handleRequest(db, req(
@@ -366,14 +365,14 @@ async () => {
     const first = await handleRequest(db, req(
         'DELETE', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
     ));
-    assert.equal(first.status, 204);
+    assertStrictEquals(first.status, 204);
     const second = await handleRequest(db, req(
         'DELETE', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
     ));
-    assert.equal(second.status, 204);
+    assertStrictEquals(second.status, 204);
 });
 
-test('PUT over existing head with NO precondition '
+Deno.test('PUT over existing head with NO precondition '
 + 'header → 200 supersedes (simple class)',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -383,7 +382,7 @@ async () => {
             'Before', 1, 'active', AT, 'rt-1-genesis',
         ),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const second = await handleRequest(db, req(
         'PUT', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
         typeBody(
@@ -391,22 +390,22 @@ async () => {
             'updated',
         ),
     ));
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
     const echo = await second.json() as RecordTypePutEcho;
-    assert.equal(echo.name, 'After');
-    assert.equal(echo.position, 2);
-    assert.equal(echo.description, 'updated');
+    assertStrictEquals(echo.name, 'After');
+    assertStrictEquals(echo.position, 2);
+    assertStrictEquals(echo.description, 'updated');
     const get = await handleRequest(db, req(
         'GET', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
     ));
-    assert.equal(get.status, 200);
+    assertStrictEquals(get.status, 200);
     const row = await get.json() as RecordTypeGetRow;
-    assert.equal(row.name, 'After');
-    assert.equal(row.description, 'updated');
-    assert.equal(row.position, 2);
+    assertStrictEquals(row.name, 'After');
+    assertStrictEquals(row.description, 'updated');
+    assertStrictEquals(row.position, 2);
 });
 
-test('stored PUT body equals recordTypeEntityOf of the'
+Deno.test('stored PUT body equals recordTypeEntityOf of the'
 + ' same chain', async () => {
     const { db, adminToken } = await adminDb();
     const id = generateIdentifier();
@@ -416,7 +415,7 @@ test('stored PUT body equals recordTypeEntityOf of the'
     const put = await handleRequest(
         db, req('PUT', DETAIL + id, adminToken, body),
     );
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const prefix = '/organizations/'
         + ORGANIZATION + '/record-types/';
     const stored = JSON.parse(
@@ -432,8 +431,8 @@ test('stored PUT body equals recordTypeEntityOf of the'
         ORGANIZATION,
         { state: 'active' },
     );
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(
+    assertEquals(stored, expected);
+    assertEquals(
         stored,
         await deriveRecordTypeEntity(
             db, ORGANIZATION, id,
@@ -446,17 +445,17 @@ test('stored PUT body equals recordTypeEntityOf of the'
             '2020-01-01T00:00:00.000000Z', 'ev-g1-skew',
         ),
     ));
-    assert.equal(skewed.status, 201);
+    assertStrictEquals(skewed.status, 201);
     const afterSkew = JSON.parse(
         await storedPutBodyText(db, prefix, id),
     );
-    assert.deepEqual(
+    assertEquals(
         afterSkew,
         await deriveRecordTypeEntity(
             db, ORGANIZATION, id,
         ),
     );
-    assert.equal(afterSkew.state, 'archived');
-    assert.equal(afterSkew.name, 'Skewed');
-    assert.equal('state_at' in afterSkew, false);
+    assertStrictEquals(afterSkew.state, 'archived');
+    assertStrictEquals(afterSkew.name, 'Skewed');
+    assertStrictEquals('state_at' in afterSkew, false);
 });

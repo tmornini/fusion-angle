@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import { reduceFsm }
     from '../web-app/app/flow-fsm-reduce.ts';
 import type {
@@ -37,7 +41,7 @@ function findAction<K extends Action['kind']>(
     );
 }
 
-test(
+Deno.test(
     'click empty canvas clears selection'
     + ' and starts marquee',
     () => {
@@ -53,26 +57,26 @@ test(
             clientX: 0, clientY: 0,
         };
         const r = reduceFsm(state, input);
-        assert.equal(
+        assertStrictEquals(
             r.state.selection.kind, 'none',
         );
-        assert.equal(
+        assertStrictEquals(
             r.state.marquee.kind, 'selecting',
         );
         const open = findAction(
             r.actions, 'open-panel',
         );
-        assert.equal(open?.open, false);
-        assert.ok(findAction(
+        assertStrictEquals(open?.open, false);
+        assert(findAction(
             r.actions, 'capture-pointer',
         ));
-        assert.deepEqual(
+        assertEquals(
             r.state.viewBox, state.viewBox,
         );
     },
 );
 
-test(
+Deno.test(
     'empty canvas click keeps a zoomed viewBox',
     () => {
         const zoomed = {
@@ -100,14 +104,14 @@ test(
         const afterUp = reduceFsm(
             afterDown.state, up,
         );
-        assert.deepEqual(
+        assertEquals(
             afterUp.state.viewBox, zoomed,
         );
-        assert.equal(afterUp.state.zoom, 1.1);
+        assertStrictEquals(afterUp.state.zoom, 1.1);
     },
 );
 
-test('click on node selects it', () => {
+Deno.test('click on node selects it', () => {
     const state = buildState();
     const input: FsmInput = {
         kind: 'pointer-down-on-node',
@@ -124,16 +128,16 @@ test('click on node selects it', () => {
         ]),
     };
     const r = reduceFsm(state, input);
-    assert.equal(r.state.selection.kind, 'nodes');
+    assertStrictEquals(r.state.selection.kind, 'nodes');
     if (r.state.selection.kind === 'nodes') {
-        assert.ok(
+        assert(
             r.state.selection.nodeIds.has('n1'),
         );
     }
-    assert.equal(r.state.drag.kind, 'dragging');
+    assertStrictEquals(r.state.drag.kind, 'dragging');
 });
 
-test(
+Deno.test(
     'shift-click adds node to selection',
     () => {
         const state = buildState({
@@ -158,19 +162,19 @@ test(
             ]),
         };
         const r = reduceFsm(state, input);
-        assert.equal(
+        assertStrictEquals(
             r.state.selection.kind, 'nodes',
         );
         if (r.state.selection.kind === 'nodes') {
             const ids = r.state.selection.nodeIds;
-            assert.equal(ids.size, 2);
-            assert.ok(ids.has('n1'));
-            assert.ok(ids.has('n2'));
+            assertStrictEquals(ids.size, 2);
+            assert(ids.has('n1'));
+            assert(ids.has('n2'));
         }
     },
 );
 
-test(
+Deno.test(
     'pointer-up after drag emits move-nodes',
     () => {
         const initial = new Map([
@@ -201,21 +205,21 @@ test(
             allNodes: [],
         };
         const r = reduceFsm(state, input);
-        assert.equal(r.state.drag.kind, 'idle');
+        assertStrictEquals(r.state.drag.kind, 'idle');
         const move = findAction(
             r.actions, 'move-nodes',
         );
-        assert.ok(move);
-        assert.equal(move.updates.length, 1);
-        assert.equal(
+        assert(move);
+        assertStrictEquals(move.updates.length, 1);
+        assertStrictEquals(
             move.updates[0]?.nodeId, 'n1',
         );
-        assert.equal(move.updates[0]?.x, 50);
-        assert.equal(move.updates[0]?.y, 30);
+        assertStrictEquals(move.updates[0]?.x, 50);
+        assertStrictEquals(move.updates[0]?.y, 30);
     },
 );
 
-test(
+Deno.test(
     'port click starts connect mode',
     () => {
         const state = buildState();
@@ -232,18 +236,18 @@ test(
             selectedPositions: new Map(),
         };
         const r = reduceFsm(state, input);
-        assert.equal(
+        assertStrictEquals(
             r.state.connect.kind, 'connecting',
         );
         if (r.state.connect.kind === 'connecting') {
-            assert.equal(
+            assertStrictEquals(
                 r.state.connect.fromNodeId, 'n1',
             );
         }
     },
 );
 
-test(
+Deno.test(
     'shift-pointer-up over node emits add-edge',
     () => {
         const state = buildState({
@@ -265,19 +269,19 @@ test(
             allNodes: [],
         };
         const r = reduceFsm(state, input);
-        assert.equal(
+        assertStrictEquals(
             r.state.connect.kind, 'idle',
         );
         const edge = findAction(
             r.actions, 'add-edge',
         );
-        assert.ok(edge);
-        assert.equal(edge.fromId, 'n1');
-        assert.equal(edge.toId, 'n2');
+        assert(edge);
+        assertStrictEquals(edge.fromId, 'n1');
+        assertStrictEquals(edge.toId, 'n2');
     },
 );
 
-test(
+Deno.test(
     'far-drop port-drag emits add-node',
     () => {
         const state = buildState({
@@ -299,18 +303,18 @@ test(
             allNodes: [],
         };
         const r = reduceFsm(state, input);
-        assert.equal(
+        assertStrictEquals(
             r.state.connect.kind, 'idle',
         );
         const addNode = findAction(
             r.actions, 'add-node',
         );
-        assert.ok(addNode);
-        assert.equal(addNode.fromId, 'n1');
+        assert(addNode);
+        assertStrictEquals(addNode.fromId, 'n1');
     },
 );
 
-test('marquee selects overlapping nodes', () => {
+Deno.test('marquee selects overlapping nodes', () => {
     const state = buildState({
         marquee: {
             kind: 'selecting',
@@ -332,16 +336,16 @@ test('marquee selects overlapping nodes', () => {
         allNodes,
     };
     const r = reduceFsm(state, input);
-    assert.equal(r.state.marquee.kind, 'idle');
-    assert.equal(r.state.selection.kind, 'nodes');
+    assertStrictEquals(r.state.marquee.kind, 'idle');
+    assertStrictEquals(r.state.selection.kind, 'nodes');
     if (r.state.selection.kind === 'nodes') {
         const ids = r.state.selection.nodeIds;
-        assert.ok(ids.has('n1'));
-        assert.ok(!ids.has('n2'));
+        assert(ids.has('n1'));
+        assert(!ids.has('n2'));
     }
 });
 
-test(
+Deno.test(
     'space-toggle from off enables pan mode'
     + ' and emits cursor-on action',
     () => {
@@ -352,17 +356,17 @@ test(
             isFormFocused: false,
         };
         const r = reduceFsm(state, input);
-        assert.equal(
+        assertStrictEquals(
             r.state.isPanMode, true,
         );
         const cursor = findAction(
             r.actions, 'set-pan-cursor',
         );
-        assert.equal(cursor?.on, true);
+        assertStrictEquals(cursor?.on, true);
     },
 );
 
-test(
+Deno.test(
     'space-toggle from on disables pan mode'
     + ' and emits cursor-off action',
     () => {
@@ -375,17 +379,17 @@ test(
             isFormFocused: false,
         };
         const r = reduceFsm(state, input);
-        assert.equal(
+        assertStrictEquals(
             r.state.isPanMode, false,
         );
         const cursor = findAction(
             r.actions, 'set-pan-cursor',
         );
-        assert.equal(cursor?.on, false);
+        assertStrictEquals(cursor?.on, false);
     },
 );
 
-test(
+Deno.test(
     'space-toggle from off with autofit'
     + ' shows toast and stays off',
     () => {
@@ -396,18 +400,18 @@ test(
             isFormFocused: false,
         };
         const r = reduceFsm(state, input);
-        assert.equal(
+        assertStrictEquals(
             r.state.isPanMode, false,
         );
         const toast = findAction(
             r.actions, 'show-toast',
         );
-        assert.ok(toast);
-        assert.equal(toast.tone, 'error');
+        assert(toast);
+        assertStrictEquals(toast.tone, 'error');
     },
 );
 
-test(
+Deno.test(
     'space-toggle from on with autofit'
     + ' still toggles off',
     () => {
@@ -420,17 +424,17 @@ test(
             isFormFocused: false,
         };
         const r = reduceFsm(state, input);
-        assert.equal(
+        assertStrictEquals(
             r.state.isPanMode, false,
         );
         const cursor = findAction(
             r.actions, 'set-pan-cursor',
         );
-        assert.equal(cursor?.on, false);
+        assertStrictEquals(cursor?.on, false);
     },
 );
 
-test(
+Deno.test(
     'space-toggle commits isPanMode via'
     + ' request-update',
     () => {
@@ -442,18 +446,18 @@ test(
         const upd = findAction(
             r.actions, 'request-update',
         );
-        assert.ok(upd);
-        assert.equal(
+        assert(upd);
+        assertStrictEquals(
             upd.state.isPanMode, true,
         );
         const cursor = findAction(
             r.actions, 'set-pan-cursor',
         );
-        assert.equal(cursor?.on, true);
+        assertStrictEquals(cursor?.on, true);
     },
 );
 
-test(
+Deno.test(
     'space-toggle off under autofit still'
     + ' request-updates',
     () => {
@@ -468,18 +472,18 @@ test(
         const upd = findAction(
             r.actions, 'request-update',
         );
-        assert.ok(upd);
-        assert.equal(
+        assert(upd);
+        assertStrictEquals(
             upd.state.isPanMode, false,
         );
-        assert.equal(
+        assertStrictEquals(
             findAction(r.actions, 'show-toast'),
             undefined,
         );
     },
 );
 
-test(
+Deno.test(
     'space-toggle while dragging is ignored',
     () => {
         const state = buildState({
@@ -499,12 +503,12 @@ test(
             isFormFocused: false,
         };
         const r = reduceFsm(state, input);
-        assert.equal(r.state, state);
-        assert.equal(r.actions.length, 0);
+        assertStrictEquals(r.state, state);
+        assertStrictEquals(r.actions.length, 0);
     },
 );
 
-test(
+Deno.test(
     'space-toggle while connecting is ignored',
     () => {
         const state = buildState({
@@ -523,12 +527,12 @@ test(
             isFormFocused: false,
         };
         const r = reduceFsm(state, input);
-        assert.equal(r.state, state);
-        assert.equal(r.actions.length, 0);
+        assertStrictEquals(r.state, state);
+        assertStrictEquals(r.actions.length, 0);
     },
 );
 
-test(
+Deno.test(
     'space-toggle while marquee selecting'
     + ' is ignored',
     () => {
@@ -547,12 +551,12 @@ test(
             isFormFocused: false,
         };
         const r = reduceFsm(state, input);
-        assert.equal(r.state, state);
-        assert.equal(r.actions.length, 0);
+        assertStrictEquals(r.state, state);
+        assertStrictEquals(r.actions.length, 0);
     },
 );
 
-test(
+Deno.test(
     'space-toggle while panning is ignored',
     () => {
         const state = buildState({
@@ -569,12 +573,12 @@ test(
             isFormFocused: false,
         };
         const r = reduceFsm(state, input);
-        assert.equal(r.state, state);
-        assert.equal(r.actions.length, 0);
+        assertStrictEquals(r.state, state);
+        assertStrictEquals(r.actions.length, 0);
     },
 );
 
-test(
+Deno.test(
     'space-toggle while form-focused is ignored',
     () => {
         const state = buildState();
@@ -584,12 +588,12 @@ test(
             isFormFocused: true,
         };
         const r = reduceFsm(state, input);
-        assert.equal(r.state, state);
-        assert.equal(r.actions.length, 0);
+        assertStrictEquals(r.state, state);
+        assertStrictEquals(r.actions.length, 0);
     },
 );
 
-test(
+Deno.test(
     'wheel with autofit shows toast '
     + 'and does not zoom',
     () => {
@@ -601,11 +605,11 @@ test(
             isAutoFit: true,
         };
         const r = reduceFsm(state, input);
-        assert.equal(r.state.zoom, 1.0);
+        assertStrictEquals(r.state.zoom, 1.0);
     },
 );
 
-test(
+Deno.test(
     'wheel without autofit changes zoom',
     () => {
         const state = buildState();
@@ -616,11 +620,11 @@ test(
             isAutoFit: false,
         };
         const r = reduceFsm(state, input);
-        assert.notEqual(r.state.zoom, 1.0);
+        assertNotStrictEquals(r.state.zoom, 1.0);
     },
 );
 
-test(
+Deno.test(
     'request-update carries the new state'
     + ' (FSM-to-presenter sync contract)',
     () => {
@@ -643,15 +647,15 @@ test(
         const update = findAction(
             r.actions, 'request-update',
         );
-        assert.ok(update);
-        assert.equal(update.state, r.state);
-        assert.equal(
+        assert(update);
+        assertStrictEquals(update.state, r.state);
+        assertStrictEquals(
             update.state.selection.kind, 'nodes',
         );
     },
 );
 
-test(
+Deno.test(
     'second click within DBLCLICK window emits'
     + ' open-panel:true and request-update with'
     + ' selection set (double-click integration)',
@@ -680,18 +684,18 @@ test(
         const open = findAction(
             r2.actions, 'open-panel',
         );
-        assert.equal(open?.open, true);
+        assertStrictEquals(open?.open, true);
         const update = findAction(
             r2.actions, 'request-update',
         );
-        assert.ok(update);
-        assert.equal(
+        assert(update);
+        assertStrictEquals(
             update.state.selection.kind, 'nodes',
         );
         if (
             update.state.selection.kind === 'nodes'
         ) {
-            assert.ok(
+            assert(
                 update.state.selection
                     .nodeIds.has('n1'),
             );
@@ -699,7 +703,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'canvas-key-activate on a node single-selects it,'
     + ' opens the panel, and requests an update',
     () => {
@@ -709,11 +713,11 @@ test(
             nodeId: 'n1',
             edgeId: null,
         });
-        assert.equal(
+        assertStrictEquals(
             r.state.selection.kind, 'nodes',
         );
         if (r.state.selection.kind === 'nodes') {
-            assert.deepEqual(
+            assertEquals(
                 [...r.state.selection.nodeIds],
                 ['n1'],
             );
@@ -721,16 +725,16 @@ test(
         const open = findAction(
             r.actions, 'open-panel',
         );
-        assert.equal(open?.open, true);
+        assertStrictEquals(open?.open, true);
         const update = findAction(
             r.actions, 'request-update',
         );
-        assert.ok(update);
-        assert.equal(update.state, r.state);
+        assert(update);
+        assertStrictEquals(update.state, r.state);
     },
 );
 
-test(
+Deno.test(
     'canvas-key-activate on an edge selects the edge'
     + ' and opens the panel',
     () => {
@@ -740,25 +744,25 @@ test(
             nodeId: null,
             edgeId: 'e1',
         });
-        assert.equal(
+        assertStrictEquals(
             r.state.selection.kind, 'edge',
         );
         if (r.state.selection.kind === 'edge') {
-            assert.equal(
+            assertStrictEquals(
                 r.state.selection.edgeId, 'e1',
             );
         }
         const open = findAction(
             r.actions, 'open-panel',
         );
-        assert.equal(open?.open, true);
-        assert.ok(findAction(
+        assertStrictEquals(open?.open, true);
+        assert(findAction(
             r.actions, 'request-update',
         ));
     },
 );
 
-test(
+Deno.test(
     'canvas-focus on an unselected node single-selects'
     + ' it with request-update and no open-panel',
     () => {
@@ -769,26 +773,26 @@ test(
             edgeId: null,
             isRenderedSelected: false,
         });
-        assert.equal(
+        assertStrictEquals(
             r.state.selection.kind, 'nodes',
         );
         if (r.state.selection.kind === 'nodes') {
-            assert.deepEqual(
+            assertEquals(
                 [...r.state.selection.nodeIds],
                 ['n1'],
             );
         }
-        assert.ok(findAction(
+        assert(findAction(
             r.actions, 'request-update',
         ));
-        assert.equal(
+        assertStrictEquals(
             findAction(r.actions, 'open-panel'),
             undefined,
         );
     },
 );
 
-test(
+Deno.test(
     'canvas-focus on a rendered-selected item is a'
     + ' no-op (the promotion loop-breaker)',
     () => {
@@ -804,12 +808,12 @@ test(
             edgeId: null,
             isRenderedSelected: true,
         });
-        assert.equal(r.state, state);
-        assert.equal(r.actions.length, 0);
+        assertStrictEquals(r.state, state);
+        assertStrictEquals(r.actions.length, 0);
     },
 );
 
-test(
+Deno.test(
     'canvas-focus mid-gesture is ignored',
     () => {
         const state = buildState({
@@ -831,12 +835,12 @@ test(
             edgeId: null,
             isRenderedSelected: false,
         });
-        assert.equal(r.state, state);
-        assert.equal(r.actions.length, 0);
+        assertStrictEquals(r.state, state);
+        assertStrictEquals(r.actions.length, 0);
     },
 );
 
-test(
+Deno.test(
     'canvas-focus on an edge selects the edge',
     () => {
         const state = buildState();
@@ -846,21 +850,21 @@ test(
             edgeId: 'e1',
             isRenderedSelected: false,
         });
-        assert.equal(
+        assertStrictEquals(
             r.state.selection.kind, 'edge',
         );
         if (r.state.selection.kind === 'edge') {
-            assert.equal(
+            assertStrictEquals(
                 r.state.selection.edgeId, 'e1',
             );
         }
-        assert.ok(findAction(
+        assert(findAction(
             r.actions, 'request-update',
         ));
     },
 );
 
-test(
+Deno.test(
     'canvas-focus collapses a foreign multi-selection'
     + ' to the focused node',
     () => {
@@ -876,11 +880,11 @@ test(
             edgeId: null,
             isRenderedSelected: false,
         });
-        assert.equal(
+        assertStrictEquals(
             r.state.selection.kind, 'nodes',
         );
         if (r.state.selection.kind === 'nodes') {
-            assert.deepEqual(
+            assertEquals(
                 [...r.state.selection.nodeIds],
                 ['n1'],
             );

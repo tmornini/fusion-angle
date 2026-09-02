@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals, assertThrows } from '@std/assert';
 import {
     validateFlowGraphDelta,
 } from '../api/validators.ts';
@@ -29,17 +28,17 @@ function makeDelta(): Record<string, unknown> {
 
 // ── top-level shape ───────────
 
-test('well-formed empty delta round-trips', () => {
+Deno.test('well-formed empty delta round-trips', () => {
     const result = validateFlowGraphDelta(makeDelta());
-    assert.equal(result.nodes.length, 0);
-    assert.equal(result.edges.length, 0);
-    assert.equal(result.deletions.length, 0);
-    assert.equal(result.memberEvents.length, 0);
-    assert.equal(result.attributeEvents.length, 0);
+    assertStrictEquals(result.nodes.length, 0);
+    assertStrictEquals(result.edges.length, 0);
+    assertStrictEquals(result.deletions.length, 0);
+    assertStrictEquals(result.memberEvents.length, 0);
+    assertStrictEquals(result.attributeEvents.length, 0);
 });
 
-test('unknown top-level key throws ValidationError', () => {
-    assert.throws(
+Deno.test('unknown top-level key throws ValidationError', () => {
+    assertThrows(
         () => validateFlowGraphDelta(
             { ...makeDelta(), extra: true },
         ),
@@ -47,9 +46,9 @@ test('unknown top-level key throws ValidationError', () => {
     );
 });
 
-test('missing top-level key throws ValidationError', () => {
+Deno.test('missing top-level key throws ValidationError', () => {
     const { nodes: _n, ...rest } = makeDelta();
-    assert.throws(
+    assertThrows(
         () => validateFlowGraphDelta(rest),
         ValidationError,
     );
@@ -73,19 +72,19 @@ function makeNode(
     };
 }
 
-test('well-formed node round-trips', () => {
+Deno.test('well-formed node round-trips', () => {
     const delta = {
         ...makeDelta(),
         nodes: [makeNode()],
     };
     const result = validateFlowGraphDelta(delta);
-    assert.equal(result.nodes.length, 1);
-    assert.equal(result.nodes[0]!.id, NODE_ID);
-    assert.equal(result.nodes[0]!.flow_id, FLOW_ID);
+    assertStrictEquals(result.nodes.length, 1);
+    assertStrictEquals(result.nodes[0]!.id, NODE_ID);
+    assertStrictEquals(result.nodes[0]!.flow_id, FLOW_ID);
 });
 
-test('node with markup id throws ValidationError', () => {
-    assert.throws(
+Deno.test('node with markup id throws ValidationError', () => {
+    assertThrows(
         () => validateFlowGraphDelta({
             ...makeDelta(),
             nodes: [makeNode('<svg>')],
@@ -94,8 +93,8 @@ test('node with markup id throws ValidationError', () => {
     );
 });
 
-test('node with bad at throws ValidationError', () => {
-    assert.throws(
+Deno.test('node with bad at throws ValidationError', () => {
+    assertThrows(
         () => validateFlowGraphDelta({
             ...makeDelta(),
             nodes: [{ ...makeNode(), at: '2026-01-01' }],
@@ -117,19 +116,19 @@ function makeEdge(): Record<string, unknown> {
     };
 }
 
-test('well-formed edge round-trips', () => {
+Deno.test('well-formed edge round-trips', () => {
     const delta = {
         ...makeDelta(),
         edges: [makeEdge()],
     };
     const result = validateFlowGraphDelta(delta);
-    assert.equal(result.edges.length, 1);
-    assert.equal(result.edges[0]!.id, EDGE_ID);
-    assert.equal(result.edges[0]!.from_node_id, NODE_ID);
+    assertStrictEquals(result.edges.length, 1);
+    assertStrictEquals(result.edges[0]!.id, EDGE_ID);
+    assertStrictEquals(result.edges[0]!.from_node_id, NODE_ID);
 });
 
-test('edge with markup to_node_id throws', () => {
-    assert.throws(
+Deno.test('edge with markup to_node_id throws', () => {
+    assertThrows(
         () => validateFlowGraphDelta({
             ...makeDelta(),
             edges: [{ ...makeEdge(), to_node_id: '<script>' }],
@@ -148,22 +147,22 @@ function makeDeletion(): Record<string, unknown> {
     };
 }
 
-test('well-formed deletion round-trips', () => {
+Deno.test('well-formed deletion round-trips', () => {
     const delta = {
         ...makeDelta(),
         deletions: [makeDeletion()],
     };
     const result = validateFlowGraphDelta(delta);
-    assert.equal(result.deletions.length, 1);
-    assert.equal(
+    assertStrictEquals(result.deletions.length, 1);
+    assertStrictEquals(
         result.deletions[0]!.eventId, DELETION_EVENT_ID,
     );
-    assert.equal(result.deletions[0]!.entityId, NODE_ID);
-    assert.equal(result.deletions[0]!.at, AT);
+    assertStrictEquals(result.deletions[0]!.entityId, NODE_ID);
+    assertStrictEquals(result.deletions[0]!.at, AT);
 });
 
-test('deletion with empty eventId throws', () => {
-    assert.throws(
+Deno.test('deletion with empty eventId throws', () => {
+    assertThrows(
         () => validateFlowGraphDelta({
             ...makeDelta(),
             deletions: [{ ...makeDeletion(), eventId: '' }],
@@ -172,8 +171,8 @@ test('deletion with empty eventId throws', () => {
     );
 });
 
-test('deletion with markup entityId throws', () => {
-    assert.throws(
+Deno.test('deletion with markup entityId throws', () => {
+    assertThrows(
         () => validateFlowGraphDelta({
             ...makeDelta(),
             deletions: [
@@ -184,8 +183,8 @@ test('deletion with markup entityId throws', () => {
     );
 });
 
-test('deletion with bad at throws', () => {
-    assert.throws(
+Deno.test('deletion with bad at throws', () => {
+    assertThrows(
         () => validateFlowGraphDelta({
             ...makeDelta(),
             deletions: [
@@ -208,29 +207,29 @@ function makeMemberEvent(): Record<string, unknown> {
     };
 }
 
-test('well-formed memberEvent round-trips', () => {
+Deno.test('well-formed memberEvent round-trips', () => {
     const delta = {
         ...makeDelta(),
         memberEvents: [makeMemberEvent()],
     };
     const result = validateFlowGraphDelta(delta);
-    assert.equal(result.memberEvents.length, 1);
-    assert.equal(
+    assertStrictEquals(result.memberEvents.length, 1);
+    assertStrictEquals(
         result.memberEvents[0]!.id, MEMBER_EVENT_ID,
     );
-    assert.equal(
+    assertStrictEquals(
         result.memberEvents[0]!.flow_node_id, NODE_ID,
     );
-    assert.equal(
+    assertStrictEquals(
         result.memberEvents[0]!.member_id, 'mFNSxZqywTSMXhgUTdTqtA',
     );
-    assert.equal(
+    assertStrictEquals(
         result.memberEvents[0]!.action, 'added',
     );
 });
 
-test('memberEvent empty id throws', () => {
-    assert.throws(
+Deno.test('memberEvent empty id throws', () => {
+    assertThrows(
         () => validateFlowGraphDelta({
             ...makeDelta(),
             memberEvents: [
@@ -241,8 +240,8 @@ test('memberEvent empty id throws', () => {
     );
 });
 
-test('memberEvent markup flow_node_id throws', () => {
-    assert.throws(
+Deno.test('memberEvent markup flow_node_id throws', () => {
+    assertThrows(
         () => validateFlowGraphDelta({
             ...makeDelta(),
             memberEvents: [
@@ -270,26 +269,26 @@ function makeAttrEvent(): Record<string, unknown> {
     };
 }
 
-test('well-formed attributeEvent round-trips', () => {
+Deno.test('well-formed attributeEvent round-trips', () => {
     const delta = {
         ...makeDelta(),
         attributeEvents: [makeAttrEvent()],
     };
     const result = validateFlowGraphDelta(delta);
-    assert.equal(result.attributeEvents.length, 1);
-    assert.equal(
+    assertStrictEquals(result.attributeEvents.length, 1);
+    assertStrictEquals(
         result.attributeEvents[0]!.id, ATTR_EVENT_ID,
     );
-    assert.equal(
+    assertStrictEquals(
         result.attributeEvents[0]!.attribute_id, 'UQTJZvCoKlFjEoDlDUwekw',
     );
-    assert.equal(
+    assertStrictEquals(
         result.attributeEvents[0]!.mode, 'editable',
     );
 });
 
-test('attributeEvent empty id throws', () => {
-    assert.throws(
+Deno.test('attributeEvent empty id throws', () => {
+    assertThrows(
         () => validateFlowGraphDelta({
             ...makeDelta(),
             attributeEvents: [
@@ -300,8 +299,8 @@ test('attributeEvent empty id throws', () => {
     );
 });
 
-test('attributeEvent unknown mode throws', () => {
-    assert.throws(
+Deno.test('attributeEvent unknown mode throws', () => {
+    assertThrows(
         () => validateFlowGraphDelta({
             ...makeDelta(),
             attributeEvents: [

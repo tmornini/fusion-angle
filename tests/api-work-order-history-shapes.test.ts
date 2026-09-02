@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import { handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -154,7 +153,7 @@ async function createWorkOrder(
             createBody(workOrderId),
         ),
     );
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 }
 
 // Below-gate transition append (appendInstancePair idiom).
@@ -212,7 +211,7 @@ interface HistoryEvent {
 // Pin 1: legacy-only cross-event migration — same fv row
 // id in two pairs; head-reduce attributes value to the
 // LATER event only.
-test('legacy-only WO: fold pools by fv id; later event'
+Deno.test('legacy-only WO: fold pools by fv id; later event'
 + ' owns the head',
 async () => {
     const db = await seedBaseDb();
@@ -266,12 +265,12 @@ async () => {
 
     const early = history.find((r) => r.id === teEarly);
     const late = history.find((r) => r.id === teLate);
-    assert.ok(early !== undefined);
-    assert.ok(late !== undefined);
+    assert(early !== undefined);
+    assert(late !== undefined);
     // Head-reduce by fv row id: only the later event carries
     // the value; earlier event's bag is empty for this id.
-    assert.deepEqual(early!.field_values, []);
-    assert.deepEqual(late!.field_values, [{
+    assertEquals(early!.field_values, []);
+    assertEquals(late!.field_values, [{
         id: fvShared,
         attribute_id: ATTR_X,
         value: 'new',
@@ -280,7 +279,7 @@ async () => {
 
 // Pin 2: new-shape-only — set + clear → per-event rows,
 // id-ascending; cleared row has NO value key.
-test('new-shape-only WO: set/clear rows id-ascending;'
+Deno.test('new-shape-only WO: set/clear rows id-ascending;'
 + ' cleared has no value key',
 async () => {
     const db = await seedBaseDb();
@@ -324,10 +323,10 @@ async () => {
 
     const other = history.find((r) => r.id === teOther);
     const row = history.find((r) => r.id === teNew);
-    assert.ok(other !== undefined);
-    assert.ok(row !== undefined);
-    assert.deepEqual(other!.field_values, []);
-    assert.deepEqual(row!.field_values, [
+    assert(other !== undefined);
+    assert(row !== undefined);
+    assertEquals(other!.field_values, []);
+    assertEquals(row!.field_values, [
         { id: 'UQTJZvCoKlFjEoDlDUwekw'
             , attribute_id: 'UQTJZvCoKlFjEoDlDUwekw', value: 'y' },
         { id: 'UZgNCkZlSJcSaAmAJuSkcw'
@@ -337,13 +336,13 @@ async () => {
     const cleared = row!.field_values.find(
         (fv) => fv.id === 'a3',
     );
-    assert.ok(cleared !== undefined);
-    assert.equal(Object.hasOwn(cleared!, 'value'), false);
+    assert(cleared !== undefined);
+    assertStrictEquals(Object.hasOwn(cleared!, 'value'), false);
 });
 
 // Pin 3: mixed WO — each pair under its own shape rule;
 // legacy bytes unchanged.
-test('mixed WO: legacy bag + new-shape set/clear each'
+Deno.test('mixed WO: legacy bag + new-shape set/clear each'
 + ' under own rule',
 async () => {
     const db = await seedBaseDb();
@@ -394,19 +393,19 @@ async () => {
 
     const legacy = history.find((r) => r.id === teLegacy);
     const neu = history.find((r) => r.id === teNew);
-    assert.ok(legacy !== undefined);
-    assert.ok(neu !== undefined);
+    assert(legacy !== undefined);
+    assert(neu !== undefined);
     // Legacy bytes: fv row id, attribute_id, value only.
-    assert.deepEqual(legacy!.field_values, [{
+    assertEquals(legacy!.field_values, [{
         id: fvId,
         attribute_id: ATTR_SEVERITY,
         value: 'high',
     }]);
-    assert.equal(
+    assertStrictEquals(
         Object.hasOwn(legacy!.field_values[0]!, 'cleared'),
         false,
     );
-    assert.deepEqual(neu!.field_values, [
+    assertEquals(neu!.field_values, [
         { id: 'b0', attribute_id: 'b0', cleared: true },
         { id: 'b1', attribute_id: 'b1', value: 'q' },
         { id: 'b2', attribute_id: 'b2', value: 'p' },
@@ -414,7 +413,7 @@ async () => {
 });
 
 // Pin 4: claim rows still field_values: []; DESC order.
-test('claim rows field_values []; history is (at, id)'
+Deno.test('claim rows field_values []; history is (at, id)'
 + ' DESC',
 async () => {
     const db = await seedBaseDb();
@@ -443,8 +442,8 @@ async () => {
     const claimed = history.find(
         (r) => r.state === 'claimed',
     );
-    assert.ok(claimed !== undefined);
-    assert.deepEqual(claimed!.field_values, []);
+    assert(claimed !== undefined);
+    assertEquals(claimed!.field_values, []);
 
     // Strict DESC on (at, id).
     for (let i = 1; i < history.length; i++) {
@@ -453,7 +452,7 @@ async () => {
         const ordered =
             prev.at > cur.at
             || (prev.at === cur.at && prev.id > cur.id);
-        assert.ok(
+        assert(
             ordered,
             'history must be (at, id) DESC',
         );
@@ -462,7 +461,7 @@ async () => {
 
 // Pin 5: RESTRICT census ignores new-shape pairs; counts
 // legacy bag values only; does not crash.
-test('deriveStateFieldValueReferrers counts legacy only;'
+Deno.test('deriveStateFieldValueReferrers counts legacy only;'
 + ' new-shape pairs do not crash',
 async () => {
     const db = await seedBaseDb();
@@ -511,9 +510,9 @@ async () => {
         db, ORGANIZATION, [attrId],
     );
     const rows = derived.get(attrId) ?? [];
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]!.id, fvId);
-    assert.equal(rows[0]!.attribute_id, attrId);
-    assert.equal(rows[0]!.value, 'counted');
-    assert.equal(rows[0]!.state_event_id, teLegacy);
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.id, fvId);
+    assertStrictEquals(rows[0]!.attribute_id, attrId);
+    assertStrictEquals(rows[0]!.value, 'counted');
+    assertStrictEquals(rows[0]!.state_event_id, teLegacy);
 });

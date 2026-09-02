@@ -1,7 +1,5 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { assert, assertStrictEquals } from '@std/assert';
+import { fromFileUrl } from '@std/path';
 import { routes, type Route } from '../api/routes.ts';
 import {
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
@@ -18,10 +16,10 @@ import {
 // task-2a-report.md deferred to explicitly: "the Task 6 exit
 // test will catch any gap mechanically."
 
-const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+const repoRoot = fromFileUrl(new URL('..', import.meta.url));
 
 function sourceText(relativePath: string): string {
-    return readFileSync(repoRoot + relativePath, 'utf8');
+    return Deno.readTextFileSync(repoRoot + relativePath);
 }
 
 // A write registration: a Route entry exposing put, post,
@@ -61,7 +59,7 @@ const NAMED_EXEMPT_ROUTE_PATTERNS:
         'identities/:id/invitations/:id',
     ]);
 
-test('every write-verb route is pair-wired or named exempt',
+Deno.test('every write-verb route is pair-wired or named exempt',
 () => {
     const writeRoutePatterns = routes
         .map(writtenPattern)
@@ -72,9 +70,9 @@ test('every write-verb route is pair-wired or named exempt',
     // A sanity floor: fails loudly if route parsing regresses
     // to near-zero (e.g. an import returns the wrong shape)
     // instead of silently passing on an empty list.
-    assert.ok(writeRoutePatterns.length > 36);
+    assert(writeRoutePatterns.length > 36);
     for (const pattern of writeRoutePatterns) {
-        assert.ok(
+        assert(
             MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.has(pattern)
                 || NAMED_EXEMPT_ROUTE_PATTERNS.has(pattern),
             'unwired, un-exempt write route: ' + pattern,
@@ -88,7 +86,7 @@ test('every write-verb route is pair-wired or named exempt',
 // fail the completeness gate above — the alphabet grew, so
 // the gate must see patch. Currently no live route carries
 // patch; this pins the walker, not a table row.
-test('patch-only synthetic is a write route the walker'
+Deno.test('patch-only synthetic is a write route the walker'
 + ' would require pair-wired', () => {
     const synthetic: Route = {
         segments: ['patch-only-synthetic', ':id'],
@@ -97,21 +95,21 @@ test('patch-only synthetic is a write route the walker'
         patch: (async () => ({})) as NonNullable<Route['patch']>,
     };
     const pattern = writtenPattern(synthetic);
-    assert.equal(pattern, 'patch-only-synthetic/:id');
-    assert.equal(
+    assertStrictEquals(pattern, 'patch-only-synthetic/:id');
+    assertStrictEquals(
         MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.has(pattern!),
         false,
     );
-    assert.equal(
+    assertStrictEquals(
         NAMED_EXEMPT_ROUTE_PATTERNS.has(pattern!),
         false,
     );
 });
 
-test('AUTHENTICATION_ROUTES ride the dedicated pair arm, so'
+Deno.test('AUTHENTICATION_ROUTES ride the dedicated pair arm, so'
 + ' both are also replay-exempt', () => {
     for (const pattern of AUTHENTICATION_ROUTES) {
-        assert.ok(
+        assert(
             REPLAY_EXEMPT_ROUTE_PATTERNS.has(pattern),
             pattern + ' rides the dedicated arm but is not'
                 + ' replay-exempt',
@@ -122,24 +120,24 @@ test('AUTHENTICATION_ROUTES ride the dedicated pair arm, so'
 // Invitation nest writes are named-exempt (test 1). Pair
 // formation still lives in invitations-domain.ts at the
 // /invitations/ storage prefix. Pin the primitives.
-test('invitation writes import pair-formation primitives',
+Deno.test('invitation writes import pair-formation primitives',
 () => {
     const path = 'api/invitations-domain.ts';
     const text = sourceText(path);
-    assert.ok(
+    assert(
         text.includes('appendMessagePair'),
         path + ' does not import appendMessagePair',
     );
-    assert.ok(
+    assert(
         text.includes('formWriteMessagePair'),
         path + ' does not import formWriteMessagePair',
     );
 });
 
-test('api/api.ts awaits simulateLatency exactly 4 times', () => {
+Deno.test('api/api.ts awaits simulateLatency exactly 4 times', () => {
     const text = sourceText('api/api.ts');
     const hits = text.match(
         /await adapter\.simulateLatency\(\);/g,
     ) ?? [];
-    assert.equal(hits.length, 4);
+    assertStrictEquals(hits.length, 4);
 });

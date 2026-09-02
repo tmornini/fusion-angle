@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { PUT, GET, handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -52,13 +57,13 @@ function identityFields() {
 
 // -- 1. validators: accept + the label mandate + missing key --
 
-test('validateIdentityDocumentBody accepts the exact one-key'
+Deno.test('validateIdentityDocumentBody accepts the exact one-key'
 + ' body', () => {
     const doc = validateIdentityDocumentBody(identityFields());
-    assert.deepEqual(doc.entity, identityFields());
+    assertEquals(doc.entity, identityFields());
 });
 
-test('validateIdentityDocumentBody rejects a stray key with'
+Deno.test('validateIdentityDocumentBody rejects a stray key with'
 + ' the byte-identical message validateIdentityEntity produces'
 + ' for the SAME violation (the label mandate)', () => {
     const body = { ...identityFields(), bogus: 'nope' };
@@ -67,23 +72,23 @@ test('validateIdentityDocumentBody rejects a stray key with'
     try {
         validateIdentityDocumentBody(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         documentMessage = (e as ValidationError).message;
     }
     try {
         validateIdentityEntity(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         entityMessage = (e as ValidationError).message;
     }
-    assert.equal(
+    assertStrictEquals(
         documentMessage,
         'unexpected key "bogus" for IdentityEntity',
     );
-    assert.equal(documentMessage, entityMessage);
+    assertStrictEquals(documentMessage, entityMessage);
 });
 
-test('validateIdentityDocumentBody rejects the missing key,'
+Deno.test('validateIdentityDocumentBody rejects the missing key,'
 + ' byte-identical to validateIdentityEntity on both paths',
 () => {
     const body: Record<string, unknown> = {};
@@ -92,23 +97,23 @@ test('validateIdentityDocumentBody rejects the missing key,'
     try {
         validateIdentityDocumentBody(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         documentMessage = (e as ValidationError).message;
     }
     try {
         validateIdentityEntity(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         entityMessage = (e as ValidationError).message;
     }
-    assert.equal(
+    assertStrictEquals(
         documentMessage,
         'missing required key "kind" for IdentityEntity',
     );
-    assert.equal(documentMessage, entityMessage);
+    assertStrictEquals(documentMessage, entityMessage);
 });
 
-test('validateIdentityDocumentBody rejects an unknown kind,'
+Deno.test('validateIdentityDocumentBody rejects an unknown kind,'
 + ' byte-identical to validateIdentityEntity on both paths',
 () => {
     const body = { kind: 'bogus-kind' };
@@ -117,25 +122,25 @@ test('validateIdentityDocumentBody rejects an unknown kind,'
     try {
         validateIdentityDocumentBody(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         documentMessage = (e as ValidationError).message;
     }
     try {
         validateIdentityEntity(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         entityMessage = (e as ValidationError).message;
     }
-    assert.equal(
+    assertStrictEquals(
         documentMessage,
         'invalid identity kind "bogus-kind" on IdentityEntity',
     );
-    assert.equal(documentMessage, entityMessage);
+    assertStrictEquals(documentMessage, entityMessage);
 });
 
 // -- 2. the op (below-gate, MemoryDbAdapter) -------------------
 
-test('postIdentityDocumentOp writes exactly the pair'
+Deno.test('postIdentityDocumentOp writes exactly the pair'
 + ' (Phase Final Task 2: identities ROW half stripped)',
 async () => {
     const db = memoryDbAdapter();
@@ -158,15 +163,15 @@ async () => {
         db, 'gTMDzYjclgPKfPUYsUdtoQ', body,
         'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
-    assert.deepEqual(written, body);
+    assertEquals(written, body);
     // Phase Final Stage B: identity spine tables retired.
-    assert.equal((await db.messagePairs.getAll()).length, 1);
-    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) --
 
-test('a byte-identical PUT resend to identities/:id converges'
+Deno.test('a byte-identical PUT resend to identities/:id converges'
 + ' to one stored request/response pair', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -178,9 +183,9 @@ test('a byte-identical PUT resend to identities/:id converges'
     const second = await PUT(
         db, 'identities/' + id, body, DEV_TOKEN,
     );
-    assert.deepEqual(first, second);
-    assert.equal((await db.messagePairs.getAll()).length, 3);
-    assert.equal((await db.messagePairs.getAll()).length, 3);
+    assertEquals(first, second);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
 });
 
 // -- 4. below-route via the generic handlers (the drift-file
@@ -243,7 +248,7 @@ async function deleteDocumentMessagePair(
     );
 }
 
-test('a PUT chain Supersedes-chains and the head derives the'
+Deno.test('a PUT chain Supersedes-chains and the head derives the'
 + ' LATEST body, through the generic document handlers'
 + ' (identities)', async () => {
     const db = memoryDbAdapter();
@@ -258,7 +263,7 @@ test('a PUT chain Supersedes-chains and the head derives the'
     const headAfterFirst = await documentGetHandler(wiring)(
         db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored', [],
     );
-    assert.deepEqual(headAfterFirst, {
+    assertEquals(headAfterFirst, {
         id, ...first,
     });
 
@@ -268,17 +273,17 @@ test('a PUT chain Supersedes-chains and the head derives the'
         '2026-02-02T00:00:00.000000Z',
     );
     const secondResponse = await db.messagePairs.getById(secondId);
-    assert.equal('supersedes' in secondResponse, false);
+    assertStrictEquals('supersedes' in secondResponse, false);
 
     const headAfterSecond = await documentGetHandler(wiring)(
         db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored', [],
     );
-    assert.deepEqual(headAfterSecond, {
+    assertEquals(headAfterSecond, {
         id, ...second,
     });
 });
 
-test('a DELETE-head derives absent through the generic document'
+Deno.test('a DELETE-head derives absent through the generic document'
 + ' handlers, carrying notFoundTable (identities)', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -291,23 +296,14 @@ test('a DELETE-head derives absent through the generic document'
     await deleteDocumentMessagePair(
         db, id, '2026-02-02T00:00:00.000000Z',
     );
-    await assert.rejects(
-        documentGetHandler(wiring)(
+    const err = await assertRejects(
+        () => documentGetHandler(wiring)(
             db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored', [],
         ),
-        (error: unknown) => {
-            assert.ok(error instanceof EntityNotFoundError);
-            assert.equal(
-                (error as EntityNotFoundError).table,
-                'identities',
-            );
-            assert.equal(
-                (error as EntityNotFoundError).message,
-                'Not found: identities/' + id,
-            );
-            return true;
-        },
-    );
+    ) as EntityNotFoundError;
+    assertInstanceOf(err, EntityNotFoundError);
+    assertStrictEquals(err.table, 'identities');
+    assertStrictEquals(err.message, 'Not found: identities/' + id);
 });
 
 // -- 5. below-route via the generic handlers: the chain/head/404
@@ -315,7 +311,7 @@ test('a DELETE-head derives absent through the generic document'
 // itself carries NO organization_id (organizationNested:false —
 // the Phase 8 fix) through the generic successBody builder. ---
 
-test('documentWriteResponseSpec(IDENTITIES_WIRING) emits'
+Deno.test('documentWriteResponseSpec(IDENTITIES_WIRING) emits'
 + ' {id, kind} only, no organization_id', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -324,15 +320,15 @@ test('documentWriteResponseSpec(IDENTITIES_WIRING) emits'
     const written = await PUT<Record<string, unknown>>(
         db, 'identities/' + id, body, DEV_TOKEN,
     );
-    assert.deepEqual(
+    assertEquals(
         Object.keys(written).sort(),
         ['id', 'kind'],
     );
-    assert.equal(written['id'], id);
-    assert.equal(written['kind'], 'person');
+    assertStrictEquals(written['id'], id);
+    assertStrictEquals(written['kind'], 'person');
 });
 
-test('stored PUT body equals identityDocumentEntityOf',
+Deno.test('stored PUT body equals identityDocumentEntityOf',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -348,11 +344,11 @@ async () => {
             operationId: TEST_OPERATION_ID,
         }),
     );
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const stored = JSON.parse(
         await storedPutBodyText(db, '/identities/', id),
     );
-    assert.deepEqual(
+    assertEquals(
         stored,
         identityDocumentEntityOf(
             {
@@ -377,7 +373,7 @@ const PII_FACET = {
     bio: '',
 };
 
-test('PUT service identity with title is 400', async () => {
+Deno.test('PUT service identity with title is 400', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const res = await handleRequest(
@@ -390,10 +386,10 @@ test('PUT service identity with title is 400', async () => {
             operationId: TEST_OPERATION_ID,
         }),
     );
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('PUT person identity with a partial profile is 400',
+Deno.test('PUT person identity with a partial profile is 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -407,14 +403,14 @@ async () => {
             operationId: TEST_OPERATION_ID,
         }),
     );
-    assert.equal(res.status, 400);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 400);
+    assertEquals(await res.json(), {
         error: 'missing required key "department"'
             + ' for IdentityEntity',
     });
 });
 
-test('GET identity returns the whole profile',
+Deno.test('GET identity returns the whole profile',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -435,7 +431,7 @@ async () => {
             operationId: TEST_OPERATION_ID,
         }),
     );
-    assert.ok(put.status === 201 || put.status === 200);
+    assert(put.status === 201 || put.status === 200);
     const got = await GET<{
         id: string;
         kind: string;
@@ -444,17 +440,17 @@ async () => {
         strengths: string[];
         team_dimensions: Record<string, number>;
     }>(db, 'identities/' + id, DEV_TOKEN);
-    assert.equal(got.id, id);
-    assert.equal(got.kind, 'person');
-    assert.equal(got.title, profile.title);
-    assert.equal(got.department, profile.department);
-    assert.deepEqual(got.strengths, profile.strengths);
-    assert.deepEqual(
+    assertStrictEquals(got.id, id);
+    assertStrictEquals(got.kind, 'person');
+    assertStrictEquals(got.title, profile.title);
+    assertStrictEquals(got.department, profile.department);
+    assertEquals(got.strengths, profile.strengths);
+    assertEquals(
         got.team_dimensions, profile.team_dimensions,
     );
 });
 
-test('PUT pii does not require title; GET pii has no title',
+Deno.test('PUT pii does not require title; GET pii has no title',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -474,7 +470,7 @@ async () => {
             operationId: TEST_OPERATION_ID,
         }),
     );
-    assert.ok(
+    assert(
         profile.status === 201 || profile.status === 200,
     );
     const piiPut = await handleRequest(
@@ -487,17 +483,17 @@ async () => {
             operationId: TEST_OPERATION_ID,
         }),
     );
-    assert.ok(
+    assert(
         piiPut.status === 201 || piiPut.status === 200,
     );
     const pii = await GET<Record<string, unknown>>(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA/pii', DEV_TOKEN,
     );
-    assert.equal(pii['name'], 'Ada');
-    assert.equal('title' in pii, false);
+    assertStrictEquals(pii['name'], 'Ada');
+    assertStrictEquals('title' in pii, false);
     const identity = await GET<Record<string, unknown>>(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA', DEV_TOKEN,
     );
-    assert.equal(identity['title'], 'CEO');
-    assert.equal('name' in identity, false);
+    assertStrictEquals(identity['title'], 'CEO');
+    assertStrictEquals('name' in identity, false);
 });

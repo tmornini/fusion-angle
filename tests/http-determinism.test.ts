@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import type {
     FieldLine,
@@ -20,7 +19,7 @@ function requestModel(fields: FieldLine[]): MessageModel {
     };
 }
 
-test('shuffled field order yields identical wire', () => {
+Deno.test('shuffled field order yields identical wire', () => {
     const a = HttpMessage.fromModel(requestModel([
         { name: 'accept', value: 'text/html' },
         { name: 'host', value: 'example.com' },
@@ -31,10 +30,10 @@ test('shuffled field order yields identical wire', () => {
         { name: 'host', value: 'example.com' },
         { name: 'accept', value: 'text/html' },
     ]));
-    assert.equal(a.toWire(), b.toWire());
+    assertStrictEquals(a.toWire(), b.toWire());
 });
 
-test('canonical wire is sorted ascending by field name', () => {
+Deno.test('canonical wire is sorted ascending by field name', () => {
     const wire = HttpMessage.fromModel(requestModel([
         { name: 'host', value: 'example.com' },
         { name: 'accept', value: 'text/html' },
@@ -43,10 +42,10 @@ test('canonical wire is sorted ascending by field name', () => {
         .split('\r\n')
         .slice(1, 3)
         .map((line) => line.split(':')[0]);
-    assert.deepEqual(names, ['accept', 'host']);
+    assertEquals(names, ['accept', 'host']);
 });
 
-test('re-serializing canonical wire is a fixed point', () => {
+Deno.test('re-serializing canonical wire is a fixed point', () => {
     const once = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\n' +
         'Host: example.com\r\n' +
@@ -54,5 +53,5 @@ test('re-serializing canonical wire is a fixed point', () => {
         '\r\n',
     ).toWire();
     const twice = HttpMessage.fromWire(once).toWire();
-    assert.equal(twice, once);
+    assertStrictEquals(twice, once);
 });

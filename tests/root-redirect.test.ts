@@ -1,30 +1,27 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { assertMatch, assertStrictEquals } from '@std/assert';
+import { fromFileUrl } from '@std/path';
 
-const src = readFileSync(
-    fileURLToPath(
+const src = Deno.readTextFileSync(
+    fromFileUrl(
         new URL(
             '../web-app/app/root-redirect.ts',
             import.meta.url,
         ),
     ),
-    'utf8',
 );
 
-test('apex hops via the destination helper', () => {
-    assert.match(src, /resolveApexLocation/);
-    assert.match(src, /probeRefreshSession/);
-    assert.equal(
+Deno.test('apex hops via the destination helper', () => {
+    assertMatch(src, /resolveApexLocation/);
+    assertMatch(src, /probeRefreshSession/);
+    assertStrictEquals(
         src.includes('auth/index.html'),
         false,
     );
-    assert.equal(
+    assertStrictEquals(
         src.includes('snapshots/index.html'),
         false,
     );
-    assert.equal(
+    assertStrictEquals(
         src.includes('getSchemaPresent'),
         false,
     );

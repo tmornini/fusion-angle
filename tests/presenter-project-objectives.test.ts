@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from '@std/assert';
 import { ProjectObjectivesPresenter } from
     '../web-app/app/presenters/project-objectives.ts';
 
@@ -22,7 +21,7 @@ const defs = new Map([
     ['o2', { name: 'Cost', description: 'd2' }],
 ]);
 
-test('renders one row per active objective', () => {
+Deno.test('renders one row per active objective', () => {
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs,
         [{ id: 'b1',
@@ -35,12 +34,12 @@ test('renders one row per active objective', () => {
         'under_review',
     );
     const html = p.buildSection().toString();
-    assert.ok(html.includes('Revenue'));
-    assert.ok(html.includes('Cost'));
-    assert.ok(html.includes('+50'));
+    assert(html.includes('Revenue'));
+    assert(html.includes('Cost'));
+    assert(html.includes('+50'));
 });
 
-test('shows "none yet" when no actuals',
+Deno.test('shows "none yet" when no actuals',
     () => {
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs,
@@ -54,11 +53,11 @@ test('shows "none yet" when no actuals',
         'under_review',
     );
     const html = p.buildSection().toString();
-    assert.ok(html.toLowerCase()
+    assert(html.toLowerCase()
         .includes('none yet'));
 });
 
-test('shows latest actual with sign', () => {
+Deno.test('shows latest actual with sign', () => {
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs,
         [{ id: 'b1',
@@ -76,13 +75,13 @@ test('shows latest actual with sign', () => {
         'approved',
     );
     const html = p.buildSection().toString();
-    assert.ok(
+    assert(
         html.includes('−10')
         || html.includes('-10'),
     );
 });
 
-test(
+Deno.test(
     'baseline sliders enabled while under_review',
     () => {
     const p = new ProjectObjectivesPresenter(
@@ -90,7 +89,7 @@ test(
         'under_review',
     );
     const html = p.buildSection().toString();
-    assert.ok(
+    assert(
         !html.match(
             /class="baseline-slider"\s*disabled/,
         ),
@@ -98,7 +97,7 @@ test(
     );
 });
 
-test(
+Deno.test(
     'baseline slider hidden after approval',
     () => {
     const p = new ProjectObjectivesPresenter(
@@ -113,17 +112,17 @@ test(
         'approved',
     );
     const html = p.buildSection().toString();
-    assert.ok(
+    assert(
         !html.includes('baseline-slider'),
         'baseline slider hidden once approved',
     );
-    assert.ok(
+    assert(
         html.includes('actual-slider'),
         'actual slider shown once approved',
     );
 });
 
-test(
+Deno.test(
     'actual slider hidden before approval',
     () => {
     const p = new ProjectObjectivesPresenter(
@@ -138,17 +137,17 @@ test(
         'under_review',
     );
     const html = p.buildSection().toString();
-    assert.ok(
+    assert(
         html.includes('baseline-slider'),
         'baseline slider shown pre-approval',
     );
-    assert.ok(
+    assert(
         !html.includes('actual-slider'),
         'actual slider hidden pre-approval',
     );
 });
 
-test(
+Deno.test(
     'declined shows read-only Baseline slider only',
     () => {
     const p = new ProjectObjectivesPresenter(
@@ -163,8 +162,8 @@ test(
         'declined',
     );
     const html = p.buildSection().toString();
-    assert.ok(!html.includes('actual-slider'));
-    assert.ok(
+    assert(!html.includes('actual-slider'));
+    assert(
         html.match(
             /class="baseline-slider"[^>]*disabled/,
         ),
@@ -172,7 +171,7 @@ test(
     );
 });
 
-test(
+Deno.test(
     'archived shows read-only Baseline slider only',
     () => {
     const p = new ProjectObjectivesPresenter(
@@ -192,8 +191,8 @@ test(
         'archived',
     );
     const html = p.buildSection().toString();
-    assert.ok(!html.includes('actual-slider'));
-    assert.ok(
+    assert(!html.includes('actual-slider'));
+    assert(
         html.match(
             /class="baseline-slider"[^>]*disabled/,
         ),
@@ -201,7 +200,7 @@ test(
     );
 });
 
-test(
+Deno.test(
     'actual sliders enabled while approved'
     + ' for baseline-scored objectives',
     () => {
@@ -220,18 +219,18 @@ test(
     const o1Row = html.match(
         /data-objective-id="ohqxgUBEaFQwYbXsonRPmg"[\s\S]*?<\/li>/,
     );
-    assert.ok(o1Row, 'ohqxgUBEaFQwYbXsonRPmg row should be present');
+    assert(o1Row, 'ohqxgUBEaFQwYbXsonRPmg row should be present');
     const o2Row = html.match(
         /data-objective-id="o2"[\s\S]*?<\/li>/,
     );
-    assert.ok(o2Row, 'o2 row should be present');
-    assert.ok(
+    assert(o2Row, 'o2 row should be present');
+    assert(
         !o1Row[0].match(
             /class="actual-slider"[^>]*disabled/,
         ),
         'ohqxgUBEaFQwYbXsonRPmg actual should be enabled (baselined)',
     );
-    assert.ok(
+    assert(
         o2Row[0].match(
             /class="actual-slider"[^>]*disabled/,
         ),
@@ -239,19 +238,19 @@ test(
     );
 });
 
-test('renders Save button when any slider is editable',
+Deno.test('renders Save button when any slider is editable',
     () => {
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs, [], [],
         'under_review',
     );
     const html = p.buildSection().toString();
-    assert.ok(html.includes(
+    assert(html.includes(
         'data-action="save-objectives"',
     ));
 });
 
-test(
+Deno.test(
     'no Save button when project is archived',
     () => {
     const p = new ProjectObjectivesPresenter(
@@ -271,7 +270,7 @@ test(
         'archived',
     );
     const html = p.buildSection().toString();
-    assert.ok(
+    assert(
         !html.includes(
             'data-action="save-objectives"',
         ),

@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import { PUT, handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -11,6 +16,7 @@ import {
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { ValidationError } from '../api/types.ts';
+import type { ObjectiveEntity } from '../api/types.ts';
 import {
     EntityNotFoundError,
     MESSAGE_TABLES,
@@ -77,66 +83,66 @@ function documentFields(
 
 // -- 1. validateObjectiveDocumentBody ------------------------
 
-test('validateObjectiveDocumentBody accepts the entity field'
+Deno.test('validateObjectiveDocumentBody accepts the entity field'
 + ' plus the lifecycle trio and an optional organization_id',
 () => {
     const doc = validateObjectiveDocumentBody({
         ...documentFields(),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     });
-    assert.deepEqual(doc.entity, entityFields());
-    assert.equal(doc.state, 'active');
-    assert.equal('state_at' in doc, false);
+    assertEquals(doc.entity, entityFields());
+    assertStrictEquals(doc.state, 'active');
+    assertStrictEquals('state_at' in doc, false);
 });
 
-test('validateObjectiveDocumentBody accepts the entity field'
+Deno.test('validateObjectiveDocumentBody accepts the entity field'
 + ' plus state with organization_id absent', () => {
     const doc = validateObjectiveDocumentBody(
         documentFields(),
     );
-    assert.deepEqual(doc.entity, entityFields());
-    assert.equal(doc.state, 'active');
-    assert.equal('state_at' in doc, false);
+    assertEquals(doc.entity, entityFields());
+    assertStrictEquals(doc.state, 'active');
+    assertStrictEquals('state_at' in doc, false);
 });
 
-test('validateObjectiveDocumentBody rejects a stray key with'
+Deno.test('validateObjectiveDocumentBody rejects a stray key with'
 + ' the byte-exact, label-mandated message ("for Objective",'
 + ' matching today\'s store validator, not the *DocumentBody'
 + ' convention)', () => {
-    assert.throws(
+    const err = assertThrows(
         () => validateObjectiveDocumentBody({
             ...documentFields(),
             bogus: 'x',
         }),
-        {
-            message: 'unexpected key "bogus" for Objective',
-        },
+    ) as Error;
+    assertStrictEquals(
+        err.message, 'unexpected key "bogus" for Objective',
     );
 });
 
-test('validateObjectiveDocumentBody rejects a missing'
+Deno.test('validateObjectiveDocumentBody rejects a missing'
 + ' position with the byte-exact message, identical on both'
 + ' the store-validator path and this one', () => {
-    assert.throws(
+    const err = assertThrows(
         () => validateObjectiveDocumentBody({}),
-        {
-            message:
-                'missing required key "position" for Objective',
-        },
+    ) as Error;
+    assertStrictEquals(
+        err.message,
+        'missing required key "position" for Objective',
     );
 });
 
-test('validateObjectiveDocumentBody rejects a body missing'
+Deno.test('validateObjectiveDocumentBody rejects a body missing'
 + ' the lifecycle trio', () => {
-    assert.throws(
+    assertThrows(
         () => validateObjectiveDocumentBody(entityFields()),
         ValidationError,
     );
 });
 
-test('validateObjectiveDocumentBody rejects a state outside'
+Deno.test('validateObjectiveDocumentBody rejects a state outside'
 + ' the objective alphabet', () => {
-    assert.throws(
+    assertThrows(
         () => validateObjectiveDocumentBody(
             documentFields(3, 'deleted'),
         ),
@@ -147,7 +153,7 @@ test('validateObjectiveDocumentBody rejects a state outside'
 // -- 1b. PUT organizations/:id/objectives/:id wire trio
 // ------------------------
 
-test('PUT organizations/:id/objectives/:id accepts state and'
+Deno.test('PUT organizations/:id/objectives/:id accepts state and'
 + ' echoes the entity fields', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -159,17 +165,17 @@ test('PUT organizations/:id/objectives/:id accepts state and'
             state: 'active',
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const wire = await res.json() as Record<string, unknown>;
-    assert.equal(wire.id, 'pSZRYqLDXMzjAeMTNhjdng');
-    assert.equal(wire.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
-    assert.equal(wire.position, 7);
-    assert.equal(wire.state, 'active');
-    assert.equal('state_at' in wire, false);
-    assert.equal('state_event_id' in wire, false);
+    assertStrictEquals(wire.id, 'pSZRYqLDXMzjAeMTNhjdng');
+    assertStrictEquals(wire.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
+    assertStrictEquals(wire.position, 7);
+    assertStrictEquals(wire.state, 'active');
+    assertStrictEquals('state_at' in wire, false);
+    assertStrictEquals('state_event_id' in wire, false);
 });
 
-test('PUT organizations/:id/objectives/:id without the trio is 400',
+Deno.test('PUT organizations/:id/objectives/:id without the trio is 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -179,10 +185,10 @@ async () => {
             + 'pSrXXWazOYSiAhkQARWgfw', token,
         { position: 1 },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('PUT organizations/:id/objectives/:id rejects a state outside the'
+Deno.test('PUT organizations/:id/objectives/:id rejects a state outside the'
 + ' objective alphabet', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -194,12 +200,12 @@ test('PUT organizations/:id/objectives/:id rejects a state outside the'
             state: 'deleted',
         },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
 // -- 2. postObjectiveDocumentOp (below-gate, MemoryDbAdapter) -
 
-test('postObjectiveDocumentOp writes exactly the pair and'
+Deno.test('postObjectiveDocumentOp writes exactly the pair and'
 + ' reconstructs the entity return (row half stripped)',
 async () => {
     const db = memoryDbAdapter();
@@ -228,14 +234,14 @@ async () => {
         db, 'pPvOknZUChYizyOOiXWBVg', body,
         'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
-    assert.deepEqual(written, {
+    assertEquals(written, {
         id: 'pPvOknZUChYizyOOiXWBVg',
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         ...entityFields(),
-    });
+    } as ObjectiveEntity);
     // Phase Final Stage B: objectives table retired.
-    assert.equal((await db.messagePairs.getAll()).length, 1);
-    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
@@ -243,7 +249,7 @@ async () => {
 // .test.ts's own resend case: the fast path lives at the gate
 // (api.ts), agnostic to which op serves the route). ----------
 
-test('a byte-identical PUT resend to'
+Deno.test('a byte-identical PUT resend to'
     + ' organizations/:id/objectives/:id converges'
 + ' to one stored request/response pair', async () => {
     const db = memoryDbAdapter();
@@ -259,9 +265,9 @@ test('a byte-identical PUT resend to'
             + id
             , body, DEV_TOKEN,
     );
-    assert.deepEqual(first, second);
-    assert.equal((await db.messagePairs.getAll()).length, 3);
-    assert.equal((await db.messagePairs.getAll()).length, 3);
+    assertEquals(first, second);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
 });
 
 // -- 4. below-route via the generic handlers, against the REAL
@@ -319,7 +325,7 @@ async function deleteDocumentMessagePair(
     );
 }
 
-test('a PUT chain at one objective address Supersedes-chains,'
+Deno.test('a PUT chain at one objective address Supersedes-chains,'
 + ' and documentGetHandler derives the LATEST head',
 async () => {
     const db = memoryDbAdapter();
@@ -341,7 +347,7 @@ async () => {
             , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
         [],
     );
-    assert.deepEqual(got, {
+    assertEquals(got, {
         id,
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         position: 2,
@@ -349,7 +355,7 @@ async () => {
     });
 });
 
-test('a DELETE-head derives absent through the generic'
+Deno.test('a DELETE-head derives absent through the generic'
 + ' document handlers, carrying notFoundTable, never the'
 + ' family', async () => {
     const db = memoryDbAdapter();
@@ -364,24 +370,18 @@ test('a DELETE-head derives absent through the generic'
         db, id, '2026-01-02T00:00:00.000000Z',
     );
     const wiring = documentFamilyWiring('objectives')!;
-    await assert.rejects(
-        documentGetHandler(wiring)(
+    const err = await assertRejects(
+        () => documentGetHandler(wiring)(
             db, ['AjdvjuECVZEgZoFajaIEkg', id]
                 , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
             [],
         ),
-        (error: unknown) => {
-            assert.ok(error instanceof EntityNotFoundError);
-            assert.equal(
-                (error as EntityNotFoundError).table,
-                'objectives',
-            );
-            return true;
-        },
-    );
+    ) as EntityNotFoundError;
+    assertInstanceOf(err, EntityNotFoundError);
+    assertStrictEquals(err.table, 'objectives');
 });
 
-test('stored PUT body equals objectiveDocumentEntityOf of'
+Deno.test('stored PUT body equals objectiveDocumentEntityOf of'
 + ' the same chain', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -392,7 +392,7 @@ test('stored PUT body equals objectiveDocumentEntityOf of'
             , token,
         documentFields(3, 'active'),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/';
     const stored = JSON.parse(
         await storedPutBodyText(db, prefix, id),
@@ -403,24 +403,24 @@ test('stored PUT body equals objectiveDocumentEntityOf of'
         position: 3,
         state: 'active',
     };
-    assert.deepEqual(stored, expected);
+    assertEquals(stored, expected);
     const wiring = documentFamilyWiring('objectives')!;
     const derived = await documentGetHandler(wiring)(
         db, ['AjdvjuECVZEgZoFajaIEkg', id], 'XXZruirZyAOoRpNxaDnpSA'
             , 'AjdvjuECVZEgZoFajaIEkg',
         [],
     );
-    assert.deepEqual(stored, derived);
+    assertEquals(stored, derived);
     const later = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
             , token,
         documentFields(99, 'archived'),
     ));
-    assert.equal(later.status, 201);
+    assertStrictEquals(later.status, 201);
     const after: Record<string, unknown> = JSON.parse(
         await storedPutBodyText(db, prefix, id),
     );
-    assert.deepEqual(
+    assertEquals(
         after,
         await documentGetHandler(wiring)(
             db, ['AjdvjuECVZEgZoFajaIEkg', id], 'XXZruirZyAOoRpNxaDnpSA'
@@ -428,7 +428,7 @@ test('stored PUT body equals objectiveDocumentEntityOf of'
             [],
         ),
     );
-    assert.equal(after.state, 'archived');
-    assert.equal(after.position, 99);
-    assert.equal('state_at' in after, false);
+    assertStrictEquals(after.state, 'archived');
+    assertStrictEquals(after.position, 99);
+    assertStrictEquals('state_at' in after, false);
 });

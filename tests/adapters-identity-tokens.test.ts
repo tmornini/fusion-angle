@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertThrows } from '@std/assert';
 import {
     validateIdentityTokenEntity,
 } from '../api/validators.ts';
@@ -14,34 +13,34 @@ const goodRow = {
     at: '2026-06-03T00:00:00.000000Z',
 };
 
-test('validates an issued token event', () => {
-    assert.deepEqual(
+Deno.test('validates an issued token event', () => {
+    assertEquals(
         validateIdentityTokenEntity(goodRow), goodRow);
 });
 
-test('rejects the retired parent_jti key', () => {
-    assert.throws(() =>
+Deno.test('rejects the retired parent_jti key', () => {
+    assertThrows(() =>
         validateIdentityTokenEntity({
             ...goodRow, parent_jti: generateIdentifier(),
         }));
 });
 
-test('rejects an unknown action', () => {
-    assert.throws(() =>
+Deno.test('rejects an unknown action', () => {
+    assertThrows(() =>
         validateIdentityTokenEntity({
             ...goodRow, action: 'minted',
         }));
 });
 
-test('rejects an extra key', () => {
-    assert.throws(() =>
+Deno.test('rejects an extra key', () => {
+    assertThrows(() =>
         validateIdentityTokenEntity({
             ...goodRow, extra: 1,
         }));
 });
 
-test('rejects an unparseable timestamp', () => {
-    assert.throws(() =>
+Deno.test('rejects an unparseable timestamp', () => {
+    assertThrows(() =>
         validateIdentityTokenEntity({
             ...goodRow, at: 'not-a-date',
         }));

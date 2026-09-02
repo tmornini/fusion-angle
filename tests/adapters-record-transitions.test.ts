@@ -1,5 +1,8 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -239,7 +242,7 @@ async function seedAttribute(
     );
 }
 
-test(
+Deno.test(
     'validateRecordTransition returns an empty'
     + ' array for a flow with no record binding',
     async () => {
@@ -262,11 +265,11 @@ test(
         const out = await validateRecordTransition(
             ctx, WO_ID, new Map(), new Map(),
         );
-        assert.deepEqual(out, []);
+        assertEquals(out, []);
     },
 );
 
-test(
+Deno.test(
     'validateRecordTransition returns a required'
     + ' violation when the CURRENT node has a'
     + ' required attribute with no stored value',
@@ -308,14 +311,14 @@ test(
         const out = await validateRecordTransition(
             ctx, WO_ID, new Map(), new Map(),
         );
-        assert.equal(out.length, 1);
-        assert.equal(out[0]!.kind, 'required');
+        assertStrictEquals(out.length, 1);
+        assertStrictEquals(out[0]!.kind, 'required');
         if (out[0]!.kind !== 'required') return;
-        assert.equal(out[0]!.attributeName, 'Email');
+        assertStrictEquals(out[0]!.attributeName, 'Email');
     },
 );
 
-test(
+Deno.test(
     'validateRecordTransition reports every'
     + ' required ref when storedValues is null'
     + ' (unbound A3 mirror)',
@@ -356,14 +359,14 @@ test(
         const out = await validateRecordTransition(
             ctx, WO_ID, new Map(), null,
         );
-        assert.equal(out.length, 1);
-        assert.equal(out[0]!.kind, 'required');
+        assertStrictEquals(out.length, 1);
+        assertStrictEquals(out[0]!.kind, 'required');
         if (out[0]!.kind !== 'required') return;
-        assert.equal(out[0]!.attributeName, 'Email');
+        assertStrictEquals(out[0]!.attributeName, 'Email');
     },
 );
 
-test(
+Deno.test(
     'validateRecordTransition does not require'
     + ' TARGET-node attributes when the current'
     + ' node is clean',
@@ -401,11 +404,11 @@ test(
         const out = await validateRecordTransition(
             ctx, WO_ID, new Map(), new Map(),
         );
-        assert.deepEqual(out, []);
+        assertEquals(out, []);
     },
 );
 
-test(
+Deno.test(
     'validateRecordTransition passes when a'
     + ' required CURRENT attribute has a'
     + ' satisfying stored value',
@@ -453,11 +456,11 @@ test(
             ctx, WO_ID, new Map(),
             new Map([['UQBiHFcwJeCDSnmkPBoYRA', 'me@example.com']]),
         );
-        assert.deepEqual(out, []);
+        assertEquals(out, []);
     },
 );
 
-test(
+Deno.test(
     'validateRecordTransition lets pendingValues'
     + ' override stored values to satisfy a'
     + ' required check on the CURRENT node',
@@ -498,11 +501,11 @@ test(
             new Map([['UQBiHFcwJeCDSnmkPBoYRA', 'ABC']]),
             new Map(),
         );
-        assert.deepEqual(out, []);
+        assertEquals(out, []);
     },
 );
 
-test(
+Deno.test(
     'validateRecordTransition surfaces a regex'
     + ' constraint violation from the runner',
     async () => {
@@ -548,12 +551,12 @@ test(
             new Map([['UQBiHFcwJeCDSnmkPBoYRA', 'not-an-email']]),
             new Map(),
         );
-        assert.equal(out.length, 1);
-        assert.equal(out[0]!.kind, 'regex');
+        assertStrictEquals(out.length, 1);
+        assertStrictEquals(out[0]!.kind, 'regex');
     },
 );
 
-test(
+Deno.test(
     'validateRecordTransition throws when the'
     + ' current node id does not exist on the'
     + ' work order flow graph',
@@ -576,11 +579,12 @@ test(
             db, WO_ID, flowGraph, GHOST_NODE,
         );
         const ctx = createRequestContext(db, await organizationToken());
-        await assert.rejects(
+        await assertRejects(
             () => validateRecordTransition(
                 ctx, WO_ID, new Map(), new Map(),
             ),
-            /current node not found/,
+            Error,
+            'current node not found',
         );
     },
 );

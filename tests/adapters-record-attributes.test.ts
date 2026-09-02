@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -66,7 +65,7 @@ async function seedTypeWithAttrs(
     });
 }
 
-test(
+Deno.test(
     'getRecordAttributesByRecord maps storage rows'
     + ' to the camelCase domain shape',
     async () => {
@@ -78,7 +77,7 @@ test(
             getRecordAttributesByRecord(
                 ctx, 'rbfHGatkwQzGZJVXKJEeyw',
             );
-        assert.deepEqual(attr, {
+        assertEquals(attr, {
             id: 'UQBiHFcwJeCDSnmkPBoYRA',
             organizationId: 'AjdvjuECVZEgZoFajaIEkg',
             recordId: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -93,7 +92,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'getRecordAttributesByRecord returns only the'
     + ' attributes for the given recordId',
     async () => {
@@ -111,13 +110,13 @@ test(
                 ctx, 'rbfHGatkwQzGZJVXKJEeyw',
             );
         const ids = sRqRSyldQDFbqkDYSObDqw.map(a => a.id).sort();
-        assert.deepEqual(
+        assertEquals(
             ids, ['UQBiHFcwJeCDSnmkPBoYRA', a2].sort(),
         );
     },
 );
 
-test(
+Deno.test(
     'getRecordAttributesByRecord returns rows in'
     + ' sortOrder ascending',
     async () => {
@@ -143,7 +142,7 @@ test(
             getRecordAttributesByRecord(
                 ctx, 'rbfHGatkwQzGZJVXKJEeyw',
             );
-        assert.deepEqual(
+        assertEquals(
             rows.map(r => r.id),
             [firstId, midId, lastId],
         );

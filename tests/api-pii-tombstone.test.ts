@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -110,38 +115,38 @@ async function loginPassword(
 
 // ── 1. PUT-PUT: two pairs, the head supersedes ──
 
-test('PUT-PUT leaves two pairs and Supersedes', async () => {
+Deno.test('PUT-PUT leaves two pairs and Supersedes', async () => {
     const db = await freshDb();
     const id = 'tyqfBGunVEufdtzApefuyw';
     const first = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Ann'),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const firstId = first.headers.get('Response-ID');
     const second = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Ann Marie'),
     ));
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
     const secondId = second.headers.get('Response-ID');
-    assert.notEqual(secondId, firstId);
+    assertNotStrictEquals(secondId, firstId);
     const atAddress = await pairsAtPii(db, id);
-    assert.equal(atAddress.length, 2);
-    assert.ok(atAddress.some(r => r.id === firstId));
-    assert.ok(atAddress.some(r => r.id === secondId));
+    assertStrictEquals(atAddress.length, 2);
+    assert(atAddress.some(r => r.id === firstId));
+    assert(atAddress.some(r => r.id === secondId));
     const head = await documentHeadAt(
         db, piiCollection(id), '',
     );
-    assert.equal(head?.id, secondId);
-    assert.equal(head?.method, 'PUT');
+    assertStrictEquals(head?.id, secondId);
+    assertStrictEquals(head?.method, 'PUT');
     const domainRow = await deriveIdentityPii(db, id);
-    assert.equal(domainRow.name, 'Ann Marie');
+    assertStrictEquals(domainRow.name, 'Ann Marie');
 });
 
 // ── 2. PUT-DELETE: bodyless DELETE head, derive absent ──
 
-test('PUT-DELETE leaves a bodyless DELETE head and an'
+Deno.test('PUT-DELETE leaves a bodyless DELETE head and an'
 + ' absent derive', async () => {
     const db = await freshDb();
     const id = 'uEYoNLWQrgIToJPFkyvdPw';
@@ -149,64 +154,64 @@ test('PUT-DELETE leaves a bodyless DELETE head and an'
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Bob'),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const putId = put.headers.get('Response-ID');
     const del = await handleRequest(db, req(
         'DELETE', '/identities/' + id + '/pii', DEV_TOKEN,
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const delId = del.headers.get('Response-ID');
-    assert.notEqual(delId, putId);
+    assertNotStrictEquals(delId, putId);
     const atAddress = await pairsAtPii(db, id);
-    assert.equal(atAddress.length, 2);
+    assertStrictEquals(atAddress.length, 2);
     const delRow = atAddress.find(r => r.id === delId);
-    assert.ok(delRow);
-    assert.equal(delRow!.method, 'DELETE');
-    assert.ok(!delRow!.request.includes('Bob'));
-    assert.ok(atAddress.some(r => r.id === putId
+    assert(delRow);
+    assertStrictEquals(delRow!.method, 'DELETE');
+    assert(!delRow!.request.includes('Bob'));
+    assert(atAddress.some(r => r.id === putId
         && r.request.includes('Bob')));
     const head = await documentHeadAt(
         db, piiCollection(id), '',
     );
-    assert.equal(head?.id, delId);
-    assert.equal(head?.method, 'DELETE');
-    await assert.rejects(() => deriveIdentityPii(db, id));
+    assertStrictEquals(head?.id, delId);
+    assertStrictEquals(head?.method, 'DELETE');
+    await assertRejects(() => deriveIdentityPii(db, id));
 });
 
 // ── 3. DELETE-PUT: live again at three pairs ──
 
-test('DELETE-PUT is live again at three pairs', async () => {
+Deno.test('DELETE-PUT is live again at three pairs', async () => {
     const db = await freshDb();
     const id = 'uFgKFelNjvJcrtefsfZxrA';
     const first = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Cara'),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', '/identities/' + id + '/pii', DEV_TOKEN,
     ));
-    assert.equal(del.status, 204);
-    await assert.rejects(() => deriveIdentityPii(db, id));
+    assertStrictEquals(del.status, 204);
+    await assertRejects(() => deriveIdentityPii(db, id));
     const put = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Cara Restored'),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const atAddress = await pairsAtPii(db, id);
-    assert.equal(atAddress.length, 3);
+    assertStrictEquals(atAddress.length, 3);
     const head = await documentHeadAt(
         db, piiCollection(id), '',
     );
-    assert.equal(head?.id, put.headers.get('Response-ID'));
-    assert.equal(head?.method, 'PUT');
+    assertStrictEquals(head?.id, put.headers.get('Response-ID'));
+    assertStrictEquals(head?.method, 'PUT');
     const domainRow = await deriveIdentityPii(db, id);
-    assert.equal(domainRow.name, 'Cara Restored');
+    assertStrictEquals(domainRow.name, 'Cara Restored');
 });
 
 // ── 4. Ordinary document replay ──
 
-test('a byte-identical resend against the LIVE slot replays'
+Deno.test('a byte-identical resend against the LIVE slot replays'
 + ' the stored response and appends nothing', async () => {
     const db = await freshDb();
     const id = 'uKYubOSYwiunzyPztWBtkw';
@@ -214,7 +219,7 @@ test('a byte-identical resend against the LIVE slot replays'
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Dana'),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const firstId = first.headers.get('Response-ID');
     const countAfterFirst = (await db.messagePairs.getAll())
         .length;
@@ -222,15 +227,15 @@ test('a byte-identical resend against the LIVE slot replays'
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Dana'),
     ));
-    assert.equal(resend.status, 201);
-    assert.equal(resend.headers.get('Response-ID'), firstId);
-    assert.equal(
+    assertStrictEquals(resend.status, 201);
+    assertStrictEquals(resend.headers.get('Response-ID'), firstId);
+    assertStrictEquals(
         (await db.messagePairs.getAll()).length,
         countAfterFirst,
     );
 });
 
-test('a byte-identical resend AFTER supersession replays'
+Deno.test('a byte-identical resend AFTER supersession replays'
 + ' the stored first pair and appends nothing', async () => {
     const db = await freshDb();
     const id = 'uLUQPJnlVuzeGqXLYqCItA';
@@ -238,30 +243,30 @@ test('a byte-identical resend AFTER supersession replays'
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Erin'),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const firstId = first.headers.get('Response-ID');
     const second = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Erin Marie'),
     ));
-    assert.equal(second.status, 201);
-    assert.notEqual(second.headers.get('Response-ID'), firstId);
+    assertStrictEquals(second.status, 201);
+    assertNotStrictEquals(second.headers.get('Response-ID'), firstId);
     const countAfterSecond = (await db.messagePairs.getAll())
         .length;
     const resend = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Erin'),
     ));
-    assert.equal(resend.status, 201);
-    assert.equal(resend.headers.get('Response-ID'), firstId);
-    assert.equal(
+    assertStrictEquals(resend.status, 201);
+    assertStrictEquals(resend.headers.get('Response-ID'), firstId);
+    assertStrictEquals(
         (await db.messagePairs.getAll()).length,
         countAfterSecond,
     );
     const atAddress = await pairsAtPii(db, id);
-    assert.equal(atAddress.length, 2);
+    assertStrictEquals(atAddress.length, 2);
     const domainRow = await deriveIdentityPii(db, id);
-    assert.equal(domainRow.name, 'Erin Marie');
+    assertStrictEquals(domainRow.name, 'Erin Marie');
 });
 
 // ── 5. Seam: erased PII remains in superseded pairs ──
@@ -275,7 +280,7 @@ const EDITED_EMAIL = 'erasable-renamed@example.com';
 const EDITED_PHONE = '555-0199';
 const EDITED_BIO = 'the edited erasure-completeness pin text';
 
-test('erased PII remains in superseded pairs; login is 401',
+Deno.test('erased PII remains in superseded pairs; login is 401',
 async () => {
     const db = await freshDb();
     const id = generateIdentifier();
@@ -283,7 +288,7 @@ async () => {
         'PUT', '/identities/' + id, DEV_TOKEN,
         { kind: 'person', ...humanDetail() },
     ));
-    assert.equal(create.status, 201);
+    assertStrictEquals(create.status, 201);
     const intake = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         {
@@ -291,7 +296,7 @@ async () => {
             phone: ERASED_PHONE, bio: ERASED_BIO,
         },
     ));
-    assert.equal(intake.status, 201);
+    assertStrictEquals(intake.status, 201);
     await seedIdentityCredential(
         db, id, generateIdentifier(), {
             identity_id: id, kind: 'password',
@@ -311,7 +316,7 @@ async () => {
             grantEventId: generateIdentifier(), grantAt: AT,
         },
     ));
-    assert.equal(grantRes.status, 200);
+    assertStrictEquals(grantRes.status, 200);
     const invitationId =
         ((await grantRes.json()) as { id: string }).id;
     const acceptRes = await handleRequest(db, req(
@@ -324,7 +329,7 @@ async () => {
             eventId: generateIdentifier(), at: AT,
         },
     ));
-    assert.equal(acceptRes.status, 204);
+    assertStrictEquals(acceptRes.status, 204);
     const edit = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         {
@@ -332,24 +337,24 @@ async () => {
             phone: EDITED_PHONE, bio: EDITED_BIO,
         },
     ));
-    assert.equal(edit.status, 201);
+    assertStrictEquals(edit.status, 201);
     const erase = await handleRequest(db, req(
         'DELETE', '/identities/' + id + '/pii', DEV_TOKEN,
     ));
-    assert.equal(erase.status, 204);
-    await assert.rejects(() => deriveIdentityPii(db, id));
+    assertStrictEquals(erase.status, 204);
+    await assertRejects(() => deriveIdentityPii(db, id));
 
     const atAddress = await pairsAtPii(db, id);
-    assert.equal(atAddress.length, 3);
+    assertStrictEquals(atAddress.length, 3);
     const piiText = atAddress
         .map(r => r.request + r.response).join('');
-    assert.ok(piiText.includes(ERASED_NAME));
-    assert.ok(piiText.includes(ERASED_EMAIL));
-    assert.ok(piiText.includes(EDITED_NAME));
-    assert.ok(piiText.includes(EDITED_EMAIL));
+    assert(piiText.includes(ERASED_NAME));
+    assert(piiText.includes(ERASED_EMAIL));
+    assert(piiText.includes(EDITED_NAME));
+    assert(piiText.includes(EDITED_EMAIL));
     const livePii = await deriveIdentityPiiRows(db);
-    assert.ok(!livePii.some(r => r.id === id));
-    assert.ok(!livePii.some(r =>
+    assert(!livePii.some(r => r.id === id));
+    assert(!livePii.some(r =>
         r.name === ERASED_NAME
             || r.name === EDITED_NAME
             || r.email === ERASED_EMAIL
@@ -359,16 +364,16 @@ async () => {
         '/organizations/AjdvjuECVZEgZoFajaIEkg/members/',
         await organizationToken(),
     ));
-    assert.equal(roster.status, 200);
+    assertStrictEquals(roster.status, 200);
     const rosterText = JSON.stringify(await roster.json());
-    assert.ok(!rosterText.includes(ERASED_NAME));
-    assert.ok(!rosterText.includes(EDITED_NAME));
-    assert.ok(!rosterText.includes(ERASED_EMAIL));
-    assert.ok(!rosterText.includes(EDITED_EMAIL));
+    assert(!rosterText.includes(ERASED_NAME));
+    assert(!rosterText.includes(EDITED_NAME));
+    assert(!rosterText.includes(ERASED_EMAIL));
+    assert(!rosterText.includes(EDITED_EMAIL));
     for (const username of [ERASED_EMAIL, EDITED_EMAIL]) {
         const login = await loginPassword(db, username);
-        assert.equal(login.status, 401);
-        assert.deepEqual(
+        assertStrictEquals(login.status, 401);
+        assertEquals(
             await login.json(), { error: 'invalid_grant' },
         );
     }
@@ -376,7 +381,7 @@ async () => {
 
 // ── 6. Confinement: no address splices ──
 
-test('PUT-PUT-DELETE adds exactly three pairs (no address'
+Deno.test('PUT-PUT-DELETE adds exactly three pairs (no address'
 + ' splices)', async () => {
     const db = await freshDb();
     const id = 'XSNEaxodzAorrAiVBegDGw';
@@ -384,28 +389,28 @@ test('PUT-PUT-DELETE adds exactly three pairs (no address'
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Ann'),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const second = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Ann Marie'),
     ));
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', '/identities/' + id + '/pii', DEV_TOKEN,
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const atAddress = await pairsAtPii(db, id);
-    assert.equal(atAddress.length, 3);
+    assertStrictEquals(atAddress.length, 3);
     const head = await documentHeadAt(
         db, piiCollection(id), '',
     );
-    assert.equal(head?.id, del.headers.get('Response-ID'));
-    assert.equal(head?.method, 'DELETE');
+    assertStrictEquals(head?.id, del.headers.get('Response-ID'));
+    assertStrictEquals(head?.method, 'DELETE');
 });
 
 // G5: stored PUT = piiEntityOf (GET derive). GET self-only
 // so this pin writes and reads the caller's own slot.
-test('stored PUT body equals piiEntityOf', async () => {
+Deno.test('stored PUT body equals piiEntityOf', async () => {
     const db = await freshDb();
     const id = 'XXZruirZyAOoRpNxaDnpSA';
     const fields = humanPii('Gina');
@@ -413,7 +418,7 @@ test('stored PUT body equals piiEntityOf', async () => {
         'PUT', '/identities/' + id + '/pii',
         DEV_TOKEN, fields,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const stored = JSON.parse(
         await storedPutBodyText(
             db, '/identities/' + id + '/pii/', '',
@@ -425,13 +430,13 @@ test('stored PUT body equals piiEntityOf', async () => {
         method: 'PUT',
         body: fields,
     });
-    assert.equal(Object.keys(expected)[0], 'id');
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(stored, await deriveIdentityPii(db, id));
-    assert.deepEqual(stored, await put.json());
+    assertStrictEquals(Object.keys(expected)[0], 'id');
+    assertEquals(stored, expected);
+    assertEquals(stored, await deriveIdentityPii(db, id));
+    assertEquals(stored, await put.json());
     const got = await handleRequest(db, req(
         'GET', '/identities/' + id + '/pii', DEV_TOKEN,
     ));
-    assert.equal(got.status, 200);
-    assert.deepEqual(stored, await got.json());
+    assertStrictEquals(got.status, 200);
+    assertEquals(stored, await got.json());
 });

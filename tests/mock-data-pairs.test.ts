@@ -1,8 +1,12 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     workOrderLifecycleStatesFor,
 } from '../api/derive-states.ts';
-import assert from 'node:assert/strict';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postBootstrap } from '../api/mock-data.ts';
 import {
@@ -157,23 +161,23 @@ function messagePairJsonOf(message: string): {
 // seed — do not invent. Bootstrap absolute is 8.
 const EXPECTED_MESSAGE_PAIR_COUNT = 1453;
 
-test('a mock-data seed populates pairs',
+Deno.test('a mock-data seed populates pairs',
 async () => {
     const db = await sharedMockDb();
     const messagePairs = await db.messagePairs.getAll();
-    assert.ok(messagePairs.length > 0);
+    assert(messagePairs.length > 0);
 });
 
-test('the mock-data seed forms exactly the traced'
+Deno.test('the mock-data seed forms exactly the traced'
 + ' op-invocation count', async () => {
     const db = await sharedMockDb();
     const messagePairs = await db.messagePairs.getAll();
-    assert.equal(
+    assertStrictEquals(
         messagePairs.length, EXPECTED_MESSAGE_PAIR_COUNT,
     );
 });
 
-test('every seed op body carries a unique entity id, so no'
+Deno.test('every seed op body carries a unique entity id, so no'
 + ' two request hashes collide', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
@@ -182,10 +186,10 @@ test('every seed op body carries a unique entity id, so no'
     );
     // A collision would silently drop a pair via
     // appendMessagePair's same-hash dedup skip.
-    assert.equal(distinctHashes.size, requests.length);
+    assertStrictEquals(distinctHashes.size, requests.length);
 });
 
-test('a seeded idea create pair sits at its entity address',
+Deno.test('a seeded idea create pair sits at its entity address',
 async () => {
     const db = await sharedMockDb();
     const firstIdea = buildIdeas()[0]!;
@@ -193,12 +197,12 @@ async () => {
     const row = requests.find(
         r => r.uri_id === firstIdea.id,
     );
-    assert.ok(row, 'no request row for the seeded idea');
-    assert.equal(row!.uri_collection
+    assert(row, 'no request row for the seeded idea');
+    assertStrictEquals(row!.uri_collection
         , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/');
 });
 
-test('a seeded organizations pair sits at the global'
+Deno.test('a seeded organizations pair sits at the global'
 + ' (non-org-nested) address, its actor is the system member,'
 + ' and its stored body\'s fields equal the derived'
 + ' organization exactly (Phase Final Task 2: organizations'
@@ -210,15 +214,15 @@ async () => {
         r => r.uri_collection === '/organizations/'
             && r.uri_id === STARK_ORGANIZATION,
     );
-    assert.ok(row, 'no request row for the seeded organization');
-    assert.equal(row!.requester_identity_id, SYSTEM_MEMBER_ID);
+    assert(row, 'no request row for the seeded organization');
+    assertStrictEquals(row!.requester_identity_id, SYSTEM_MEMBER_ID);
     const derived = await deriveOrganization(
         db, STARK_ORGANIZATION,
     );
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(embedded.body, {
+    assertEquals(embedded.body, {
         name: derived.name,
         domain: derived.domain,
         next_billing: derived.next_billing,
@@ -229,7 +233,7 @@ async () => {
     // Phase Final Stage B: organizations table retired.
 });
 
-test('a seeded person identity pair sits at the global'
+Deno.test('a seeded person identity pair sits at the global'
 + ' identities address', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
@@ -237,14 +241,14 @@ test('a seeded person identity pair sits at the global'
         r => r.uri_collection === '/identities/'
             && r.uri_id === 'XXZruirZyAOoRpNxaDnpSA',
     );
-    assert.ok(row, 'no request row for the current identity');
+    assert(row, 'no request row for the current identity');
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.equal(embedded.body['kind'], 'person');
+    assertStrictEquals(embedded.body['kind'], 'person');
 });
 
-test('a seeded human member\'s PII intake pair sits at its own'
+Deno.test('a seeded human member\'s PII intake pair sits at its own'
 + ' identities/:id/pii address, its body carrying the four PII'
 + ' keys (Phase 10 Task 2\'s intake decomposition)', async () => {
     const db = await sharedMockDb();
@@ -254,18 +258,18 @@ test('a seeded human member\'s PII intake pair sits at its own'
         r => r.uri_collection
             === '/identities/' + firstMember.id + '/pii/',
     );
-    assert.ok(row, 'no request row for the seeded PII intake');
-    assert.equal(row!.uri_id, '');
+    assert(row, 'no request row for the seeded PII intake');
+    assertStrictEquals(row!.uri_id, '');
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         ['bio', 'email', 'name', 'phone'],
     );
 });
 
-test('a seeded human member\'s identities-document message pair'
+Deno.test('a seeded human member\'s identities-document message pair'
 + ' sits at the shared identities/:id address, its body carrying'
 + ' `kind` alone (Phase 10 Task 5)', async () => {
     const db = await sharedMockDb();
@@ -275,29 +279,29 @@ test('a seeded human member\'s identities-document message pair'
         r => r.uri_collection === '/identities/'
             && r.uri_id === firstMember.id,
     );
-    assert.ok(
+    assert(
         row, 'no request row for the seeded identities document',
     );
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.equal(embedded.body['kind'], 'person');
-    assert.equal(typeof embedded.body['title'], 'string');
+    assertStrictEquals(embedded.body['kind'], 'person');
+    assertStrictEquals(typeof embedded.body['title'], 'string');
 });
 
-test('a seeded flow create pair sits at its org-nested'
+Deno.test('a seeded flow create pair sits at its org-nested'
 + ' entity address', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
         r => r.uri_id === 'esKujtyQFYUJaVSXWwavzA',
     );
-    assert.ok(row, 'no request row for the seeded flow');
-    assert.equal(row!.uri_collection
+    assert(row, 'no request row for the seeded flow');
+    assertStrictEquals(row!.uri_collection
         , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/');
 });
 
-test('a seeded AI agent pair sits at the global'
+Deno.test('a seeded AI agent pair sits at the global'
 + ' ai-agents address', async () => {
     const db = await sharedMockDb();
     const firstAgent = buildAiMembers()[0]!;
@@ -306,17 +310,17 @@ test('a seeded AI agent pair sits at the global'
         r => r.uri_id === firstAgent.id
             && r.uri_collection === '/ai-agents/',
     );
-    assert.ok(row, 'no request row for the seeded agent');
+    assert(row, 'no request row for the seeded agent');
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         ['description', 'model', 'name', 'skill_focus'],
     );
 });
 
-test('a seeded seat document message pair sits at its org-nested'
+Deno.test('a seeded seat document message pair sits at its org-nested'
 + ' members address', async () => {
     const db = await sharedMockDb();
     const firstMember = buildMembers()[0]!;
@@ -328,17 +332,17 @@ test('a seeded seat document message pair sits at its org-nested'
                 + STARK_ORGANIZATION
                 + '/members/',
     );
-    assert.ok(row, 'no request row for the seeded seat');
+    assert(row, 'no request row for the seeded seat');
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         ['at', 'type'],
     );
 });
 
-test('a seeded default-organization pair sits at its'
+Deno.test('a seeded default-organization pair sits at its'
 + ' identity-keyed address, its body carrying'
 + ' organization_id',
 async () => {
@@ -350,37 +354,37 @@ async () => {
             === '/identities/' + firstMember.id
                 + '/default-organization/',
     );
-    assert.ok(
+    assert(
         row,
         'no request row for the seeded'
             + ' default-organization document',
     );
-    assert.equal(row!.uri_id, '');
+    assertStrictEquals(row!.uri_id, '');
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         ['organization_id'],
     );
 });
 
-test('a seeded record create pair sits at its org-nested'
+Deno.test('a seeded record create pair sits at its org-nested'
 + ' entity address', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
         r => r.uri_id === customerProfileRecordId,
     );
-    assert.ok(row, 'no request row for the seeded record');
+    assert(row, 'no request row for the seeded record');
     // Task 4: wire family `records` stores at record-types.
-    assert.equal(
+    assertStrictEquals(
         row!.uri_collection,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/',
     );
 });
 
-test('a seeded record\'s document message pair sits at its'
+Deno.test('a seeded record\'s document message pair sits at its'
 + ' entity address, its body carrying the entity plus the'
 + ' state trio (no id or organization_id key)', async () => {
     const db = await sharedMockDb();
@@ -395,7 +399,7 @@ test('a seeded record\'s document message pair sits at its'
                 === '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             && r.method === 'PUT',
     );
-    assert.ok(
+    assert(
         documentRow, 'no document message pair for the seeded record',
     );
     // The id-strip covenant (verification finding, lens 4) made
@@ -405,7 +409,7 @@ test('a seeded record\'s document message pair sits at its'
     const embedded = messagePairJsonOf(documentRow!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         [
             'description', 'name', 'position',
@@ -414,7 +418,7 @@ test('a seeded record\'s document message pair sits at its'
     );
 });
 
-test('a seeded record attribute\'s document message pair sits at'
+Deno.test('a seeded record attribute\'s document message pair sits at'
 + ' its nested type-attributes address, its body carrying'
 + ' no id, organization_id, or record_id key and both ACL'
 + ' arrays', async () => {
@@ -424,10 +428,10 @@ test('a seeded record attribute\'s document message pair sits at'
     const row = requests.find(
         r => r.uri_id === firstAttribute.id,
     );
-    assert.ok(
+    assert(
         row, 'no request row for the seeded attribute',
     );
-    assert.equal(
+    assertStrictEquals(
         row!.uri_collection,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
         + 'sJxkGGTrPegHqFbQAkXnjw/attributes/',
@@ -435,7 +439,7 @@ test('a seeded record attribute\'s document message pair sits at'
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         [
             'attribute_type', 'constraints', 'name',
@@ -445,7 +449,7 @@ test('a seeded record attribute\'s document message pair sits at'
     );
 });
 
-test('a seeded objective create pair sits at its org-nested'
+Deno.test('a seeded objective create pair sits at its org-nested'
 + ' entity address, per org', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
@@ -457,9 +461,9 @@ test('a seeded objective create pair sits at its org-nested'
     const starkRows = requests.filter(
         r => r.uri_id === starkSeed.id,
     );
-    assert.equal(starkRows.length, 2);
+    assertStrictEquals(starkRows.length, 2);
     for (const row of starkRows) {
-        assert.equal(
+        assertStrictEquals(
             row.uri_collection,
             `/organizations/${STARK_ORGANIZATION}/objectives/`,
         );
@@ -467,16 +471,16 @@ test('a seeded objective create pair sits at its org-nested'
     const org2Rows = requests.filter(
         r => r.uri_id === ORGANIZATION_TWO_OBJECTIVE.id,
     );
-    assert.equal(org2Rows.length, 2);
+    assertStrictEquals(org2Rows.length, 2);
     for (const row of org2Rows) {
-        assert.equal(
+        assertStrictEquals(
             row.uri_collection,
             `/organizations/${ORGANIZATION_TWO}/objectives/`,
         );
     }
 });
 
-test('a seeded objective\'s document message pair sits at its'
+Deno.test('a seeded objective\'s document message pair sits at its'
 + ' entity address, body carrying position plus the'
 + ' lifecycle trio and no organization_id key', async () => {
     const db = await sharedMockDb();
@@ -493,21 +497,21 @@ test('a seeded objective\'s document message pair sits at its'
                     + '/objectives/'
             && r.method === 'PUT',
     );
-    assert.ok(
+    assert(
         documentRow,
         'no document message pair for the seeded objective',
     );
     const embedded = messagePairJsonOf(documentRow!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body),
         ['position', 'state'],
     );
-    assert.equal(embedded.body.state, 'active');
+    assertStrictEquals(embedded.body.state, 'active');
 });
 
-test('a seeded objective\'s revision pair sits at its own'
+Deno.test('a seeded objective\'s revision pair sits at its own'
 + ' entity address, its body carrying the five revision'
 + ' keys', async () => {
     const db = await sharedMockDb();
@@ -522,19 +526,19 @@ test('a seeded objective\'s revision pair sits at its own'
                 === `/organizations/${STARK_ORGANIZATION}`
                     + `/objectives/${starkSeed.id}/revisions/`,
     );
-    assert.ok(
+    assert(
         revisionRow, 'no revision pair for the seeded objective',
     );
     const embedded = messagePairJsonOf(revisionRow!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         ['at', 'description', 'member_id', 'name', 'objective_id'],
     );
 });
 
-test('a seeded work-order document message pair sits at its'
+Deno.test('a seeded work-order document message pair sits at its'
 + ' org-nested entity address, its body carrying no id key',
 async () => {
     const db = await sharedMockDb();
@@ -543,8 +547,8 @@ async () => {
     const row = requests.find(
         r => r.uri_id === firstWorkOrder.id,
     );
-    assert.ok(row, 'no request row for the seeded work order');
-    assert.equal(row!.uri_collection
+    assert(row, 'no request row for the seeded work order');
+    assertStrictEquals(row!.uri_collection
         , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/');
     // The id-strip covenant (verification finding, lens 4): a
     // spurious `id` key riding the recorded body would drift
@@ -553,21 +557,21 @@ async () => {
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         ['display_id', 'flow_graph', 'organization_id', 'position'],
     );
 });
 
-test('a seeded flow-work-order join pair sits at its'
+Deno.test('a seeded flow-work-order join pair sits at its'
 + ' org-nested join address, its body carrying no id key',
 async () => {
     const db = await sharedMockDb();
     const firstJoin = buildFlowWorkOrderJoins()[0]!;
     const requests = await db.messagePairs.getAll();
     const row = requests.find(r => r.uri_id === firstJoin.id);
-    assert.ok(row, 'no request row for the seeded join');
-    assert.equal(
+    assert(row, 'no request row for the seeded join');
+    assertStrictEquals(
         row!.uri_collection,
         `/organizations/${STARK_ORGANIZATION}/flows/`
             + `${firstJoin.flow_id}/work-orders/`,
@@ -575,20 +579,20 @@ async () => {
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         ['at', 'flow_id', 'work_order_id'],
     );
 });
 
-test('a seeded flow-record join pair sits at its org-nested'
+Deno.test('a seeded flow-record join pair sits at its org-nested'
 + ' join address, its body carrying no id key', async () => {
     const db = await sharedMockDb();
     const firstJoin = mockFlowRecords[0]!;
     const requests = await db.messagePairs.getAll();
     const row = requests.find(r => r.uri_id === firstJoin.id);
-    assert.ok(row, 'no request row for the seeded join');
-    assert.equal(
+    assert(row, 'no request row for the seeded join');
+    assertStrictEquals(
         row!.uri_collection,
         `/organizations/${STARK_ORGANIZATION}/flows/`
             + `${firstJoin.flow_id}/records/`,
@@ -596,7 +600,7 @@ test('a seeded flow-record join pair sits at its org-nested'
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         ['at', 'flow_id', 'record_id'],
     );
@@ -627,7 +631,7 @@ function transitionRequestForEvent(
     });
 }
 
-test('a seeded work-order trace event\'s pair sits at its'
+Deno.test('a seeded work-order trace event\'s pair sits at its'
 + ' org-nested transition address, its body carrying the'
 + ' transition keys (states/:id retired)', async () => {
     const db = await sharedMockDb();
@@ -636,8 +640,8 @@ test('a seeded work-order trace event\'s pair sits at its'
     const row = transitionRequestForEvent(
         requests, firstTrace.id,
     );
-    assert.ok(row, 'no request row for the seeded transition');
-    assert.equal(
+    assert(row, 'no request row for the seeded transition');
+    assertStrictEquals(
         row!.uri_collection,
         `/organizations/${STARK_ORGANIZATION}/work-orders/`
             + `${firstTrace.entity_id}/transition/`,
@@ -645,22 +649,22 @@ test('a seeded work-order trace event\'s pair sits at its'
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         [
             'fieldValues', 'release', 'targetState',
             'transitionAt', 'transitionEventId',
         ],
     );
-    assert.equal(
+    assertStrictEquals(
         embedded.body['transitionEventId'], firstTrace.id,
     );
-    assert.equal(
+    assertStrictEquals(
         embedded.body['targetState'], firstTrace.state,
     );
 });
 
-test('a seeded transition pair\'s stored request'
+Deno.test('a seeded transition pair\'s stored request'
 + ' requester_identity_id matches its derived event\'s'
 + ' member_id (the role-grant precedent: fingerprints hash'
 + ' ids only, so a wrong-but-real member_id is otherwise'
@@ -671,13 +675,13 @@ test('a seeded transition pair\'s stored request'
     const row = transitionRequestForEvent(
         requests, firstTrace.id,
     );
-    assert.ok(row, 'no request row for the seeded transition');
+    assert(row, 'no request row for the seeded transition');
     const lifecycle = await workOrderLifecycleStatesFor(
         db, STARK_ORGANIZATION, firstTrace.entity_id,
     );
     const written = lifecycle.find(s => s.id === firstTrace.id)!;
-    assert.ok(written, 'derived state missing');
-    assert.equal(row!.requester_identity_id, written.member_id);
+    assert(written, 'derived state missing');
+    assertStrictEquals(row!.requester_identity_id, written.member_id);
     // Index 0 is its work order's OWN first event, so a
     // regression that sources every trace pair's requester
     // from the work order's first-event member (rather than
@@ -689,7 +693,7 @@ test('a seeded transition pair\'s stored request'
     const divergingRow = transitionRequestForEvent(
         requests, divergingTrace.id,
     );
-    assert.ok(
+    assert(
         divergingRow,
         'no request row for the diverging transition',
     );
@@ -700,13 +704,13 @@ test('a seeded transition pair\'s stored request'
     const divergingWritten = divergingLifecycle.find(
         s => s.id === divergingTrace.id,
     )!;
-    assert.equal(
+    assertStrictEquals(
         divergingRow!.requester_identity_id,
         divergingWritten.member_id,
     );
 });
 
-test('a seeded state_field_value folds into its parent'
+Deno.test('a seeded state_field_value folds into its parent'
 + ' transition body (no bare leaf pair)', async () => {
     const db = await sharedMockDb();
     const firstFieldValue = mockStateFieldValues[0]!;
@@ -734,8 +738,8 @@ test('a seeded state_field_value folds into its parent'
             return false;
         }
     });
-    assert.ok(row, 'no transition carries the seeded field value');
-    assert.match(
+    assert(row, 'no transition carries the seeded field value');
+    assertMatch(
         row!.uri_collection,
         new RegExp(
             `^/organizations/${STARK_ORGANIZATION}`
@@ -757,16 +761,16 @@ test('a seeded state_field_value folds into its parent'
             entry.attribute_id
                 === firstFieldValue.attribute_id,
     )!;
-    assert.equal(fold.value, firstFieldValue.value);
-    assert.equal(
+    assertStrictEquals(fold.value, firstFieldValue.value);
+    assertStrictEquals(
         typeof embedded.body.instance_id, 'string',
     );
-    assert.equal(
+    assertStrictEquals(
         typeof embedded.body.record_type_id, 'string',
     );
 });
 
-test('the mock-data seed\'s system identity sits at'
+Deno.test('the mock-data seed\'s system identity sits at'
 + ' /identities/',
 async () => {
     const db = await sharedMockDb();
@@ -775,11 +779,11 @@ async () => {
         r => r.uri_collection === '/identities/'
             && r.uri_id === SYSTEM_MEMBER_ID,
     );
-    assert.ok(row, 'no system identity pair');
+    assert(row, 'no system identity pair');
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.equal(embedded.body.kind, 'service');
+    assertStrictEquals(embedded.body.kind, 'service');
 });
 
 // Phase 7 Task 5: the scores half of the seed deferral closes —
@@ -796,14 +800,14 @@ const scoreRows = buildSeedScoreRows(
     humanMemberPoolsByOrganization(buildMembers()),
 );
 
-test('a seeded baseline-score pair sits at its org-nested'
+Deno.test('a seeded baseline-score pair sits at its org-nested'
 + ' entity address, its body carrying no id key', async () => {
     const db = await sharedMockDb();
     const firstBaseline = scoreRows.baselines[0]!;
     const requests = await db.messagePairs.getAll();
     const row = requests.find(r => r.uri_id === firstBaseline.id);
-    assert.ok(row, 'no request row for the seeded baseline score');
-    assert.equal(
+    assert(row, 'no request row for the seeded baseline score');
+    assertStrictEquals(
         row!.uri_collection,
         `/organizations/${STARK_ORGANIZATION}/projects/`
             + `${firstBaseline.fields.project_id}`
@@ -812,20 +816,20 @@ test('a seeded baseline-score pair sits at its org-nested'
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         ['at', 'member_id', 'objective_id', 'project_id', 'score'],
     );
 });
 
-test('a seeded actual-score pair sits at its org-nested'
+Deno.test('a seeded actual-score pair sits at its org-nested'
 + ' entity address, its body carrying no id key', async () => {
     const db = await sharedMockDb();
     const firstActual = scoreRows.actuals[0]!;
     const requests = await db.messagePairs.getAll();
     const row = requests.find(r => r.uri_id === firstActual.id);
-    assert.ok(row, 'no request row for the seeded actual score');
-    assert.equal(
+    assert(row, 'no request row for the seeded actual score');
+    assertStrictEquals(
         row!.uri_collection,
         `/organizations/${STARK_ORGANIZATION}/projects/`
             + `${firstActual.fields.project_id}`
@@ -834,13 +838,13 @@ test('a seeded actual-score pair sits at its org-nested'
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         ['at', 'member_id', 'objective_id', 'project_id', 'score'],
     );
 });
 
-test('every seeded STARK objective pair\'s embedded revision'
+Deno.test('every seeded STARK objective pair\'s embedded revision'
 + ' author matches the revision document message pair body',
 async () => {
     // Guards the pure pre-tx human-member-pool reconstruction
@@ -861,7 +865,7 @@ async () => {
             r => r.uri_id === revisionId
                 && r.uri_collection.includes('/revisions/'),
         );
-        assert.ok(
+        assert(
             revisionRow,
             'no revision pair for ' + starkSeed.id,
         );
@@ -878,18 +882,18 @@ async () => {
             r => r.uri_id === starkSeed.id
                 && r.method === 'POST',
         );
-        assert.ok(row, 'no request row for ' + starkSeed.id);
+        assert(row, 'no request row for ' + starkSeed.id);
         const embedded = messagePairJsonOf(row!.request) as {
             body: { revision: { member_id: string } };
         };
-        assert.equal(
+        assertStrictEquals(
             embedded.body.revision.member_id,
             revisionBody.body.member_id,
         );
     }
 });
 
-test('a seeded credential\'s response body carries the full'
+Deno.test('a seeded credential\'s response body carries the full'
 + ' credential key set (Phase 10 Task 6 — content is'
 + ' nondeterministic per reseed, finding 13, so only the'
 + ' key set is falsifiable here)', async () => {
@@ -897,26 +901,26 @@ test('a seeded credential\'s response body carries the full'
     const id = 'cFiyyRHxbIEVqeVFNPmDnw';
     const requests = await db.messagePairs.getAll();
     const requestRow = requests.find(r => r.uri_id === id);
-    assert.ok(requestRow, 'no request row for ' + id);
+    assert(requestRow, 'no request row for ' + id);
     const responses = await db.messagePairs.getAll();
     const responseRow = responses.find(
         r => r.id === requestRow!.id,
     );
-    assert.ok(responseRow, 'no response row for ' + id);
+    assert(responseRow, 'no response row for ' + id);
     const embedded = messagePairJsonOf(responseRow!.response) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(
+    assertEquals(
         Object.keys(embedded.body).sort(),
         ['at', 'id', 'identity_id', 'kind', 'secret', 'status'],
     );
 });
 
-test('seeded seats carry type and no role-grant'
+Deno.test('seeded seats carry type and no role-grant'
 + ' pairs remain', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
-    assert.equal(
+    assertStrictEquals(
         requests.filter(r =>
             r.uri_collection.includes('/role-grants/')).length,
         0,
@@ -925,12 +929,12 @@ test('seeded seats carry type and no role-grant'
         /\/organizations\/[^/]+\/members\//.test(
             r.uri_collection,
         ));
-    assert.ok(seatReqs.length > 0);
+    assert(seatReqs.length > 0);
     for (const row of seatReqs) {
         const embedded = messagePairJsonOf(row.request) as {
             body: Record<string, unknown>;
         };
-        assert.ok(
+        assert(
             embedded.body.type === 'admin'
             || embedded.body.type === 'member',
             'seat ' + row.uri_id + ' missing type',
@@ -938,17 +942,17 @@ test('seeded seats carry type and no role-grant'
     }
 });
 
-test('seed pairs verify against their hashes', async () => {
+Deno.test('seed pairs verify against their hashes', async () => {
     const db = await sharedMockDb();
     for (const row of await db.messagePairs.getAll()) {
-        assert.equal(
+        assertStrictEquals(
             await requestMessageHash(row.request),
             row.request_hash,
         );
     }
 });
 
-test('a bootstrap seed populates exactly eight balanced,'
+Deno.test('a bootstrap seed populates exactly eight balanced,'
 + ' hash-verified pairs for the current identity and the'
 + ' system identity', async () => {
     const db = memoryDbAdapter();
@@ -956,40 +960,40 @@ test('a bootstrap seed populates exactly eight balanced,'
         hashPassword: testHashPassword,
     });
     const requests = await db.messagePairs.getAll();
-    assert.equal(requests.length, 8);
+    assertStrictEquals(requests.length, 8);
     const atIdentity = requests.filter(
         r => r.uri_collection === '/identities/'
             && r.uri_id === 'XXZruirZyAOoRpNxaDnpSA',
     );
-    assert.equal(atIdentity.length, 1);
+    assertStrictEquals(atIdentity.length, 1);
     const atSystem = requests.filter(
         r => r.uri_collection === '/identities/'
             && r.uri_id === SYSTEM_MEMBER_ID,
     );
-    assert.equal(atSystem.length, 1);
+    assertStrictEquals(atSystem.length, 1);
     const atSeat = requests.filter(
         r => r.uri_collection
             === `/organizations/${STARK_ORGANIZATION}/members/`
             && r.uri_id === 'XXZruirZyAOoRpNxaDnpSA',
     );
-    assert.equal(atSeat.length, 1);
+    assertStrictEquals(atSeat.length, 1);
     const atPii = requests.filter(
         r => r.uri_collection === '/identities/XXZruirZyAOoRpNxaDnpSA/pii/',
     );
-    assert.equal(atPii.length, 1);
+    assertStrictEquals(atPii.length, 1);
     const atDefaultOrganization = requests.filter(
         r => r.uri_collection
             === '/identities/XXZruirZyAOoRpNxaDnpSA/default-organization/'
             && r.uri_id === '',
     );
-    assert.equal(atDefaultOrganization.length, 1);
+    assertStrictEquals(atDefaultOrganization.length, 1);
     const atOrganization = requests.filter(
         r => r.uri_collection === '/organizations/'
             && r.uri_id === STARK_ORGANIZATION,
     );
-    assert.equal(atOrganization.length, 1);
+    assertStrictEquals(atOrganization.length, 1);
     for (const row of requests) {
-        assert.equal(
+        assertStrictEquals(
             await requestMessageHash(row.request),
             row.request_hash,
         );

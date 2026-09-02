@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { parseDialogClick } from '../web-app/app/dialog.ts';
 
 const elementWith = (
@@ -14,23 +13,23 @@ const elementWith = (
     },
 }) as unknown as Element;
 
-test('parseDialogClick reads data-dialog-open as an open', () => {
+Deno.test('parseDialogClick reads data-dialog-open as an open', () => {
     const t = elementWith({ 'data-dialog-open': 'y' });
-    assert.deepEqual(parseDialogClick(t), {
+    assertEquals(parseDialogClick(t), {
         kind: 'open', id: 'y',
     });
 });
 
-test('parseDialogClick reads data-dialog-cancel as a close',
+Deno.test('parseDialogClick reads data-dialog-cancel as a close',
     () => {
         const t = elementWith({
             'data-dialog-cancel': 'z',
         });
-        assert.deepEqual(parseDialogClick(t), {
+        assertEquals(parseDialogClick(t), {
             kind: 'close', id: 'z',
         });
     });
 
-test('parseDialogClick returns null for a plain click', () => {
-    assert.equal(parseDialogClick(elementWith({})), null);
+Deno.test('parseDialogClick returns null for a plain click', () => {
+    assertStrictEquals(parseDialogClick(elementWith({})), null);
 });

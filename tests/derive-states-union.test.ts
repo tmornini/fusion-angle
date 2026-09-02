@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -237,7 +236,7 @@ async function createAiMember(
         'PUT', '/ai-agents/' + id, token,
         aiMemberDetail('Bot ' + id),
     ));
-    assert.equal(res.status, 201, 'ai-agent create failed');
+    assertStrictEquals(res.status, 201, 'ai-agent create failed');
 }
 
 function flowFields(name: string) {
@@ -286,7 +285,7 @@ async function createFlowWithNodes(
             },
         },
     ));
-    assert.equal(res.status, 201, 'flow creation POST failed');
+    assertStrictEquals(res.status, 201, 'flow creation POST failed');
 }
 
 interface GraphSidecar {
@@ -310,7 +309,7 @@ async function saveFlowWithSidecars(
         ),
     );
     const etag = got.headers.get('ETag');
-    assert.ok(
+    assert(
         etag,
         'no ETag on GET /organizations/'
             + organizationA + '/flows/' + flowId,
@@ -331,7 +330,7 @@ async function saveFlowWithSidecars(
         },
         { 'if-match': etag },
     ));
-    assert.equal(res.status, 201, 'flow save PUT failed');
+    assertStrictEquals(res.status, 201, 'flow save PUT failed');
 }
 
 function workOrderBody(
@@ -390,7 +389,7 @@ async function createWorkOrder(
             stateEventIds: [...stateEventIds],
         },
     ));
-    assert.equal(res.status, 201, 'work order create failed');
+    assertStrictEquals(res.status, 201, 'work order create failed');
     return { stateEventIds };
 }
 
@@ -408,7 +407,7 @@ async function grantAndAccept(
         adminToken,
         { email: inviteeEmail, invitationId, grantEventId, grantAt },
     ));
-    assert.equal(grantRes.status, 200, 'grant failed');
+    assertStrictEquals(grantRes.status, 200, 'grant failed');
 
     const acceptRes = await handleRequest(db, req(
         'PUT',
@@ -422,7 +421,7 @@ async function grantAndAccept(
             at: acceptAt,
         },
     ));
-    assert.equal(acceptRes.status, 204, 'accept failed');
+    assertStrictEquals(acceptRes.status, 204, 'accept failed');
 }
 
 interface UnionFixture {
@@ -462,7 +461,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
         tokenA,
         ideaDocument('Union Idea'),
     ));
-    assert.equal(ideaRes.status, 201);
+    assertStrictEquals(ideaRes.status, 201);
 
     const foreignIdeaId = generateIdentifier();
     const foreignIdeaRes = await handleRequest(db, req(
@@ -470,7 +469,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
             + foreignIdeaId, tokenB,
         ideaDocument('Foreign Idea'),
     ));
-    assert.equal(foreignIdeaRes.status, 201);
+    assertStrictEquals(foreignIdeaRes.status, 201);
 
     // (a-objective) an objectives document trio — the
     // states/:id orphan leg's replacement in the five-source
@@ -484,7 +483,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
             state: 'active',
         },
     ));
-    assert.equal(objectiveRes.status, 201);
+    assertStrictEquals(objectiveRes.status, 201);
 
     // (b) an AI member's document-trio genesis — membered into
     // org A so the fence resolves it there rather than as an
@@ -564,7 +563,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
 
 // ---- 1. ownership fence (bulk union retired with C3) --------
 
-test('a leftover /memberships/ pair without a seat'
+Deno.test('a leftover /memberships/ pair without a seat'
 + ' does not own the identity',
 async () => {
     const db = memoryDbAdapter();
@@ -576,13 +575,13 @@ async () => {
         organization_id: organizationA, identity_id: ghost,
         type: 'member', at: AT,
     });
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(db, ghost, organizationA),
         null,
     );
 });
 
-test('deriveMembers is seats ∩ identities: leftover'
+Deno.test('deriveMembers is seats ∩ identities: leftover'
 + ' /members/ and /memberships/ do not join',
 async () => {
     const db = memoryDbAdapter();
@@ -595,13 +594,13 @@ async () => {
         organization_id: organizationA, identity_id: ghost,
         type: 'member', at: AT,
     });
-    assert.equal(
+    assertStrictEquals(
         (await deriveMembers(db, organizationA))
             .some((row) => row.id === ghost),
         false,
     );
     await seedSeat(db, organizationA, ghost, 'member', AT);
-    assert.equal(
+    assertStrictEquals(
         (await deriveMembers(db, organizationA))
             .some((row) => row.id === ghost),
         false,
@@ -611,36 +610,36 @@ async () => {
         name: 'Ghost', email: 'g@x.com',
         phone: '', bio: '',
     });
-    assert.equal(
+    assertStrictEquals(
         (await deriveMembers(db, organizationA))
             .some((row) => row.id === ghost),
         true,
     );
 });
 
-test('resolveOwningOrganization: own entities resolve to A;'
+Deno.test('resolveOwningOrganization: own entities resolve to A;'
 + ' foreign idea resolves to B (no bulk-union leak path)',
 async () => {
     const fx = await buildUnionFixture();
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(
             fx.db, fx.ideaId, fx.organizationA,
         ),
         fx.organizationA,
     );
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(
             fx.db, fx.workOrderId, fx.organizationA,
         ),
         fx.organizationA,
     );
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(
             fx.db, fx.foreignIdeaId, fx.organizationA,
         ),
         fx.organizationB,
     );
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(
             fx.db, fx.foreignIdeaId, fx.organizationB,
         ),
@@ -650,18 +649,18 @@ async () => {
 
 // ---- 2. per-family history subsets, (at, id) order (C2) -----
 
-test('per-family history: each family\'s own entity subset',
+Deno.test('per-family history: each family\'s own entity subset',
 async () => {
     const fx = await buildUnionFixture();
 
-    assert.deepEqual(
+    assertEquals(
         (await deriveIdeaStateHistory(
             fx.db, fx.organizationA, fx.ideaId,
         ))
             .map((row) => row.state),
         ['active'],
     );
-    assert.deepEqual(
+    assertEquals(
         (await deriveObjectiveStateHistory(
             fx.db, fx.organizationA, fx.objectiveId,
         )).map((row) => row.state),
@@ -674,10 +673,10 @@ async () => {
             await organizationToken(fx.adminA, fx.organizationA),
         ),
     );
-    assert.equal(agent.status, 200);
+    assertStrictEquals(agent.status, 200);
     const agentBody = await agent.json() as { id: string };
-    assert.equal(agentBody.id, fx.aiMemberId);
-    assert.deepEqual(
+    assertStrictEquals(agentBody.id, fx.aiMemberId);
+    assertEquals(
         (await workOrderLifecycleStatesFor(
             fx.db, fx.organizationA, fx.workOrderId,
         )).map((row) => row.id),
@@ -733,9 +732,9 @@ async () => {
             }
         }
     }
-    assert.ok(sidecarIds.includes(fx.deletedEventId));
-    assert.ok(sidecarIds.includes(fx.restoredEventId));
-    assert.deepEqual(
+    assert(sidecarIds.includes(fx.deletedEventId));
+    assert(sidecarIds.includes(fx.restoredEventId));
+    assertEquals(
         (await deriveInvitationStates(fx.db))
             .filter((row) =>
                 row.entity_id === fx.invitationId)
@@ -762,7 +761,7 @@ async () => {
 // this section — these three tests drive each phantom shape
 // through handleRequest and assert row counts, not just presence.
 
-test('deriveInvitationStates: a duplicate grant on the same'
+Deno.test('deriveInvitationStates: a duplicate grant on the same'
 + ' pending (organization, invitee) pair derives exactly ONE'
 + ' \'pending\' row, and posts no event on the old plane for'
 + ' the duplicate\'s own id', async () => {
@@ -786,7 +785,7 @@ test('deriveInvitationStates: a duplicate grant on the same'
             grantAt: '2026-04-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(first.status, 200, 'first grant failed');
+    assertStrictEquals(first.status, 200, 'first grant failed');
 
     const second = await handleRequest(db, req(
         'POST', '/organizations/' + organizationA + '/invitations/',
@@ -798,16 +797,16 @@ test('deriveInvitationStates: a duplicate grant on the same'
             grantAt: '2026-04-01T00:00:00.000001Z',
         },
     ));
-    assert.equal(second.status, 200, 'duplicate grant failed');
+    assertStrictEquals(second.status, 200, 'duplicate grant failed');
     const secondBody = await second.json() as { id: string };
     // The duplicate echoes the ORIGINAL invitation id, never its
     // own submitted one.
-    assert.equal(secondBody.id, invA);
+    assertStrictEquals(secondBody.id, invA);
 
     // The old plane: no event was ever posted for the
     // duplicate's own submitted id — a REAL second pending row
     // here would be a live parity bug, not a test gap.
-    assert.deepEqual(
+    assertEquals(
         [], [], // states table retired
     );
 
@@ -816,16 +815,16 @@ test('deriveInvitationStates: a duplicate grant on the same'
         (row) => row.entity_id === invA
             && row.state === 'pending',
     );
-    assert.equal(pendingForOriginal.length, 1);
-    assert.equal(pendingForOriginal[0]!.id, grantA);
+    assertStrictEquals(pendingForOriginal.length, 1);
+    assertStrictEquals(pendingForOriginal[0]!.id, grantA);
 
     // No phantom row was derived for the duplicate's own id.
-    assert.equal(
+    assertStrictEquals(
         rows.some((row) => row.entity_id === invB), false,
     );
 });
 
-test('deriveInvitationStates: a re-accept (idempotent resend)'
+Deno.test('deriveInvitationStates: a re-accept (idempotent resend)'
 + ' derives exactly ONE \'accepted\' row, keyed to the FIRST'
 + ' accept\'s own event id', async () => {
     const { db, organizationA, adminA } = await seed();
@@ -852,7 +851,7 @@ test('deriveInvitationStates: a re-accept (idempotent resend)'
             grantAt: '2026-04-02T00:00:00.000000Z',
         },
     ));
-    assert.equal(grantRes.status, 200, 'grant failed');
+    assertStrictEquals(grantRes.status, 200, 'grant failed');
 
     const firstAccept = await handleRequest(db, req(
         'PUT',
@@ -866,7 +865,7 @@ test('deriveInvitationStates: a re-accept (idempotent resend)'
             at: '2026-04-02T00:00:00.000001Z',
         },
     ));
-    assert.equal(firstAccept.status, 204, 'first accept failed');
+    assertStrictEquals(firstAccept.status, 204, 'first accept failed');
 
     const secondAccept = await handleRequest(db, req(
         'PUT',
@@ -880,7 +879,7 @@ test('deriveInvitationStates: a re-accept (idempotent resend)'
             at: '2026-04-02T00:00:00.000002Z',
         },
     ));
-    assert.equal(
+    assertStrictEquals(
         secondAccept.status, 204, 're-accept is a no-op',
     );
 
@@ -889,15 +888,15 @@ test('deriveInvitationStates: a re-accept (idempotent resend)'
         (row) => row.entity_id === invitationId
             && row.state === 'accepted',
     );
-    assert.equal(accepted.length, 1);
-    assert.equal(accepted[0]!.id, accept1);
-    assert.equal(
+    assertStrictEquals(accepted.length, 1);
+    assertStrictEquals(accepted[0]!.id, accept1);
+    assertStrictEquals(
         rows.some((row) => row.id === accept2),
         false,
     );
 });
 
-test('deriveInvitationStates: a re-decline (idempotent resend)'
+Deno.test('deriveInvitationStates: a re-decline (idempotent resend)'
 + ' derives exactly ONE \'declined\' row, keyed to the FIRST'
 + ' decline\'s own event id', async () => {
     const { db, organizationA, adminA } = await seed();
@@ -924,7 +923,7 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
             grantAt: '2026-04-03T00:00:00.000000Z',
         },
     ));
-    assert.equal(grantRes.status, 200, 'grant failed');
+    assertStrictEquals(grantRes.status, 200, 'grant failed');
 
     const firstDecline = await handleRequest(db, req(
         'PUT',
@@ -937,7 +936,7 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
             at: '2026-04-03T00:00:00.000001Z',
         },
     ));
-    assert.equal(firstDecline.status, 204, 'first decline failed');
+    assertStrictEquals(firstDecline.status, 204, 'first decline failed');
 
     const secondDecline = await handleRequest(db, req(
         'PUT',
@@ -950,7 +949,7 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
             at: '2026-04-03T00:00:00.000002Z',
         },
     ));
-    assert.equal(
+    assertStrictEquals(
         secondDecline.status, 204,
         're-decline is a no-op',
     );
@@ -960,9 +959,9 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
         (row) => row.entity_id === invitationId
             && row.state === 'declined',
     );
-    assert.equal(declined.length, 1);
-    assert.equal(declined[0]!.id, decline1);
-    assert.equal(
+    assertStrictEquals(declined.length, 1);
+    assertStrictEquals(declined[0]!.id, decline1);
+    assertStrictEquals(
         rows.some((row) => row.id === decline2),
         false,
     );

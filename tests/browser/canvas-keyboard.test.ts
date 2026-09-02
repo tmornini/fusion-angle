@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import { useBrowser, withAdminPage, type Page } from
     './fixtures.ts';
 import {
@@ -39,7 +38,7 @@ async function tabToNode(
     throw new Error(`Tab never reached node ${nodeId}`);
 }
 
-test('Tab from the canvas enters the ring and marks the node',
+Deno.test('Tab from the canvas enters the ring and marks the node',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         await openFlow(page, origin, ONBOARDING);
@@ -57,13 +56,13 @@ async () => {
             })()`,
             'a focused node',
         );
-        assert.equal(current, 'true');
+        assertStrictEquals(current, 'true');
         await page.key('Enter');
         await page.waitFor('#prop-node-name');
         const count = await page.evaluate<number>(
             `document.querySelectorAll(`
             + `'${NODE}[aria-current="true"]').length`,
         );
-        assert.equal(count, 1);
+        assertStrictEquals(count, 1);
     });
 });

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -113,95 +112,95 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 // ── regime 1: the route-table 405s (15 patterns, 36 combos) ──
 
 // Task 10: PATCH alphabet — no identity-spine patch yet.
-test('PATCH identities/:id 405s (no patch handler'
+Deno.test('PATCH identities/:id 405s (no patch handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PATCH', '/identities/fndCYAsXazdzMUlEGMNIZw', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT identities 405s (no put handler wired)', async () => {
+Deno.test('PUT identities 405s (no put handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('PUT', '/identities/', token, {}),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE identities 405s (no delete handler wired)',
+Deno.test('DELETE identities 405s (no delete handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/identities/', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST identities/:id 405s (no post handler wired)',
+Deno.test('POST identities/:id 405s (no post handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/identities/fndCYAsXazdzMUlEGMNIZw', token, {}),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE identities/:id 405s (no delete handler wired)',
+Deno.test('DELETE identities/:id 405s (no delete handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/identities/fndCYAsXazdzMUlEGMNIZw', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST identities/:id/pii 405s (no post handler wired)',
+Deno.test('POST identities/:id/pii 405s (no post handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/identities/fndCYAsXazdzMUlEGMNIZw/pii', token, {}),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT identity-pii 404s (route retired)', async () => {
+Deno.test('PUT identity-pii 404s (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('PUT', '/identity-pii', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST identity-pii 404s (route retired)',
+Deno.test('POST identity-pii 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/identity-pii', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE identity-pii 404s (route retired)',
+Deno.test('DELETE identity-pii 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/identity-pii', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT identities/:id/credentials 405s (no put handler'
+Deno.test('PUT identities/:id/credentials 405s (no put handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -211,10 +210,10 @@ test('PUT identities/:id/credentials 405s (no put handler'
                 , {},
         ),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST identities/:id/credentials 405s (no post handler'
+Deno.test('POST identities/:id/credentials 405s (no post handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -224,10 +223,10 @@ test('POST identities/:id/credentials 405s (no post handler'
                 , {},
         ),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE identities/:id/credentials 405s (no delete'
+Deno.test('DELETE identities/:id/credentials 405s (no delete'
 + ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -235,10 +234,10 @@ test('DELETE identities/:id/credentials 405s (no delete'
         db, req('DELETE', '/identities/fndCYAsXazdzMUlEGMNIZw/credentials/'
             , token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST identities/:id/credentials/:cid 405s (no post'
+Deno.test('POST identities/:id/credentials/:cid 405s (no post'
 + ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -248,10 +247,10 @@ test('POST identities/:id/credentials/:cid 405s (no post'
                 + 'WeXjAaAxGSpLpamfEuvcww', token, {},
         ),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE identities/:id/credentials/:cid 405s (no delete'
+Deno.test('DELETE identities/:id/credentials/:cid 405s (no delete'
 + ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -261,10 +260,10 @@ test('DELETE identities/:id/credentials/:cid 405s (no delete'
                 + 'WeXjAaAxGSpLpamfEuvcww', token,
         ),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST identity-token-revocations/:id 404s'
+Deno.test('POST identity-token-revocations/:id 404s'
 + ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -276,10 +275,10 @@ test('POST identity-token-revocations/:id 404s'
             token, {},
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE identity-token-revocations/:id 404s'
+Deno.test('DELETE identity-token-revocations/:id 404s'
 + ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -291,10 +290,10 @@ test('DELETE identity-token-revocations/:id 404s'
             token,
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT identity-token-revocations/:id 404s'
+Deno.test('PUT identity-token-revocations/:id 404s'
 + ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -309,10 +308,10 @@ test('PUT identity-token-revocations/:id 404s'
             },
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('GET identity-token-revocations/:id 404s'
+Deno.test('GET identity-token-revocations/:id 404s'
 + ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -320,10 +319,10 @@ test('GET identity-token-revocations/:id 404s'
         db, req('GET', '/identity-token-revocations/rOEPOcVMQdJiiiMuiiEhlg'
             , token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST identities/:id/token-revocations/:rid 405s'
+Deno.test('POST identities/:id/token-revocations/:rid 405s'
 + ' (no post handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -335,10 +334,10 @@ test('POST identities/:id/token-revocations/:rid 405s'
             token, {},
         ),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE identities/:id/token-revocations/:rid 405s'
+Deno.test('DELETE identities/:id/token-revocations/:rid 405s'
 + ' (no delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -350,109 +349,109 @@ test('DELETE identities/:id/token-revocations/:rid 405s'
             token,
         ),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT role-grants 404s (route retired)', async () => {
+Deno.test('PUT role-grants 404s (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('PUT', '/role-grants', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST role-grants 404s (route retired)',
+Deno.test('POST role-grants 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/role-grants', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE role-grants 404s (route retired)',
+Deno.test('DELETE role-grants 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/role-grants', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST role-grants/:id 404s (route retired)',
+Deno.test('POST role-grants/:id 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/role-grants/sbGBwBHGVUqXkSLISjksUg', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE role-grants/:id 404s (route retired)',
+Deno.test('DELETE role-grants/:id 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/role-grants/sbGBwBHGVUqXkSLISjksUg', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT identity-tokens 404s (route retired)',
+Deno.test('PUT identity-tokens 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('PUT', '/identity-tokens', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST identity-tokens 404s (route retired)',
+Deno.test('POST identity-tokens 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/identity-tokens', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE identity-tokens 404s (route retired)',
+Deno.test('DELETE identity-tokens 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/identity-tokens', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST identity-tokens/:id 404s (route retired)',
+Deno.test('POST identity-tokens/:id 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/identity-tokens/jSajolWDMnlgnKMObjGMqA', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE identity-tokens/:id 404s (route retired)',
+Deno.test('DELETE identity-tokens/:id 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/identity-tokens/jSajolWDMnlgnKMObjGMqA', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('GET identity-tokens/:jti/rotation 404s (route retired)',
+Deno.test('GET identity-tokens/:jti/rotation 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -461,10 +460,10 @@ async () => {
             'GET', '/identity-tokens/kMxUUYCSpGsfuBpyHiIZqA/rotation', token,
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT identity-tokens/:jti/rotation 404s (route retired)',
+Deno.test('PUT identity-tokens/:jti/rotation 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -474,10 +473,10 @@ async () => {
                 , {},
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE identity-tokens/:jti/rotation 404s'
+Deno.test('DELETE identity-tokens/:jti/rotation 404s'
 + ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -487,10 +486,10 @@ test('DELETE identity-tokens/:jti/rotation 404s'
                 , token,
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('GET identity-tokens/:jti/revocation 404s'
+Deno.test('GET identity-tokens/:jti/revocation 404s'
 + ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -500,10 +499,10 @@ test('GET identity-tokens/:jti/revocation 404s'
                 , token,
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT identity-tokens/:jti/revocation 404s'
+Deno.test('PUT identity-tokens/:jti/revocation 404s'
 + ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -513,10 +512,10 @@ test('PUT identity-tokens/:jti/revocation 404s'
                 , token, {},
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE identity-tokens/:jti/revocation 404s'
+Deno.test('DELETE identity-tokens/:jti/revocation 404s'
 + ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -526,7 +525,7 @@ test('DELETE identity-tokens/:jti/revocation 404s'
                 , token,
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
 const SARAH_PROVIDER = {
@@ -537,7 +536,7 @@ const SARAH_PROVIDER = {
     at: '2026-01-01T00:00:00.000000Z',
 };
 
-test('GET /identities/:id/providers lists that identity',
+Deno.test('GET /identities/:id/providers lists that identity',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -549,19 +548,19 @@ async () => {
         db, req('GET', '/identities/toccYYkLEABmlbpHJalgtQ/providers/'
             , token),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const rows = await res.json() as readonly {
         readonly provider: string;
         readonly provider_subject: string;
         readonly action: string;
     }[];
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]!.provider, 'google');
-    assert.equal(rows[0]!.provider_subject, 'sub-sarah');
-    assert.equal(rows[0]!.action, 'linked');
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.provider, 'google');
+    assertStrictEquals(rows[0]!.provider_subject, 'sub-sarah');
+    assertStrictEquals(rows[0]!.action, 'linked');
 });
 
-test('GET /identities/:id/providers 403s for a member'
+Deno.test('GET /identities/:id/providers 403s for a member'
 + ' naming another identity (absent from MEMBER_VERBS)',
 async () => {
     const db = await freshDb();
@@ -572,20 +571,20 @@ async () => {
             'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/providers/', token,
         ),
     );
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
 });
 
-test('GET /identity-providers is retired (router 404)',
+Deno.test('GET /identity-providers is retired (router 404)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('GET', '/identity-providers', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('GET /identity-providers/:id is retired (router 404)',
+Deno.test('GET /identity-providers/:id is retired (router 404)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -596,10 +595,10 @@ async () => {
     const res = await handleRequest(
         db, req('GET', '/identity-providers/jQHkoHmSUDmFPStSQgYTdA', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT /identity-providers/:id is retired (router 404)',
+Deno.test('PUT /identity-providers/:id is retired (router 404)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -609,40 +608,40 @@ async () => {
             SARAH_PROVIDER,
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT identity-providers 404s (route retired)',
+Deno.test('PUT identity-providers 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('PUT', '/identity-providers', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST identity-providers 404s (route retired)',
+Deno.test('POST identity-providers 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/identity-providers', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE identity-providers 404s (route retired)',
+Deno.test('DELETE identity-providers 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/identity-providers', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST identity-providers/:id 404s (route retired)',
+Deno.test('POST identity-providers/:id 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -650,10 +649,10 @@ async () => {
         db, req('POST', '/identity-providers/jQHkoHmSUDmFPStSQgYTdA', token
             , {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE identity-providers/:id 404s (route retired)',
+Deno.test('DELETE identity-providers/:id 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -661,13 +660,13 @@ async () => {
         db, req('DELETE', '/identity-providers/jQHkoHmSUDmFPStSQgYTdA'
             , token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
 // ── regime 2: the default-organization side channel's own
 // inline 405 terminal (2 combos) ──
 
-test('POST identities/:id/default-organization 405s (side'
+Deno.test('POST identities/:id/default-organization 405s (side'
 + ' channel never matches routes)', async () => {
     const db = await freshDb();
     const token = await devToken('XXZruirZyAOoRpNxaDnpSA');
@@ -678,10 +677,10 @@ test('POST identities/:id/default-organization 405s (side'
             token, {},
         ),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE identities/:id/default-organization 405s (side'
+Deno.test('DELETE identities/:id/default-organization 405s (side'
 + ' channel never matches routes)', async () => {
     const db = await freshDb();
     const token = await devToken('XXZruirZyAOoRpNxaDnpSA');
@@ -692,7 +691,7 @@ test('DELETE identities/:id/default-organization 405s (side'
             token,
         ),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
 // ── regime 3: the identity-tokens GET-admin/POST-member authz
@@ -702,7 +701,7 @@ const TOKEN_AT = '2026-01-01T00:00:00.000000Z';
 const TOKEN_JTI = generateIdentifier();
 const TOKEN_CHAIN = generateIdentifier();
 
-test('GET /identities/:id/tokens lists that identity',
+Deno.test('GET /identities/:id/tokens lists that identity',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -715,33 +714,33 @@ async () => {
             at: TOKEN_AT,
         },
     ));
-    assert.ok(put.status === 200 || put.status === 201);
+    assert(put.status === 200 || put.status === 201);
     const res = await handleRequest(
         db, req('GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/', token),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const rows = await res.json() as readonly {
         readonly jti: string;
         readonly identity_id: string;
         readonly action: string;
     }[];
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]!.jti, TOKEN_JTI);
-    assert.equal(rows[0]!.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
-    assert.equal(rows[0]!.action, 'issued');
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.jti, TOKEN_JTI);
+    assertStrictEquals(rows[0]!.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(rows[0]!.action, 'issued');
 });
 
-test('GET /identity-tokens is retired (router 404)',
+Deno.test('GET /identity-tokens is retired (router 404)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('GET', '/identity-tokens', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('GET /identities/:id/tokens 403s for a member-tier'
+Deno.test('GET /identities/:id/tokens 403s for a member-tier'
 + ' token (admin-only; absent from MEMBER_VERBS GET)',
 async () => {
     const db = await freshDb();
@@ -750,10 +749,10 @@ async () => {
     const res = await handleRequest(
         db, req('GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/', token),
     );
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
 });
 
-test('POST /identities/:id/tokens/:jti/rotation clears'
+Deno.test('POST /identities/:id/tokens/:jti/rotation clears'
 + ' authz for a member-tier token (MEMBER_VERBS widens'
 + ' /identities/:id/tokens POST) and 409s on domain terms'
 + ' for an unknown jti', async () => {
@@ -769,10 +768,10 @@ test('POST /identities/:id/tokens/:jti/rotation clears'
             token, {},
         ),
     );
-    assert.equal(res.status, 409);
+    assertStrictEquals(res.status, 409);
 });
 
-test('POST /identity-tokens/:jti/rotation is retired'
+Deno.test('POST /identity-tokens/:jti/rotation is retired'
 + ' (router 404)', async () => {
     const db = await freshDb();
     await seedOrganizationMember(db, 'nkgaOHZISTQrILTfPThWCA');
@@ -783,10 +782,10 @@ test('POST /identity-tokens/:jti/rotation is retired'
             token, {},
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST /identities/:id/tokens/:jti/revocation clears'
+Deno.test('POST /identities/:id/tokens/:jti/revocation clears'
 + ' authz for a member-tier token (MEMBER_VERBS widens'
 + ' /identities/:id/tokens POST) and no-ops 204 for an'
 + ' unknown jti', async () => {
@@ -802,10 +801,10 @@ test('POST /identities/:id/tokens/:jti/revocation clears'
             token, {},
         ),
     );
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 });
 
-test('POST /identity-tokens/:jti/revocation is retired'
+Deno.test('POST /identity-tokens/:jti/revocation is retired'
 + ' (router 404)', async () => {
     const db = await freshDb();
     await seedOrganizationMember(db, 'nkgaOHZISTQrILTfPThWCA');
@@ -816,10 +815,10 @@ test('POST /identity-tokens/:jti/revocation is retired'
             token, {},
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST rotation 403s when path identity is not the'
+Deno.test('POST rotation 403s when path identity is not the'
 + ' jti owner', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -833,17 +832,17 @@ test('POST rotation 403s when path identity is not the'
             at: TOKEN_AT,
         },
     ));
-    assert.ok(put.status === 200 || put.status === 201);
+    assert(put.status === 200 || put.status === 201);
     const res = await handleRequest(db, req(
         'POST',
         '/identities/toccYYkLEABmlbpHJalgtQ/tokens/kGolXBkfDPCBVKcZzZIHnQ/'
             + 'rotation',
         token, {},
     ));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
 });
 
-test('GET /identities/:id/tokens/:tid 404s for an absent'
+Deno.test('GET /identities/:id/tokens/:tid 404s for an absent'
 + ' jti', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -852,9 +851,9 @@ test('GET /identities/:id/tokens/:tid 404s for an absent'
         '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/oSBUDvuXylWVkqvrVHkJtA',
         token,
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
     const body = await res.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         body.error,
         'Not found: identity_tokens/oSBUDvuXylWVkqvrVHkJtA',
     );
@@ -863,7 +862,7 @@ test('GET /identities/:id/tokens/:tid 404s for an absent'
 // ── regime 4: the identity-token-revocations PUT-member/
 // GET-admin authz asymmetry (WP8, Phase 13 Task 8; 1 combo) ──
 
-test('PUT identities/:id/token-revocations/:rid clears'
+Deno.test('PUT identities/:id/token-revocations/:rid clears'
 + ' authz for a member-tier token naming itself'
 + " (MEMBER_VERBS widens '/identities/:id/token-revocations'"
 + ' PUT) and succeeds 2xx — the path-level self/foreign'
@@ -885,5 +884,5 @@ test('PUT identities/:id/token-revocations/:rid clears'
             },
         ),
     );
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 });

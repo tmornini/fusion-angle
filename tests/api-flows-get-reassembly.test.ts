@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -164,7 +163,7 @@ async function seedFlowWithGraph(
 
 // ── 1. ROUND-TRIP: GET returns the message-plane graph ──
 
-test(
+Deno.test(
     'GET /organizations/:id/flows/:id returns the graph from the'
     + ' document message plane',
     async () => {
@@ -181,7 +180,7 @@ test(
         const got = asStoredGraph(
             fetched.graph, 'flow.graph',
         );
-        assert.deepEqual(
+        assertEquals(
             norm(got),
             norm(intended),
             'GET graph equals intended',
@@ -195,7 +194,7 @@ test(
 // WORK ORDER auto-derives: creation captures the message-plane
 // graph via GET /organizations/:id/flows/:id.
 
-test(
+Deno.test(
     'postWorkOrderCreation freezes flow_graph'
     + ' from the message-plane GET graph',
     async () => {
@@ -217,15 +216,15 @@ test(
 
         // Phase Final Task 2: frozen graph on message-plane GET.
         const wo = await getWorkOrder(ctx, woId);
-        assert.ok(wo, 'work order created');
+        assert(wo, 'work order created');
 
         // The frozen flow_graph on the work order must carry
         // the message-plane nodes, not an empty blob.
-        assert.ok(
+        assert(
             wo.flowGraph.nodes.length > 0,
             'work order flow_graph has nodes from message plane',
         );
-        assert.ok(
+        assert(
             wo.flowGraph.edges.length > 0,
             'work order flow_graph has edges from message plane',
         );
@@ -239,7 +238,7 @@ test(
 // document-message-pair history, and computes graphDelta/revivals
 // SERVER-SIDE (SIDECAR-KEEP). Phase Final Task 2: no row-
 // plane graph writer remains.
-test(
+Deno.test(
     'after undo GET /organizations/:id/flows/:id returns the'
     + ' target (undone) graph from the message plane',
     async () => {
@@ -313,7 +312,7 @@ test(
         const got = asStoredGraph(
             fetched.graph, 'flow.graph',
         );
-        assert.deepEqual(
+        assertEquals(
             norm(got),
             norm(targetGraph),
             'GET after undo matches target graph',
@@ -321,15 +320,15 @@ test(
         // The target had 3 nodes; after undo we should
         // see the target shape again (start, mid, end).
         const nodeIds = got.nodes.map(n => n.id).sort();
-        assert.ok(
+        assert(
             nodeIds.includes(NODE_MID),
             'undone graph contains mid node',
         );
-        assert.ok(
+        assert(
             nodeIds.includes(NODE_START),
             'undone graph contains start node',
         );
-        assert.ok(
+        assert(
             nodeIds.includes(NODE_END),
             'undone graph contains end node',
         );

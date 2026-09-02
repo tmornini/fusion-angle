@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals,
+    assertInstanceOf,
+    assertMatch,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import { ValidationError } from '../api/types.ts';
 import {
     ApiError,
@@ -39,46 +44,46 @@ function byId(
     return new Map(rows.map(r => [r.id, r]));
 }
 
-test(
+Deno.test(
     'member + read_roles [member, admin] → readable',
     () => {
         const row = makeRow({
             readRoles: ['member', 'admin'],
         });
-        assert.equal(
+        assertStrictEquals(
             rolesCanRead(['member'], row),
             true,
         );
     },
 );
 
-test(
+Deno.test(
     'member + read_roles [] → not readable',
     () => {
         const row = makeRow({ readRoles: [] });
-        assert.equal(
+        assertStrictEquals(
             rolesCanRead(['member'], row),
             false,
         );
     },
 );
 
-test(
+Deno.test(
     'admin + read_roles [] → readable (bypass)',
     () => {
         const row = makeRow({ readRoles: [] });
-        assert.equal(
+        assertStrictEquals(
             rolesCanRead(['admin'], row),
             true,
         );
-        assert.equal(
+        assertStrictEquals(
             rolesCanWrite(['admin'], row),
             true,
         );
     },
 );
 
-test(
+Deno.test(
     'member + write w/o read (submit-only)'
     + ' → writable, not readable',
     () => {
@@ -86,43 +91,35 @@ test(
             readRoles: [],
             writeRoles: ['member'],
         });
-        assert.equal(
+        assertStrictEquals(
             rolesCanWrite(['member'], row),
             true,
         );
-        assert.equal(
+        assertStrictEquals(
             rolesCanRead(['member'], row),
             false,
         );
     },
 );
 
-test(
+Deno.test(
     'unknown attribute id in write set'
     + ' → ValidationError',
     () => {
         const known = makeRow({ id: 'a-known' });
-        assert.throws(
+        const err = assertThrows(
             () => assertWritableAttributeIds(
                 ['a-known', 'a-missing'],
                 byId(known),
                 ['member'],
             ),
-            (err: unknown) => {
-                assert.ok(
-                    err instanceof ValidationError,
-                );
-                assert.match(
-                    err.message,
-                    /a-missing/,
-                );
-                return true;
-            },
         );
+        assertInstanceOf(err, ValidationError);
+        assertMatch(err.message, /a-missing/);
     },
 );
 
-test(
+Deno.test(
     'one unwritable id among writable ones'
     + ' → ApiError 403 all-or-nothing',
     () => {
@@ -134,43 +131,38 @@ test(
             id: 'a-no',
             writeRoles: ['admin'],
         });
-        assert.throws(
+        const err = assertThrows(
             () => assertWritableAttributeIds(
                 ['a-ok', 'a-no'],
                 byId(writable, blocked),
                 ['member'],
             ),
-            (err: unknown) => {
-                assert.ok(err instanceof ApiError);
-                assert.equal(
-                    err.status, HTTP_FORBIDDEN,
-                );
-                assert.equal(
-                    err.message,
-                    'forbidden: attribute a-no is not'
-                    + ' writable with the held roles',
-                );
-                return true;
-            },
+        ) as ApiError;
+        assertInstanceOf(err, ApiError);
+        assertStrictEquals(err.status, HTTP_FORBIDDEN);
+        assertStrictEquals(
+            err.message,
+            'forbidden: attribute a-no is not'
+            + ' writable with the held roles',
         );
     },
 );
 
-test(
+Deno.test(
     "custom role 'auditor' in read_roles"
     + ' + member token → not readable',
     () => {
         const row = makeRow({
             readRoles: ['auditor'],
         });
-        assert.equal(
+        assertStrictEquals(
             rolesCanRead(['member'], row),
             false,
         );
     },
 );
 
-test(
+Deno.test(
     'projection of zero readable → []',
     () => {
         const secret = makeRow({
@@ -185,11 +177,11 @@ test(
             byId(secret),
             ['member'],
         );
-        assert.deepEqual(out, []);
+        assertEquals(out, []);
     },
 );
 
-test(
+Deno.test(
     'projection keeps only readable values'
     + ' in order',
     () => {
@@ -219,7 +211,7 @@ test(
             byId(open, closed),
             ['member'],
         );
-        assert.deepEqual(out, [
+        assertEquals(out, [
             {
                 attribute_id: 'a-open',
                 value: 'seen',
@@ -232,7 +224,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'assertWritableAttributeIds passes when'
     + ' every id is writable',
     () => {
@@ -244,29 +236,25 @@ test(
             id: 'a-2',
             writeRoles: ['member', 'admin'],
         });
-        assert.doesNotThrow(
-            () => assertWritableAttributeIds(
-                ['UQBiHFcwJeCDSnmkPBoYRA', 'a-2'],
-                byId(a, b),
-                ['member'],
-            ),
+        assertWritableAttributeIds(
+            ['UQBiHFcwJeCDSnmkPBoYRA', 'a-2'],
+            byId(a, b),
+            ['member'],
         );
     },
 );
 
-test(
+Deno.test(
     'admin bypass on write ACL assert',
     () => {
         const row = makeRow({
             id: 'a-locked',
             writeRoles: [],
         });
-        assert.doesNotThrow(
-            () => assertWritableAttributeIds(
-                ['a-locked'],
-                byId(row),
-                ['admin'],
-            ),
+        assertWritableAttributeIds(
+            ['a-locked'],
+            byId(row),
+            ['admin'],
         );
     },
 );

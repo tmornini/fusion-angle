@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
@@ -96,11 +95,11 @@ async function assertPendingWritePathParity(
         (view) => pendingInvitationFor(
             view, organization, identityId),
     );
-    assert.deepEqual(inTx, preTx);
+    assertEquals(inTx, preTx);
     return preTx;
 }
 
-test('pendingInvitationFor: pre-tx vs in-tx (grantInvitation\'s'
+Deno.test('pendingInvitationFor: pre-tx vs in-tx (grantInvitation\'s'
 + ' own table list) agree across a fresh grant, a decline, and'
 + ' a declined-reinvite (multi-candidate)', async () => {
     const db = await seededDb();
@@ -110,7 +109,7 @@ test('pendingInvitationFor: pre-tx vs in-tx (grantInvitation\'s'
     const inviteeToken = await organizationToken(
         inviteeId, ORGANIZATION_TWO);
 
-    assert.equal(
+    assertStrictEquals(
         await assertPendingWritePathParity(
             db, ORGANIZATION_TWO, inviteeId),
         null,
@@ -125,10 +124,10 @@ test('pendingInvitationFor: pre-tx vs in-tx (grantInvitation\'s'
             grantAt: '2026-06-02T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 200);
+    assertStrictEquals(grant.status, 200);
     const afterGrant = await assertPendingWritePathParity(
         db, ORGANIZATION_TWO, inviteeId);
-    assert.equal(afterGrant?.id, 'iUFAcBfktmuASnGGNrPCKw');
+    assertStrictEquals(afterGrant?.id, 'iUFAcBfktmuASnGGNrPCKw');
 
     const decline = await handleRequest(db, req(
         'PUT',
@@ -140,8 +139,8 @@ test('pendingInvitationFor: pre-tx vs in-tx (grantInvitation\'s'
             at: '2026-06-02T00:00:01.000000Z',
         },
     ));
-    assert.equal(decline.status, 204);
-    assert.equal(
+    assertStrictEquals(decline.status, 204);
+    assertStrictEquals(
         await assertPendingWritePathParity(
             db, ORGANIZATION_TWO, inviteeId),
         null,
@@ -160,13 +159,13 @@ test('pendingInvitationFor: pre-tx vs in-tx (grantInvitation\'s'
             grantAt: '2026-06-02T00:00:02.000000Z',
         },
     ));
-    assert.equal(regrant.status, 200);
+    assertStrictEquals(regrant.status, 200);
     const afterRegrant = await assertPendingWritePathParity(
         db, ORGANIZATION_TWO, inviteeId);
-    assert.equal(afterRegrant?.id, INV_PARITY_WRITE_SECOND);
+    assertStrictEquals(afterRegrant?.id, INV_PARITY_WRITE_SECOND);
 });
 
-test('currentInvitationState: pre-tx vs in-tx agree across'
+Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
 + ' pending, accepted, declined, and revoked, each over its own'
 + ' write-gate\'s own table list', async () => {
     const db = await seededDb();
@@ -183,7 +182,7 @@ test('currentInvitationState: pre-tx vs in-tx agree across'
                 grantEventId: ID_GRANT, grantAt: at,
             },
         ));
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
     }
 
     async function assertStateWritePathParity(
@@ -194,7 +193,7 @@ test('currentInvitationState: pre-tx vs in-tx agree across'
             tables,
             (view) => currentInvitationState(view, id),
         );
-        assert.equal(inTx, preTx);
+        assertStrictEquals(inTx, preTx);
         return preTx;
     }
 
@@ -203,7 +202,7 @@ test('currentInvitationState: pre-tx vs in-tx agree across'
         INV_PARITY_WRITE_PENDING, 'sarah.chen@company.com',
         '2026-06-03T00:00:00.000000Z',
     );
-    assert.equal(
+    assertStrictEquals(
         await assertStateWritePathParity(
             INV_PARITY_WRITE_PENDING, ACCEPT_TX_TABLES,
         ),
@@ -229,8 +228,8 @@ test('currentInvitationState: pre-tx vs in-tx agree across'
             at: '2026-06-03T00:00:02.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
-    assert.equal(
+    assertStrictEquals(accept.status, 204);
+    assertStrictEquals(
         await assertStateWritePathParity(
             'iOhteLyCdhnLqTaeGYCoYQ', ACCEPT_TX_TABLES,
         ),
@@ -256,8 +255,8 @@ test('currentInvitationState: pre-tx vs in-tx agree across'
             at: '2026-06-03T00:00:04.000000Z',
         },
     ));
-    assert.equal(decline.status, 204);
-    assert.equal(
+    assertStrictEquals(decline.status, 204);
+    assertStrictEquals(
         await assertStateWritePathParity(
             'iPxNOWCigMcIYgqchAefWA',
             DECLINE_OR_REVOKE_TX_TABLES,
@@ -280,8 +279,8 @@ test('currentInvitationState: pre-tx vs in-tx agree across'
             at: '2026-06-03T00:00:06.000000Z',
         },
     ));
-    assert.equal(revoke.status, 204);
-    assert.equal(
+    assertStrictEquals(revoke.status, 204);
+    assertStrictEquals(
         await assertStateWritePathParity(
             'iZisVMKVGRGkyLzjwyTjow',
             DECLINE_OR_REVOKE_TX_TABLES,
@@ -290,7 +289,7 @@ test('currentInvitationState: pre-tx vs in-tx agree across'
     );
 
     // A never-granted id, same parity.
-    assert.equal(
+    assertStrictEquals(
         await assertStateWritePathParity(
             NO_SUCH_INVITATION, ACCEPT_TX_TABLES,
         ),
@@ -310,11 +309,11 @@ async function assertMembershipExistsWritePathParity(
         (view) => membershipExistsFor(
             view, organization, identityId),
     );
-    assert.equal(inTx, preTx);
+    assertStrictEquals(inTx, preTx);
     return preTx;
 }
 
-test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
+Deno.test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
 + " own table list) agree before and after a live accept — the"
 + ' `already` gate\'s derived row source, held honest', async () => {
     const db = await seededDb();
@@ -324,7 +323,7 @@ test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
     const inviteeToken = await organizationToken(
         inviteeId, ORGANIZATION_TWO);
 
-    assert.equal(
+    assertStrictEquals(
         await assertMembershipExistsWritePathParity(
             db, ORGANIZATION_TWO, inviteeId,
         ),
@@ -340,7 +339,7 @@ test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
             grantAt: '2026-06-04T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 200);
+    assertStrictEquals(grant.status, 200);
 
     const accept = await handleRequest(db, req(
         'PUT',
@@ -353,9 +352,9 @@ test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
             at: '2026-06-04T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assertStrictEquals(accept.status, 204);
 
-    assert.equal(
+    assertStrictEquals(
         await assertMembershipExistsWritePathParity(
             db, ORGANIZATION_TWO, inviteeId,
         ),
@@ -367,7 +366,7 @@ test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
     const seatRows = await db.messagePairs.getAllWhere(
         'uri_collection', seatPrefix,
     );
-    assert.equal(
+    assertStrictEquals(
         seatRows.some((row) => row.uri_id === inviteeId
             && row.operation_id === TEST_OPERATION_ID),
         true,

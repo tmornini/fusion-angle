@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -155,7 +159,7 @@ const SEEDED_PROJECTS = [
     },
 ];
 
-test('seeded GET /projects wire equals deriveProjects'
+Deno.test('seeded GET /projects wire equals deriveProjects'
 + ' per org', async () => {
     const db = await seededDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
@@ -170,19 +174,19 @@ test('seeded GET /projects wire equals deriveProjects'
                 token,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const prefix = '/organizations/'
             + organization + '/projects/';
-        assert.equal(
+        assertStrictEquals(
             await res.text(),
             await storedCollectionText(db, prefix),
         );
         const derived = await deriveProjects(db, organization);
-        assert.ok(derived.length > 0);
+        assert(derived.length > 0);
     }
 });
 
-test('per-project GET wire equals deriveProject for'
+Deno.test('per-project GET wire equals deriveProject for'
 + ' every seed', async () => {
     const db = await seededDb();
     for (const seed of SEEDED_PROJECTS) {
@@ -197,10 +201,10 @@ test('per-project GET wire equals deriveProject for'
                 token,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const prefix = '/organizations/'
             + seed.organization + '/projects/';
-        assert.equal(
+        assertStrictEquals(
             await res.text(),
             await storedPutBodyText(db, prefix, seed.id),
         );
@@ -208,13 +212,13 @@ test('per-project GET wire equals deriveProject for'
             db, seed.organization, seed.id,
         );
         if (seed.title !== undefined) {
-            assert.equal(derived.title, seed.title);
-            assert.equal(derived.position, seed.position);
+            assertStrictEquals(derived.title, seed.title);
+            assertStrictEquals(derived.position, seed.position);
         }
     }
 });
 
-test('a foreign-org project id 404s on GET and on derive',
+Deno.test('a foreign-org project id 404s on GET and on derive',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_PROJECTS.find(
@@ -229,13 +233,13 @@ async () => {
                 , token,
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
     const body = await res.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         body.error,
         'Not found: projects/' + foreign.id,
     );
-    await assert.rejects(
+    await assertRejects(
         () => deriveProject(db, 'BBjWJsjYIDkTRKIIPrzWRw', foreign.id),
         EntityNotFoundError,
     );
@@ -243,7 +247,7 @@ async () => {
 
 // Live fixtures inserted NON-LEX (z, then a, then m) so
 // oldest live head (at, id) is insertion, not id-lex.
-test('GET /projects collection is oldest live head '
+Deno.test('GET /projects collection is oldest live head '
 + '(at, id) first after non-lex PUTs',
 async () => {
     const db = await seededDb();
@@ -274,8 +278,8 @@ async () => {
                 , token,
             projectDocument(f.title, 'submitted', f.at, f.ev),
         ));
-        assert.equal(put.status, 201);
-        assert.deepEqual(
+        assertStrictEquals(put.status, 201);
+        assertEquals(
             await put.json(),
             wireProjectGet(
                 f.id, f.title, 'submitted', f.at, f.ev,
@@ -286,7 +290,7 @@ async () => {
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             , token),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const list = await res.json() as { id: string }[];
     const added = list.filter((row) =>
         [
@@ -294,7 +298,7 @@ async () => {
             PROJECT_DRIFT_A,
             PROJECT_DRIFT_M,
         ].includes(row.id));
-    assert.deepEqual(
+    assertEquals(
         added.map((row) => row.id),
         [
             PROJECT_DRIFT_Z,
@@ -308,15 +312,15 @@ async () => {
             db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + '' + row.id, token),
         );
-        assert.equal(single.status, 200);
-        assert.equal(
+        assertStrictEquals(single.status, 200);
+        assertStrictEquals(
             await single.text(),
             await storedPutBodyText(db, prefix, row.id),
         );
     }
 });
 
-test('derived history keeps the FIRST arrival\'s authorship'
+Deno.test('derived history keeps the FIRST arrival\'s authorship'
 + ' on a same-trio resend by a different member', async () => {
     const db = await seededDb();
     await seedOrganizationMember(db, MEMBER_B);
@@ -348,8 +352,8 @@ test('derived history keeps the FIRST arrival\'s authorship'
     const derived = await deriveProjectStateHistory(
         db, 'AjdvjuECVZEgZoFajaIEkg', projectId,
     );
-    assert.equal(derived.length, 1);
-    assert.equal(derived[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(derived.length, 1);
+    assertStrictEquals(derived[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 
     // Wire entity reflects the SECOND title; authorship of the
     // head event stays on member A; GET trio is the one event.
@@ -357,8 +361,8 @@ test('derived history keeps the FIRST arrival\'s authorship'
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + projectId, tokenA),
     );
-    assert.equal(getRes.status, 200);
-    assert.equal(
+    assertStrictEquals(getRes.status, 200);
+    assertStrictEquals(
         await getRes.text(),
         await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
@@ -366,7 +370,7 @@ test('derived history keeps the FIRST arrival\'s authorship'
     );
 });
 
-test('live-write case: create + edit + transition + delete',
+Deno.test('live-write case: create + edit + transition + delete',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -414,8 +418,8 @@ async () => {
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + projectId, token),
     );
-    assert.equal(beforeDelete.status, 200);
-    assert.equal(
+    assertStrictEquals(beforeDelete.status, 200);
+    assertStrictEquals(
         await beforeDelete.text(),
         await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
@@ -424,7 +428,7 @@ async () => {
     const derivedBefore = await deriveProject(
         db, 'AjdvjuECVZEgZoFajaIEkg', projectId,
     );
-    assert.equal(derivedBefore.state, 'under_review');
+    assertStrictEquals(derivedBefore.state, 'under_review');
 
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
@@ -445,14 +449,14 @@ async () => {
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + projectId, token),
     );
-    assert.equal(deleted.status, 200);
-    assert.equal(
+    assertStrictEquals(deleted.status, 200);
+    assertStrictEquals(
         await deleted.text(),
         await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
         ),
     );
-    await assert.rejects(
+    await assertRejects(
         () => deriveProject(db, 'AjdvjuECVZEgZoFajaIEkg', projectId),
         EntityNotFoundError,
     );
@@ -461,7 +465,7 @@ async () => {
             , token),
     );
     const list = await listRes.json() as { id: string }[];
-    assert.equal(
+    assertStrictEquals(
         list.some((p) => p.id === projectId), true,
     );
 
@@ -470,10 +474,10 @@ async () => {
     );
     // genesis + under_review + deleted (same-trio edit
     // does not add a second event)
-    assert.equal(derivedHistory.length, 3);
+    assertStrictEquals(derivedHistory.length, 3);
 });
 
-test('live conversion case: a converted idea\'s project'
+Deno.test('live conversion case: a converted idea\'s project'
 + ' is wire-visible like a PUT-born one', async () => {
     const db = await seededDb();
     const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
@@ -514,19 +518,19 @@ test('live conversion case: a converted idea\'s project'
             baselines: [],
         },
     ));
-    assert.equal(conv.status, 201);
+    assertStrictEquals(conv.status, 201);
 
     const getRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + projectId, token),
     );
-    assert.equal(getRes.status, 200);
+    assertStrictEquals(getRes.status, 200);
     const wireText = await getRes.text();
     const wire = JSON.parse(wireText) as { title: string };
-    assert.equal(wire.title, 'Converted Project');
+    assertStrictEquals(wire.title, 'Converted Project');
     const derived = await deriveProject(db, 'AjdvjuECVZEgZoFajaIEkg'
         , projectId);
-    assert.equal(
+    assertStrictEquals(
         wireText,
         await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
@@ -538,15 +542,15 @@ test('live conversion case: a converted idea\'s project'
             , token),
     );
     const list = await listRes.json() as { id: string }[];
-    assert.ok(list.some((p) => p.id === projectId));
+    assert(list.some((p) => p.id === projectId));
 
     const derivedHistory = await deriveProjectStateHistory(
         db, 'AjdvjuECVZEgZoFajaIEkg', projectId,
     );
-    assert.equal(derivedHistory.length, 1);
-    assert.equal(derivedHistory[0]!.state, 'submitted');
+    assertStrictEquals(derivedHistory.length, 1);
+    assertStrictEquals(derivedHistory[0]!.state, 'submitted');
     // GET trio is the lifecycle-current genesis event.
-    assert.equal(derived.state, 'submitted');
+    assertStrictEquals(derived.state, 'submitted');
 });
 
 // case-7d mirror for projects GET: a clock-skewed later
@@ -554,7 +558,7 @@ test('live conversion case: a converted idea\'s project'
 // displace genesis as lifecycle-current. Head body fields
 // (title) may reflect the later arrival; the GET trio must
 // stay genesis.
-test('GET project trio is lifecycle-current under clock skew'
+Deno.test('GET project trio is lifecycle-current under clock skew'
 + ' (genesis-wins-under-skew, case 7d)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -572,7 +576,7 @@ test('GET project trio is lifecycle-current under clock skew'
             genesisAt, genesisEv,
         ),
     ));
-    assert.equal(genesis.status, 201);
+    assertStrictEquals(genesis.status, 201);
 
     // Later arrival, earlier state_at, different state + title.
     const skewed = await handleRequest(db, req(
@@ -583,7 +587,7 @@ test('GET project trio is lifecycle-current under clock skew'
             skewedAt, skewedEv,
         ),
     ));
-    assert.equal(skewed.status, 201);
+    assertStrictEquals(skewed.status, 201);
 
     const expected = wireProjectGet(
         projectId, 'Skewed Title', 'under_review',
@@ -593,9 +597,9 @@ test('GET project trio is lifecycle-current under clock skew'
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + projectId, token),
     );
-    assert.equal(getRes.status, 200);
-    assert.deepEqual(await getRes.json(), expected);
-    assert.deepEqual(
+    assertStrictEquals(getRes.status, 200);
+    assertEquals(await getRes.json(), expected);
+    assertEquals(
         JSON.parse(await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
         )),
@@ -604,17 +608,17 @@ test('GET project trio is lifecycle-current under clock skew'
 
     const derived = await deriveProject(db, 'AjdvjuECVZEgZoFajaIEkg'
         , projectId);
-    assert.equal(
+    assertStrictEquals(
         JSON.stringify(derived), JSON.stringify(expected),
     );
-    assert.equal(derived.title, 'Skewed Title');
-    assert.equal(derived.state, 'under_review');
+    assertStrictEquals(derived.title, 'Skewed Title');
+    assertStrictEquals(derived.state, 'under_review');
 
     const listRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             , token),
     );
-    assert.equal(listRes.status, 200);
+    assertStrictEquals(listRes.status, 200);
     const list = await listRes.json() as { id: string }[];
-    assert.ok(list.some((row) => row.id === projectId));
+    assert(list.some((row) => row.id === projectId));
 });

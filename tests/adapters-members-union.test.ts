@@ -1,12 +1,11 @@
+import {
+    assert,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-};
-
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { withLocalStorageAsync } from
+    './fixtures/local-storage.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -49,6 +48,12 @@ import {
 } from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+
+const NULL_STORAGE: Partial<Storage> = {
+    getItem: () => null,
+    setItem: () => {},
+};
+
 async function setupSeeded(): Promise<{
     db: MemoryDbAdapter;
     humanId: string;
@@ -67,10 +72,10 @@ async function setupSeeded(): Promise<{
     return { db, humanId, aiId };
 }
 
-test(
+Deno.test(
     'getMembers omits system; getMemberMap'
     + ' resolves it as an author',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(
@@ -78,49 +83,49 @@ test(
         );
         const ctx = createRequestContext(db, await organizationToken());
         const roster = await getMembers(ctx);
-        assert.ok(
+        assert(
             !roster.some(
                 w => w.idForLink() === SYSTEM_MEMBER_ID,
             ),
             'roster excludes the system member',
         );
         const map = await getMemberMap(ctx);
-        assert.equal(
+        assertStrictEquals(
             memberName(map, SYSTEM_MEMBER_ID),
             SYSTEM_MEMBER_NAME,
         );
-    },
+    }),
 );
 
-test(
+Deno.test(
     'getMembers returns humans and AIs unioned'
     + ' with correct kind discriminator',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, humanId, aiId } = await setupSeeded();
         const ctx = createRequestContext(db, await organizationToken());
         const members = await getMembers(ctx);
-        assert.equal(members.length, 3);
+        assertStrictEquals(members.length, 3);
         const human = members.find(
             m => m.idForLink() === humanId,
         );
         const ai = members.find(isAIMember)!;
-        assert.ok(human);
-        assert.ok(isHumanMember(human));
-        assert.ok(ai);
-        assert.equal(human.kind, 'human');
-        assert.equal(ai.kind, 'ai');
-        assert.equal(
+        assert(human);
+        assert(isHumanMember(human));
+        assert(ai);
+        assertStrictEquals(human.kind, 'human');
+        assertStrictEquals(ai.kind, 'ai');
+        assertStrictEquals(
             ai.idForLink(), aiId,
         );
-    },
+    }),
 );
 
 // Former adapters-state-events pin: bulk member lifecycle
 // is the GET-stamped members collection — spans kinds and
 // never admits a foreign entity id (idea) as a member.
-test(
+Deno.test(
     'getMembers spans kinds and excludes an idea',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, humanId, aiId } = await setupSeeded();
         const ctx = createRequestContext(
             db, await organizationToken(),
@@ -138,107 +143,108 @@ test(
         });
         const members = await getMembers(ctx);
         const ids = members.map(m => m.idForLink());
-        assert.ok(ids.includes(humanId));
-        assert.ok(ids.includes(aiId));
-        assert.ok(
+        assert(ids.includes(humanId));
+        assert(ids.includes(aiId));
+        assert(
             !ids.includes('fndCYAsXazdzMUlEGMNIZw'),
             'idea must not leak into members',
         );
-    },
+    }),
 );
 
-test(
+Deno.test(
     'getMemberMap keys by id with both kinds'
     + ' present',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, humanId, aiId } = await setupSeeded();
         const ctx = createRequestContext(db, await organizationToken());
         const map = await getMemberMap(ctx);
-        assert.equal(map.size, 4);
+        assertStrictEquals(map.size, 4);
         const human = map.get(humanId)!;
         const ai = map.get(aiId)!;
-        assert.ok(human);
-        assert.ok(ai);
-        assert.equal(human.kind, 'human');
-        assert.equal(ai.kind, 'ai');
-    },
+        assert(human);
+        assert(ai);
+        assertStrictEquals(human.kind, 'human');
+        assertStrictEquals(ai.kind, 'ai');
+    }),
 );
 
-test(
+Deno.test(
     'memberName returns the display name for'
     + ' both human and AI kinds',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, humanId, aiId } = await setupSeeded();
         const ctx = createRequestContext(db, await organizationToken());
         const map = await getMemberMap(ctx);
-        assert.equal(
+        assertStrictEquals(
             memberName(map, humanId),
             'Sarah Test',
         );
-        assert.equal(
+        assertStrictEquals(
             memberName(map, aiId),
             'Claude Opus',
         );
-    },
+    }),
 );
 
-test(
+Deno.test(
     'memberName is polymorphic across human'
     + ' and AI kinds',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, humanId, aiId } = await setupSeeded();
         const ctx = createRequestContext(db, await organizationToken());
         const map = await getMemberMap(ctx);
-        assert.equal(
+        assertStrictEquals(
             memberName(map, humanId),
             'Sarah Test',
         );
-        assert.equal(
+        assertStrictEquals(
             memberName(map, aiId),
             'Claude Opus',
         );
-    },
+    }),
 );
 
-test(
+Deno.test(
     'memberName throws on missing id (matches'
     + ' personName contract)',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const map = new Map<MemberId, Member>();
-        assert.throws(
+        assertThrows(
             () => memberName(map, 'hw_missing'),
-            /unknown member/,
+            Error,
+            'unknown member',
         );
-    },
+    }),
 );
 
-test(
+Deno.test(
     'getMembers on a schema-only db is the'
     + ' seated root admin',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { ctx } = await adminContext();
         const members = await getMembers(ctx);
-        assert.equal(members.length, 1);
-        assert.equal(
+        assertStrictEquals(members.length, 1);
+        assertStrictEquals(
             members[0]?.idForLink(), 'XXZruirZyAOoRpNxaDnpSA',
         );
-        assert.ok(
+        assert(
             members[0] !== undefined
             && isHumanMember(members[0]),
         );
-        assert.equal(
+        assertStrictEquals(
             memberName(
                 await getMemberMap(ctx), 'XXZruirZyAOoRpNxaDnpSA',
             ),
             MEMBER_WITHOUT_PII_NAME,
         );
-    },
+    }),
 );
 
-test(
+Deno.test(
     'memberName degrades visibly when a human'
     + ' has no identity_pii row (erased)',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const { seedSeat } = await import(
@@ -290,17 +296,17 @@ test(
         );
         const ctx = createRequestContext(db, await organizationToken());
         const map = await getMemberMap(ctx);
-        assert.equal(
+        assertStrictEquals(
             memberName(map, memberId),
             MEMBER_WITHOUT_PII_NAME,
         );
-    },
+    }),
 );
 
-test(
+Deno.test(
     'getMembers fills live PII names; an erased'
     + ' slot stays Member without PII',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, ctx } = await adminContext();
         const aliceId = generateIdentifier();
         const agentId = generateIdentifier();
@@ -314,28 +320,28 @@ test(
         const alice = members.find(
             m => m.idForLink() === aliceId,
         );
-        assert.ok(alice && isHumanMember(alice));
+        assert(alice && isHumanMember(alice));
         const pii = alice.pii();
-        assert.ok(!pii.erased);
+        assert(!pii.erased);
         if (!pii.erased) {
-            assert.equal(pii.name, 'Alice Test');
+            assertStrictEquals(pii.name, 'Alice Test');
         }
         const agent = members.find(
             m => m.idForLink() === agentId,
         );
-        assert.ok(agent && isAIMember(agent));
-        assert.equal(agent.name(), 'Claude Opus');
+        assert(agent && isAIMember(agent));
+        assertStrictEquals(agent.name(), 'Claude Opus');
         const map = await getMemberMap(ctx);
-        assert.equal(
+        assertStrictEquals(
             memberName(map, aliceId), 'Alice Test',
         );
-    },
+    }),
 );
 
-test(
+Deno.test(
     'fillHumanMemberProfile copies identity title'
     + ' and department onto list rows',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, ctx } = await adminContext();
         const aliceId = generateIdentifier();
         await seedHumanMember(
@@ -347,28 +353,28 @@ test(
         const alice = filled.find(
             m => m.idForLink() === aliceId,
         );
-        assert.ok(alice && isHumanMember(alice));
+        assert(alice && isHumanMember(alice));
         const profile = alice.profile();
-        assert.equal(profile.present, true);
+        assertStrictEquals(profile.present, true);
         if (profile.present) {
-            assert.equal(
+            assertStrictEquals(
                 profile.title, 'product_manager',
             );
-            assert.equal(
+            assertStrictEquals(
                 profile.department, 'Product',
             );
         }
-    },
+    }),
 );
 
-test(
+Deno.test(
     'fillHumanMemberProfile does not throw when an'
     + ' identity document is absent',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { ctx } = await adminContext();
         const filled = await fillHumanMemberProfile(
             ctx, await getMembers(ctx),
         );
-        assert.ok(filled.some(isHumanMember));
-    },
+        assert(filled.some(isHumanMember));
+    }),
 );

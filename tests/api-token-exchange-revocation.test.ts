@@ -1,6 +1,5 @@
+import { assertStrictEquals } from '@std/assert';
 import './hmac-test-key.ts';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -132,7 +131,7 @@ async function revokedDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('token-exchange rejects a logged-out subject token',
+Deno.test('token-exchange rejects a logged-out subject token',
 async () => {
     const db = await revokedDb();
     const token = await tokenFor(USER_1);
@@ -141,11 +140,11 @@ async () => {
         subject_token: token, actor_token: token,
         organization: ORGANIZATION_A,
     }, tokenRequestSeed());
-    assert.equal(res.ok, false);
-    if (!res.ok) assert.equal(res.status, 401);
+    assertStrictEquals(res.ok, false);
+    if (!res.ok) assertStrictEquals(res.status, 401);
 });
 
-test('token-exchange rejects a logged-out actor token',
+Deno.test('token-exchange rejects a logged-out actor token',
 async () => {
     const db = await revokedDb();
     // u2 is a clean subject and a member; u1 is the
@@ -162,21 +161,21 @@ async () => {
         subject_token: subject, actor_token: actor,
         organization: ORGANIZATION_A,
     }, tokenRequestSeed());
-    assert.equal(res.ok, false);
-    if (!res.ok) assert.equal(res.status, 401);
+    assertStrictEquals(res.ok, false);
+    if (!res.ok) assertStrictEquals(res.status, 401);
 });
 
-test('refresh rejects a logged-out token', async () => {
+Deno.test('refresh rejects a logged-out token', async () => {
     const db = await revokedDb();
     const token = await tokenFor(USER_1);
     const res = await postToken(db, {
         grant_type: 'refresh', refresh_token: token,
     }, tokenRequestSeed());
-    assert.equal(res.ok, false);
-    if (!res.ok) assert.equal(res.status, 401);
+    assertStrictEquals(res.ok, false);
+    if (!res.ok) assertStrictEquals(res.status, 401);
 });
 
-test('refresh on a logged-out but live jti is the'
+Deno.test('refresh on a logged-out but live jti is the'
     + ' revocation, not reuse', async () => {
     const db = await revokedDb();
     // A LIVE issued jti in the ledger: without the
@@ -203,9 +202,9 @@ test('refresh on a logged-out but live jti is the'
     const res = await postToken(db, {
         grant_type: 'refresh', refresh_token: token,
     }, tokenRequestSeed());
-    assert.equal(res.ok, false);
+    assertStrictEquals(res.ok, false);
     if (!res.ok) {
-        assert.equal(res.status, 401);
-        assert.equal(res.error, 'token revoked');
+        assertStrictEquals(res.status, 401);
+        assertStrictEquals(res.error, 'token revoked');
     }
 });

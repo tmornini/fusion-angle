@@ -1,5 +1,8 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     buildGraphSvg,
     computeEdgeGeometry,
@@ -59,7 +62,7 @@ function render(
     ).toString();
 }
 
-test(
+Deno.test(
     'the rendered edge path is exactly the'
     + ' computed geometry',
     () => {
@@ -77,16 +80,16 @@ test(
         const out = render(
             nodes, edges, new Map(),
         );
-        assert.ok(
+        assert(
             out.includes(`d="${geo.pathD}"`),
         );
-        assert.ok(
+        assert(
             out.includes(`x="${geo.labelX}"`),
         );
     },
 );
 
-test(
+Deno.test(
     'a two-way pair aims both edges off-axis'
     + ' and renders both computed paths',
     () => {
@@ -100,28 +103,28 @@ test(
         ];
         const offsets =
             computeEdgeAimOffsets(edges);
-        assert.equal(offsets.get('YiJPbufDpkyrZcZCYbUJpg'), 1);
-        assert.equal(offsets.get('e2'), 1);
+        assertStrictEquals(offsets.get('YiJPbufDpkyrZcZCYbUJpg'), 1);
+        assertStrictEquals(offsets.get('e2'), 1);
         const g1 = computeEdgeGeometry(
             nodes[0]!, nodes[1]!, 1, [],
         );
         const g2 = computeEdgeGeometry(
             nodes[1]!, nodes[0]!, 1, [],
         );
-        assert.notEqual(g1.pathD, g2.pathD);
+        assertNotStrictEquals(g1.pathD, g2.pathD);
         const out = render(
             nodes, edges, new Map(),
         );
-        assert.ok(
+        assert(
             out.includes(`d="${g1.pathD}"`),
         );
-        assert.ok(
+        assert(
             out.includes(`d="${g2.pathD}"`),
         );
     },
 );
 
-test(
+Deno.test(
     'a lone edge between distinct pairs aims'
     + ' straight',
     () => {
@@ -131,12 +134,12 @@ test(
         ];
         const offsets =
             computeEdgeAimOffsets(edges);
-        assert.equal(offsets.get('YiJPbufDpkyrZcZCYbUJpg'), 0);
-        assert.equal(offsets.get('e2'), 0);
+        assertStrictEquals(offsets.get('YiJPbufDpkyrZcZCYbUJpg'), 0);
+        assertStrictEquals(offsets.get('e2'), 0);
     },
 );
 
-test(
+Deno.test(
     'a waypoint edge renders the computed'
     + ' polyline path',
     () => {
@@ -153,9 +156,9 @@ test(
             nodes, edges,
             new Map([['YiJPbufDpkyrZcZCYbUJpg', wps]]),
         );
-        assert.ok(
+        assert(
             out.includes(`d="${geo.pathD}"`),
         );
-        assert.ok(geo.pathD.includes(' Q '));
+        assert(geo.pathD.includes(' Q '));
     },
 );

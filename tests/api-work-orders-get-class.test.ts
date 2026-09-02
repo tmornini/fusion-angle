@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assert, assertNotEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -114,7 +113,7 @@ async function seedFlow(
             },
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
 async function seedWorkOrder(
@@ -131,7 +130,7 @@ async function seedWorkOrder(
             position: 1,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
@@ -143,7 +142,7 @@ async function seedWorkOrder(
             at: AT,
         },
     ));
-    assert.equal(join.status, 201);
+    assertStrictEquals(join.status, 201);
 }
 
 async function seedLiveType(
@@ -159,7 +158,7 @@ async function seedLiveType(
 
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedAttribute(
@@ -177,7 +176,7 @@ async function seedAttribute(
             write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedInstance(
@@ -194,7 +193,7 @@ async function seedInstance(
             ],
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedFlowTypeJoin(
@@ -213,7 +212,7 @@ async function seedFlowTypeJoin(
             at: AT,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seededDb(): Promise<{
@@ -245,10 +244,10 @@ async function bindWorkOrder(
     const res = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
-test('GET organizations/:id/work-orders/:id is Assemble, not Stream',
+Deno.test('GET organizations/:id/work-orders/:id is Assemble, not Stream',
 async () => {
     const { db, token } = await seededDb();
     await bindWorkOrder(db, token);
@@ -256,8 +255,8 @@ async () => {
     const stored = JSON.parse(
         await storedPutBodyText(db, DOCUMENT_PREFIX, WO_ID),
     ) as Record<string, unknown>;
-    assert.equal(Object.hasOwn(stored, 'instance_id'), false);
-    assert.equal(
+    assertStrictEquals(Object.hasOwn(stored, 'instance_id'), false);
+    assertStrictEquals(
         Object.hasOwn(stored, 'record_type_id'), false,
     );
 
@@ -265,16 +264,16 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
             , token,
     ));
-    assert.equal(detail.status, 200);
+    assertStrictEquals(detail.status, 200);
     const got = await detail.json() as Record<
         string, unknown
     >;
-    assert.equal(got['instance_id'], INSTANCE_ID);
-    assert.equal(got['record_type_id'], TYPE_ID);
-    assert.notDeepEqual(got, stored);
+    assertStrictEquals(got['instance_id'], INSTANCE_ID);
+    assertStrictEquals(got['record_type_id'], TYPE_ID);
+    assertNotEquals(got, stored);
 });
 
-test('GET work-orders is Assemble, not Stream',
+Deno.test('GET work-orders is Assemble, not Stream',
 async () => {
     const { db, token } = await seededDb();
     await bindWorkOrder(db, token);
@@ -282,12 +281,12 @@ async () => {
     const storedHeads = JSON.parse(
         await storedCollectionText(db, DOCUMENT_PREFIX),
     ) as Record<string, unknown>[];
-    assert.ok(storedHeads.length > 0);
+    assert(storedHeads.length > 0);
     for (const head of storedHeads) {
-        assert.equal(
+        assertStrictEquals(
             Object.hasOwn(head, 'instance_id'), false,
         );
-        assert.equal(
+        assertStrictEquals(
             Object.hasOwn(head, 'record_type_id'), false,
         );
     }
@@ -295,18 +294,18 @@ async () => {
     const list = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
     ));
-    assert.equal(list.status, 200);
+    assertStrictEquals(list.status, 200);
     const rows = await list.json() as Record<
         string, unknown
     >[];
     const bound = rows.find((row) => row['id'] === WO_ID);
-    assert.ok(bound !== undefined);
-    assert.equal(bound['instance_id'], INSTANCE_ID);
-    assert.equal(bound['record_type_id'], TYPE_ID);
-    assert.notDeepEqual(rows, storedHeads);
+    assert(bound !== undefined);
+    assertStrictEquals(bound['instance_id'], INSTANCE_ID);
+    assertStrictEquals(bound['record_type_id'], TYPE_ID);
+    assertNotEquals(rows, storedHeads);
 });
 
-test('unbound GET omits bind keys (absent, not null)',
+Deno.test('unbound GET omits bind keys (absent, not null)',
 async () => {
     const { db, token } = await seededDb();
 
@@ -314,31 +313,31 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + WO_UNBOUND, token,
     ));
-    assert.equal(detail.status, 200);
+    assertStrictEquals(detail.status, 200);
     const got = await detail.json() as Record<
         string, unknown
     >;
-    assert.equal(got['id'], WO_UNBOUND);
-    assert.equal(Object.hasOwn(got, 'instance_id'), false);
-    assert.equal(
+    assertStrictEquals(got['id'], WO_UNBOUND);
+    assertStrictEquals(Object.hasOwn(got, 'instance_id'), false);
+    assertStrictEquals(
         Object.hasOwn(got, 'record_type_id'), false,
     );
 
     const list = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
     ));
-    assert.equal(list.status, 200);
+    assertStrictEquals(list.status, 200);
     const rows = await list.json() as Record<
         string, unknown
     >[];
     const unbound = rows.find(
         (row) => row['id'] === WO_UNBOUND,
     );
-    assert.ok(unbound !== undefined);
-    assert.equal(
+    assert(unbound !== undefined);
+    assertStrictEquals(
         Object.hasOwn(unbound, 'instance_id'), false,
     );
-    assert.equal(
+    assertStrictEquals(
         Object.hasOwn(unbound, 'record_type_id'), false,
     );
 });
@@ -370,7 +369,7 @@ function createBody(id: string) {
     };
 }
 
-test('work-order history stays /history, not /versions',
+Deno.test('work-order history stays /history, not /versions',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -381,24 +380,24 @@ async () => {
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token
             , createBody(WO_ID),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const history = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
             + '/history', token,
     ));
-    assert.equal(history.status, 200);
-    assert.ok(Array.isArray(await history.json()));
+    assertStrictEquals(history.status, 200);
+    assert(Array.isArray(await history.json()));
 
     const versions = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
             + '/versions', token,
     ));
-    assert.equal(versions.status, 404);
+    assertStrictEquals(versions.status, 404);
 
     const bulk = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + generateIdentifier(), token,
     ));
-    assert.equal(bulk.status, 404);
+    assertStrictEquals(bulk.status, 404);
 });

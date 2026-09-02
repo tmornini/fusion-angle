@@ -1,10 +1,9 @@
-import { test } from 'node:test';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     invitationLifecycleStatesFor,
     deriveInvitationStates,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -187,11 +186,11 @@ async function grantSarahToWayne(
             grantEventId: EV_GRANT,
             grantAt: AT,
         }));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     return (await deriveInvitations(db))[0]!.id;
 }
 
-test('a role-less invitee may read their invitations',
+Deno.test('a role-less invitee may read their invitations',
 async () => {
     // Sarah holds no role, so the deny-by-default policy would
     // 403 her on /members; the invitation facade stands apart.
@@ -201,13 +200,13 @@ async () => {
         'GET', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/',
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg')));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const rows = await res.json() as { state: string }[];
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]!.state, 'pending');
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.state, 'pending');
 });
 
-test('a non-admin is forbidden from granting', async () => {
+Deno.test('a non-admin is forbidden from granting', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/',
@@ -218,8 +217,8 @@ test('a non-admin is forbidden from granting', async () => {
             invitationId: INV_X, grantEventId: EV_X,
             grantAt: AT,
         }));
-    assert.equal(res.status, 403);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
         error: 'forbidden: POST'
             + ' /organizations/AjdvjuECVZEgZoFajaIEkg'
             + '/invitations/'
@@ -227,7 +226,7 @@ test('a non-admin is forbidden from granting', async () => {
     });
 });
 
-test('a non-admin is forbidden from revoking', async () => {
+Deno.test('a non-admin is forbidden from revoking', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'PUT',
@@ -237,8 +236,8 @@ test('a non-admin is forbidden from revoking', async () => {
             , 'AjdvjuECVZEgZoFajaIEkg'),
         { state: 'revoked', eventId: EV_REVOKE, at: AT },
     ));
-    assert.equal(res.status, 403);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
         error: 'forbidden: PUT'
             + ' /organizations/AjdvjuECVZEgZoFajaIEkg'
             + '/invitations/' + INV_REVOKE
@@ -246,7 +245,7 @@ test('a non-admin is forbidden from revoking', async () => {
     });
 });
 
-test('a pending invite writes no membership', async () => {
+Deno.test('a pending invite writes no membership', async () => {
     // Reachability derives from the membership ledger; a pending
     // invite must not add one, so the org stays unreachable.
     const db = await seed();
@@ -254,14 +253,14 @@ test('a pending invite writes no membership', async () => {
     const sarahOrganizations = (await allMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ')
         .map(m => m.organization_id).sort();
-    assert.deepEqual(sarahOrganizations, ['AjdvjuECVZEgZoFajaIEkg']);
+    assertEquals(sarahOrganizations, ['AjdvjuECVZEgZoFajaIEkg']);
 });
 
-test('a pending invitee is absent from the roster', async () => {
+Deno.test('a pending invitee is absent from the roster', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const before = await rosterIds(db);
-    assert.ok(!before.has('toccYYkLEABmlbpHJalgtQ'));
+    assert(!before.has('toccYYkLEABmlbpHJalgtQ'));
     // Sarah accepts; now the Wayne roster includes her.
     const id = (await deriveInvitations(db))[0]!.id;
     const acc = await handleRequest(db, req(
@@ -273,9 +272,9 @@ test('a pending invitee is absent from the roster', async () => {
             membershipId: MS_SARAH, eventId: EV_ACC,
             at: AT,
         }));
-    assert.equal(acc.status, 204);
+    assertStrictEquals(acc.status, 204);
     const after = await rosterIds(db);
-    assert.ok(after.has('toccYYkLEABmlbpHJalgtQ'));
+    assert(after.has('toccYYkLEABmlbpHJalgtQ'));
 });
 
 async function rosterIds(
@@ -285,12 +284,12 @@ async function rosterIds(
         'GET', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/members/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw')));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const rows = await res.json() as { id: string }[];
     return new Set(rows.map(r => r.id));
 }
 
-test('accept makes the invitation org reachable', async () => {
+Deno.test('accept makes the invitation org reachable', async () => {
     const db = await seed();
     const id = await grantSarahToWayne(db);
     await handleRequest(db, req(
@@ -306,7 +305,7 @@ test('accept makes the invitation org reachable', async () => {
     const sarahOrganizations = (await allMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ')
         .map(m => m.organization_id).sort();
-    assert.deepEqual(sarahOrganizations, ['AjdvjuECVZEgZoFajaIEkg'
+    assertEquals(sarahOrganizations, ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']);
 });
 
@@ -315,20 +314,20 @@ test('accept makes the invitation org reachable', async () => {
 // owns the invitation; foreign askers still resolve that
 // owner (and would fence it out of a bulk union that no
 // longer exists).
-test('an invitation event is owned by the inviting org',
+Deno.test('an invitation event is owned by the inviting org',
 async () => {
     const db = await seed();
     const id = await grantSarahToWayne(db);
     const rows = await deriveInvitationStates(db);
-    assert.ok(
+    assert(
         rows.some((r) => r.entity_id === id),
         'invitation lifecycle events derive for the grant',
     );
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(db, id, 'BBjWJsjYIDkTRKIIPrzWRw'),
         'BBjWJsjYIDkTRKIIPrzWRw',
     );
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(db, id, 'AjdvjuECVZEgZoFajaIEkg'),
         'BBjWJsjYIDkTRKIIPrzWRw',
     );
@@ -346,7 +345,7 @@ const ACCEPT_AT = '2099-06-01T12:00:01.000000Z'; // far-future
 const DECLINE_AT = '2099-06-01T12:00:02.000000Z'; // far-future
 const REVOKE_AT = '2099-06-01T12:00:03.000000Z'; // far-future
 
-test('grant: replay of fixed body is a no-op (one event)',
+Deno.test('grant: replay of fixed body is a no-op (one event)',
 async () => {
     const db = await seed();
     const body = {
@@ -360,13 +359,13 @@ async () => {
     const rOEPOcVMQdJiiiMuiiEhlg = await handleRequest(
         db, req('POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
             tok, body));
-    assert.equal(rOEPOcVMQdJiiiMuiiEhlg.status, 200);
+    assertStrictEquals(rOEPOcVMQdJiiiMuiiEhlg.status, 200);
     const r2 = await handleRequest(
         db, req('POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
             tok, body));
-    assert.equal(r2.status, 200);
-    assert.equal((await deriveInvitations(db)).length, 1);
-    assert.equal(
+    assertStrictEquals(r2.status, 200);
+    assertStrictEquals((await deriveInvitations(db)).length, 1);
+    assertStrictEquals(
         (await invitationLifecycleStatesFor(db, INV_IDEM)).length, 1,
     );
     // Event carries the caller-supplied at.
@@ -379,11 +378,11 @@ async () => {
             : a.id < b.id ? -1
             : a.id > b.id ? 1 : 0,
     ).at(-1)!;
-    assert.equal(ev.at, GRANT_AT);
-    assert.equal(ev.id, EV_G_IDEM);
+    assertStrictEquals(ev.at, GRANT_AT);
+    assertStrictEquals(ev.id, EV_G_IDEM);
 });
 
-test('accept: replay of fixed body is a no-op (two events total)',
+Deno.test('accept: replay of fixed body is a no-op (two events total)',
 async () => {
     // grant emits 1 event, accept emits 1 more; a second accept
     // of the same body must not emit a third.
@@ -409,13 +408,13 @@ async () => {
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hasVDnGjEylAnJDTPjnZuQ',
         sTok, accBody));
-    assert.equal(UQTJZvCoKlFjEoDlDUwekw.status, 204);
+    assertStrictEquals(UQTJZvCoKlFjEoDlDUwekw.status, 204);
     const UZgNCkZlSJcSaAmAJuSkcw = await handleRequest(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hasVDnGjEylAnJDTPjnZuQ',
         sTok, accBody));
-    assert.equal(UZgNCkZlSJcSaAmAJuSkcw.status, 204);
-    assert.equal(
+    assertStrictEquals(UZgNCkZlSJcSaAmAJuSkcw.status, 204);
+    assertStrictEquals(
         (await invitationLifecycleStatesFor(db
             , 'hasVDnGjEylAnJDTPjnZuQ')).length, 2,
     );
@@ -429,12 +428,12 @@ async () => {
             : a.id < b.id ? -1
             : a.id > b.id ? 1 : 0,
     ).at(-1)!;
-    assert.equal(ev.at, ACCEPT_AT);
-    assert.equal(ev.id, EV_A_IDEM);
-    assert.equal(ev.member_id, 'toccYYkLEABmlbpHJalgtQ');
+    assertStrictEquals(ev.at, ACCEPT_AT);
+    assertStrictEquals(ev.id, EV_A_IDEM);
+    assertStrictEquals(ev.member_id, 'toccYYkLEABmlbpHJalgtQ');
 });
 
-test('decline: replay of fixed body is a no-op (two events total)',
+Deno.test('decline: replay of fixed body is a no-op (two events total)',
 async () => {
     // grant emits 1 event, decline emits 1 more; a second
     // decline of the same body must not emit a third.
@@ -459,13 +458,13 @@ async () => {
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hlmIVMfGBbdTSoChNYsQkQ',
         sTok, decBody));
-    assert.equal(d1.status, 204);
+    assertStrictEquals(d1.status, 204);
     const d2 = await handleRequest(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hlmIVMfGBbdTSoChNYsQkQ',
         sTok, decBody));
-    assert.equal(d2.status, 204);
-    assert.equal(
+    assertStrictEquals(d2.status, 204);
+    assertStrictEquals(
         (await invitationLifecycleStatesFor(db
             , 'hlmIVMfGBbdTSoChNYsQkQ')).length, 2,
     );
@@ -479,11 +478,11 @@ async () => {
             : a.id < b.id ? -1
             : a.id > b.id ? 1 : 0,
     ).at(-1)!;
-    assert.equal(ev.at, DECLINE_AT);
-    assert.equal(ev.id, EV_D_IDEM);
+    assertStrictEquals(ev.at, DECLINE_AT);
+    assertStrictEquals(ev.id, EV_D_IDEM);
 });
 
-test('revoke: replay of fixed body is a no-op (two events total)',
+Deno.test('revoke: replay of fixed body is a no-op (two events total)',
 async () => {
     // grant emits 1 event, revoke emits 1 more; a second revoke
     // of the same body must not emit a third.
@@ -506,13 +505,13 @@ async () => {
         'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
             + 'itekPiJIBiPQhcZveiqTKw',
         tok, revBody));
-    assert.equal(rOEPOcVMQdJiiiMuiiEhlg.status, 204);
+    assertStrictEquals(rOEPOcVMQdJiiiMuiiEhlg.status, 204);
     const r2 = await handleRequest(db, req(
         'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
             + 'itekPiJIBiPQhcZveiqTKw',
         tok, revBody));
-    assert.equal(r2.status, 204);
-    assert.equal(
+    assertStrictEquals(r2.status, 204);
+    assertStrictEquals(
         (await invitationLifecycleStatesFor(db
             , 'itekPiJIBiPQhcZveiqTKw')).length, 2,
     );
@@ -526,14 +525,14 @@ async () => {
             : a.id < b.id ? -1
             : a.id > b.id ? 1 : 0,
     ).at(-1)!;
-    assert.equal(ev.at, REVOKE_AT);
-    assert.equal(ev.id, EV_R_IDEM);
-    assert.equal(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(ev.at, REVOKE_AT);
+    assertStrictEquals(ev.id, EV_R_IDEM);
+    assertStrictEquals(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
 // Gap-1 gate: empty ids are rejected at the gate (400).
 
-test('grant: empty invitationId is rejected (400)', async () => {
+Deno.test('grant: empty invitationId is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
@@ -545,10 +544,10 @@ test('grant: empty invitationId is rejected (400)', async () => {
             grantEventId: EV_X,
             grantAt: AT,
         }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('grant: empty grantEventId is rejected (400)', async () => {
+Deno.test('grant: empty grantEventId is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
@@ -560,10 +559,10 @@ test('grant: empty grantEventId is rejected (400)', async () => {
             grantEventId: '',
             grantAt: AT,
         }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('accept: empty membershipId is rejected (400)', async () => {
+Deno.test('accept: empty membershipId is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
@@ -577,10 +576,10 @@ test('accept: empty membershipId is rejected (400)', async () => {
             eventId: EV_X,
             at: AT,
         }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('decline: empty declineEventId is rejected (400)',
+Deno.test('decline: empty declineEventId is rejected (400)',
 async () => {
     const db = await seed();
     await grantSarahToWayne(db);
@@ -594,10 +593,10 @@ async () => {
             eventId: '',
             at: AT,
         }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('revoke: empty revokeEventId is rejected (400)', async () => {
+Deno.test('revoke: empty revokeEventId is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
@@ -610,7 +609,7 @@ test('revoke: empty revokeEventId is rejected (400)', async () => {
             eventId: '',
             at: AT,
         }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
 // Gap-2 gate: missing or non-string fields are rejected (400),
@@ -618,7 +617,7 @@ test('revoke: empty revokeEventId is rejected (400)', async () => {
 // throw ValidationError on these inputs; the domain functions
 // must catch and translate, not leak.
 
-test('grant: missing invitationId is rejected (400)', async () => {
+Deno.test('grant: missing invitationId is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
@@ -630,10 +629,10 @@ test('grant: missing invitationId is rejected (400)', async () => {
             grantEventId: EV_X,
             grantAt: AT,
         }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('grant: non-string grantAt is rejected (400)', async () => {
+Deno.test('grant: non-string grantAt is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
@@ -645,10 +644,10 @@ test('grant: non-string grantAt is rejected (400)', async () => {
             grantEventId: EV_X,
             grantAt: 42,   // non-string
         }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('accept: missing eventId is rejected (400)',
+Deno.test('accept: missing eventId is rejected (400)',
 async () => {
     const db = await seed();
     await grantSarahToWayne(db);
@@ -663,10 +662,10 @@ async () => {
             // eventId intentionally absent
             at: AT,
         }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('accept: non-string at is rejected (400)',
+Deno.test('accept: non-string at is rejected (400)',
 async () => {
     const db = await seed();
     await grantSarahToWayne(db);
@@ -681,10 +680,10 @@ async () => {
             eventId: EV_X,
             at: 42,   // non-string
         }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('decline: missing declineAt is rejected (400)', async () => {
+Deno.test('decline: missing declineAt is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
@@ -697,7 +696,7 @@ test('decline: missing declineAt is rejected (400)', async () => {
             eventId: EV_X,
             // at intentionally absent
         }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
 // KEEP-ATOMIC (Author gate 6e): a removed member cannot
@@ -707,7 +706,7 @@ test('decline: missing declineAt is rejected (400)', async () => {
 // the property holds today already — this pin proves it against
 // TODAY's code, before Phase 8 Task 6 adds the document-plane
 // synthesis around this same accept path.
-test('a removed member who re-accepts gets a no-op — not a'
+Deno.test('a removed member who re-accepts gets a no-op — not a'
 + ' silent re-admission (KEEP-ATOMIC)', async () => {
     // Distinct, strictly-increasing `at` stamps: grant/accept
     // share one invitation entity_id in the states log, so a tied
@@ -726,13 +725,13 @@ test('a removed member who re-accepts gets a no-op — not a'
             eventId: EV_ACC_REMOVED,
             at: '2026-01-01T00:00:01.000000Z',
         }));
-    assert.equal(accept.status, 204);
+    assertStrictEquals(accept.status, 204);
     const del = await handleRequest(db, req(
         'DELETE', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/members/'
             + 'toccYYkLEABmlbpHJalgtQ',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw')));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const statesBefore = (await invitationLifecycleStatesFor(db, id)).length;
     const reaccept = await handleRequest(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
@@ -744,17 +743,17 @@ test('a removed member who re-accepts gets a no-op — not a'
             eventId: EV_ACC_AGAIN,
             at: '2026-01-01T00:00:02.000000Z',
         }));
-    assert.equal(reaccept.status, 204);
+    assertStrictEquals(reaccept.status, 204);
     const sarahInWayne = (await allMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ'
             && m.organization_id === 'BBjWJsjYIDkTRKIIPrzWRw');
-    assert.deepEqual(sarahInWayne, []);
-    assert.equal(
+    assertEquals(sarahInWayne, []);
+    assertStrictEquals(
         (await invitationLifecycleStatesFor(db, id)).length, statesBefore,
     );
 });
 
-test('revoke: missing revokeAt is rejected (400)', async () => {
+Deno.test('revoke: missing revokeAt is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
@@ -767,5 +766,5 @@ test('revoke: missing revokeAt is rejected (400)', async () => {
             eventId: EV_X,
             // at intentionally absent
         }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });

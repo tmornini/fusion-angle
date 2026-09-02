@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -132,7 +131,7 @@ async function putLiveType(
     const put = await handleRequest(db, req(
         'PUT', TYPE_DETAIL, adminToken, typeBody(),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function putAttribute(
@@ -144,7 +143,7 @@ async function putAttribute(
     const put = await handleRequest(db, req(
         'PUT', ATTRS + attrId, adminToken, body,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedPublicAndSecretAttrs(
@@ -237,7 +236,7 @@ interface HistoryEntry {
     values: { attribute_id: string; value: string }[];
 }
 
-test('history genesis + 2 PATCHes → 200, three entries, '
+Deno.test('history genesis + 2 PATCHes → 200, three entries, '
 + '(at,id) DESC; index 0 == current head',
 async () => {
     const { db, adminToken, memberToken } =
@@ -256,7 +255,7 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_PUBLIC, value: 'v0' },
     ]);
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const etag0 = put.headers.get('ETag')!;
 
     const patch1 = await patchInstance(
@@ -269,7 +268,7 @@ async () => {
             ],
         },
     );
-    assert.equal(patch1.status, 201);
+    assertStrictEquals(patch1.status, 201);
     const etag1 = patch1.headers.get('ETag')!;
 
     const patch2 = await patchInstance(
@@ -282,78 +281,78 @@ async () => {
             ],
         },
     );
-    assert.equal(patch2.status, 201);
+    assertStrictEquals(patch2.status, 201);
     const etag2 = patch2.headers.get('ETag')!;
 
     const detail = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
-    assert.equal(detail.status, 200);
-    assert.equal(detail.headers.get('ETag'), etag2);
+    assertStrictEquals(detail.status, 200);
+    assertStrictEquals(detail.headers.get('ETag'), etag2);
 
     const history = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, memberToken,
     ));
-    assert.equal(history.status, 200);
+    assertStrictEquals(history.status, 200);
     const entries = await history.json() as HistoryEntry[];
-    assert.equal(entries.length, 3);
+    assertStrictEquals(entries.length, 3);
 
     // DESC: index 0 is current head (etag sans quotes).
-    assert.equal(
+    assertStrictEquals(
         entries[0]!.etag,
         etag2.replaceAll('"', ''),
     );
-    assert.equal(
+    assertStrictEquals(
         strongEtagOf(entries[0]!.etag),
         etag2,
     );
-    assert.deepEqual(entries[0]!.values, [
+    assertEquals(entries[0]!.values, [
         { attribute_id: ATTR_PUBLIC, value: 'v2' },
     ]);
-    assert.deepEqual(entries[1]!.values, [
+    assertEquals(entries[1]!.values, [
         { attribute_id: ATTR_PUBLIC, value: 'xDyDkxEPwtcNmJVknUHDsg' },
     ]);
-    assert.deepEqual(entries[2]!.values, [
+    assertEquals(entries[2]!.values, [
         { attribute_id: ATTR_PUBLIC, value: 'v0' },
     ]);
-    assert.equal(
+    assertStrictEquals(
         entries[1]!.etag,
         etag1.replaceAll('"', ''),
     );
-    assert.equal(
+    assertStrictEquals(
         entries[2]!.etag,
         etag0.replaceAll('"', ''),
     );
 
     // Wire (at, id) DESC — timestamps non-increasing.
-    assert.ok(entries[0]!.at >= entries[1]!.at);
-    assert.ok(entries[1]!.at >= entries[2]!.at);
+    assert(entries[0]!.at >= entries[1]!.at);
+    assert(entries[1]!.at >= entries[2]!.at);
 
     // Each entry is FULL state (not a delta).
     for (const entry of entries) {
-        assert.ok(Array.isArray(entry.values));
-        assert.equal(
+        assert(Array.isArray(entry.values));
+        assertStrictEquals(
             typeof entry.etag === 'string'
             && isIdentifier(entry.etag)
             && !entry.etag.includes('"'),
             true,
             'etag is an identifier, no quotes in JSON',
         );
-        assert.equal(
+        assertStrictEquals(
             'version' in entry,
             false,
             'history entries carry no version field',
         );
-        assert.equal(typeof entry.at, 'string');
+        assertStrictEquals(typeof entry.at, 'string');
     }
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assert.ok(head !== undefined);
-    assert.equal(entries[0]!.etag, head.messagePairId);
+    assert(head !== undefined);
+    assertStrictEquals(entries[0]!.etag, head.messagePairId);
 });
 
-test('history etag[0] is the head pair id for both roles',
+Deno.test('history etag[0] is the head pair id for both roles',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -369,34 +368,34 @@ async () => {
             value: 'secret-0',
         },
     ]);
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assert.ok(head !== undefined);
+    assert(head !== undefined);
     const memberHist = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, memberToken,
     ));
     const adminHist = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, adminToken,
     ));
-    assert.equal(memberHist.status, 200);
-    assert.equal(adminHist.status, 200);
+    assertStrictEquals(memberHist.status, 200);
+    assertStrictEquals(adminHist.status, 200);
     const memberEntries =
         await memberHist.json() as HistoryEntry[];
     const adminEntries =
         await adminHist.json() as HistoryEntry[];
-    assert.equal(
+    assertStrictEquals(
         memberEntries[0]!.etag,
         head.messagePairId,
     );
-    assert.equal(
+    assertStrictEquals(
         adminEntries[0]!.etag,
         head.messagePairId,
     );
 });
 
-test('GET versions/:etag by pair id; foreign pair id 404s',
+Deno.test('GET versions/:etag by pair id; foreign pair id 404s',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -412,11 +411,11 @@ async () => {
             value: 'secret-0',
         },
     ]);
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assert.ok(head !== undefined);
+    assert(head !== undefined);
     const leafPath =
         INSTANCE_HISTORY + '/' + head.messagePairId;
     const memberLeaf = await handleRequest(db, req(
@@ -425,13 +424,13 @@ async () => {
     const adminLeaf = await handleRequest(db, req(
         'GET', leafPath, adminToken,
     ));
-    assert.equal(memberLeaf.status, 200);
-    assert.equal(adminLeaf.status, 200);
-    assert.equal(
+    assertStrictEquals(memberLeaf.status, 200);
+    assertStrictEquals(adminLeaf.status, 200);
+    assertStrictEquals(
         memberLeaf.headers.get('ETag'),
         strongEtagOf(head.messagePairId),
     );
-    assert.equal(
+    assertStrictEquals(
         adminLeaf.headers.get('ETag'),
         strongEtagOf(head.messagePairId),
     );
@@ -455,14 +454,14 @@ async () => {
         INSTANCE_HISTORY + '/' + foreignPairId,
         memberToken,
     ));
-    assert.equal(foreign.status, 404);
-    assert.deepEqual(await foreign.json(), {
+    assertStrictEquals(foreign.status, 404);
+    assertEquals(await foreign.json(), {
         error:
             'Not found: record_instances/' + INSTANCE_ID,
     });
 });
 
-test('history projection: member sees only currently-'
+Deno.test('history projection: member sees only currently-'
 + 'readable values in EVERY entry; admin sees all',
 async () => {
     const { db, adminToken, memberToken } =
@@ -480,7 +479,7 @@ async () => {
             value: 'secret-0',
         },
     ]);
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const etag0 = put.headers.get('ETag')!;
 
     const patch1 = await patchInstance(
@@ -497,33 +496,33 @@ async () => {
             ],
         },
     );
-    assert.equal(patch1.status, 201);
+    assertStrictEquals(patch1.status, 201);
 
     const memberHist = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, memberToken,
     ));
-    assert.equal(memberHist.status, 200);
+    assertStrictEquals(memberHist.status, 200);
     const memberEntries =
         await memberHist.json() as HistoryEntry[];
-    assert.equal(memberEntries.length, 2);
+    assertStrictEquals(memberEntries.length, 2);
     for (const entry of memberEntries) {
-        assert.equal(entry.values.length, 1);
-        assert.equal(
+        assertStrictEquals(entry.values.length, 1);
+        assertStrictEquals(
             entry.values[0]!.attribute_id,
             ATTR_PUBLIC,
         );
-        assert.ok(
+        assert(
             !entry.values.some(
                 (v) => v.attribute_id === ATTR_SECRET,
             ),
             'member never sees secret in any revision',
         );
     }
-    assert.equal(
+    assertStrictEquals(
         memberEntries[0]!.values[0]!.value,
         'public-1',
     );
-    assert.equal(
+    assertStrictEquals(
         memberEntries[1]!.values[0]!.value,
         'public-0',
     );
@@ -531,29 +530,29 @@ async () => {
     const adminHist = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, adminToken,
     ));
-    assert.equal(adminHist.status, 200);
+    assertStrictEquals(adminHist.status, 200);
     const adminEntries =
         await adminHist.json() as HistoryEntry[];
-    assert.equal(adminEntries.length, 2);
+    assertStrictEquals(adminEntries.length, 2);
     for (const entry of adminEntries) {
-        assert.equal(entry.values.length, 2);
+        assertStrictEquals(entry.values.length, 2);
         const byId = new Map(
             entry.values.map(
                 (v) => [v.attribute_id, v.value],
             ),
         );
-        assert.ok(byId.has(ATTR_PUBLIC));
-        assert.ok(byId.has(ATTR_SECRET));
+        assert(byId.has(ATTR_PUBLIC));
+        assert(byId.has(ATTR_SECRET));
     }
     const head = adminEntries[0]!;
     const byId = new Map(
         head.values.map((v) => [v.attribute_id, v.value]),
     );
-    assert.equal(byId.get(ATTR_PUBLIC), 'public-1');
-    assert.equal(byId.get(ATTR_SECRET), 'secret-1');
+    assertStrictEquals(byId.get(ATTR_PUBLIC), 'public-1');
+    assertStrictEquals(byId.get(ATTR_SECRET), 'secret-1');
 });
 
-test('history absent instance → 404 via missedReadError',
+Deno.test('history absent instance → 404 via missedReadError',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -564,14 +563,14 @@ async () => {
         INSTANCES + missing + '/versions',
         memberToken,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error:
             'Not found: record_instances/' + missing,
     });
 });
 
-test('history tombstoned → 404 via missedReadError (R2)',
+Deno.test('history tombstoned → 404 via missedReadError (R2)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -588,23 +587,23 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_PUBLIC, value: 'live' },
     ]);
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
 
     const res = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, memberToken,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error:
             'Not found: record_instances/' + INSTANCE_ID,
     });
 });
 
-test('history foreign instance id → 404 via '
+Deno.test('history foreign instance id → 404 via '
 + 'missedReadError (R2)',
 async () => {
     const { db, adminToken, memberToken } =
@@ -626,14 +625,14 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, memberToken,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error:
             'Not found: record_instances/' + INSTANCE_ID,
     });
 });
 
-test('history absent type → 404 record_types',
+Deno.test('history absent type → 404 record_types',
 async () => {
     const { db, memberToken } = await adminDb();
     const res = await handleRequest(db, req(
@@ -643,8 +642,8 @@ async () => {
             + INSTANCE_ID + '/versions',
         memberToken,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error: 'Not found: record_types/oZjfWriXLxoqurdbwfBnpA',
     });
 });
@@ -653,7 +652,7 @@ async () => {
 // RESTRICT guards heads only (clear, then DELETE → 204).
 // Its values are unreadable by every role — never a 500,
 // never an attribute the schema no longer knows.
-test('history after clear + attribute DELETE → 200; the '
+Deno.test('history after clear + attribute DELETE → 200; the '
 + 'deleted attribute is absent from every entry',
 async () => {
     const { db, adminToken, memberToken } =
@@ -682,29 +681,29 @@ async () => {
         { attribute_id: ATTR_PUBLIC, value: 'kept' },
         { attribute_id: ATTR_RETIRED, value: 'gone' },
     ]);
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const etag0 = put.headers.get('ETag')!;
 
     const cleared = await patchInstance(
         db, memberToken, etag0, { clear: [ATTR_RETIRED] },
     );
-    assert.equal(cleared.status, 201);
+    assertStrictEquals(cleared.status, 201);
 
     const del = await handleRequest(db, req(
         'DELETE', ATTRS + ATTR_RETIRED, adminToken,
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
 
     for (const token of [memberToken, adminToken]) {
         const history = await handleRequest(db, req(
             'GET', INSTANCE_HISTORY, token,
         ));
-        assert.equal(history.status, 200);
+        assertStrictEquals(history.status, 200);
         const entries =
             await history.json() as HistoryEntry[];
-        assert.equal(entries.length, 2);
+        assertStrictEquals(entries.length, 2);
         for (const entry of entries) {
-            assert.deepEqual(entry.values, [
+            assertEquals(entry.values, [
                 { attribute_id: ATTR_PUBLIC, value: 'kept' },
             ]);
         }
@@ -713,11 +712,11 @@ async () => {
             INSTANCE_HISTORY + '/' + entries[1]!.etag,
             token,
         ));
-        assert.equal(older.status, 200);
+        assertStrictEquals(older.status, 200);
         const body = await older.json() as {
             values: HistoryEntry['values'];
         };
-        assert.deepEqual(body.values, [
+        assertEquals(body.values, [
             { attribute_id: ATTR_PUBLIC, value: 'kept' },
         ]);
     }

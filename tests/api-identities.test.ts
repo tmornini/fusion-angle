@@ -1,5 +1,5 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
+import type { IdentityEntityFields } from '../api/types.ts';
 import {
     validateIdentityEntity,
     validateIdentityPiiEntity,
@@ -20,27 +20,28 @@ import {
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
-test('SYSTEM_MEMBER_ID is NIL_IDENTIFIER', () => {
-    assert.equal(SYSTEM_MEMBER_ID, NIL_IDENTIFIER);
+Deno.test('SYSTEM_MEMBER_ID is NIL_IDENTIFIER', () => {
+    assertStrictEquals(SYSTEM_MEMBER_ID, NIL_IDENTIFIER);
 });
 
-test('validateIdentityEntity accepts person/service', () => {
-    assert.deepEqual(
+Deno.test('validateIdentityEntity accepts person/service', () => {
+    assertEquals(
         validateIdentityEntity({ kind: 'person' }),
         { kind: 'person' },
     );
-    assert.deepEqual(
+    assertEquals(
         validateIdentityEntity({ kind: 'service' }),
         { kind: 'service' },
     );
 });
 
-test('validateIdentityEntity rejects a partial profile', () => {
-    assert.throws(
+Deno.test('validateIdentityEntity rejects a partial profile', () => {
+    assertThrows(
         () => validateIdentityEntity({
             kind: 'person', title: 'Engineer',
         }),
-        /missing required key "department"/,
+        Error,
+        'missing required key "department"',
     );
     const whole = {
         kind: 'person',
@@ -49,23 +50,23 @@ test('validateIdentityEntity rejects a partial profile', () => {
         strengths: ['Leadership'],
         team_dimensions: { driver: 60 },
     };
-    assert.deepEqual(
-        validateIdentityEntity(whole), whole,
+    assertEquals(
+        validateIdentityEntity(whole), whole as IdentityEntityFields,
     );
 });
 
-test('validateIdentityEntity rejects bad kind', () => {
-    assert.throws(() =>
+Deno.test('validateIdentityEntity rejects bad kind', () => {
+    assertThrows(() =>
         validateIdentityEntity({ kind: 'robot' }));
 });
 
-test('validateIdentityEntity rejects extra keys', () => {
-    assert.throws(() =>
+Deno.test('validateIdentityEntity rejects extra keys', () => {
+    assertThrows(() =>
         validateIdentityEntity({ kind: 'person', name: 'x' }));
 });
 
-test('validateIdentityPiiEntity requires four fields', () => {
-    assert.deepEqual(
+Deno.test('validateIdentityPiiEntity requires four fields', () => {
+    assertEquals(
         validateIdentityPiiEntity({
             name: 'Tony Stark',
             email: 'demo@example.com',
@@ -81,8 +82,8 @@ test('validateIdentityPiiEntity requires four fields', () => {
     );
 });
 
-test('validateIdentityPiiEntity rejects missing field', () => {
-    assert.throws(() =>
+Deno.test('validateIdentityPiiEntity rejects missing field', () => {
+    assertThrows(() =>
         validateIdentityPiiEntity({
             name: 'x', email: 'y', phone: 'z',
         }));
@@ -94,7 +95,7 @@ async function freshDb() {
     return db;
 }
 
-test('PUT then GET an identity round-trips', async () => {
+Deno.test('PUT then GET an identity round-trips', async () => {
     const db = await freshDb();
     const id = generateIdentifier();
     await PUT(
@@ -102,10 +103,10 @@ test('PUT then GET an identity round-trips', async () => {
     const got = await GET<{ id: string; kind: string }>(
         db, 'identities/' + id, DEV_TOKEN,
     );
-    assert.deepEqual(got, { id, kind: 'person' });
+    assertEquals(got, { id, kind: 'person' });
 });
 
-test('bootstrap seeds an identity per member, id-equal',
+Deno.test('bootstrap seeds an identity per member, id-equal',
 async () => {
     const db = await freshDb();
     const { postBootstrap } =
@@ -113,10 +114,10 @@ async () => {
     await postBootstrap(db);
     const sys = await GET<{ kind: string }>(
         db, 'identities/' + SYSTEM_MEMBER_ID, DEV_TOKEN);
-    assert.equal(sys.kind, 'service');
+    assertStrictEquals(sys.kind, 'service');
     const cur = await GET<{ kind: string }>(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA', DEV_TOKEN);
-    assert.equal(cur.kind, 'person');
+    assertStrictEquals(cur.kind, 'person');
 });
 
 // ---- /identities/:id/pii subtree authz ----
@@ -183,42 +184,42 @@ function piiReq(
     });
 }
 
-test('a member reads its own pii on the subtree', async () => {
+Deno.test('a member reads its own pii on the subtree', async () => {
     const db = await dbWithMember();
     const pii = await GET<{ name: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ/pii'
             , await devToken('toccYYkLEABmlbpHJalgtQ'));
-    assert.equal(pii.name, 'Sarah');
+    assertStrictEquals(pii.name, 'Sarah');
 });
 
-test('a member cannot read another identity pii',
+Deno.test('a member cannot read another identity pii',
 async () => {
     const db = await dbWithMember();
     const res = await handleRequest(db, piiReq(
         'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/pii',
         await devToken('toccYYkLEABmlbpHJalgtQ')));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
 });
 
-test('admin GET reads another identity nested pii',
+Deno.test('admin GET reads another identity nested pii',
 async () => {
     const db = await dbWithMember();
     const res = await handleRequest(db, piiReq(
         'GET', '/identities/toccYYkLEABmlbpHJalgtQ/pii', DEV_TOKEN));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const pii = await res.json() as {
         name: string;
         email: string;
         phone: string;
         bio: string;
     };
-    assert.equal(pii.name, PII.name);
-    assert.equal(pii.email, PII.email);
-    assert.equal(pii.phone, PII.phone);
-    assert.equal(pii.bio, PII.bio);
+    assertStrictEquals(pii.name, PII.name);
+    assertStrictEquals(pii.email, PII.email);
+    assertStrictEquals(pii.phone, PII.phone);
+    assertStrictEquals(pii.bio, PII.bio);
 });
 
-test('a member writes its own pii', async () => {
+Deno.test('a member writes its own pii', async () => {
     const db = await dbWithMember();
     await PUT(db, 'identities/toccYYkLEABmlbpHJalgtQ/pii',
         { ...PII, name: 'Sarah Lee' }
@@ -226,37 +227,37 @@ test('a member writes its own pii', async () => {
     const pii = await GET<{ name: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ/pii'
             , await devToken('toccYYkLEABmlbpHJalgtQ'));
-    assert.equal(pii.name, 'Sarah Lee');
+    assertStrictEquals(pii.name, 'Sarah Lee');
 });
 
-test('an admin writes another identity pii', async () => {
+Deno.test('an admin writes another identity pii', async () => {
     const db = await dbWithMember();
     await PUT(db, 'identities/toccYYkLEABmlbpHJalgtQ/pii',
         { ...PII, name: 'By Admin' }, DEV_TOKEN);
     const pii = await GET<{ name: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ/pii'
             , await devToken('toccYYkLEABmlbpHJalgtQ'));
-    assert.equal(pii.name, 'By Admin');
+    assertStrictEquals(pii.name, 'By Admin');
 });
 
-test('a non-admin cannot write another identity pii',
+Deno.test('a non-admin cannot write another identity pii',
 async () => {
     const db = await dbWithMember();
     const res = await handleRequest(db, piiReq(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/pii',
         await devToken('toccYYkLEABmlbpHJalgtQ'), PII));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
 });
 
-test('deleting pii on the subtree leaves the identity',
+Deno.test('deleting pii on the subtree leaves the identity',
 async () => {
     const db = await dbWithMember();
     await DELETE(db, 'identities/toccYYkLEABmlbpHJalgtQ/pii', DEV_TOKEN);
     const gone = await handleRequest(db, piiReq(
         'GET', '/identities/toccYYkLEABmlbpHJalgtQ/pii',
         await devToken('toccYYkLEABmlbpHJalgtQ')));
-    assert.equal(gone.status, 404);
+    assertStrictEquals(gone.status, 404);
     const id = await GET<{ id: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ', DEV_TOKEN);
-    assert.equal(id.id, 'toccYYkLEABmlbpHJalgtQ');
+    assertStrictEquals(id.id, 'toccYYkLEABmlbpHJalgtQ');
 });

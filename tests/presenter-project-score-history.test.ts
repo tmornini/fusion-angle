@@ -1,17 +1,14 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertMatch } from '@std/assert';
+import {
+    ProjectScoreHistoryPresenter,
+} from '../web-app/app/presenters/project-score-history.ts';
 
-// ProjectScoreHistoryPresenter imports from
-// ../core.ts, whose module init reads theme/sidebar
-// from localStorage via state.ts. Stubs must land
-// before the dynamic import pulls in the presenter.
-
+// presenters/project-score-history.ts never reads
+// localStorage (checked against the full product tree);
+// window/document are stubbed because
+// ProjectScoreHistoryPresenter.render walks a real DOM
+// element.
 const g = globalThis as Record<string, unknown>;
-g['localStorage'] = {
-    getItem: () => null,
-    setItem: () => {},
-    removeItem: () => {},
-};
 g['window'] = {
     matchMedia: () => ({
         matches: false,
@@ -21,10 +18,6 @@ g['window'] = {
     addEventListener: () => {},
 };
 g['document'] = { addEventListener: () => {} };
-
-const { ProjectScoreHistoryPresenter } = await import(
-    '../web-app/app/presenters/project-score-history.ts'
-);
 
 const baselines = [
     { id: 'b1',
@@ -79,7 +72,7 @@ function resolver(_objId: string, atTime: string) {
     };
 }
 
-test('merges all four streams chronologically', () => {
+Deno.test('merges all four streams chronologically', () => {
     const p = new ProjectScoreHistoryPresenter(
         baselines, actuals, revisions, lifecycle,
         resolver, whoName,
@@ -93,12 +86,12 @@ test('merges all four streams chronologically', () => {
         html.indexOf('2026-04-01'),
     ];
     for (let i = 1; i < positions.length; i++) {
-        assert.ok(positions[i]! > positions[i - 1]!,
+        assert(positions[i]! > positions[i - 1]!,
             'events out of order at index ' + i);
     }
 });
 
-test('resolves historical objective name at each event',
+Deno.test('resolves historical objective name at each event',
     () => {
         const p = new ProjectScoreHistoryPresenter(
             baselines, actuals, revisions, lifecycle,
@@ -111,17 +104,17 @@ test('resolves historical objective name at each event',
             .indexOf('Increase Revenue', marchOnePos);
         const driveGrowthAfterApril = html
             .indexOf('Drive Growth', aprilOnePos);
-        assert.ok(
+        assert(
             incrRevAfterMarch > marchOnePos
                 && incrRevAfterMarch < aprilOnePos,
             'March score should render under '
                 + '"Increase Revenue"',
         );
-        assert.ok(driveGrowthAfterApril > aprilOnePos,
+        assert(driveGrowthAfterApril > aprilOnePos,
             'April score should render under "Drive Growth"');
     });
 
-test('revision event row shows the new objective name',
+Deno.test('revision event row shows the new objective name',
     () => {
         const p = new ProjectScoreHistoryPresenter(
             [], [], revisions, lifecycle, resolver, whoName,
@@ -133,15 +126,15 @@ test('revision event row shows the new objective name',
             .indexOf('Increase Revenue', r1Pos);
         const driveGrowthPos = html
             .indexOf('Drive Growth', r2Pos);
-        assert.ok(
+        assert(
             incrRevPos > r1Pos && incrRevPos < r2Pos,
             'rOEPOcVMQdJiiiMuiiEhlg row should render "Increase Revenue"',
         );
-        assert.ok(driveGrowthPos > r2Pos,
+        assert(driveGrowthPos > r2Pos,
             'r2 row should render "Drive Growth"');
     });
 
-test('positive score TD carries data-tone="success"', () => {
+Deno.test('positive score TD carries data-tone="success"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [{ id: 'b1', projectId: 'pnXmXrxOWayANgDLdCjuBw'
             , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
@@ -150,11 +143,11 @@ test('positive score TD carries data-tone="success"', () => {
         [], revisions, lifecycle, resolver, whoName,
     );
     const html = p.buildBody().toString();
-    assert.match(html,
+    assertMatch(html,
         /<td data-tone="success">\+40<\/td>/);
 });
 
-test('negative score TD carries data-tone="error"', () => {
+Deno.test('negative score TD carries data-tone="error"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [], [{ id: 'UQTJZvCoKlFjEoDlDUwekw'
             , projectId: 'pnXmXrxOWayANgDLdCjuBw',
@@ -164,11 +157,11 @@ test('negative score TD carries data-tone="error"', () => {
         revisions, lifecycle, resolver, whoName,
     );
     const html = p.buildBody().toString();
-    assert.match(html,
+    assertMatch(html,
         /<td data-tone="error">−50<\/td>/);
 });
 
-test('zero score TD carries data-tone="muted"', () => {
+Deno.test('zero score TD carries data-tone="muted"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [{ id: 'b1', projectId: 'pnXmXrxOWayANgDLdCjuBw'
             , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
@@ -177,10 +170,10 @@ test('zero score TD carries data-tone="muted"', () => {
         [], revisions, lifecycle, resolver, whoName,
     );
     const html = p.buildBody().toString();
-    assert.match(html, /<td data-tone="muted">0<\/td>/);
+    assertMatch(html, /<td data-tone="muted">0<\/td>/);
 });
 
-test('Who column renders the actor name per row', () => {
+Deno.test('Who column renders the actor name per row', () => {
     const who = (id: string): string =>
         id === 'xdaJyuuPyHfffCGLhqDrOQ' ? 'Sarah Lee' : id;
     const p = new ProjectScoreHistoryPresenter(
@@ -191,12 +184,12 @@ test('Who column renders the actor name per row', () => {
         [], [], [], resolver, who,
     );
     const html = p.buildBody().toString();
-    assert.match(html, /<th>Who<\/th>/);
-    assert.ok(html.includes('Sarah Lee'),
+    assertMatch(html, /<th>Who<\/th>/);
+    assert(html.includes('Sarah Lee'),
         'Who cell should render the resolved name');
 });
 
-test(
+Deno.test(
     'archival row shows date, who, and objective'
     + ' name',
     () => {
@@ -216,21 +209,21 @@ test(
         const row = html.split('<tr>').find(
             r => r.includes('Objective archived'),
         );
-        assert.ok(row, 'archival row missing');
-        assert.ok(row.includes(
+        assert(row, 'archival row missing');
+        assert(row.includes(
             'datetime="2026-05-01T10:00:00.000000Z"',
         ));
-        assert.ok(row.includes('Sarah Lee'));
-        assert.ok(row.includes('Drive Growth'));
-        assert.ok(row.includes('archived'));
-        assert.ok(
+        assert(row.includes('Sarah Lee'));
+        assert(row.includes('Drive Growth'));
+        assert(row.includes('archived'));
+        assert(
             !row.includes('—'),
             'no em-dash resignation',
         );
     },
 );
 
-test(
+Deno.test(
     'reactivation renders its own dated row',
     () => {
         const p = new ProjectScoreHistoryPresenter(
@@ -251,17 +244,17 @@ test(
                 'Objective reactivated',
             ),
         );
-        assert.ok(row, 'reactivation row missing');
-        assert.ok(row.includes(
+        assert(row, 'reactivation row missing');
+        assert(row.includes(
             'datetime="2026-05-02T10:00:00.000000Z"',
         ));
-        assert.ok(row.includes('Sarah Lee'));
-        assert.ok(row.includes('Drive Growth'));
-        assert.ok(row.includes('reactivated'));
+        assert(row.includes('Sarah Lee'));
+        assert(row.includes('Drive Growth'));
+        assert(row.includes('reactivated'));
     },
 );
 
-test(
+Deno.test(
     'lifecycle rows interleave chronologically',
     () => {
         const p = new ProjectScoreHistoryPresenter(
@@ -286,9 +279,9 @@ test(
         const last = html.indexOf(
             'datetime="2026-03-05',
         );
-        assert.ok(first >= 0 && mid >= 0
+        assert(first >= 0 && mid >= 0
             && last >= 0);
-        assert.ok(
+        assert(
             first < mid && mid < last,
             'archival must sort between the'
             + ' baselines, not trail the table',

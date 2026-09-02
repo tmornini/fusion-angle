@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -142,7 +141,7 @@ async function seedOrganizationWithMember(
     return organizationToken(identityId, organization);
 }
 
-test('GET .../record-types → 200 [] on empty org',
+Deno.test('GET .../record-types → 200 [] on empty org',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -153,11 +152,11 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', token,
     ));
-    assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), []);
+    assertStrictEquals(res.status, 200);
+    assertEquals(await res.json(), []);
 });
 
-test('GET .../record-types → 200 oldest live head '
+Deno.test('GET .../record-types → 200 oldest live head '
 + '(at, id) first, trio embedded, member token',
 async () => {
     const db = memoryDbAdapter();
@@ -180,12 +179,12 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', token,
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const rows = await res.json() as RecordTypeWireRow[];
-    assert.equal(rows.length, 2);
-    assert.equal(rows[0]!.id, typeB);
-    assert.equal(rows[1]!.id, typeA);
-    assert.deepEqual(rows[0], {
+    assertStrictEquals(rows.length, 2);
+    assertStrictEquals(rows[0]!.id, typeB);
+    assertStrictEquals(rows[1]!.id, typeA);
+    assertEquals(rows[0], {
         id: typeB,
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         name: 'Beta',
@@ -195,7 +194,7 @@ async () => {
     });
 });
 
-test('GET .../record-types/:id → 200, no attribute embed',
+Deno.test('GET .../record-types/:id → 200, no attribute embed',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -213,22 +212,22 @@ async () => {
             + 'sjWcXwYGlgxxJOHxzMoUow',
         token,
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const row = await res.json() as RecordTypeWireRow
         & { attributes?: unknown };
-    assert.equal(row.id, 'sjWcXwYGlgxxJOHxzMoUow');
-    assert.equal(row.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
-    assert.equal(row.name, 'Rental');
-    assert.equal(row.state, 'active');
-    assert.equal('state_at' in row, false);
-    assert.equal(
+    assertStrictEquals(row.id, 'sjWcXwYGlgxxJOHxzMoUow');
+    assertStrictEquals(row.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
+    assertStrictEquals(row.name, 'Rental');
+    assertStrictEquals(row.state, 'active');
+    assertStrictEquals('state_at' in row, false);
+    assertStrictEquals(
         'attributes' in row,
         false,
         'detail must not embed attributes',
     );
 });
 
-test('GET .../record-types/:id → 404 absent '
+Deno.test('GET .../record-types/:id → 404 absent '
 + "('record_types/soZTXQotovDGOpdZulttTQ')",
 async () => {
     const db = memoryDbAdapter();
@@ -243,13 +242,13 @@ async () => {
             + 'soZTXQotovDGOpdZulttTQ',
         token,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error: 'Not found: record_types/soZTXQotovDGOpdZulttTQ',
     });
 });
 
-test('GET .../record-types/:id/versions → 200 DESC, '
+Deno.test('GET .../record-types/:id/versions → 200 DESC, '
 + 'index 0 current',
 async () => {
     const db = memoryDbAdapter();
@@ -272,17 +271,17 @@ async () => {
             + 'sjWcXwYGlgxxJOHxzMoUow/versions/',
         token,
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const rows = await res.json() as RecordTypeWireRow[];
-    assert.equal(rows.length, 2);
-    assert.equal(rows[0]!.id, 'sjWcXwYGlgxxJOHxzMoUow');
-    assert.equal(rows[0]!.state, 'archived');
-    assert.equal(rows[1]!.id, 'sjWcXwYGlgxxJOHxzMoUow');
-    assert.equal(rows[1]!.state, 'active');
-    assert.equal('state_at' in rows[0]!, false);
+    assertStrictEquals(rows.length, 2);
+    assertStrictEquals(rows[0]!.id, 'sjWcXwYGlgxxJOHxzMoUow');
+    assertStrictEquals(rows[0]!.state, 'archived');
+    assertStrictEquals(rows[1]!.id, 'sjWcXwYGlgxxJOHxzMoUow');
+    assertStrictEquals(rows[1]!.state, 'active');
+    assertStrictEquals('state_at' in rows[0]!, false);
 });
 
-test('GET path org ≠ token org → 403 (member of A '
+Deno.test('GET path org ≠ token org → 403 (member of A '
 + 'probing /organizations/B/...)',
 async () => {
     const db = memoryDbAdapter();
@@ -306,13 +305,13 @@ async () => {
         '/organizations/' + organizationB + '/record-types/',
         tokenA,
     ));
-    assert.equal(res.status, 403);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
         error: PATH_ORGANIZATION_MISMATCH_ERROR,
     });
 });
 
-test('GET nonexistent path org → 403 (same arm, same body)',
+Deno.test('GET nonexistent path org → 403 (same arm, same body)',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -325,13 +324,13 @@ async () => {
         '/organizations/oLbQcDdzGHmpcoUKyvlTnQ/record-types/',
         token,
     ));
-    assert.equal(res.status, 403);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
         error: PATH_ORGANIZATION_MISMATCH_ERROR,
     });
 });
 
-test('GET member token → 200 (member READ tier)',
+Deno.test('GET member token → 200 (member READ tier)',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -346,19 +345,19 @@ async () => {
     const collection = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', token,
     ));
-    assert.equal(collection.status, 200);
+    assertStrictEquals(collection.status, 200);
     const detail = await handleRequest(db, req(
         'GET',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'sjWcXwYGlgxxJOHxzMoUow',
         token,
     ));
-    assert.equal(detail.status, 200);
+    assertStrictEquals(detail.status, 200);
     const history = await handleRequest(db, req(
         'GET',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'sjWcXwYGlgxxJOHxzMoUow/versions/',
         token,
     ));
-    assert.equal(history.status, 200);
+    assertStrictEquals(history.status, 200);
 });

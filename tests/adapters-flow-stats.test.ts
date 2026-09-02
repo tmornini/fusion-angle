@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertRejects, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -166,7 +165,7 @@ function buildTestGraph(): {
 
 // -- Tests ------------------------------------
 
-test(
+Deno.test(
     'getFlowStats only includes this flow\'s'
     + ' work orders',
     async () => {
@@ -257,42 +256,48 @@ test(
         const { model, graph } =
             await getFlowStats(ctx, 'ZOousbbnzpqlxJExVAruYQ', Date.now());
 
-        assert.equal(graph.name, 'Onboarding');
-        assert.equal(
+        assertStrictEquals(graph.name, 'Onboarding');
+        assertStrictEquals(
             model.completedWorkOrderCount, 1,
         );
-        assert.equal(
+        assertStrictEquals(
             model.incompleteWorkOrderCount, 0,
         );
         const a =
             model.nodes.find(
                 n => n.id === f1Graph.activeId,
             )!;
-        assert.ok(
+        assert(
             a !== undefined,
             'active node must be present',
         );
-        assert.ok(
+        assert(
             a.heatPct > 0,
             `expected heatPct > 0, got ${a.heatPct}`,
         );
     },
 );
 
-test(
+Deno.test(
     'getFlowStats unknown flowId propagates'
     + ' the underlying error',
     async () => {
         const { ctx } = await adminContext();
-        await assert.rejects(
+        await assertRejects(
             () => getFlowStats(
                 ctx, generateIdentifier(), Date.now(),
             ),
         );
+        // getFlowStats fans four reads out through
+        // Promise.all; getFlowGraph's rejection settles the
+        // caller while the other three are still in flight.
+        // Yield a macrotask turn so those ops complete in
+        // the test that started them.
+        await new Promise(resolve => setTimeout(resolve, 0));
     },
 );
 
-test(
+Deno.test(
     'getFlowStats lays out an auto-layout flow so the'
     + ' returned graph and stat model are not degenerate',
     async () => {
@@ -334,19 +339,19 @@ test(
                 n => `${n.positionX},${n.positionY}`,
             ),
         );
-        assert.equal(graphPos.size, 3);
+        assertStrictEquals(graphPos.size, 3);
         const c = graph.nodes.find(
             n => n.id === autoGraph.createId,
         )!;
         const z = graph.nodes.find(
             n => n.id === autoGraph.doneId,
         )!;
-        assert.ok(c.positionX < z.positionX);
+        assert(c.positionX < z.positionX);
         const modelPos = new Set(
             model.nodes.map(
                 n => `${n.positionX},${n.positionY}`,
             ),
         );
-        assert.equal(modelPos.size, 3);
+        assertStrictEquals(modelPos.size, 3);
     },
 );

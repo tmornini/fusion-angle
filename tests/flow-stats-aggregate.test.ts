@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     buildFlowStats,
     quantile,
@@ -58,49 +57,49 @@ export function makeFixture(): FlowStatsInput {
     };
 }
 
-test('quantile is linear-interpolation, p50 is true median', () => {
-    assert.equal(quantile([60, 120, 180, 240, 300], 0.5), 180);
-    assert.equal(quantile([60, 120, 180, 240, 300], 0.9), 276);
-    assert.equal(quantile([10],                    0.5),  10);
-    assert.equal(quantile([1, 3],                  0.5),   2);
+Deno.test('quantile is linear-interpolation, p50 is true median', () => {
+    assertStrictEquals(quantile([60, 120, 180, 240, 300], 0.5), 180);
+    assertStrictEquals(quantile([60, 120, 180, 240, 300], 0.9), 276);
+    assertStrictEquals(quantile([10],                    0.5),  10);
+    assertStrictEquals(quantile([1, 3],                  0.5),   2);
 });
 
-test('quantile on empty input returns 0', () => {
-    assert.equal(quantile([], 0.5), 0);
+Deno.test('quantile on empty input returns 0', () => {
+    assertStrictEquals(quantile([], 0.5), 0);
 });
 
-test('clipInterval returns overlap in seconds', () => {
+Deno.test('clipInterval returns overlap in seconds', () => {
     // window [10000, 100000] ms = [10s, 100s].
-    assert.equal(clipInterval(50000,  80000, 10000, 100000), 30);
-    assert.equal(clipInterval(0,      50000, 10000, 100000), 40);
-    assert.equal(clipInterval(-100000, 200000, 10000, 100000), 90);
-    assert.equal(clipInterval(0,      5000,  10000, 100000), 0);
-    assert.equal(clipInterval(110000, 200000, 10000, 100000), 0);
-    assert.equal(clipInterval(80000,  50000, 10000, 100000), 0);
+    assertStrictEquals(clipInterval(50000,  80000, 10000, 100000), 30);
+    assertStrictEquals(clipInterval(0,      50000, 10000, 100000), 40);
+    assertStrictEquals(clipInterval(-100000, 200000, 10000, 100000), 90);
+    assertStrictEquals(clipInterval(0,      5000,  10000, 100000), 0);
+    assertStrictEquals(clipInterval(110000, 200000, 10000, 100000), 0);
+    assertStrictEquals(clipInterval(80000,  50000, 10000, 100000), 0);
 });
 
-test(
+Deno.test(
     'buildFlowStats returns the structural shape'
     + ' on empty input',
     () => {
         const m: FlowStatsModel =
             buildFlowStats(makeFixture());
-        assert.equal(m.nodes.length, 4);
-        assert.deepEqual(
+        assertStrictEquals(m.nodes.length, 4);
+        assertEquals(
             m.nodes.map(n => n.id),
             ['c', 'a', 'b', 'z'],
         );
-        assert.equal(m.edges.length, 4);
-        assert.equal(m.pathEntries.length, 0);
-        assert.equal(
+        assertStrictEquals(m.edges.length, 4);
+        assertStrictEquals(m.pathEntries.length, 0);
+        assertStrictEquals(
             m.completedWorkOrderCount, 0,
         );
-        assert.equal(
+        assertStrictEquals(
             m.incompleteWorkOrderCount, 0,
         );
-        assert.equal(m.windowDays, 90);
-        assert.equal(m.droppedNodeIds.size, 0);
-        assert.equal(
+        assertStrictEquals(m.windowDays, 90);
+        assertStrictEquals(m.droppedNodeIds.size, 0);
+        assertStrictEquals(
             m.pathsWithDroppedStepsCount, 0,
         );
     },
@@ -113,7 +112,7 @@ function tBefore(
     return new Date(input.nowMs - ms).toISOString();
 }
 
-test(
+Deno.test(
     'attributes sojourns and computes'
     + ' heatPct + heatT',
     () => {
@@ -150,34 +149,34 @@ test(
         const byId = new Map(
             m.nodes.map(n => [n.id, n]),
         );
-        assert.equal(
+        assertStrictEquals(
             Math.round(byId.get('a')!.heatPct),
             67,
         );
-        assert.equal(
+        assertStrictEquals(
             Math.round(byId.get('b')!.heatPct),
             33,
         );
-        assert.equal(byId.get('c')!.heatPct, 0);
-        assert.equal(byId.get('z')!.heatPct, 0);
-        assert.equal(
+        assertStrictEquals(byId.get('c')!.heatPct, 0);
+        assertStrictEquals(byId.get('z')!.heatPct, 0);
+        assertStrictEquals(
             byId.get('a')!.heatT.toFixed(2),
             '0.67',
         );
-        assert.equal(
+        assertStrictEquals(
             byId.get('b')!.heatT.toFixed(2),
             '0.33',
         );
-        assert.equal(
+        assertStrictEquals(
             m.completedWorkOrderCount, 1,
         );
-        assert.equal(
+        assertStrictEquals(
             m.incompleteWorkOrderCount, 0,
         );
     },
 );
 
-test(
+Deno.test(
     'drops transitions to nodes missing'
     + ' from the current graph',
     () => {
@@ -199,14 +198,14 @@ test(
             ],
         };
         const m = buildFlowStats(input);
-        assert.ok(m.droppedNodeIds.has('GHOST'));
-        assert.equal(
+        assert(m.droppedNodeIds.has('GHOST'));
+        assertStrictEquals(
             m.pathsWithDroppedStepsCount, 1,
         );
     },
 );
 
-test(
+Deno.test(
     'clips sojourns to the trailing'
     + ' 90-day window',
     () => {
@@ -233,7 +232,7 @@ test(
             ],
         };
         const m = buildFlowStats(input);
-        assert.equal(
+        assertStrictEquals(
             Math.round(
                 m.nodes.find(n =>
                     n.id === 'a',
@@ -244,7 +243,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'tracks incomplete (in-flight) work orders',
     () => {
         const f = makeFixture();
@@ -263,16 +262,16 @@ test(
             ],
         };
         const m = buildFlowStats(input);
-        assert.equal(
+        assertStrictEquals(
             m.completedWorkOrderCount, 0,
         );
-        assert.equal(
+        assertStrictEquals(
             m.incompleteWorkOrderCount, 1,
         );
     },
 );
 
-test(
+Deno.test(
     'per-node percentiles, visits, WIP,'
     + ' throughput, revisit',
     () => {
@@ -348,28 +347,28 @@ test(
         const a = m.nodes.find(n => n.id === 'a')!;
         const b = m.nodes.find(n => n.id === 'b')!;
         // a visits: xdaJyuuPyHfffCGLhqDrOQ×1 + w2×2 + w3×1 = 4
-        assert.equal(a.visitsInWindow, 4);
-        assert.equal(a.distinctWorkOrders, 3);
-        assert.equal(a.currentlyHere, 1);
+        assertStrictEquals(a.visitsInWindow, 4);
+        assertStrictEquals(a.distinctWorkOrders, 3);
+        assertStrictEquals(a.currentlyHere, 1);
         // revisits: w2's 2nd visit → AjdvjuECVZEgZoFajaIEkg/4 = 25%
-        assert.equal(a.revisitRatePct, 25);
+        assertStrictEquals(a.revisitRatePct, 25);
         // throughput: 4 / (90/7) ≈ 0.31
-        assert.equal(
+        assertStrictEquals(
             a.throughputPerWeek.toFixed(2), '0.31',
         );
-        assert.equal(b.visitsInWindow, 3);
-        assert.equal(b.currentlyHere, 0);
+        assertStrictEquals(b.visitsInWindow, 3);
+        assertStrictEquals(b.currentlyHere, 0);
         // a sojourns sorted: [3600, 3600, 7200, 14400]
         // avg 7200, median (q*(n-1)=1.5 between
         // idx1=3600 and idx2=7200) = 5400,
         // p90 (idx=2.7 → 7200+0.7*(14400-7200) = 12240)
-        assert.equal(a.avgSeconds,    7200);
-        assert.equal(a.medianSeconds, 5400);
-        assert.equal(a.p90Seconds,    12240);
+        assertStrictEquals(a.avgSeconds,    7200);
+        assertStrictEquals(a.medianSeconds, 5400);
+        assertStrictEquals(a.p90Seconds,    12240);
     },
 );
 
-test(
+Deno.test(
     'resolves clan from memberIds, identifies'
     + ' top producer + vsClanAvg + share',
     () => {
@@ -447,20 +446,20 @@ test(
         };
         const m = buildFlowStats(input);
         const a = m.nodes.find(n => n.id === 'a')!;
-        assert.equal(a.clanSize, 3);
-        assert.equal(a.activeProducerCount, 2);
-        assert.equal(
+        assertStrictEquals(a.clanSize, 3);
+        assertStrictEquals(a.activeProducerCount, 2);
+        assertStrictEquals(
             a.assignmentLabel, 'Alex, Bea, Cy',
         );
-        assert.ok(a.topProducer);
-        assert.equal(a.topProducer!.name, 'Alex');
-        assert.equal(a.topProducer!.sharePct, 75);
-        assert.equal(a.topProducer!.vsClanAvgPct, 225);
-        assert.equal(a.topProducer!.inCurrentClan, true);
+        assert(a.topProducer);
+        assertStrictEquals(a.topProducer!.name, 'Alex');
+        assertStrictEquals(a.topProducer!.sharePct, 75);
+        assertStrictEquals(a.topProducer!.vsClanAvgPct, 225);
+        assertStrictEquals(a.topProducer!.inCurrentClan, true);
     },
 );
 
-test(
+Deno.test(
     'top producer outside the current clan'
     + ' is flagged',
     () => {
@@ -495,25 +494,25 @@ test(
         };
         const m = buildFlowStats(input);
         const a = m.nodes.find(n => n.id === 'a')!;
-        assert.equal(a.topProducer!.name, 'Zed');
-        assert.equal(
+        assertStrictEquals(a.topProducer!.name, 'Zed');
+        assertStrictEquals(
             a.topProducer!.inCurrentClan, false,
         );
     },
 );
 
-test(
+Deno.test(
     'unassigned node has clan size 0 and label'
     + ' "Unassigned"',
     () => {
         const m = buildFlowStats(makeFixture());
         const a = m.nodes.find(n => n.id === 'a')!;
-        assert.equal(a.clanSize, 0);
-        assert.equal(a.assignmentLabel, 'Unassigned');
+        assertStrictEquals(a.clanSize, 0);
+        assertStrictEquals(a.assignmentLabel, 'Unassigned');
     },
 );
 
-test(
+Deno.test(
     'branch split distributes outgoing transitions'
     + ' across edges',
     () => {
@@ -579,23 +578,23 @@ test(
         };
         const m = buildFlowStats(input);
         const b = m.nodes.find(n => n.id === 'b')!;
-        assert.equal(b.branchSplit.length, 2);
-        assert.equal(
+        assertStrictEquals(b.branchSplit.length, 2);
+        assertStrictEquals(
             b.branchSplit[0]!.label, 'approve',
         );
-        assert.equal(b.branchSplit[0]!.pct, 75);
-        assert.equal(
+        assertStrictEquals(b.branchSplit[0]!.pct, 75);
+        assertStrictEquals(
             b.branchSplit[1]!.label, 'revise',
         );
-        assert.equal(b.branchSplit[1]!.pct, 25);
+        assertStrictEquals(b.branchSplit[1]!.pct, 25);
     },
 );
 
-test(
+Deno.test(
     'branchSplit empty on linear (single-out) nodes',
     () => {
         const m = buildFlowStats(makeFixture());
-        assert.equal(
+        assertStrictEquals(
             m.nodes.find(n => n.id === 'a')!
                 .branchSplit.length,
             0,
@@ -603,28 +602,28 @@ test(
     },
 );
 
-test(
+Deno.test(
     'memberHazard is danger on zero-member'
     + ' regular nodes (per shouldShowMemberHazard)',
     () => {
         const m = buildFlowStats(makeFixture());
-        assert.equal(
+        assertStrictEquals(
             m.nodes.find(n => n.id === 'a')!
                 .memberHazard,
             'danger',
         );
-        assert.equal(
+        assertStrictEquals(
             m.nodes.find(n => n.id === 'b')!
                 .memberHazard,
             'danger',
         );
         // start and complete nodes never hazard
-        assert.equal(
+        assertStrictEquals(
             m.nodes.find(n => n.id === 'c')!
                 .memberHazard,
             null,
         );
-        assert.equal(
+        assertStrictEquals(
             m.nodes.find(n => n.id === 'z')!
                 .memberHazard,
             null,
@@ -632,7 +631,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'memberHazard is warning on single-member'
     + ' regular nodes with outgoing edges',
     () => {
@@ -642,12 +641,12 @@ test(
                 ? { ...n, memberIds: ['hw_1'] }
                 : n);
         const m = buildFlowStats({ ...f, nodes });
-        assert.equal(
+        assertStrictEquals(
             m.nodes.find(n => n.id === 'a')!
                 .memberHazard,
             'warning',
         );
-        assert.equal(
+        assertStrictEquals(
             m.nodes.find(n => n.id === 'b')!
                 .memberHazard,
             'warning',
@@ -655,7 +654,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'memberHazard is null on multi-member regular'
     + ' nodes with outgoing edges',
     () => {
@@ -668,12 +667,12 @@ test(
                 }
                 : n);
         const m = buildFlowStats({ ...f, nodes });
-        assert.equal(
+        assertStrictEquals(
             m.nodes.find(n => n.id === 'a')!
                 .memberHazard,
             null,
         );
-        assert.equal(
+        assertStrictEquals(
             m.nodes.find(n => n.id === 'b')!
                 .memberHazard,
             null,
@@ -681,7 +680,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'groups completed paths and sorts by frequency'
     + ' desc',
     () => {
@@ -753,29 +752,29 @@ test(
             ],
         };
         const m = buildFlowStats(input);
-        assert.equal(m.pathEntries.length, 2);
+        assertStrictEquals(m.pathEntries.length, 2);
         const top = m.pathEntries[0]! as
             { kind: 'path'; path: FlowPath };
-        assert.deepEqual(
+        assertEquals(
             top.path.nodeIds, ['c','a','b','z'],
         );
-        assert.equal(top.path.workOrderCount, 3);
-        assert.equal(top.path.sharePct, 75);
-        assert.deepEqual(
+        assertStrictEquals(top.path.workOrderCount, 3);
+        assertStrictEquals(top.path.sharePct, 75);
+        assertEquals(
             top.path.edgeIds, ['YiJPbufDpkyrZcZCYbUJpg','e2','e3'],
         );
         const second = m.pathEntries[1]! as
             { kind: 'path'; path: FlowPath };
-        assert.deepEqual(
+        assertEquals(
             second.path.nodeIds,
             ['c','a','b','a','b','z'],
         );
-        assert.equal(second.path.workOrderCount, 1);
-        assert.equal(second.path.sharePct, 25);
+        assertStrictEquals(second.path.workOrderCount, 1);
+        assertStrictEquals(second.path.sharePct, 25);
     },
 );
 
-test('collapses long tail into a rest bucket', () => {
+Deno.test('collapses long tail into a rest bucket', () => {
     const f = makeFixture();
     const t = (msAgo: number) => tBefore(f, msAgo);
     const H = 3600 * 1000;
@@ -812,16 +811,16 @@ test('collapses long tail into a rest bucket', () => {
         push('b', 'z');
     }
     const m = buildFlowStats({ ...f, transitions });
-    assert.equal(m.pathEntries.length, 9);
-    assert.equal(m.pathEntries[8]!.kind, 'rest');
+    assertStrictEquals(m.pathEntries.length, 9);
+    assertStrictEquals(m.pathEntries[8]!.kind, 'rest');
     const rest = m.pathEntries[8]! as
         { kind:'rest'; count:number;
           combinedSharePct:number };
-    assert.equal(rest.count, 2);
-    assert.equal(rest.combinedSharePct, 20);
+    assertStrictEquals(rest.count, 2);
+    assertStrictEquals(rest.combinedSharePct, 20);
 });
 
-test(
+Deno.test(
     'an out-of-order Archive is here-now at the later node',
     () => {
         const f = makeFixture();
@@ -850,9 +849,9 @@ test(
             ],
         };
         const m = buildFlowStats(input);
-        assert.equal(m.completedWorkOrderCount, 0);
-        assert.equal(m.incompleteWorkOrderCount, 1);
-        assert.equal(
+        assertStrictEquals(m.completedWorkOrderCount, 0);
+        assertStrictEquals(m.incompleteWorkOrderCount, 1);
+        assertStrictEquals(
             m.nodes.find(n => n.id === 'b')!.currentlyHere,
             1,
         );

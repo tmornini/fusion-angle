@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -46,7 +45,7 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('PATCH /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+Deno.test('PATCH /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
     + 'gVvtDIaqhnkXZQcxZeSuiw admin → 405 (known verb, no'
 + ' handler)', async () => {
     const db = await freshDb();
@@ -55,16 +54,16 @@ test('PATCH /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
         'PATCH', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gVvtDIaqhnkXZQcxZeSuiw', token, { set: {} },
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
     const body = await res.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         body.error,
         'Method PATCH not allowed on /organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/gVvtDIaqhnkXZQcxZeSuiw',
     );
 });
 
-test('PATCH /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+Deno.test('PATCH /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
     + 'gVvtDIaqhnkXZQcxZeSuiw member → 403 (policy before'
 + ' verb gap)', async () => {
     const db = await freshDb();
@@ -73,9 +72,9 @@ test('PATCH /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
         'PATCH', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gVvtDIaqhnkXZQcxZeSuiw', token, { set: {} },
     ));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
     const body = await res.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         body.error,
         'forbidden: PATCH /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gVvtDIaqhnkXZQcxZeSuiw requires a role'
@@ -83,25 +82,25 @@ test('PATCH /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
     );
 });
 
-test('PATCH /nowhere admin → 404', async () => {
+Deno.test('PATCH /nowhere admin → 404', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PATCH', '/nowhere', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PATCH unauthenticated → 401', async () => {
+Deno.test('PATCH unauthenticated → 401', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
         'PATCH', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gVvtDIaqhnkXZQcxZeSuiw', undefined, {},
     ));
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
 });
 
-test('writeAuthorizerFor includes PATCH on organizations/:id/ideas/:id',
+Deno.test('writeAuthorizerFor includes PATCH on organizations/:id/ideas/:id',
 () => {
     const put = writeAuthorizerFor('organizations/:id/ideas/:id', 'PUT');
     const patch = writeAuthorizerFor(
@@ -110,21 +109,21 @@ test('writeAuthorizerFor includes PATCH on organizations/:id/ideas/:id',
     const post = writeAuthorizerFor(
         'organizations/:id/ideas/:id', 'POST',
     );
-    assert.deepEqual(put, {
+    assertEquals(put, {
         table: 'ideas', idParamIndex: 1,
     });
-    assert.deepEqual(patch, put);
-    assert.equal(post, undefined);
+    assertEquals(patch, put);
+    assertStrictEquals(post, undefined);
 });
 
-test('IF_MATCH_HEADER is if-match and is hoisted',
+Deno.test('IF_MATCH_HEADER is if-match and is hoisted',
 () => {
-    assert.equal(IF_MATCH_HEADER, 'if-match');
+    assertStrictEquals(IF_MATCH_HEADER, 'if-match');
     const request = new Request('http://x/', {
         headers: { 'if-match': '"pair-head-1"' },
     });
     const fields = hoistedHeaderFields(request);
-    assert.ok(
+    assert(
         fields.some(
             f => f.name === 'if-match'
                 && f.value === '"pair-head-1"',

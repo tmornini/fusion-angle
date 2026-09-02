@@ -1,7 +1,11 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { deriveRecordStateHistory } from
     '../api/derive-record-types.ts';
-import { strict as assert } from 'node:assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -24,7 +28,7 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-test(
+Deno.test(
     'postRecordChange create writes the row and'
     + ' the initial state event',
     async () => {
@@ -43,14 +47,14 @@ test(
             initialState: 'active',
         });
         const stored = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
-        assert.equal(stored.id, 'rbfHGatkwQzGZJVXKJEeyw');
-        assert.equal(stored.name, 'Customer');
+        assertStrictEquals(stored.id, 'rbfHGatkwQzGZJVXKJEeyw');
+        assertStrictEquals(stored.name, 'Customer');
         // Lifecycle-current trio is stamped on the GET row.
-        assert.equal(stored.state, 'active');
+        assertStrictEquals(stored.state, 'active');
     },
 );
 
-test(
+Deno.test(
     'postRecordChange create writes attributes'
     + ' alongside the record',
     async () => {
@@ -85,12 +89,12 @@ test(
                 + 'rbfHGatkwQzGZJVXKJEeyw'
             + '/attributes/',
         );
-        assert.equal(attrs.length, 1);
-        assert.equal(attrs[0]!.name, 'Fee');
+        assertStrictEquals(attrs.length, 1);
+        assertStrictEquals(attrs[0]!.name, 'Fee');
     },
 );
 
-test(
+Deno.test(
     'putRecord overwrites an existing row',
     async () => {
         const db = memoryDbAdapter();
@@ -114,12 +118,12 @@ test(
             state: 'active',
         });
         const stored = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
-        assert.equal(stored.name, 'B');
-        assert.equal(stored.description, 'second');
+        assertStrictEquals(stored.name, 'B');
+        assertStrictEquals(stored.description, 'second');
     },
 );
 
-test(
+Deno.test(
     'postRecordChange edit replaces removed'
     + ' attributes with new ones',
     async () => {
@@ -178,12 +182,12 @@ test(
                 + 'rbfHGatkwQzGZJVXKJEeyw'
             + '/attributes/',
         );
-        assert.equal(attrs.length, 1);
-        assert.equal(attrs[0]!.id, newAttrId);
+        assertStrictEquals(attrs.length, 1);
+        assertStrictEquals(attrs[0]!.id, newAttrId);
     },
 );
 
-test(
+Deno.test(
     'getRecords excludes records whose latest'
     + ' state event is deleted',
     async () => {
@@ -219,11 +223,11 @@ test(
         const ids = records
             .map(r => r.record.idForLink())
             .sort();
-        assert.deepEqual(ids, ['rbfHGatkwQzGZJVXKJEeyw']);
+        assertEquals(ids, ['rbfHGatkwQzGZJVXKJEeyw']);
     },
 );
 
-test(
+Deno.test(
     'postRecordStateChange records a new event'
     + ' without changing non-lifecycle entity fields'
     + ' on GET',
@@ -249,18 +253,18 @@ test(
         const after = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
         // Entity content fields unchanged; GET trio advances
         // to the transition event (lifecycle-current stamp).
-        assert.equal(after.name, before.name);
-        assert.equal(after.description, 'orig');
-        assert.equal(after.position, before.position);
-        assert.equal(after.state, 'archived');
+        assertStrictEquals(after.name, before.name);
+        assertStrictEquals(after.description, 'orig');
+        assertStrictEquals(after.position, before.position);
+        assertStrictEquals(after.state, 'archived');
         const model = await getRecordModel(
             ctx, 'rbfHGatkwQzGZJVXKJEeyw',
         );
-        assert.equal(model.stateValue(), 'archived');
+        assertStrictEquals(model.stateValue(), 'archived');
         const events = await deriveRecordStateHistory(
             db, 'AjdvjuECVZEgZoFajaIEkg', 'rbfHGatkwQzGZJVXKJEeyw',
         );
-        assert.equal(events.at(-1)?.state, 'archived');
+        assertStrictEquals(events.at(-1)?.state, 'archived');
     },
 );
 
@@ -268,15 +272,16 @@ test(
 // deleted — production-dead. Its throws-on-absence force
 // re-homes onto getRecordModel: a missing record is a GET
 // miss (Not found), not a dual-plane "no state event".
-test(
+Deno.test(
     'getRecordModel rejects a missing record',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await organizationToken());
-        await assert.rejects(
+        await assertRejects(
             () => getRecordModel(ctx, generateIdentifier()),
-            /Not found/,
+            Error,
+            'Not found',
         );
     },
 );
@@ -284,7 +289,7 @@ test(
 // Former adapters-state-events pin: bulk record lifecycle
 // is the GET-stamped row collection — an idea with an
 // overlapping alphabet value must not appear as a record.
-test(
+Deno.test(
     'getRecords excludes a same-valued idea',
     async () => {
         const db = memoryDbAdapter();
@@ -318,15 +323,15 @@ test(
         const ids = rows.map(
             r => r.record.idForLink(),
         );
-        assert.ok(ids.includes('rOEPOcVMQdJiiiMuiiEhlg'));
-        assert.ok(
+        assert(ids.includes('rOEPOcVMQdJiiiMuiiEhlg'));
+        assert(
             !ids.includes('fndCYAsXazdzMUlEGMNIZw'),
             'idea must not leak into records',
         );
     },
 );
 
-test(
+Deno.test(
     'state events for records land in the unified'
     + ' states log',
     async () => {
@@ -356,7 +361,7 @@ test(
         const values = events
             .map(e => e.state)
             .sort();
-        assert.deepEqual(
+        assertEquals(
             values, ['active', 'archived'],
         );
     },

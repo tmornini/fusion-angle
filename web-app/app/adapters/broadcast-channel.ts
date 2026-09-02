@@ -1,9 +1,10 @@
 // The ONLY place BroadcastChannel is named — the divorce
 // point for cross-tab data notification, against the day the
-// platform evolves. Inert without a browser: Node ships a
-// BroadcastChannel (for worker threads), so absence can't be
-// the guard; we key on `window`, so post/subscribe are no-ops
-// under `node --test` and never hold the process open.
+// platform evolves. Inert without a browser: Deno ships a
+// BroadcastChannel of its own, so absence can't be the guard;
+// we key on `window`, so post/subscribe are no-ops under
+// `deno test` unless a test shims `window`. One that does
+// releases the handle through deleteNotificationChannel.
 
 import {
     subscribeEventListener,
@@ -40,19 +41,20 @@ function getChannel(): BroadcastChannel | undefined {
     if (typeof window === 'undefined') return undefined;
     if (channel === undefined) {
         channel = new BroadcastChannel(CHANNEL_NAME);
-        // A test that shims `window` could reach here under
-        // node --test, where BroadcastChannel is a ref'd
-        // handle that would keep the runner from exiting.
-        // Node's channel exposes unref(); the browser's does
-        // not, so this is a no-op in a real tab.
-        (channel as unknown as {
-            unref?: () => void;
-        }).unref?.();
         subscribeEventListener(
             channel, 'message', dispatch,
         );
     }
     return channel;
+}
+
+// A tab releases its channel at unload; a test process has
+// no unload, so the divorce point offers the release
+// explicitly. getChannel reopens lazily and re-registers
+// dispatch on the new handle, so the subscribers survive.
+export function deleteNotificationChannel(): void {
+    channel?.close();
+    channel = undefined;
 }
 
 // Announce a scoped (or full) notification event. Other tabs'

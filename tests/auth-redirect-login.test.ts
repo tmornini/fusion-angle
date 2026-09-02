@@ -8,31 +8,30 @@ globalThis.document = {
     },
 } as unknown as Document;
 
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertMatch, assertStrictEquals } from '@std/assert';
 import { redirectToLogin } from
     '../web-app/app/auth-redirect.ts';
 
-test('an unknown page bounces to auth with no return',
+Deno.test('an unknown page bounces to auth with no return',
 () => {
     pageName = 'snapshots';
     window.location.href = '';
     redirectToLogin();
-    assert.match(
+    assertMatch(
         window.location.href,
         /auth\/index\.html$/,
     );
-    assert.equal(
+    assertStrictEquals(
         window.location.href.includes('return='),
         false,
     );
 });
 
-test('a gated page still carries return', () => {
+Deno.test('a gated page still carries return', () => {
     pageName = 'dashboard';
     window.location.href = '';
     redirectToLogin();
-    assert.match(
+    assertMatch(
         window.location.href,
         /auth.*return=dashboard/,
     );

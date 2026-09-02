@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { organizationRow } from './test-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
@@ -12,14 +11,14 @@ import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-test('putOrganization then getOrganization round-trips',
+Deno.test('putOrganization then getOrganization round-trips',
 async () => {
     const { ctx } = await adminContext();
     await putOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg'
         , organizationRow('Acme'));
     const organization = await getOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg');
-    assert.equal(organization.name, 'Acme');
-    assert.equal(organization.id, 'AjdvjuECVZEgZoFajaIEkg');
+    assertStrictEquals(organization.name, 'Acme');
+    assertStrictEquals(organization.id, 'AjdvjuECVZEgZoFajaIEkg');
 });
 
 // Below-facade pair formation (the member-fixtures.ts idiom):
@@ -43,7 +42,7 @@ async function seedMembershipPair(
     );
 }
 
-test('getOrganizations returns only the caller member orgs',
+Deno.test('getOrganizations returns only the caller member orgs',
 async () => {
     const { db, ctx } = await adminContext();
     await putOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg'
@@ -57,6 +56,6 @@ async () => {
         '2026-06-04T00:00:00.000000Z',
     );
     const organizations = await getOrganizations(ctx);
-    assert.deepEqual(organizations.map(o => o.id)
+    assertEquals(organizations.map(o => o.id)
         , ['AjdvjuECVZEgZoFajaIEkg']);
 });

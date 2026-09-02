@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals } from '@std/assert';
 import type { DbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -148,35 +147,35 @@ export function defineStoreAcceptance(
         return { db, token: await organizationToken() };
     }
 
-    test(name + ': get live PUT', async () => {
+    Deno.test(name + ': get live PUT', async () => {
         const { db, token } = await ready();
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'tcoFxeBipRIaYftXqNfjIg', token,
             ideaDocument('Live', 'ev-sa-live'),
         ));
-        assert.equal(put.status, 201);
+        assertStrictEquals(put.status, 201);
         const putEtag = put.headers.get('ETag');
-        assert.ok(putEtag !== null && putEtag !== '');
+        assert(putEtag !== null && putEtag !== '');
         const got = await handleRequest(
             db, req('GET'
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'tcoFxeBipRIaYftXqNfjIg', token),
         );
-        assert.equal(got.status, 200);
-        assert.equal(got.headers.get('ETag'), putEtag);
+        assertStrictEquals(got.status, 200);
+        assertStrictEquals(got.headers.get('ETag'), putEtag);
         const body = await got.json() as { title: string };
-        assert.equal(body.title, 'Live');
+        assertStrictEquals(body.title, 'Live');
     });
 
-    test(name + ': DELETE head is gone', async () => {
+    Deno.test(name + ': DELETE head is gone', async () => {
         const { db, token } = await ready();
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
                 + 'tOGidMXUNrBnbXkIQWSpag', token,
             { type: 'member', at: '2026-01-01T00:00:00.000000Z' },
         ));
-        assert.equal(put.status, 201);
+        assertStrictEquals(put.status, 201);
         const del = await handleRequest(
             db, req(
                 'DELETE',
@@ -185,7 +184,7 @@ export function defineStoreAcceptance(
                 token,
             ),
         );
-        assert.equal(del.status, 204);
+        assertStrictEquals(del.status, 204);
         const got = await handleRequest(
             db, req(
                 'GET',
@@ -194,10 +193,10 @@ export function defineStoreAcceptance(
                 token,
             ),
         );
-        assert.equal(got.status, 404);
+        assertStrictEquals(got.status, 404);
     });
 
-    test(name + ': same-body PUT is 200', async () => {
+    Deno.test(name + ': same-body PUT is 200', async () => {
         const { db, token } = await ready();
         const body = ideaDocument('Same', 'ev-sa-same');
         const first = await handleRequest(
@@ -205,9 +204,9 @@ export function defineStoreAcceptance(
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'tlQsXUYcTRtLtuHsWqBJBQ', token, body),
         );
-        assert.equal(first.status, 201);
+        assertStrictEquals(first.status, 201);
         const firstEtag = first.headers.get('ETag');
-        assert.equal(
+        assertStrictEquals(
             await messagePairsAt(db, IDEA_PREFIX, 'tlQsXUYcTRtLtuHsWqBJBQ'),
             1,
         );
@@ -216,15 +215,15 @@ export function defineStoreAcceptance(
                 + 'tlQsXUYcTRtLtuHsWqBJBQ', token, body,
             undefined, generateIdentifier(),
         ));
-        assert.equal(second.status, 200);
-        assert.equal(second.headers.get('ETag'), firstEtag);
-        assert.equal(
+        assertStrictEquals(second.status, 200);
+        assertStrictEquals(second.headers.get('ETag'), firstEtag);
+        assertStrictEquals(
             await messagePairsAt(db, IDEA_PREFIX, 'tlQsXUYcTRtLtuHsWqBJBQ'),
             1,
         );
     });
 
-    test(name + ': exact retry keeps status', async () => {
+    Deno.test(name + ': exact retry keeps status', async () => {
         const { db, token } = await ready();
         const body = ideaDocument('Retry', 'ev-sa-retry');
         const first = await handleRequest(
@@ -232,7 +231,7 @@ export function defineStoreAcceptance(
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'tjrZLujBtBVqFwOsBDWdQQ', token, body),
         );
-        assert.equal(first.status, 201);
+        assertStrictEquals(first.status, 201);
         const firstId = first.headers.get('Response-ID');
         const firstOp = first.headers.get('Operation-ID');
         const firstBytes = await first.text();
@@ -241,54 +240,54 @@ export function defineStoreAcceptance(
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'tjrZLujBtBVqFwOsBDWdQQ', token, body),
         );
-        assert.equal(second.status, 201);
-        assert.equal(
+        assertStrictEquals(second.status, 201);
+        assertStrictEquals(
             second.headers.get('Operation-ID'), firstOp,
         );
-        assert.equal(
+        assertStrictEquals(
             second.headers.get('Response-ID'), firstId,
         );
-        assert.equal(await second.text(), firstBytes);
-        assert.equal(
+        assertStrictEquals(await second.text(), firstBytes);
+        assertStrictEquals(
             await messagePairsAt(db, IDEA_PREFIX, 'tjrZLujBtBVqFwOsBDWdQQ'),
             1,
         );
     });
 
-    test(name + ': address miss is 404', async () => {
+    Deno.test(name + ': address miss is 404', async () => {
         const { db, token } = await ready();
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'tiYxjzuiloksGbOADnuMWA', token,
             projectDocument('Other', 'ev-sa-miss'),
         ));
-        assert.equal(put.status, 201);
+        assertStrictEquals(put.status, 201);
         const got = await handleRequest(
             db, req('GET'
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'tiYxjzuiloksGbOADnuMWA', token),
         );
-        assert.equal(got.status, 404);
+        assertStrictEquals(got.status, 404);
     });
 
-    test(name + ': If-Match stale is 412', async () => {
+    Deno.test(name + ': If-Match stale is 412', async () => {
         const { db, token } = await ready();
         const created = await handleRequest(db, req(
             'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token
                 , flowCreate('tYhGBKEoBjBYeqTcJWMNVQ'),
         ));
-        assert.equal(created.status, 201);
+        assertStrictEquals(created.status, 201);
         const live = await handleRequest(
             db, req('GET'
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'tYhGBKEoBjBYeqTcJWMNVQ', token),
         );
-        assert.equal(live.status, 200);
+        assertStrictEquals(live.status, 200);
         const liveEtag = live.headers.get('ETag');
         const liveBody = await live.json() as {
             name: string;
         };
-        assert.equal(liveBody.name, 'Acceptance');
+        assertStrictEquals(liveBody.name, 'Acceptance');
         const before = await messagePairsAt(
             db, FLOW_PREFIX, 'tYhGBKEoBjBYeqTcJWMNVQ',
         );
@@ -298,8 +297,8 @@ export function defineStoreAcceptance(
             flowDocument('Stale', generateIdentifier()),
             { 'if-match': '"' + generateIdentifier() + '"' },
         ));
-        assert.equal(stale.status, 412);
-        assert.equal(
+        assertStrictEquals(stale.status, 412);
+        assertStrictEquals(
             await messagePairsAt(db, FLOW_PREFIX, 'tYhGBKEoBjBYeqTcJWMNVQ'),
             before,
         );
@@ -308,11 +307,11 @@ export function defineStoreAcceptance(
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'tYhGBKEoBjBYeqTcJWMNVQ', token),
         );
-        assert.equal(again.status, 200);
-        assert.equal(again.headers.get('ETag'), liveEtag);
+        assertStrictEquals(again.status, 200);
+        assertStrictEquals(again.headers.get('ETag'), liveEtag);
         const againBody = await again.json() as {
             name: string;
         };
-        assert.equal(againBody.name, liveBody.name);
+        assertStrictEquals(againBody.name, liveBody.name);
     });
 }

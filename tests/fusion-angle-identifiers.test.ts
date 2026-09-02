@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertNotStrictEquals, assertStrictEquals } from '@std/assert';
 import { TOKEN_AUDIENCE } from
     '../api/access-token.ts';
 import {
@@ -11,37 +10,37 @@ import {
     STORAGE_KEY_PENDING_TOAST,
 } from '../web-app/app/storage-keys.ts';
 
-test('JWT audience is fusion-angle', () => {
-    assert.equal(TOKEN_AUDIENCE, 'fusion-angle');
-    assert.notEqual(
+Deno.test('JWT audience is fusion-angle', () => {
+    assertStrictEquals(TOKEN_AUDIENCE, 'fusion-angle');
+    assertNotStrictEquals(
         TOKEN_AUDIENCE,
         'fusion-angle-web',
     );
 });
 
-test('storage keys use the fusion-angle prefix',
+Deno.test('storage keys use the fusion-angle prefix',
 () => {
-    assert.equal(
+    assertStrictEquals(
         STORAGE_KEY_AUTHORIZATION,
         'fusion-angle:authorization',
     );
-    assert.equal(
+    assertStrictEquals(
         STORAGE_KEY_ACTIVE_ORGANIZATION_ID,
         'fusion-angle:active-organization-id',
     );
-    assert.equal(
+    assertStrictEquals(
         STORAGE_KEY_THEME,
         'fusion-angle:theme',
     );
-    assert.equal(
+    assertStrictEquals(
         STORAGE_KEY_SIDEBAR,
         'fusion-angle:sidebar-collapsed',
     );
-    assert.equal(
+    assertStrictEquals(
         STORAGE_KEY_LOG_LEVEL,
         'fusion-angle:log-level',
     );
-    assert.equal(
+    assertStrictEquals(
         STORAGE_KEY_PENDING_TOAST,
         'fusion-angle:pending-toast',
     );

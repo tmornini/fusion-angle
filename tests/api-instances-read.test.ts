@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -134,7 +133,7 @@ async function putLiveType(
     const put = await handleRequest(db, req(
         'PUT', TYPE_DETAIL, adminToken, typeBody(),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function putAttribute(
@@ -146,7 +145,7 @@ async function putAttribute(
     const put = await handleRequest(db, req(
         'PUT', ATTRS + attrId, adminToken, body,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedPublicAndSecretAttrs(
@@ -235,7 +234,7 @@ interface InstanceDetailWire {
     etag?: string;
 }
 
-test('GET detail member → 200; only read-permitted '
+Deno.test('GET detail member → 200; only read-permitted '
 + 'values; ETag is the quoted head pair id',
 async () => {
     const { db, adminToken, memberToken } =
@@ -254,22 +253,22 @@ async () => {
             },
         ],
     );
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const etag = res.headers.get('ETag');
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_A,
     );
-    assert.ok(head !== undefined);
-    assert.ok(
+    assert(head !== undefined);
+    assert(
         etag !== null && isIdentifier(etag.slice(1, -1)),
     );
-    assert.equal(etag, strongEtagOf(head.messagePairId));
+    assertStrictEquals(etag, strongEtagOf(head.messagePairId));
     const body = await res.json() as InstanceDetailWire;
-    assert.deepEqual(body, {
+    assertEquals(body, {
         id: INSTANCE_A,
         organization_id: ORGANIZATION,
         record_type_id: TYPE_ID,
@@ -280,14 +279,14 @@ async () => {
             },
         ],
     });
-    assert.equal(
+    assertStrictEquals(
         'etag' in body,
         false,
         'detail embeds no etag field (header only)',
     );
 });
 
-test('GET detail, caller reads ZERO → 200 values: []',
+Deno.test('GET detail, caller reads ZERO → 200 values: []',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -309,13 +308,13 @@ async () => {
             },
         ],
     );
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const body = await res.json() as InstanceDetailWire;
-    assert.deepEqual(body, {
+    assertEquals(body, {
         id: INSTANCE_A,
         organization_id: ORGANIZATION,
         record_type_id: TYPE_ID,
@@ -323,7 +322,7 @@ async () => {
     });
 });
 
-test('GET detail admin → 200 all values (bypass)',
+Deno.test('GET detail admin → 200 all values (bypass)',
 async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
@@ -340,21 +339,21 @@ async () => {
             },
         ],
     );
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), adminToken,
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const body = await res.json() as InstanceDetailWire;
-    assert.equal(body.values.length, 2);
+    assertStrictEquals(body.values.length, 2);
     const byId = new Map(
         body.values.map((v) => [v.attribute_id, v.value]),
     );
-    assert.equal(byId.get(ATTR_PUBLIC), 'Hello');
-    assert.equal(byId.get(ATTR_SECRET), 'hidden');
+    assertStrictEquals(byId.get(ATTR_PUBLIC), 'Hello');
+    assertStrictEquals(byId.get(ATTR_SECRET), 'hidden');
 });
 
-test('member and admin share the head pair id as ETag',
+Deno.test('member and admin share the head pair id as ETag',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -372,11 +371,11 @@ async () => {
             },
         ],
     );
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_A,
     );
-    assert.ok(head !== undefined);
+    assert(head !== undefined);
     const expected = strongEtagOf(head.messagePairId);
     const memberGet = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
@@ -384,19 +383,19 @@ async () => {
     const adminGet = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), adminToken,
     ));
-    assert.equal(memberGet.status, 200);
-    assert.equal(adminGet.status, 200);
-    assert.equal(memberGet.headers.get('ETag'), expected);
-    assert.equal(adminGet.headers.get('ETag'), expected);
-    assert.equal(memberGet.headers.get('Response-ID'), null);
-    assert.equal(adminGet.headers.get('Response-ID'), null);
-    assert.equal(
+    assertStrictEquals(memberGet.status, 200);
+    assertStrictEquals(adminGet.status, 200);
+    assertStrictEquals(memberGet.headers.get('ETag'), expected);
+    assertStrictEquals(adminGet.headers.get('ETag'), expected);
+    assertStrictEquals(memberGet.headers.get('Response-ID'), null);
+    assertStrictEquals(adminGet.headers.get('Response-ID'), null);
+    assertStrictEquals(
         memberGet.headers.get(
             'Authorization-Limited-Attributes',
         ),
         'true',
     );
-    assert.equal(
+    assertStrictEquals(
         adminGet.headers.get(
             'Authorization-Limited-Attributes',
         ),
@@ -408,8 +407,8 @@ async () => {
     const listAdmin = await handleRequest(db, req(
         'GET', INSTANCES, adminToken,
     ));
-    assert.equal(listMember.status, 200);
-    assert.equal(listAdmin.status, 200);
+    assertStrictEquals(listMember.status, 200);
+    assertStrictEquals(listAdmin.status, 200);
     const memberRows = await listMember.json() as {
         id: string;
         etag: string;
@@ -424,13 +423,13 @@ async () => {
     const adminRow = adminRows.find(
         (row) => row.id === INSTANCE_A,
     );
-    assert.ok(memberRow !== undefined);
-    assert.ok(adminRow !== undefined);
-    assert.equal(memberRow.etag, head.messagePairId);
-    assert.equal(adminRow.etag, head.messagePairId);
+    assert(memberRow !== undefined);
+    assert(adminRow !== undefined);
+    assertStrictEquals(memberRow.etag, head.messagePairId);
+    assertStrictEquals(adminRow.etag, head.messagePairId);
 });
 
-test('GET detail absent → 404 record_instances '
+Deno.test('GET detail absent → 404 record_instances '
 + '(missedReadError)',
 async () => {
     const { db, adminToken, memberToken } =
@@ -440,13 +439,13 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', detailPath(missing), memberToken,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error: 'Not found: record_instances/' + missing,
     });
 });
 
-test('GET detail tombstoned → 404 record_instances',
+Deno.test('GET detail tombstoned → 404 record_instances',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -470,14 +469,14 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error:
             'Not found: record_instances/' + INSTANCE_A,
     });
 });
 
-test('GET detail foreign instance id under own org path '
+Deno.test('GET detail foreign instance id under own org path '
 + '→ 404 (missedReadError R2)',
 async () => {
     const { db, adminToken, memberToken } =
@@ -502,14 +501,14 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error:
             'Not found: record_instances/' + INSTANCE_A,
     });
 });
 
-test('GET list → 200 identifier order ASC; tombstones'
+Deno.test('GET list → 200 identifier order ASC; tombstones'
 + ' omitted; row etag == detail ETag sans quotes',
 async () => {
     const { db, adminToken, memberToken } =
@@ -533,7 +532,7 @@ async () => {
             },
         ],
     );
-    assert.equal(putB.status, 201);
+    assertStrictEquals(putB.status, 201);
     const putA = await putInstance(
         db, memberToken, INSTANCE_A, [
             {
@@ -542,7 +541,7 @@ async () => {
             },
         ],
     );
-    assert.equal(putA.status, 201);
+    assertStrictEquals(putA.status, 201);
     await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_C,
         'PUT', {
@@ -562,28 +561,28 @@ async () => {
     const list = await handleRequest(db, req(
         'GET', INSTANCES, memberToken,
     ));
-    assert.equal(list.status, 200);
+    assertStrictEquals(list.status, 200);
     const rows = await list.json() as InstanceDetailWire[];
-    assert.equal(rows.length, 2);
+    assertStrictEquals(rows.length, 2);
     const ordered = [INSTANCE_A, INSTANCE_B]
         .slice()
         .sort(compareIdentifiers);
-    assert.equal(rows[0]!.id, ordered[0]);
-    assert.equal(rows[1]!.id, ordered[1]);
-    assert.ok(isIdentifier(rows[0]!.etag!));
-    assert.ok(isIdentifier(rows[1]!.etag!));
+    assertStrictEquals(rows[0]!.id, ordered[0]);
+    assertStrictEquals(rows[1]!.id, ordered[1]);
+    assert(isIdentifier(rows[0]!.etag!));
+    assert(isIdentifier(rows[1]!.etag!));
     const firstId = rows[0]!.id;
     const detailFirst = await handleRequest(db, req(
         'GET', detailPath(firstId), memberToken,
     ));
-    assert.equal(detailFirst.status, 200);
+    assertStrictEquals(detailFirst.status, 200);
     const detailEtag = detailFirst.headers.get('ETag');
-    assert.ok(detailEtag !== null);
-    assert.equal(
+    assert(detailEtag !== null);
+    assertStrictEquals(
         rows[0]!.etag,
         detailEtag.slice(1, -1),
     );
-    assert.deepEqual(rows[0]!.values, [
+    assertEquals(rows[0]!.values, [
         {
             attribute_id: ATTR_PUBLIC,
             value: firstId === INSTANCE_A ? 'A' : 'B',
@@ -591,19 +590,19 @@ async () => {
     ]);
 });
 
-test('GET list under absent type → 404 record_types',
+Deno.test('GET list under absent type → 404 record_types',
 async () => {
     const { db, memberToken } = await adminDb();
     const res = await handleRequest(db, req(
         'GET', INSTANCES, memberToken,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error: 'Not found: record_types/' + TYPE_ID,
     });
 });
 
-test('instance ETag is the head pair id',
+Deno.test('instance ETag is the head pair id',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -625,22 +624,22 @@ async () => {
             },
         ],
     );
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const header = res.headers.get('ETag');
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_A,
     );
-    assert.ok(head !== undefined);
-    assert.ok(header !== null);
-    assert.ok(isIdentifier(header.slice(1, -1)));
-    assert.equal(header, strongEtagOf(head.messagePairId));
+    assert(head !== undefined);
+    assert(header !== null);
+    assert(isIdentifier(header.slice(1, -1)));
+    assertStrictEquals(header, strongEtagOf(head.messagePairId));
 });
 
-test('GET after full-state revision pair → values from '
+Deno.test('GET after full-state revision pair → values from '
 + 'ONE head (no fold across genesis)',
 async () => {
     const { db, adminToken, memberToken } =
@@ -682,28 +681,28 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), adminToken,
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const revEtag = res.headers.get('ETag');
-    assert.ok(
+    assert(
         revEtag !== null
         && isIdentifier(revEtag.slice(1, -1)),
     );
-    assert.equal(revEtag, strongEtagOf(revisionId));
+    assertStrictEquals(revEtag, strongEtagOf(revisionId));
     const body = await res.json() as InstanceDetailWire;
     const byId = new Map(
         body.values.map((v) => [v.attribute_id, v.value]),
     );
-    assert.equal(byId.get(ATTR_PUBLIC), 'new');
-    assert.equal(byId.get(ATTR_SECRET), 'sec');
-    assert.equal(byId.has('missing'), false);
+    assertStrictEquals(byId.get(ATTR_PUBLIC), 'new');
+    assertStrictEquals(byId.get(ATTR_SECRET), 'sec');
+    assertStrictEquals(byId.has('missing'), false);
     // Member projection still applies on the revision head.
     const memberRes = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
     ));
-    assert.equal(memberRes.status, 200);
+    assertStrictEquals(memberRes.status, 200);
     const memberBody =
         await memberRes.json() as InstanceDetailWire;
-    assert.deepEqual(memberBody.values, [
+    assertEquals(memberBody.values, [
         {
             attribute_id: ATTR_PUBLIC,
             value: 'new',

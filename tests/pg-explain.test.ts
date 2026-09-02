@@ -1,5 +1,4 @@
-import { after, before, test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertNotMatch } from '@std/assert';
 import { connectPostgres } from
     '../api/postgres-client.ts';
 import { PostgresBackend } from
@@ -16,7 +15,7 @@ import { decodeIdentifier } from
 // Postgres-free: skip when POSTGRES_URL is unset. Private
 // schema per file; do not share schemas across files.
 
-const POSTGRES_URL = process.env['POSTGRES_URL'];
+const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 const IDEA_COLLECTION = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
@@ -38,12 +37,12 @@ const OPERATION = 'WvNiHVgksjrlfhPfdgfcyQ';
 const AUTH_CONTAINMENT = { code: 'abc' };
 
 function schemaName(): string {
-    const base = process.env['SCHEMA_NAME']
+    const base = Deno.env.get('SCHEMA_NAME')
         ?? (
             'fusion_test_'
             + String(Date.now())
             + '_'
-            + String(process.pid)
+            + String(Deno.pid)
         );
     const name = base + '_explain';
     if (!IDENT.test(name)) {
@@ -260,18 +259,18 @@ function assertIndexPlan(
     indexes: readonly string[],
 ): void {
     for (const name of indexes) {
-        assert.ok(
+        assert(
             text.includes(name),
             'expected ' + name + ' in\n' + text,
         );
     }
-    assert.doesNotMatch(text, /Seq Scan/);
+    assertNotMatch(text, /Seq Scan/);
 }
 
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
-    test(
+    Deno.test(
         'postgres explain skipped without POSTGRES_URL',
-        { skip: 'POSTGRES_URL is unset' },
+        { ignore: true }, // POSTGRES_URL is unset
         () => {},
     );
 } else {
@@ -283,7 +282,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     const ideaId = id22(IDEA_N);
     const ideaHash = hex64(IDEA_N);
 
-    before(async () => {
+    Deno.test.beforeAll(async () => {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
@@ -292,7 +291,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.query`ANALYZE message_pairs`;
     });
 
-    after(async () => {
+    Deno.test.afterAll(async () => {
         try {
             await sql.unsafe(
                 'DROP SCHEMA IF EXISTS '
@@ -304,7 +303,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         }
     });
 
-    test('pk uses message_pairs_pkey', async () => {
+    Deno.test('pk uses message_pairs_pkey', async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
@@ -318,7 +317,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
     });
 
-    test('small collection uses collection index',
+    Deno.test('small collection uses collection index',
     async () => {
         const plans = await sql.query<
             Record<string, unknown>
@@ -334,7 +333,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
     });
 
-    test('request_hash uses message_pairs_replay', async () => {
+    Deno.test('request_hash uses message_pairs_replay', async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
@@ -348,7 +347,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
     });
 
-    test('address uses address index', async () => {
+    Deno.test('address uses address index', async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
@@ -364,7 +363,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
     });
 
-    test('body containment uses message_pairs_body',
+    Deno.test('body containment uses message_pairs_body',
     async () => {
         const plans = await sql.query<
             Record<string, unknown>
@@ -382,7 +381,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
     });
 
-    test('latestPutDelete uses address and pkey',
+    Deno.test('latestPutDelete uses address and pkey',
     async () => {
         const plans = await sql.query<
             Record<string, unknown>
@@ -397,8 +396,8 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             LIMIT 1
         `;
         const text = explainText(plans);
-        assert.doesNotMatch(text, /requests_pkey/);
-        assert.doesNotMatch(text, /Join/);
+        assertNotMatch(text, /requests_pkey/);
+        assertNotMatch(text, /Join/);
         assertIndexPlan(text, ['message_pairs_address']);
     });
 }

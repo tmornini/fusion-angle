@@ -1,7 +1,11 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { deriveProjectStateHistory } from
     '../api/derive-projects.ts';
-import { strict as assert } from 'node:assert';
 
 import {
     createRequestContext,
@@ -89,7 +93,7 @@ async function seedProject(
     });
 }
 
-test(
+Deno.test(
     'getProjectEntity round-trips all fields',
     async () => {
         const { ctx } = await adminContext();
@@ -100,73 +104,74 @@ test(
             },
         );
         const row = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(row.id, 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(row.title, 'Alpha');
-        assert.equal(row.description, 'desc for Alpha');
-        assert.equal(row.progress, 73);
-        assert.equal(row.start_date, '2026-01-01');
-        assert.equal(
+        assertStrictEquals(row.id, 'pnXmXrxOWayANgDLdCjuBw');
+        assertStrictEquals(row.title, 'Alpha');
+        assertStrictEquals(row.description, 'desc for Alpha');
+        assertStrictEquals(row.progress, 73);
+        assertStrictEquals(row.start_date, '2026-01-01');
+        assertStrictEquals(
             row.target_end_date, '2026-12-31',
         );
-        assert.equal(row.estimated_cost, 99000);
-        assert.equal(row.actual_cost, 12000);
-        assert.equal(row.position, 1);
+        assertStrictEquals(row.estimated_cost, 99000);
+        assertStrictEquals(row.actual_cost, 12000);
+        assertStrictEquals(row.position, 1);
     },
 );
 
-test(
+Deno.test(
     'getProjectEntity rejects for missing id',
     async () => {
         const { ctx } = await adminContext();
-        await assert.rejects(
+        await assertRejects(
             () => getProjectEntity(ctx, generateIdentifier()),
-            /Not found/,
+            Error,
+            'Not found',
         );
     },
 );
 
-test(
+Deno.test(
     'getProjectEntities returns persisted rows',
     async () => {
         const { ctx } = await adminContext();
         await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Alpha');
         await seedProject(ctx, 'prBESZPjJDiuXCeZLmbiVw', 'Beta');
         const rows = await getProjectEntities(ctx);
-        assert.equal(rows.length, 2);
+        assertStrictEquals(rows.length, 2);
         const titles = rows
             .map(r => r.title)
             .sort();
-        assert.deepEqual(titles, ['Alpha', 'Beta']);
+        assertEquals(titles, ['Alpha', 'Beta']);
     },
 );
 
-test(
+Deno.test(
     'getProjectEntities returns empty on empty db',
     async () => {
         const { ctx } = await adminContext();
         const rows = await getProjectEntities(ctx);
-        assert.deepEqual(rows, []);
+        assertEquals(rows, []);
     },
 );
 
-test(
+Deno.test(
     'getProjects wraps rows in Project objects',
     async () => {
         const { ctx } = await adminContext();
         await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Alpha');
         const projects = await getProjects(ctx);
-        assert.equal(projects.length, 1);
-        assert.ok(projects[0] instanceof Project);
-        assert.equal(
+        assertStrictEquals(projects.length, 1);
+        assert(projects[0] instanceof Project);
+        assertStrictEquals(
             projects[0]?.titleText(), 'Alpha',
         );
-        assert.equal(
+        assertStrictEquals(
             projects[0]?.stateValue(), 'approved',
         );
     },
 );
 
-test(
+Deno.test(
     'getProjects excludes deleted-state rows',
     async () => {
         const { ctx } = await adminContext();
@@ -177,14 +182,14 @@ test(
             ctx, goneId, 'Gone', 'deleted',
         );
         const projects = await getProjects(ctx);
-        assert.equal(projects.length, 1);
-        assert.equal(
+        assertStrictEquals(projects.length, 1);
+        assertStrictEquals(
             projects[0]?.titleText(), 'Keep',
         );
     },
 );
 
-test(
+Deno.test(
     'getProjects excludes tombstoned rows',
     async () => {
         const { ctx } = await adminContext();
@@ -201,14 +206,14 @@ test(
             ctx, goneId, fields, 'deleted',
         );
         const projects = await getProjects(ctx);
-        assert.equal(projects.length, 1);
-        assert.equal(
+        assertStrictEquals(projects.length, 1);
+        assertStrictEquals(
             projects[0]?.titleText(), 'Keep',
         );
         // Collection GET streams live PUT heads, including
         // a trio-deleted document. getProjects filters it.
         const rows = await getProjectEntities(ctx);
-        assert.equal(rows.length, 2);
+        assertStrictEquals(rows.length, 2);
     },
 );
 
@@ -216,7 +221,7 @@ const TRIO = {
     state: 'approved' as ProjectState,
 };
 
-test('putProject persists a new project', async () => {
+Deno.test('putProject persists a new project', async () => {
     const { ctx } = await adminContext();
     const { organization_id: _o, ...entity } =
         buildProject('pnXmXrxOWayANgDLdCjuBw', 'Created');
@@ -225,10 +230,10 @@ test('putProject persists a new project', async () => {
         { ...entity, ...TRIO },
     );
     const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assert.equal(stored.title, 'Created');
+    assertStrictEquals(stored.title, 'Created');
 });
 
-test('putProject updates an existing project', async () => {
+Deno.test('putProject updates an existing project', async () => {
     const { ctx } = await adminContext();
     await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Before');
     const { organization_id: _o, ...entity } =
@@ -238,11 +243,11 @@ test('putProject updates an existing project', async () => {
         ...TRIO,
     });
     const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assert.equal(stored.title, 'After');
-    assert.equal(stored.progress, 100);
+    assertStrictEquals(stored.title, 'After');
+    assertStrictEquals(stored.progress, 100);
 });
 
-test(
+Deno.test(
     'putProject changes are visible to a fresh ctx',
     async () => {
         const { db, ctx } = await adminContext();
@@ -254,11 +259,11 @@ test(
         });
         const fresh = createRequestContext(db, await organizationToken());
         const row = await getProjectEntity(fresh, 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(row.title, 'Persisted');
+        assertStrictEquals(row.title, 'Persisted');
     },
 );
 
-test(
+Deno.test(
     'putProjectFields merges the camel patch onto'
     + ' the stored row, keeping untouched columns',
     async () => {
@@ -277,25 +282,25 @@ test(
             estimatedCost: 75000,
         }, TRIO);
         const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(stored.title, 'After');
-        assert.equal(
+        assertStrictEquals(stored.title, 'After');
+        assertStrictEquals(
             stored.description, 'new desc',
         );
-        assert.equal(
+        assertStrictEquals(
             stored.start_date, '2026-02-01',
         );
-        assert.equal(
+        assertStrictEquals(
             stored.target_end_date, '2026-11-30',
         );
-        assert.equal(
+        assertStrictEquals(
             stored.estimated_cost, 75000,
         );
-        assert.equal(stored.position, 7);
-        assert.equal(stored.progress, 40);
+        assertStrictEquals(stored.position, 7);
+        assertStrictEquals(stored.progress, 40);
     },
 );
 
-test(
+Deno.test(
     'putProjectPosition writes only the position',
     async () => {
         const { ctx } = await adminContext();
@@ -306,12 +311,12 @@ test(
         );
         await putProjectPosition(ctx, 'pnXmXrxOWayANgDLdCjuBw', 9.5, TRIO);
         const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(stored.position, 9.5);
-        assert.equal(stored.title, 'Stay');
+        assertStrictEquals(stored.position, 9.5);
+        assertStrictEquals(stored.title, 'Stay');
     },
 );
 
-test(
+Deno.test(
     'ProjectView exposes project display fields',
     () => {
         const project = new Project({
@@ -325,27 +330,27 @@ test(
             id: 'pnXmXrxOWayANgDLdCjuBw',
         }, TRIO);
         const view = new ProjectView(project, [], [], []);
-        assert.equal(view.idForLink(), 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(view.titleText(), 'Viewable');
-        assert.equal(view.stateValue(), 'approved');
-        assert.equal(
+        assertStrictEquals(view.idForLink(), 'pnXmXrxOWayANgDLdCjuBw');
+        assertStrictEquals(view.titleText(), 'Viewable');
+        assertStrictEquals(view.stateValue(), 'approved');
+        assertStrictEquals(
             view.startDateValue(), '2026-01-01',
         );
-        assert.equal(
+        assertStrictEquals(
             view.targetEndDateValue(), '2026-12-31',
         );
-        assert.equal(
+        assertStrictEquals(
             view.costBaselineK(),
             4000 / COST_DIVISOR,
         );
-        assert.equal(
+        assertStrictEquals(
             view.costActualK(),
             2000 / COST_DIVISOR,
         );
     },
 );
 
-test(
+Deno.test(
     'postProjectStateChange records a state event'
     + ' without changing non-lifecycle entity fields'
     + ' on GET',
@@ -371,23 +376,23 @@ test(
         const after = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
         // Entity content fields unchanged; GET trio advances
         // to the transition event (lifecycle-current stamp).
-        assert.equal(after.title, before.title);
-        assert.equal(after.position, before.position);
-        assert.equal(
+        assertStrictEquals(after.title, before.title);
+        assertStrictEquals(after.position, before.position);
+        assertStrictEquals(
             after.description, before.description,
         );
-        assert.equal(after.state, 'archived');
+        assertStrictEquals(after.state, 'archived');
         const events = await deriveProjectStateHistory(db
             , 'AjdvjuECVZEgZoFajaIEkg', 'pnXmXrxOWayANgDLdCjuBw');
         // genesis + transition
-        assert.equal(events.length, 2);
-        assert.equal(
+        assertStrictEquals(events.length, 2);
+        assertStrictEquals(
             events.at(-1)?.state, 'archived',
         );
     },
 );
 
-test(
+Deno.test(
     'ProjectView timeBaselineDays spans the dates',
     () => {
         const project = new Project({
@@ -399,6 +404,6 @@ test(
             id: 'pnXmXrxOWayANgDLdCjuBw',
         }, TRIO);
         const view = new ProjectView(project, [], [], []);
-        assert.equal(view.timeBaselineDays(), 10);
+        assertStrictEquals(view.timeBaselineDays(), 10);
     },
 );

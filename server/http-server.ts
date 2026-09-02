@@ -412,6 +412,10 @@ function defaultLog(fields: Record<string, unknown>): void {
     );
 }
 
+// latencyMs measures to response CONSTRUCTION, not to
+// the last byte: serveStatic hands Deno.serve a streaming
+// file body, and this line fires when the handler returns.
+// A static asset's transfer time is therefore outside it.
 function logRequest(
     log: RequestLog,
     request: Request,

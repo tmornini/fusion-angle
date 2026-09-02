@@ -1,9 +1,12 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { deriveIdeaStateHistory } from
     '../api/derive-ideas.ts';
 import { deriveProjectStateHistory } from
     '../api/derive-projects.ts';
-import { strict as assert } from 'node:assert';
 import {
     createRequestContext,
     type RequestContext,
@@ -94,7 +97,7 @@ async function seedIdeaSubmission(
     );
 }
 
-test('getIdeas as member lists a co-member idea',
+Deno.test('getIdeas as member lists a co-member idea',
 async () => {
     const { db, ctx } = await adminContext();
     const aliceId = generateIdentifier();
@@ -113,10 +116,10 @@ async () => {
     const hit = result.find(
         row => row.idea.titleText() === 'Member list',
     );
-    assert.ok(hit);
+    assert(hit);
 });
 
-test('getIdeas returns ideas with submitter', async () => {
+Deno.test('getIdeas returns ideas with submitter', async () => {
     const { db, ctx } = await adminContext();
     const aliceId = generateIdentifier();
     await seedHumanMember(db, aliceId, 'Alice Test');
@@ -126,33 +129,34 @@ test('getIdeas returns ideas with submitter', async () => {
         '2026-04-01T00:00:00.000000Z',
     );
     const result = await getIdeas(ctx);
-    assert.equal(result.length, 1);
-    assert.equal(
+    assertStrictEquals(result.length, 1);
+    assertStrictEquals(
         result[0]?.idea.titleText(),
         'First idea',
     );
-    assert.equal(
+    assertStrictEquals(
         result[0]?.submitterName,
         'Alice Test',
     );
-    assert.equal(
+    assertStrictEquals(
         result[0]?.idea.stateValue(),
         'active',
     );
 });
 
-test('getIdeas throws when idea has no submission', async () => {
+Deno.test('getIdeas throws when idea has no submission', async () => {
     const { db, ctx } = await adminContext();
     await seedHumanMember(db, generateIdentifier(), 'Alice Test');
     await seedIdea(ctx, 'fndCYAsXazdzMUlEGMNIZw', 'Orphan', 'active');
     // No submission for fndCYAsXazdzMUlEGMNIZw
-    await assert.rejects(
+    await assertRejects(
         () => getIdeas(ctx),
-        /no submission/,
+        Error,
+        'no submission',
     );
 });
 
-test('getIdea finds submission for one idea', async () => {
+Deno.test('getIdea finds submission for one idea', async () => {
     const { db, ctx } = await adminContext();
     const aliceId = generateIdentifier();
     await seedHumanMember(db, aliceId, 'Alice Test');
@@ -162,23 +166,29 @@ test('getIdea finds submission for one idea', async () => {
         '2026-04-01T00:00:00.000000Z',
     );
     const result = await getIdea(ctx, 'fndCYAsXazdzMUlEGMNIZw');
-    assert.equal(result.idea.titleText(), 'A');
-    assert.equal(
+    assertStrictEquals(result.idea.titleText(), 'A');
+    assertStrictEquals(
         result.submitterName, 'Alice Test',
     );
 });
 
-test('getIdea throws on missing submission', async () => {
+Deno.test('getIdea throws on missing submission', async () => {
     const { db, ctx } = await adminContext();
     await seedHumanMember(db, generateIdentifier(), 'Alice Test');
     await seedIdea(ctx, 'fndCYAsXazdzMUlEGMNIZw', 'A', 'active');
-    await assert.rejects(
+    await assertRejects(
         () => getIdea(ctx, 'fndCYAsXazdzMUlEGMNIZw'),
-        /submission not found/,
+        Error,
+        'submission not found',
     );
+    // getIdea fans three reads out through Promise.all; the
+    // submission's rejection settles the caller while the
+    // other two are still in flight. Yield a macrotask turn
+    // so those ops complete in the test that started them.
+    await new Promise(resolve => setTimeout(resolve, 0));
 });
 
-test('putIdea persists changes', async () => {
+Deno.test('putIdea persists changes', async () => {
     const { ctx } = await adminContext();
     await seedIdea(ctx, 'fndCYAsXazdzMUlEGMNIZw', 'Original', 'active');
     const before = await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw');
@@ -193,10 +203,10 @@ test('putIdea persists changes', async () => {
         state: 'active',
     });
     const stored = await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw');
-    assert.equal(stored.title, 'Updated');
+    assertStrictEquals(stored.title, 'Updated');
 });
 
-test('archived ideas are filtered from getIdeas', async () => {
+Deno.test('archived ideas are filtered from getIdeas', async () => {
     const { db, ctx } = await adminContext();
     const aliceId = generateIdentifier();
     await seedHumanMember(db, aliceId, 'Alice Test');
@@ -211,13 +221,13 @@ test('archived ideas are filtered from getIdeas', async () => {
         '2026-04-01T00:00:00.000000Z',
     );
     const result = await getIdeas(ctx);
-    assert.equal(result.length, 1);
-    assert.equal(
+    assertStrictEquals(result.length, 1);
+    assertStrictEquals(
         result[0]?.idea.titleText(), 'Keep',
     );
 });
 
-test(
+Deno.test(
     'postIdeaCreation persists via GET and'
     + ' records the initial state event',
     async () => {
@@ -236,19 +246,19 @@ test(
         );
 
         const row = await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw');
-        assert.equal(row.title, 'Fresh');
+        assertStrictEquals(row.title, 'Fresh');
         const events =
             await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
                 , 'fndCYAsXazdzMUlEGMNIZw');
-        assert.equal(events.length, 1);
-        assert.equal(
+        assertStrictEquals(events.length, 1);
+        assertStrictEquals(
             events[0]?.state,
             'active',
         );
     },
 );
 
-test(
+Deno.test(
     'postIdeaStateChange records a state event'
     + ' without changing non-lifecycle entity fields'
     + ' on GET',
@@ -268,25 +278,25 @@ test(
         const after = await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw');
         // Entity content fields unchanged; GET trio advances
         // to the transition event (lifecycle-current stamp).
-        assert.equal(after.title, before.title);
-        assert.equal(after.position, before.position);
-        assert.equal(
+        assertStrictEquals(after.title, before.title);
+        assertStrictEquals(after.position, before.position);
+        assertStrictEquals(
             after.problem_statement,
             before.problem_statement,
         );
-        assert.equal(after.state, 'approved');
+        assertStrictEquals(after.state, 'approved');
         const events =
             await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
                 , 'fndCYAsXazdzMUlEGMNIZw');
         // genesis + transition
-        assert.equal(events.length, 2);
-        assert.equal(
+        assertStrictEquals(events.length, 2);
+        assertStrictEquals(
             events.at(-1)?.state, 'approved',
         );
     },
 );
 
-test(
+Deno.test(
     'postIdeaConversion commits project, idea,'
     + ' two state events, and N baseline rows in'
     + ' one atomic batch',
@@ -335,20 +345,20 @@ test(
             'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw',
         );
-        assert.equal(project.title, 'P1');
+        assertStrictEquals(project.title, 'P1');
 
         const ideaEvents =
             await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
                 , 'fndCYAsXazdzMUlEGMNIZw');
-        assert.equal(
+        assertStrictEquals(
             ideaEvents.at(-1)?.state, 'promoted',
         );
 
         const projectEvents =
             await deriveProjectStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
                 , 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(projectEvents.length, 1);
-        assert.equal(
+        assertStrictEquals(projectEvents.length, 1);
+        assertStrictEquals(
             projectEvents[0]?.state, 'submitted',
         );
 
@@ -360,18 +370,18 @@ test(
                     + 'pnXmXrxOWayANgDLdCjuBw/objective'
                 + '-baseline-scores/',
             );
-        assert.equal(mine.length, 2);
+        assertStrictEquals(mine.length, 2);
         const byObj = new Map(
             mine.map(b => [
                 b.objective_id, b.score,
             ]),
         );
-        assert.equal(byObj.get(obj1), 50);
-        assert.equal(byObj.get(obj2), -25);
+        assertStrictEquals(byObj.get(obj1), 50);
+        assertStrictEquals(byObj.get(obj2), -25);
     },
 );
 
-test(
+Deno.test(
     'postIdeaConversion rejects a conversion'
     + ' missing a score for an active objective',
     async () => {
@@ -394,7 +404,7 @@ test(
             buildIdea('fndCYAsXazdzMUlEGMNIZw', 'First');
         const obj1 = generateIdentifier();
         const obj2 = generateIdentifier();
-        await assert.rejects(
+        await assertRejects(
             () => postIdeaConversion(
                 ctx,
                 'fndCYAsXazdzMUlEGMNIZw',
@@ -407,12 +417,13 @@ test(
                 ],
                 [obj1, obj2],
             ),
-            /every active objective/,
+            Error,
+            'every active objective',
         );
     },
 );
 
-test('deleted ideas are filtered from getIdeas', async () => {
+Deno.test('deleted ideas are filtered from getIdeas', async () => {
     const { db, ctx } = await adminContext();
     const aliceId = generateIdentifier();
     await seedHumanMember(db, aliceId, 'Alice Test');
@@ -434,8 +445,8 @@ test('deleted ideas are filtered from getIdeas', async () => {
         ctx, await getIdeaEntity(ctx, 'fxysGbBPBsnCwJNJsyZnkA'), 'deleted',
     );
     const result = await getIdeas(ctx);
-    assert.equal(result.length, 1);
-    assert.equal(
+    assertStrictEquals(result.length, 1);
+    assertStrictEquals(
         result[0]?.idea.titleText(), 'Keep',
     );
 });
@@ -444,7 +455,7 @@ test('deleted ideas are filtered from getIdeas', async () => {
 // outside the idea's org roster makes memberName throw and
 // crashes the page. The seed must keep every submitter a
 // co-member of their idea's org, in BOTH orgs.
-test('getIdeas resolves every seeded submitter in'
+Deno.test('getIdeas resolves every seeded submitter in'
     + ' both orgs', async () => {
     const db = await seededMockDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
@@ -454,7 +465,7 @@ test('getIdeas resolves every seeded submitter in'
                 , organization));
         const ideas = await getIdeas(ctx);
         for (const i of ideas) {
-            assert.ok(
+            assert(
                 i.submitterName.length > 0,
                 'empty submitter in org ' + organization);
         }

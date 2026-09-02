@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -21,37 +20,39 @@ async function setup() {
     return { db, ctx: createRequestContext(db, await devToken()) };
 }
 
-test('getIdentity reads kind', async () => {
+Deno.test('getIdentity reads kind', async () => {
     const { db, ctx } = await setup();
     await seedPersonIdentity(db, 'pnXmXrxOWayANgDLdCjuBw', {
         name: 'P', email: 'p@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
     });
     const id = await getIdentity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assert.equal(id.isPerson(), true);
+    assertStrictEquals(id.isPerson(), true);
 });
 
-test('getMemberPii is present, then erased after delete',
+Deno.test('getMemberPii is present, then erased after delete',
 async () => {
     const { db, ctx } = await setup();
     await seedPersonIdentity(db, 'pnXmXrxOWayANgDLdCjuBw', {
         name: 'P', email: 'p@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
     });
     const before = await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assert.equal(before.erased, false);
+    assertStrictEquals(before.erased, false);
     await deleteIdentityPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     const after = await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assert.equal(after.erased, true);
+    assertStrictEquals(after.erased, true);
 });
 
-test('erasing PII keeps identity and person kind',
+Deno.test('erasing PII keeps identity and person kind',
 async () => {
     const { db, ctx } = await setup();
     await seedPersonIdentity(db, 'pnXmXrxOWayANgDLdCjuBw', {
         name: 'P', email: 'p@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
     });
     await deleteIdentityPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assert.equal((await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw')).erased
-        , true);
-    assert.equal((await getIdentity(ctx
+    assertStrictEquals(
+        (await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw')).erased,
+        true,
+    );
+    assertStrictEquals((await getIdentity(ctx
         , 'pnXmXrxOWayANgDLdCjuBw')).isPerson(), true);
 });

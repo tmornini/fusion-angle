@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertMatch, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { GET, handleRequest } from '../api/api.ts';
 import { devToken } from './token-fixtures.ts';
@@ -14,7 +13,7 @@ async function freshDb() {
     return db;
 }
 
-test('deny-by-default: a roleless principal is forbidden',
+Deno.test('deny-by-default: a roleless principal is forbidden',
 async () => {
     const db = await freshDb();   // no role granted
     const res = await handleRequest(db, new Request(
@@ -23,20 +22,20 @@ async () => {
                 'Authorization': 'Bearer ' + await devToken(),
             },
         }));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
     const body = await res.json() as { error: string };
-    assert.match(body.error, /forbidden/);
+    assertMatch(body.error, /forbidden/);
 });
 
-test('an admin is permitted', async () => {
+Deno.test('an admin is permitted', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
         + '', await devToken());
-    assert.ok(Array.isArray(rows));   // 200, not 403
+    assert(Array.isArray(rows));   // 200, not 403
 });
 
-test('role-grants routes are retired (404)', async () => {
+Deno.test('role-grants routes are retired (404)', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const res = await handleRequest(db, new Request(
@@ -55,10 +54,10 @@ test('role-grants routes are retired (404)', async () => {
                 at: '2026-06-03T00:00:00.000000Z',
             }),
         }));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('admin may write a membership type', async () => {
+Deno.test('admin may write a membership type', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const res = await handleRequest(db, new Request(
@@ -76,13 +75,13 @@ test('admin may write a membership type', async () => {
                 at: '2026-06-03T00:00:00.000000Z',
             }),
         }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 });
 
-test('authentication precedes authorization (401 first)',
+Deno.test('authentication precedes authorization (401 first)',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(
         db, new Request(`${BASE}/members`));
-    assert.equal(res.status, 401);   // no token, not 403
+    assertStrictEquals(res.status, 401);   // no token, not 403
 });

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { devToken } from './token-fixtures.ts';
@@ -30,31 +29,31 @@ async function setup() {
     return createRequestContext(db, await devToken());
 }
 
-test('an unregistered service reads as registered: false',
+Deno.test('an unregistered service reads as registered: false',
 async () => {
     const ctx = await setup();
-    assert.deepEqual(
+    assertEquals(
         await getClientRegistration(ctx, 'uWzjNIEeEtVWqZoJMLeYpw'),
         { registered: false },
     );
 });
 
-test('put then get round-trips through the camelCase'
+Deno.test('put then get round-trips through the camelCase'
 + ' domain shape', async () => {
     const ctx = await setup();
     await putClientRegistration(ctx, 'uWzjNIEeEtVWqZoJMLeYpw', FIELDS);
-    assert.deepEqual(
+    assertEquals(
         await getClientRegistration(ctx, 'uWzjNIEeEtVWqZoJMLeYpw'),
         { registered: true, ...FIELDS },
     );
 });
 
-test('delete deregisters back to registered: false',
+Deno.test('delete deregisters back to registered: false',
 async () => {
     const ctx = await setup();
     await putClientRegistration(ctx, 'uWzjNIEeEtVWqZoJMLeYpw', FIELDS);
     await deleteClientRegistration(ctx, 'uWzjNIEeEtVWqZoJMLeYpw');
-    assert.deepEqual(
+    assertEquals(
         await getClientRegistration(ctx, 'uWzjNIEeEtVWqZoJMLeYpw'),
         { registered: false },
     );

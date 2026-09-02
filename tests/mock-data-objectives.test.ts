@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     OBJECTIVE_SEEDS,
 } from '../api/mock-data.ts';
@@ -52,13 +51,13 @@ async function projectIdsByState(
         .map(p => p.id);
 }
 
-test('seeds every objective seed plus the org-2 objective',
+Deno.test('seeds every objective seed plus the org-2 objective',
 async () => {
     const db = await sharedMockDb();
     const ctx = createRequestContext(db, await organizationToken());
     const rows = await getObjectives(ctx);
     // getObjectives is org-scoped to the token's org (Stark).
-    assert.equal(rows.length, OBJECTIVE_SEEDS.length);
+    assertStrictEquals(rows.length, OBJECTIVE_SEEDS.length);
     for (const r of rows) {
         // GET stamps lifecycle trio; validateObjectiveEntity
         // is entity-fields only — strip the stamp before gate.
@@ -68,7 +67,7 @@ async () => {
             ...body
         } = r;
         void _s;
-        assert.ok(
+        assert(
             typeof r.state === 'string'
             && r.state.length > 0,
             'objective ' + r.id + ' missing state',
@@ -79,11 +78,11 @@ async () => {
     const org2Revs = await deriveObjectiveRevisions(
         db, ORGANIZATION_TWO, ORGANIZATION_TWO_OBJECTIVE.id,
     );
-    assert.equal(org2Revs.length, 1);
+    assertStrictEquals(org2Revs.length, 1);
     // Phase Final Stage B: objectives table retired.
 });
 
-test('postMockDataLoad seeds one revision per objective',
+Deno.test('postMockDataLoad seeds one revision per objective',
     async () => {
         const db = await sharedMockDb();
         // Stark revisions (4) + org-2 revision (1).
@@ -92,7 +91,7 @@ test('postMockDataLoad seeds one revision per objective',
             const revs = await deriveObjectiveRevisions(
                 db, STARK_ORGANIZATION, seed.id,
             );
-            assert.equal(revs.length, 1);
+            assertStrictEquals(revs.length, 1);
             const { id: _id, ...body } = revs[0]!;
             validateObjectiveRevisionEntity(body);
             total += 1;
@@ -101,31 +100,31 @@ test('postMockDataLoad seeds one revision per objective',
             db, ORGANIZATION_TWO,
             ORGANIZATION_TWO_OBJECTIVE.id,
         );
-        assert.equal(org2Revs.length, 1);
+        assertStrictEquals(org2Revs.length, 1);
         total += 1;
-        assert.equal(total, OBJECTIVE_SEEDS.length + 1);
+        assertStrictEquals(total, OBJECTIVE_SEEDS.length + 1);
         // Phase Final Stage B: objective_revisions retired.
     });
 
 // All five objective seeds mint genesis state 'active' via
 // the create-body trio (states-address retirement) — none
 // are archived. GET objectives stamps that trio on rows.
-test('postMockDataLoad seeds zero archived objectives',
+Deno.test('postMockDataLoad seeds zero archived objectives',
     async () => {
         const db = await sharedMockDb();
         const ctx = createRequestContext(db, await organizationToken());
         const ids = await getArchivedObjectiveIds(ctx);
-        assert.equal(ids.size, 0);
+        assertStrictEquals(ids.size, 0);
     });
 
-test('approved projects have full baseline coverage',
+Deno.test('approved projects have full baseline coverage',
     async () => {
         const db = await sharedMockDb();
         const ctx = createRequestContext(db, await organizationToken());
         const approved = await projectIdsByState(
             ctx, 'approved',
         );
-        assert.ok(
+        assert(
             approved.length > 0,
             'seed has approved projects',
         );
@@ -156,7 +155,7 @@ test('approved projects have full baseline coverage',
                 organization === STARK_ORGANIZATION
                     ? OBJECTIVE_SEEDS.length
                     : 1;
-            assert.equal(
+            assertStrictEquals(
                 pairs.size,
                 organizationObjCount,
                 `project ${pid} missing coverage`,
@@ -164,14 +163,14 @@ test('approved projects have full baseline coverage',
         }
     });
 
-test('completed projects have at least one actual per pair',
+Deno.test('completed projects have at least one actual per pair',
     async () => {
         const db = await sharedMockDb();
         const ctx = createRequestContext(db, await organizationToken());
         const completed = await projectIdsByState(
             ctx, 'archived',
         );
-        assert.ok(
+        assert(
             completed.length > 0,
             'seed has archived projects',
         );
@@ -189,7 +188,7 @@ test('completed projects have at least one actual per pair',
                 actuals.map(a => a.objectiveId),
             );
             for (const pair of pairs) {
-                assert.ok(
+                assert(
                     actualPairs.has(pair),
                     `project ${pid} missing `
                         + `actual for ${pair}`,
@@ -198,14 +197,14 @@ test('completed projects have at least one actual per pair',
         }
     });
 
-test('approved projects have an actual for every pair',
+Deno.test('approved projects have an actual for every pair',
     async () => {
         const db = await sharedMockDb();
         const ctx = createRequestContext(db, await organizationToken());
         const approved = await projectIdsByState(
             ctx, 'approved',
         );
-        assert.ok(
+        assert(
             approved.length > 0,
             'seed has approved projects',
         );
@@ -223,7 +222,7 @@ test('approved projects have an actual for every pair',
                 actuals.map(a => a.objectiveId),
             );
             for (const pair of pairs) {
-                assert.ok(
+                assert(
                     actualPairs.has(pair),
                     `approved ${pid} missing `
                         + `actual for ${pair}`,
@@ -232,13 +231,13 @@ test('approved projects have an actual for every pair',
         }
     });
 
-test('submitted projects have zero scores', async () => {
+Deno.test('submitted projects have zero scores', async () => {
     const db = await sharedMockDb();
     const ctx = createRequestContext(db, await organizationToken());
     const submitted = await projectIdsByState(
         ctx, 'submitted',
     );
-    assert.ok(
+    assert(
         submitted.length > 0,
         'seed has submitted projects',
     );
@@ -246,7 +245,7 @@ test('submitted projects have zero scores', async () => {
         const baselines = await getBaselineScoresForProject(
             ctx, pid,
         );
-        assert.equal(baselines.length, 0);
+        assertStrictEquals(baselines.length, 0);
     }
 });
 
@@ -254,7 +253,7 @@ test('submitted projects have zero scores', async () => {
 // fingerprint (tests/mock-data-fingerprint.test.ts) no longer
 // covers objectives after the strip, so these pin author picks
 // via the message-plane score adapter.
-test('a seeded baseline score\'s author matches the pinned'
+Deno.test('a seeded baseline score\'s author matches the pinned'
 + ' pre-hoist pick', async () => {
     const db = await sharedMockDb();
     const ctx = createRequestContext(db, await organizationToken());
@@ -264,11 +263,11 @@ test('a seeded baseline score\'s author matches the pinned'
     const row = baselines.find(
         b => b.objectiveId === 'JobGWBxUTEBusPcVhYEKtA',
     );
-    assert.ok(row, 'no baseline row for the pinned pair');
-    assert.equal(row!.memberId, 'XXZruirZyAOoRpNxaDnpSA');
+    assert(row, 'no baseline row for the pinned pair');
+    assertStrictEquals(row!.memberId, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
-test('a seeded actual-score triple\'s per-index authors match'
+Deno.test('a seeded actual-score triple\'s per-index authors match'
 + ' the pinned pre-hoist picks', async () => {
     const db = await sharedMockDb();
     const ctx = createRequestContext(db, await organizationToken());
@@ -280,8 +279,8 @@ test('a seeded actual-score triple\'s per-index authors match'
             a => a.objectiveId === 'QVZjTYvKwffyfGpYILwkOA',
         )
         .sort((a, b) => a.at.localeCompare(b.at));
-    assert.equal(rows.length, 3);
-    assert.deepEqual(
+    assertStrictEquals(rows.length, 3);
+    assertEquals(
         rows.map(r => r.memberId),
         [
             'CJrglMsNBxOWWfbihHQSeg',

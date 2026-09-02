@@ -1,5 +1,21 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assertEquals,
+    assertInstanceOf,
+    assertMatch,
+    assertNotMatch,
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
+// Kept deliberately (measured, not assumed): npm:postgres
+// hands latin1OfBytea (api/backend-postgres.ts) a real
+// Buffer, whose own toString(encoding) is what the fast
+// path there checks for. A plain Uint8Array's inherited
+// toString ignores its argument, so swapping this for
+// `new Uint8Array(bytes)` would silently move this test
+// onto the fallback branch (Octets.fromBytes(...)
+// .toLatin1()) and stop covering the Buffer path — the
+// one the real driver actually returns.
 import { Buffer } from 'node:buffer';
 import {
     POSTGRES_DROP_SCHEMA,
@@ -97,49 +113,49 @@ const MESSAGE_PAIR_ROW = {
     operation_id: 'WvNiHVgksjrlfhPfdgfcyQ',
 };
 
-test('ensureTables runs compile-time SCHEMA', async () => {
+Deno.test('ensureTables runs compile-time SCHEMA', async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     await backend.ensureTables(['message_pairs']);
-    assert.equal(fake.calls.length, 1);
-    assert.equal(fake.calls[0]!.text, POSTGRES_SCHEMA);
+    assertStrictEquals(fake.calls.length, 1);
+    assertStrictEquals(fake.calls[0]!.text, POSTGRES_SCHEMA);
 });
 
-test('schema declares collection indexes', () => {
-    assert.match(
+Deno.test('schema declares collection indexes', () => {
+    assertMatch(
         POSTGRES_SCHEMA,
         /CREATE INDEX IF NOT EXISTS message_pairs_collection/,
     );
-    assert.match(
+    assertMatch(
         POSTGRES_SCHEMA,
         /ON message_pairs \(uri_collection, response_at, id\)/,
     );
 });
 
-test('deleteSchema drops tables, function, marker',
+Deno.test('deleteSchema drops tables, function, marker',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     await backend.deleteSchema();
     const text = fake.calls[0]!.text;
-    assert.match(
+    assertMatch(
         text, /DROP TABLE IF EXISTS message_pairs/,
     );
-    assert.match(text, /DROP TABLE IF EXISTS pairs/);
-    assert.match(text, /DROP TABLE IF EXISTS responses/);
-    assert.match(text, /DROP TABLE IF EXISTS requests/);
-    assert.match(
+    assertMatch(text, /DROP TABLE IF EXISTS pairs/);
+    assertMatch(text, /DROP TABLE IF EXISTS responses/);
+    assertMatch(text, /DROP TABLE IF EXISTS requests/);
+    assertMatch(
         text, /DROP TABLE IF EXISTS schema_marker/,
     );
-    assert.match(
+    assertMatch(
         text,
         /DROP FUNCTION IF EXISTS message_body\(bytea\)/,
     );
 });
 
-test('POSTGRES_DROP_SCHEMA drops message_pairs first',
+Deno.test('POSTGRES_DROP_SCHEMA drops message_pairs first',
 () => {
-    assert.equal(
+    assertStrictEquals(
         POSTGRES_DROP_SCHEMA,
         'DROP TABLE IF EXISTS message_pairs;\n'
         + 'DROP TABLE IF EXISTS pairs;\n'
@@ -150,24 +166,24 @@ test('POSTGRES_DROP_SCHEMA drops message_pairs first',
     );
 });
 
-test('hasSchema is the marker row, not table existence',
+Deno.test('hasSchema is the marker row, not table existence',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     fake.rows = [];
-    assert.equal(await backend.hasSchema(), false);
+    assertStrictEquals(await backend.hasSchema(), false);
     fake.rows = [{ only: true }];
-    assert.equal(await backend.hasSchema(), true);
-    assert.match(
+    assertStrictEquals(await backend.hasSchema(), true);
+    assertMatch(
         fake.calls[0]!.text,
         /FROM schema_marker/,
     );
 });
 
-test('getWhere throws for uri_id', async () => {
+Deno.test('getWhere throws for uri_id', async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
-    await assert.rejects(
+    const err = await assertRejects(
         () => backend.transaction(
             ['message_pairs'],
             'readonly',
@@ -175,15 +191,15 @@ test('getWhere throws for uri_id', async () => {
                 'message_pairs', 'uri_id', '42',
             ),
         ),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message
-                === 'getWhere does not accept uri_id',
+    ) as Error;
+    assertInstanceOf(err, Error);
+    assertStrictEquals(
+        err.message, 'getWhere does not accept uri_id',
     );
-    assert.equal(fake.calls.length, 0);
+    assertStrictEquals(fake.calls.length, 0);
 });
 
-test('getWhere supports indexed single columns',
+Deno.test('getWhere supports indexed single columns',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
@@ -196,11 +212,11 @@ async () => {
         ),
     );
     const text = fake.calls[0]!.text;
-    assert.match(text, /WHERE uri_collection = \$1/);
-    assert.match(text, /ORDER BY response_at, id/);
+    assertMatch(text, /WHERE uri_collection = \$1/);
+    assertMatch(text, /ORDER BY response_at, id/);
 });
 
-test('getAddress uses collection and id, ordered',
+Deno.test('getAddress uses collection and id, ordered',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
@@ -210,26 +226,26 @@ async () => {
         '42',
     );
     const text = fake.calls[0]!.text;
-    assert.match(text, /WHERE uri_collection = \$1/);
-    assert.match(text, /AND uri_id = \$2/);
-    assert.match(text, /ORDER BY response_at, id/);
-    assert.deepEqual(
+    assertMatch(text, /WHERE uri_collection = \$1/);
+    assertMatch(text, /AND uri_id = \$2/);
+    assertMatch(text, /ORDER BY response_at, id/);
+    assertEquals(
         fake.calls[0]!.values,
         ['/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42'],
     );
 });
 
-test('schema has no operation indexes', () => {
-    assert.doesNotMatch(
+Deno.test('schema has no operation indexes', () => {
+    assertNotMatch(
         POSTGRES_SCHEMA,
         /CREATE INDEX.*operation/,
     );
 });
 
-test('getWhere throws for operation_id', async () => {
+Deno.test('getWhere throws for operation_id', async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
-    await assert.rejects(
+    const err = await assertRejects(
         () => backend.transaction(
             ['message_pairs'],
             'readonly',
@@ -239,15 +255,14 @@ test('getWhere throws for operation_id', async () => {
                 'WvNiHVgksjrlfhPfdgfcyQ',
             ),
         ),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message
-                === 'getWhere does not accept'
-                + ' operation_id',
+    ) as Error;
+    assertInstanceOf(err, Error);
+    assertStrictEquals(
+        err.message, 'getWhere does not accept operation_id',
     );
 });
 
-test('getWhereBody uses message_body containment',
+Deno.test('getWhereBody uses message_body containment',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
@@ -261,23 +276,23 @@ async () => {
         ),
     );
     const text = fake.calls[0]!.text;
-    assert.match(text, /FROM message_pairs/);
-    assert.match(text, /uri_collection = \$1/);
-    assert.match(
+    assertMatch(text, /FROM message_pairs/);
+    assertMatch(text, /uri_collection = \$1/);
+    assertMatch(
         text, /message_body\(response\) @>/,
     );
-    assert.match(text, /ORDER BY response_at, id/);
-    assert.deepEqual(
+    assertMatch(text, /ORDER BY response_at, id/);
+    assertEquals(
         fake.calls[0]!.values[0],
         '/authentication/authorize/',
     );
-    assert.deepEqual(
+    assertEquals(
         fake.calls[0]!.values[1],
         { code: 'abc' },
     );
 });
 
-test('put writes BYTEA via Octets.fromLatin1',
+Deno.test('put writes BYTEA via Octets.fromLatin1',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
@@ -290,18 +305,18 @@ async () => {
     const bytes = values.filter(
         (value) => value instanceof Uint8Array,
     );
-    assert.equal(bytes.length, 2);
-    assert.deepEqual(
+    assertStrictEquals(bytes.length, 2);
+    assertEquals(
         bytes[0],
         Octets.fromLatin1(MESSAGE_PAIR_ROW.request).asBytes(),
     );
-    assert.deepEqual(
+    assertEquals(
         bytes[1],
         Octets.fromLatin1(MESSAGE_PAIR_ROW.response).asBytes(),
     );
 });
 
-test('get reads BYTEA via latin1, not TextDecoder',
+Deno.test('get reads BYTEA via latin1, not TextDecoder',
 async () => {
     const fake = fakeClient();
     const wire = MESSAGE_PAIR_ROW.request;
@@ -319,33 +334,32 @@ async () => {
             'message_pairs', MESSAGE_PAIR_ROW.id,
         ),
     );
-    assert.equal(row?.request, wire);
-    assert.notEqual(
+    assertStrictEquals(row?.request, wire);
+    assertNotStrictEquals(
         row?.request,
         new TextDecoder('latin1').decode(bytes),
     );
 });
 
-test('transaction maps deadlock to loud 500',
+Deno.test('transaction maps deadlock to loud 500',
 async () => {
     const fake = fakeClient();
     fake.failWith = { code: '40P01' };
     const backend = new PostgresBackend(fake.sql);
-    await assert.rejects(
+    const err = await assertRejects(
         () => backend.transaction(
             ['message_pairs'],
             'readonly',
             (tx) => tx.getAll('message_pairs'),
         ),
-        (error: unknown) =>
-            error instanceof ApiError
-            && error.status === HTTP_INTERNAL_ERROR
-            && error.message === 'deadlock',
-    );
+    ) as ApiError;
+    assertInstanceOf(err, ApiError);
+    assertStrictEquals(err.status, HTTP_INTERNAL_ERROR);
+    assertStrictEquals(err.message, 'deadlock');
 });
 
-test('POSTGRES_SCHEMA has no CREATE VIEW', () => {
-    assert.doesNotMatch(
+Deno.test('POSTGRES_SCHEMA has no CREATE VIEW', () => {
+    assertNotMatch(
         POSTGRES_SCHEMA,
         /CREATE\s+VIEW/i,
     );

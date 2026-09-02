@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertMatch, assertStrictEquals } from '@std/assert';
 import {
     organizationSwitcherHtml,
 } from '../web-app/app/organization-switcher.ts';
@@ -9,20 +8,20 @@ const TWO = [
     { id: 'BBjWJsjYIDkTRKIIPrzWRw', name: 'Wayne' },
 ];
 
-test('organizationSwitcherHtml renders a set-as-default control', () => {
+Deno.test('organizationSwitcherHtml renders a set-as-default control', () => {
     const out = organizationSwitcherHtml(TWO).toString();
-    assert.match(out, /class="org-set-default"/);
-    assert.match(out, /Set as default/);
+    assertMatch(out, /class="org-set-default"/);
+    assertMatch(out, /Set as default/);
 });
 
-test('organizationSwitcherHtml renders an option per org', () => {
+Deno.test('organizationSwitcherHtml renders an option per org', () => {
     const out = organizationSwitcherHtml(TWO).toString();
-    assert.match(out, /value="AjdvjuECVZEgZoFajaIEkg"/);
-    assert.match(out, /value="BBjWJsjYIDkTRKIIPrzWRw"/);
+    assertMatch(out, /value="AjdvjuECVZEgZoFajaIEkg"/);
+    assertMatch(out, /value="BBjWJsjYIDkTRKIIPrzWRw"/);
 });
 
-test('organizationSwitcherHtml is empty below two orgs', () => {
-    assert.equal(
+Deno.test('organizationSwitcherHtml is empty below two orgs', () => {
+    assertStrictEquals(
         organizationSwitcherHtml([{ id: 'AjdvjuECVZEgZoFajaIEkg'
             , name: 'Stark' }])
             .toString(),

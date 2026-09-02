@@ -1,9 +1,8 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { HttpMessageError } from '../shared/http-message/types.ts';
 
-test('round-trips a chunked response carrying a trailer', () => {
+Deno.test('round-trips a chunked response carrying a trailer', () => {
     const wire =
         'HTTP/1.1 200 OK\r\n' +
         'transfer-encoding: chunked\r\n' +
@@ -12,10 +11,10 @@ test('round-trips a chunked response carrying a trailer', () => {
         '0\r\n' +
         'x-checksum: abc\r\n' +
         '\r\n';
-    assert.equal(HttpMessage.fromWire(wire).toWire(), wire);
+    assertStrictEquals(HttpMessage.fromWire(wire).toWire(), wire);
 });
 
-test('collapses multiple chunks into one canonical chunk', () => {
+Deno.test('collapses multiple chunks into one canonical chunk', () => {
     const message = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'transfer-encoding: chunked\r\n' +
@@ -26,7 +25,7 @@ test('collapses multiple chunks into one canonical chunk', () => {
         'x-trace: 1\r\n' +
         '\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.toWire(),
         'HTTP/1.1 200 OK\r\n' +
         'transfer-encoding: chunked\r\n' +
@@ -38,7 +37,7 @@ test('collapses multiple chunks into one canonical chunk', () => {
     );
 });
 
-test('collapses chunked without a trailer to length', () => {
+Deno.test('collapses chunked without a trailer to length', () => {
     const message = HttpMessage.fromWire(
         'POST / HTTP/1.1\r\n' +
         'transfer-encoding: chunked\r\n' +
@@ -46,7 +45,7 @@ test('collapses chunked without a trailer to length', () => {
         '5\r\nhello\r\n' +
         '0\r\n\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.toWire(),
         'POST / HTTP/1.1\r\n' +
         'content-length: 5\r\n' +
@@ -55,7 +54,7 @@ test('collapses chunked without a trailer to length', () => {
     );
 });
 
-test('JSON carries the trailer when chunked', () => {
+Deno.test('JSON carries the trailer when chunked', () => {
     const json = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'transfer-encoding: chunked\r\n' +
@@ -65,11 +64,11 @@ test('JSON carries the trailer when chunked', () => {
         'x-sum: z\r\n' +
         '\r\n',
     ).toJson();
-    assert.deepEqual(JSON.parse(json).trailer, [['x-sum', 'z']]);
+    assertEquals(JSON.parse(json).trailer, [['x-sum', 'z']]);
 });
 
-test('rejects both content-length and transfer-encoding', () => {
-    assert.throws(
+Deno.test('rejects both content-length and transfer-encoding', () => {
+    assertThrows(
         () => HttpMessage.fromWire(
             'POST / HTTP/1.1\r\n' +
             'content-length: 5\r\n' +
@@ -81,8 +80,8 @@ test('rejects both content-length and transfer-encoding', () => {
     );
 });
 
-test('rejects chunk extensions', () => {
-    assert.throws(
+Deno.test('rejects chunk extensions', () => {
+    assertThrows(
         () => HttpMessage.fromWire(
             'HTTP/1.1 200 OK\r\n' +
             'transfer-encoding: chunked\r\n' +
@@ -94,8 +93,8 @@ test('rejects chunk extensions', () => {
     );
 });
 
-test('rejects an unsupported transfer-coding', () => {
-    assert.throws(
+Deno.test('rejects an unsupported transfer-coding', () => {
+    assertThrows(
         () => HttpMessage.fromWire(
             'HTTP/1.1 200 OK\r\n' +
             'transfer-encoding: gzip\r\n' +
@@ -106,8 +105,8 @@ test('rejects an unsupported transfer-coding', () => {
     );
 });
 
-test('rejects an unterminated chunk-size line', () => {
-    assert.throws(
+Deno.test('rejects an unterminated chunk-size line', () => {
+    assertThrows(
         () => HttpMessage.fromWire(
             'HTTP/1.1 200 OK\r\n' +
             'transfer-encoding: chunked\r\n' +
@@ -118,8 +117,8 @@ test('rejects an unterminated chunk-size line', () => {
     );
 });
 
-test('rejects a chunk shorter than its declared size', () => {
-    assert.throws(
+Deno.test('rejects a chunk shorter than its declared size', () => {
+    assertThrows(
         () => HttpMessage.fromWire(
             'HTTP/1.1 200 OK\r\n' +
             'transfer-encoding: chunked\r\n' +
@@ -130,8 +129,8 @@ test('rejects a chunk shorter than its declared size', () => {
     );
 });
 
-test('rejects chunk data not terminated by CRLF', () => {
-    assert.throws(
+Deno.test('rejects chunk data not terminated by CRLF', () => {
+    assertThrows(
         () => HttpMessage.fromWire(
             'HTTP/1.1 200 OK\r\n' +
             'transfer-encoding: chunked\r\n' +
@@ -142,8 +141,8 @@ test('rejects chunk data not terminated by CRLF', () => {
     );
 });
 
-test('rejects an invalid hex chunk size', () => {
-    assert.throws(
+Deno.test('rejects an invalid hex chunk size', () => {
+    assertThrows(
         () => HttpMessage.fromWire(
             'HTTP/1.1 200 OK\r\n' +
             'transfer-encoding: chunked\r\n' +
@@ -154,8 +153,8 @@ test('rejects an invalid hex chunk size', () => {
     );
 });
 
-test('rejects an unterminated trailer section', () => {
-    assert.throws(
+Deno.test('rejects an unterminated trailer section', () => {
+    assertThrows(
         () => HttpMessage.fromWire(
             'HTTP/1.1 200 OK\r\n' +
             'transfer-encoding: chunked\r\n' +

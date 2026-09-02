@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -85,30 +84,30 @@ async function seed(): Promise<{
             state: 'active',
         },
     ));
-    assert.equal(idea.status, 201);
+    assertStrictEquals(idea.status, 201);
     return { db, token, organizationA, memberA };
 }
 
-test('GET /organizations/:id/ideas/:id/versions/ is 200', async () => {
+Deno.test('GET /organizations/:id/ideas/:id/versions/ is 200', async () => {
     const { db, token, organizationA } = await seed();
     const res = await handleRequest(db, req(
         'GET', '/organizations/' + organizationA
             + '/ideas/gfwcurTzrfssEsWJyNeUyQ/versions/'
             , token,
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const rows = await res.json() as {
         id: string;
         state: string;
     }[];
-    assert.ok(
+    assert(
         rows.some(r => r.id === 'gfwcurTzrfssEsWJyNeUyQ'
             && r.state === 'active'),
         'own-org versions list the idea collection item',
     );
 });
 
-test('GET /organizations/:id/ideas/:id/versions/ foreign miss is 404'
+Deno.test('GET /organizations/:id/ideas/:id/versions/ foreign miss is 404'
 + ' at this address',
 async () => {
     const { db, token, organizationA } = await seed();
@@ -135,14 +134,14 @@ async () => {
             state: 'active',
         },
     ));
-    assert.equal(foreignIdea.status, 201);
+    assertStrictEquals(foreignIdea.status, 201);
     const res = await handleRequest(db, req(
         'GET', '/organizations/' + organizationA
             + '/ideas/glHawNZBNrzAmZIaCDGpJQ/versions/'
             , token,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(
+    assertStrictEquals(res.status, 404);
+    assertEquals(
         await res.json(),
         {
             error: 'Not found: ideas/glHawNZBNrzAmZIaCDGpJQ',

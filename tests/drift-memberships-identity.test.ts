@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
@@ -102,12 +101,12 @@ function primaryOrganizationOf(
 
 // -- leg 1: per-identity derive for EVERY seeded identity ------
 
-test('leg 1: per-identity derive for EVERY seeded identity'
+Deno.test('leg 1: per-identity derive for EVERY seeded identity'
 + ' (12 humans + system) — 12 seat documents total',
 async () => {
     const db = await seededDb();
     const ids = allSeededIdentityIds();
-    assert.equal(ids.length, 13);
+    assertStrictEquals(ids.length, 13);
 
     let total = 0;
     for (const identityId of ids) {
@@ -115,25 +114,25 @@ async () => {
             await deriveMembershipsForIdentity(db, identityId),
         );
         for (const row of derived) {
-            assert.equal(row.identity_id, identityId);
+            assertStrictEquals(row.identity_id, identityId);
         }
         total += derived.length;
     }
-    assert.equal(total, 12);
+    assertStrictEquals(total, 12);
     // Phase Final Stage B: roster tables retired.
 });
 
 // -- leg 2: the multi-org identity --------------------------------
 
-test("leg 2: the multi-org identity ('XXZruirZyAOoRpNxaDnpSA', STARK +"
+Deno.test("leg 2: the multi-org identity ('XXZruirZyAOoRpNxaDnpSA', STARK +"
 + ' ORGANIZATION_TWO) — two membership documents on message plane',
 async () => {
     const db = await seededDb();
     const derived = sortById(
         await deriveMembershipsForIdentity(db, 'XXZruirZyAOoRpNxaDnpSA'),
     );
-    assert.equal(derived.length, 2);
-    assert.deepEqual(
+    assertStrictEquals(derived.length, 2);
+    assertEquals(
         [...derived.map((m) => m.organization_id)].sort(),
         [STARK_ORGANIZATION, ORGANIZATION_TWO].sort(),
     );
@@ -148,7 +147,7 @@ async () => {
 // pins that defined order literally, the drift-organizations.
 // test.ts leg-3b precedent ("pinned against its own literal").
 
-test("leg 3: the ORDER pin — deriveMembershipsForIdentity('at'"
+Deno.test("leg 3: the ORDER pin — deriveMembershipsForIdentity('at'"
 + ' ASCENDING, id tiebreak) resolves a real equal-`at` tie for'
 + " 'XXZruirZyAOoRpNxaDnpSA', and the resulting organization sequence is the"
 + ' one subjectOrganizations would fold into the JWT `orgs`'
@@ -157,13 +156,13 @@ test("leg 3: the ORDER pin — deriveMembershipsForIdentity('at'"
     const derived = await deriveMembershipsForIdentity(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     );
-    assert.equal(derived.length, 2);
-    assert.equal(derived[0]!.at, derived[1]!.at);
-    assert.ok(
+    assertStrictEquals(derived.length, 2);
+    assertStrictEquals(derived[0]!.at, derived[1]!.at);
+    assert(
         derived[0]!.organization_id
             < derived[1]!.organization_id,
     );
-    assert.deepEqual(
+    assertEquals(
         derived.map((m) => m.organization_id),
         [STARK_ORGANIZATION, ORGANIZATION_TWO],
     );
@@ -171,7 +170,7 @@ test("leg 3: the ORDER pin — deriveMembershipsForIdentity('at'"
 
 // -- leg 4: the earliest-join reduction on the message plane ---
 
-test('leg 4: the earliest-join reduction'
+Deno.test('leg 4: the earliest-join reduction'
 + ' (primaryMembershipOrganization-shape) on derived rows,'
 + " incl. the equal-`at` lexical tiebreak ('XXZruirZyAOoRpNxaDnpSA' resolves"
 + " to STARK: 'AjdvjuECVZEgZoFajaIEkg' < 'BBjWJsjYIDkTRKIIPrzWRw')"
@@ -180,12 +179,12 @@ test('leg 4: the earliest-join reduction'
     const sarahId = 'MQFcPtrZPIGjMCRAXtZUnA';
     const currentRows =
         await deriveMembershipsForIdentity(db, 'XXZruirZyAOoRpNxaDnpSA');
-    assert.equal(
+    assertStrictEquals(
         primaryOrganizationOf(currentRows), STARK_ORGANIZATION,
     );
     const sarahRows =
         await deriveMembershipsForIdentity(db, sarahId);
-    assert.equal(
+    assertStrictEquals(
         primaryOrganizationOf(sarahRows), STARK_ORGANIZATION,
     );
 });
@@ -196,7 +195,7 @@ test('leg 4: the earliest-join reduction'
 // own open transaction (api/invitations-domain.ts's table list)
 // can call it without opening a nested transaction of its own.
 
-test('leg 5: membershipExistsFor — member + non-member parity'
+Deno.test('leg 5: membershipExistsFor — member + non-member parity'
 + ' against the grantOutcomeFor-shape row-plane check, PLUS'
 + ' byte-identical output pre-tx (the plain adapter) vs in-tx'
 + " (an open db.transaction view sharing the grant's own table"
@@ -213,8 +212,8 @@ test('leg 5: membershipExistsFor — member + non-member parity'
     );
     // Phase Final Task 2: memberships ROW half stripped —
     // member presence is message-plane only.
-    assert.equal(memberCheck, true);
-    assert.equal(nonMemberCheck, false);
+    assertStrictEquals(memberCheck, true);
+    assertStrictEquals(nonMemberCheck, false);
 
     // Phase Final Task 2: invitations + memberships ROW
     // halves stripped from grantInvitation's tx list.
@@ -231,21 +230,21 @@ test('leg 5: membershipExistsFor — member + non-member parity'
             view, STARK_ORGANIZATION, mikeId,
         ),
     );
-    assert.equal(inTxMemberCheck, memberCheck);
-    assert.equal(inTxNonMemberCheck, nonMemberCheck);
+    assertStrictEquals(inTxMemberCheck, memberCheck);
+    assertStrictEquals(inTxNonMemberCheck, nonMemberCheck);
 });
 
 // -- leg 6: the LIVE accept leg -----------------------------------
 
-test('leg 6: LIVE accept — grant + accept an invitation through'
+Deno.test('leg 6: LIVE accept — grant + accept an invitation through'
 + ' handleRequest; the new membership derives immediately on'
 + ' both planes', async () => {
     const db = await seededDb();
     const sarahId = 'MQFcPtrZPIGjMCRAXtZUnA';
 
     const before = await deriveMembershipsForIdentity(db, sarahId);
-    assert.equal(before.length, 1);
-    assert.equal(before[0]!.organization_id, STARK_ORGANIZATION);
+    assertStrictEquals(before.length, 1);
+    assertStrictEquals(before[0]!.organization_id, STARK_ORGANIZATION);
 
     const adminToken = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
@@ -259,7 +258,7 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 200);
+    assertStrictEquals(grant.status, 200);
 
     const membershipId = MS_DRIFT_IDENTITY_SARAH;
     const accept = await handleRequest(db, req(
@@ -274,15 +273,15 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assertStrictEquals(accept.status, 204);
 
     // Phase Final Task 2: memberships ROW half stripped —
     // accept lands on the message plane only.
     const after = sortById(
         await deriveMembershipsForIdentity(db, sarahId),
     );
-    assert.equal(after.length, 2);
-    assert.equal(
+    assertStrictEquals(after.length, 2);
+    assertStrictEquals(
         after.some(
             (m) => m.identity_id === sarahId
                 && m.organization_id === ORGANIZATION_TWO
@@ -295,7 +294,7 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
 
 // -- leg 7: the REMOVAL leg ----------------------------------------
 
-test('leg 7: REMOVAL — DELETE seat derives ABSENT'
+Deno.test('leg 7: REMOVAL — DELETE seat derives ABSENT'
 + ' on the message plane', async () => {
     const db = await seededDb();
     const jessicaId = 'zyGBRshxOnKHUfcyFRqowg';
@@ -303,9 +302,9 @@ test('leg 7: REMOVAL — DELETE seat derives ABSENT'
         db, jessicaId,
     );
     const target = before[0];
-    assert.ok(target);
+    assert(target);
 
-    assert.equal(
+    assertStrictEquals(
         before.some((m) => m.id === target!.id), true,
     );
 
@@ -317,30 +316,28 @@ test('leg 7: REMOVAL — DELETE seat derives ABSENT'
             'XXZruirZyAOoRpNxaDnpSA', target!.organization_id,
         ),
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
 
     const after = await deriveMembershipsForIdentity(
         db, jessicaId,
     );
-    assert.equal(after.some((m) => m.id === target!.id), false);
+    assertStrictEquals(after.some((m) => m.id === target!.id), false);
     // Phase Final Stage B: roster tables retired.
 });
 
 // -- leg 8: the zero-membership identity ---------------------------
 
-test('leg 8: zero-membership identity — an UNKNOWN identity id'
+Deno.test('leg 8: zero-membership identity — an UNKNOWN identity id'
 + ' and the system actor (a real identity that holds no'
 + ' membership row) both derive an EMPTY set, no throw',
 async () => {
     const db = await seededDb();
-    await assert.doesNotReject(
-        () => deriveMembershipsForIdentity(db, NO_SUCH_IDENTITY),
-    );
-    assert.deepEqual(
+    await deriveMembershipsForIdentity(db, NO_SUCH_IDENTITY);
+    assertEquals(
         await deriveMembershipsForIdentity(db, NO_SUCH_IDENTITY),
         [],
     );
-    assert.deepEqual(
+    assertEquals(
         await deriveMembershipsForIdentity(db, SYSTEM_MEMBER_ID),
         [],
     );
@@ -362,7 +359,7 @@ async () => {
 // identity filter — poisoning deriveMembershipsForIdentity for
 // EVERY identity sharing that row's organization.
 
-test('leg 9: an ECHOED id in a live PUT seat body'
+Deno.test('leg 9: an ECHOED id in a live PUT seat body'
 + ' (the fetch-edit-PUT client pattern) still derives — the'
 + ' stray id never poisons deriveMembershipsForIdentity',
 async () => {
@@ -372,7 +369,7 @@ async () => {
         db, davidId,
     );
     const existing = before[0];
-    assert.ok(existing);
+    assert(existing);
 
     const echoPut = await handleRequest(db, req(
         'PUT',
@@ -387,12 +384,12 @@ async () => {
             at: existing!.at,
         },
     ));
-    assert.equal(echoPut.status, 201);
+    assertStrictEquals(echoPut.status, 201);
 
     const derived = sortById(
         await deriveMembershipsForIdentity(db, davidId),
     );
-    assert.equal(derived.length, 1);
-    assert.equal(derived[0]!.id, existing!.id);
+    assertStrictEquals(derived.length, 1);
+    assertStrictEquals(derived[0]!.id, existing!.id);
     // Phase Final Stage B: roster tables retired.
 });

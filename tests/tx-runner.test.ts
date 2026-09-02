@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import {
     MemoryStorageBackend,
 } from '../api/backend-memory.ts';
@@ -7,7 +6,7 @@ import { backendRunner, ambientRunner } from '../api/db.ts';
 
 interface Row { id: string; n: number }
 
-test(
+Deno.test(
     'backendRunner opens a real backend transaction',
     async () => {
         const backend = new MemoryStorageBackend();
@@ -21,11 +20,11 @@ test(
             ['t'], 'readonly',
             tx => tx.get<Row>('t', 'a'),
         );
-        assert.equal(got!.n, 1);
+        assertStrictEquals(got!.n, 1);
     },
 );
 
-test(
+Deno.test(
     'ambientRunner joins the open tx, ignoring its args',
     async () => {
         const backend = new MemoryStorageBackend();
@@ -40,7 +39,7 @@ test(
                 await join(
                     ['ignored'], 'readonly',
                     (inner) => {
-                        assert.equal(inner, outer);
+                        assertStrictEquals(inner, outer);
                         return inner.put<Row>('t', {
                             id: 'a', n: 9,
                         });
@@ -52,6 +51,6 @@ test(
             ['t'], 'readonly',
             tx => tx.get<Row>('t', 'a'),
         );
-        assert.equal(got!.n, 9);
+        assertStrictEquals(got!.n, 9);
     },
 );

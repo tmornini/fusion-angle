@@ -1,49 +1,48 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals, assertThrows } from '@std/assert';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { HttpMessageError } from '../shared/http-message/types.ts';
 
-test('withFieldPut overwrites an existing field', () => {
+Deno.test('withFieldPut overwrites an existing field', () => {
     const message = HttpMessage
         .fromWire('GET / HTTP/1.1\r\nhost: a\r\n\r\n')
         .withFieldPut('host', 'b');
-    assert.equal(message.query('header.host').toText(), 'b');
+    assertStrictEquals(message.query('header.host').toText(), 'b');
 });
 
-test('withFieldPut leaves the original unchanged', () => {
+Deno.test('withFieldPut leaves the original unchanged', () => {
     const original = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\nhost: a\r\n\r\n',
     );
     original.withFieldPut('host', 'b');
-    assert.equal(original.query('header.host').toText(), 'a');
+    assertStrictEquals(original.query('header.host').toText(), 'a');
 });
 
-test('withFieldAppended keeps same-name fields', () => {
+Deno.test('withFieldAppended keeps same-name fields', () => {
     const message = HttpMessage
         .fromWire('GET / HTTP/1.1\r\nhost: a\r\n\r\n')
         .withFieldAppended('set-cookie', 'x=1')
         .withFieldAppended('set-cookie', 'y=2');
-    assert.equal(
+    assertStrictEquals(
         message.query('header.set-cookie.0').toText(),
         'x=1',
     );
-    assert.equal(
+    assertStrictEquals(
         message.query('header.set-cookie.1').toText(),
         'y=2',
     );
 });
 
-test('withFieldDeleted removes a field', () => {
+Deno.test('withFieldDeleted removes a field', () => {
     const message = HttpMessage
         .fromWire(
             'GET / HTTP/1.1\r\nhost: a\r\naccept: x\r\n\r\n',
         )
         .withFieldDeleted('accept');
-    assert.equal(message.query('header.accept').exists(), false);
+    assertStrictEquals(message.query('header.accept').exists(), false);
 });
 
-test('withFieldPut rejects a derived framing field', () => {
-    assert.throws(
+Deno.test('withFieldPut rejects a derived framing field', () => {
+    assertThrows(
         () => HttpMessage
             .fromWire('GET / HTTP/1.1\r\nhost: a\r\n\r\n')
             .withFieldPut('content-length', '5'),
@@ -51,8 +50,8 @@ test('withFieldPut rejects a derived framing field', () => {
     );
 });
 
-test('withFieldPut rejects a value with CRLF', () => {
-    assert.throws(
+Deno.test('withFieldPut rejects a value with CRLF', () => {
+    assertThrows(
         () => HttpMessage
             .fromWire('GET / HTTP/1.1\r\n\r\n')
             .withFieldPut('x-evil', 'a\r\ninjected: 1'),
@@ -60,19 +59,19 @@ test('withFieldPut rejects a value with CRLF', () => {
     );
 });
 
-test('withStatus changes the response status line', () => {
+Deno.test('withStatus changes the response status line', () => {
     const message = HttpMessage
         .fromWire('HTTP/1.1 200 OK\r\n\r\n')
         .withStatus(404, 'Not Found');
-    assert.equal(message.query('status').toNumber(), 404);
-    assert.equal(
+    assertStrictEquals(message.query('status').toNumber(), 404);
+    assertStrictEquals(
         message.toWire().split('\r\n')[0],
         'HTTP/1.1 404 Not Found',
     );
 });
 
-test('withStatus on a request throws', () => {
-    assert.throws(
+Deno.test('withStatus on a request throws', () => {
+    assertThrows(
         () => HttpMessage
             .fromWire('GET / HTTP/1.1\r\n\r\n')
             .withStatus(200, 'OK'),
@@ -80,15 +79,15 @@ test('withStatus on a request throws', () => {
     );
 });
 
-test('withMethod changes the request method', () => {
+Deno.test('withMethod changes the request method', () => {
     const message = HttpMessage
         .fromWire('GET / HTTP/1.1\r\n\r\n')
         .withMethod('HEAD');
-    assert.equal(message.query('method').toText(), 'HEAD');
+    assertStrictEquals(message.query('method').toText(), 'HEAD');
 });
 
-test('withTarget rejects a target with CRLF', () => {
-    assert.throws(
+Deno.test('withTarget rejects a target with CRLF', () => {
+    assertThrows(
         () => HttpMessage
             .fromWire('GET / HTTP/1.1\r\n\r\n')
             .withTarget('/ HTTP/1.1\r\nevil: 1'),
@@ -96,8 +95,8 @@ test('withTarget rejects a target with CRLF', () => {
     );
 });
 
-test('withTarget rejects a target with a space', () => {
-    assert.throws(
+Deno.test('withTarget rejects a target with a space', () => {
+    assertThrows(
         () => HttpMessage
             .fromWire('GET / HTTP/1.1\r\n\r\n')
             .withTarget('/a b'),
@@ -105,8 +104,8 @@ test('withTarget rejects a target with a space', () => {
     );
 });
 
-test('withStatus rejects a reason with CRLF', () => {
-    assert.throws(
+Deno.test('withStatus rejects a reason with CRLF', () => {
+    assertThrows(
         () => HttpMessage
             .fromWire('HTTP/1.1 200 OK\r\n\r\n')
             .withStatus(200, 'OK\r\nevil: 1'),
@@ -114,8 +113,8 @@ test('withStatus rejects a reason with CRLF', () => {
     );
 });
 
-test('withMethod on a response throws', () => {
-    assert.throws(
+Deno.test('withMethod on a response throws', () => {
+    assertThrows(
         () => HttpMessage
             .fromWire('HTTP/1.1 200 OK\r\n\r\n')
             .withMethod('GET'),
@@ -123,8 +122,8 @@ test('withMethod on a response throws', () => {
     );
 });
 
-test('withMethod rejects an invalid method token', () => {
-    assert.throws(
+Deno.test('withMethod rejects an invalid method token', () => {
+    assertThrows(
         () => HttpMessage
             .fromWire('GET / HTTP/1.1\r\n\r\n')
             .withMethod('G@T'),
@@ -132,8 +131,8 @@ test('withMethod rejects an invalid method token', () => {
     );
 });
 
-test('withTarget on a response throws', () => {
-    assert.throws(
+Deno.test('withTarget on a response throws', () => {
+    assertThrows(
         () => HttpMessage
             .fromWire('HTTP/1.1 200 OK\r\n\r\n')
             .withTarget('/x'),
@@ -141,8 +140,8 @@ test('withTarget on a response throws', () => {
     );
 });
 
-test('withStatus rejects an out-of-range status', () => {
-    assert.throws(
+Deno.test('withStatus rejects an out-of-range status', () => {
+    assertThrows(
         () => HttpMessage
             .fromWire('HTTP/1.1 200 OK\r\n\r\n')
             .withStatus(700, 'x'),
@@ -150,8 +149,8 @@ test('withStatus rejects an out-of-range status', () => {
     );
 });
 
-test('withFieldPut rejects an invalid field name', () => {
-    assert.throws(
+Deno.test('withFieldPut rejects an invalid field name', () => {
+    assertThrows(
         () => HttpMessage
             .fromWire('GET / HTTP/1.1\r\n\r\n')
             .withFieldPut('bad name', 'x'),
@@ -159,11 +158,11 @@ test('withFieldPut rejects an invalid field name', () => {
     );
 });
 
-test('a modified message re-serializes canonically', () => {
+Deno.test('a modified message re-serializes canonically', () => {
     const message = HttpMessage
         .fromWire('GET / HTTP/1.1\r\nhost: a\r\n\r\n')
         .withFieldPut('accept', 'text/html');
-    assert.equal(
+    assertStrictEquals(
         message.toWire(),
         'GET / HTTP/1.1\r\naccept: text/html\r\nhost: a\r\n\r\n',
     );

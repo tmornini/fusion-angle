@@ -1,9 +1,8 @@
-import { test } from 'node:test';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     workOrderLifecycleStatesFor,
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
-import { strict as assert } from 'node:assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     asWorkOrderFlowGraph,
@@ -107,7 +106,7 @@ async function allAttributes(
                 },
             ),
         );
-        assert.equal(typesRes.status, 200);
+        assertStrictEquals(typesRes.status, 200);
         const types = await typesRes.json() as { id: string }[];
         for (const type of types) {
             const res = await handleRequest(
@@ -123,7 +122,7 @@ async function allAttributes(
                     },
                 ),
             );
-            assert.equal(res.status, 200);
+            assertStrictEquals(res.status, 200);
             out.push(
                 ...await res.json() as RecordAttributeEntity[],
             );
@@ -132,12 +131,12 @@ async function allAttributes(
     return out;
 }
 
-test(
+Deno.test(
     'postMockDataLoad seeds at least two Records',
     async () => {
         const db = await seeded();
         const records = await allRecords(db);
-        assert.ok(
+        assert(
             records.length >= 2,
             'expected >=2 records, got '
             + records.length,
@@ -146,7 +145,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'each seeded Record has at least three'
     + ' attributes',
     async () => {
@@ -159,7 +158,7 @@ test(
                     === rec.id
                 || a.record_id === rec.id,
             );
-            assert.ok(
+            assert(
                 own.length >= 3,
                 'record ' + rec.id + ' has '
                 + own.length + ' attrs',
@@ -168,7 +167,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'seeded attributes span at least three'
     + ' attribute_types',
     async () => {
@@ -177,7 +176,7 @@ test(
         const types = new Set(
             attrs.map(a => a.attribute_type),
         );
-        assert.ok(
+        assert(
             types.size >= 3,
             'expected >=3 distinct types, got '
             + types.size,
@@ -185,7 +184,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'seeded constraints include at least one of'
     + ' each: regex, range_min, range_max',
     async () => {
@@ -197,22 +196,22 @@ test(
                 allKinds.add(c.kind);
             }
         }
-        assert.ok(
+        assert(
             allKinds.has('regex'),
             'expected a regex constraint',
         );
-        assert.ok(
+        assert(
             allKinds.has('range_min'),
             'expected a range_min constraint',
         );
-        assert.ok(
+        assert(
             allKinds.has('range_max'),
             'expected a range_max constraint',
         );
     },
 );
 
-test(
+Deno.test(
     'at least one seeded Record is bound to'
     + ' multiple flows via flow_records',
     async () => {
@@ -236,7 +235,7 @@ test(
             }
         }
         const max = Math.max(0, ...counts.values());
-        assert.ok(
+        assert(
             max >= 2,
             'expected >=2 bindings for some record,'
             + ' got max=' + max,
@@ -245,7 +244,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'the gate-violation work order has a current'
     + ' node with at least one required attribute'
     + ' with a null stored value',
@@ -266,7 +265,7 @@ test(
                 },
             ),
         );
-        assert.equal(woRes.status, 200);
+        assertStrictEquals(woRes.status, 200);
         const wo = await woRes.json() as {
             flow_graph: Record<string, unknown>;
         };
@@ -289,7 +288,7 @@ test(
                     a.at.localeCompare(b.at),
             )
             .at(-1);
-        assert.ok(
+        assert(
             latest,
             'gate WO must have at least one'
             + ' transition',
@@ -298,7 +297,7 @@ test(
         const currentNode = flowGraph.nodes.find(
             n => n.id === currentNodeId,
         );
-        assert.ok(
+        assert(
             currentNode,
             'current node must exist on the'
             + ' frozen flow graph',
@@ -307,7 +306,7 @@ test(
         const outgoing = flowGraph.edges.filter(
             e => e.fromNodeId === currentNodeId,
         );
-        assert.ok(
+        assert(
             outgoing.length > 0,
             'current node should have outgoing'
             + ' edges so the gate is reachable',
@@ -339,7 +338,7 @@ test(
                 );
             }
         }
-        assert.ok(
+        assert(
             violations.length > 0,
             'gate WO must trip on at least one'
             + ' required CURRENT attribute',
@@ -347,7 +346,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'every seeded flow graph carries attributes[]'
     + ' (no fields[]) via message-plane derive',
     async () => {
@@ -370,7 +369,7 @@ test(
                     },
                 ),
             );
-            assert.equal(res.status, 200);
+            assertStrictEquals(res.status, 200);
             const flows = await res.json() as {
                 id: string;
             }[];
@@ -389,7 +388,7 @@ test(
                         },
                     ),
                 );
-                assert.equal(detail.status, 200);
+                assertStrictEquals(detail.status, 200);
                 const body = await detail.json() as {
                     graph: {
                         nodes: {
@@ -399,15 +398,15 @@ test(
                         }[];
                     };
                 };
-                assert.equal(typeof body.graph, 'object');
+                assertStrictEquals(typeof body.graph, 'object');
                 const graph = body.graph;
                 for (const node of graph.nodes) {
-                    assert.ok(
+                    assert(
                         Array.isArray(node.attributes),
                         'node ' + node.id
                         + ' is missing attributes[]',
                     );
-                    assert.ok(
+                    assert(
                         !('fields' in node),
                         'node ' + node.id
                         + ' must not carry fields[]',
@@ -428,7 +427,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'Project Brief Priority and Approved carry the'
     + ' restricted seed ACLs; the rest keep the default',
     async () => {
@@ -439,25 +438,25 @@ test(
         const priority = projectBrief.get(
             'pwjGSoPQMbsjmEJLDAgbaA',
         );
-        assert.ok(priority, 'Priority attribute exists');
-        assert.deepEqual(priority.readRoles, ['admin']);
-        assert.deepEqual(priority.writeRoles, ['admin']);
+        assert(priority, 'Priority attribute exists');
+        assertEquals(priority.readRoles, ['admin']);
+        assertEquals(priority.writeRoles, ['admin']);
         const approved = projectBrief.get(
             'qDgLYtdgNBjEEoPqCoMATg',
         );
-        assert.ok(approved, 'Approved attribute exists');
-        assert.deepEqual(
+        assert(approved, 'Approved attribute exists');
+        assertEquals(
             approved.readRoles, ['member', 'admin'],
         );
-        assert.deepEqual(approved.writeRoles, ['admin']);
+        assertEquals(approved.writeRoles, ['admin']);
         const projectName = projectBrief.get(
             'ptlpsUrQssxuTLkouUAnNw',
         );
-        assert.ok(projectName, 'Project Name exists');
-        assert.deepEqual(
+        assert(projectName, 'Project Name exists');
+        assertEquals(
             projectName.readRoles, ['member', 'admin'],
         );
-        assert.deepEqual(
+        assertEquals(
             projectName.writeRoles, ['member', 'admin'],
         );
         const customerProfile =
@@ -465,12 +464,12 @@ test(
                 db, STARK_ORGANIZATION,
                 customerProfileRecordId,
             );
-        assert.ok(customerProfile.size >= 3);
+        assert(customerProfile.size >= 3);
         for (const row of customerProfile.values()) {
-            assert.deepEqual(
+            assertEquals(
                 row.readRoles, ['member', 'admin'],
             );
-            assert.deepEqual(
+            assertEquals(
                 row.writeRoles, ['member', 'admin'],
             );
         }

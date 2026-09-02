@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import { GET, PUT, handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, organizationToken } from
@@ -38,21 +37,21 @@ async function freshDb() {
     return db;
 }
 
-test('PUT /ai-agents/:id writes the agent', async () => {
+Deno.test('PUT /ai-agents/:id writes the agent', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const put = await handleRequest(db, req(
         'PUT', '/ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
         agentFields('Claude'),
     ));
-    assert.ok(put.status === 201 || put.status === 200);
+    assert(put.status === 201 || put.status === 200);
     const got = await GET<{ name: string }>(
         db, 'ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
     );
-    assert.equal(got.name, 'Claude');
+    assertStrictEquals(got.name, 'Claude');
 });
 
-test('POST /ai-members is retired 404', async () => {
+Deno.test('POST /ai-members is retired 404', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
         'POST', '/ai-members', DEV_TOKEN, {
@@ -60,10 +59,10 @@ test('POST /ai-members is retired 404', async () => {
             detail: agentFields('Claude'),
         },
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('a flow write with an AI agent id in memberIds'
+Deno.test('a flow write with an AI agent id in memberIds'
 + ' is 400', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -107,5 +106,5 @@ test('a flow write with an AI agent id in memberIds'
             revivals: [],
         },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });

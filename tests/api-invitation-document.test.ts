@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -148,23 +147,23 @@ async function grant(
 
 // ── grant: the invitation document message pair ──
 
-test('a fresh grant appends 2 pairs — the operation and the'
+Deno.test('a fresh grant appends 2 pairs — the operation and the'
 + ' invitation document, email ABSENT by construction',
 async () => {
     const db = await freshDb();
     const res = await grant(db, INV_DOC_1);
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const requests = await db.messagePairs.getAll();
     // 6: the fixture's own membership pair (Phase 13 Task 1;
     // role-grant retired), two identities/:id/pii pairs
     // (Phase 15 gate 6), the organizations/:id document
     // (Stage B), and the grant's own 2 pairs.
-    assert.equal(requests.length, 6);
+    assertStrictEquals(requests.length, 6);
     const atAddress = requests.filter(
         r => r.uri_collection === '/invitations/'
             && r.uri_id === INV_DOC_1,
     );
-    assert.equal(atAddress.length, 2);
+    assertStrictEquals(atAddress.length, 2);
     // The document head: the ONE PUT/2xx pair at this address —
     // documentMessagePairsAt excludes the operation message pair's POST
     // method by construction (design decision 6), so a match
@@ -172,40 +171,40 @@ async () => {
     const documents = documentMessagePairsAt(
         requests, '/invitations/',
     ).filter(messagePair => messagePair.uriId === INV_DOC_1);
-    assert.equal(documents.length, 1);
+    assertStrictEquals(documents.length, 1);
     const wire = documents[0]!.body;
-    assert.deepEqual(
+    assertEquals(
         Object.keys(wire).sort(),
         ['at', 'identity_id', 'organization_id'],
     );
-    assert.equal(wire.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
-    assert.equal(wire.identity_id, 'toccYYkLEABmlbpHJalgtQ');
-    assert.equal(wire.at, AT);
-    assert.equal(wire.email, undefined);
+    assertStrictEquals(wire.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
+    assertStrictEquals(wire.identity_id, 'toccYYkLEABmlbpHJalgtQ');
+    assertStrictEquals(wire.at, AT);
+    assertStrictEquals(wire.email, undefined);
 });
 
-test('a duplicate grant appends ONLY its operation message pair — no'
+Deno.test('a duplicate grant appends ONLY its operation message pair — no'
 + ' phantom document at the duplicate\'s submitted id',
 async () => {
     const db = await freshDb();
     const first = await grant(db, INV_DOC_2A);
-    assert.equal(first.status, 200);
+    assertStrictEquals(first.status, 200);
     const second = await grant(db, INV_DOC_2B);
-    assert.equal(second.status, 200);
+    assertStrictEquals(second.status, 200);
     const requests = await db.messagePairs.getAll();
     const atDuplicateId = requests.filter(
         r => r.uri_collection === '/invitations/'
             && r.uri_id === INV_DOC_2B,
     );
-    assert.equal(atDuplicateId.length, 1);
+    assertStrictEquals(atDuplicateId.length, 1);
     const atFreshId = requests.filter(
         r => r.uri_collection === '/invitations/'
             && r.uri_id === INV_DOC_2A,
     );
-    assert.equal(atFreshId.length, 2);
+    assertStrictEquals(atFreshId.length, 2);
 });
 
-test('a failed (member-conflict) grant appends nothing',
+Deno.test('a failed (member-conflict) grant appends nothing',
 async () => {
     const db = await freshDb();
     await seedMembershipMessagePair(db, generateIdentifier(), {
@@ -214,14 +213,14 @@ async () => {
         type: 'member', at: AT,
     });
     const res = await grant(db, INV_DOC_FAIL);
-    assert.equal(res.status, 409);
+    assertStrictEquals(res.status, 409);
     // 5: the fixture's own membership pair, two
     // identities/:id/pii pairs (Phase 15 gate 6), the
     // organizations/:id document (Stage B), plus toccYYkLEABmlbpHJalgtQ's own
     // conflicting membership pair (Phase 13 Task 1) — the
     // failed grant appends nothing further. Role-grant retired.
-    assert.equal((await db.messagePairs.getAll()).length, 5);
-    assert.equal((await db.messagePairs.getAll()).length, 5);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
 });
 
 // ── accept: the memberships document message pair
@@ -252,7 +251,7 @@ async function accept(
     ));
 }
 
-test('a fresh accept appends its seat document at the'
+Deno.test('a fresh accept appends its seat document at the'
 + ' invitation-org members address', async () => {
     const db = await freshDb();
     await grant(db, INV_DOC_3);
@@ -260,15 +259,15 @@ test('a fresh accept appends its seat document at the'
         db, INV_DOC_3, MS_DOC_3, EV_ACC_3,
         '2026-01-01T00:00:01.000000Z',
     );
-    assert.equal(res.status, 204);
+    assertStrictEquals(res.status, 204);
     const requests = await db.messagePairs.getAll();
     const documents = documentMessagePairsAt(
         requests, '/organizations/AjdvjuECVZEgZoFajaIEkg/members/',
     ).filter(
         messagePair => messagePair.uriId === 'toccYYkLEABmlbpHJalgtQ',
     );
-    assert.equal(documents.length, 1);
-    assert.deepEqual(documents[0]!.body, {
+    assertStrictEquals(documents.length, 1);
+    assertEquals(documents[0]!.body, {
         type: 'member',
         at: '2026-01-01T00:00:01.000000Z',
     });
@@ -278,7 +277,7 @@ test('a fresh accept appends its seat document at the'
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'AjdvjuECVZEgZoFajaIEkg'),
     ));
-    assert.equal(got.status, 200);
+    assertStrictEquals(got.status, 200);
     const acceptBody = {
         id: 'toccYYkLEABmlbpHJalgtQ',
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
@@ -286,17 +285,17 @@ test('a fresh accept appends its seat document at the'
         type: 'member',
         at: '2026-01-01T00:00:01.000000Z',
     };
-    assert.deepEqual(await got.json(), acceptBody);
+    assertEquals(await got.json(), acceptBody);
     const stored = JSON.parse(
         await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
                 , 'toccYYkLEABmlbpHJalgtQ',
         ),
     );
-    assert.deepEqual(stored, acceptBody);
+    assertEquals(stored, acceptBody);
 });
 
-test('a no-op re-accept appends no seat document',
+Deno.test('a no-op re-accept appends no seat document',
 async () => {
     const db = await freshDb();
     await grant(db, INV_DOC_4);
@@ -304,18 +303,18 @@ async () => {
         db, INV_DOC_4, MS_DOC_4, EV_ACC_4,
         '2026-01-01T00:00:01.000000Z',
     );
-    assert.equal(first.status, 204);
+    assertStrictEquals(first.status, 204);
     const second = await accept(
         db, INV_DOC_4, MS_DOC_4B, EV_ACC_4B,
         '2026-01-01T00:00:02.000000Z',
     );
-    assert.equal(second.status, 204);
+    assertStrictEquals(second.status, 204);
     const documents = (await db.messagePairs.getAll()).filter(
         r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'members/'
             && r.uri_id === 'toccYYkLEABmlbpHJalgtQ',
     );
-    assert.equal(documents.length, 1);
+    assertStrictEquals(documents.length, 1);
 });
 
 // ── deriveInvitations: the message-plane reduction ──
@@ -358,7 +357,7 @@ async function revokeFor(
     ));
 }
 
-test('deriveInvitations round-trips every terminal state:'
+Deno.test('deriveInvitations round-trips every terminal state:'
 + ' grant→pending, accept→accepted, decline→declined,'
 + ' revoke→revoked', async () => {
     const db = await freshDb();
@@ -396,34 +395,34 @@ test('deriveInvitations round-trips every terminal state:'
 
     const derived = await deriveInvitations(db);
     const byId = new Map(derived.map(row => [row.id, row]));
-    assert.equal(
+    assertStrictEquals(
         byId.get(INV_DERIVE_PENDING)?.state, 'pending');
-    assert.equal(
+    assertStrictEquals(
         byId.get('hkbiAljVBMHiLoGwiWjaaw')?.state, 'accepted');
-    assert.equal(
+    assertStrictEquals(
         byId.get(INV_DERIVE_DECLINE)?.state, 'declined');
-    assert.equal(
+    assertStrictEquals(
         byId.get(INV_DERIVE_REVOKE)?.state, 'revoked');
     // Identifier order (byIdAscending — the derivation's
     // own order, never the backend's).
     const ids = derived.map(row => row.id);
-    assert.deepEqual(
+    assertEquals(
         ids,
         [...ids].sort(compareIdentifiers),
     );
 });
 
-test('a no-op replay changes nothing deriveInvitations reads',
+Deno.test('a no-op replay changes nothing deriveInvitations reads',
 async () => {
     const db = await freshDb();
     await grant(db, INV_DERIVE_REPLAY);
     const before = await deriveInvitations(db);
     await grant(db, INV_DERIVE_REPLAY);   // byte-identical resend
     const after = await deriveInvitations(db);
-    assert.deepEqual(after, before);
+    assertEquals(after, before);
 });
 
-test('every stored invitation-family message verifies against'
+Deno.test('every stored invitation-family message verifies against'
 + ' its hash, and requests/responses stay balanced across a'
 + ' full grant→accept→decline mix', async () => {
     const db = await freshDb();
@@ -457,9 +456,9 @@ test('every stored invitation-family message verifies against'
     // pairs (current, toccYYkLEABmlbpHJalgtQ, bruce, clark — Phase 15 gate
     // 6),
     // and the organizations/:id document (Stage B) = 15.
-    assert.equal(messagePairs.length, 15);
+    assertStrictEquals(messagePairs.length, 15);
     for (const row of messagePairs) {
-        assert.equal(
+        assertStrictEquals(
             await requestMessageHash(row.request),
             row.request_hash,
         );

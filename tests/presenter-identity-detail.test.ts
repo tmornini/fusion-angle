@@ -1,37 +1,24 @@
-// state.ts (transitively imported via core.ts ->
-// presenters) reads localStorage and window /
-// document at module-eval time, which Node lacks.
-// Stub before any import, then load presenter
-// modules with dynamic import() so the stubs are
-// in place. Same pattern as presenter-member-detail.
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-};
+import { assertMatch, assertNotMatch, assertStrictEquals } from '@std/assert';
+import { Identity } from '../api/types.ts';
+import {
+    IDENTITY_WITHOUT_PII_NAME,
+    UNNAMED_SERVICE_NAME,
+} from '../web-app/app/adapters/identities.ts';
+import {
+    IdentityDetailPresenter,
+} from '../web-app/app/presenters/identity-detail.ts';
+
+// Neither adapters/identities.ts nor
+// presenters/identity-detail.ts reads localStorage
+// (checked against the full product tree); window/
+// document are stubbed because IdentityDetailPresenter
+// walks a real DOM tree via renderShell/mutateSlot.
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
-
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-
-const { Identity } = await import('../api/types.ts');
-const {
-    IDENTITY_WITHOUT_PII_NAME,
-    UNNAMED_SERVICE_NAME,
-} = await import(
-    '../web-app/app/adapters/identities.ts'
-);
-
-const {
-    IdentityDetailPresenter,
-} = await import(
-    '../web-app/app/presenters/identity-detail.ts'
-);
 
 function makeRecordingContainer(): {
     container: HTMLElement;
@@ -97,31 +84,31 @@ function personPresenter() {
     });
 }
 
-test(
+Deno.test(
     'person detail renders id, Person badge, and'
     + ' personal-info fields',
     () => {
         const rec = makeRecordingContainer();
         personPresenter().renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, /pnXmXrxOWayANgDLdCjuBw/);
-        assert.match(out, /Person/);
-        assert.match(out, /Personal Information/);
-        assert.match(out, /Ada Lovelace/);
-        assert.match(out, /ada@example\.com/);
-        assert.match(out, /555-0100/);
-        assert.match(out, /First programmer\./);
+        assertMatch(out, /pnXmXrxOWayANgDLdCjuBw/);
+        assertMatch(out, /Person/);
+        assertMatch(out, /Personal Information/);
+        assertMatch(out, /Ada Lovelace/);
+        assertMatch(out, /ada@example\.com/);
+        assertMatch(out, /555-0100/);
+        assertMatch(out, /First programmer\./);
         // Back affordance present
-        assert.match(
+        assertMatch(
             out, /data-identity-action="back"/,
         );
         // Links to providers and tokens views
-        assert.match(out, /data-identity-link="providers"/);
-        assert.match(out, /data-identity-link="tokens"/);
+        assertMatch(out, /data-identity-link="providers"/);
+        assertMatch(out, /data-identity-link="tokens"/);
     },
 );
 
-test(
+Deno.test(
     'erased person shows IDENTITY_WITHOUT_PII_NAME and the'
     + ' absent marker for the blanked fields',
     () => {
@@ -138,12 +125,12 @@ test(
         const out = rec.allHtml();
         // The call site supplies the named-constant
         // fallback (no bare literal in the presenter).
-        assert.match(out, new RegExp(IDENTITY_WITHOUT_PII_NAME));
-        assert.match(out, /—/);
+        assertMatch(out, new RegExp(IDENTITY_WITHOUT_PII_NAME));
+        assertMatch(out, /—/);
     },
 );
 
-test(
+Deno.test(
     'named service detail shows its name and Service'
     + ' badge, never the secret',
     () => {
@@ -161,24 +148,24 @@ test(
             registration: { registered: false as const },
         }).renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, /Grok 4\.3/);
-        assert.match(out, /Service/);
-        assert.match(out, /Credentials/);
-        assert.match(out, /client_secret/);
+        assertMatch(out, /Grok 4\.3/);
+        assertMatch(out, /Service/);
+        assertMatch(out, /Credentials/);
+        assertMatch(out, /client_secret/);
         // The secret value never appears.
-        assert.equal(out.includes('secret-v'), false);
+        assertStrictEquals(out.includes('secret-v'), false);
         // No personal-info card for a service.
-        assert.equal(
+        assertStrictEquals(
             out.includes('Personal Information'), false,
         );
         // It is not redacted as an unknown member.
-        assert.equal(
+        assertStrictEquals(
             out.includes(IDENTITY_WITHOUT_PII_NAME), false,
         );
     },
 );
 
-test(
+Deno.test(
     'nameless service detail redacts to the service'
     + ' label, never the id as the title',
     () => {
@@ -194,15 +181,15 @@ test(
             registration: { registered: false as const },
         }).renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, new RegExp(UNNAMED_SERVICE_NAME));
+        assertMatch(out, new RegExp(UNNAMED_SERVICE_NAME));
         // The id is the subtitle, never the heading.
-        assert.doesNotMatch(
+        assertNotMatch(
             out, /<h1[^>]*>\s*BhdhBLQPyktOCbdJzGsggg/,
         );
     },
 );
 
-test(
+Deno.test(
     'a service identity renders an unregistered'
     + ' registration card',
     () => {
@@ -218,13 +205,13 @@ test(
             activeCredentialKinds: [],
             registration: { registered: false },
         }).renderShell(container);
-        assert.match(allHtml(), /Client registration/);
-        assert.match(allHtml(), /Not registered\./);
-        assert.match(allHtml(), /Register client/);
+        assertMatch(allHtml(), /Client registration/);
+        assertMatch(allHtml(), /Not registered\./);
+        assertMatch(allHtml(), /Register client/);
     },
 );
 
-test(
+Deno.test(
     'a registered service renders status tone and fields',
     () => {
         const { container, allHtml } =
@@ -246,8 +233,8 @@ test(
                 status: 'active',
             },
         }).renderShell(container);
-        assert.match(allHtml(), /data-tone="success"/);
-        assert.match(allHtml(), /client_credentials/);
-        assert.match(allHtml(), /Manage registration/);
+        assertMatch(allHtml(), /data-tone="success"/);
+        assertMatch(allHtml(), /client_credentials/);
+        assertMatch(allHtml(), /Manage registration/);
     },
 );

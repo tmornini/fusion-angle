@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals,
+    assertInstanceOf,
+    assertMatch,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     ValidationError,
@@ -26,121 +31,109 @@ function coreFields(
 
 // -- create: ACL optional → stamp defaults -----------------
 
-test('create omits both ACL keys → stamps'
+Deno.test('create omits both ACL keys → stamps'
 + ' DEFAULT_ATTRIBUTE_ACL_ROLES on both', () => {
     const out = validateAttributeDocumentCreate(
         coreFields(),
     );
-    assert.deepEqual(
+    assertEquals(
         out.read_roles,
         [...DEFAULT_ATTRIBUTE_ACL_ROLES],
     );
-    assert.deepEqual(
+    assertEquals(
         out.write_roles,
         [...DEFAULT_ATTRIBUTE_ACL_ROLES],
     );
-    assert.equal(out.name, 'Priority');
-    assert.equal(out.attribute_type, 'text');
-    assert.equal(out.sort_order, 1);
-    assert.deepEqual(out.options, []);
-    assert.deepEqual(out.constraints, []);
+    assertStrictEquals(out.name, 'Priority');
+    assertStrictEquals(out.attribute_type, 'text');
+    assertStrictEquals(out.sort_order, 1);
+    assertEquals(out.options, []);
+    assertEquals(out.constraints, []);
 });
 
-test('create accepts read_roles: [] (admins only)',
+Deno.test('create accepts read_roles: [] (admins only)',
 () => {
     const out = validateAttributeDocumentCreate(
         coreFields({ read_roles: [] }),
     );
-    assert.deepEqual(out.read_roles, []);
-    assert.deepEqual(
+    assertEquals(out.read_roles, []);
+    assertEquals(
         out.write_roles,
         [...DEFAULT_ATTRIBUTE_ACL_ROLES],
     );
 });
 
-test('create rejects read_roles with empty string',
+Deno.test('create rejects read_roles with empty string',
 () => {
-    assert.throws(
+    const err = assertThrows(
         () => validateAttributeDocumentCreate(
             coreFields({ read_roles: [''] }),
         ),
-        (err: unknown) => {
-            assert.ok(err instanceof ValidationError);
-            assert.match(
-                err.message,
-                /non-empty/,
-            );
-            return true;
-        },
-    );
+    ) as Error;
+    assertInstanceOf(err, ValidationError);
+    assertMatch(err.message, /non-empty/);
 });
 
-test('create accepts write_roles without read_roles'
+Deno.test('create accepts write_roles without read_roles'
 + ' (submit-only field)', () => {
     const out = validateAttributeDocumentCreate(
         coreFields({ write_roles: ['member'] }),
     );
-    assert.deepEqual(
+    assertEquals(
         out.read_roles,
         [...DEFAULT_ATTRIBUTE_ACL_ROLES],
     );
-    assert.deepEqual(out.write_roles, ['member']);
+    assertEquals(out.write_roles, ['member']);
 });
 
-test('create rejects unknown key record_id', () => {
-    assert.throws(
+Deno.test('create rejects unknown key record_id', () => {
+    const err = assertThrows(
         () => validateAttributeDocumentCreate(
             coreFields({ record_id: 'rbfHGatkwQzGZJVXKJEeyw' }),
         ),
-        (err: unknown) => {
-            assert.ok(err instanceof ValidationError);
-            assert.equal(
-                err.message,
-                'unexpected key "record_id" for'
-                + ' AttributeDocumentBody',
-            );
-            return true;
-        },
+    ) as Error;
+    assertInstanceOf(err, ValidationError);
+    assertStrictEquals(
+        err.message,
+        'unexpected key "record_id" for'
+        + ' AttributeDocumentBody',
     );
 });
 
 // -- replace: ACL keys required ----------------------------
 
-test('replace rejects missing write_roles', () => {
-    assert.throws(
+Deno.test('replace rejects missing write_roles', () => {
+    const err = assertThrows(
         () => validateAttributeDocumentReplace(
             coreFields({
                 read_roles: ['member'],
             }),
         ),
-        (err: unknown) => {
-            assert.ok(err instanceof ValidationError);
-            assert.equal(
-                err.message,
-                'missing required key "write_roles"'
-                + ' for AttributeDocumentBody',
-            );
-            return true;
-        },
+    ) as Error;
+    assertInstanceOf(err, ValidationError);
+    assertStrictEquals(
+        err.message,
+        'missing required key "write_roles"'
+        + ' for AttributeDocumentBody',
     );
 });
 
-test('replace accepts both ACL keys verbatim', () => {
+Deno.test('replace accepts both ACL keys verbatim', () => {
     const out = validateAttributeDocumentReplace(
         coreFields({
             read_roles: ['auditor'],
             write_roles: ['admin'],
         }),
     );
-    assert.deepEqual(out.read_roles, ['auditor']);
-    assert.deepEqual(out.write_roles, ['admin']);
-    assert.equal(out.name, 'Priority');
+    assertEquals(out.read_roles, ['auditor']);
+    assertEquals(out.write_roles, ['admin']);
+    assertStrictEquals(out.name, 'Priority');
 });
 
 // -- shared existing attribute rules -----------------------
 
-test('create rejects select with zero options', () => {
-    assert.throws(
+Deno.test('create rejects select with zero options', () => {
+    assertThrows(
         () => validateAttributeDocumentCreate(
             coreFields({
                 attribute_type: 'select',
@@ -151,9 +144,9 @@ test('create rejects select with zero options', () => {
     );
 });
 
-test('create rejects constraint that does not'
+Deno.test('create rejects constraint that does not'
 + ' apply to attribute_type', () => {
-    assert.throws(
+    assertThrows(
         () => validateAttributeDocumentCreate(
             coreFields({
                 attribute_type: 'number',

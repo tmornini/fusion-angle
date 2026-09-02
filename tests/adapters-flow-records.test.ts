@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { adminContext } from './context-fixtures.ts';
 import { createRequestContext } from
@@ -92,7 +91,7 @@ async function seedWorkOrder(
     );
 }
 
-test(
+Deno.test(
     'putFlowRecord then getRecordForFlow round-trips'
     + ' the binding',
     async () => {
@@ -102,14 +101,14 @@ test(
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
-        assert.equal(
+        assertStrictEquals(
             await getRecordForFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw'),
             'rbfHGatkwQzGZJVXKJEeyw',
         );
     },
 );
 
-test(
+Deno.test(
     'getRecordForFlow returns the bound'
     + ' record id, or null if unbound',
     async () => {
@@ -119,11 +118,11 @@ test(
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
-        assert.equal(
+        assertStrictEquals(
             await getRecordForFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw'),
             'rbfHGatkwQzGZJVXKJEeyw',
         );
-        assert.equal(
+        assertStrictEquals(
             await getRecordForFlow(
                 ctx, generateIdentifier(),
             ),
@@ -132,7 +131,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'getRecordForWorkOrder resolves the record'
     + ' via flow_work_orders then flow_records',
     async () => {
@@ -146,7 +145,7 @@ test(
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
-        assert.equal(
+        assertStrictEquals(
             await getRecordForWorkOrder(
                 ctx, workOrderId,
             ),
@@ -155,7 +154,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'getRecordForWorkOrder returns null for a'
     + ' work order with no flow link',
     async () => {
@@ -165,7 +164,7 @@ test(
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
-        assert.equal(
+        assertStrictEquals(
             await getRecordForWorkOrder(
                 ctx, generateIdentifier(),
             ),
@@ -174,7 +173,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'getRecordForWorkOrder returns null when the'
     + ' linked flow has no record binding',
     async () => {
@@ -183,7 +182,7 @@ test(
         await seedWorkOrder(
             db, workOrderId, 'A001', 'aEsGMmBEFaVdWihhHXwCbw', 1,
         );
-        assert.equal(
+        assertStrictEquals(
             await getRecordForWorkOrder(
                 ctx, workOrderId,
             ),
@@ -192,7 +191,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'getFlowSummariesForRecord returns id and'
     + ' name for every flow bound to a record',
     async () => {
@@ -222,7 +221,7 @@ test(
             await getFlowSummariesForRecord(
                 ctx, 'rbfHGatkwQzGZJVXKJEeyw',
             );
-        assert.deepEqual(
+        assertEquals(
             flows.toSorted(
                 (a, b) =>
                     a.id.localeCompare(b.id),
@@ -238,7 +237,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'getWorkOrdersForRecord walks'
     + ' flow_records → flow_work_orders →'
     + ' work_orders correctly for a record bound'
@@ -280,11 +279,11 @@ test(
         const ids = workOrders
             .map(w => w.id)
             .sort();
-        assert.deepEqual(ids, [woA, woB].sort());
+        assertEquals(ids, [woA, woB].sort());
     },
 );
 
-test(
+Deno.test(
     'getWorkOrdersForRecord returns an empty'
     + ' list for an unbound record',
     async () => {
@@ -293,11 +292,11 @@ test(
             await getWorkOrdersForRecord(
                 ctx, generateIdentifier(),
             );
-        assert.equal(workOrders.length, 0);
+        assertStrictEquals(workOrders.length, 0);
     },
 );
 
-test(
+Deno.test(
     'deleteFlowRecord removes the binding row',
     async () => {
         const { ctx } = await adminContext();
@@ -308,7 +307,7 @@ test(
         });
         await deleteFlowRecord(ctx, 'aEsGMmBEFaVdWihhHXwCbw'
             , 'dCnpryxCNwuTnCrBBDIMOw');
-        assert.equal(
+        assertStrictEquals(
             await getRecordForFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw'),
             null,
         );

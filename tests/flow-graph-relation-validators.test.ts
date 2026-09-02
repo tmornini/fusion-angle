@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertThrows } from '@std/assert';
 import {
     validateFlowNodeEntity,
     validateFlowEdgeEntity,
@@ -39,8 +38,8 @@ const attrBody = () => ({
 
 // ── flow_nodes ──
 
-test('validateFlowNodeEntity accepts a valid body', () => {
-    assert.deepEqual(validateFlowNodeEntity(nodeBody()), {
+Deno.test('validateFlowNodeEntity accepts a valid body', () => {
+    assertEquals(validateFlowNodeEntity(nodeBody()), {
         flow_id: 'ZOousbbnzpqlxJExVAruYQ', name: 'Draft',
         position_x: 12, position_y: 34,
         is_create: true, is_archive: false,
@@ -48,15 +47,15 @@ test('validateFlowNodeEntity accepts a valid body', () => {
     });
 });
 
-test('validateFlowNodeEntity rejects an extra key', () => {
-    assert.throws(
+Deno.test('validateFlowNodeEntity rejects an extra key', () => {
+    assertThrows(
         () => validateFlowNodeEntity(
             { ...nodeBody(), graph: '{}' }),
         ValidationError);
 });
 
-test('validateFlowNodeEntity rejects a non-zulu at', () => {
-    assert.throws(
+Deno.test('validateFlowNodeEntity rejects a non-zulu at', () => {
+    assertThrows(
         () => validateFlowNodeEntity(
             { ...nodeBody(), at: '2026-01-01' }),
         ValidationError);
@@ -64,16 +63,16 @@ test('validateFlowNodeEntity rejects a non-zulu at', () => {
 
 // ── flow_edges ──
 
-test('validateFlowEdgeEntity accepts a valid body', () => {
-    assert.deepEqual(validateFlowEdgeEntity(edgeBody()), {
+Deno.test('validateFlowEdgeEntity accepts a valid body', () => {
+    assertEquals(validateFlowEdgeEntity(edgeBody()), {
         flow_id: 'ZOousbbnzpqlxJExVAruYQ', name: 'next',
         from_node_id: NODE_1, to_node_id: NODE_2, at: AT,
     });
 });
 
-test('validateFlowEdgeEntity rejects a markup node ref',
+Deno.test('validateFlowEdgeEntity rejects a markup node ref',
 () => {
-    assert.throws(
+    assertThrows(
         () => validateFlowEdgeEntity(
             { ...edgeBody(), to_node_id: '<svg>' }),
         ValidationError);
@@ -81,18 +80,18 @@ test('validateFlowEdgeEntity rejects a markup node ref',
 
 // ── flow_node_members ──
 
-test('validateFlowNodeMemberEntity accepts a valid body',
+Deno.test('validateFlowNodeMemberEntity accepts a valid body',
 () => {
-    assert.deepEqual(
+    assertEquals(
         validateFlowNodeMemberEntity(memberBody()), {
             flow_node_id: NODE_1, member_id: 'mFNSxZqywTSMXhgUTdTqtA',
             action: 'added', at: AT,
         });
 });
 
-test('validateFlowNodeMemberEntity rejects unknown action',
+Deno.test('validateFlowNodeMemberEntity rejects unknown action',
 () => {
-    assert.throws(
+    assertThrows(
         () => validateFlowNodeMemberEntity(
             { ...memberBody(), action: 'deleted' }),
         ValidationError);
@@ -100,9 +99,9 @@ test('validateFlowNodeMemberEntity rejects unknown action',
 
 // ── flow_node_attributes ──
 
-test('validateFlowNodeAttributeEntity accepts a valid body',
+Deno.test('validateFlowNodeAttributeEntity accepts a valid body',
 () => {
-    assert.deepEqual(
+    assertEquals(
         validateFlowNodeAttributeEntity(attrBody()), {
             flow_node_id: NODE_1, attribute_id: 'UQTJZvCoKlFjEoDlDUwekw',
             mode: 'editable', is_required: true,
@@ -110,18 +109,18 @@ test('validateFlowNodeAttributeEntity accepts a valid body',
         });
 });
 
-test('validateFlowNodeAttributeEntity rejects unknown mode',
+Deno.test('validateFlowNodeAttributeEntity rejects unknown mode',
 () => {
-    assert.throws(
+    assertThrows(
         () => validateFlowNodeAttributeEntity(
             { ...attrBody(), mode: 'hidden' }),
         ValidationError);
 });
 
-test('validateFlowNodeAttributeEntity rejects a missing key',
+Deno.test('validateFlowNodeAttributeEntity rejects a missing key',
 () => {
     const { is_required: _drop, ...rest } = attrBody();
-    assert.throws(
+    assertThrows(
         () => validateFlowNodeAttributeEntity(rest),
         ValidationError);
 });

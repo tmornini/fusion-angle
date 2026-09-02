@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -18,7 +17,7 @@ import { sharedMockDb } from './mock-seed.ts';
 // range, the approved-project set, or the objective
 // position weights, both tests fall — by design.
 
-test('mock seed produces portfolio Impact baseline +50',
+Deno.test('mock seed produces portfolio Impact baseline +50',
     async () => {
         const db = await sharedMockDb();
         const ctx = createRequestContext(db, await organizationToken());
@@ -26,12 +25,12 @@ test('mock seed produces portfolio Impact baseline +50',
         const impact = gauges.find(
             g => g.title === 'Impact',
         );
-        assert.ok(impact, 'Impact gauge present');
-        assert.equal(impact.kind, 'bipolar');
-        assert.equal(impact.outer.value, 50);
+        assert(impact, 'Impact gauge present');
+        assertStrictEquals(impact.kind, 'bipolar');
+        assertStrictEquals(impact.outer.value, 50);
     });
 
-test('mock seed produces per-objective baseline means',
+Deno.test('mock seed produces per-objective baseline means',
     async () => {
         const db = await sharedMockDb();
         const ctx = createRequestContext(db, await organizationToken());
@@ -50,11 +49,11 @@ test('mock seed produces per-objective baseline means',
             const row = aggs.find(
                 a => a.objectiveId === id,
             );
-            assert.ok(
+            assert(
                 row,
                 'aggregate row present for ' + id,
             );
-            assert.equal(row.baselineMean, mean);
-            assert.equal(row.projectsBaselineScored, 8);
+            assertStrictEquals(row.baselineMean, mean);
+            assertStrictEquals(row.projectsBaselineScored, 8);
         }
     });

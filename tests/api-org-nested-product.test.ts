@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from
     '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -12,8 +11,8 @@ import { routes, matchRoute } from
 import { pathSegmentsOf } from
     '../api/path-segments.ts';
 
-test('flat GET /ideas/ is not a door', () => {
-    assert.equal(
+Deno.test('flat GET /ideas/ is not a door', () => {
+    assertStrictEquals(
         matchRoute(
             routes, pathSegmentsOf('/ideas/'),
         ),
@@ -21,17 +20,17 @@ test('flat GET /ideas/ is not a door', () => {
     );
 });
 
-test('GET /organizations/:id/ideas/ is the'
+Deno.test('GET /organizations/:id/ideas/ is the'
     + ' collection', () => {
     const match = matchRoute(
         routes,
         pathSegmentsOf('/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'),
     );
-    assert.ok(match);
-    assert.equal(typeof match.route.get, 'function');
+    assert(match);
+    assertStrictEquals(typeof match.route.get, 'function');
 });
 
-test('GET /organizations/:id/identities is 404',
+Deno.test('GET /organizations/:id/identities is 404',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -45,10 +44,10 @@ async () => {
             },
         }),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('GET /organizations/:id/authentication/token'
+Deno.test('GET /organizations/:id/authentication/token'
     + ' is 404', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -62,5 +61,5 @@ test('GET /organizations/:id/authentication/token'
             },
         }),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });

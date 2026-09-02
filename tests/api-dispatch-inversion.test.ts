@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { routes, route } from '../api/routes.ts';
@@ -22,7 +21,7 @@ function req(
     });
 }
 
-test('an in-table nested organizations route matches',
+Deno.test('an in-table nested organizations route matches',
     async () => {
         const probe = route(
             'organizations/:organization-id/XpBeHmMjsWMQXipgvzBjqA',
@@ -38,8 +37,8 @@ test('an in-table nested organizations route matches',
                     + 'XpBeHmMjsWMQXipgvzBjqA',
                 token,
             ));
-            assert.equal(res.status, 200);
-            assert.deepEqual(
+            assertStrictEquals(res.status, 200);
+            assertEquals(
                 await res.json(), { probed: true },
             );
         } finally {
@@ -48,7 +47,7 @@ test('an in-table nested organizations route matches',
         }
     });
 
-test('unmatched slashless organizations ideas is 404',
+Deno.test('unmatched slashless organizations ideas is 404',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -56,10 +55,10 @@ test('unmatched slashless organizations ideas is 404',
         const res = await handleRequest(db, req(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas', token,
         ));
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
     });
 
-test('in-table slashed organizations ideas is 200',
+Deno.test('in-table slashed organizations ideas is 200',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -67,10 +66,10 @@ test('in-table slashed organizations ideas is 200',
         const res = await handleRequest(db, req(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', token,
         ));
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
     });
 
-test('unauthenticated in-table nested path answers the '
+Deno.test('unauthenticated in-table nested path answers the '
     + 'gate 401, not the facade 401', async () => {
     const probe = route(
         'organizations/:organization-id/XpBeHmMjsWMQXipgvzBjqA',
@@ -84,9 +83,9 @@ test('unauthenticated in-table nested path answers the '
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                 + 'XpBeHmMjsWMQXipgvzBjqA',
         ));
-        assert.equal(res.status, 401);
+        assertStrictEquals(res.status, 401);
         const body = await res.json();
-        assert.equal(body.error, 'invalid_token');
+        assertStrictEquals(body.error, 'invalid_token');
     } finally {
         const i = routes.indexOf(probe);
         if (i >= 0) routes.splice(i, 1);

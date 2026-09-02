@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { MemoryStorageBackend }
     from '../api/backend-memory.ts';
 import { HistoryEntityStore } from
@@ -44,7 +48,7 @@ const ROWS: Row[] = [
     },
 ];
 
-test('getAddress is collection+uri_id, ordered by at,id',
+Deno.test('getAddress is collection+uri_id, ordered by at,id',
 async () => {
     const backend = new MemoryStorageBackend();
     await backend.ensureTables(['t']);
@@ -63,13 +67,13 @@ async () => {
                 , 'AjdvjuECVZEgZoFajaIEkg',
         ),
     );
-    assert.deepEqual(
+    assertEquals(
         got.map((row) => row.id),
         ['a', 'b'],
     );
 });
 
-test('getAllAtAddress delegates to Tx.getAddress',
+Deno.test('getAllAtAddress delegates to Tx.getAddress',
 async () => {
     const backend = new MemoryStorageBackend();
     await backend.ensureTables(['message_pairs']);
@@ -92,7 +96,7 @@ async () => {
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             , 'AjdvjuECVZEgZoFajaIEkg',
     );
-    assert.deepEqual(got.map((row) => row.id), ['a']);
+    assertEquals(got.map((row) => row.id), ['a']);
 });
 
 function jsonWire(body: unknown): string {
@@ -115,7 +119,7 @@ function jsonWire(body: unknown): string {
     });
 }
 
-test('getWhereBody is collection + JSON containment',
+Deno.test('getWhereBody is collection + JSON containment',
 async () => {
     const backend = new MemoryStorageBackend();
     await backend.ensureTables(['message_pairs']);
@@ -154,13 +158,13 @@ async () => {
             { code: 'abc' },
         ),
     );
-    assert.deepEqual(got.map((row) => row.id), ['hit']);
+    assertEquals(got.map((row) => row.id), ['hit']);
 });
 
-test('memory getWhere refuses uri_id', async () => {
+Deno.test('memory getWhere refuses uri_id', async () => {
     const backend = new MemoryStorageBackend();
     await backend.ensureTables(['message_pairs']);
-    await assert.rejects(
+    const err = await assertRejects(
         () => backend.transaction(
             ['message_pairs'],
             'readonly',
@@ -168,18 +172,18 @@ test('memory getWhere refuses uri_id', async () => {
                 'message_pairs', 'uri_id', 'AjdvjuECVZEgZoFajaIEkg',
             ),
         ),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message
-                === 'getWhere does not accept uri_id',
+    ) as Error;
+    assertInstanceOf(err, Error);
+    assertStrictEquals(
+        err.message, 'getWhere does not accept uri_id',
     );
 });
 
-test('memory getWhere refuses operation_id',
+Deno.test('memory getWhere refuses operation_id',
 async () => {
     const backend = new MemoryStorageBackend();
     await backend.ensureTables(['message_pairs']);
-    await assert.rejects(
+    const err = await assertRejects(
         () => backend.transaction(
             ['message_pairs'],
             'readonly',
@@ -187,10 +191,9 @@ async () => {
                 'message_pairs', 'operation_id', 'x',
             ),
         ),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message
-                === 'getWhere does not accept'
-                + ' operation_id',
+    ) as Error;
+    assertInstanceOf(err, Error);
+    assertStrictEquals(
+        err.message, 'getWhere does not accept operation_id',
     );
 });

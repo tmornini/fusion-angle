@@ -1,6 +1,12 @@
-import { after, before, test } from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertMatch,
+    assertNotMatch,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     hasSchemaMarker,
 } from '../server/boot.ts';
@@ -52,16 +58,16 @@ function fakeClient(
     return { sql, texts };
 }
 
-const POSTGRES_URL = process.env['POSTGRES_URL'];
+const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function schemaName(): string {
-    const base = process.env['SCHEMA_NAME']
+    const base = Deno.env.get('SCHEMA_NAME')
         ?? (
             'fusion_test_'
             + String(Date.now())
             + '_'
-            + String(process.pid)
+            + String(Deno.pid)
         );
     const name = base + '_seed';
     if (!IDENT.test(name)) {
@@ -83,63 +89,63 @@ function urlWithSearchPath(
     return parsed.href;
 }
 
-test('parseSeedArgv accepts one mode flag', () => {
-    assert.deepEqual(
+Deno.test('parseSeedArgv accepts one mode flag', () => {
+    assertEquals(
         parseSeedArgv(['--bootstrap']),
         { kind: 'ok', mode: 'bootstrap' },
     );
-    assert.deepEqual(
+    assertEquals(
         parseSeedArgv(['--mock-data']),
         { kind: 'ok', mode: 'mock-data' },
     );
 });
 
-test('parseSeedArgv help is kind help', () => {
-    assert.deepEqual(
+Deno.test('parseSeedArgv help is kind help', () => {
+    assertEquals(
         parseSeedArgv(['--help']),
         { kind: 'help' },
     );
-    assert.deepEqual(
+    assertEquals(
         parseSeedArgv(['-h']),
         { kind: 'help' },
     );
 });
 
-test('parseSeedArgv none two unknown', () => {
+Deno.test('parseSeedArgv none two unknown', () => {
     const none = parseSeedArgv([]);
-    assert.equal(none.kind, 'error');
+    assertStrictEquals(none.kind, 'error');
     if (none.kind !== 'error') return;
-    assert.equal(
+    assertStrictEquals(
         none.message,
         SEED_EXCLUSIVE_FLAGS,
     );
     const two = parseSeedArgv([
         '--bootstrap', '--mock-data',
     ]);
-    assert.equal(two.kind, 'error');
+    assertStrictEquals(two.kind, 'error');
     if (two.kind !== 'error') return;
-    assert.equal(
+    assertStrictEquals(
         two.message,
         SEED_EXCLUSIVE_FLAGS,
     );
     const unknown = parseSeedArgv(['--pristine']);
-    assert.equal(unknown.kind, 'error');
+    assertStrictEquals(unknown.kind, 'error');
     if (unknown.kind !== 'error') return;
-    assert.match(unknown.message, /unknown/i);
+    assertMatch(unknown.message, /unknown/i);
 });
 
-test('seedErrorMessage never echoes a URL', () => {
-    assert.equal(
+Deno.test('seedErrorMessage never echoes a URL', () => {
+    assertStrictEquals(
         seedErrorMessage(new Error(
             'connect postgres://user:pw@h/db',
         )),
         'seed failed',
     );
-    assert.equal(
+    assertStrictEquals(
         seedErrorMessage(new Error(SEED_NONEMPTY)),
         SEED_NONEMPTY,
     );
-    assert.equal(
+    assertStrictEquals(
         seedErrorMessage(
             new Error(SEED_EXCLUSIVE_FLAGS),
         ),
@@ -147,62 +153,60 @@ test('seedErrorMessage never echoes a URL', () => {
     );
 });
 
-test('isDatabaseEmpty is true when no rows exist',
+Deno.test('isDatabaseEmpty is true when no rows exist',
 async () => {
     const empty = fakeClient([{
         message_pairs: false,
         marker: false,
     }]);
-    assert.equal(await isDatabaseEmpty(empty.sql), true);
-    assert.match(
+    assertStrictEquals(await isDatabaseEmpty(empty.sql), true);
+    assertMatch(
         empty.texts[0] ?? '', /FROM message_pairs/,
     );
-    assert.match(empty.texts[0] ?? '', /schema_marker/);
+    assertMatch(empty.texts[0] ?? '', /schema_marker/);
 });
 
-test('assertEmptyDatabase refuses any message row',
+Deno.test('assertEmptyDatabase refuses any message row',
 async () => {
     const nonempty = fakeClient([{
         message_pairs: true,
         marker: false,
     }]);
-    await assert.rejects(
+    const error = await assertRejects(
         () => assertEmptyDatabase(nonempty.sql),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message === SEED_NONEMPTY,
-    );
+    ) as Error;
+    assertInstanceOf(error, Error);
+    assertStrictEquals(error.message, SEED_NONEMPTY);
 });
 
-test('assertEmptyDatabase refuses a marker row',
+Deno.test('assertEmptyDatabase refuses a marker row',
 async () => {
     const marked = fakeClient([{
         message_pairs: false,
         marker: true,
     }]);
-    await assert.rejects(
+    const error = await assertRejects(
         () => assertEmptyDatabase(marked.sql),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message === SEED_NONEMPTY,
-    );
+    ) as Error;
+    assertInstanceOf(error, Error);
+    assertStrictEquals(error.message, SEED_NONEMPTY);
 });
 
-test('postgres-seed refuses leftover pairs before DDL',
+Deno.test('postgres-seed refuses leftover pairs before DDL',
 () => {
-    const src = readFileSync(
-        'server/postgres-seed.ts', 'utf8',
+    const src = Deno.readTextFileSync(
+        'server/postgres-seed.ts',
     );
     const legacy = src.indexOf(
         'assertNoLegacyMessageTables',
     );
     const ensure = src.indexOf('ensureTables');
-    assert.ok(legacy >= 0);
-    assert.ok(ensure >= 0);
-    assert.ok(legacy < ensure);
+    assert(legacy >= 0);
+    assert(ensure >= 0);
+    assert(legacy < ensure);
 });
 
-test('serial hasher never overlaps', async () => {
+Deno.test('serial hasher never overlaps', async () => {
     let current = 0;
     let max = 0;
     const hash = serialPasswordHasher(async (text) => {
@@ -217,10 +221,10 @@ test('serial hasher never overlaps', async () => {
     await Promise.all(['a', 'b', 'c'].map((text) =>
         hash(text),
     ));
-    assert.equal(max, 1);
+    assertStrictEquals(max, 1);
 });
 
-test('formatSeededCredentials is terminal text', () => {
+Deno.test('formatSeededCredentials is terminal text', () => {
     const text = formatSeededCredentials({
         identities: [{
             identityId: 'XXZruirZyAOoRpNxaDnpSA',
@@ -228,12 +232,12 @@ test('formatSeededCredentials is terminal text', () => {
             password: 'secret-once',
         }],
     });
-    assert.ok(text.includes(SEED_REVEAL_HEADER));
-    assert.match(text, /demo@example.com\tsecret-once/);
-    assert.doesNotMatch(text, /"level":/);
+    assert(text.includes(SEED_REVEAL_HEADER));
+    assertMatch(text, /demo@example.com\tsecret-once/);
+    assertNotMatch(text, /"level":/);
 });
 
-test('non-empty refuses without seeding or printing',
+Deno.test('non-empty refuses without seeding or printing',
 async () => {
     const db = memoryDbAdapter();
     const nonempty = fakeClient([{
@@ -241,7 +245,7 @@ async () => {
         marker: false,
     }]);
     let wrote = false;
-    await assert.rejects(
+    const error = await assertRejects(
         () => seedPostgres(
             nonempty.sql, db, 'bootstrap', {
                 hashPassword: testHashPassword,
@@ -250,15 +254,14 @@ async () => {
                 },
             },
         ),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message === SEED_NONEMPTY,
-    );
-    assert.equal(wrote, false);
-    assert.equal(await db.hasSchema(), false);
+    ) as Error;
+    assertInstanceOf(error, Error);
+    assertStrictEquals(error.message, SEED_NONEMPTY);
+    assertStrictEquals(wrote, false);
+    assertStrictEquals(await db.hasSchema(), false);
 });
 
-test('seedPostgres seeds when mode is required',
+Deno.test('seedPostgres seeds when mode is required',
 async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
@@ -275,13 +278,13 @@ async () => {
         },
     );
     const printed = chunks.join('');
-    assert.match(printed, /demo@example.com\t/);
-    assert.ok(printed.includes(SEED_REVEAL_HEADER));
-    assert.equal(await db.hasSchema(), true);
-    assert.equal(chunks.length, 1);
+    assertMatch(printed, /demo@example.com\t/);
+    assert(printed.includes(SEED_REVEAL_HEADER));
+    assertStrictEquals(await db.hasSchema(), true);
+    assertStrictEquals(chunks.length, 1);
 });
 
-test('bootstrap seed prints credentials once',
+Deno.test('bootstrap seed prints credentials once',
 async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
@@ -298,13 +301,13 @@ async () => {
         },
     );
     const printed = chunks.join('');
-    assert.match(printed, /demo@example.com\t/);
-    assert.ok(printed.includes(SEED_REVEAL_HEADER));
-    assert.equal(await db.hasSchema(), true);
-    assert.equal(chunks.length, 1);
+    assertMatch(printed, /demo@example.com\t/);
+    assert(printed.includes(SEED_REVEAL_HEADER));
+    assertStrictEquals(await db.hasSchema(), true);
+    assertStrictEquals(chunks.length, 1);
 });
 
-test('mock-data seed prints every human sign-in',
+Deno.test('mock-data seed prints every human sign-in',
 async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
@@ -321,20 +324,20 @@ async () => {
         },
     );
     const printed = chunks.join('');
-    assert.equal(
+    assertStrictEquals(
         printed.split('\n').filter((line) =>
             line.includes('\t'),
         ).length,
         12,
     );
-    assert.ok(printed.includes(SEED_REVEAL_HEADER));
-    assert.equal(await db.hasSchema(), true);
+    assert(printed.includes(SEED_REVEAL_HEADER));
+    assertStrictEquals(await db.hasSchema(), true);
 });
 
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
-    test(
+    Deno.test(
         'live seed skipped without POSTGRES_URL',
-        { skip: 'POSTGRES_URL is unset' },
+        { ignore: true }, // POSTGRES_URL is unset
         () => {},
     );
 } else {
@@ -350,14 +353,14 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         () => {},
     );
 
-    before(async () => {
+    Deno.test.beforeAll(async () => {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
         await adapter.ensureTables(TABLE_NAMES);
     });
 
-    after(async () => {
+    Deno.test.afterAll(async () => {
         try {
             await sql.unsafe(
                 'DROP SCHEMA IF EXISTS '
@@ -369,9 +372,9 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         }
     });
 
-    test('live empty bootstrap seeds then refuses',
+    Deno.test('live empty bootstrap seeds then refuses',
     async () => {
-        assert.equal(await isDatabaseEmpty(sql), true);
+        assertStrictEquals(await isDatabaseEmpty(sql), true);
         const chunks: string[] = [];
         await seedPostgres(sql, adapter, 'bootstrap', {
             hashPassword: testHashPassword,
@@ -379,22 +382,21 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 chunks.push(chunk);
             },
         });
-        assert.equal(await hasSchemaMarker(sql), true);
-        assert.equal(await isDatabaseEmpty(sql), false);
-        assert.match(
+        assertStrictEquals(await hasSchemaMarker(sql), true);
+        assertStrictEquals(await isDatabaseEmpty(sql), false);
+        assertMatch(
             chunks.join(''),
             /demo@example.com\t/,
         );
-        await assert.rejects(
+        const error = await assertRejects(
             () => seedPostgres(
                 sql, adapter, 'bootstrap', {
                     hashPassword: testHashPassword,
                     write: () => {},
                 },
             ),
-            (error: unknown) =>
-                error instanceof Error
-                && error.message === SEED_NONEMPTY,
-        );
+        ) as Error;
+        assertInstanceOf(error, Error);
+        assertStrictEquals(error.message, SEED_NONEMPTY);
     });
 }

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -117,7 +116,7 @@ async function seedMember(
     );
 }
 
-test(
+Deno.test(
     'getOrganizationStats counts projects that'
     + ' are not deleted or declined',
     async () => {
@@ -132,11 +131,11 @@ test(
         await seedProject(ctx, generateIdentifier(), 'deleted');
         const stats =
             await getOrganizationStats(ctx);
-        assert.equal(stats.projectsCurrent, 4);
+        assertStrictEquals(stats.projectsCurrent, 4);
     },
 );
 
-test(
+Deno.test(
     'getOrganizationStats counts ideas that are'
     + ' not archived or deleted',
     async () => {
@@ -163,11 +162,11 @@ test(
         );
         const stats =
             await getOrganizationStats(ctx);
-        assert.equal(stats.ideasCurrent, 4);
+        assertStrictEquals(stats.ideasCurrent, 4);
     },
 );
 
-test(
+Deno.test(
     'getOrganizationStats counts only active'
     + ' human members',
     async () => {
@@ -178,11 +177,11 @@ test(
         await seedMember(db, generateIdentifier());
         const stats =
             await getOrganizationStats(ctx);
-        assert.equal(stats.activePeopleCount, 5);
+        assertStrictEquals(stats.activePeopleCount, 5);
     },
 );
 
-test(
+Deno.test(
     'getOrganizationStats reflects latest state'
     + ' event when entities transition',
     async () => {
@@ -197,9 +196,9 @@ test(
         );
         let stats =
             await getOrganizationStats(ctx);
-        assert.equal(stats.projectsCurrent, 1);
-        assert.equal(stats.ideasCurrent, 1);
-        assert.equal(stats.activePeopleCount, 2);
+        assertStrictEquals(stats.projectsCurrent, 1);
+        assertStrictEquals(stats.ideasCurrent, 1);
+        assertStrictEquals(stats.activePeopleCount, 2);
 
         // Transitions through later document-trio PUTs
         // (latest by 'at' wins) — the states/:id address is
@@ -218,13 +217,13 @@ test(
             state: 'archived',
         });
         stats = await getOrganizationStats(ctx);
-        assert.equal(stats.projectsCurrent, 0);
-        assert.equal(stats.ideasCurrent, 0);
-        assert.equal(stats.activePeopleCount, 2);
+        assertStrictEquals(stats.projectsCurrent, 0);
+        assertStrictEquals(stats.ideasCurrent, 0);
+        assertStrictEquals(stats.activePeopleCount, 2);
     },
 );
 
-test(
+Deno.test(
     'getOrganization derives seat usage from the'
     + ' memberships ledger',
     async () => {
@@ -246,6 +245,6 @@ test(
             generateIdentifier(), 'member',
         );
         const organization = await getOrganization(ctx);
-        assert.equal(organization.usedSeats(), 2);
+        assertStrictEquals(organization.usedSeats(), 2);
     },
 );

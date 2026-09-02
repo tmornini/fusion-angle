@@ -1,5 +1,11 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertMatch,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     createHttpFacade,
 } from '../web-app/app/adapters/http-facade.ts';
@@ -14,6 +20,17 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import { isIdentifier } from '../shared/identifier.ts';
 import { postPasswordLogin } from
     '../web-app/app/adapters/authentication.ts';
+import { deleteRefreshChannel } from
+    '../web-app/app/adapters/session-refresh-mutex.ts';
+
+// The single-flight mutex opens ONE refresh channel per
+// process, lazily, and a test process has no unload to
+// reclaim it. Release after each test, so the handle never
+// outlives the test that opened it; the next refresh
+// reopens it.
+Deno.test.afterEach(() => {
+    deleteRefreshChannel();
+});
 
 async function withMockFetch(
     handler: typeof fetch,
@@ -28,7 +45,7 @@ async function withMockFetch(
     }
 }
 
-test(
+Deno.test(
     'PUT through the fetch facade sends operation-id',
     async () => {
         let url = '';
@@ -49,18 +66,18 @@ test(
                     + 'AjdvjuECVZEgZoFajaIEkg', { name: 'x' }, 'tok',
             );
         });
-        assert.equal(
+        assertStrictEquals(
             url,
             'http://example.test/api/organizations/AjdvjuECVZEgZoFajaIEkg/'
                 + 'ideas/AjdvjuECVZEgZoFajaIEkg',
         );
-        assert.equal(credentials, 'same-origin');
-        assert.ok(operationId !== null);
-        assert.equal(isIdentifier(operationId), true);
+        assertStrictEquals(credentials, 'same-origin');
+        assert(operationId !== null);
+        assertStrictEquals(isIdentifier(operationId), true);
     },
 );
 
-test(
+Deno.test(
     'cookie refresh posts under the /api/ mount',
     async () => {
         const urls: string[] = [];
@@ -86,26 +103,26 @@ test(
             const facade = createHttpFacade(
                 'http://example.test',
             );
-            await assert.rejects(
+            await assertRejects(
                 () => facade.GET(
                     'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', 'dead',
                 ),
                 UnauthorizedError,
             );
         });
-        assert.equal(
+        assertStrictEquals(
             urls[0],
             'http://example.test/api/organizations/AjdvjuECVZEgZoFajaIEkg/'
                 + 'ideas/',
         );
-        assert.equal(
+        assertStrictEquals(
             urls[1],
             'http://example.test/api/authentication/token',
         );
     },
 );
 
-test(
+Deno.test(
     'createRequestContext accepts the fetch facade',
     async () => {
         let operationId: string | null = null;
@@ -121,12 +138,12 @@ test(
             await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'AjdvjuECVZEgZoFajaIEkg', { name: 'x' });
         });
-        assert.ok(operationId !== null);
-        assert.equal(isIdentifier(operationId), true);
+        assert(operationId !== null);
+        assertStrictEquals(isIdentifier(operationId), true);
     },
 );
 
-test(
+Deno.test(
     '401 through the fetch facade is UnauthorizedError',
     async () => {
         globalThis.document = {
@@ -143,23 +160,17 @@ test(
             const facade = createHttpFacade(
                 'http://example.test',
             );
-            await assert.rejects(
+            const err = await assertRejects(
                 () => facade.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'members/', 'tok'),
-                (err: unknown) => {
-                    assert.ok(
-                        err instanceof UnauthorizedError,
-                    );
-                    assert.equal(
-                        err.reason, 'invalid_token');
-                    return true;
-                },
-            );
+            ) as UnauthorizedError;
+            assertInstanceOf(err, UnauthorizedError);
+            assertStrictEquals(err.reason, 'invalid_token');
         });
     },
 );
 
-test(
+Deno.test(
     '401 on authentication/authorize does not'
     + ' refresh or bounce',
     async () => {
@@ -184,7 +195,7 @@ test(
             const facade = createHttpFacade(
                 'http://example.test',
             );
-            await assert.rejects(
+            await assertRejects(
                 () => facade.POST(
                     'authentication/authorize',
                     {
@@ -197,17 +208,17 @@ test(
                 UnauthorizedError,
             );
         });
-        assert.deepEqual(urls, [
+        assertEquals(urls, [
             'http://example.test/api/'
             + 'authentication/authorize',
         ]);
-        assert.equal(
+        assertStrictEquals(
             window.location.href, '',
         );
     },
 );
 
-test(
+Deno.test(
     'postPasswordLogin wrong password is'
     + ' one fetch and null',
     async () => {
@@ -235,19 +246,19 @@ test(
                 ),
                 DEV_TOKEN,
             );
-            assert.equal(
+            assertStrictEquals(
                 await postPasswordLogin(
                     ctx, 'a@b.c', 'WRONG',
                 ),
                 null,
             );
         });
-        assert.equal(urls.length, 1);
-        assert.match(
+        assertStrictEquals(urls.length, 1);
+        assertMatch(
             urls[0]!,
             /authentication\/authorize$/,
         );
-        assert.equal(
+        assertStrictEquals(
             window.location.href, '',
         );
     },

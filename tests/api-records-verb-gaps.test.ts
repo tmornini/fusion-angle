@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -37,67 +36,67 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('PUT /records → 404 (flat retired)',
+Deno.test('PUT /records → 404 (flat retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/records', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE /records → 404 (flat retired)',
+Deno.test('DELETE /records → 404 (flat retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/records', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST /records/sRqRSyldQDFbqkDYSObDqw → 404 (flat retired)',
+Deno.test('POST /records/sRqRSyldQDFbqkDYSObDqw → 404 (flat retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', '/records/sRqRSyldQDFbqkDYSObDqw', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST /record-attributes → 404 (flat retired)',
+Deno.test('POST /record-attributes → 404 (flat retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', '/record-attributes', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT /record-attributes → 404 (flat retired)',
+Deno.test('PUT /record-attributes → 404 (flat retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/record-attributes', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE /record-attributes → 404 (flat retired)',
+Deno.test('DELETE /record-attributes → 404 (flat retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/record-attributes', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST /record-attributes/'
+Deno.test('POST /record-attributes/'
     + 'VXTdVVRluJDRBqbXWZBntA → 404 (flat retired)',
 async () => {
     const db = await freshDb();
@@ -105,32 +104,32 @@ async () => {
     const res = await handleRequest(db, req(
         'POST', '/record-attributes/VXTdVVRluJDRBqbXWZBntA', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST organizations/:id/flows/:id/records 405s (no post handler wired)',
-async () => {
+Deno.test('POST organizations/:id/flows/:id/records 405s (no post handler'
++ ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ/records/', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT organizations/:id/flows/:id/records 405s (no put handler wired)',
-async () => {
+Deno.test('PUT organizations/:id/flows/:id/records 405s (no put handler'
++ ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ/records/', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/flows/:id/records 405s (no delete handler'
+Deno.test('DELETE organizations/:id/flows/:id/records 405s (no delete handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -139,11 +138,11 @@ test('DELETE organizations/:id/flows/:id/records 405s (no delete handler'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ/records/', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST organizations/:id/flows/:id/records/:frid 405s (no post handler'
-+ ' wired)', async () => {
+Deno.test('POST organizations/:id/flows/:id/records/:frid 405s (no post'
++ ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -151,20 +150,20 @@ test('POST organizations/:id/flows/:id/records/:frid 405s (no post handler'
             + 'ZOousbbnzpqlxJExVAruYQ/records/dMtgdDIobtMiwOttuwPbFw', token
             , {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PATCH /records/sRqRSyldQDFbqkDYSObDqw → 404 (flat retired)',
+Deno.test('PATCH /records/sRqRSyldQDFbqkDYSObDqw → 404 (flat retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PATCH', '/records/sRqRSyldQDFbqkDYSObDqw', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PATCH /record-attributes/'
+Deno.test('PATCH /record-attributes/'
     + 'VXTdVVRluJDRBqbXWZBntA → 404 (flat retired)',
 async () => {
     const db = await freshDb();
@@ -172,5 +171,5 @@ async () => {
     const res = await handleRequest(db, req(
         'PATCH', '/record-attributes/VXTdVVRluJDRBqbXWZBntA', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });

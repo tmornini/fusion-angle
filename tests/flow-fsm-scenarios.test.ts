@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import { reduceFsm }
     from '../web-app/app/flow-fsm-reduce.ts';
 import type {
@@ -69,7 +68,7 @@ function drive(
     return { state: s, actions: out };
 }
 
-test(
+Deno.test(
     'port drag far-drop emits add-node'
     + ' (AA27/AA31/F15)',
     () => {
@@ -108,22 +107,22 @@ test(
             },
         ];
         const r = drive(buildState(), inputs);
-        assert.equal(r.state.connect.kind, 'idle');
+        assertStrictEquals(r.state.connect.kind, 'idle');
         const addNode = findAction(
             r.actions, 'add-node',
         );
-        assert.ok(addNode);
-        assert.equal(addNode.fromId, 'n1');
-        assert.equal(addNode.svgX, FAR_DROP_X);
-        assert.equal(addNode.svgY, FAR_DROP_Y);
-        assert.equal(
+        assert(addNode);
+        assertStrictEquals(addNode.fromId, 'n1');
+        assertStrictEquals(addNode.svgX, FAR_DROP_X);
+        assertStrictEquals(addNode.svgY, FAR_DROP_Y);
+        assertStrictEquals(
             findActions(r.actions, 'add-edge')
                 .length, 0,
         );
     },
 );
 
-test(
+Deno.test(
     'port drag close-drop (under 20px) emits'
     + ' no add-node (AA27 negative)',
     () => {
@@ -162,19 +161,19 @@ test(
             },
         ];
         const r = drive(buildState(), inputs);
-        assert.equal(r.state.connect.kind, 'idle');
-        assert.equal(
+        assertStrictEquals(r.state.connect.kind, 'idle');
+        assertStrictEquals(
             findActions(r.actions, 'add-node')
                 .length, 0,
         );
-        assert.equal(
+        assertStrictEquals(
             findActions(r.actions, 'add-edge')
                 .length, 0,
         );
     },
 );
 
-test(
+Deno.test(
     'shift-drag from port onto different node'
     + ' emits add-edge (AA32/F19)',
     () => {
@@ -211,21 +210,21 @@ test(
             },
         ];
         const r = drive(buildState(), inputs);
-        assert.equal(r.state.connect.kind, 'idle');
+        assertStrictEquals(r.state.connect.kind, 'idle');
         const edge = findAction(
             r.actions, 'add-edge',
         );
-        assert.ok(edge);
-        assert.equal(edge.fromId, 'n1');
-        assert.equal(edge.toId, 'n2');
-        assert.equal(
+        assert(edge);
+        assertStrictEquals(edge.fromId, 'n1');
+        assertStrictEquals(edge.toId, 'n2');
+        assertStrictEquals(
             findActions(r.actions, 'add-node')
                 .length, 0,
         );
     },
 );
 
-test(
+Deno.test(
     'shift-drag onto same source node emits'
     + ' nothing (no self-loop) (F19 self)',
     () => {
@@ -262,19 +261,19 @@ test(
             },
         ];
         const r = drive(buildState(), inputs);
-        assert.equal(r.state.connect.kind, 'idle');
-        assert.equal(
+        assertStrictEquals(r.state.connect.kind, 'idle');
+        assertStrictEquals(
             findActions(r.actions, 'add-edge')
                 .length, 0,
         );
-        assert.equal(
+        assertStrictEquals(
             findActions(r.actions, 'add-node')
                 .length, 0,
         );
     },
 );
 
-test(
+Deno.test(
     'shift-drag released over empty canvas emits'
     + ' nothing (F22)',
     () => {
@@ -313,19 +312,19 @@ test(
             },
         ];
         const r = drive(buildState(), inputs);
-        assert.equal(r.state.connect.kind, 'idle');
-        assert.equal(
+        assertStrictEquals(r.state.connect.kind, 'idle');
+        assertStrictEquals(
             findActions(r.actions, 'add-edge')
                 .length, 0,
         );
-        assert.equal(
+        assertStrictEquals(
             findActions(r.actions, 'add-node')
                 .length, 0,
         );
     },
 );
 
-test(
+Deno.test(
     'plain port-drag then shift-key toggles'
     + ' connect.isShift (F23)',
     () => {
@@ -344,13 +343,13 @@ test(
         const press = drive(
             buildState(), [initialPress],
         );
-        assert.equal(
+        assertStrictEquals(
             press.state.connect.kind, 'connecting',
         );
         if (
             press.state.connect.kind === 'connecting'
         ) {
-            assert.equal(
+            assertStrictEquals(
                 press.state.connect.isShift, false,
             );
         }
@@ -359,7 +358,7 @@ test(
                 kind: 'shift-key', isShift: true,
             },
         ]);
-        assert.equal(
+        assertStrictEquals(
             afterShift.state.connect.kind,
             'connecting',
         );
@@ -367,7 +366,7 @@ test(
             afterShift.state.connect.kind
                 === 'connecting'
         ) {
-            assert.equal(
+            assertStrictEquals(
                 afterShift.state.connect.isShift,
                 true,
             );
@@ -384,7 +383,7 @@ test(
 // visible region when Auto Fit is on — is composed
 // in detail.ts via withPanelOpen + reconcileFitFromDom.
 // Not testable here.
-test(
+Deno.test(
     'double-click node opens panel; second tap'
     + ' within window flips open=true (AA28/F13)',
     () => {
@@ -421,12 +420,12 @@ test(
         const panels = findActions(
             r.actions, 'open-panel',
         );
-        assert.equal(panels.length, 1);
-        assert.equal(panels[0]?.open, true);
+        assertStrictEquals(panels.length, 1);
+        assertStrictEquals(panels[0]?.open, true);
     },
 );
 
-test(
+Deno.test(
     'second click beyond DBLCLICK window does not'
     + ' open panel (F13 negative)',
     () => {
@@ -463,11 +462,11 @@ test(
         const panels = findActions(
             r.actions, 'open-panel',
         );
-        assert.equal(panels.length, 0);
+        assertStrictEquals(panels.length, 0);
     },
 );
 
-test(
+Deno.test(
     'double-click n1 then double-click n2 retargets'
     + ' panel and selection to n2 (F13 retarget)',
     () => {
@@ -530,23 +529,23 @@ test(
             secondN1, releaseN1,
             firstN2, releaseN2, secondN2,
         ]);
-        assert.equal(
+        assertStrictEquals(
             r.state.selection.kind, 'nodes',
         );
         if (r.state.selection.kind === 'nodes') {
             const ids = r.state.selection.nodeIds;
-            assert.equal(ids.size, 1);
-            assert.ok(ids.has('n2'));
+            assertStrictEquals(ids.size, 1);
+            assert(ids.has('n2'));
         }
         const panels = findActions(
             r.actions, 'open-panel',
         );
         const lastPanel = panels[panels.length - 1];
-        assert.equal(lastPanel?.open, true);
+        assertStrictEquals(lastPanel?.open, true);
     },
 );
 
-test(
+Deno.test(
     'drag node emits move-nodes with delta '
     + 'matching cumulative pointer travel (F16/F17)',
     () => {
@@ -595,22 +594,22 @@ test(
             },
         ];
         const r = drive(buildState(), inputs);
-        assert.equal(r.state.drag.kind, 'idle');
+        assertStrictEquals(r.state.drag.kind, 'idle');
         const move = findAction(
             r.actions, 'move-nodes',
         );
-        assert.ok(move);
-        assert.equal(move.updates.length, 1);
+        assert(move);
+        assertStrictEquals(move.updates.length, 1);
         const u = move.updates[0]!;
-        assert.equal(u.nodeId, 'n1');
+        assertStrictEquals(u.nodeId, 'n1');
         // dx = 160-110 = 50; dy = 145-110 = 35.
         // initial 100,100 -> 150, 135.
-        assert.equal(u.x, 150);
-        assert.equal(u.y, 135);
+        assertStrictEquals(u.x, 150);
+        assertStrictEquals(u.y, 135);
     },
 );
 
-test(
+Deno.test(
     'drag start node also emits move-nodes (F17)',
     () => {
         const startPositions = new Map([
@@ -652,16 +651,16 @@ test(
         const move = findAction(
             r.actions, 'move-nodes',
         );
-        assert.ok(move);
-        assert.equal(move.updates.length, 1);
+        assert(move);
+        assertStrictEquals(move.updates.length, 1);
         const u = move.updates[0]!;
-        assert.equal(u.nodeId, 'start');
-        assert.equal(u.x, 40);
-        assert.equal(u.y, 25);
+        assertStrictEquals(u.nodeId, 'start');
+        assertStrictEquals(u.x, 40);
+        assertStrictEquals(u.y, 25);
     },
 );
 
-test(
+Deno.test(
     'edge double-click selects edge and opens'
     + ' panel (F26)',
     () => {
@@ -678,23 +677,23 @@ test(
         const r = drive(buildState(), [
             firstClick, secondClick,
         ]);
-        assert.equal(
+        assertStrictEquals(
             r.state.selection.kind, 'edge',
         );
         if (r.state.selection.kind === 'edge') {
-            assert.equal(
+            assertStrictEquals(
                 r.state.selection.edgeId, 'YiJPbufDpkyrZcZCYbUJpg',
             );
         }
         const panels = findActions(
             r.actions, 'open-panel',
         );
-        assert.equal(panels.length, 1);
-        assert.equal(panels[0]?.open, true);
+        assertStrictEquals(panels.length, 1);
+        assertStrictEquals(panels[0]?.open, true);
     },
 );
 
-test(
+Deno.test(
     'single edge click selects but does not'
     + ' open panel (F26 single)',
     () => {
@@ -705,17 +704,17 @@ test(
                 now: 1000,
             },
         ]);
-        assert.equal(
+        assertStrictEquals(
             r.state.selection.kind, 'edge',
         );
         const panel = findAction(
             r.actions, 'open-panel',
         );
-        assert.equal(panel, undefined);
+        assertStrictEquals(panel, undefined);
     },
 );
 
-test(
+Deno.test(
     'marquee drag covers two nodes → selection'
     + ' contains both (marquee)',
     () => {
@@ -750,21 +749,21 @@ test(
             },
         ];
         const r = drive(buildState(), inputs);
-        assert.equal(r.state.marquee.kind, 'idle');
-        assert.equal(
+        assertStrictEquals(r.state.marquee.kind, 'idle');
+        assertStrictEquals(
             r.state.selection.kind, 'nodes',
         );
         if (r.state.selection.kind === 'nodes') {
             const ids = r.state.selection.nodeIds;
-            assert.equal(ids.size, 2);
-            assert.ok(ids.has('n1'));
-            assert.ok(ids.has('n2'));
-            assert.ok(!ids.has('n3'));
+            assertStrictEquals(ids.size, 2);
+            assert(ids.has('n1'));
+            assert(ids.has('n2'));
+            assert(!ids.has('n3'));
         }
     },
 );
 
-test(
+Deno.test(
     'marquee drag covering no nodes leaves'
     + ' selection none (marquee negative)',
     () => {
@@ -797,8 +796,8 @@ test(
             },
         ];
         const r = drive(buildState(), inputs);
-        assert.equal(r.state.marquee.kind, 'idle');
-        assert.equal(
+        assertStrictEquals(r.state.marquee.kind, 'idle');
+        assertStrictEquals(
             r.state.selection.kind, 'none',
         );
     },

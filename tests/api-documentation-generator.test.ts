@@ -1,6 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import {
+    assert,
+    assertMatch,
+    assertNotMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import { routes } from '../api/routes.ts';
 import {
     roomPathOf,
@@ -10,76 +13,76 @@ import {
 import { offeredVerbs, uriOf } from
     '../api/route-surface.ts';
 
-test('validate runs generate-api-documentation'
+Deno.test('validate runs generate-api-documentation'
     + ' --check', () => {
-    const src = readFileSync('validate', 'utf8');
-    assert.match(
+    const src = Deno.readTextFileSync('validate');
+    assertMatch(
         src,
         /generate-api-documentation --check/,
     );
-    assert.doesNotMatch(src, /API-TREE\.md/);
+    assertNotMatch(src, /API-TREE\.md/);
 });
 
-test('a known collection is drawn with /',
+Deno.test('a known collection is drawn with /',
 () => {
     const svg = svgOf(routes);
-    assert.match(svg, /\/api\/identities\//);
-    assert.doesNotMatch(
+    assertMatch(svg, /\/api\/identities\//);
+    assertNotMatch(
         svg, /\/invitations\/sent/,
     );
 });
 
-test('filled GET circle hrefs the identities'
+Deno.test('filled GET circle hrefs the identities'
     + ' collection room', () => {
     const row = routes.find((r) =>
         uriOf(r) === '/identities/');
-    assert.ok(row);
-    assert.ok(offeredVerbs(row).includes('get'));
-    assert.equal(
+    assert(row);
+    assert(offeredVerbs(row).includes('get'));
+    assertStrictEquals(
         roomPathOf('get', row.segments),
         'get/identities/index.html',
     );
 });
 
-test('two 401 links share statuses/401/',
+Deno.test('two 401 links share statuses/401/',
 () => {
     const html = verbRoomHtml(
         'get', '/identities/', ['401', '404'],
         'none',
     );
-    assert.match(
+    assertMatch(
         html, /href="..\/..\/statuses\/401\/"/,
     );
 });
 
-test('svg draws the /api/ wire prefix',
+Deno.test('svg draws the /api/ wire prefix',
 () => {
     const svg = svgOf(routes);
-    assert.match(svg, /\/api\/identities\//);
-    assert.match(
+    assertMatch(svg, /\/api\/identities\//);
+    assertMatch(
         svg, /\/api\/authentication\/token/,
     );
 });
 
-test('rooms stay a page tree, not an /api/ folder',
+Deno.test('rooms stay a page tree, not an /api/ folder',
 () => {
     const row = routes.find((r) =>
         uriOf(r) === '/identities/');
-    assert.ok(row);
-    assert.equal(
+    assert(row);
+    assertStrictEquals(
         roomPathOf('get', row.segments),
         'get/identities/index.html',
     );
 });
 
-test('verb room title is the wire URI',
+Deno.test('verb room title is the wire URI',
 () => {
     const html = verbRoomHtml(
         'get', '/identities/', ['401', '404'],
         'none',
     );
-    assert.match(html, /GET \/api\/identities\//);
-    assert.match(
+    assertMatch(html, /GET \/api\/identities\//);
+    assertMatch(
         html, /href="..\/..\/statuses\/401\/"/,
     );
 });

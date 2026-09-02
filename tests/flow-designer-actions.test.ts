@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     applyMoveNodes,
     applyDragPreview,
@@ -41,7 +45,7 @@ const edge = (
     toNodeId: toId,
 });
 
-test('applyMoveNodes updates only matching ids', () => {
+Deno.test('applyMoveNodes updates only matching ids', () => {
     const nodes = [
         node('a', 0, 0),
         node('b', 10, 10),
@@ -50,28 +54,28 @@ test('applyMoveNodes updates only matching ids', () => {
     const result = applyMoveNodes(nodes, [
         { nodeId: 'b', x: 99, y: 88 },
     ]);
-    assert.equal(result[0]?.positionX, 0);
-    assert.equal(result[1]?.positionX, 99);
-    assert.equal(result[1]?.positionY, 88);
-    assert.equal(result[2]?.positionX, 20);
+    assertStrictEquals(result[0]?.positionX, 0);
+    assertStrictEquals(result[1]?.positionX, 99);
+    assertStrictEquals(result[1]?.positionY, 88);
+    assertStrictEquals(result[2]?.positionX, 20);
 });
 
-test('applyMoveNodes returns new array (immutable)', () => {
+Deno.test('applyMoveNodes returns new array (immutable)', () => {
     const nodes = [node('a')];
     const result = applyMoveNodes(nodes, [
         { nodeId: 'a', x: 5, y: 5 },
     ]);
-    assert.notEqual(result, nodes);
-    assert.equal(nodes[0]?.positionX, 0);
+    assertNotStrictEquals(result, nodes);
+    assertStrictEquals(nodes[0]?.positionX, 0);
 });
 
-test('applyMoveNodes empty updates returns equivalent', () => {
+Deno.test('applyMoveNodes empty updates returns equivalent', () => {
     const nodes = [node('a', 1, 2)];
     const result = applyMoveNodes(nodes, []);
-    assert.deepEqual(result, nodes);
+    assertEquals(result, nodes);
 });
 
-test('applyDragPreview applies offset to dragging nodes', () => {
+Deno.test('applyDragPreview applies offset to dragging nodes', () => {
     const nodes = [
         node('a', 100, 100),
         node('b', 200, 200),
@@ -91,69 +95,72 @@ test('applyDragPreview applies offset to dragging nodes', () => {
     const result = applyDragPreview(
         nodes, drag,
     );
-    assert.equal(result[0]?.positionX, 150);
-    assert.equal(result[0]?.positionY, 130);
-    assert.equal(result[1]?.positionX, 250);
-    assert.equal(result[1]?.positionY, 230);
+    assertStrictEquals(result[0]?.positionX, 150);
+    assertStrictEquals(result[0]?.positionY, 130);
+    assertStrictEquals(result[1]?.positionX, 250);
+    assertStrictEquals(result[1]?.positionY, 230);
 });
 
-test('applyDragPreview idle drag returns nodes copy', () => {
+Deno.test('applyDragPreview idle drag returns nodes copy', () => {
     const nodes = [node('a', 1, 2)];
     const result = applyDragPreview(
         nodes, { kind: 'idle' },
     );
-    assert.deepEqual(result, nodes);
-    assert.notEqual(result, nodes);
+    assertEquals(result, nodes);
+    assertNotStrictEquals(result, nodes);
 });
 
-test('applyToggleLock unlocked → locked clears editing', () => {
+Deno.test('applyToggleLock unlocked → locked clears editing', () => {
     const result = applyToggleLock(
         false, true,
     );
-    assert.equal(result.isLocked, true);
-    assert.equal(
+    assertStrictEquals(result.isLocked, true);
+    assertStrictEquals(
         result.isEditingName, false,
     );
 });
 
-test('applyToggleLock locked → unlocked preserves editing flag', () => {
-    const result = applyToggleLock(
-        true, true,
-    );
-    assert.equal(result.isLocked, false);
-    assert.equal(
-        result.isEditingName, true,
-    );
-});
+Deno.test(
+    'applyToggleLock locked → unlocked preserves editing flag',
+    () => {
+        const result = applyToggleLock(
+            true, true,
+        );
+        assertStrictEquals(result.isLocked, false);
+        assertStrictEquals(
+            result.isEditingName, true,
+        );
+    },
+);
 
-test('applyUpdateFlowName trims input', () => {
+Deno.test('applyUpdateFlowName trims input', () => {
     const result =
         applyUpdateFlowName('  hello  ');
-    assert.equal(result.flowName, 'hello');
-    assert.equal(
+    assertStrictEquals(result.flowName, 'hello');
+    assertStrictEquals(
         result.isEditingName, false,
     );
 });
 
-test('applyAddEdge appends new edge', () => {
+Deno.test('applyAddEdge appends new edge', () => {
     const edges = [edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b')];
     const result = applyAddEdge(
         edges, 'e2', 'goto', 'b', 'c',
     );
-    assert.equal(result.length, 2);
-    assert.equal(result[1]?.id, 'e2');
-    assert.equal(result[1]?.name, 'goto');
-    assert.equal(result[1]?.fromNodeId, 'b');
-    assert.equal(result[1]?.toNodeId, 'c');
+    assertStrictEquals(result.length, 2);
+    assertStrictEquals(result[1]?.id, 'e2');
+    assertStrictEquals(result[1]?.name, 'goto');
+    assertStrictEquals(result[1]?.fromNodeId, 'b');
+    assertStrictEquals(result[1]?.toNodeId, 'c');
 });
 
-test('applyAddEdge does not mutate input', () => {
+Deno.test('applyAddEdge does not mutate input', () => {
     const edges = [edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b')];
     applyAddEdge(edges, 'e2', '', 'b', 'c');
-    assert.equal(edges.length, 1);
+    assertStrictEquals(edges.length, 1);
 });
 
-test('applyDeleteNodes removes nodes and orphan edges', () => {
+Deno.test('applyDeleteNodes removes nodes and orphan edges', () => {
     const nodes = [
         node('a'), node('b'), node('c'),
     ];
@@ -166,31 +173,35 @@ test('applyDeleteNodes removes nodes and orphan edges', () => {
         nodes, edges,
         new Set(['b']),
     );
-    assert.equal(result.nodes.length, 2);
-    assert.deepEqual(
+    assertStrictEquals(result.nodes.length, 2);
+    assertEquals(
         result.nodes.map(n => n.id),
         ['a', 'c'],
     );
     // YiJPbufDpkyrZcZCYbUJpg and e2 reference 'b', so are dropped
-    assert.equal(result.edges.length, 1);
-    assert.equal(result.edges[0]?.id, 'e3');
+    assertStrictEquals(result.edges.length, 1);
+    assertStrictEquals(result.edges[0]?.id, 'e3');
 });
 
-test('applyDeleteNodes empty id set leaves both arrays unchanged', () => {
-    const nodes = [node('a'), node('b')];
-    const edges = [edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b')];
-    const result = applyDeleteNodes(
-        nodes, edges, new Set(),
-    );
-    assert.deepEqual(
-        result.nodes.map(n => n.id), ['a', 'b'],
-    );
-    assert.deepEqual(
-        result.edges.map(e => e.id), ['YiJPbufDpkyrZcZCYbUJpg'],
-    );
-});
+Deno.test(
+    'applyDeleteNodes empty id set leaves both arrays unchanged',
+    () => {
+        const nodes = [node('a'), node('b')];
+        const edges = [edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b')];
+        const result = applyDeleteNodes(
+            nodes, edges, new Set(),
+        );
+        assertEquals(
+            result.nodes.map(n => n.id), ['a', 'b'],
+        );
+        assertEquals(
+            result.edges.map(e => e.id),
+            ['YiJPbufDpkyrZcZCYbUJpg'],
+        );
+    },
+);
 
-test('applyDeleteEdge removes single edge by id', () => {
+Deno.test('applyDeleteEdge removes single edge by id', () => {
     const edges = [
         edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b'),
         edge('e2', 'b', 'c'),
@@ -198,11 +209,11 @@ test('applyDeleteEdge removes single edge by id', () => {
     const result = applyDeleteEdge(
         edges, 'YiJPbufDpkyrZcZCYbUJpg',
     );
-    assert.equal(result.length, 1);
-    assert.equal(result[0]?.id, 'e2');
+    assertStrictEquals(result.length, 1);
+    assertStrictEquals(result[0]?.id, 'e2');
 });
 
-test('applyDeleteEdge with non-matching id is a no-op', () => {
+Deno.test('applyDeleteEdge with non-matching id is a no-op', () => {
     const edges = [
         edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b'),
         edge('e2', 'b', 'c'),
@@ -210,13 +221,13 @@ test('applyDeleteEdge with non-matching id is a no-op', () => {
     const result = applyDeleteEdge(
         edges, 'missing',
     );
-    assert.equal(result.length, 2);
-    assert.deepEqual(
+    assertStrictEquals(result.length, 2);
+    assertEquals(
         result.map(e => e.id), ['YiJPbufDpkyrZcZCYbUJpg', 'e2'],
     );
 });
 
-test('applyUpdateNode patches matching id', () => {
+Deno.test('applyUpdateNode patches matching id', () => {
     const nodes = [
         node('a', 0, 0),
         node('b', 0, 0),
@@ -225,12 +236,12 @@ test('applyUpdateNode patches matching id', () => {
         nodes, 'a',
         { name: 'Alpha', isCreate: true },
     );
-    assert.equal(result[0]?.name, 'Alpha');
-    assert.equal(result[0]?.isCreate, true);
-    assert.equal(result[1]?.name, 'B');
+    assertStrictEquals(result[0]?.name, 'Alpha');
+    assertStrictEquals(result[0]?.isCreate, true);
+    assertStrictEquals(result[1]?.name, 'B');
 });
 
-test(
+Deno.test(
     'applyUpdateNode patches memberIds',
     () => {
         const nodes = [
@@ -241,17 +252,17 @@ test(
             nodes, 'a',
             { memberIds: ['hw_1', 'ai_1'] },
         );
-        assert.deepEqual(
+        assertEquals(
             result[0]?.memberIds,
             ['hw_1', 'ai_1'],
         );
-        assert.deepEqual(
+        assertEquals(
             result[1]?.memberIds, [],
         );
     },
 );
 
-test('applyUpdateEdge patches matching id', () => {
+Deno.test('applyUpdateEdge patches matching id', () => {
     const edges = [
         edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b'),
         edge('e2', 'b', 'c'),
@@ -259,8 +270,8 @@ test('applyUpdateEdge patches matching id', () => {
     const result = applyUpdateEdge(
         edges, 'YiJPbufDpkyrZcZCYbUJpg', { name: 'go' },
     );
-    assert.equal(result[0]?.name, 'go');
-    assert.equal(result[1]?.name, '');
+    assertStrictEquals(result[0]?.name, 'go');
+    assertStrictEquals(result[1]?.name, '');
 });
 
 // ── T16: previously-untested apply* transforms ──
@@ -271,39 +282,39 @@ const attr = (
     isRequired = false,
 ) => ({ attributeId: id, mode, isRequired });
 
-test('applyAddNode appends a node with defaults', () => {
+Deno.test('applyAddNode appends a node with defaults', () => {
     const result = applyAddNode(
         [node('a')], 'b', 'New', 10, 20);
-    assert.equal(result.length, 2);
+    assertStrictEquals(result.length, 2);
     const added = result[1]!;
-    assert.equal(added.id, 'b');
-    assert.equal(added.name, 'New');
-    assert.equal(added.positionX, 10);
-    assert.equal(added.positionY, 20);
-    assert.equal(added.isCreate, false);
-    assert.equal(added.isArchive, false);
+    assertStrictEquals(added.id, 'b');
+    assertStrictEquals(added.name, 'New');
+    assertStrictEquals(added.positionX, 10);
+    assertStrictEquals(added.positionY, 20);
+    assertStrictEquals(added.isCreate, false);
+    assertStrictEquals(added.isArchive, false);
 });
 
-test('applyAddNode does not mutate the input', () => {
+Deno.test('applyAddNode does not mutate the input', () => {
     const nodes = [node('a')];
     applyAddNode(nodes, 'b', 'New', 0, 0);
-    assert.equal(nodes.length, 1);
+    assertStrictEquals(nodes.length, 1);
 });
 
-test('applyAddAttributeRef appends to the matching node', () => {
+Deno.test('applyAddAttributeRef appends to the matching node', () => {
     const nodes = [
         { ...node('a'), attributes: [] },
         { ...node('b'), attributes: [] },
     ];
     const result = applyAddAttributeRef(
         nodes, 'a', attr('x'));
-    assert.deepEqual(
+    assertEquals(
         result[0]!.attributes.map(r => r.attributeId),
         ['x']);
-    assert.equal(result[1]!.attributes.length, 0);
+    assertStrictEquals(result[1]!.attributes.length, 0);
 });
 
-test('applyRemoveAttributeRef drops by attributeId', () => {
+Deno.test('applyRemoveAttributeRef drops by attributeId', () => {
     const nodes = [
         {
             ...node('a'),
@@ -311,12 +322,12 @@ test('applyRemoveAttributeRef drops by attributeId', () => {
         },
     ];
     const result = applyRemoveAttributeRef(nodes, 'a', 'x');
-    assert.deepEqual(
+    assertEquals(
         result[0]!.attributes.map(r => r.attributeId),
         ['y']);
 });
 
-test('applyUpdateAttributeMode updates the one ref', () => {
+Deno.test('applyUpdateAttributeMode updates the one ref', () => {
     const nodes = [
         {
             ...node('a'),
@@ -325,11 +336,11 @@ test('applyUpdateAttributeMode updates the one ref', () => {
     ];
     const result = applyUpdateAttributeMode(
         nodes, 'a', 'x', 'readonly');
-    assert.equal(
+    assertStrictEquals(
         result[0]!.attributes[0]!.mode, 'readonly');
 });
 
-test('applyUpdateAttributeRequired flips the flag', () => {
+Deno.test('applyUpdateAttributeRequired flips the flag', () => {
     const nodes = [
         {
             ...node('a'),
@@ -338,67 +349,67 @@ test('applyUpdateAttributeRequired flips the flag', () => {
     ];
     const result = applyUpdateAttributeRequired(
         nodes, 'a', 'x', true);
-    assert.equal(
+    assertStrictEquals(
         result[0]!.attributes[0]!.isRequired, true);
 });
 
-test('applyAutoLayout positions every node', () => {
+Deno.test('applyAutoLayout positions every node', () => {
     const result = applyAutoLayout(
         [{ ...node('a'), isCreate: true }, node('b')],
         [edge('YiJPbufDpkyrZcZCYbUJpg', 'a', 'b')],
         800, 600, false, 0);
     for (const n of result.nodes) {
-        assert.equal(typeof n.positionX, 'number');
-        assert.equal(typeof n.positionY, 'number');
+        assertStrictEquals(typeof n.positionX, 'number');
+        assertStrictEquals(typeof n.positionY, 'number');
     }
-    assert.ok(result.edgeWaypoints instanceof Map);
+    assert(result.edgeWaypoints instanceof Map);
 });
 
-test('applyPanToRevealSelected centers a node, else null',
+Deno.test('applyPanToRevealSelected centers a node, else null',
 () => {
     const vb = { x: 0, y: 0, w: 800, h: 600 };
     const at100 = applyPanToRevealSelected(
         'a', null, [node('a', 100, 0)], [], vb, 800, 0);
     const at200 = applyPanToRevealSelected(
         'a', null, [node('a', 200, 0)], [], vb, 800, 0);
-    assert.ok(at100 !== null && at200 !== null);
+    assert(at100 !== null && at200 !== null);
     // A node 100 to the right shifts the origin by 100.
-    assert.equal(at200!.x - at100!.x, 100);
+    assertStrictEquals(at200!.x - at100!.x, 100);
     // No selection → no pan.
-    assert.equal(
+    assertStrictEquals(
         applyPanToRevealSelected(
             null, null, [], [], vb, 800, 0),
         null);
 });
 
-test('applyPanelTransition saves the viewBox on open', () => {
+Deno.test('applyPanelTransition saves the viewBox on open', () => {
     const vb = { x: 5, y: 6, w: 800, h: 600 };
     // autoFit short-circuits to null.
-    assert.equal(
+    assertStrictEquals(
         applyPanelTransition(
             true, true, { kind: 'none' }, vb),
         null);
     // Panel just opened → save the viewBox + request a pan.
     const opened = applyPanelTransition(
         false, true, { kind: 'none' }, vb);
-    assert.ok(opened !== null);
-    assert.equal(opened!.shouldPanToReveal, true);
-    assert.equal(opened!.savedViewBox.kind, 'saved');
+    assert(opened !== null);
+    assertStrictEquals(opened!.shouldPanToReveal, true);
+    assertStrictEquals(opened!.savedViewBox.kind, 'saved');
 });
 
-test('applyPanelTransition restores the viewBox on close',
+Deno.test('applyPanelTransition restores the viewBox on close',
     () => {
         const pre = { x: 5, y: 6, w: 800, h: 600 };
         const opened = applyPanelTransition(
             false, true, { kind: 'none' }, pre);
-        assert.ok(opened !== null);
+        assert(opened !== null);
         const panned = {
             x: 50, y: 60, w: 800, h: 600,
         };
         const closed = applyPanelTransition(
             false, false, opened!.savedViewBox, panned);
-        assert.ok(closed !== null);
-        assert.equal(closed!.savedViewBox.kind, 'none');
-        assert.deepEqual(closed!.viewBox, pre);
-        assert.equal(closed!.shouldPanToReveal, false);
+        assert(closed !== null);
+        assertStrictEquals(closed!.savedViewBox.kind, 'none');
+        assertEquals(closed!.viewBox, pre);
+        assertStrictEquals(closed!.shouldPanToReveal, false);
     });

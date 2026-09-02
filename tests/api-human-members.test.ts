@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { GET, PUT, handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, organizationToken } from
@@ -30,7 +29,7 @@ async function freshDb() {
     return db;
 }
 
-test(
+Deno.test(
     'PUT identity + seat creates a seated person',
     async () => {
         const db = await freshDb();
@@ -44,7 +43,7 @@ test(
                 team_dimensions: {},
             },
         ));
-        assert.ok(put.status === 201 || put.status === 200);
+        assert(put.status === 201 || put.status === 200);
         await PUT(db, 'identities/xdaJyuuPyHfffCGLhqDrOQ/pii', {
             name: 'Alice',
             email: 'alice@example.com',
@@ -58,22 +57,22 @@ test(
                 at: AT,
             },
         ));
-        assert.ok(
+        assert(
             seat.status === 201 || seat.status === 200,
         );
         const row = await GET<{
             kind: string; title: string;
         }>(db, 'identities/xdaJyuuPyHfffCGLhqDrOQ', token);
-        assert.equal(row.kind, 'person');
-        assert.equal(row.title, 'Engineer');
+        assertStrictEquals(row.kind, 'person');
+        assertStrictEquals(row.title, 'Engineer');
         const seats = await GET<{ id: string }[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', token,
         );
-        assert.ok(seats.some(s => s.id === 'xdaJyuuPyHfffCGLhqDrOQ'));
+        assert(seats.some(s => s.id === 'xdaJyuuPyHfffCGLhqDrOQ'));
     },
 );
 
-test('POST /human-members is retired 404', async () => {
+Deno.test('POST /human-members is retired 404', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
         'POST', '/human-members', DEV_TOKEN, {
@@ -81,13 +80,13 @@ test('POST /human-members is retired 404', async () => {
             detail: {},
         },
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
 // AA9's covenant below the browser: a second identity PUT
 // REPLACES strengths, so an id toggled on in the same save
 // that toggles another off is what the next GET returns.
-test(
+Deno.test(
     'a strengths PUT replaces the list — the toggled-on id'
     + ' persists',
     async () => {
@@ -109,7 +108,7 @@ test(
                 'Stakeholder Management',
             ]),
         }));
-        assert.ok(first.status === 201 || first.status === 200);
+        assert(first.status === 201 || first.status === 200);
         const second = await handleRequest(db, apiRequest({
             method: 'PUT', path, token,
             body: person([
@@ -118,11 +117,11 @@ test(
                 'Agile Methods',
             ]),
         }));
-        assert.ok(second.status === 201 || second.status === 200);
+        assert(second.status === 201 || second.status === 200);
         const row = await GET<{ strengths: string[] }>(
             db, 'identities/xdaJyuuPyHfffCGLhqDrOQ', token,
         );
-        assert.deepEqual(row.strengths, [
+        assertEquals(row.strengths, [
             'Strategic Planning',
             'Stakeholder Management',
             'Agile Methods',

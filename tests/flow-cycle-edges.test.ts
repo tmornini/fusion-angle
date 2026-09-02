@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals } from '@std/assert';
 import {
     findCycleEdgeIds,
 } from '../web-app/app/flow-cycle-edges.ts';
@@ -18,23 +17,23 @@ function e(
     return { id, fromNodeId, toNodeId };
 }
 
-test('a linear flow has no cycle edges', () => {
+Deno.test('a linear flow has no cycle edges', () => {
     const ids = findCycleEdgeIds(
         [n('start', true), n('a'), n('done')],
         [e('YiJPbufDpkyrZcZCYbUJpg', 'start', 'a'), e('e2', 'a', 'done')],
     );
-    assert.deepEqual([...ids], []);
+    assertEquals([...ids], []);
 });
 
-test('a self-loop edge is a cycle edge', () => {
+Deno.test('a self-loop edge is a cycle edge', () => {
     const ids = findCycleEdgeIds(
         [n('start', true), n('a')],
         [e('YiJPbufDpkyrZcZCYbUJpg', 'start', 'a'), e('loop', 'a', 'a')],
     );
-    assert.deepEqual([...ids], ['loop']);
+    assertEquals([...ids], ['loop']);
 });
 
-test(
+Deno.test(
     'a back-edge to an ancestor is a cycle edge',
     () => {
         const ids = findCycleEdgeIds(
@@ -45,11 +44,11 @@ test(
                 e('back', 'b', 'a'),
             ],
         );
-        assert.deepEqual([...ids], ['back']);
+        assertEquals([...ids], ['back']);
     },
 );
 
-test(
+Deno.test(
     'a diamond with no back-edge has no cycle edges',
     () => {
         const ids = findCycleEdgeIds(
@@ -61,11 +60,11 @@ test(
                 e('e4', 'b', 'c'),
             ],
         );
-        assert.deepEqual([...ids], []);
+        assertEquals([...ids], []);
     },
 );
 
-test(
+Deno.test(
     'parallel forward edges between one pair are both'
     + ' forward (no cycle edges)',
     () => {
@@ -77,11 +76,11 @@ test(
                 e('e2b', 'a', 'b'),
             ],
         );
-        assert.deepEqual([...ids], []);
+        assertEquals([...ids], []);
     },
 );
 
-test(
+Deno.test(
     'the DFS roots at the start node, not the first'
     + ' node in the array',
     () => {
@@ -97,11 +96,11 @@ test(
                 e('e3', 'b', 'start'),
             ],
         );
-        assert.deepEqual([...ids], ['e3']);
+        assertEquals([...ids], ['e3']);
     },
 );
 
-test(
+Deno.test(
     'an edge from a node not in the set is ignored,'
     + ' not a crash',
     () => {
@@ -112,6 +111,6 @@ test(
                 e('ghost', 'missing', 'a'),
             ],
         );
-        assert.deepEqual([...ids], []);
+        assertEquals([...ids], []);
     },
 );

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { GET, PUT, handleRequest } from
     '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
@@ -93,14 +92,14 @@ function flowDocument(
     };
 }
 
-test('PUT /ai-agents/:id writes the four fields; GET'
+Deno.test('PUT /ai-agents/:id writes the four fields; GET'
 + ' returns them', async () => {
     const db = await freshDb();
     const body = agentFields('Drafting agent');
     const put = await handleRequest(db, req(
         'PUT', '/ai-agents/UuvoBhQJUSEsiJwscXPkUg', DEV_TOKEN, body,
     ));
-    assert.ok(
+    assert(
         put.status === 201 || put.status === 200,
         'expected 201 or 200, got ' + put.status,
     );
@@ -111,11 +110,11 @@ test('PUT /ai-agents/:id writes the four fields; GET'
         skill_focus: string;
         model: string;
     };
-    assert.equal(written.id, 'UuvoBhQJUSEsiJwscXPkUg');
-    assert.equal(written.name, body.name);
-    assert.equal(written.description, body.description);
-    assert.equal(written.skill_focus, body.skill_focus);
-    assert.equal(written.model, body.model);
+    assertStrictEquals(written.id, 'UuvoBhQJUSEsiJwscXPkUg');
+    assertStrictEquals(written.name, body.name);
+    assertStrictEquals(written.description, body.description);
+    assertStrictEquals(written.skill_focus, body.skill_focus);
+    assertStrictEquals(written.model, body.model);
     const got = await GET<{
         id: string;
         name: string;
@@ -123,10 +122,10 @@ test('PUT /ai-agents/:id writes the four fields; GET'
         skill_focus: string;
         model: string;
     }>(db, 'ai-agents/UuvoBhQJUSEsiJwscXPkUg', DEV_TOKEN);
-    assert.deepEqual(got, written);
+    assertEquals(got, written);
 });
 
-test('a flow write with an AI member id in memberIds'
+Deno.test('a flow write with an AI member id in memberIds'
 + ' is 400', async () => {
     const db = await freshDb();
     const agentId = generateIdentifier();
@@ -149,10 +148,10 @@ test('a flow write with an AI member id in memberIds'
             },
         ),
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('a flow write with agentIds naming a live'
+Deno.test('a flow write with agentIds naming a live'
 + ' AI agent is 201 or 200', async () => {
     const db = await freshDb();
     const agent = agentFields('Live agent');
@@ -160,7 +159,7 @@ test('a flow write with agentIds naming a live'
         'PUT', '/ai-agents/UxpkDaNMmbWLvCTkyrFfGA', DEV_TOKEN,
         agent,
     ));
-    assert.ok(
+    assert(
         minted.status === 201 || minted.status === 200,
     );
     const token = await organizationToken();
@@ -176,7 +175,7 @@ test('a flow write with agentIds naming a live'
             },
         ),
     ));
-    assert.ok(
+    assert(
         res.status === 201 || res.status === 200,
         'expected 201 or 200, got ' + res.status,
     );
@@ -187,5 +186,5 @@ test('a flow write with agentIds naming a live'
     }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
         + 'aJJKPwIzmbFseMhGUrFyFQ', token);
     const node = flow.graph.nodes[0]!;
-    assert.deepEqual(node.agentIds, ['UxpkDaNMmbWLvCTkyrFfGA']);
+    assertEquals(node.agentIds, ['UxpkDaNMmbWLvCTkyrFfGA']);
 });

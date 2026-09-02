@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import { MemoryStorageBackend }
     from '../api/backend-memory.ts';
 import type { StorageBackend } from '../api/db.ts';
@@ -45,20 +44,20 @@ const TIERS: ReadonlyArray<{
 ];
 
 for (const tier of TIERS) {
-    test(
+    Deno.test(
         `${tier.name}: mutating a get() row does not`
             + ' reach committed state',
         async () => {
             const backend = await seeded(tier.make());
             const fetched = await readBack(backend);
-            assert.ok(fetched !== null);
+            assert(fetched !== null);
             fetched.n = 999;
             const again = await readBack(backend);
-            assert.equal(again?.n, 1);
+            assertStrictEquals(again?.n, 1);
         },
     );
 
-    test(
+    Deno.test(
         `${tier.name}: mutating a getAll() row does not`
             + ' reach committed state',
         async () => {
@@ -69,11 +68,11 @@ for (const tier of TIERS) {
             );
             rows[0]!.n = 999;
             const again = await readBack(backend);
-            assert.equal(again?.n, 1);
+            assertStrictEquals(again?.n, 1);
         },
     );
 
-    test(
+    Deno.test(
         `${tier.name}: mutating a getWhere() row does`
             + ' not reach committed state',
         async () => {
@@ -84,11 +83,11 @@ for (const tier of TIERS) {
             );
             rows[0]!.n = 999;
             const again = await readBack(backend);
-            assert.equal(again?.n, 1);
+            assertStrictEquals(again?.n, 1);
         },
     );
 
-    test(
+    Deno.test(
         `${tier.name}: in-tx mutation of a fetched row`
             + ' does not survive the transaction',
         async () => {
@@ -102,7 +101,7 @@ for (const tier of TIERS) {
                 },
             );
             const again = await readBack(backend);
-            assert.equal(again?.n, 1);
+            assertStrictEquals(again?.n, 1);
         },
     );
 }

@@ -1,6 +1,5 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
 
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { adminContext } from './context-fixtures.ts';
 import type { RequestContext } from
     '../web-app/app/adapters/shared.ts';
@@ -158,31 +157,31 @@ async function tombstoneFlow(
     );
 }
 
-test(
+Deno.test(
     'getDashboardStats labels Ideas, Projects, Flows',
     async () => {
         const { ctx } = await adminContext();
         const stats = await getDashboardStats(ctx);
-        assert.deepEqual(
+        assertEquals(
             stats.map(s => s.label),
             ['Ideas', 'Projects', 'Flows'],
         );
     },
 );
 
-test(
+Deno.test(
     'getDashboardStats is all zeros on empty db',
     async () => {
         const { ctx } = await adminContext();
         const stats = await getDashboardStats(ctx);
-        assert.deepEqual(
+        assertEquals(
             stats.map(s => s.value),
             [0, 0, 0],
         );
     },
 );
 
-test(
+Deno.test(
     'getDashboardStats counts seeded entities',
     async () => {
         const { ctx } = await adminContext();
@@ -192,14 +191,14 @@ test(
         await seedFlow(ctx, generateIdentifier());
         await seedFlow(ctx, generateIdentifier());
         const stats = await getDashboardStats(ctx);
-        assert.deepEqual(
+        assertEquals(
             stats.map(s => s.value),
             [2, 1, 2],
         );
     },
 );
 
-test(
+Deno.test(
     'getDashboardStats excludes archived ideas',
     async () => {
         const { ctx } = await adminContext();
@@ -209,11 +208,11 @@ test(
         const stats = await getDashboardStats(ctx);
         const ideas = stats
             .find(s => s.label === 'Ideas');
-        assert.equal(ideas?.value, 1);
+        assertStrictEquals(ideas?.value, 1);
     },
 );
 
-test(
+Deno.test(
     'getDashboardStats excludes deleted projects',
     async () => {
         const { ctx } = await adminContext();
@@ -222,11 +221,11 @@ test(
         const stats = await getDashboardStats(ctx);
         const projects = stats
             .find(s => s.label === 'Projects');
-        assert.equal(projects?.value, 1);
+        assertStrictEquals(projects?.value, 1);
     },
 );
 
-test(
+Deno.test(
     'getDashboardStats counts tombstoned out',
     async () => {
         const { ctx } = await adminContext();
@@ -254,40 +253,40 @@ test(
             .find(s => s.label === 'Projects');
         const flows = stats
             .find(s => s.label === 'Flows');
-        assert.equal(projects?.value, 1);
-        assert.equal(flows?.value, 0);
+        assertStrictEquals(projects?.value, 1);
+        assertStrictEquals(flows?.value, 0);
     },
 );
 
-test(
+Deno.test(
     'getDashboardGauges returns Time, Cost, Impact',
     async () => {
         const { ctx } = await adminContext();
         const gauges = await getDashboardGauges(ctx);
-        assert.deepEqual(
+        assertEquals(
             gauges.map(g => g.title),
             ['Time', 'Cost', 'Impact'],
         );
-        assert.deepEqual(
+        assertEquals(
             gauges.map(g => g.icon),
             ['clock', 'dollarSign', 'zap'],
         );
     },
 );
 
-test(
+Deno.test(
     'getDashboardGauges is zeroed on empty db',
     async () => {
         const { ctx } = await adminContext();
         const gauges = await getDashboardGauges(ctx);
         const cost = gauges
             .find(g => g.title === 'Cost');
-        assert.equal(cost?.outer.value, 0);
-        assert.equal(cost?.inner.value, 0);
+        assertStrictEquals(cost?.outer.value, 0);
+        assertStrictEquals(cost?.inner.value, 0);
     },
 );
 
-test(
+Deno.test(
     'getDashboardGauges sums approved projects only',
     async () => {
         const { ctx } = await adminContext();
@@ -307,12 +306,12 @@ test(
         const gauges = await getDashboardGauges(ctx);
         const cost = gauges
             .find(g => g.title === 'Cost');
-        assert.equal(cost?.outer.value, 3000);
-        assert.equal(cost?.inner.value, 1000);
+        assertStrictEquals(cost?.outer.value, 3000);
+        assertStrictEquals(cost?.inner.value, 1000);
     },
 );
 
-test(
+Deno.test(
     'getDashboardGauges Time sums the 10-day span',
     async () => {
         const { ctx } = await adminContext();
@@ -323,40 +322,40 @@ test(
         const gauges = await getDashboardGauges(ctx);
         const time = gauges
             .find(g => g.title === 'Time');
-        assert.equal(time?.outer.value, 10);
-        assert.equal(time?.outer.display, '10d');
+        assertStrictEquals(time?.outer.value, 10);
+        assertStrictEquals(time?.outer.display, '10d');
     },
 );
 
-test(
+Deno.test(
     'getDashboardGauges returns the three sibling gauges',
     async () => {
         const { ctx } = await adminContext();
         const gauges = await getDashboardGauges(ctx);
-        assert.equal(gauges.length, 3);
+        assertStrictEquals(gauges.length, 3);
         const titles = gauges.map(
             g => g.title.toLowerCase(),
         );
-        assert.ok(titles.some(t => t.includes('time')));
-        assert.ok(titles.some(t => t.includes('cost')));
-        assert.ok(
+        assert(titles.some(t => t.includes('time')));
+        assert(titles.some(t => t.includes('cost')));
+        assert(
             titles.some(t => t.includes('impact')),
             'impact gauge missing from grid',
         );
     });
 
-test(
+Deno.test(
     'getDashboardGauges marks Impact as bipolar',
     async () => {
         const { ctx } = await adminContext();
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges
             .find(g => g.title === 'Impact');
-        assert.equal(impact?.kind, 'bipolar');
+        assertStrictEquals(impact?.kind, 'bipolar');
     },
 );
 
-test(
+Deno.test(
     'getDashboardGauges marks Time and Cost as ratio',
     async () => {
         const { ctx } = await adminContext();
@@ -365,12 +364,12 @@ test(
             .find(g => g.title === 'Time');
         const cost = gauges
             .find(g => g.title === 'Cost');
-        assert.equal(time?.kind, 'ratio');
-        assert.equal(cost?.kind, 'ratio');
+        assertStrictEquals(time?.kind, 'ratio');
+        assertStrictEquals(cost?.kind, 'ratio');
     },
 );
 
-test(
+Deno.test(
     'getDashboardGauges Impact passes'
     + ' undefined means without clamping to zero',
     async () => {
@@ -382,9 +381,9 @@ test(
         // both undefined. The bipolar Impact gauge
         // must NOT clamp them to 0 (the previous
         // ratio behavior was Math.max(0, v ?? 0)).
-        assert.equal(impact?.kind, 'bipolar');
+        assertStrictEquals(impact?.kind, 'bipolar');
         if (impact?.kind !== 'bipolar') return;
-        assert.equal(impact.outer.value, undefined);
-        assert.equal(impact.inner.value, undefined);
+        assertStrictEquals(impact.outer.value, undefined);
+        assertStrictEquals(impact.inner.value, undefined);
     },
 );

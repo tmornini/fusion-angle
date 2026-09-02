@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -88,7 +87,7 @@ async function oneOrganization(): Promise<{
     return { db, organizationA, organizationB };
 }
 
-test('nested record-types write stamps the bound org'
+Deno.test('nested record-types write stamps the bound org'
     + ' over a forged record', async () => {
     const { db, organizationA, organizationB } = await oneOrganization();
     const token = await organizationToken(
@@ -98,21 +97,21 @@ test('nested record-types write stamps the bound org'
         'POST', '/organizations/' + organizationA + '/record-types/',
         token,
         editBody(organizationB)));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const get = await handleRequest(db, req(
         'GET',
         '/organizations/' + organizationA
             + '/record-types/rbfHGatkwQzGZJVXKJEeyw',
         token,
     ));
-    assert.equal(get.status, 200);
+    assertStrictEquals(get.status, 200);
     const stored = await get.json() as {
         organization_id: string;
     };
-    assert.equal(stored.organization_id, organizationA);
+    assertStrictEquals(stored.organization_id, organizationA);
 });
 
-test('nested record-types write into a non-member org'
+Deno.test('nested record-types write into a non-member org'
     + ' is 403', async () => {
     const { db, organizationA, organizationB } = await oneOrganization();
     // Token scoped to A cannot use path org B (org-match).
@@ -123,10 +122,10 @@ test('nested record-types write into a non-member org'
         'POST', '/organizations/' + organizationB + '/record-types/',
         token,
         editBody(organizationB)));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
 });
 
-test('authenticated flat GET /records → 404',
+Deno.test('authenticated flat GET /records → 404',
 async () => {
     const { db, organizationA } = await oneOrganization();
     const token = await organizationToken(
@@ -135,15 +134,15 @@ async () => {
     const res = await handleRequest(
         db, req('GET', '/records', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('unauthenticated GET /records → 401',
+Deno.test('unauthenticated GET /records → 401',
 async () => {
     const { db } = await oneOrganization();
     const res = await handleRequest(
         db,
         new Request(`${BASE}/records`, { method: 'GET' }),
     );
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
 });

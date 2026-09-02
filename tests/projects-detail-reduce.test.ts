@@ -1,34 +1,23 @@
-// state.ts (transitively imported via core.ts ->
-// presenters) reads localStorage and window /
-// document at module-eval time, which Node lacks.
-// Stub before any import, then load the page-module
-// reducer with dynamic import() so the stubs are in
-// place. Same pattern as members-detail-reduce.
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-};
+import { assertMatch, assertNotMatch, assertStrictEquals } from '@std/assert';
+import { Project } from '../api/types.ts';
+import { ProjectView } from
+    '../web-app/app/adapters/projects.ts';
+import {
+    ProjectDetailPresenter,
+} from '../web-app/app/presenters/project-detail.ts';
+import { reduceProjectSave } from
+    '../web-app/projects/detail.ts';
+
+// None of these four modules reads localStorage (checked
+// against the full product tree); window/document are
+// stubbed because ProjectDetailPresenter walks a real DOM
+// tree via renderShell/mutateSlot.
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
-
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-
-const { Project } = await import('../api/types.ts');
-const { ProjectView } = await import(
-    '../web-app/app/adapters/projects.ts'
-);
-const { ProjectDetailPresenter } = await import(
-    '../web-app/app/presenters/project-detail.ts'
-);
-const { reduceProjectSave } = await import(
-    '../web-app/projects/detail.ts'
-);
 
 function makeRecordingContainer(): {
     container: HTMLElement;
@@ -76,7 +65,7 @@ function makeRecordingContainer(): {
     };
 }
 
-test(
+Deno.test(
     'reduceProjectSave lands in read mode with'
     + ' the fresh description and Edit, not Save',
     () => {
@@ -106,8 +95,8 @@ test(
             detail,
             flows: [],
         });
-        assert.equal(next.kind, 'reading');
-        assert.equal(
+        assertStrictEquals(next.kind, 'reading');
+        assertStrictEquals(
             next.view.descriptionText(),
             'Edited body',
         );
@@ -116,11 +105,11 @@ test(
             next.view, next.flows,
         ).renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, /Edited body/);
-        assert.match(
+        assertMatch(out, /Edited body/);
+        assertMatch(
             out, /data-project-action="edit"/,
         );
-        assert.doesNotMatch(
+        assertNotMatch(
             out, /data-project-action="save"/,
         );
     },

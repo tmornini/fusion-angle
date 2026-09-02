@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -110,7 +109,7 @@ async function putLiveType(
     const put = await handleRequest(db, req(
         'PUT', TYPE_DETAIL, adminToken, typeBody(),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedWritableTextAttr(
@@ -128,7 +127,7 @@ async function seedWritableTextAttr(
             write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function putLiveInstance(
@@ -145,10 +144,10 @@ async function putLiveInstance(
             ],
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
-test('type DELETE with one live instance → 409 naming '
+Deno.test('type DELETE with one live instance → 409 naming '
 + '1 instance(s)',
 async () => {
     const { db, adminToken, memberToken } =
@@ -159,9 +158,9 @@ async () => {
     const del = await handleRequest(db, req(
         'DELETE', TYPE_DETAIL, adminToken,
     ));
-    assert.equal(del.status, 409);
+    assertStrictEquals(del.status, 409);
     const body = await del.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         body.error,
         'record type ' + TYPE_ID
             + ' is referenced by 1 instance(s)',
@@ -169,10 +168,10 @@ async () => {
     const still = await handleRequest(db, req(
         'GET', TYPE_DETAIL, adminToken,
     ));
-    assert.equal(still.status, 200);
+    assertStrictEquals(still.status, 200);
 });
 
-test('type DELETE after instance DELETE → 204 '
+Deno.test('type DELETE after instance DELETE → 204 '
 + '(tombstoned instances do not block)',
 async () => {
     const { db, adminToken, memberToken } =
@@ -183,13 +182,13 @@ async () => {
     const instDel = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
-    assert.equal(instDel.status, 204);
+    assertStrictEquals(instDel.status, 204);
     const typeDel = await handleRequest(db, req(
         'DELETE', TYPE_DETAIL, adminToken,
     ));
-    assert.equal(typeDel.status, 204);
+    assertStrictEquals(typeDel.status, 204);
     const detail = await handleRequest(db, req(
         'GET', TYPE_DETAIL, adminToken,
     ));
-    assert.equal(detail.status, 404);
+    assertStrictEquals(detail.status, 404);
 });

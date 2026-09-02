@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     pointAlongPolyline,
 } from '../web-app/app/flow-graph.ts';
@@ -10,7 +9,7 @@ import {
 // off the route). These assert the BASE anchor lies ON the
 // routed polyline — the deliberate two-way perpendicular offset
 // is applied on top of this point, not tested here.
-test('midpoint of a straight waypoint path is on the line',
+Deno.test('midpoint of a straight waypoint path is on the line',
 () => {
     const p = pointAlongPolyline(
         [
@@ -20,11 +19,11 @@ test('midpoint of a straight waypoint path is on the line',
         ],
         0.5,
     );
-    assert.equal(p.y, 0);   // exactly on the y=0 route
-    assert.equal(p.x, 50);  // arc-length midpoint
+    assertStrictEquals(p.y, 0);   // exactly on the y=0 route
+    assertStrictEquals(p.x, 50);  // arc-length midpoint
 });
 
-test('midpoint of an L-shaped waypoint path is on a segment',
+Deno.test('midpoint of an L-shaped waypoint path is on a segment',
 () => {
     const p = pointAlongPolyline(
         [
@@ -36,19 +35,19 @@ test('midpoint of an L-shaped waypoint path is on a segment',
     );
     // Total length 200; the half-length point lands exactly at
     // the corner, which lies on both segments of the route.
-    assert.equal(p.x, 0);
-    assert.equal(p.y, 100);
+    assertStrictEquals(p.x, 0);
+    assertStrictEquals(p.y, 100);
 });
 
-test('the polyline anchor hits the endpoints at t=0 and t=1',
+Deno.test('the polyline anchor hits the endpoints at t=0 and t=1',
 () => {
     const pts = [
         { x: 5, y: 5 },
         { x: 20, y: 40 },
         { x: 60, y: 10 },
     ];
-    assert.deepEqual(
+    assertEquals(
         pointAlongPolyline(pts, 0), { x: 5, y: 5 });
-    assert.deepEqual(
+    assertEquals(
         pointAlongPolyline(pts, 1), { x: 60, y: 10 });
 });

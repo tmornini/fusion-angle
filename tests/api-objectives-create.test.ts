@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assert, assertRejects, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { strict as assert } from 'node:assert';
 import { GET, POST } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
@@ -42,7 +41,7 @@ function genesisTrio(_id: string) {
     };
 }
 
-test(
+Deno.test(
     'POST objectives writes the objective and its first'
     + ' revision on the message plane in one operation',
     async () => {
@@ -64,11 +63,13 @@ test(
             state?: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
             , DEV_TOKEN);
-        assert.equal(objective.position, 1);
+        assertStrictEquals(objective.position, 1);
         // The fence stamped the bound org — never the body.
-        assert.equal(objective.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
+        assertStrictEquals(
+            objective.organization_id, 'AjdvjuECVZEgZoFajaIEkg',
+        );
         // GET streams the stored PUT (G1: trio included).
-        assert.equal(objective.state, 'active');
+        assertStrictEquals(objective.state, 'active');
         // The leaf revision route is PUT-only; read the nested
         // per-objective collection and find the revision the
         // create synthesized (the server filters to this id).
@@ -80,14 +81,14 @@ test(
             + '/revisions/', DEV_TOKEN);
         const revision = revisions.find(
             r => r.id === 'sVWUntTCtQYFCpONjkzAKg');
-        assert.ok(revision);
-        assert.equal(revision.objective_id, id);
-        assert.equal(revision.name, 'Revenue');
+        assert(revision);
+        assertStrictEquals(revision.objective_id, id);
+        assertStrictEquals(revision.name, 'Revenue');
         // Phase Final Stage B: objectives tables retired.
     },
 );
 
-test(
+Deno.test(
     'POST objectives appends nothing when its first'
     + ' revision is malformed',
     async () => {
@@ -97,7 +98,7 @@ test(
         // pre-tx (pair formation), so no pairs land and
         // GET cannot derive the objective.
         const id = generateIdentifier();
-        await assert.rejects(
+        await assertRejects(
             () => POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
                 + '', {
                 id,
@@ -107,7 +108,7 @@ test(
                 ...genesisTrio(id),
             }, DEV_TOKEN),
         );
-        await assert.rejects(
+        await assertRejects(
             () => GET(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
                     + id, DEV_TOKEN,

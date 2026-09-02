@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     searchItems,
     ideaToSearchItem,
@@ -114,18 +113,18 @@ const sampleItems: SearchItem[] = [
     },
 ];
 
-test(
+Deno.test(
     'searchItems empty query returns first N',
     () => {
         const out = searchItems(sampleItems, '');
-        assert.equal(
+        assertStrictEquals(
             out.length, sampleItems.length,
             'all items returned (under cap)',
         );
     },
 );
 
-test(
+Deno.test(
     'searchItems empty query caps at default count',
     () => {
         const many: SearchItem[] = Array
@@ -139,67 +138,67 @@ test(
                 keywords: '',
             }));
         const out = searchItems(many, '   ');
-        assert.equal(
+        assertStrictEquals(
             out.length, 12,
             'caps at 12 default results',
         );
     },
 );
 
-test(
+Deno.test(
     'searchItems matches title case-insensitively',
     () => {
         const out = searchItems(
             sampleItems, 'APPLE',
         );
-        assert.equal(out.length, 1);
-        assert.equal(out[0]!.id, 'a');
+        assertStrictEquals(out.length, 1);
+        assertStrictEquals(out[0]!.id, 'a');
     },
 );
 
-test(
+Deno.test(
     'searchItems matches meta',
     () => {
         const out = searchItems(
             sampleItems, 'savory',
         );
-        assert.equal(out.length, 1);
-        assert.equal(out[0]!.id, 'c');
+        assertStrictEquals(out.length, 1);
+        assertStrictEquals(out[0]!.id, 'c');
     },
 );
 
-test(
+Deno.test(
     'searchItems matches keywords',
     () => {
         const out = searchItems(
             sampleItems, 'pastry',
         );
-        assert.equal(out.length, 1);
-        assert.equal(out[0]!.id, 'a');
+        assertStrictEquals(out.length, 1);
+        assertStrictEquals(out[0]!.id, 'a');
     },
 );
 
-test(
+Deno.test(
     'searchItems matches across rows',
     () => {
         const out = searchItems(
             sampleItems, 'sweet',
         );
-        assert.equal(out.length, 2);
+        assertStrictEquals(out.length, 2);
     },
 );
 
-test(
+Deno.test(
     'searchItems no match returns empty',
     () => {
         const out = searchItems(
             sampleItems, 'zzzz',
         );
-        assert.equal(out.length, 0);
+        assertStrictEquals(out.length, 0);
     },
 );
 
-test(
+Deno.test(
     'ideaToSearchItem builds correct shape',
     () => {
         const tuple = {
@@ -209,16 +208,16 @@ test(
             submittedAt: '2026-01-01',
         };
         const out = ideaToSearchItem(tuple);
-        assert.equal(out.id, 'idea-fndCYAsXazdzMUlEGMNIZw');
-        assert.equal(out.title, 'My Idea');
-        assert.equal(out.category, 'ideas');
-        assert.ok(
+        assertStrictEquals(out.id, 'idea-fndCYAsXazdzMUlEGMNIZw');
+        assertStrictEquals(out.title, 'My Idea');
+        assertStrictEquals(out.category, 'ideas');
+        assert(
             out.keywords.includes('Alice'),
         );
     },
 );
 
-test(
+Deno.test(
     'ideaToSearchItem normalises hyphens in status',
     () => {
         const tuple = {
@@ -231,30 +230,30 @@ test(
             submittedAt: '2026-01-01',
         };
         const out = ideaToSearchItem(tuple);
-        assert.ok(
+        assert(
             !out.meta.includes('-'),
             'hyphens stripped from meta',
         );
     },
 );
 
-test(
+Deno.test(
     'projectToSearchItem builds correct shape',
     () => {
         const out = projectToSearchItem(
             buildProject('pnXmXrxOWayANgDLdCjuBw', 'My Project'),
         );
-        assert.equal(out.id, 'project-pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(out.title, 'My Project');
-        assert.equal(out.category, 'projects');
-        assert.ok(
+        assertStrictEquals(out.id, 'project-pnXmXrxOWayANgDLdCjuBw');
+        assertStrictEquals(out.title, 'My Project');
+        assertStrictEquals(out.category, 'projects');
+        assert(
             out.meta.includes('42%'),
             'meta includes progress',
         );
     },
 );
 
-test(
+Deno.test(
     'humanMemberToSearchItem builds correct shape',
     () => {
         const out = humanMemberToSearchItem(
@@ -263,18 +262,18 @@ test(
                 'pm', 'Product',
             ),
         );
-        assert.equal(out.id, 'member-u1');
-        assert.equal(out.title, 'Carol Smith');
-        assert.equal(out.category, 'members');
-        assert.ok(
+        assertStrictEquals(out.id, 'member-u1');
+        assertStrictEquals(out.title, 'Carol Smith');
+        assertStrictEquals(out.category, 'members');
+        assert(
             out.keywords.includes('pm'),
             'title in keywords',
         );
-        assert.ok(
+        assert(
             out.keywords.includes('Product'),
             'department in keywords',
         );
-        assert.ok(
+        assert(
             out.keywords.includes(
                 'carol@example.com',
             ),
@@ -283,7 +282,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'searchItems search by member email works',
     () => {
         const memberItem = humanMemberToSearchItem(
@@ -294,6 +293,6 @@ test(
         const out = searchItems(
             [memberItem], 'carol@',
         );
-        assert.equal(out.length, 1);
+        assertStrictEquals(out.length, 1);
     },
 );

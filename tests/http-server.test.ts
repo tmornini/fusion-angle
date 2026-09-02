@@ -1,11 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from
-    'node:fs/promises';
-import { readFileSync, readdirSync, statSync } from
-    'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import {
+    assert,
+    assertMatch,
+    assertNotMatch,
+    assertStrictEquals,
+} from '@std/assert';
+import { join } from '@std/path';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     HTTP_NOT_FOUND,
@@ -21,6 +20,8 @@ import {
     type HttpListener,
     type RequestHandler,
 } from '../server/http-server.ts';
+import { fetchDiscardingBody } from
+    './fixtures/fetch-discarding-body.ts';
 
 async function withServer(
     files: Record<string, string>,
@@ -30,18 +31,18 @@ async function withServer(
         logs: Record<string, unknown>[],
     ) => Promise<void>,
 ): Promise<void> {
-    const root = await mkdtemp(
-        join(tmpdir(), 'fusion-http-'),
-    );
+    const root = await Deno.makeTempDir({
+        prefix: 'fusion-http-',
+    });
     const logs: Record<string, unknown>[] = [];
     let listener: HttpListener | undefined;
     try {
         for (const [rel, body] of Object.entries(files)) {
             const path = join(root, rel);
-            await mkdir(join(path, '..'), {
+            await Deno.mkdir(join(path, '..'), {
                 recursive: true,
             });
-            await writeFile(path, body);
+            await Deno.writeTextFile(path, body);
         }
         const options = {
             adapter: memoryDbAdapter(),
@@ -60,11 +61,11 @@ async function withServer(
         );
     } finally {
         if (listener !== undefined) await listener.close();
-        await rm(root, { recursive: true, force: true });
+        await Deno.remove(root, { recursive: true });
     }
 }
 
-test('body over 1 MiB is 413 and is not parsed',
+Deno.test('body over 1 MiB is 413 and is not parsed',
 async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
@@ -79,20 +80,20 @@ async () => {
             },
             body: 'x'.repeat(REQUEST_BODY_MAX_BYTES + 1),
         });
-        assert.equal(res.status, HTTP_PAYLOAD_TOO_LARGE);
-        assert.equal(
+        assertStrictEquals(res.status, HTTP_PAYLOAD_TOO_LARGE);
+        assertStrictEquals(
             res.headers.get('cache-control'),
             NO_STORE,
         );
         const body = await res.json() as {
             error: string;
         };
-        assert.equal(body.error, 'payload too large');
-        assert.equal(handled, 0);
+        assertStrictEquals(body.error, 'payload too large');
+        assertStrictEquals(handled, 0);
     });
 });
 
-test('HTML is no-store and hashed assets are immutable',
+Deno.test('HTML is no-store and hashed assets are immutable',
 async () => {
     await withServer({
         'landing/index.html': '<p>hi</p>',
@@ -102,42 +103,42 @@ async () => {
         const page = await fetch(
             base + '/landing/index.html',
         );
-        assert.equal(page.status, 200);
-        assert.equal(
+        assertStrictEquals(page.status, 200);
+        assertStrictEquals(
             page.headers.get('cache-control'),
             NO_STORE,
         );
-        assert.equal(await page.text(), '<p>hi</p>');
+        assertStrictEquals(await page.text(), '<p>hi</p>');
 
-        const app = await fetch(base + '/assets/app.js');
-        assert.equal(app.status, 200);
-        assert.equal(
+        const app = await fetchDiscardingBody(base + '/assets/app.js');
+        assertStrictEquals(app.status, 200);
+        assertStrictEquals(
             app.headers.get('cache-control'),
             NO_STORE,
         );
 
-        const hashed = await fetch(
+        const hashed = await fetchDiscardingBody(
             base + '/assets/app.deadbeef.js',
         );
-        assert.equal(hashed.status, 200);
-        assert.equal(
+        assertStrictEquals(hashed.status, 200);
+        assertStrictEquals(
             hashed.headers.get('cache-control'),
             HASHED_CACHE_CONTROL,
         );
     });
 });
 
-test('HTML carries the Content-Security-Policy header',
+Deno.test('HTML carries the Content-Security-Policy header',
 async () => {
     await withServer({
         'landing/index.html': '<p>hi</p>',
         'assets/app.js': 'console.log(1)',
     }, undefined, async (base) => {
-        const page = await fetch(
+        const page = await fetchDiscardingBody(
             base + '/landing/index.html',
         );
-        assert.equal(page.status, 200);
-        assert.equal(
+        assertStrictEquals(page.status, 200);
+        assertStrictEquals(
             page.headers.get('content-security-policy'),
             "default-src 'self'; script-src 'self';"
             + " style-src 'self';"
@@ -146,93 +147,93 @@ async () => {
             + " frame-ancestors 'none'; base-uri 'self';"
             + " form-action 'self'",
         );
-        assert.equal(
+        assertStrictEquals(
             page.headers.get('content-security-policy'),
             CONTENT_SECURITY_POLICY,
         );
 
-        const head = await fetch(
+        const head = await fetchDiscardingBody(
             base + '/landing/index.html',
             { method: 'HEAD' },
         );
-        assert.equal(head.status, 200);
-        assert.equal(
+        assertStrictEquals(head.status, 200);
+        assertStrictEquals(
             head.headers.get('content-security-policy'),
             CONTENT_SECURITY_POLICY,
         );
 
-        const app = await fetch(base + '/assets/app.js');
-        assert.equal(app.status, 200);
-        assert.equal(
+        const app = await fetchDiscardingBody(base + '/assets/app.js');
+        assertStrictEquals(app.status, 200);
+        assertStrictEquals(
             app.headers.get('content-security-policy'),
             null,
         );
 
-        const miss = await fetch(base + '/assets/no.js');
-        assert.equal(miss.status, 404);
-        assert.equal(
+        const miss = await fetchDiscardingBody(base + '/assets/no.js');
+        assertStrictEquals(miss.status, 404);
+        assertStrictEquals(
             miss.headers.get('content-security-policy'),
             null,
         );
     });
 });
 
-test('missing static file is 404', async () => {
+Deno.test('missing static file is 404', async () => {
     await withServer({}, undefined, async (base) => {
-        const res = await fetch(base + '/assets/no.js');
-        assert.equal(res.status, HTTP_NOT_FOUND);
+        const res = await fetchDiscardingBody(base + '/assets/no.js');
+        assertStrictEquals(res.status, HTTP_NOT_FOUND);
     });
 });
 
-test('API path without a token is 401 before 404',
+Deno.test('API path without a token is 401 before 404',
 async () => {
     await withServer({}, undefined, async (base, logs) => {
-        const res = await fetch(
+        const res = await fetchDiscardingBody(
             base
             + '/api/organizations/AjdvjuECVZEgZoFajaIEkg/ideas?secret=1',
         );
-        assert.equal(res.status, HTTP_UNAUTHORIZED);
+        assertStrictEquals(res.status, HTTP_UNAUTHORIZED);
         const last = logs[logs.length - 1];
-        assert.ok(last !== undefined);
-        assert.equal(
+        assert(last !== undefined);
+        assertStrictEquals(
             last['path'],
             '/api/organizations/AjdvjuECVZEgZoFajaIEkg/ideas',
         );
-        assert.equal(last['method'], 'GET');
-        assert.equal(last['status'], HTTP_UNAUTHORIZED);
-        assert.equal(typeof last['at'], 'string');
-        assert.match(
+        assertStrictEquals(last['method'], 'GET');
+        assertStrictEquals(last['status'], HTTP_UNAUTHORIZED);
+        assertStrictEquals(typeof last['at'], 'string');
+        assertMatch(
             String(last['at']),
             /^\d{4}-\d{2}-\d{2}T/,
         );
-        assert.equal(last['operationId'], undefined);
+        assertStrictEquals(last['operationId'], undefined);
     });
 });
 
-test('no web-app HTML carries a CSP meta; the server does',
+Deno.test('no web-app HTML carries a CSP meta; the server does',
 () => {
     const files: string[] = [];
     const walk = (dir: string): void => {
-        for (const name of readdirSync(dir)) {
-            const path = join(dir, name);
-            if (statSync(path).isDirectory()) {
+        for (const entry of Deno.readDirSync(dir)) {
+            const path = join(dir, entry.name);
+            if (entry.isDirectory) {
                 walk(path);
-            } else if (name.endsWith('.html')) {
+            } else if (entry.name.endsWith('.html')) {
                 files.push(path);
             }
         }
     };
     walk('web-app');
-    assert.ok(files.length >= 30);
+    assert(files.length >= 30);
     for (const path of files) {
-        assert.doesNotMatch(
-            readFileSync(path, 'utf8'),
+        assertNotMatch(
+            Deno.readTextFileSync(path),
             /Content-Security-Policy/,
             path + ' carries a CSP meta',
         );
     }
-    assert.match(
-        readFileSync('server/http-server.ts', 'utf8'),
+    assertMatch(
+        Deno.readTextFileSync('server/http-server.ts'),
         /Content-Security-Policy/,
     );
 });

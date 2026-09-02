@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
 import { PUT } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -9,6 +8,7 @@ import { MESSAGE_TABLES } from '../api/db.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { ValidationError } from '../api/types.ts';
+import type { RecordAttributeEntity } from '../api/types.ts';
 import {
     validateRecordAttributeDocumentBody,
 } from '../api/validators.ts';
@@ -52,51 +52,51 @@ function documentFields() {
 
 // -- 1. validateRecordAttributeDocumentBody -----------------
 
-test('validateRecordAttributeDocumentBody accepts the entity'
+Deno.test('validateRecordAttributeDocumentBody accepts the entity'
 + ' fields plus an optional organization_id and stamps ACL'
 + ' defaults', () => {
     const doc = validateRecordAttributeDocumentBody({
         ...documentFields(),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     });
-    assert.deepEqual(doc.entity, {
+    assertEquals(doc.entity, {
         ...documentFields(),
         read_roles: ['member', 'admin'],
         write_roles: ['member', 'admin'],
-    });
+    } as typeof doc.entity);
 });
 
-test('validateRecordAttributeDocumentBody accepts the entity'
+Deno.test('validateRecordAttributeDocumentBody accepts the entity'
 + ' fields with organization_id absent and stamps ACL'
 + ' defaults', () => {
     const doc = validateRecordAttributeDocumentBody(
         documentFields(),
     );
-    assert.deepEqual(doc.entity, {
+    assertEquals(doc.entity, {
         ...documentFields(),
         read_roles: ['member', 'admin'],
         write_roles: ['member', 'admin'],
-    });
+    } as typeof doc.entity);
 });
 
-test('validateRecordAttributeDocumentBody rejects a trio key'
+Deno.test('validateRecordAttributeDocumentBody rejects a trio key'
 + ' at the gate (no lifecycle concept exists to admit one)',
 () => {
-    assert.throws(
+    assertThrows(
         () => validateRecordAttributeDocumentBody({
             ...documentFields(),
             state: 'active',
         }),
         ValidationError,
     );
-    assert.throws(
+    assertThrows(
         () => validateRecordAttributeDocumentBody({
             ...documentFields(),
             state_at: '2026-01-01T00:00:00.000000Z',
         }),
         ValidationError,
     );
-    assert.throws(
+    assertThrows(
         () => validateRecordAttributeDocumentBody({
             ...documentFields(),
             state_event_id: 'ev-1',
@@ -105,10 +105,10 @@ test('validateRecordAttributeDocumentBody rejects a trio key'
     );
 });
 
-test('validateRecordAttributeDocumentBody rejects an'
+Deno.test('validateRecordAttributeDocumentBody rejects an'
 + ' options-less select attribute (the shared'
 + ' constraint/options rule carries over intact)', () => {
-    assert.throws(
+    assertThrows(
         () => validateRecordAttributeDocumentBody({
             ...documentFields(),
             attribute_type: 'select',
@@ -121,7 +121,7 @@ test('validateRecordAttributeDocumentBody rejects an'
 // -- 2. postRecordAttributeDocumentOp (below-gate,
 // MemoryDbAdapter) -------------------------------------------
 
-test('postRecordAttributeDocumentOp writes exactly the'
+Deno.test('postRecordAttributeDocumentOp writes exactly the'
 + ' record_attributes row and the pair', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -153,16 +153,16 @@ test('postRecordAttributeDocumentOp writes exactly the'
         db, ATTRIBUTE_ID, body, 'XXZruirZyAOoRpNxaDnpSA',
         messagePair,
     );
-    assert.deepEqual(written, {
+    assertEquals(written, {
         id: ATTRIBUTE_ID,
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         ...documentFields(),
         read_roles: ['member', 'admin'],
         write_roles: ['member', 'admin'],
-    });
+    } as RecordAttributeEntity);
     // Phase Final Stage B: record_attributes table retired.
-    assert.equal((await db.messagePairs.getAll()).length, 1);
-    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
@@ -171,7 +171,7 @@ test('postRecordAttributeDocumentOp writes exactly the'
 // agnostic to which op serves the route, so this pin holds
 // unchanged straight through the absorption). ------------------
 
-test('a byte-identical PUT resend to nested attributes/:id'
+Deno.test('a byte-identical PUT resend to nested attributes/:id'
 + ' converges to one stored request/response pair',
 async () => {
     const db = memoryDbAdapter();
@@ -204,10 +204,10 @@ async () => {
         body, DEV_TOKEN,
         opHeaders,
     );
-    assert.deepEqual(first, second);
+    assertEquals(first, second);
     // seedAdminSchema + parent type + 2 attribute PUTs
-    assert.equal((await db.messagePairs.getAll()).length, 4);
-    assert.equal((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 // -- 4. the DELETE-head derives absent — below-route via the
@@ -290,7 +290,7 @@ async function deleteDocumentMessagePair(
     );
 }
 
-test('a DELETE-head derives absent on the nested attributes'
+Deno.test('a DELETE-head derives absent on the nested attributes'
 + ' prefix (Task 8 storage)', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -307,7 +307,7 @@ test('a DELETE-head derives absent on the nested attributes'
     const head = deriveDocumentsAt(requests, prefix).get(
         deletedId,
     );
-    assert.equal(
+    assertStrictEquals(
         head, undefined,
         'DELETE head must exclude the attribute',
     );

@@ -1,10 +1,5 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { request } from 'node:http';
-import { mkdtemp, mkdir, writeFile, rm } from
-    'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { assertMatch, assertStrictEquals } from '@std/assert';
+import { join } from '@std/path';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     HTTP_NOT_FOUND,
@@ -15,6 +10,8 @@ import {
     type HttpListener,
     type RequestHandler,
 } from '../server/http-server.ts';
+import { fetchDiscardingBody } from
+    './fixtures/fetch-discarding-body.ts';
 
 async function withServer(
     files: Record<string, string>,
@@ -24,18 +21,18 @@ async function withServer(
         logs: Record<string, unknown>[],
     ) => Promise<void>,
 ): Promise<void> {
-    const root = await mkdtemp(
-        join(tmpdir(), 'fusion-http-'),
-    );
+    const root = await Deno.makeTempDir({
+        prefix: 'fusion-http-',
+    });
     const logs: Record<string, unknown>[] = [];
     let listener: HttpListener | undefined;
     try {
         for (const [rel, body] of Object.entries(files)) {
             const path = join(root, rel);
-            await mkdir(join(path, '..'), {
+            await Deno.mkdir(join(path, '..'), {
                 recursive: true,
             });
-            await writeFile(path, body);
+            await Deno.writeTextFile(path, body);
         }
         const options = {
             adapter: memoryDbAdapter(),
@@ -54,53 +51,23 @@ async function withServer(
         );
     } finally {
         if (listener !== undefined) await listener.close();
-        await rm(root, { recursive: true, force: true });
+        await Deno.remove(root, { recursive: true });
     }
 }
 
-// Node fetch overwrites Sec-Fetch-Mode to the request
-// mode (`cors`). A document navigation can only be
-// sent on the raw socket.
+// PROBE 11 (Task 30, re-verified independently): unlike
+// Node's fetch, Deno's fetch does not overwrite a
+// caller-supplied Sec-Fetch-Mode, so the document
+// navigation this proves no longer needs a raw socket.
 function getDocument(
     url: string,
 ): Promise<Response> {
-    const parsed = new URL(url);
-    return new Promise((resolve, reject) => {
-        const req = request({
-            hostname: parsed.hostname,
-            port: parsed.port,
-            path: parsed.pathname,
-            agent: false,
-            headers: {
-                'sec-fetch-mode': 'navigate',
-            },
-        }, (incoming) => {
-            const chunks: Buffer[] = [];
-            incoming.on('data', (chunk: Buffer) => {
-                chunks.push(chunk);
-            });
-            incoming.on('end', () => {
-                resolve(new Response(
-                    Buffer.concat(chunks),
-                    {
-                        status:
-                            incoming.statusCode ?? 0,
-                        headers: {
-                            'content-type':
-                                incoming.headers
-                                    ['content-type']
-                                ?? '',
-                        },
-                    },
-                ));
-            });
-        });
-        req.on('error', reject);
-        req.end();
+    return fetch(url, {
+        headers: { 'sec-fetch-mode': 'navigate' },
     });
 }
 
-test('/api-documentation/get/identities/ serves'
+Deno.test('/api-documentation/get/identities/ serves'
     + ' index.html',
 async () => {
     await withServer({
@@ -110,19 +77,19 @@ async () => {
         const res = await fetch(
             base + '/api-documentation/get/identities/',
         );
-        assert.equal(res.status, 200);
-        assert.equal(
+        assertStrictEquals(res.status, 200);
+        assertStrictEquals(
             res.headers.get('content-type'),
             'text/html; charset=utf-8',
         );
-        assert.equal(
+        assertStrictEquals(
             await res.text(),
             '<p>identities collection</p>',
         );
     });
 });
 
-test('missing room under /api-documentation/ is'
+Deno.test('missing room under /api-documentation/ is'
     + ' 404 JSON, not an API hop',
 async () => {
     let handled = 0;
@@ -135,34 +102,34 @@ async () => {
             base
             + '/api-documentation/get/missing/',
         );
-        assert.equal(res.status, HTTP_NOT_FOUND);
+        assertStrictEquals(res.status, HTTP_NOT_FOUND);
         const body = await res.json() as {
             error: string;
         };
-        assert.equal(body.error, 'Not found');
-        assert.equal(handled, 0);
+        assertStrictEquals(body.error, 'Not found');
+        assertStrictEquals(handled, 0);
     });
 });
 
-test('/ideas/ serves ideas/index.html',
+Deno.test('/ideas/ serves ideas/index.html',
 async () => {
     await withServer({
         'ideas/index.html': '<p>ideas page</p>',
     }, undefined, async (base) => {
         const res = await fetch(base + '/ideas/');
-        assert.equal(res.status, 200);
-        assert.equal(
+        assertStrictEquals(res.status, 200);
+        assertStrictEquals(
             res.headers.get('content-type'),
             'text/html; charset=utf-8',
         );
-        assert.equal(
+        assertStrictEquals(
             await res.text(),
             '<p>ideas page</p>',
         );
     });
 });
 
-test('/ideas without a slash is a miss',
+Deno.test('/ideas without a slash is a miss',
 async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
@@ -173,16 +140,16 @@ async () => {
         'ideas/index.html': '<p>ideas page</p>',
     }, handle, async (base) => {
         const res = await fetch(base + '/ideas');
-        assert.equal(res.status, HTTP_NOT_FOUND);
+        assertStrictEquals(res.status, HTTP_NOT_FOUND);
         const body = await res.json() as {
             error: string;
         };
-        assert.equal(body.error, 'Not found');
-        assert.equal(handled, 0);
+        assertStrictEquals(body.error, 'Not found');
+        assertStrictEquals(handled, 0);
     });
 });
 
-test('/assets/ is a miss when no index.html',
+Deno.test('/assets/ is a miss when no index.html',
 async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
@@ -193,16 +160,16 @@ async () => {
         'assets/inter-400.woff2': 'woff',
     }, handle, async (base) => {
         const res = await fetch(base + '/assets/');
-        assert.equal(res.status, HTTP_NOT_FOUND);
+        assertStrictEquals(res.status, HTTP_NOT_FOUND);
         const body = await res.json() as {
             error: string;
         };
-        assert.equal(body.error, 'Not found');
-        assert.equal(handled, 0);
+        assertStrictEquals(body.error, 'Not found');
+        assertStrictEquals(handled, 0);
     });
 });
 
-test('/api-documentation/post/ is a miss when'
+Deno.test('/api-documentation/post/ is a miss when'
     + ' no index.html',
 async () => {
     let handled = 0;
@@ -214,15 +181,15 @@ async () => {
         'api-documentation/index.html':
             '<p>docs home</p>',
     }, handle, async (base) => {
-        const res = await fetch(
+        const res = await fetchDiscardingBody(
             base + '/api-documentation/post/',
         );
-        assert.equal(res.status, HTTP_NOT_FOUND);
-        assert.equal(handled, 0);
+        assertStrictEquals(res.status, HTTP_NOT_FOUND);
+        assertStrictEquals(handled, 0);
     });
 });
 
-test('/api-documentation/ serves index.html',
+Deno.test('/api-documentation/ serves index.html',
 async () => {
     await withServer({
         'api-documentation/index.html':
@@ -231,15 +198,15 @@ async () => {
         const res = await fetch(
             base + '/api-documentation/',
         );
-        assert.equal(res.status, 200);
-        assert.equal(
+        assertStrictEquals(res.status, 200);
+        assertStrictEquals(
             await res.text(),
             '<p>docs home</p>',
         );
     });
 });
 
-test('a document navigation to a leftover path'
+Deno.test('a document navigation to a leftover path'
     + ' serves not-found HTML',
 async () => {
     await withServer({
@@ -248,16 +215,16 @@ async () => {
         const res = await getDocument(
             base + '/oPmOpJCSqfhhTFTjvPkLpw',
         );
-        assert.equal(res.status, 200);
-        assert.match(
+        assertStrictEquals(res.status, 200);
+        assertMatch(
             res.headers.get('content-type') ?? '',
             /text\/html/,
         );
-        assert.equal(await res.text(), '<p>gone</p>');
+        assertStrictEquals(await res.text(), '<p>gone</p>');
     });
 });
 
-test('a fetch to a leftover path is 404 JSON',
+Deno.test('a fetch to a leftover path is 404 JSON',
 async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
@@ -270,20 +237,20 @@ async () => {
         const res = await fetch(
             base + '/oPmOpJCSqfhhTFTjvPkLpw',
         );
-        assert.equal(res.status, HTTP_NOT_FOUND);
-        assert.match(
+        assertStrictEquals(res.status, HTTP_NOT_FOUND);
+        assertMatch(
             res.headers.get('content-type') ?? '',
             /application\/json/,
         );
         const body = await res.json() as {
             error: string;
         };
-        assert.equal(body.error, 'Not found');
-        assert.equal(handled, 0);
+        assertStrictEquals(body.error, 'Not found');
+        assertStrictEquals(handled, 0);
     });
 });
 
-test('the door strips /api/ and hands the remainder',
+Deno.test('the door strips /api/ and hands the remainder',
 async () => {
     let seen = '';
     const handle: RequestHandler = async (
@@ -293,17 +260,17 @@ async () => {
         return new Response('ok', { status: 200 });
     };
     await withServer({}, handle, async (base) => {
-        const res = await fetch(
+        const res = await fetchDiscardingBody(
             base + '/api/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         );
-        assert.equal(res.status, 200);
-        assert.equal(
+        assertStrictEquals(res.status, 200);
+        assertStrictEquals(
             seen, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         );
     });
 });
 
-test('bare /api is a miss, not a strip',
+Deno.test('bare /api is a miss, not a strip',
 async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
@@ -312,16 +279,16 @@ async () => {
     };
     await withServer({}, handle, async (base) => {
         const res = await fetch(base + '/api');
-        assert.equal(res.status, HTTP_NOT_FOUND);
+        assertStrictEquals(res.status, HTTP_NOT_FOUND);
         const body = await res.json() as {
             error: string;
         };
-        assert.equal(body.error, 'Not found');
-        assert.equal(handled, 0);
+        assertStrictEquals(body.error, 'Not found');
+        assertStrictEquals(handled, 0);
     });
 });
 
-test('GET /api/ hops to handleRequest as /',
+Deno.test('GET /api/ hops to handleRequest as /',
 async () => {
     let seen = '';
     const handle: RequestHandler = async (
@@ -331,25 +298,25 @@ async () => {
         return new Response('ok', { status: 200 });
     };
     await withServer({}, handle, async (base) => {
-        await fetch(base + '/api/');
-        assert.equal(seen, '/');
+        await fetchDiscardingBody(base + '/api/');
+        assertStrictEquals(seen, '/');
     });
 });
 
-test('unsigned fetch under /api/ is 401 JSON',
+Deno.test('unsigned fetch under /api/ is 401 JSON',
 async () => {
     await withServer({}, undefined, async (base) => {
         const res = await fetch(
             base + '/api/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         );
-        assert.equal(res.status, HTTP_UNAUTHORIZED);
-        assert.match(
+        assertStrictEquals(res.status, HTTP_UNAUTHORIZED);
+        assertMatch(
             res.headers.get('content-type') ?? '',
             /application\/json/,
         );
         const body = await res.json() as {
             error: string;
         };
-        assert.equal(body.error, 'invalid_token');
+        assertStrictEquals(body.error, 'invalid_token');
     });
 });

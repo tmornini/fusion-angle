@@ -1,5 +1,11 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assertEquals,
+    assertInstanceOf,
+    assertMatch,
+    assertRejects,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import {
     boot,
     readListenEnv,
@@ -22,7 +28,7 @@ import type { SqlClient } from
 // Unit pins stay Postgres-free. Live SHOW runs only
 // when POSTGRES_URL is set (./test-postgres).
 
-const POSTGRES_URL = process.env['POSTGRES_URL'];
+const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
 
 function fakeClient(
     rows: Record<string, unknown>[],
@@ -49,84 +55,82 @@ function fakeClient(
     return { sql, texts };
 }
 
-test('assertUtf8 accepts UTF8', async () => {
+Deno.test('assertUtf8 accepts UTF8', async () => {
     const fake = fakeClient([
         { server_encoding: 'UTF8' },
     ]);
     await assertUtf8(fake.sql);
-    assert.match(
+    assertMatch(
         fake.texts[0] ?? '',
         /SHOW server_encoding/,
     );
 });
 
-test('assertUtf8 rejects SQL_ASCII', async () => {
+Deno.test('assertUtf8 rejects SQL_ASCII', async () => {
     const fake = fakeClient([
         { server_encoding: 'SQL_ASCII' },
     ]);
-    await assert.rejects(
+    const error = await assertRejects(
         () => assertUtf8(fake.sql),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message === UTF8_REQUIRED,
-    );
+    ) as Error;
+    assertInstanceOf(error, Error);
+    assertStrictEquals(error.message, UTF8_REQUIRED);
 });
 
-test('assertUtf8 rejects a missing encoding row',
+Deno.test('assertUtf8 rejects a missing encoding row',
 async () => {
     const fake = fakeClient([]);
-    await assert.rejects(
+    const error = await assertRejects(
         () => assertUtf8(fake.sql),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message === UTF8_REQUIRED,
-    );
+    ) as Error;
+    assertInstanceOf(error, Error);
+    assertStrictEquals(error.message, UTF8_REQUIRED);
 });
 
-test('hasSchemaMarker is the marker row, not tables',
+Deno.test('hasSchemaMarker is the marker row, not tables',
 async () => {
     const empty = fakeClient([]);
-    assert.equal(await hasSchemaMarker(empty.sql), false);
+    assertStrictEquals(await hasSchemaMarker(empty.sql), false);
     const marked = fakeClient([{ only: true }]);
-    assert.equal(
+    assertStrictEquals(
         await hasSchemaMarker(marked.sql),
         true,
     );
-    assert.match(
+    assertMatch(
         marked.texts[0] ?? '',
         /FROM schema_marker/,
     );
 });
 
-test('readListenEnv requires the three secrets', () => {
-    assert.throws(
+Deno.test('readListenEnv requires the three secrets', () => {
+    assertThrows(
         () => readListenEnv((name) => ({
             JWT_HMAC_SIGNING_KEY: 'k',
             HTTP_SERVER_PORT: '8080',
         }[name])),
-        /missing required env POSTGRES_URL/,
+        Error, 'missing required env POSTGRES_URL',
     );
-    assert.throws(
+    assertThrows(
         () => readListenEnv((name) => ({
             POSTGRES_URL: 'postgres://x',
             HTTP_SERVER_PORT: '8080',
         }[name])),
-        /missing required env JWT_HMAC_SIGNING_KEY/,
+        Error, 'missing required env JWT_HMAC_SIGNING_KEY',
     );
-    assert.throws(
+    assertThrows(
         () => readListenEnv((name) => ({
             POSTGRES_URL: 'postgres://x',
             JWT_HMAC_SIGNING_KEY: 'k',
         }[name])),
-        /missing required env HTTP_SERVER_PORT/,
+        Error, 'missing required env HTTP_SERVER_PORT',
     );
-    assert.throws(
+    assertThrows(
         () => readListenEnv((name) => ({
             POSTGRES_URL: 'postgres://x',
             JWT_HMAC_SIGNING_KEY: 'k',
             HTTP_SERVER_PORT: 'nope',
         }[name])),
-        /HTTP_SERVER_PORT must be an integer/,
+        Error, 'HTTP_SERVER_PORT must be an integer',
     );
     const env = readListenEnv((name) => ({
         POSTGRES_URL: 'postgres://x',
@@ -134,11 +138,11 @@ test('readListenEnv requires the three secrets', () => {
         HTTP_SERVER_PORT: '8080',
         TRUSTED_PROXY_HOPS: '10.0.0.1',
     }[name]));
-    assert.equal(env.port, 8080);
-    assert.equal(env.trustedProxyHops, '10.0.0.1');
+    assertStrictEquals(env.port, 8080);
+    assertStrictEquals(env.trustedProxyHops, '10.0.0.1');
 });
 
-test('readListenEnv reads by name, never the bag', () => {
+Deno.test('readListenEnv reads by name, never the bag', () => {
     const seen: string[] = [];
     const read = (name: string): string | undefined => {
         seen.push(name);
@@ -149,9 +153,9 @@ test('readListenEnv reads by name, never the bag', () => {
         }[name];
     };
     const env = readListenEnv(read);
-    assert.equal(env.port, 8080);
-    assert.equal(env.trustedProxyHops, undefined);
-    assert.deepEqual(seen.sort(), [
+    assertStrictEquals(env.port, 8080);
+    assertStrictEquals(env.trustedProxyHops, undefined);
+    assertEquals(seen.sort(), [
         'HTTP_SERVER_PORT',
         'JWT_HMAC_SIGNING_KEY',
         'POSTGRES_URL',
@@ -159,7 +163,7 @@ test('readListenEnv reads by name, never the bag', () => {
     ]);
 });
 
-test('hasSchemaMarker treats 42P01 as absent',
+Deno.test('hasSchemaMarker treats 42P01 as absent',
 async () => {
     const err = Object.assign(
         new Error('undefined_table'),
@@ -171,49 +175,47 @@ async () => {
         unsafe: async () => [],
         end: async () => {},
     };
-    assert.equal(await hasSchemaMarker(sql), false);
+    assertStrictEquals(await hasSchemaMarker(sql), false);
 });
 
-test('assertSchemaMarker refuses an empty marker',
+Deno.test('assertSchemaMarker refuses an empty marker',
 async () => {
     const empty = fakeClient([]);
-    await assert.rejects(
+    const error = await assertRejects(
         () => assertSchemaMarker(empty.sql),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message === MISSING_MARKER,
-    );
+    ) as Error;
+    assertInstanceOf(error, Error);
+    assertStrictEquals(error.message, MISSING_MARKER);
     const marked = fakeClient([{ only: true }]);
     await assertSchemaMarker(marked.sql);
 });
 
-test('assertSchemaMarker re-voices absence',
+Deno.test('assertSchemaMarker re-voices absence',
 async () => {
     const empty = fakeClient([]);
-    await assert.rejects(
+    const error = await assertRejects(
         () => assertSchemaMarker(empty.sql),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message === MISSING_MARKER,
-    );
-    assert.equal(
+    ) as Error;
+    assertInstanceOf(error, Error);
+    assertStrictEquals(error.message, MISSING_MARKER);
+    assertStrictEquals(
         MISSING_MARKER,
         'schema_marker absent; seed with ./postgres-seed',
     );
 });
 
-test('bootErrorMessage never echoes a URL', () => {
-    assert.equal(
+Deno.test('bootErrorMessage never echoes a URL', () => {
+    assertStrictEquals(
         bootErrorMessage(new Error(
             'connect postgres://user:pw@h/db',
         )),
         'boot failed',
     );
-    assert.equal(
+    assertStrictEquals(
         bootErrorMessage(new Error(MISSING_MARKER)),
         MISSING_MARKER,
     );
-    assert.equal(
+    assertStrictEquals(
         bootErrorMessage(
             new Error(LEGACY_MESSAGE_TABLES),
         ),
@@ -221,20 +223,18 @@ test('bootErrorMessage never echoes a URL', () => {
     );
 });
 
-test('boot refuses legacy message tables',
+Deno.test('boot refuses legacy message tables',
 async () => {
     const present = fakeClient([
         { rel: 'requests' },
     ]);
-    await assert.rejects(
+    const error = await assertRejects(
         () => assertNoLegacyMessageTables(
             present.sql,
         ),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message
-                === LEGACY_MESSAGE_TABLES,
-    );
+    ) as Error;
+    assertInstanceOf(error, Error);
+    assertStrictEquals(error.message, LEGACY_MESSAGE_TABLES);
     const absent = fakeClient([
         { rel: null },
         { rel: null },
@@ -244,24 +244,22 @@ async () => {
     );
 });
 
-test('boot refuses leftover pairs table',
+Deno.test('boot refuses leftover pairs table',
 async () => {
     const present = fakeClient([
         { rel: 'pairs' },
     ]);
-    await assert.rejects(
+    const error = await assertRejects(
         () => assertNoLegacyMessageTables(
             present.sql,
         ),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message
-                === LEGACY_MESSAGE_TABLES,
-    );
+    ) as Error;
+    assertInstanceOf(error, Error);
+    assertStrictEquals(error.message, LEGACY_MESSAGE_TABLES);
 });
 
-test('boot refuses argv before connecting', async () => {
-    await assert.rejects(
+Deno.test('boot refuses argv before connecting', async () => {
+    const error = await assertRejects(
         () => boot(
             (name) => ({
                 POSTGRES_URL: 'postgres://user:pw@h/db',
@@ -271,19 +269,18 @@ test('boot refuses argv before connecting', async () => {
             ['--seed-mock-data'],
             '/unused',
         ),
-        (error: unknown) =>
-            error instanceof Error
-            && error.message === NO_ARGUMENTS,
-    );
-    assert.equal(
+    ) as Error;
+    assertInstanceOf(error, Error);
+    assertStrictEquals(error.message, NO_ARGUMENTS);
+    assertStrictEquals(
         bootErrorMessage(new Error(NO_ARGUMENTS)),
         NO_ARGUMENTS,
     );
 });
 
-test('bootErrorMessage maps seed leftovers to boot failed',
+Deno.test('bootErrorMessage maps seed leftovers to boot failed',
 () => {
-    assert.equal(
+    assertStrictEquals(
         bootErrorMessage(new Error(
             'database is not empty; refuse to seed',
         )),
@@ -292,13 +289,13 @@ test('bootErrorMessage maps seed leftovers to boot failed',
 });
 
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
-    test(
+    Deno.test(
         'live SHOW skipped without POSTGRES_URL',
-        { skip: 'POSTGRES_URL is unset' },
+        { ignore: true }, // POSTGRES_URL is unset
         () => {},
     );
 } else {
-    test('live SHOW server_encoding is UTF8',
+    Deno.test('live SHOW server_encoding is UTF8',
     async () => {
         const sql = connectPostgres(POSTGRES_URL);
         try {

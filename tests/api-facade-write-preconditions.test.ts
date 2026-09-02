@@ -1,5 +1,6 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
+import { stub } from '@std/testing/mock';
+import { FakeTime } from '@std/testing/time';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -44,7 +45,7 @@ function ideaPutBody(_ideaId: string, title: string) {
     };
 }
 
-test('PUT threads an arbitrary header field into the stored'
+Deno.test('PUT threads an arbitrary header field into the stored'
 + ' request message (a simple-class family never keys'
 + ' behavior off it — only the message carries it)',
 async () => {
@@ -59,15 +60,15 @@ async () => {
     );
     const stored = (await db.messagePairs.getAll())
         .find(r => r.uri_id === ideaId);
-    assert.ok(stored, 'a request row was stored');
-    assert.ok(
+    assert(stored, 'a request row was stored');
+    assert(
         stored!.request.includes('probe-value-123'),
         'the header value must reach the stored request'
         + ' message',
     );
 });
 
-test('PUT with no headerFields behaves exactly as before —'
+Deno.test('PUT with no headerFields behaves exactly as before —'
 + ' the parameter is purely additive', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -77,10 +78,10 @@ test('PUT with no headerFields behaves exactly as before —'
             + ideaId,
         ideaPutBody(ideaId, 'No Headers'), token,
     );
-    assert.equal(written.title, 'No Headers');
+    assertStrictEquals(written.title, 'No Headers');
 });
 
-test('GETWithEtag returns the parsed body and the'
+Deno.test('GETWithEtag returns the parsed body and the'
 + ' head pair id as ETag (streamed organizations/:id/ideas/:id)',
 async () => {
     const db = await freshDb();
@@ -96,11 +97,11 @@ async () => {
             id: string; title: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId, token);
-    assert.equal(body.title, 'Plain');
-    assert.ok(etag !== undefined && isIdentifier(etag));
+    assertStrictEquals(body.title, 'Plain');
+    assert(etag !== undefined && isIdentifier(etag));
 });
 
-test('GETWithEtag and GET agree on the body for the'
+Deno.test('GETWithEtag and GET agree on the body for the'
 + ' same resource (delegation, not a divergent read path)',
 async () => {
     const db = await freshDb();
@@ -120,29 +121,29 @@ async () => {
             id: string; title: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId, token);
-    assert.deepEqual(viaGetWithEtag, viaGet);
+    assertEquals(viaGetWithEtag, viaGet);
 });
 
-test('jitteredBackoff waits base*2^(attempt-1) plus jitter'
+Deno.test('jitteredBackoff waits base*2^(attempt-1) plus jitter'
 + ' (the C6 retry loop\'s pacing primitive)',
-async (t) => {
+async () => {
     // BACKOFF_BASE_MS is 100; random fixed at 0 → delay
     // equals the base with no jitter added.
-    t.mock.timers.enable({ apis: ['setTimeout'] });
-    t.mock.method(Math, 'random', () => 0);
+    using time = new FakeTime();
+    using _randomStub = stub(Math, 'random', () => 0);
 
     let resolved = false;
     const p = jitteredBackoff(2).then(() => {
         resolved = true;
     });
     // attempt 2 → base = 100 * 2^(2-1) = 200
-    t.mock.timers.tick(199);
+    time.tick(199);
     await Promise.resolve();
-    assert.equal(
+    assertStrictEquals(
         resolved, false,
         'must not resolve before the backoff delay',
     );
-    t.mock.timers.tick(1);
+    time.tick(1);
     await p;
-    assert.equal(resolved, true);
+    assertStrictEquals(resolved, true);
 });

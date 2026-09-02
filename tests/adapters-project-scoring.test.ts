@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -27,7 +26,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-test('getBaselineScoresForProject returns project rows',
+Deno.test('getBaselineScoresForProject returns project rows',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -59,11 +58,11 @@ test('getBaselineScoresForProject returns project rows',
         const rows = await getBaselineScoresForProject(
             ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );
-        assert.equal(rows.length, 1);
-        assert.equal(rows[0]!.score, 50);
+        assertStrictEquals(rows.length, 1);
+        assertStrictEquals(rows[0]!.score, 50);
     });
 
-test('getActualScoresForProject returns project rows',
+Deno.test('getActualScoresForProject returns project rows',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -83,11 +82,11 @@ test('getActualScoresForProject returns project rows',
         const rows = await getActualScoresForProject(
             ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );
-        assert.equal(rows.length, 1);
-        assert.equal(rows[0]!.score, 33);
+        assertStrictEquals(rows.length, 1);
+        assertStrictEquals(rows[0]!.score, 33);
     });
 
-test('getProjectScoring returns both lists',
+Deno.test('getProjectScoring returns both lists',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -117,10 +116,10 @@ test('getProjectScoring returns both lists',
             },
         );
         const r = await getProjectScoring(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(r.baseline.length, 1);
-        assert.equal(r.actual.length, 1);
-        assert.equal(r.baseline[0]!.score, 50);
-        assert.equal(r.actual[0]!.score, 33);
+        assertStrictEquals(r.baseline.length, 1);
+        assertStrictEquals(r.actual.length, 1);
+        assertStrictEquals(r.baseline[0]!.score, 50);
+        assertStrictEquals(r.actual[0]!.score, 33);
     });
 
 // Seeds both projects through the SAME document PUT the live
@@ -195,18 +194,18 @@ async function seedTwoApprovedProjects(
     );
 }
 
-test('getPortfolioImpactSummary averages project averages',
+Deno.test('getPortfolioImpactSummary averages project averages',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await organizationToken());
         await seedTwoApprovedProjects(db, ctx);
         const r = await getPortfolioImpactSummary(ctx);
-        assert.equal(r.projectCount, 2);
-        assert.equal(r.baselineMean, 20); // (60 + -20) / 2
+        assertStrictEquals(r.projectCount, 2);
+        assertStrictEquals(r.baselineMean, 20); // (60 + -20) / 2
     });
 
-test('buildObjectiveAggregates returns per-objective rows',
+Deno.test('buildObjectiveAggregates returns per-objective rows',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -215,13 +214,13 @@ test('buildObjectiveAggregates returns per-objective rows',
         const rows = buildObjectiveAggregates(
             await getObjectiveScoringInputs(ctx),
         );
-        assert.equal(rows.length, 1);
-        assert.equal(rows[0]!.objectiveId, 'ohqxgUBEaFQwYbXsonRPmg');
-        assert.equal(rows[0]!.baselineMean, 20);
-        assert.equal(rows[0]!.projectsBaselineScored, 2);
+        assertStrictEquals(rows.length, 1);
+        assertStrictEquals(rows[0]!.objectiveId, 'ohqxgUBEaFQwYbXsonRPmg');
+        assertStrictEquals(rows[0]!.baselineMean, 20);
+        assertStrictEquals(rows[0]!.projectsBaselineScored, 2);
     });
 
-test('getProjectsScoreColumn returns per-project rollup',
+Deno.test('getProjectsScoreColumn returns per-project rollup',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -231,11 +230,15 @@ test('getProjectsScoreColumn returns per-project rollup',
         const byId = new Map(
             rows.map(r => [r.projectId, r]),
         );
-        assert.equal(byId.get('pnXmXrxOWayANgDLdCjuBw')!.baselineAvg, 60);
-        assert.equal(byId.get('prBESZPjJDiuXCeZLmbiVw')!.baselineAvg, -20);
+        assertStrictEquals(
+            byId.get('pnXmXrxOWayANgDLdCjuBw')!.baselineAvg, 60,
+        );
+        assertStrictEquals(
+            byId.get('prBESZPjJDiuXCeZLmbiVw')!.baselineAvg, -20,
+        );
     });
 
-test(
+Deno.test(
     'buildObjectiveTrendlines: baseline + two actuals',
     async () => {
         const db = memoryDbAdapter();
@@ -270,17 +273,17 @@ test(
             await getObjectiveScoringInputs(ctx),
         );
         const points = trendlines.get('ohqxgUBEaFQwYbXsonRPmg');
-        assert.ok(points, 'ohqxgUBEaFQwYbXsonRPmg trendline must exist');
-        assert.deepEqual(
+        assert(points, 'ohqxgUBEaFQwYbXsonRPmg trendline must exist');
+        assertEquals(
             points.map(p => p.value), [20, 40, 25],
         );
-        assert.equal(
+        assertStrictEquals(
             points[0]?.at, '2026-05-14T00:00:00.000000Z',
         );
-        assert.equal(
+        assertStrictEquals(
             points[1]?.at, '2026-05-15T00:00:00.000000Z',
         );
-        assert.equal(
+        assertStrictEquals(
             points[2]?.at, '2026-05-16T00:00:00.000000Z',
         );
         // baselineMean = (60 + -20) / 2 = 20
@@ -290,7 +293,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'buildObjectiveTrendlines: baseline + one actual',
     async () => {
         const db = memoryDbAdapter();
@@ -313,17 +316,17 @@ test(
             await getObjectiveScoringInputs(ctx),
         );
         const points = trendlines.get('ohqxgUBEaFQwYbXsonRPmg');
-        assert.ok(points, 'ohqxgUBEaFQwYbXsonRPmg trendline must exist');
-        assert.deepEqual(
+        assert(points, 'ohqxgUBEaFQwYbXsonRPmg trendline must exist');
+        assertEquals(
             points.map(p => p.value), [20, 40],
         );
-        assert.equal(
+        assertStrictEquals(
             points[1]?.at, '2026-05-15T00:00:00.000000Z',
         );
     },
 );
 
-test(
+Deno.test(
     'buildObjectiveTrendlines: same-at batch is one point',
     async () => {
         const db = memoryDbAdapter();
@@ -358,17 +361,17 @@ test(
             await getObjectiveScoringInputs(ctx),
         );
         const points = trendlines.get('ohqxgUBEaFQwYbXsonRPmg');
-        assert.ok(points, 'ohqxgUBEaFQwYbXsonRPmg trendline must exist');
-        assert.deepEqual(
+        assert(points, 'ohqxgUBEaFQwYbXsonRPmg trendline must exist');
+        assertEquals(
             points.map(p => p.value), [20, 25],
         );
-        assert.equal(
+        assertStrictEquals(
             points[1]?.at, '2026-05-15T00:00:00.000000Z',
         );
     },
 );
 
-test(
+Deno.test(
     'buildObjectiveTrendlines: no baseline returns empty',
     async () => {
         const db = memoryDbAdapter();
@@ -390,11 +393,11 @@ test(
         const trendlines = buildObjectiveTrendlines(
             await getObjectiveScoringInputs(ctx),
         );
-        assert.deepEqual(trendlines.get('ohqxgUBEaFQwYbXsonRPmg'), []);
+        assertEquals(trendlines.get('ohqxgUBEaFQwYbXsonRPmg'), []);
     },
 );
 
-test('postProjectBaselineScoring appends via GET scores',
+Deno.test('postProjectBaselineScoring appends via GET scores',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -409,16 +412,16 @@ test('postProjectBaselineScoring appends via GET scores',
         const rows = await getBaselineScoresForProject(
             ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );
-        assert.equal(rows.length, 2);
+        assertStrictEquals(rows.length, 2);
         for (const r of rows) {
-            assert.equal(r.memberId, 'XXZruirZyAOoRpNxaDnpSA');
+            assertStrictEquals(r.memberId, 'XXZruirZyAOoRpNxaDnpSA');
         }
     });
 
 // Multi-score concurrent PUT: three rows land with
 // distinct ids and one shared `at` (minted once before
 // the fan-out).
-test(
+Deno.test(
     'postProjectBaselineScoring lands 3 rows with'
     + ' distinct ids and one shared at',
     async () => {
@@ -438,15 +441,15 @@ test(
         const rows = await getBaselineScoresForProject(
             ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );
-        assert.equal(rows.length, 3);
+        assertStrictEquals(rows.length, 3);
         const ids = new Set(rows.map(r => r.id));
-        assert.equal(ids.size, 3);
+        assertStrictEquals(ids.size, 3);
         const ats = new Set(rows.map(r => r.at));
-        assert.equal(ats.size, 1);
+        assertStrictEquals(ats.size, 1);
     },
 );
 
-test('postProjectActualMeasurement appends via GET scores',
+Deno.test('postProjectActualMeasurement appends via GET scores',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -458,7 +461,7 @@ test('postProjectActualMeasurement appends via GET scores',
         const rows = await getActualScoresForProject(
             ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );
-        assert.equal(rows.length, 1);
-        assert.equal(rows[0]!.score, 33);
-        assert.equal(rows[0]!.memberId, 'XXZruirZyAOoRpNxaDnpSA');
+        assertStrictEquals(rows.length, 1);
+        assertStrictEquals(rows[0]!.score, 33);
+        assertStrictEquals(rows[0]!.memberId, 'XXZruirZyAOoRpNxaDnpSA');
     });

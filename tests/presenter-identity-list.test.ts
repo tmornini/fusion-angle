@@ -1,25 +1,18 @@
-// state.ts reads localStorage / window / document at
-// module-eval time; stub before importing presenters.
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-};
+import { assertMatch, assertNotMatch } from '@std/assert';
+import {
+    IdentityRosterPresenter,
+} from '../web-app/app/presenters/identity-list.ts';
+
+// identity-list.ts never reads localStorage (checked
+// against the full product tree); window/document are
+// stubbed because IdentityRosterPresenter.render walks a
+// real DOM element.
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
-
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-
-const {
-    IdentityRosterPresenter,
-} = await import(
-    '../web-app/app/presenters/identity-list.ts'
-);
 
 function record(): {
     container: HTMLElement;
@@ -40,7 +33,7 @@ function record(): {
     };
 }
 
-test('person row shows name, email, and Person badge',
+Deno.test('person row shows name, email, and Person badge',
 () => {
     const rec = record();
     new IdentityRosterPresenter([
@@ -53,14 +46,14 @@ test('person row shows name, email, and Person badge',
         },
     ]).render(rec.container);
     const out = rec.html();
-    assert.match(out, /data-identity-id="pnXmXrxOWayANgDLdCjuBw"/);
-    assert.match(out, /card card-hover/);
-    assert.match(out, /Ada/);
-    assert.match(out, /ada@x\.io/);
-    assert.match(out, /Person/);
+    assertMatch(out, /data-identity-id="pnXmXrxOWayANgDLdCjuBw"/);
+    assertMatch(out, /card card-hover/);
+    assertMatch(out, /Ada/);
+    assertMatch(out, /ada@x\.io/);
+    assertMatch(out, /Person/);
 });
 
-test('named service shows its name and detail, not the id',
+Deno.test('named service shows its name and detail, not the id',
 () => {
     const rec = record();
     new IdentityRosterPresenter([
@@ -73,13 +66,13 @@ test('named service shows its name and detail, not the id',
         },
     ]).render(rec.container);
     const out = rec.html();
-    assert.match(out, /data-identity-id="syWUUcdBSbBgMwBiCrgbDw"/);
-    assert.match(out, /Service/);
-    assert.match(out, /Grok 4\.3/);
-    assert.match(out, /Fast reasoning model/);
+    assertMatch(out, /data-identity-id="syWUUcdBSbBgMwBiCrgbDw"/);
+    assertMatch(out, /Service/);
+    assertMatch(out, /Grok 4\.3/);
+    assertMatch(out, /Fast reasoning model/);
 });
 
-test('unnamed service redacts to a label, not the id',
+Deno.test('unnamed service redacts to a label, not the id',
 async () => {
     const { UNNAMED_SERVICE_NAME } = await import(
         '../web-app/app/adapters/identities.ts'
@@ -93,13 +86,13 @@ async () => {
         },
     ]).render(rec.container);
     const out = rec.html();
-    assert.match(out, new RegExp(UNNAMED_SERVICE_NAME));
-    assert.doesNotMatch(
+    assertMatch(out, new RegExp(UNNAMED_SERVICE_NAME));
+    assertNotMatch(
         out, />\s*BhdhBLQPyktOCbdJzGsggg\s*</,
     );
 });
 
-test('erased person falls back to the named constant',
+Deno.test('erased person falls back to the named constant',
 async () => {
     const { IDENTITY_WITHOUT_PII_NAME } = await import(
         '../web-app/app/adapters/identities.ts'
@@ -111,13 +104,13 @@ async () => {
             pii: { erased: true },
         },
     ]).render(rec.container);
-    assert.match(
+    assertMatch(
         rec.html(), new RegExp(IDENTITY_WITHOUT_PII_NAME),
     );
 });
 
-test('renders an empty state when no identities', () => {
+Deno.test('renders an empty state when no identities', () => {
     const rec = record();
     new IdentityRosterPresenter([]).render(rec.container);
-    assert.match(rec.html(), /No identities/);
+    assertMatch(rec.html(), /No identities/);
 });

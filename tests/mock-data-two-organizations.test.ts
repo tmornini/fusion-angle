@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     deriveIdeas,
@@ -198,7 +203,7 @@ async function membershipsByIdentity(
     return byIdentity;
 }
 
-test('current is a member of exactly orgs 1 and 2',
+Deno.test('current is a member of exactly orgs 1 and 2',
 async () => {
     const { db } = await seed();
     // Phase Final Task 2: memberships on the message plane.
@@ -207,12 +212,12 @@ async () => {
     )
         .map(m => m.organization_id)
         .sort();
-    assert.deepEqual(organizations, ['AjdvjuECVZEgZoFajaIEkg'
+    assertEquals(organizations, ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']);
     // Phase Final Stage B: roster tables retired.
 });
 
-test('current holds admin in both orgs', async () => {
+Deno.test('current holds admin in both orgs', async () => {
     const { db } = await seed();
     // Privilege is membership type:"admin"; mint bakes
     // claim roles from that type.
@@ -222,11 +227,11 @@ test('current holds admin in both orgs', async () => {
     const byOrganization = new Map(
         rows.map(m => [m.organization_id, m.type]),
     );
-    assert.equal(byOrganization.get(ORGANIZATION_ONE), 'admin');
-    assert.equal(byOrganization.get(ORGANIZATION_TWO), 'admin');
+    assertStrictEquals(byOrganization.get(ORGANIZATION_ONE), 'admin');
+    assertStrictEquals(byOrganization.get(ORGANIZATION_TWO), 'admin');
 });
 
-test('both organizations exist with distinct names',
+Deno.test('both organizations exist with distinct names',
 async () => {
     const { db } = await seed();
     // Phase Final Task 2: organizations ROW half stripped.
@@ -237,13 +242,13 @@ async () => {
     const two = organizations.find(
         o => o.id === ORGANIZATION_TWO,
     );
-    assert.ok(one, 'org 1 exists');
-    assert.ok(two, 'org 2 exists');
-    assert.notEqual(one.name, two.name);
+    assert(one, 'org 1 exists');
+    assert(two, 'org 2 exists');
+    assertNotStrictEquals(one.name, two.name);
     // Phase Final Stage B: organizations table retired.
 });
 
-test('each org owns at least one of every org-scoped'
+Deno.test('each org owns at least one of every org-scoped'
     + ' entity', async () => {
     const { db } = await seed();
     // Phase Final Task 2: ideas + projects + flows derive
@@ -252,19 +257,19 @@ test('each org owns at least one of every org-scoped'
         ORGANIZATION_ONE, ORGANIZATION_TWO,
     ]) {
         const ideas = await deriveIdeas(db, organization);
-        assert.ok(
+        assert(
             ideas.length >= 1,
             `org ${organization} owns no ideas`,
         );
         const projects = await deriveProjects(
             db, organization,
         );
-        assert.ok(
+        assert(
             projects.length >= 1,
             `org ${organization} owns no projects`,
         );
         const flows = await deriveFlows(db, organization);
-        assert.ok(
+        assert(
             flows.length >= 1,
             `org ${organization} owns no flows`,
         );
@@ -277,14 +282,14 @@ test('each org owns at least one of every org-scoped'
         const records = await derivedRecords(
             db, organization,
         );
-        assert.ok(
+        assert(
             records.length >= 1,
             `org ${organization} owns no records`,
         );
         const objectives = await derivedObjectives(
             db, organization,
         );
-        assert.ok(
+        assert(
             objectives.length >= 1,
             `org ${organization} owns no objectives`,
         );
@@ -292,7 +297,7 @@ test('each org owns at least one of every org-scoped'
     // Phase Final Stage B: objectives table retired.
 });
 
-test('every work order belongs to org 1', async () => {
+Deno.test('every work order belongs to org 1', async () => {
     const { db } = await seed();
     // Phase Final Task 2: work orders from the message plane.
     const token = await organizationToken(
@@ -307,14 +312,14 @@ test('every work order belongs to org 1', async () => {
             },
         }),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const wos = await res.json() as {
         id: string;
         organization_id: string;
     }[];
-    assert.ok(wos.length > 0, 'work orders exist');
+    assert(wos.length > 0, 'work orders exist');
     for (const wo of wos) {
-        assert.equal(wo.organization_id, ORGANIZATION_ONE);
+        assertStrictEquals(wo.organization_id, ORGANIZATION_ONE);
     }
     // Org two carries none.
     const tokenTwo = await organizationToken(
@@ -331,11 +336,11 @@ test('every work order belongs to org 1', async () => {
             },
         }),
     );
-    assert.equal(empty.status, 200);
-    assert.deepEqual(await empty.json(), []);
+    assertStrictEquals(empty.status, 200);
+    assertEquals(await empty.json(), []);
 });
 
-test('every record attribute matches its parent record org',
+Deno.test('every record attribute matches its parent record org',
 async () => {
     const { db } = await seed();
     // Phase Final Task 2: records + attributes on
@@ -356,13 +361,13 @@ async () => {
             ),
         );
     }
-    assert.ok(allAttrs.length > 0, 'attributes exist');
+    assert(allAttrs.length > 0, 'attributes exist');
     for (const attr of allAttrs) {
         const parentId =
             (attr as { record_type_id?: string })
                 .record_type_id
             ?? attr.record_id;
-        assert.equal(
+        assertStrictEquals(
             attr.organization_id,
             recordOrganization.get(parentId),
             `attribute ${attr.id} org mismatch`);
@@ -370,7 +375,7 @@ async () => {
     // Phase Final Stage B: record_attributes table retired.
 });
 
-test('every non-admin seeded human is single-org',
+Deno.test('every non-admin seeded human is single-org',
 async () => {
     const { db } = await seed();
     const byIdentity = await membershipsByIdentity(db);
@@ -381,13 +386,13 @@ async () => {
     for (const id of persons) {
         if (id === 'XXZruirZyAOoRpNxaDnpSA') continue;
         const organizations = byIdentity.get(id) ?? new Set();
-        assert.ok(
+        assert(
             organizations.size <= 1,
             `non-admin ${id} spans multiple orgs`);
     }
 });
 
-test('every flow_records join binds same-org flow and'
+Deno.test('every flow_records join binds same-org flow and'
     + ' record', async () => {
     const { db } = await seed();
     // Phase Final Task 2: flows + records + joins on the
@@ -416,9 +421,9 @@ test('every flow_records join binds same-org flow and'
             recordOrganization.set(r.id, organization);
         }
     }
-    assert.ok(bindings.length > 0, 'bindings exist');
+    assert(bindings.length > 0, 'bindings exist');
     for (const b of bindings) {
-        assert.equal(
+        assertStrictEquals(
             flowOrganization.get(b.flow_id),
             recordOrganization.get(b.record_id),
             `binding ${b.id} crosses orgs`);
@@ -426,7 +431,7 @@ test('every flow_records join binds same-org flow and'
     // Phase Final Stage B: flow_records table retired.
 });
 
-test('every idea submission names a submitter in its'
+Deno.test('every idea submission names a submitter in its'
     + " idea's org", async () => {
     const { db } = await seed();
     // Phase Final Task 2: derive ideas + submissions (row
@@ -454,12 +459,12 @@ test('every idea submission names a submitter in its'
             }
         }
     }
-    assert.deepEqual(
+    assertEquals(
         violations, [],
         'cross-org submitters: ' + violations.join('; '));
 });
 
-test('every project score names an author in its'
+Deno.test('every project score names an author in its'
     + " project's org", async () => {
     const { db } = await seed();
     // Phase Final Task 2: projects + scores from
@@ -490,7 +495,7 @@ test('every project score names an author in its'
     }
     // Phase Final Task 2: memberships on the message plane.
     const memberOrganizations = await membershipsByIdentity(db);
-    assert.ok(scores.length > 0, 'scores exist');
+    assert(scores.length > 0, 'scores exist');
     const violations: string[] = [];
     for (const s of scores) {
         const organization = projectOrganization.get(
@@ -508,12 +513,12 @@ test('every project score names an author in its'
                 + ' not in project org ' + organization);
         }
     }
-    assert.deepEqual(
+    assertEquals(
         violations, [],
         'cross-org score authors: ' + violations.join('; '));
 });
 
-test('every seeded human gets a password credential',
+Deno.test('every seeded human gets a password credential',
 async () => {
     const { db } = await seed();
     // Phase Final Task 2: identity_credentials ROW half
@@ -530,12 +535,12 @@ async () => {
         const row = rows.find(r => r.kind === 'password');
         if (!row) continue;
         passwordCount += 1;
-        assert.match(
+        assertMatch(
             row.secret,
             /^\$pbkdf2-sha256\$i=1\$/,
         );
     }
-    assert.ok(
+    assert(
         passwordCount >= 2,
         'multiple humans seeded with passwords');
     // Phase Final Stage B: identity spine tables retired.

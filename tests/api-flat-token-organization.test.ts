@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -72,7 +71,7 @@ function putDefaultOrganization(
         });
 }
 
-test('a flat token resolves its org from the set default',
+Deno.test('a flat token resolves its org from the set default',
 async () => {
     const db = await freshDb();
     await join(db, 'XXZruirZyAOoRpNxaDnpSA', 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -83,14 +82,14 @@ async () => {
     const put = await handleRequest(
         db, putDefaultOrganization(token, 'XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw'));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const res = await handleRequest(
         db, getSeats(token, 'BBjWJsjYIDkTRKIIPrzWRw'),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
 });
 
-test('a flat token falls back to its primary membership org',
+Deno.test('a flat token falls back to its primary membership org',
 async () => {
     const db = await freshDb();
     await join(db, 'XXZruirZyAOoRpNxaDnpSA', 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -102,14 +101,14 @@ async () => {
             'BBjWJsjYIDkTRKIIPrzWRw',
         ),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
 });
 
-test('a flat token with no org resolution is denied',
+Deno.test('a flat token with no org resolution is denied',
 async () => {
     const db = await freshDb();   // role, no member
     const res = await handleRequest(
         db, getSeats(await devToken(), 'AjdvjuECVZEgZoFajaIEkg'),
     );
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
 });

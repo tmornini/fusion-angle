@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals } from '@std/assert';
 import { seededMockDb } from './mock-seed.ts';
 import { GET } from '../api/api.ts';
 import { organizationToken } from
@@ -24,7 +23,7 @@ function nest(
         + '/' + family + '/' + id;
 }
 
-test('idea JSON has no state_at or'
+Deno.test('idea JSON has no state_at or'
     + ' state_event_id', async () => {
     const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
@@ -34,12 +33,12 @@ test('idea JSON has no state_at or'
         nest('ideas', idea.id),
         token,
     );
-    assert.equal('state_at' in row, false);
-    assert.equal('state_event_id' in row, false);
-    assert.equal(typeof row.state, 'string');
+    assertStrictEquals('state_at' in row, false);
+    assertStrictEquals('state_event_id' in row, false);
+    assertStrictEquals(typeof row.state, 'string');
 });
 
-test('GET idea versions/ is collection item'
+Deno.test('GET idea versions/ is collection item'
     + ' shape', async () => {
     const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
@@ -51,14 +50,14 @@ test('GET idea versions/ is collection item'
         nest('ideas', idea.id) + '/versions/',
         token,
     );
-    assert.ok(rows.length >= 1);
+    assert(rows.length >= 1);
     const first = rows[0]!;
-    assert.equal('state_at' in first, false);
-    assert.equal(typeof first.title, 'string');
-    assert.equal(typeof first.state, 'string');
+    assertStrictEquals('state_at' in first, false);
+    assertStrictEquals(typeof first.title, 'string');
+    assertStrictEquals(typeof first.state, 'string');
 });
 
-test('project JSON has no state_at or'
+Deno.test('project JSON has no state_at or'
     + ' state_event_id', async () => {
     const db = await seededMockDb();
     const project = buildProjects()[0]!;
@@ -68,12 +67,12 @@ test('project JSON has no state_at or'
         nest('projects', project.id),
         token,
     );
-    assert.equal('state_at' in row, false);
-    assert.equal('state_event_id' in row, false);
-    assert.equal(typeof row.state, 'string');
+    assertStrictEquals('state_at' in row, false);
+    assertStrictEquals('state_event_id' in row, false);
+    assertStrictEquals(typeof row.state, 'string');
 });
 
-test('GET project versions/ is collection item'
+Deno.test('GET project versions/ is collection item'
     + ' shape', async () => {
     const db = await seededMockDb();
     const project = buildProjects()[0]!;
@@ -86,14 +85,14 @@ test('GET project versions/ is collection item'
             + '/versions/',
         token,
     );
-    assert.ok(rows.length >= 1);
+    assert(rows.length >= 1);
     const first = rows[0]!;
-    assert.equal('state_at' in first, false);
-    assert.equal(typeof first.title, 'string');
-    assert.equal(typeof first.state, 'string');
+    assertStrictEquals('state_at' in first, false);
+    assertStrictEquals(typeof first.title, 'string');
+    assertStrictEquals(typeof first.state, 'string');
 });
 
-test('objective JSON has no state_at or'
+Deno.test('objective JSON has no state_at or'
     + ' state_event_id', async () => {
     const db = await seededMockDb();
     const objective = OBJECTIVE_SEEDS[0]!;
@@ -103,12 +102,12 @@ test('objective JSON has no state_at or'
         nest('objectives', objective.id),
         token,
     );
-    assert.equal('state_at' in row, false);
-    assert.equal('state_event_id' in row, false);
-    assert.equal(typeof row.state, 'string');
+    assertStrictEquals('state_at' in row, false);
+    assertStrictEquals('state_event_id' in row, false);
+    assertStrictEquals(typeof row.state, 'string');
 });
 
-test('GET objective versions/ is collection'
+Deno.test('GET objective versions/ is collection'
     + ' item shape', async () => {
     const db = await seededMockDb();
     const objective = OBJECTIVE_SEEDS[0]!;
@@ -121,14 +120,14 @@ test('GET objective versions/ is collection'
             + '/versions/',
         token,
     );
-    assert.ok(rows.length >= 1);
+    assert(rows.length >= 1);
     const first = rows[0]!;
-    assert.equal('state_at' in first, false);
-    assert.equal(typeof first.position, 'number');
-    assert.equal(typeof first.state, 'string');
+    assertStrictEquals('state_at' in first, false);
+    assertStrictEquals(typeof first.position, 'number');
+    assertStrictEquals(typeof first.state, 'string');
 });
 
-test('record-type JSON has no state_at or'
+Deno.test('record-type JSON has no state_at or'
     + ' state_event_id', async () => {
     const db = await seededMockDb();
     const record = buildRecords()[0]!;
@@ -138,12 +137,12 @@ test('record-type JSON has no state_at or'
         nest('record-types', record.id),
         token,
     );
-    assert.equal('state_at' in row, false);
-    assert.equal('state_event_id' in row, false);
-    assert.equal(typeof row.state, 'string');
+    assertStrictEquals('state_at' in row, false);
+    assertStrictEquals('state_event_id' in row, false);
+    assertStrictEquals(typeof row.state, 'string');
 });
 
-test('GET record-type versions/ is collection'
+Deno.test('GET record-type versions/ is collection'
     + ' item shape', async () => {
     const db = await seededMockDb();
     const record = buildRecords()[0]!;
@@ -156,9 +155,9 @@ test('GET record-type versions/ is collection'
             + '/versions/',
         token,
     );
-    assert.ok(rows.length >= 1);
+    assert(rows.length >= 1);
     const first = rows[0]!;
-    assert.equal('state_at' in first, false);
-    assert.equal(typeof first.name, 'string');
-    assert.equal(typeof first.state, 'string');
+    assertStrictEquals('state_at' in first, false);
+    assertStrictEquals(typeof first.name, 'string');
+    assertStrictEquals(typeof first.state, 'string');
 });

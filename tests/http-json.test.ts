@@ -1,9 +1,13 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { HttpMessageError } from '../shared/http-message/types.ts';
 
-test('wire and JSON forms round-trip to the same wire', () => {
+Deno.test('wire and JSON forms round-trip to the same wire', () => {
     const wire =
         'POST /things HTTP/1.1\r\n' +
         'host: example.com\r\n' +
@@ -12,18 +16,18 @@ test('wire and JSON forms round-trip to the same wire', () => {
         'hello';
     const viaWire = HttpMessage.fromWire(wire);
     const viaJson = HttpMessage.fromJson(viaWire.toJson());
-    assert.equal(viaJson.toWire(), viaWire.toWire());
+    assertStrictEquals(viaJson.toWire(), viaWire.toWire());
 });
 
-test('JSON re-serialization is a fixed point', () => {
+Deno.test('JSON re-serialization is a fixed point', () => {
     const once = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\ncontent-type: text/plain\r\n\r\nhi',
     ).toJson();
     const twice = HttpMessage.fromJson(once).toJson();
-    assert.equal(twice, once);
+    assertStrictEquals(twice, once);
 });
 
-test('JSON top-level keys are sorted ascending', () => {
+Deno.test('JSON top-level keys are sorted ascending', () => {
     const json = HttpMessage.fromWire(
         'POST /x HTTP/1.1\r\n' +
         'host: h\r\n' +
@@ -31,75 +35,75 @@ test('JSON top-level keys are sorted ascending', () => {
         '\r\n' +
         'hi',
     ).toJson();
-    assert.deepEqual(
+    assertEquals(
         Object.keys(JSON.parse(json)),
         ['body', 'header', 'method', 'target', 'version'],
     );
 });
 
-test('JSON header is sorted array of name/value pairs', () => {
+Deno.test('JSON header is sorted array of name/value pairs', () => {
     const json = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\n' +
         'host: example.com\r\n' +
         'accept: text/html\r\n' +
         '\r\n',
     ).toJson();
-    assert.deepEqual(JSON.parse(json).header, [
+    assertEquals(JSON.parse(json).header, [
         ['accept', 'text/html'],
         ['host', 'example.com'],
     ]);
 });
 
-test('JSON header preserves same-name field order', () => {
+Deno.test('JSON header preserves same-name field order', () => {
     const json = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\n' +
         'set-cookie: a=1\r\n' +
         'set-cookie: b=2\r\n' +
         '\r\n',
     ).toJson();
-    assert.deepEqual(JSON.parse(json).header, [
+    assertEquals(JSON.parse(json).header, [
         ['set-cookie', 'a=1'],
         ['set-cookie', 'b=2'],
     ]);
 });
 
-test('a body without a content-type is base64', () => {
+Deno.test('a body without a content-type is base64', () => {
     const json = HttpMessage.fromWire(
         'POST / HTTP/1.1\r\ncontent-length: 5\r\n\r\nhello',
     ).toJson();
-    assert.equal(JSON.parse(json).body, 'aGVsbG8=');
+    assertStrictEquals(JSON.parse(json).body, 'aGVsbG8=');
 });
 
-test('JSON omits the body key when there is no body', () => {
+Deno.test('JSON omits the body key when there is no body', () => {
     const json = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\nhost: h\r\n\r\n',
     ).toJson();
-    assert.ok(!('body' in JSON.parse(json)));
+    assert(!('body' in JSON.parse(json)));
 });
 
-test('rejects malformed JSON text', () => {
-    assert.throws(
+Deno.test('rejects malformed JSON text', () => {
+    assertThrows(
         () => HttpMessage.fromJson('{not json'),
         HttpMessageError,
     );
 });
 
-test('rejects JSON with neither method nor status', () => {
-    assert.throws(
+Deno.test('rejects JSON with neither method nor status', () => {
+    assertThrows(
         () => HttpMessage.fromJson('{"header":[]}'),
         HttpMessageError,
     );
 });
 
-test('rejects a non-object JSON message', () => {
-    assert.throws(
+Deno.test('rejects a non-object JSON message', () => {
+    assertThrows(
         () => HttpMessage.fromJson('[1,2,3]'),
         HttpMessageError,
     );
 });
 
-test('rejects a JSON request with an invalid method', () => {
-    assert.throws(
+Deno.test('rejects a JSON request with an invalid method', () => {
+    assertThrows(
         () => HttpMessage.fromJson(
             '{"method":"G@T","target":"/",'
             + '"version":"HTTP/1.1","header":[]}',
@@ -108,8 +112,8 @@ test('rejects a JSON request with an invalid method', () => {
     );
 });
 
-test('rejects a JSON request with a bad version', () => {
-    assert.throws(
+Deno.test('rejects a JSON request with a bad version', () => {
+    assertThrows(
         () => HttpMessage.fromJson(
             '{"method":"GET","target":"/",'
             + '"version":"HTTP/9","header":[]}',
@@ -118,8 +122,8 @@ test('rejects a JSON request with a bad version', () => {
     );
 });
 
-test('rejects a JSON response with an out-of-range status', () => {
-    assert.throws(
+Deno.test('rejects a JSON response with an out-of-range status', () => {
+    assertThrows(
         () => HttpMessage.fromJson(
             '{"version":"HTTP/1.1","status":99,'
             + '"reason":"x","header":[]}',
@@ -128,8 +132,8 @@ test('rejects a JSON response with an out-of-range status', () => {
     );
 });
 
-test('rejects a JSON response with a non-numeric status', () => {
-    assert.throws(
+Deno.test('rejects a JSON response with a non-numeric status', () => {
+    assertThrows(
         () => HttpMessage.fromJson(
             '{"version":"HTTP/1.1","status":"200",'
             + '"reason":"OK","header":[]}',
@@ -138,8 +142,8 @@ test('rejects a JSON response with a non-numeric status', () => {
     );
 });
 
-test('rejects a JSON header that is not an array', () => {
-    assert.throws(
+Deno.test('rejects a JSON header that is not an array', () => {
+    assertThrows(
         () => HttpMessage.fromJson(
             '{"method":"GET","target":"/",'
             + '"version":"HTTP/1.1","header":{}}',
@@ -148,8 +152,8 @@ test('rejects a JSON header that is not an array', () => {
     );
 });
 
-test('rejects a JSON header pair with a non-string value', () => {
-    assert.throws(
+Deno.test('rejects a JSON header pair with a non-string value', () => {
+    assertThrows(
         () => HttpMessage.fromJson(
             '{"method":"GET","target":"/",'
             + '"version":"HTTP/1.1","header":[["host",5]]}',
@@ -158,8 +162,8 @@ test('rejects a JSON header pair with a non-string value', () => {
     );
 });
 
-test('rejects a JSON header with an invalid field name', () => {
-    assert.throws(
+Deno.test('rejects a JSON header with an invalid field name', () => {
+    assertThrows(
         () => HttpMessage.fromJson(
             '{"method":"GET","target":"/","version":"HTTP/1.1",'
             + '"header":[["bad name","x"]]}',
@@ -168,8 +172,8 @@ test('rejects a JSON header with an invalid field name', () => {
     );
 });
 
-test('rejects a JSON response with a bad version', () => {
-    assert.throws(
+Deno.test('rejects a JSON response with a bad version', () => {
+    assertThrows(
         () => HttpMessage.fromJson(
             '{"version":"HTTP/9","status":200,'
             + '"reason":"OK","header":[]}',

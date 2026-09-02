@@ -1,10 +1,9 @@
-import { test } from 'node:test';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     deriveProject,
     deriveProjectStateHistory,
     projectEntityOf,
 } from '../api/derive-projects.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -78,7 +77,7 @@ function projectDocument(
     };
 }
 
-test('a document PUT with a new state writes wire entity'
+Deno.test('a document PUT with a new state writes wire entity'
 + ' and exactly one event, authored by the actor', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -87,32 +86,32 @@ test('a document PUT with a new state writes wire entity'
             + 'XufQcWIKhZshfJYOVNeUSw', token,
         projectDocument('Fresh', 'submitted'),
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const putWire = await res.json() as Record<string, unknown>;
-    assert.equal(putWire.title, 'Fresh');
-    assert.equal(putWire.state, 'submitted');
+    assertStrictEquals(putWire.title, 'Fresh');
+    assertStrictEquals(putWire.state, 'submitted');
     const getRes = await handleRequest(
         db, req('GET'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'XufQcWIKhZshfJYOVNeUSw', token),
     );
-    assert.equal(getRes.status, 200);
+    assertStrictEquals(getRes.status, 200);
     const getWire = await getRes.json() as {
         title: string;
         state: string;
         state_at: string;
         state_event_id: string;
     };
-    assert.equal(getWire.title, 'Fresh');
-    assert.equal(getWire.state, 'submitted');
+    assertStrictEquals(getWire.title, 'Fresh');
+    assertStrictEquals(getWire.state, 'submitted');
     const events = await deriveProjectStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'XufQcWIKhZshfJYOVNeUSw');
-    assert.equal(events.length, 1);
-    assert.equal(events[0]!.state, 'submitted');
-    assert.equal(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(events.length, 1);
+    assertStrictEquals(events[0]!.state, 'submitted');
+    assertStrictEquals(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
-test('a state-unchanged edit writes no second event',
+Deno.test('a state-unchanged edit writes no second event',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -126,20 +125,20 @@ async () => {
             + 'YHvbnJSZHECuziaHXcsKpw', token,
         projectDocument('Second', 'submitted'),
     ));
-    assert.equal(edit.status, 201);
+    assertStrictEquals(edit.status, 201);
     const events = await deriveProjectStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'YHvbnJSZHECuziaHXcsKpw');
-    assert.equal(events.length, 1);
+    assertStrictEquals(events.length, 1);
     const getRes = await handleRequest(
         db, req('GET'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'YHvbnJSZHECuziaHXcsKpw', token),
     );
     const wire = await getRes.json() as { title: string };
-    assert.equal(wire.title, 'Second');
+    assertStrictEquals(wire.title, 'Second');
 });
 
-test('a byte-identical resend converges: one event,'
+Deno.test('a byte-identical resend converges: one event,'
 + ' one pair', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -156,12 +155,12 @@ test('a byte-identical resend converges: one event,'
     );
     const events = await deriveProjectStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'YIuEjXvCwXAgrpyvcvLJjg');
-    assert.equal(events.length, 1);
-    assert.equal((await db.messagePairs.getAll()).length, 3);
-    assert.equal((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals(events.length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
 });
 
-test('the pair request body carries domain state;'
+Deno.test('the pair request body carries domain state;'
 + ' GET has no trio metadata', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -179,17 +178,17 @@ test('the pair request body carries domain state;'
         title: string;
         state?: string;
     };
-    assert.equal(wire.title, 'Wired');
-    assert.equal(wire.state, 'under_review');
-    assert.equal('state_at' in wire, false);
+    assertStrictEquals(wire.title, 'Wired');
+    assertStrictEquals(wire.state, 'under_review');
+    assertStrictEquals('state_at' in wire, false);
     const requests = await db.messagePairs.getAll();
     // seedRootAdmin 2 + project PUT 1
-    assert.equal(requests.length, 3);
+    assertStrictEquals(requests.length, 3);
     const parsed = messagePairJsonOf(requests[2]!.request) as {
         body: { state: string };
     };
-    assert.equal(parsed.body.state, 'under_review');
-    assert.equal('state_at' in parsed.body, false);
+    assertStrictEquals(parsed.body.state, 'under_review');
+    assertStrictEquals('state_at' in parsed.body, false);
 });
 
 // The MEMBER_ID CAVEAT, isolated: every OTHER case above uses
@@ -203,7 +202,7 @@ test('the pair request body carries domain state;'
 // member_id too, so that mismatch against the ALREADY-STORED
 // (A-authored) row would 409 — this assertion turns that
 // swap into a failing test instead of a silent regression.
-test('a same-state edit by a DIFFERENT member never'
+Deno.test('a same-state edit by a DIFFERENT member never'
 + ' reattributes the head event\'s authorship', async () => {
     const db = await freshDb();
     const memberB = generateIdentifier();
@@ -215,19 +214,19 @@ test('a same-state edit by a DIFFERENT member never'
             + 'YLbPBVpBLImxPQRqLKPKLw', tokenA,
         projectDocument('First', 'submitted'),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const edited = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'YLbPBVpBLImxPQRqLKPKLw', tokenB,
         projectDocument('Second', 'submitted'),
     ));
-    assert.equal(edited.status, 201);
+    assertStrictEquals(edited.status, 201);
 
     const events = await deriveProjectStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'YLbPBVpBLImxPQRqLKPKLw');
-    assert.equal(events.length, 1);
-    assert.equal(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(events.length, 1);
+    assertStrictEquals(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 
     const getRes = await handleRequest(
         db, req('GET'
@@ -235,10 +234,10 @@ test('a same-state edit by a DIFFERENT member never'
             + 'YLbPBVpBLImxPQRqLKPKLw', tokenA),
     );
     const wire = await getRes.json() as { title: string };
-    assert.equal(wire.title, 'Second');
+    assertStrictEquals(wire.title, 'Second');
 });
 
-test('stored PUT body equals projectEntityOf of the same'
+Deno.test('stored PUT body equals projectEntityOf of the same'
 + ' chain', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -248,7 +247,7 @@ test('stored PUT body equals projectEntityOf of the same'
         db, req('PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + id, token, body),
     );
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/';
     const stored = JSON.parse(
         await storedPutBodyText(db, prefix, id),
@@ -263,23 +262,23 @@ test('stored PUT body equals projectEntityOf of the same'
         'AjdvjuECVZEgZoFajaIEkg',
         { state: 'submitted' },
     );
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(
+    assertEquals(stored, expected);
+    assertEquals(
         stored, await deriveProject(db, 'AjdvjuECVZEgZoFajaIEkg', id),
     );
     const later = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + id, token,
         projectDocument('Revised', 'under_review'),
     ));
-    assert.equal(later.status, 201);
+    assertStrictEquals(later.status, 201);
     const after = JSON.parse(
         await storedPutBodyText(db, prefix, id),
     );
-    assert.deepEqual(
+    assertEquals(
         after,
         await deriveProject(db, 'AjdvjuECVZEgZoFajaIEkg', id),
     );
-    assert.equal(after.state, 'under_review');
-    assert.equal(after.title, 'Revised');
-    assert.equal('state_at' in after, false);
+    assertStrictEquals(after.state, 'under_review');
+    assertStrictEquals(after.title, 'Revised');
+    assertStrictEquals('state_at' in after, false);
 });

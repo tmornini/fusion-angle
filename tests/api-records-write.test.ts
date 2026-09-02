@@ -1,5 +1,8 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { GET, POST } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
@@ -22,7 +25,7 @@ async function freshDb() {
 
 // ── Create variant ──────
 
-test(
+Deno.test(
     'POST nested record-types create writes the'
     + ' record, initial state event, and'
     + ' attributes in one operation',
@@ -60,7 +63,7 @@ test(
             name: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN);
-        assert.equal(record.name, 'Quarterly Renewals');
+        assertStrictEquals(record.name, 'Quarterly Renewals');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
         // surviving /versions.
@@ -68,17 +71,17 @@ test(
             state: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rbfHGatkwQzGZJVXKJEeyw/versions/', DEV_TOKEN);
-        assert.equal(history.length, 1);
-        assert.equal(history[0]!.state, 'active');
+        assertStrictEquals(history.length, 1);
+        assertStrictEquals(history[0]!.state, 'active');
         const attrs = await GET<unknown[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN,
         );
-        assert.equal(attrs.length, 1);
+        assertStrictEquals(attrs.length, 1);
     },
 );
 
-test(
+Deno.test(
     'POST nested record-types create with empty'
     + ' attributes still writes the record and'
     + ' state event',
@@ -104,7 +107,7 @@ test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rcaSzEaORBkezCxyhLhecA', DEV_TOKEN,
         );
-        assert.equal(record.name, 'Empty');
+        assertStrictEquals(record.name, 'Empty');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7).
         const history = await GET<{
@@ -112,17 +115,17 @@ test(
             member_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rcaSzEaORBkezCxyhLhecA/versions/', DEV_TOKEN);
-        assert.equal(history.length, 1);
-        assert.equal(history[0]!.state, 'active');
-        assert.equal(typeof history[0]!.member_id, 'string');
-        assert.notEqual(history[0]!.member_id, '');
-        assert.equal('state_at' in history[0]!, false);
+        assertStrictEquals(history.length, 1);
+        assertStrictEquals(history[0]!.state, 'active');
+        assertStrictEquals(typeof history[0]!.member_id, 'string');
+        assertNotStrictEquals(history[0]!.member_id, '');
+        assertStrictEquals('state_at' in history[0]!, false);
     },
 );
 
 // ── Edit variant ──────
 
-test(
+Deno.test(
     'POST nested record-types edit updates the'
     + ' record fields without touching state',
     async () => {
@@ -165,21 +168,21 @@ test(
             description: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN);
-        assert.equal(record.name, 'After');
-        assert.equal(
+        assertStrictEquals(record.name, 'After');
+        assertStrictEquals(
             record.description, 'updated',
         );
         const events = await deriveRecordTypeStateHistory(
             db, 'AjdvjuECVZEgZoFajaIEkg', 'rbfHGatkwQzGZJVXKJEeyw',
         );
-        assert.equal(
+        assertStrictEquals(
             events.length, 1,
             'edit must not emit a state event',
         );
     },
 );
 
-test(
+Deno.test(
     'POST nested record-types edit removes'
     + ' attributes by id and adds new ones',
     async () => {
@@ -243,13 +246,13 @@ test(
             name: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN);
-        assert.equal(all.length, 1);
-        assert.equal(all[0]!.id, newAttrId);
-        assert.equal(all[0]!.name, 'New');
+        assertStrictEquals(all.length, 1);
+        assertStrictEquals(all[0]!.id, newAttrId);
+        assertStrictEquals(all[0]!.name, 'New');
     },
 );
 
-test(
+Deno.test(
     'POST nested record-types edit updates an'
     + ' existing attribute by upsert',
     async () => {
@@ -314,8 +317,8 @@ test(
             + '/attributes/UQBiHFcwJeCDSnmkPBoYRA',
             DEV_TOKEN,
         );
-        assert.equal(stored.name, 'Renamed');
-        assert.equal(
+        assertStrictEquals(stored.name, 'Renamed');
+        assertStrictEquals(
             stored.attribute_type, 'number',
         );
     },
@@ -323,13 +326,13 @@ test(
 
 // ── Failure modes ──────
 
-test(
+Deno.test(
     'POST nested record-types rejects an empty'
     + ' attribute name',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await assert.rejects(
+        await assertRejects(
             () => POST(db
                 , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'create',
@@ -356,19 +359,20 @@ test(
                 initialStateAt:
                     '2025-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
-            /must be non-empty/,
+            Error,
+            'must be non-empty',
         );
     },
 );
 
-test(
+Deno.test(
     'POST nested record-types rejects an'
     + ' attribute whose record_id does not'
     + ' match the top-level id',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await assert.rejects(
+        await assertRejects(
             () => POST(db
                 , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'create',
@@ -395,18 +399,19 @@ test(
                 initialStateAt:
                     '2025-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
-            /record_id must match top-level id/,
+            Error,
+            'record_id must match top-level id',
         );
     },
 );
 
-test(
+Deno.test(
     'POST nested record-types rejects an unknown'
     + ' kind discriminator',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await assert.rejects(
+        await assertRejects(
             () => POST(db
                 , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'destroy',
@@ -418,18 +423,19 @@ test(
                 },
                 attributes: [],
             }, DEV_TOKEN),
-            /RecordWriteBody kind/,
+            Error,
+            'RecordWriteBody kind',
         );
     },
 );
 
-test(
+Deno.test(
     'POST nested record-types rejects an invalid'
     + ' initialState',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await assert.rejects(
+        await assertRejects(
             () => POST(db
                 , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'create',
@@ -445,18 +451,19 @@ test(
                 initialStateAt:
                     '2025-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
-            /expected RecordState/,
+            Error,
+            'expected RecordState',
         );
     },
 );
 
-test(
+Deno.test(
     'POST nested record-types rejects a body with'
     + ' an unexpected key',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await assert.rejects(
+        await assertRejects(
             () => POST(db
                 , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'create',
@@ -473,18 +480,19 @@ test(
                     '2025-01-01T00:00:00.000000Z',
                 extra: 'forbidden',
             }, DEV_TOKEN),
-            /unexpected key/,
+            Error,
+            'unexpected key',
         );
     },
 );
 
-test(
+Deno.test(
     'POST nested record-types rejects a body with'
     + ' a missing required key',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await assert.rejects(
+        await assertRejects(
             () => POST(db
                 , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'edit',
@@ -496,12 +504,13 @@ test(
                 },
                 attributes: [],
             }, DEV_TOKEN),
-            /missing required key/,
+            Error,
+            'missing required key',
         );
     },
 );
 
-test(
+Deno.test(
     'POST nested record-types create threads caller'
     + ' initialStateAt to the initial state event',
     async () => {
@@ -533,15 +542,15 @@ test(
             state: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + recId + '/versions/', DEV_TOKEN);
-        assert.equal(history.length, 1);
+        assertStrictEquals(history.length, 1);
         const current = history[0]!;
-        assert.equal(current.id, recId);
-        assert.equal(current.state, 'active');
-        assert.equal('state_at' in current, false);
+        assertStrictEquals(current.id, recId);
+        assertStrictEquals(current.state, 'active');
+        assertStrictEquals('state_at' in current, false);
     },
 );
 
-test(
+Deno.test(
     'POST nested record-types create ignores a raw colliding states'
     + ' row (states ROW half stripped)',
     async () => {
@@ -569,6 +578,6 @@ test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + recId, DEV_TOKEN,
         );
-        assert.equal(rec.id, recId);
+        assertStrictEquals(rec.id, recId);
     },
 );

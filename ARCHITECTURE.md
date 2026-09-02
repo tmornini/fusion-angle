@@ -46,7 +46,10 @@ Measured (do not round away): retired Node start-up
 0.186s, 73441154 bytes. The Linux binary is 110767200
 bytes; the image is 419MB virtual; a cold
 `docker compose build` is ~13s. Example ZIP on Desktop:
-`fusion-angle-348710d.zip`, 36722188 bytes.
+`fusion-angle-348710d.zip`, 36722188 bytes. A static
+asset's logged `latencyMs` also narrowed: the body is a
+stream now, so it measures to response construction and
+excludes the transfer the awaited Node pipeline included.
 
 Render builds from the Dockerfile. The compose-stack
 spec's "no Render config change" is retired.

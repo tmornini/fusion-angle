@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import { PUT, handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -104,38 +108,38 @@ function documentFields() {
 
 // -- 1. validateWorkOrderDocumentBody -----------------------
 
-test('validateWorkOrderDocumentBody accepts the entity fields'
+Deno.test('validateWorkOrderDocumentBody accepts the entity fields'
 + ' plus an optional organization_id', () => {
     const doc = validateWorkOrderDocumentBody({
         ...documentFields(),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     });
-    assert.deepEqual(doc.entity, documentFields());
+    assertEquals(doc.entity, documentFields());
 });
 
-test('validateWorkOrderDocumentBody accepts the entity fields'
+Deno.test('validateWorkOrderDocumentBody accepts the entity fields'
 + ' with organization_id absent', () => {
     const doc = validateWorkOrderDocumentBody(documentFields());
-    assert.deepEqual(doc.entity, documentFields());
+    assertEquals(doc.entity, documentFields());
 });
 
-test('validateWorkOrderDocumentBody rejects a trio key at the'
+Deno.test('validateWorkOrderDocumentBody rejects a trio key at the'
 + ' gate (the stateless covenant, validator-enforced)', () => {
-    assert.throws(
+    assertThrows(
         () => validateWorkOrderDocumentBody({
             ...documentFields(),
             state: 'active',
         }),
         ValidationError,
     );
-    assert.throws(
+    assertThrows(
         () => validateWorkOrderDocumentBody({
             ...documentFields(),
             state_at: '2026-01-01T00:00:00.000000Z',
         }),
         ValidationError,
     );
-    assert.throws(
+    assertThrows(
         () => validateWorkOrderDocumentBody({
             ...documentFields(),
             state_event_id: 'ev-1',
@@ -148,7 +152,7 @@ test('validateWorkOrderDocumentBody rejects a trio key at the'
 
 // Phase Final Task 2: work_orders ROW half stripped — op
 // returns a reconstructed entity + appends the pair only.
-test('postWorkOrderDocumentOp returns the entity and the'
+Deno.test('postWorkOrderDocumentOp returns the entity and the'
 + ' pair; work_orders row plane stays empty', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -174,13 +178,13 @@ test('postWorkOrderDocumentOp returns the entity and the'
         db, 'yAhMcJGxllmQkLemOQjCmA', body,
         'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
-    assert.deepEqual(written, {
+    assertEquals(written, {
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         ...documentFields(),
     });
     // Phase Final Stage B: work_orders table retired.
-    assert.equal((await db.messagePairs.getAll()).length, 1);
-    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
@@ -193,7 +197,7 @@ test('postWorkOrderDocumentOp returns the entity and the'
 // the route, so this pin holds unchanged straight through the
 // absorption (finding 11: wire-byte parity). -----------------
 
-test('a byte-identical PUT resend to'
+Deno.test('a byte-identical PUT resend to'
     + ' organizations/:id/work-orders/:id converges'
 + ' to one stored request/response pair', async () => {
     const db = await freshDb();
@@ -207,9 +211,9 @@ test('a byte-identical PUT resend to'
             + WO_RESEND
             , body, DEV_TOKEN,
     );
-    assert.deepEqual(first, second);
-    assert.equal((await db.messagePairs.getAll()).length, 3);
-    assert.equal((await db.messagePairs.getAll()).length, 3);
+    assertEquals(first, second);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
 });
 
 // -- 4. postWorkOrderCreationOp's synthesized create pairs
@@ -336,7 +340,7 @@ function documentRowAt(
 
 const ENTITY_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/';
 
-test('a work-order create appends a PUT-shaped document'
+Deno.test('a work-order create appends a PUT-shaped document'
 + ' message pair at the WO address and a PUT-shaped join pair'
 + ' at the join address, all three sharing one requestAt',
 async () => {
@@ -346,16 +350,16 @@ async () => {
             , DEV_TOKEN,
         workOrderCreateBody(WO_C1, WO_C1_FWO, 'aNoIDzecmwfawmsLSsDsPw'),
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const messagePairs = await db.messagePairs.getAll();
-    assert.equal(messagePairs.length, 6);
+    assertStrictEquals(messagePairs.length, 6);
 
     const documentRow =
         documentRowAt(messagePairs, ENTITY_PREFIX, WO_C1);
-    assert.ok(
+    assert(
         documentRow, 'no document message pair at the WO address',
     );
-    assert.deepEqual(
+    assertEquals(
         validateWorkOrderDocumentBody(
             decodeRequestMessage(documentRow!.request).body,
         ).entity,
@@ -367,7 +371,7 @@ async () => {
             + 'work-orders/';
     const joinRow =
         documentRowAt(messagePairs, joinPrefix, WO_C1_FWO);
-    assert.ok(joinRow, 'no join pair at the join address');
+    assert(joinRow, 'no join pair at the join address');
 
     // slice(3): the fixture's own root-admin pairs (organization
     // document + role grant + membership, Phase 13 Tasks 1 and 3)
@@ -375,10 +379,10 @@ async () => {
     const requestAts = new Set(
         messagePairs.slice(3).map(r => r.request_at),
     );
-    assert.equal(requestAts.size, 1);
+    assertStrictEquals(requestAts.size, 1);
 });
 
-test('a duplicate work-order create (same WO id) records'
+Deno.test('a duplicate work-order create (same WO id) records'
 + ' Supersedes on its NEW document message pair, never Follows',
 async () => {
     const db = await freshDb();
@@ -387,11 +391,11 @@ async () => {
             , DEV_TOKEN,
         workOrderCreateBody(WO_C2, WO_C2_FWO_A, FLOW_C2),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const firstDocumentRow = documentRowAt(
         await db.messagePairs.getAll(), ENTITY_PREFIX, WO_C2,
     );
-    assert.ok(
+    assert(
         firstDocumentRow, 'no document message pair on first create',
     );
     const firstDocumentId = firstDocumentRow!.id;
@@ -403,25 +407,25 @@ async () => {
             WO_C2, WO_C2_FWO_B, FLOW_C2, 'wo-c2-revised',
         ),
     ));
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
     const secondDocumentRow = documentRowAt(
         await db.messagePairs.getAll(), ENTITY_PREFIX, WO_C2,
         firstDocumentId,
     );
-    assert.ok(secondDocumentRow, 'no second document message pair');
+    assert(secondDocumentRow, 'no second document message pair');
     const secondDocumentResponse = await db.messagePairs.getById(
         secondDocumentRow!.id,
     );
-    assert.equal(
+    assertStrictEquals(
         'supersedes' in secondDocumentResponse, false,
     );
 
     for (const response of await db.messagePairs.getAll()) {
-        assert.equal('follows' in response, false);
+        assertStrictEquals('follows' in response, false);
     }
 });
 
-test('a duplicate work-order create\'s own OPERATION pair'
+Deno.test('a duplicate work-order create\'s own OPERATION pair'
 + ' stores no predecessor column', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
@@ -429,29 +433,29 @@ test('a duplicate work-order create\'s own OPERATION pair'
             , DEV_TOKEN,
         workOrderCreateBody(WO_C3, WO_C3_FWO_A, FLOW_C3),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const firstDocumentRow = documentRowAt(
         await db.messagePairs.getAll(), ENTITY_PREFIX, WO_C3,
     );
-    assert.ok(firstDocumentRow);
+    assert(firstDocumentRow);
 
     const second = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             , DEV_TOKEN,
         workOrderCreateBody(WO_C3, WO_C3_FWO_B, FLOW_C3),
     ));
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
     const secondOperationId = second.headers.get('Response-ID');
-    assert.ok(secondOperationId);
+    assert(secondOperationId);
     const secondOperationResponse = await db.messagePairs.getById(
         secondOperationId!,
     );
-    assert.equal(
+    assertStrictEquals(
         'supersedes' in secondOperationResponse, false,
     );
 });
 
-test('a work-order create ignores a raw colliding states'
+Deno.test('a work-order create ignores a raw colliding states'
 + ' row (states ROW half stripped)', async () => {
     const db = await freshDb();
     const flowWorkOrderId = WO_C4_FWO;
@@ -465,9 +469,9 @@ test('a work-order create ignores a raw colliding states'
             WO_C4, flowWorkOrderId, FLOW_C4,
         ),
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     // 2 seed pairs (org+membership) + 4 create pairs
     // (operation, document, join, genesis claim).
-    assert.equal((await db.messagePairs.getAll()).length, 6);
-    assert.equal((await db.messagePairs.getAll()).length, 6);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
 });

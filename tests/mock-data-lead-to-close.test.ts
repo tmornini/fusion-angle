@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -38,7 +37,7 @@ async function seededLeadToClose() {
     const flow = flows.find(
         f => f.name === FLOW_NAME,
     );
-    assert.ok(
+    assert(
         flow,
         `flow "${FLOW_NAME}" not seeded`,
     );
@@ -46,24 +45,24 @@ async function seededLeadToClose() {
     return await getFlowStats(ctx, flow!.id, now.getTime());
 }
 
-test(
+Deno.test(
     'L2C triage names Lisa in memberIds and'
     + ' Claude in agentIds',
     () => {
         const triage = buildLeadToCloseNodes().find(
             (node) => node.id === l2cTriageNodeId,
         );
-        assert.ok(triage, 'Inbound Triage node');
-        assert.deepEqual(
+        assert(triage, 'Inbound Triage node');
+        assertEquals(
             triage.memberIds, [memberLisa],
         );
-        assert.deepEqual(
+        assertEquals(
             triage.agentIds, [memberClaude],
         );
     },
 );
 
-test(
+Deno.test(
     'no seed graph memberIds names an AI member',
     () => {
         const aiIds = new Set(
@@ -75,7 +74,7 @@ test(
             );
             for (const node of graph.nodes) {
                 for (const id of node.memberIds) {
-                    assert.equal(
+                    assertStrictEquals(
                         aiIds.has(id),
                         false,
                         flow.id + ' node ' + node.id
@@ -88,16 +87,16 @@ test(
     },
 );
 
-test(
+Deno.test(
     'Lead-to-Close graph has 7 nodes, 9 edges,'
     + ' one isCreate, one isArchive',
     async () => {
         const { graph } = await seededLeadToClose();
-        assert.equal(
+        assertStrictEquals(
             graph.nodes.length,
             EXPECTED_NODE_COUNT,
         );
-        assert.equal(
+        assertStrictEquals(
             graph.edges.length,
             EXPECTED_EDGE_COUNT,
         );
@@ -105,18 +104,18 @@ test(
             .filter(n => n.isCreate).length;
         const archiveCount = graph.nodes
             .filter(n => n.isArchive).length;
-        assert.equal(
+        assertStrictEquals(
             createCount, 1,
             'exactly one isCreate node',
         );
-        assert.equal(
+        assertStrictEquals(
             archiveCount, 1,
             'exactly one isArchive node',
         );
     },
 );
 
-test(
+Deno.test(
     'Lead-to-Close work-order count lies in'
     + ` [${WO_COUNT_MIN}, ${WO_COUNT_MAX}]`,
     async () => {
@@ -124,7 +123,7 @@ test(
         const total =
             model.completedWorkOrderCount
             + model.incompleteWorkOrderCount;
-        assert.ok(
+        assert(
             total >= WO_COUNT_MIN
             && total <= WO_COUNT_MAX,
             `WO count ${total} outside`
@@ -133,7 +132,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'Lead-to-Close Qualification node is the'
     + ' single red node; every other working node'
     + ' stays cool',
@@ -142,11 +141,11 @@ test(
         const hot = model.nodes.find(
             n => n.displayName === HOT_NODE_NAME,
         );
-        assert.ok(
+        assert(
             hot !== undefined,
             `${HOT_NODE_NAME} node must be present`,
         );
-        assert.ok(
+        assert(
             hot!.heatT >= HOT_NODE_HEAT_MIN,
             `${HOT_NODE_NAME} heatT ${hot!.heatT}`
             + ` < ${HOT_NODE_HEAT_MIN}`,
@@ -156,7 +155,7 @@ test(
             if (n.displayName === HOT_NODE_NAME) {
                 continue;
             }
-            assert.ok(
+            assert(
                 n.heatT
                 <= COLD_WORKING_NODE_HEAT_MAX,
                 `${n.displayName} heatT`
@@ -167,7 +166,7 @@ test(
     },
 );
 
-test('generated state events are strictly ascending', () => {
+Deno.test('generated state events are strictly ascending', () => {
     const generated = buildLeadToCloseWorkload();
     const atsByWorkOrder = new Map<string, string[]>();
     for (const event of generated.stateEvents) {
@@ -176,10 +175,10 @@ test('generated state events are strictly ascending', () => {
         ats.push(event.at);
         atsByWorkOrder.set(event.entity_id, ats);
     }
-    assert.ok(atsByWorkOrder.size >= WO_COUNT_MIN);
+    assert(atsByWorkOrder.size >= WO_COUNT_MIN);
     for (const [id, ats] of atsByWorkOrder) {
         for (let i = 1; i < ats.length; i++) {
-            assert.ok(
+            assert(
                 ats[i]! > ats[i - 1]!,
                 id + ' step ' + i + ': ' + ats[i - 1]
                     + ' then ' + ats[i],

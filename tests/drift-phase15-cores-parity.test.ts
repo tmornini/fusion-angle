@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -30,7 +35,7 @@ import {
 } from '../api/flow-graph-relations.ts';
 import { latestByKey } from
     '../shared/ledger-reduction.ts';
-import type { GraphEdge } from '../api/types.ts';
+import type { GraphEdge, WorkOrderEntity } from '../api/types.ts';
 import {
     collectAttributeReferrers,
     type AttributeReferrers,
@@ -161,7 +166,7 @@ const EMPTY_FLOW_ID = 'GgfDbXOJUvvaCekCTcvhuw';
 
 // Phase Final Task 2: work_orders ROW half stripped — wire +
 // message-plane head are the oracles (row plane empty).
-test('workOrderDocumentHeadFor: wire GET equals head for a'
+Deno.test('workOrderDocumentHeadFor: wire GET equals head for a'
 + ' live create; null for absent; pre-tx vs in-tx parity',
 async () => {
     const db = await seededDb();
@@ -192,13 +197,13 @@ async () => {
             states: [N_START, N_FINISH, 'claimed'],
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const getRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + workOrderId, token),
     );
-    assert.equal(getRes.status, 200);
+    assertStrictEquals(getRes.status, 200);
     const wire = await getRes.json();
     const preTx = await workOrderDocumentHeadFor(
         db, STARK_ORGANIZATION, workOrderId,
@@ -209,8 +214,8 @@ async () => {
             view, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.deepEqual(preTx, inTx);
-    assert.deepEqual(preTx, wire);
+    assertEquals(preTx, inTx);
+    assertEquals(preTx, wire);
     // Phase Final Stage B: work_orders table retired.
 
     // Absent id: message plane returns null (Task 2 maps to the
@@ -224,17 +229,17 @@ async () => {
             view, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
         ),
     );
-    assert.equal(preTxMissing, null);
-    assert.equal(inTxMissing, null);
+    assertStrictEquals(preTxMissing, null);
+    assertStrictEquals(inTxMissing, null);
     const missRes = await handleRequest(
         db,
         req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'oYnbiWXzroVnyolOhmkBIQ', token),
     );
-    assert.equal(missRes.status, 404);
+    assertStrictEquals(missRes.status, 404);
 });
 
-test('workOrderDocumentHeadFor: tracks a later document PUT'
+Deno.test('workOrderDocumentHeadFor: tracks a later document PUT'
 + ' (head, not create-time body) on wire + message plane',
 async () => {
     const db = await seededDb();
@@ -251,7 +256,7 @@ async () => {
             position: 1,
         },
     ));
-    assert.equal(put1.status, 201);
+    assertStrictEquals(put1.status, 201);
 
     const put2 = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -261,13 +266,13 @@ async () => {
             position: 3,
         },
     ));
-    assert.equal(put2.status, 201);
+    assertStrictEquals(put2.status, 201);
 
     const getRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + workOrderId, token),
     );
-    assert.equal(getRes.status, 200);
+    assertStrictEquals(getRes.status, 200);
     const wire = await getRes.json() as {
         display_id: string;
         position: number;
@@ -275,9 +280,9 @@ async () => {
     const derived = await workOrderDocumentHeadFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assert.deepEqual(derived, wire);
-    assert.equal(derived!.display_id, 'after');
-    assert.equal(derived!.position, 3);
+    assertEquals(derived, wire);
+    assertStrictEquals(derived!.display_id, 'after');
+    assertStrictEquals(derived!.position, 3);
 });
 
 // -- claim graph parity (Phase 15 Task 2) ------------------------
@@ -285,7 +290,7 @@ async () => {
 // Phase Final Task 2: claim graph is message-plane only.
 // Seed via PUT (document message pair, no birth claim) so the live
 // claim is a real append, not an idempotent re-claim.
-test('claim graph: pre-tx vs in-tx flow_graph parity and'
+Deno.test('claim graph: pre-tx vs in-tx flow_graph parity and'
 + ' claim-outcome on the message plane',
 async () => {
     const db = await seededDb();
@@ -302,7 +307,7 @@ async () => {
             position: 2,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 
     const preTx = await workOrderDocumentHeadFor(
         db, STARK_ORGANIZATION, workOrderId,
@@ -313,13 +318,13 @@ async () => {
             view, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.deepEqual(preTx, inTx);
-    assert.deepEqual(preTx!.flow_graph, graph);
+    assertEquals(preTx, inTx);
+    assertEquals(preTx!.flow_graph, graph);
 
     const headGraph = asWorkOrderFlowGraph(
         preTx!.flow_graph, 'work_orders.flow_graph',
     );
-    assert.equal(headGraph.lockTimeout, lockTimeoutSeconds);
+    assertStrictEquals(headGraph.lockTimeout, lockTimeoutSeconds);
 
     // Fresh PUT: no live claim → priorLive is false.
     const history = await workOrderClaimHistoryFor(
@@ -331,7 +336,7 @@ async () => {
         && !isClaimEventExpired(
             prior, headGraph.lockTimeout,
         );
-    assert.equal(priorLiveFromHead, false);
+    assertStrictEquals(priorLiveFromHead, false);
 
     // Live path: claim against the re-anchored gate succeeds.
     const claimResponse = await handleRequest(db, req(
@@ -345,7 +350,7 @@ async () => {
             expireAt: nowUtc(),
         },
     ));
-    assert.equal(claimResponse.status, 201);
+    assertStrictEquals(claimResponse.status, 201);
 
     // Absent id: document head null pre-tx and in-tx; wire
     // 404 carries the same Not found: work_orders/:id bytes.
@@ -359,17 +364,17 @@ async () => {
             view, STARK_ORGANIZATION, missingId,
         ),
     );
-    assert.equal(preMissing, null);
-    assert.equal(inMissing, null);
+    assertStrictEquals(preMissing, null);
+    assertStrictEquals(inMissing, null);
     const missRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + missingId, token),
     );
-    assert.equal(missRes.status, 404);
+    assertStrictEquals(missRes.status, 404);
     const missBody = await missRes.json() as {
         error: string;
     };
-    assert.equal(
+    assertStrictEquals(
         missBody.error,
         'Not found: work_orders/' + missingId,
     );
@@ -391,7 +396,7 @@ async function pairPlaneVisibility(
     );
 }
 
-test('stateEventVisibilityFor: tier (i) event-append pairs'
+Deno.test('stateEventVisibilityFor: tier (i) event-append pairs'
 + ' match the row-plane three-way (own / foreign / orphan);'
 + ' pre-tx vs in-tx parity', async () => {
     const db = await seededDb();
@@ -413,7 +418,7 @@ test('stateEventVisibilityFor: tier (i) event-append pairs'
             break;
         }
     }
-    assert.notEqual(ownEventId, '');
+    assertNotStrictEquals(ownEventId, '');
 
     let foreignEventId = '';
     for (const row of sampleRows) {
@@ -425,7 +430,7 @@ test('stateEventVisibilityFor: tier (i) event-append pairs'
             break;
         }
     }
-    assert.notEqual(foreignEventId, '');
+    assertNotStrictEquals(foreignEventId, '');
 
     const txTables = MESSAGE_TABLES;
 
@@ -439,9 +444,9 @@ test('stateEventVisibilityFor: tier (i) event-append pairs'
             view, STARK_ORGANIZATION, ownEventId,
         ),
     );
-    assert.equal(preOwn, 'visible');
-    assert.equal(inOwn, preOwn);
-    assert.equal(
+    assertStrictEquals(preOwn, 'visible');
+    assertStrictEquals(inOwn, preOwn);
+    assertStrictEquals(
         await pairPlaneVisibility(db, STARK_ORGANIZATION, ownEventId),
         'visible',
     );
@@ -452,8 +457,8 @@ test('stateEventVisibilityFor: tier (i) event-append pairs'
     const preForeign = await stateEventVisibilityFor(
         db, ORGANIZATION_TWO, foreignEventId,
     );
-    assert.equal(preForeign, 'hidden');
-    assert.equal(
+    assertStrictEquals(preForeign, 'hidden');
+    assertStrictEquals(
         await pairPlaneVisibility(db, ORGANIZATION_TWO, foreignEventId),
         'hidden',
     );
@@ -468,9 +473,9 @@ test('stateEventVisibilityFor: tier (i) event-append pairs'
             view, STARK_ORGANIZATION, GHOST_EVENT_NOWHERE,
         ),
     );
-    assert.equal(preOrphan, 'orphan');
-    assert.equal(inOrphan, 'orphan');
-    assert.equal(
+    assertStrictEquals(preOrphan, 'orphan');
+    assertStrictEquals(inOrphan, 'orphan');
+    assertStrictEquals(
         await pairPlaneVisibility(
             db, STARK_ORGANIZATION, GHOST_EVENT_NOWHERE,
         ),
@@ -478,7 +483,7 @@ test('stateEventVisibilityFor: tier (i) event-append pairs'
     );
 });
 
-test('stateEventVisibilityFor: tier (ii) op-born transition'
+Deno.test('stateEventVisibilityFor: tier (ii) op-born transition'
 + ' event is visible to the owning org and hidden to a'
 + ' foreign org (tier iii)', async () => {
     const db = await seededDb();
@@ -510,7 +515,7 @@ test('stateEventVisibilityFor: tier (ii) op-born transition'
             states: [N_START, N_FINISH, 'claimed'],
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const transitioned = await handleRequest(db, req(
         'POST',
@@ -524,7 +529,7 @@ test('stateEventVisibilityFor: tier (ii) op-born transition'
             transitionAt: nowUtc(),
         },
     ));
-    assert.equal(transitioned.status, 201);
+    assertStrictEquals(transitioned.status, 201);
 
     // Op-born: no states/:id pair at transitionEventId;
     // lives only inside the transition op body.
@@ -534,15 +539,15 @@ test('stateEventVisibilityFor: tier (ii) op-born transition'
     const statesTail = '/' + 'states' + '/';
     const statesHits = byId.filter((r) =>
         r.uri_collection.endsWith(statesTail));
-    assert.equal(statesHits.length, 0);
+    assertStrictEquals(statesHits.length, 0);
 
-    assert.equal(
+    assertStrictEquals(
         await stateEventVisibilityFor(
             db, STARK_ORGANIZATION, transitionEventId,
         ),
         'visible',
     );
-    assert.equal(
+    assertStrictEquals(
         await stateEventVisibilityFor(
             db, ORGANIZATION_TWO, transitionEventId,
         ),
@@ -550,7 +555,7 @@ test('stateEventVisibilityFor: tier (ii) op-born transition'
     );
 });
 
-test('resolveOwningOrganization: identity without a seat'
+Deno.test('resolveOwningOrganization: identity without a seat'
 + ' is unowned; seated identity is own-org / foreign-hidden',
 async () => {
     const db = await seededDb();
@@ -566,9 +571,9 @@ async () => {
             team_dimensions: {},
         },
     ));
-    assert.equal(unownedCreate.status, 201);
+    assertStrictEquals(unownedCreate.status, 201);
 
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(
             db, unownedId, STARK_ORGANIZATION,
         ),
@@ -585,7 +590,7 @@ async () => {
             team_dimensions: {},
         },
     ));
-    assert.equal(ownedCreate.status, 201);
+    assertStrictEquals(ownedCreate.status, 201);
     const membership = await handleRequest(db, req(
         'PUT',
         '/organizations/' + STARK_ORGANIZATION
@@ -593,15 +598,15 @@ async () => {
         token,
         { type: 'member', at: nowUtc() },
     ));
-    assert.equal(membership.status, 201);
+    assertStrictEquals(membership.status, 201);
 
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(
             db, ownedId, STARK_ORGANIZATION,
         ),
         STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(
             db, ownedId, ORGANIZATION_TWO,
         ),
@@ -613,7 +618,7 @@ async () => {
 
 // Phase Final Task 2: graph relation ROW halves stripped —
 // message plane (flowGraphBindingsFromMessagePairs) is sole oracle.
-test('flowGraphBindingsFromMessagePairs: seed attribute + member'
+Deno.test('flowGraphBindingsFromMessagePairs: seed attribute + member'
 + ' ledgers non-empty; pre-tx vs in-tx parity; nodeFlowIds'
 + ' cover every bound node', async () => {
     const db = await seededDb();
@@ -627,14 +632,14 @@ test('flowGraphBindingsFromMessagePairs: seed attribute + member'
             view, STARK_ORGANIZATION,
         ),
     );
-    assert.deepEqual(inTx, preTx);
+    assertEquals(inTx, preTx);
 
     // Seed is all Stark — non-empty graphDelta events.
-    assert.ok(
+    assert(
         preTx.attributeEvents.length > 0,
         'seed attributeEvents empty',
     );
-    assert.ok(
+    assert(
         preTx.memberEvents.length > 0,
         'seed memberEvents empty',
     );
@@ -643,13 +648,13 @@ test('flowGraphBindingsFromMessagePairs: seed attribute + member'
 
     // Every attribute/member event's node resolves a flow.
     for (const event of preTx.attributeEvents) {
-        assert.ok(
+        assert(
             preTx.nodeFlowIds.has(event.flow_node_id),
             'attr node ' + event.flow_node_id,
         );
     }
     for (const event of preTx.memberEvents) {
-        assert.ok(
+        assert(
             preTx.nodeFlowIds.has(event.flow_node_id),
             'member node ' + event.flow_node_id,
         );
@@ -661,13 +666,13 @@ test('flowGraphBindingsFromMessagePairs: seed attribute + member'
         (r) => r.flow_node_id + '\0' + r.attribute_id,
         relationFailClosed,
     );
-    assert.ok(derivedLatest.size > 0);
+    assert(derivedLatest.size > 0);
 });
 
 // GraphEdge carries no attributes field and no
 // flow_edge_attributes table exists — prove-impossible so
 // RESTRICT never grows an edges leg (Author gate 5).
-test('prove-impossible: attribute bindings cannot reach'
+Deno.test('prove-impossible: attribute bindings cannot reach'
 + ' flow edges (GraphEdge has no attributes; no'
 + ' flow_edge_attributes table)', () => {
     type GraphEdgeHasNoAttributes =
@@ -675,22 +680,22 @@ test('prove-impossible: attribute bindings cannot reach'
             ? never
             : true;
     const typeProof: GraphEdgeHasNoAttributes = true;
-    assert.equal(typeProof, true);
+    assertStrictEquals(typeProof, true);
 
     const edgeKeys: readonly (keyof GraphEdge)[] = [
         'id', 'name', 'fromNodeId', 'toNodeId',
     ];
-    assert.deepEqual(
+    assertEquals(
         edgeKeys.slice().sort(),
         (['id', 'name', 'fromNodeId', 'toNodeId'] as const)
             .slice().sort(),
     );
-    assert.equal(
+    assertStrictEquals(
         (edgeKeys as readonly string[])
             .includes('attributes'),
         false,
     );
-    assert.equal(
+    assertStrictEquals(
         (TABLE_NAMES as readonly string[])
             .includes('flow_edge_attributes'),
         false,
@@ -699,7 +704,7 @@ test('prove-impossible: attribute bindings cannot reach'
 
 // -- residual cross-core pins (Phase 15 Task 1 final) ----------
 
-test('residual pin: workOrderDocumentHeadFor matches wire'
+Deno.test('residual pin: workOrderDocumentHeadFor matches wire'
 + ' GET for every seeded Stark work order',
 async () => {
     const db = await seededDb();
@@ -710,18 +715,18 @@ async () => {
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             , token),
     );
-    assert.equal(listRes.status, 200);
+    assertStrictEquals(listRes.status, 200);
     const rows = await listRes.json() as {
         id: string;
     }[];
-    assert.ok(rows.length > 0);
+    assert(rows.length > 0);
     for (const row of rows) {
         const getRes = await handleRequest(
             db, req('GET'
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + row.id, token),
         );
-        assert.equal(getRes.status, 200);
+        assertStrictEquals(getRes.status, 200);
         // Wire GET attaches bind embeds (instance_id /
         // record_type_id); document-head derive is bind-
         // free — strip embeds before comparing heads.
@@ -736,19 +741,21 @@ async () => {
         const derived = await workOrderDocumentHeadFor(
             db, STARK_ORGANIZATION, row.id,
         );
-        assert.deepEqual(derived, wireHead, row.id);
+        assertEquals(
+            derived, wireHead as unknown as WorkOrderEntity, row.id,
+        );
     }
     // Phase Final Stage B: work_orders table retired.
 });
 
-test('residual pin: stateEventVisibilityFor matches the'
+Deno.test('residual pin: stateEventVisibilityFor matches the'
 + ' row-plane three-way over a sample of seed events for'
 + ' both organizations', async () => {
     const db = await seededDb();
     // C3: sample from surviving lifecycle derives (bulk
     // deriveStates retired).
     const allStates = await deriveWorkOrderLifecycle(db);
-    assert.ok(
+    assert(
         allStates.length >= 7,
         'need enough WO lifecycle rows for sampling',
     );
@@ -770,7 +777,7 @@ test('residual pin: stateEventVisibilityFor matches the'
             );
             // Phase Final Task 2: message-plane only (row oracle
             // retired with the states dual-write strip).
-            assert.ok(
+            assert(
                 derived === 'visible'
                 || derived === 'hidden'
                 || derived === 'orphan',
@@ -780,7 +787,7 @@ test('residual pin: stateEventVisibilityFor matches the'
     }
 });
 
-test('residual pin: organizations self-as-owner —'
+Deno.test('residual pin: organizations self-as-owner —'
 + ' resolveOwningOrganization maps an org id to itself',
 async () => {
     const db = await seededDb();
@@ -789,19 +796,19 @@ async () => {
     // Pin the ownership probe that once fed that event's
     // visibility: an org id self-as-owner resolves to itself
     // regardless of the caller's bound organization.
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(
             db, STARK_ORGANIZATION, STARK_ORGANIZATION,
         ),
         STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(
             db, STARK_ORGANIZATION, ORGANIZATION_TWO,
         ),
         STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(
             db, ORGANIZATION_TWO, STARK_ORGANIZATION,
         ),
@@ -811,7 +818,7 @@ async () => {
 
 // -- Task 5: message-plane ownership (row-plane fence retired) --
 
-test('fence pin: resolveOwningOrganization owns seed'
+Deno.test('fence pin: resolveOwningOrganization owns seed'
 + ' entities on the message plane; orphan stays null',
 async () => {
     const db = await seededDb();
@@ -845,7 +852,7 @@ async () => {
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
             + '/record-types/', recordToken),
     );
-    assert.equal(recordsRes.status, 200);
+    assertStrictEquals(recordsRes.status, 200);
     const recordsStark = await recordsRes.json() as {
         id: string;
     }[];
@@ -863,22 +870,22 @@ async () => {
     const memberStark = currentMemberships.find(
         (m) => m.organization_id === STARK_ORGANIZATION,
     )!;
-    assert.ok(memberStark, 'current has stark membership');
+    assert(memberStark, 'current has stark membership');
 
     const ideaStark = ideasStark[0]!;
     const ideaTwo = ideasTwo[0]!;
-    assert.ok(ideaStark, 'stark ideas non-empty');
-    assert.ok(ideaTwo, 'org-two ideas non-empty');
+    assert(ideaStark, 'stark ideas non-empty');
+    assert(ideaTwo, 'org-two ideas non-empty');
     const projectStark = projectsStark[0]!;
     const projectTwo = projectsTwo[0]!;
-    assert.ok(projectStark, 'stark projects non-empty');
-    assert.ok(projectTwo, 'org-two projects non-empty');
+    assert(projectStark, 'stark projects non-empty');
+    assert(projectTwo, 'org-two projects non-empty');
     const recordStark = recordsStark[0]!;
-    assert.ok(recordStark, 'stark records non-empty');
+    assert(recordStark, 'stark records non-empty');
     const flowStark = flowsStark[0]!;
     const flowTwo = flowsTwo[0]!;
-    assert.ok(flowStark, 'stark flows non-empty');
-    assert.ok(flowTwo, 'org-two flows non-empty');
+    assert(flowStark, 'stark flows non-empty');
+    assert(flowTwo, 'org-two flows non-empty');
     // A live node id from the message-plane graph (graphDelta
     // upserts) — seed Customer Onboarding create node.
     const nodeStarkId = 'laXQcGGyWrbEiExtgkyCcw';
@@ -893,13 +900,13 @@ async () => {
         [nodeStarkId, STARK_ORGANIZATION],
         [recordStark.id, STARK_ORGANIZATION],
     ] as const) {
-        assert.equal(
+        assertStrictEquals(
             await pairOwner(entityId, owner), owner,
         );
         const foreignBound = owner === STARK_ORGANIZATION
             ? ORGANIZATION_TWO
             : STARK_ORGANIZATION;
-        assert.equal(
+        assertStrictEquals(
             await pairOwner(entityId, foreignBound), owner,
         );
     }
@@ -910,7 +917,7 @@ async () => {
     for (const bound of [
         STARK_ORGANIZATION, ORGANIZATION_TWO,
     ]) {
-        assert.equal(
+        assertStrictEquals(
             await pairOwner(
                 memberStark.identity_id, bound,
             ),
@@ -921,7 +928,7 @@ async () => {
         );
     }
     // Genuine orphan: null.
-    assert.equal(
+    assertStrictEquals(
         await pairOwner(
             GHOST_NOWHERE_P15_FENCE,
             STARK_ORGANIZATION,
@@ -930,13 +937,13 @@ async () => {
     );
 
     // WP1: organization id is self-as-owner.
-    assert.equal(
+    assertStrictEquals(
         await pairOwner(
             STARK_ORGANIZATION, STARK_ORGANIZATION,
         ),
         STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         await pairOwner(
             STARK_ORGANIZATION, ORGANIZATION_TWO,
         ),
@@ -944,13 +951,13 @@ async () => {
     );
 
     // Records retain message-plane ownership after row strip.
-    assert.equal(
+    assertStrictEquals(
         await pairOwner(
             recordStark.id, STARK_ORGANIZATION,
         ),
         STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         await pairOwner(
             recordStark.id, ORGANIZATION_TWO,
         ),
@@ -960,7 +967,7 @@ async () => {
 
 // Phase Final Task 2: graph ROW half stripped — message plane
 // alone tracks the live attribute add/remove ledger.
-test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
+Deno.test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
 + ' live attribute add then remove (fail-closed) on the'
 + ' message plane', async () => {
     const db = await seededDb();
@@ -984,7 +991,7 @@ test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
             constraints: [],
         },
     ));
-    assert.equal(attrPut.status, 201);
+    assertStrictEquals(attrPut.status, 201);
 
     // Create with the binding already 'added'.
     const created = await handleRequest(db, req(
@@ -1029,7 +1036,7 @@ test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
             },
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const afterAdd = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
@@ -1037,9 +1044,9 @@ test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
     const addRow = afterAdd.attributeEvents.find(
         (r) => r.id === P15_FNA_ADD,
     );
-    assert.ok(addRow);
-    assert.equal(addRow!.action, 'added');
-    assert.equal(
+    assert(addRow);
+    assertStrictEquals(addRow!.action, 'added');
+    assertStrictEquals(
         afterAdd.nodeFlowIds.get(nodeId), flowId,
     );
 
@@ -1048,9 +1055,9 @@ test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + flowId, token),
     );
-    assert.equal(headGet.status, 200);
+    assertStrictEquals(headGet.status, 200);
     const headId = headGet.headers.get('Response-ID');
-    assert.ok(headId);
+    assert(headId);
 
     const putRemove = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
@@ -1105,7 +1112,7 @@ test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
             )
         ).headers.get('ETag')! },
     ));
-    assert.equal(putRemove.status, 201);
+    assertStrictEquals(putRemove.status, 201);
 
     const afterRm = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
@@ -1113,8 +1120,8 @@ test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
     const rmRow = afterRm.attributeEvents.find(
         (r) => r.id === P15_FNA_RM,
     );
-    assert.ok(rmRow);
-    assert.equal(rmRow!.action, 'removed');
+    assert(rmRow);
+    assertStrictEquals(rmRow!.action, 'removed');
 
     const latest = latestByKey(
         afterRm.attributeEvents.filter(
@@ -1124,13 +1131,13 @@ test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
         (r) => r.flow_node_id,
         relationFailClosed,
     );
-    assert.equal(latest.get(nodeId)!.action, 'removed');
+    assertStrictEquals(latest.get(nodeId)!.action, 'removed');
 });
 
 // F1 fix pin: soft-deleting a node via graphDelta.deletions
 // must drop it from nodeFlowIds. Residual 'added' must NOT
 // RESTRICT attribute DELETE (message-plane path).
-test('residual pin: soft-deleted node drops from'
+Deno.test('residual pin: soft-deleted node drops from'
 + ' nodeFlowIds so residual attribute binding is not a'
 + ' RESTRICT referrer (DELETE → 204)', async () => {
     const db = await seededDb();
@@ -1153,7 +1160,7 @@ test('residual pin: soft-deleted node drops from'
             constraints: [],
         },
     ));
-    assert.equal(attrPut.status, 201);
+    assertStrictEquals(attrPut.status, 201);
 
     const created = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token, {
@@ -1197,12 +1204,12 @@ test('residual pin: soft-deleted node drops from'
             },
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const afterAdd = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         afterAdd.nodeFlowIds.get(nodeId), flowId,
     );
 
@@ -1210,9 +1217,9 @@ test('residual pin: soft-deleted node drops from'
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + flowId, token),
     );
-    assert.equal(headGet.status, 200);
+    assertStrictEquals(headGet.status, 200);
     const headId = headGet.headers.get('Response-ID');
-    assert.ok(headId);
+    assert(headId);
 
     // Soft-delete the bound node only — residual 'added'
     // attributeEvent remains; no attributeEvents 'removed'.
@@ -1252,12 +1259,12 @@ test('residual pin: soft-deleted node drops from'
             )
         ).headers.get('ETag')! },
     ));
-    assert.equal(putDelete.status, 201);
+    assertStrictEquals(putDelete.status, 201);
 
     const afterDel = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         afterDel.nodeFlowIds.has(nodeId), false,
         'soft-deleted node must leave nodeFlowIds',
     );
@@ -1265,15 +1272,15 @@ test('residual pin: soft-deleted node drops from'
     const residual = afterDel.attributeEvents.find(
         (r) => r.id === P15_SOFTDEL_FNA,
     );
-    assert.ok(residual);
-    assert.equal(residual!.action, 'added');
+    assert(residual);
+    assertStrictEquals(residual!.action, 'added');
 
     // recordTypeId scopes the Task 7 instance leg (empty
     // until Task 14 writes instances).
     const pairPlane = await collectAttributeReferrers(
         db, STARK_ORGANIZATION, [attrId], 'rOEPOcVMQdJiiiMuiiEhlg',
     );
-    assert.deepEqual(
+    assertEquals(
         pairPlane.get(attrId)!.flowIds, [],
         'no current-node flow referrer',
     );
@@ -1287,7 +1294,7 @@ test('residual pin: soft-deleted node drops from'
             + '/attributes/' + attrId,
         token,
     ));
-    assert.equal(deleted.status, 204);
+    assertStrictEquals(deleted.status, 204);
 });
 
 // -- field-values visibility re-anchor (Phase 15 Task 3) ------
@@ -1328,7 +1335,7 @@ async function transitionWithFieldValue(
             states: [N_START, N_FINISH, 'claimed'],
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     // Phase Final Stage B: record_attributes retired.
     const typePut = await handleRequest(db, req(
@@ -1342,7 +1349,7 @@ async function transitionWithFieldValue(
             state: 'active',
         },
     ));
-    assert.equal(typePut.status, 201);
+    assertStrictEquals(typePut.status, 201);
     const attrWrite = await handleRequest(db, req(
         'PUT',
         '/organizations/' + STARK_ORGANIZATION
@@ -1357,7 +1364,7 @@ async function transitionWithFieldValue(
             constraints: [],
         },
     ));
-    assert.equal(attrWrite.status, 201);
+    assertStrictEquals(attrWrite.status, 201);
 
     // Task 8 CUT: legacy fieldValues below the gate.
     await appendLegacyTransition(
@@ -1383,7 +1390,7 @@ async function transitionWithFieldValue(
 // never written here → 404; absent → 404). Field values
 // fold inline; the retired GET states/:id/field-values
 // three-way force lives here.
-test('work-order history GET: 200/404 two-way for'
+Deno.test('work-order history GET: 200/404 two-way for'
 + ' own / foreign-or-absent work orders', async () => {
     const db = await seededDb();
     const starkToken = await organizationToken(
@@ -1410,7 +1417,7 @@ test('work-order history GET: 200/404 two-way for'
             starkToken,
         ),
     );
-    assert.equal(own.status, 200);
+    assertStrictEquals(own.status, 200);
     const ownRows = await own.json() as {
         id: string;
         field_values: { id: string }[];
@@ -1418,8 +1425,8 @@ test('work-order history GET: 200/404 two-way for'
     const ownTe = ownRows.find(
         (r) => r.id === transitionEventId,
     );
-    assert.ok(ownTe !== undefined);
-    assert.deepEqual(
+    assert(ownTe !== undefined);
+    assertEquals(
         ownTe!.field_values.map((r) => r.id), [fieldValueId],
     );
 
@@ -1433,10 +1440,10 @@ test('work-order history GET: 200/404 two-way for'
             twoToken,
         ),
     );
-    assert.equal(foreign.status, 404);
+    assertStrictEquals(foreign.status, 404);
     const foreignBody =
         await foreign.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         foreignBody.error,
         'Not found: work_orders/' + workOrderId,
     );
@@ -1451,10 +1458,10 @@ test('work-order history GET: 200/404 two-way for'
             starkToken,
         ),
     );
-    assert.equal(orphan.status, 404);
+    assertStrictEquals(orphan.status, 404);
     const orphanBody =
         await orphan.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         orphanBody.error,
         'Not found: work_orders/ecupcwyehqSNYeaJpJtNFw',
     );
@@ -1463,7 +1470,7 @@ test('work-order history GET: 200/404 two-way for'
 // Derive-path (C4): workOrderHistoryFor throws on foreign
 // miss (404) and absent (404); own still returns folded rows.
 // stateEventVisibilityFor still drives RESTRICT visibility.
-test('workOrderHistoryFor visibility: own field_values,'
+Deno.test('workOrderHistoryFor visibility: own field_values,'
 + ' foreign rejects, absent rejects',
 async () => {
     const db = await seededDb();
@@ -1476,13 +1483,13 @@ async () => {
     );
 
     // Own → history returns the transition fold.
-    assert.equal(
+    assertStrictEquals(
         await pairPlaneVisibility(
             db, STARK_ORGANIZATION, transitionEventId,
         ),
         'visible',
     );
-    assert.equal(
+    assertStrictEquals(
         await stateEventVisibilityFor(
             db, STARK_ORGANIZATION, transitionEventId,
         ),
@@ -1494,24 +1501,24 @@ async () => {
     const ownTe = ownHistory.find(
         (row) => row.id === transitionEventId,
     );
-    assert.ok(ownTe !== undefined);
-    assert.equal(ownTe!.field_values.length, 1);
-    assert.equal(ownTe!.field_values[0]!.id, fieldValueId);
+    assert(ownTe !== undefined);
+    assertStrictEquals(ownTe!.field_values.length, 1);
+    assertStrictEquals(ownTe!.field_values[0]!.id, fieldValueId);
 
     // Foreign → work-order ownership rejects.
-    assert.equal(
+    assertStrictEquals(
         await pairPlaneVisibility(
             db, ORGANIZATION_TWO, transitionEventId,
         ),
         'hidden',
     );
-    assert.equal(
+    assertStrictEquals(
         await stateEventVisibilityFor(
             db, ORGANIZATION_TWO, transitionEventId,
         ),
         'hidden',
     );
-    await assert.rejects(
+    await assertRejects(
         () => workOrderHistoryFor(
             db, ORGANIZATION_TWO, workOrderId,
         ),
@@ -1519,19 +1526,19 @@ async () => {
     );
 
     // Absent work order → EntityNotFoundError.
-    assert.equal(
+    assertStrictEquals(
         await pairPlaneVisibility(
             db, STARK_ORGANIZATION, GHOST_P15_VIS,
         ),
         'orphan',
     );
-    assert.equal(
+    assertStrictEquals(
         await stateEventVisibilityFor(
             db, STARK_ORGANIZATION, GHOST_P15_VIS,
         ),
         'orphan',
     );
-    await assert.rejects(
+    await assertRejects(
         () => workOrderHistoryFor(
             db, STARK_ORGANIZATION, GHOST_P15_VIS,
         ),
@@ -1569,9 +1576,9 @@ function assertReferrerParity(
     for (const attributeId of attributeIds) {
         const a = left.get(attributeId);
         const b = right.get(attributeId);
-        assert.ok(a, label + ' left ' + attributeId);
-        assert.ok(b, label + ' right ' + attributeId);
-        assert.deepEqual(
+        assert(a, label + ' left ' + attributeId);
+        assert(b, label + ' right ' + attributeId);
+        assertEquals(
             sortedReferrerShape(a!),
             sortedReferrerShape(b!),
             label + ' ' + attributeId,
@@ -1579,7 +1586,7 @@ function assertReferrerParity(
     }
 }
 
-test('collectAttributeReferrers graph legs: seed attributes'
+Deno.test('collectAttributeReferrers graph legs: seed attributes'
 + ' with any referrer; pre-tx vs in-tx parity (message plane)',
 async () => {
     const db = await seededDb();
@@ -1602,7 +1609,7 @@ async () => {
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             , woToken),
     );
-    assert.equal(woListRes.status, 200);
+    assertStrictEquals(woListRes.status, 200);
     const workOrders = await woListRes.json() as {
         flow_graph: Record<string, unknown>;
     }[];
@@ -1620,7 +1627,7 @@ async () => {
         ...attrFromRelations,
         ...attrFromWorkOrders,
     ])].sort();
-    assert.ok(
+    assert(
         attributeIds.length > 0,
         'seed must name at least one bound attribute',
     );
@@ -1649,10 +1656,10 @@ async () => {
     for (const id of attributeIds) {
         flowBound += preTx.get(id)!.flowIds.length;
     }
-    assert.ok(flowBound > 0, 'seed flow bindings empty');
+    assert(flowBound > 0, 'seed flow bindings empty');
 });
 
-test('collectAttributeReferrers graph legs: live-minted'
+Deno.test('collectAttributeReferrers graph legs: live-minted'
 + ' flow binding + work-order head stay message-plane stable',
 async () => {
     const db = await seededDb();
@@ -1675,7 +1682,7 @@ async () => {
             constraints: [],
         },
     ));
-    assert.equal(attrPut.status, 201);
+    assertStrictEquals(attrPut.status, 201);
 
     const created = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token, {
@@ -1719,7 +1726,7 @@ async () => {
             },
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const woGraph = {
         name: 'P15 Restrict WO',
@@ -1761,7 +1768,7 @@ async () => {
             states: [N_START, N_FINISH, 'claimed'],
         },
     ));
-    assert.equal(woCreated.status, 201);
+    assertStrictEquals(woCreated.status, 201);
 
     // recordTypeId scopes the Task 7 instance leg (empty
     // until Task 14 writes instances).
@@ -1784,6 +1791,6 @@ async () => {
         pairPlane, inTx, [attrId],
     );
     const refs = pairPlane.get(attrId)!;
-    assert.ok(refs.flowIds.includes(flowId));
-    assert.ok(refs.workOrderIds.includes(woId));
+    assert(refs.flowIds.includes(flowId));
+    assert(refs.workOrderIds.includes(woId));
 });

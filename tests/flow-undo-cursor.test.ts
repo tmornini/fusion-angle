@@ -1,7 +1,12 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { strict as assert } from 'node:assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -58,6 +63,8 @@ import type { GraphNode } from '../api/types.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { withLocalStorageAsync } from
+    './fixtures/local-storage.ts';
 
 const PROJECT_1 = generateIdentifier();
 const FLOWID_A = generateIdentifier();
@@ -83,10 +90,9 @@ const FLOWID_RECONCILE = generateIdentifier();
 // a client behavior (the 412-absorbing retry loop).
 
 // flow-operations.ts -> logger.ts -> preferences.ts reads
-// localStorage, absent in Node — stub it before any log.* call
-// in an error path (mirrors flow-operations.test.ts).
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
+// localStorage lazily, only on a log.* call in an error
+// path (mirrors flow-operations.test.ts).
+const NULL_STORAGE: Partial<Storage> = {
     getItem: (_key: string) => null,
     setItem: () => {},
 };
@@ -242,7 +248,7 @@ async function createFlow(
             graphDelta: emptyDelta(),
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 }
 
 // A genuine save, echoing the current head — the ONLY way undo-
@@ -258,7 +264,7 @@ async function save(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
     const etag = got.headers.get('ETag');
-    assert.ok(etag
+    assert(etag
         , 'no ETag on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
         + flowId);
     const res = await handleRequest(db, req(
@@ -266,7 +272,7 @@ async function save(
         documentBody(name, eventId),
         { 'if-match': etag },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
 async function undo(
@@ -298,10 +304,10 @@ async function currentGraphName(
 
 // -- 1. undo (single) --------------------------
 
-test(
+Deno.test(
     'undo cursor: a single undo restores the previous'
     + ' save (one step back)',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const flowId = generateIdentifier();
@@ -312,17 +318,17 @@ test(
         const res = await undo(
             db, token, flowId, FLOWID_U1, AT,
         );
-        assert.equal(res.status, 201);
-        assert.equal(
+        assertStrictEquals(res.status, 201);
+        assertStrictEquals(
             await currentGraphName(db, token, flowId), 'A',
         );
-    },
+    }),
 );
 
-test(
+Deno.test(
     'undo cursor: after a save, undo succeeds under the'
     + ' postgres write-lock gate',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = withWriteGate(await freshDb());
         const token = await organizationToken();
         const flowId = generateIdentifier();
@@ -333,11 +339,11 @@ test(
         const res = await undo(
             db, token, flowId, FLOWID_U1, AT,
         );
-        assert.equal(res.status, 201);
-        assert.equal(
+        assertStrictEquals(res.status, 201);
+        assertStrictEquals(
             await currentGraphName(db, token, flowId), 'A',
         );
-    },
+    }),
 );
 
 // -- 2. undo-undo (consecutive) ----------------
@@ -346,10 +352,10 @@ test(
 // SECOND consecutive undo must walk FURTHER back (to genesis),
 // never oscillate back to B (the state the FIRST undo just
 // left).
-test(
+Deno.test(
     'undo cursor: undo-undo walks further back, never'
     + ' oscillating between the two most recent states',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const flowId = generateIdentifier();
@@ -360,8 +366,8 @@ test(
         const first = await undo(
             db, token, flowId, FLOWID_U1, AT,
         );
-        assert.equal(first.status, 201);
-        assert.equal(
+        assertStrictEquals(first.status, 201);
+        assertStrictEquals(
             await currentGraphName(db, token, flowId), 'A',
             'first undo lands on A',
         );
@@ -370,13 +376,13 @@ test(
             db, token, flowId, FLOWID_U2,
             '2026-01-01T00:00:01.000000Z',
         );
-        assert.equal(second.status, 201);
-        assert.equal(
+        assertStrictEquals(second.status, 201);
+        assertStrictEquals(
             await currentGraphName(db, token, flowId), 'genesis',
             'second consecutive undo reaches genesis, not'
             + ' back to B',
         );
-    },
+    }),
 );
 
 // -- 3. undo-save-undo (branch abandonment) ----
@@ -387,12 +393,12 @@ test(
 // genesis, then a NEW save from that genesis baseline, must
 // make B and A UNREACHABLE — the next undo reverts the new save
 // back to genesis, never resurrecting the abandoned A/B branch.
-test(
+Deno.test(
     'undo cursor: undo-save-undo abandons the'
     + ' undone branch — a save after undo-undo, then'
     + ' undo, reverts to the SAVE\'s own baseline, never'
     + ' the abandoned A/B branch',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const flowId = generateIdentifier();
@@ -405,7 +411,7 @@ test(
             db, token, flowId, FLOWID_U2,
             '2026-01-01T00:00:01.000000Z',
         );
-        assert.equal(
+        assertStrictEquals(
             await currentGraphName(db, token, flowId), 'genesis',
             'undo-undo reaches genesis before the new save',
         );
@@ -413,7 +419,7 @@ test(
         // A NEW edit, made from the genesis baseline — A and B
         // are now an abandoned branch.
         await save(db, token, flowId, 'D', FLOWID_D);
-        assert.equal(
+        assertStrictEquals(
             await currentGraphName(db, token, flowId), 'D',
         );
 
@@ -421,22 +427,22 @@ test(
             db, token, flowId, FLOWID_U3,
             '2026-01-01T00:00:02.000000Z',
         );
-        assert.equal(third.status, 201);
-        assert.equal(
+        assertStrictEquals(third.status, 201);
+        assertStrictEquals(
             await currentGraphName(db, token, flowId), 'genesis',
             'undo after the save reverts to genesis (D\'s own'
             + ' baseline) — never A or B',
         );
-    },
+    }),
 );
 
 // -- 4. undo at history exhaustion -------------
 
-test(
+Deno.test(
     'undo cursor: undo at exhaustion (nothing before'
     + ' genesis) is a graceful no-op — 204, no document'
     + ' pair, no graph change',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const flowId = generateIdentifier();
@@ -446,15 +452,15 @@ test(
         const res = await undo(
             db, token, flowId, FLOWID_U1, AT,
         );
-        assert.equal(res.status, 201);
+        assertStrictEquals(res.status, 201);
 
         const after = await db.messagePairs.getAll();
-        assert.equal(
+        assertStrictEquals(
             after.length, before.length + 1,
             'exhaustion appends exactly the operation message'
             + ' pair — no document message pair',
         );
-        assert.equal(
+        assertStrictEquals(
             await currentGraphName(db, token, flowId), 'genesis',
         );
 
@@ -465,17 +471,17 @@ test(
             db, token, flowId, FLOWID_U2,
             '2026-01-01T00:00:01.000000Z',
         );
-        assert.equal(again.status, 201);
+        assertStrictEquals(again.status, 201);
         const afterAgain = await db.messagePairs.getAll();
-        assert.equal(
+        assertStrictEquals(
             afterAgain.length, after.length + 1,
             'a second exhausted undo ALSO appends only its'
             + ' own operation message pair',
         );
-        assert.equal(
+        assertStrictEquals(
             await currentGraphName(db, token, flowId), 'genesis',
         );
-    },
+    }),
 );
 
 // -- 5. concurrent-save vs undo (412 + retry) --
@@ -485,11 +491,11 @@ test(
 // attempt 1 means the head moved; attempt 2 (a FRESH eventId/at,
 // the E6-split convention) just re-POSTs, and the SERVER
 // re-resolves the target fresh against the new head.
-test(
+Deno.test(
     'undo cursor: a 412 on attempt 1 is absorbed —'
     + ' attempt 2 succeeds with no client-side baseline'
     + ' refetch',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const flowId = generateIdentifier();
@@ -550,9 +556,9 @@ test(
         const op = await performUndo(
             flaky, snap, buildFlowHistorySnapshot(true),
         );
-        assert.equal(op.kind, 'ok');
-        assert.equal(posts, 2, 'the retry re-posts once');
-    },
+        assertStrictEquals(op.kind, 'ok');
+        assertStrictEquals(posts, 2, 'the retry re-posts once');
+    }),
 );
 
 function buildNode(id: string): GraphNode {
@@ -596,12 +602,12 @@ function snapOf(
 // save instead of 412ing. This drives postFlowUndoOp DIRECTLY
 // with a DELIBERATELY stale resolution, bypassing the live
 // route's always-fresh resolveFlowUndoTarget call.
-test(
+Deno.test(
     'undo cursor (fix wave): a write driven by a STALE'
     + ' resolution snapshot 412s — it must never silently'
     + ' overwrite a save that landed after the snapshot'
     + ' was taken',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const flowId = generateIdentifier();
@@ -625,7 +631,7 @@ test(
         const staleResolution = await resolveFlowUndoTarget(
             db, organization, flowId, undoUriPrefix,
         );
-        assert.ok(staleResolution, 'a resolution exists');
+        assert(staleResolution, 'a resolution exists');
 
         // A FRESH save lands through the LIVE route — moves the
         // real head forward, so staleResolution's own `current`
@@ -651,23 +657,22 @@ test(
             responseBody: undefined,
             operationId: TEST_OPERATION_ID,
         });
-        await assert.rejects(
+        const err = await assertRejects(
             () => postFlowUndoOp(
                 db, flowId, actor, organization, messagePair,
                 staleResolution!,
                 { eventId: FLOWID_STALE_EV, at: AT },
             ),
-            (err: unknown) =>
-                err instanceof ApiError
-                && err.status === HTTP_PRECONDITION_FAILED,
-        );
+        ) as ApiError;
+        assertInstanceOf(err, ApiError);
+        assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
 
         // B's content survives untouched — the whole stale-basis
         // transaction landed nothing (atomicity).
-        assert.equal(
+        assertStrictEquals(
             await currentGraphName(db, token, flowId), 'B',
         );
-    },
+    }),
 );
 
 // -- 6. SIDECAR-KEEP ---------------------------
@@ -679,10 +684,10 @@ test(
 // plane directly: a node deleted by a save, then revived
 // by undo, must leave both sidecar entries on stored
 // pairs.
-test(
+Deno.test(
     'SIDECAR-KEEP: undo-authored document message pairs carry'
     + ' deleted/restored sidecars on graphDelta/revivals',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const flowId = generateIdentifier();
@@ -713,14 +718,14 @@ test(
                 },
             },
         ));
-        assert.equal(created.status, 201);
+        assertStrictEquals(created.status, 201);
 
         const got = await handleRequest(db, req(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
                 , token,
         ));
         const etag = got.headers.get('ETag');
-        assert.ok(etag
+        assert(etag
             , 'no ETag on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + flowId);
         const deleteAt = '2026-01-01T00:00:01.000000Z';
@@ -742,13 +747,13 @@ test(
             ),
             { 'if-match': etag },
         ));
-        assert.equal(deleted.status, 201);
+        assertStrictEquals(deleted.status, 201);
 
         const undoAt = '2026-01-01T00:00:02.000000Z';
         const undone = await undo(
             db, token, flowId, FLOWID_UNDO_EV, undoAt,
         );
-        assert.equal(undone.status, 201);
+        assertStrictEquals(undone.status, 201);
 
         const prefix = canonicalUriCollection('AjdvjuECVZEgZoFajaIEkg'
             , '/flows/');
@@ -799,13 +804,13 @@ test(
             }
         }
         states.sort((a, b) => (a.at < b.at ? -1 : 1));
-        assert.deepEqual(
+        assertEquals(
             states.map((s) => s.state),
             ['deleted', 'restored'],
             'the undo-authored pair\'s own revival is'
             + ' visible on the message plane',
         );
-    },
+    }),
 );
 
 // -- 7. flags are guards, not undo content -----------
@@ -817,11 +822,11 @@ test(
 // the old cursor rule; this is the retarget, not a weaken.
 // putClientFacade(wrapInPageAdapter(db)) plus
 // putSessionToken(DEV_TOKEN) makes sessionContext() live
-// under node:test — the seam earlier comments called
+// under Deno.test — the seam earlier comments called
 // unreachable.
-test(
+Deno.test(
     'undo cursor: a flag-only pair is not a step',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const flowId = generateIdentifier();
@@ -834,7 +839,7 @@ test(
                 + flowId, token,
         ));
         const etag = got.headers.get('ETag');
-        assert.ok(etag, 'no ETag on GET before flag PUT');
+        assert(etag, 'no ETag on GET before flag PUT');
         const head = await got.json() as {
             name: string;
             graph: unknown;
@@ -855,12 +860,12 @@ test(
             },
             { 'if-match': etag },
         ));
-        assert.equal(flagged.status, 201);
+        assertStrictEquals(flagged.status, 201);
 
         const first = await undo(
             db, token, flowId, FLOWID_U1, AT,
         );
-        assert.equal(first.status, 201);
+        assertStrictEquals(first.status, 201);
         const afterFirst = await handleRequest(db, req(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + flowId, token,
@@ -869,8 +874,8 @@ test(
             name: string;
             is_locked: boolean;
         };
-        assert.equal(firstBody.name, 'A');
-        assert.equal(
+        assertStrictEquals(firstBody.name, 'A');
+        assertStrictEquals(
             firstBody.is_locked, !head.is_locked,
             'is_locked stays the current head\'s value',
         );
@@ -879,7 +884,7 @@ test(
             db, token, flowId, FLOWID_U2,
             '2026-01-01T00:00:01.000000Z',
         );
-        assert.equal(second.status, 201);
+        assertStrictEquals(second.status, 201);
         const afterSecond = await handleRequest(db, req(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + flowId, token,
@@ -888,17 +893,17 @@ test(
             name: string;
             is_locked: boolean;
         };
-        assert.equal(secondBody.name, 'genesis');
-        assert.equal(
+        assertStrictEquals(secondBody.name, 'genesis');
+        assertStrictEquals(
             secondBody.is_locked, !head.is_locked,
             'flag-only pairs are carried, not restored',
         );
-    },
+    }),
 );
 
-test(
+Deno.test(
     'undo after lock toggles reverts name not lock',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const flowId = generateIdentifier();
@@ -954,17 +959,17 @@ test(
             ),
             buildFlowHistorySnapshot(true),
         );
-        assert.equal(op.kind, 'ok');
+        assertStrictEquals(op.kind, 'ok');
         if (op.kind !== 'ok') return;
-        assert.equal(op.freshSnap.flowName, 'genesis');
-        assert.equal(op.freshSnap.isLocked, false);
-    },
+        assertStrictEquals(op.freshSnap.flowName, 'genesis');
+        assertStrictEquals(op.freshSnap.isLocked, false);
+    }),
 );
 
-test(
+Deno.test(
     'undo cursor: eleven saves walk eleven undos —'
     + ' N10 back to genesis, no cap',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const flowId = generateIdentifier();
@@ -980,8 +985,8 @@ test(
                 db, token, flowId,
                 generateIdentifier(), AT,
             );
-            assert.equal(res.status, 201);
-            assert.equal(
+            assertStrictEquals(res.status, 201);
+            assertStrictEquals(
                 await currentGraphName(
                     db, token, flowId,
                 ),
@@ -992,12 +997,12 @@ test(
             db, token, flowId,
             generateIdentifier(), AT,
         );
-        assert.equal(last.status, 201);
-        assert.equal(
+        assertStrictEquals(last.status, 201);
+        assertStrictEquals(
             await currentGraphName(
                 db, token, flowId,
             ),
             'genesis',
         );
-    },
+    }),
 );

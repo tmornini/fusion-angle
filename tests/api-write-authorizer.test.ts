@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -85,8 +84,8 @@ async function twoOrganizationDb(): Promise<{
     return { db, organizationB };
 }
 
-test('foreign-id PUT organizations/:id/ideas/:id geneses at this address',
-async () => {
+Deno.test('foreign-id PUT organizations/:id/ideas/:id geneses at this'
++ ' address', async () => {
     const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , ORGANIZATION_A);
@@ -97,7 +96,7 @@ async () => {
             + 'gfwcurTzrfssEsWJyNeUyQ', tokenA,
         ideaDocument('A-owned', 'ev-idea-a'),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const foreign = await handleRequest(db, req(
         'PUT',
@@ -105,33 +104,33 @@ async () => {
         tokenB,
         ideaDocument('stolen', 'ev-steal'),
     ));
-    assert.equal(foreign.status, 201);
+    assertStrictEquals(foreign.status, 201);
     const gotB = await handleRequest(db, req(
         'GET',
         '/organizations/' + organizationB + '/ideas/gfwcurTzrfssEsWJyNeUyQ',
         tokenB,
     ));
-    assert.equal(gotB.status, 200);
+    assertStrictEquals(gotB.status, 200);
     const wireB = await gotB.json() as {
         title: string;
         organization_id: string;
     };
-    assert.equal(wireB.title, 'stolen');
-    assert.equal(wireB.organization_id, organizationB);
+    assertStrictEquals(wireB.title, 'stolen');
+    assertStrictEquals(wireB.organization_id, organizationB);
     const gotA = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gfwcurTzrfssEsWJyNeUyQ', tokenA,
     ));
-    assert.equal(gotA.status, 200);
+    assertStrictEquals(gotA.status, 200);
     const wireA = await gotA.json() as {
         title: string;
         organization_id: string;
     };
-    assert.equal(wireA.title, 'A-owned');
-    assert.equal(wireA.organization_id, ORGANIZATION_A);
+    assertStrictEquals(wireA.title, 'A-owned');
+    assertStrictEquals(wireA.organization_id, ORGANIZATION_A);
 });
 
-test('genesis PUT organizations/:id/ideas/:id in the'
+Deno.test('genesis PUT organizations/:id/ideas/:id in the'
     + ' caller org is unaffected',
 async () => {
     const { db, organizationB } = await twoOrganizationDb();
@@ -144,7 +143,7 @@ async () => {
         tokenB,
         ideaDocument('B-new', 'ev-idea-b'),
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     // Phase Final Task 2: ideas row half stripped — org stamp
     // rides WRITE_RESPONSE_SPECS / derive GET, not the row.
     const getRes = await handleRequest(db, req(
@@ -153,14 +152,14 @@ async () => {
             + '/ideas/gmdHxjEYmxOsDKfNPlGSig',
         tokenB,
     ));
-    assert.equal(getRes.status, 200);
+    assertStrictEquals(getRes.status, 200);
     const wire = await getRes.json() as {
         organization_id: string;
     };
-    assert.equal(wire.organization_id, organizationB);
+    assertStrictEquals(wire.organization_id, organizationB);
 });
 
-test('foreign-id DELETE nested record-types is 204',
+Deno.test('foreign-id DELETE nested record-types is 204',
 async () => {
     const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
@@ -186,7 +185,7 @@ async () => {
             initialStateAt: '2026-01-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const foreign = await handleRequest(db, req(
         'DELETE',
@@ -196,19 +195,19 @@ async () => {
     ));
     // Never written at B's record-types address: 404,
     // nothing stored. A's document is untouched.
-    assert.equal(foreign.status, 404);
+    assertStrictEquals(foreign.status, 404);
     const still = await handleRequest(db, req(
         'GET',
         '/organizations/' + ORGANIZATION_A
             + '/record-types/rlzgSSwpqXVHTYfBzjWFWQ',
         tokenA,
     ));
-    assert.equal(still.status, 200);
+    assertStrictEquals(still.status, 200);
     const row = await still.json() as { name: string };
-    assert.equal(row.name, 'A record');
+    assertStrictEquals(row.name, 'A record');
 });
 
-test('foreign-id DELETE seat is a miss in the caller org',
+Deno.test('foreign-id DELETE seat is a miss in the caller org',
 async () => {
     const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
@@ -225,7 +224,7 @@ async () => {
             at: '2026-01-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const foreign = await handleRequest(db, req(
         'DELETE',
@@ -233,22 +232,22 @@ async () => {
             + '/members/uTGrEpVpODbNhDhDVdWeqQ',
         tokenB,
     ));
-    assert.equal(foreign.status, 404);
+    assertStrictEquals(foreign.status, 404);
     const stillThere = await handleRequest(db, req(
         'GET',
         '/organizations/' + ORGANIZATION_A
             + '/members/uTGrEpVpODbNhDhDVdWeqQ',
         tokenA,
     ));
-    assert.equal(stillThere.status, 200);
+    assertStrictEquals(stillThere.status, 200);
     const row = await stillThere.json() as {
         organization_id: string;
     };
-    assert.equal(row.organization_id, ORGANIZATION_A);
+    assertStrictEquals(row.organization_id, ORGANIZATION_A);
 });
 
-test('foreign-id PUT organizations/:id/projects/:id geneses at this address',
-async () => {
+Deno.test('foreign-id PUT organizations/:id/projects/:id geneses at'
++ ' this address', async () => {
     const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , ORGANIZATION_A);
@@ -269,7 +268,7 @@ async () => {
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'qizdVmLlnGCvMsomvBDqmw', tokenA, projectBody,
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const foreign = await handleRequest(db, req(
         'PUT',
@@ -280,29 +279,29 @@ async () => {
             title: 'stolen',
         },
     ));
-    assert.equal(foreign.status, 201);
+    assertStrictEquals(foreign.status, 201);
     const gotB = await handleRequest(db, req(
         'GET',
         '/organizations/' + organizationB
             + '/projects/qizdVmLlnGCvMsomvBDqmw',
         tokenB,
     ));
-    assert.equal(gotB.status, 200);
+    assertStrictEquals(gotB.status, 200);
     const wireB = await gotB.json() as {
         title: string;
         organization_id: string;
     };
-    assert.equal(wireB.title, 'stolen');
-    assert.equal(wireB.organization_id, organizationB);
+    assertStrictEquals(wireB.title, 'stolen');
+    assertStrictEquals(wireB.organization_id, organizationB);
     const gotA = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'qizdVmLlnGCvMsomvBDqmw', tokenA,
     ));
-    assert.equal(gotA.status, 200);
+    assertStrictEquals(gotA.status, 200);
     const wireA = await gotA.json() as {
         title: string;
         organization_id: string;
     };
-    assert.equal(wireA.title, 'A project');
-    assert.equal(wireA.organization_id, ORGANIZATION_A);
+    assertStrictEquals(wireA.title, 'A project');
+    assertStrictEquals(wireA.organization_id, ORGANIZATION_A);
 });

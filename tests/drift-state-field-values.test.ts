@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -144,7 +143,7 @@ async function appendLegacyTransition(
     );
 }
 
-test('RESTRICT: deriveStateFieldValueReferrers sees the'
+Deno.test('RESTRICT: deriveStateFieldValueReferrers sees the'
 + ' transition fold; SFV row plane stays empty',
 async () => {
     const db = await seededDb();
@@ -169,15 +168,15 @@ async () => {
             db, STARK_ORGANIZATION, ['VPckAwjJsTGCEkKaOOGRGw'],
         );
     const rows = derived.get('VPckAwjJsTGCEkKaOOGRGw') ?? [];
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]!.id, FV_1);
-    assert.equal(rows[0]!.attribute_id, 'VPckAwjJsTGCEkKaOOGRGw');
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.id, FV_1);
+    assertStrictEquals(rows[0]!.attribute_id, 'VPckAwjJsTGCEkKaOOGRGw');
     // Phase Final Stage B: state_field_values table retired.
 });
 
 // C4: route parity re-homes onto work-order history
 // (inline field_values fold), not GET states/:id/field-values.
-test('GET organizations/:id/work-orders/:id/history wire equals'
+Deno.test('GET organizations/:id/work-orders/:id/history wire equals'
 + ' workOrderHistoryFor over a live fold',
 async () => {
     const db = await seededDb();
@@ -202,15 +201,15 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/history', token),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const wireText = await res.text();
     const derived = await workOrderHistoryFor(
         db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
     );
-    assert.equal(wireText, JSON.stringify(derived));
+    assertStrictEquals(wireText, JSON.stringify(derived));
     const transition = derived.find((row) => row.id === TE_1);
-    assert.ok(transition !== undefined);
-    assert.deepEqual(transition!.field_values, [{
+    assert(transition !== undefined);
+    assertEquals(transition!.field_values, [{
         id: FV_1,
         attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
         value: 'high',
@@ -219,7 +218,7 @@ async () => {
 
 // Non-lex field-value ids so collection order is not
 // insertion order (byIdAscending craftsmanship).
-test('work-order history field_values are identifier-'
+Deno.test('work-order history field_values are identifier-'
 + 'ordered after non-lex transition fold', async () => {
     const db = await seededDb();
     await appendLegacyTransition(db, {
@@ -260,14 +259,14 @@ test('work-order history field_values are identifier-'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/history', token),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const list = await res.json() as {
         id: string;
         field_values: { id: string }[];
     }[];
     const transition = list.find((row) => row.id === TE_LEX);
-    assert.ok(transition !== undefined);
-    assert.deepEqual(
+    assert(transition !== undefined);
+    assertEquals(
         transition!.field_values.map(r => r.id),
         [FV_A, FV_M, FV_Z].sort(compareIdentifiers),
     );

@@ -1,7 +1,6 @@
-import { test, afterEach } from 'node:test';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
@@ -152,7 +151,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 
 // Claim-expiry legs advance the test clock (msSinceUtc seam);
 // reset so no suite poisons the next.
-afterEach(() => {
+Deno.test.afterEach(() => {
     resetClock();
 });
 
@@ -272,7 +271,7 @@ async function headResponseId(
             + flowId, token),
     );
     const id = got.headers.get('Response-ID');
-    assert.ok(id
+    assert(id
         , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
         + '' + flowId);
     return id!;
@@ -319,7 +318,7 @@ function createWorkOrderBody(
 
 // ---- case 1: collection-history parity (C3 successor) ----
 
-test('case 1: bulk history doors are absent; per-item'
+Deno.test('case 1: bulk history doors are absent; per-item'
 + ' history still 200 for BOTH organizations',
 async () => {
     const db = await seededDb();
@@ -339,7 +338,7 @@ async () => {
         ));
         // Retired bulk door matches work-orders/:id with
         // id "history" — identifier gate 400s, never 200.
-        assert.equal(woBulk.status, 400);
+        assertStrictEquals(woBulk.status, 400);
 
         const objBulk = await handleRequest(db, req(
             'GET',
@@ -347,7 +346,7 @@ async () => {
                 + '/objectives/versions',
             token,
         ));
-        assert.equal(objBulk.status, 400);
+        assertStrictEquals(objBulk.status, 400);
 
         const woList = await handleRequest(db, req(
             'GET',
@@ -355,7 +354,7 @@ async () => {
                 + '/work-orders/',
             token,
         ));
-        assert.equal(woList.status, 200);
+        assertStrictEquals(woList.status, 200);
         const workOrders = await woList.json() as {
             id: string;
         }[];
@@ -369,7 +368,7 @@ async () => {
                     token,
                 ),
             );
-            assert.equal(history.status, 200);
+            assertStrictEquals(history.status, 200);
             const events = await history.json() as {
                 id: string;
             }[];
@@ -382,7 +381,7 @@ async () => {
                 + '/objectives/',
             token,
         ));
-        assert.equal(objList.status, 200);
+        assertStrictEquals(objList.status, 200);
         const objectives = await objList.json() as {
             id: string;
         }[];
@@ -396,15 +395,15 @@ async () => {
                     token,
                 ),
             );
-            assert.equal(versions.status, 200);
+            assertStrictEquals(versions.status, 200);
             const rows = await versions.json() as {
                 id: string;
             }[];
             objSeen += rows.length;
         }
     }
-    assert.ok(woSeen > 0, 'work-order history thin');
-    assert.ok(objSeen > 0, 'objectives history thin');
+    assert(woSeen > 0, 'work-order history thin');
+    assert(objSeen > 0, 'objectives history thin');
 });
 
 // ---- case 2: GET <family>/:id/history parity, one entity --------
@@ -454,7 +453,7 @@ const CASE_2_FAMILY_ENTITY_IDS: readonly {
     },
 ];
 
-test('case 2: GET <family>/:id/history parity — one entity'
+Deno.test('case 2: GET <family>/:id/history parity — one entity'
 + ' per family (idea, project, record, flow, work-order,'
 + ' objective) + the (at, id) DESC order', async () => {
     const db = await seededDb();
@@ -480,7 +479,7 @@ test('case 2: GET <family>/:id/history parity — one entity'
             '/' + routeFamily + '/' + id + suffix,
             token,
         ));
-        assert.equal(res.status, 200, family);
+        assertStrictEquals(res.status, 200, family);
         const wire = await res.json() as {
             id: string;
             entity_id?: string;
@@ -488,37 +487,37 @@ test('case 2: GET <family>/:id/history parity — one entity'
             member_id?: string;
             at?: string;
         }[];
-        assert.equal(wire.length, expected.length, family);
+        assertStrictEquals(wire.length, expected.length, family);
         const trioList = family === 'work-order'
             || family === 'flow';
         for (let i = 0; i < expected.length; i++) {
             const e = expected[i]!;
             const w = wire[i]!;
             if (trioList) {
-                assert.equal(
+                assertStrictEquals(
                     w.id, e.id, family + ' id@' + i,
                 );
-                assert.equal(
+                assertStrictEquals(
                     w.entity_id, e.entity_id,
                     family + ' entity_id@' + i,
                 );
-                assert.equal(
+                assertStrictEquals(
                     w.member_id, e.member_id,
                     family + ' member_id@' + i,
                 );
-                assert.equal(
+                assertStrictEquals(
                     w.at, e.at, family + ' at@' + i,
                 );
             } else {
-                assert.equal(
+                assertStrictEquals(
                     w.id, id, family + ' id@' + i,
                 );
-                assert.equal(
+                assertStrictEquals(
                     'state_at' in w, false,
                     family + ' no state_at@' + i,
                 );
             }
-            assert.equal(
+            assertStrictEquals(
                 w.state, e.state, family + ' state@' + i,
             );
         }
@@ -527,11 +526,11 @@ test('case 2: GET <family>/:id/history parity — one entity'
             const cur = wire[i]!;
             const prevAt = prev.at;
             const curAt = cur.at;
-            assert.ok(
+            assert(
                 prevAt !== undefined && curAt !== undefined,
                 family + ' history row missing at@' + i,
             );
-            assert.ok(
+            assert(
                 prevAt > curAt
                 || (prevAt === curAt
                     && prev.id > cur.id),
@@ -548,15 +547,15 @@ test('case 2: GET <family>/:id/history parity — one entity'
     const objectiveHistory = await deriveObjectiveStateHistory(
         db, STARK_ORGANIZATION, objectiveEntry.id,
     );
-    assert.equal(objectiveHistory.length, 1);
-    assert.equal(objectiveHistory[0]!.state, 'active');
+    assertStrictEquals(objectiveHistory.length, 1);
+    assertStrictEquals(objectiveHistory[0]!.state, 'active');
     // The work order carries its full 4-event hand-authored
     // trace — a non-vacuous, multi-event leg (case 6 below reuses
     // this SAME entity for the field-values join proof).
     const workOrderEntry = CASE_2_FAMILY_ENTITY_IDS.find(
         (e) => e.family === 'work-order',
     )!;
-    assert.equal(
+    assertStrictEquals(
         (await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderEntry.id,
         )).length,
@@ -569,7 +568,7 @@ test('case 2: GET <family>/:id/history parity — one entity'
 // Fence legs on the message plane. Orphan states/:id writes
 // retired with the address — the own/foreign/deleted legs
 // ride document trios.
-test('case 3: the fence\'s legs — own-org history visible,'
+Deno.test('case 3: the fence\'s legs — own-org history visible,'
 + ' foreign history 404 (miss at this address), and a'
 + ' DELETED foreign entity still names its owner',
 async () => {
@@ -596,7 +595,7 @@ async () => {
         tokenOrg2,
         ideaDocument('Foreign', FOREIGNIDEAID_GENESIS, AT),
     ));
-    assert.equal(foreignCreated.status, 201);
+    assertStrictEquals(foreignCreated.status, 201);
 
     // The DELETED-entity leg: org 2 tombstones its OWN idea —
     // message plane is IMMUNE to deleted filter, so owner still
@@ -613,16 +612,16 @@ async () => {
             'deleted',
         ),
     ));
-    assert.equal(foreignDeleted.status, 201);
+    assertStrictEquals(foreignDeleted.status, 201);
 
     // Own history 200 with genesis.
     const ownRes = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ownIdeaId +
             '/versions/', tokenStark,
     ));
-    assert.equal(ownRes.status, 200);
+    assertStrictEquals(ownRes.status, 200);
     const ownWire = await ownRes.json() as { id: string }[];
-    assert.ok(
+    assert(
         ownWire.some((r) => r.id === ownIdeaId),
     );
 
@@ -634,8 +633,8 @@ async () => {
             + '/versions/',
         tokenStark,
     ));
-    assert.equal(foreignRes.status, 404);
-    assert.equal(
+    assertStrictEquals(foreignRes.status, 404);
+    assertStrictEquals(
         await resolveOwningOrganization(
             db, foreignIdeaId, STARK_ORGANIZATION,
         ),
@@ -649,16 +648,16 @@ async () => {
             + '/ideas/' + foreignIdeaId + '/versions/',
         tokenOrg2,
     ));
-    assert.equal(org2Res.status, 200);
+    assertStrictEquals(org2Res.status, 200);
     const org2Wire = await org2Res.json() as {
         id: string;
         state: string;
     }[];
-    assert.equal(org2Wire.length, 2);
-    assert.ok(
+    assertStrictEquals(org2Wire.length, 2);
+    assert(
         org2Wire.every((r) => r.id === foreignIdeaId),
     );
-    assert.ok(
+    assert(
         org2Wire.some((r) => r.state === 'deleted'),
     );
 
@@ -669,12 +668,12 @@ async () => {
             + '/ideas/' + ownIdeaId + '/versions/',
         tokenOrg2,
     ));
-    assert.equal(ownFromOrg2.status, 404);
+    assertStrictEquals(ownFromOrg2.status, 404);
 });
 
 // ---- case 4: the WO lifecycle legs (Task 4) ---------------------
 
-test('case 4a: a SEEDED work order\'s births ride the'
+Deno.test('case 4a: a SEEDED work order\'s births ride the'
 + ' transition-op source (states-address retirement) —'
 + ' deriveWorkOrderLifecycle contributes the trace events'
 + ' and workOrderLifecycleStatesFor reproduces history',
@@ -685,17 +684,17 @@ async () => {
     const seededWorkOrderId = buildWorkOrders()[1]!.id;
     const lifecycle = (await deriveWorkOrderLifecycle(db))
         .filter((row) => row.entity_id === seededWorkOrderId);
-    assert.ok(
+    assert(
         lifecycle.length > 0,
         'seeded traces must derive from transition ops',
     );
     const derived = await assertHistoryParity(
         db, STARK_ORGANIZATION, seededWorkOrderId,
     );
-    assert.equal(derived.length, lifecycle.length);
+    assertStrictEquals(derived.length, lifecycle.length);
 });
 
-test('case 4b: work-order live-write chain — birth-claimed'
+Deno.test('case 4b: work-order live-write chain — birth-claimed'
 + ' create, a transition, a transition+release, a MOVING'
 + ' lock_timeout entity PUT, a fresh claim, an idempotent'
 + ' re-claim (0 events), and a claim_expired takeover'
@@ -727,7 +726,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     const transition1 = await handleRequest(db, req(
@@ -740,7 +739,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
             transitionAt: nowUtc(),
         },
     ));
-    assert.equal(transition1.status, 201);
+    assertStrictEquals(transition1.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     const transition2At = nowUtc();
@@ -759,7 +758,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
             transitionAt: transition2At,
         },
     ));
-    assert.equal(transition2.status, 201);
+    assertStrictEquals(transition2.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     // The MOVING lock_timeout case: an entity PUT shrinks
@@ -774,7 +773,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
             position: 2,
         },
     ));
-    assert.equal(entityPut.status, 201);
+    assertStrictEquals(entityPut.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     const freshClaimAt = nowUtc();
@@ -788,7 +787,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
             expireAt: freshClaimAt,
         },
     ));
-    assert.equal(freshClaim.status, 201);
+    assertStrictEquals(freshClaim.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     // An idempotent re-claim by the SAME actor, milliseconds
@@ -809,11 +808,11 @@ test('case 4b: work-order live-write chain — birth-claimed'
             expireAt: repeatClaimAt,
         },
     ));
-    assert.equal(repeatClaim.status, 201);
+    assertStrictEquals(repeatClaim.status, 201);
     const afterRepeat = await assertHistoryParity(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assert.equal(afterRepeat.length, beforeRepeat);
+    assertStrictEquals(afterRepeat.length, beforeRepeat);
 
     // Advance the test clock past the tiny lock_timeout —
     // isClaimEventExpired checks msSinceUtc (the clock seam),
@@ -835,11 +834,11 @@ test('case 4b: work-order live-write chain — birth-claimed'
             expireAt: takeoverExpireAt,
         },
     ));
-    assert.equal(takeover.status, 201);
+    assertStrictEquals(takeover.status, 201);
     const finalHistory = await assertHistoryParity(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assert.deepEqual(
+    assertEquals(
         finalHistory.slice(-2).map((row) => row.state),
         ['claim_expired', 'claimed'],
     );
@@ -848,7 +847,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
 // HYBRID: bare document PUT (no create op) + transition
 // genesis + live claim. All events ride the work-order
 // lifecycle source (states/:id retired).
-test('case 4c: HYBRID — a seeded-shape work order (a bare'
+Deno.test('case 4c: HYBRID — a seeded-shape work order (a bare'
 + ' document PUT, no create operation) plus a transition'
 + ' genesis and a LIVE claim — no id collision',
 async () => {
@@ -866,7 +865,7 @@ async () => {
             position: 1,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 
     const genesis = await handleRequest(db, req(
         'POST',
@@ -879,7 +878,7 @@ async () => {
             transitionAt: AT,
         },
     ));
-    assert.equal(genesis.status, 201);
+    assertStrictEquals(genesis.status, 201);
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
@@ -892,20 +891,20 @@ async () => {
             expireAt: claimAt,
         },
     ));
-    assert.equal(claim.status, 201);
+    assertStrictEquals(claim.status, 201);
 
     const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assert.equal(derived.length, 2);
-    assert.deepEqual(
+    assertStrictEquals(derived.length, 2);
+    assertEquals(
         derived.map((row) => row.id),
         [WORKORDERID_GENESIS, WORKORDERID_CE1],
     );
 });
 
-test('case 4d: claim, release via POST organizations/:id/work-orders/:id/'
-+ 'release (the deleteWorkOrderClaim shape — a claim_released'
+Deno.test('case 4d: claim, release via POST organizations/:id/work-orders/'
++ ':id/release (the deleteWorkOrderClaim shape — a claim_released'
 + ' event with no claim/transition operation message pair'
 + ' beside it), then RE-claim — the replay must see that'
 + ' release as the prior claim event (exactly as'
@@ -946,7 +945,7 @@ async () => {
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     const claimAt = nowUtc();
@@ -960,7 +959,7 @@ async () => {
             expireAt: claimAt,
         },
     ));
-    assert.equal(claim.status, 201);
+    assertStrictEquals(claim.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     // The named release: DELETE organizations/:id/work-orders/:id/claim.
@@ -970,11 +969,11 @@ async () => {
             + '/claim',
         token,
     ));
-    assert.equal(released.status, 204);
+    assertStrictEquals(released.status, 204);
     const afterRelease = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assert.deepEqual(
+    assertEquals(
         afterRelease.map((row) => row.state),
         [
             N_START, N_MIDDLE, N_FINISH,
@@ -998,7 +997,7 @@ async () => {
             expireAt: reclaimAt,
         },
     ));
-    assert.equal(reclaimed.status, 201);
+    assertStrictEquals(reclaimed.status, 201);
 
     const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,
@@ -1009,7 +1008,7 @@ async () => {
     // baseline entirely, so the reclaim is never treated as an
     // expiry takeover of the (chronologically superseded)
     // original claim.
-    assert.deepEqual(
+    assertEquals(
         derived.map((row) => row.state),
         [
             N_START, N_MIDDLE, N_FINISH,
@@ -1023,7 +1022,7 @@ async () => {
 
 // C3: deriveFlowGraphStates retired — pin graphDelta.deletions
 // / revivals on the flow document message pairs directly (SIDECAR-KEEP).
-test('case 5a: a LIVE flow-node delete + undo — the'
+Deno.test('case 5a: a LIVE flow-node delete + undo — the'
 + ' deleted/restored sidecar events on the message plane',
 async () => {
     const db = await seededDb();
@@ -1053,7 +1052,7 @@ async () => {
             },
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const deleteAt = '2026-02-02T00:00:00.000000Z';
     const deleted = await handleRequest(db, req(
@@ -1079,7 +1078,7 @@ async () => {
             )
         ).headers.get('ETag')! },
     ));
-    assert.equal(deleted.status, 201);
+    assertStrictEquals(deleted.status, 201);
 
     const undoAt = '2026-02-03T00:00:00.000000Z';
     const undone = await handleRequest(db, req(
@@ -1091,7 +1090,7 @@ async () => {
         { 'if-match': '"'
             + await headResponseId(db, token, flowId) + '"' },
     ));
-    assert.equal(undone.status, 201);
+    assertStrictEquals(undone.status, 201);
 
     const prefix = canonicalUriCollection(
         STARK_ORGANIZATION, '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',
@@ -1143,13 +1142,13 @@ async () => {
         }
     }
     states.sort((a, b) => (a.at < b.at ? -1 : 1));
-    assert.deepEqual(
+    assertEquals(
         states.map((s) => s.state),
         ['deleted', 'restored'],
     );
 });
 
-test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
+Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
 + ' grant/decline chain, and a LIVE grant/revoke chain (source f'
 + ' — the seed has NONE) — each deepEquals the old plane', async () => {
     const db = await seededDb();
@@ -1175,7 +1174,7 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             grantAt: '2026-03-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(acceptGrant.status, 200);
+    assertStrictEquals(acceptGrant.status, 200);
     const accept = await handleRequest(db, req(
         'PUT',
         '/identities/YeQnyZJddPctAdaMBVWEew'
@@ -1187,11 +1186,11 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             at: '2026-03-01T00:00:00.000001Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assertStrictEquals(accept.status, 204);
     const acceptDerived = await assertHistoryParity(
         db, STARK_ORGANIZATION, 'YUuiirIfYgZZdbyLqxAHmg',
     );
-    assert.deepEqual(
+    assertEquals(
         acceptDerived.map((row) => row.state),
         ['pending', 'accepted'],
     );
@@ -1214,7 +1213,7 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             grantAt: '2026-03-02T00:00:00.000000Z',
         },
     ));
-    assert.equal(declineGrant.status, 200);
+    assertStrictEquals(declineGrant.status, 200);
     const decline = await handleRequest(db, req(
         'PUT',
         '/identities/YfxZQrzQBOaPJmijEVzQOg'
@@ -1225,11 +1224,11 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             at: '2026-03-02T00:00:00.000001Z',
         },
     ));
-    assert.equal(decline.status, 204);
+    assertStrictEquals(decline.status, 204);
     const declineDerived = await assertHistoryParity(
         db, STARK_ORGANIZATION, 'YXTFXcJwnALAOHAFRMiiPg',
     );
-    assert.deepEqual(
+    assertEquals(
         declineDerived.map((row) => row.state),
         ['pending', 'declined'],
     );
@@ -1253,7 +1252,7 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             grantAt: '2026-03-03T00:00:00.000000Z',
         },
     ));
-    assert.equal(revokeGrant.status, 200);
+    assertStrictEquals(revokeGrant.status, 200);
     const revoke = await handleRequest(db, req(
         'PUT',
         '/organizations/' + STARK_ORGANIZATION
@@ -1264,11 +1263,11 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             at: '2026-03-03T00:00:00.000001Z',
         },
     ));
-    assert.equal(revoke.status, 204);
+    assertStrictEquals(revoke.status, 204);
     const revokeDerived = await assertHistoryParity(
         db, STARK_ORGANIZATION, 'YZtAiXGchFrNHaSixyjBsg',
     );
-    assert.deepEqual(
+    assertEquals(
         revokeDerived.map((row) => row.state),
         ['pending', 'revoked'],
     );
@@ -1278,7 +1277,7 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
 
 // Phase Final Task 2: SFV row half stripped — join is
 // message-plane only (work-order history inline fold; C4).
-test('case 6: the state_field_values JOIN — WO01\'s derived'
+Deno.test('case 6: the state_field_values JOIN — WO01\'s derived'
 + ' history resolves field values on the message plane; seed'
 + ' leaf pairs total 7', async () => {
     const db = await seededDb();
@@ -1300,18 +1299,18 @@ test('case 6: the state_field_values JOIN — WO01\'s derived'
     }
     // Non-vacuous: the Review/Complete transition events
     // genuinely carry field values (the seed's own 7-pair set).
-    assert.equal(
+    assertStrictEquals(
         sawFieldValues, true,
         'no derived event resolved any state_field_values —'
         + ' the join proof would be vacuous',
     );
-    assert.equal(totalFieldValues, 7);
+    assertStrictEquals(totalFieldValues, 7);
     // Phase Final Stage B: state_field_values table retired.
 });
 
 // ---- case 7: live-write chains re-compared on both planes --------
 
-test('case 7a: live-write chain — create idea, then transition —'
+Deno.test('case 7a: live-write chain — create idea, then transition —'
 + ' derived history deepEquals the old plane at both steps',
 async () => {
     const db = await seededDb();
@@ -1327,7 +1326,7 @@ async () => {
             '2026-04-01T00:00:00.000000Z',
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, ideaId);
 
     const transitioned = await handleRequest(db, req(
@@ -1340,18 +1339,18 @@ async () => {
             state: 'in_review',
         },
     ));
-    assert.equal(transitioned.status, 201);
+    assertStrictEquals(transitioned.status, 201);
     const derived = await assertHistoryParity(
         db, STARK_ORGANIZATION, ideaId,
     );
-    assert.deepEqual(
+    assertEquals(
         derived.map((row) => row.state), ['active', 'in_review'],
     );
 });
 
 // States-address retirement: archive/reactivate ride PUT
 // /members/:id with the lifecycle trio — message-plane pin.
-test('case 7b: live-write chain — AI agent create then'
+Deno.test('case 7b: live-write chain — AI agent create then'
 + ' update — message-plane pin via PUT ai-agents/:id',
 async () => {
     const db = await seededDb();
@@ -1364,13 +1363,13 @@ async () => {
         'PUT', '/ai-agents/' + aiMemberId, token,
         aiMemberDetail('Drift Bot'),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
     const got = await handleRequest(
         db,
         req('GET', '/ai-agents/' + aiMemberId, token),
     );
-    assert.equal(got.status, 200);
-    assert.equal(
+    assertStrictEquals(got.status, 200);
+    assertStrictEquals(
         ((await got.json()) as { name: string }).name,
         'Drift Bot',
     );
@@ -1379,12 +1378,12 @@ async () => {
         'PUT', '/ai-agents/' + aiMemberId, token,
         aiMemberDetail('Drift Bot 2'),
     ));
-    assert.equal(updated.status, 201);
+    assertStrictEquals(updated.status, 201);
     const after = await handleRequest(
         db,
         req('GET', '/ai-agents/' + aiMemberId, token),
     );
-    assert.equal(
+    assertStrictEquals(
         ((await after.json()) as { name: string }).name,
         'Drift Bot 2',
     );
@@ -1393,7 +1392,7 @@ async () => {
 // States-address retirement: archive/reactivate ride PUT
 // /organizations/:id/objectives/:id with the lifecycle
 // trio — message-plane pin.
-test('case 7c: live-write chain — objective archive, reactivate'
+Deno.test('case 7c: live-write chain — objective archive, reactivate'
 + ' — message-plane pin via PUT organizations/:id/objectives/:id',
 async () => {
     const db = await seededDb();
@@ -1414,11 +1413,11 @@ async () => {
             state: 'archived',
         },
     ));
-    assert.equal(archived.status, 201);
+    assertStrictEquals(archived.status, 201);
     const afterArchive = await assertDerivedHistory(
         db, STARK_ORGANIZATION, objectiveId,
     );
-    assert.deepEqual(
+    assertEquals(
         afterArchive.map((row) => row.state),
         ['active', 'archived'],
     );
@@ -1430,17 +1429,17 @@ async () => {
             state: 'active',
         },
     ));
-    assert.equal(reactivated.status, 201);
+    assertStrictEquals(reactivated.status, 201);
     const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, objectiveId,
     );
-    assert.deepEqual(
+    assertEquals(
         derived.map((row) => row.state),
         ['active', 'archived', 'active'],
     );
 });
 
-test('case 7d: genesis-wins-under-skew — a clock-skewed'
+Deno.test('case 7d: genesis-wins-under-skew — a clock-skewed'
 + ' transition whose `at` sorts BELOW genesis does not displace'
 + ' it; the (at, id)-ordered full history still deepEquals the'
 + ' old plane', async () => {
@@ -1458,7 +1457,7 @@ test('case 7d: genesis-wins-under-skew — a clock-skewed'
             state: 'active',
         },
     ));
-    assert.equal(genesis.status, 201);
+    assertStrictEquals(genesis.status, 201);
 
     const skewed = await handleRequest(db, req(
         'PUT', typePath, token, {
@@ -1466,12 +1465,12 @@ test('case 7d: genesis-wins-under-skew — a clock-skewed'
             state: 'archived',
         },
     ));
-    assert.equal(skewed.status, 201);
+    assertStrictEquals(skewed.status, 201);
 
     const derived = await assertHistoryParity(
         db, STARK_ORGANIZATION, recordId,
     );
-    assert.deepEqual(
+    assertEquals(
         derived.map((row) => row.state),
         ['active', 'archived'],
     );
@@ -1479,7 +1478,7 @@ test('case 7d: genesis-wins-under-skew — a clock-skewed'
 
 // ---- case 8: the tombstone-fix interaction (Task 1) -------------
 
-test('case 8: the tombstone-fix interaction — a FENCED cross-org'
+Deno.test('case 8: the tombstone-fix interaction — a FENCED cross-org'
 + ' write never happened, so both planes agree the foreign'
 + ' entity has no injected event', async () => {
     const db = await seededDb();
@@ -1497,7 +1496,7 @@ test('case 8: the tombstone-fix interaction — a FENCED cross-org'
             '2026-05-02T00:00:00.000000Z',
         ),
     ));
-    assert.equal(foreignCreated.status, 201);
+    assertStrictEquals(foreignCreated.status, 201);
 
     // A STARK admin attempts to inject via the retired
     // states/:id address naming the FOREIGN idea — router
@@ -1516,7 +1515,7 @@ test('case 8: the tombstone-fix interaction — a FENCED cross-org'
         'PUT', retiredAppend, tokenStark,
         { entity_id: foreignIdeaId, state: 'archived', at: AT },
     ));
-    assert.equal(injected.status, 404);
+    assertStrictEquals(injected.status, 404);
 
     // Injected event never lands — no family history can
     // name it, and resolveOwningOrganization stays null
@@ -1527,12 +1526,12 @@ test('case 8: the tombstone-fix interaction — a FENCED cross-org'
         const history = await entityHistory(
             db, organization, foreignIdeaId,
         );
-        assert.equal(
+        assertStrictEquals(
             history.some((row) => row.id === injectedEventId),
             false,
         );
     }
-    assert.equal(
+    assertStrictEquals(
         await resolveOwningOrganization(
             db, injectedEventId, STARK_ORGANIZATION,
         ),

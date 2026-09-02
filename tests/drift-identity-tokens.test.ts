@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -170,7 +169,7 @@ function jtiOf(token: string): string {
 
 // -- 1: KEY ORDER — derived + stored PUT are id-LAST (G4) ------
 
-test('KEY ORDER: the derived row is id-LAST — matching'
+Deno.test('KEY ORDER: the derived row is id-LAST — matching'
 + ' validateIdentityTokenEntity\'s own return-literal order',
 async () => {
     const db = await freshDb();
@@ -186,12 +185,12 @@ async () => {
     const expectedOrder = [
         'jti', 'identity_id', 'action', 'chain_id', 'at', 'id',
     ];
-    assert.deepEqual(Object.keys(derived), expectedOrder);
+    assertEquals(Object.keys(derived), expectedOrder);
 });
 
 // G4: stored PUT = identityTokenEntityOf (id-last). GET wins.
 // The id-first writer pin is deleted — writer matches GET.
-test('stored PUT body equals identityTokenEntityOf id-last',
+Deno.test('stored PUT body equals identityTokenEntityOf id-last',
 async () => {
     const db = await freshDb();
     const id = generateIdentifier();
@@ -203,7 +202,7 @@ async () => {
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + id,
         DEV_TOKEN, fields,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const stored = JSON.parse(
         await storedPutBodyText(
             db, '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/', id,
@@ -215,17 +214,17 @@ async () => {
         method: 'PUT',
         body: fields,
     });
-    assert.equal(Object.keys(expected).at(-1), 'id');
-    assert.deepEqual(stored, expected);
+    assertStrictEquals(Object.keys(expected).at(-1), 'id');
+    assertEquals(stored, expected);
     const derived = await deriveIdentityToken(
         db, 'XXZruirZyAOoRpNxaDnpSA', id,
     );
-    assert.deepEqual(stored, derived);
+    assertEquals(stored, derived);
     const wire = await put.json();
-    assert.deepEqual(stored, wire);
+    assertEquals(stored, wire);
 });
 
-test('formTokenEventMessagePair stored body equals '
+Deno.test('formTokenEventMessagePair stored body equals '
 + 'identityTokenEntityOf id-last', async () => {
     const id = generateIdentifier();
     const event = {
@@ -245,17 +244,17 @@ test('formTokenEventMessagePair stored body equals '
         method: 'PUT',
         body: event,
     });
-    assert.equal(Object.keys(expected).at(-1), 'id');
-    assert.deepEqual(stored, expected);
+    assertStrictEquals(Object.keys(expected).at(-1), 'id');
+    assertEquals(stored, expected);
 });
 
 // Writer matches GET: successBody is identityTokenEntityOf
 // (id-last). The id-first pin is deleted.
-test('identities/:id/tokens/:tid successBody is id-last',
+Deno.test('identities/:id/tokens/:tid successBody is id-last',
 () => {
     const entry =
         WRITE_RESPONSE_SPECS['identities/:id/tokens/:tid'];
-    assert.ok(entry !== undefined && 'successBody' in entry);
+    assert(entry !== undefined && 'successBody' in entry);
     const body = entry.successBody!(
         ['XXZruirZyAOoRpNxaDnpSA', TOK_G4],
         {
@@ -265,15 +264,15 @@ test('identities/:id/tokens/:tid successBody is id-last',
         'XXZruirZyAOoRpNxaDnpSA',
         undefined,
     ) as { id: string };
-    assert.equal(Object.keys(body).at(-1), 'id');
-    assert.equal(body.id, TOK_G4);
+    assertStrictEquals(Object.keys(body).at(-1), 'id');
+    assertStrictEquals(body.id, TOK_G4);
 });
 
 // -- 2: GET wire byte-parity — the ACTUAL flipped route against --
 // -- a LITERAL id-LAST reconstruction of what was PUT: -----------
 // -- byIdAscending collection order, and the 404 body -------------
 
-test('GET /identities/:id/tokens + /:tid are wire'
+Deno.test('GET /identities/:id/tokens + /:tid are wire'
 + ' byte-identical to a literal id-LAST reconstruction of'
 + ' what was PUT: byIdAscending collection order and the'
 + ' 404 body',
@@ -328,8 +327,8 @@ async () => {
             'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/', DEV_TOKEN,
         ),
     );
-    assert.equal(collectionRes.status, 200);
-    assert.equal(
+    assertStrictEquals(collectionRes.status, 200);
+    assertStrictEquals(
         await collectionRes.text(), JSON.stringify(expected),
     );
 
@@ -339,8 +338,8 @@ async () => {
             '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + row.id,
             DEV_TOKEN,
         ));
-        assert.equal(singleRes.status, 200);
-        assert.equal(
+        assertStrictEquals(singleRes.status, 200);
+        assertStrictEquals(
             await singleRes.text(), JSON.stringify(row),
         );
     }
@@ -350,10 +349,10 @@ async () => {
         '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/oSBUDvuXylWVkqvrVHkJtA',
         DEV_TOKEN,
     ));
-    assert.equal(missingRes.status, 404);
+    assertStrictEquals(missingRes.status, 404);
     const missingBody =
         await missingRes.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         missingBody.error,
         'Not found: identity_tokens/oSBUDvuXylWVkqvrVHkJtA',
     );
@@ -363,7 +362,7 @@ async () => {
 // -- PARITY (the membershipExistsFor precedent, api/derive- -----
 // -- memberships.ts's own leg-5 shape) -------------------------------
 
-test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
+Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
 + ' (the plain adapter) vs in-tx (an open db.transaction view'
 + ' sharing rotateRefreshJti/revokeTokenChain\'s own table'
 + ' list) — the membershipExistsFor precedent', async () => {
@@ -388,8 +387,8 @@ test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
         (view) =>
             deriveIdentityTokenEventsForJti(view, JTI_TX),
     );
-    assert.deepEqual(inTx, preTx);
-    assert.equal(preTx.length, 2);
+    assertEquals(inTx, preTx);
+    assertStrictEquals(preTx.length, 2);
 
     const preTxMissing =
         await deriveIdentityTokenEventsForJti(db, GHOST_JTI);
@@ -398,8 +397,8 @@ test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
         (view) =>
             deriveIdentityTokenEventsForJti(view, GHOST_JTI),
     );
-    assert.deepEqual(inTxMissing, preTxMissing);
-    assert.deepEqual(preTxMissing, []);
+    assertEquals(inTxMissing, preTxMissing);
+    assertEquals(preTxMissing, []);
 });
 
 // -- 4: THE SECURITY PIN — mint via a real grant, revoke the ----
@@ -409,7 +408,7 @@ test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
 
 const PASSWORD = 's3cret';
 
-test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
+Deno.test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
 + ' token still passes the gate until exp; its REFRESH'
 + ' grant is 401ed (per-request revocation retired;'
 + ' mint-path checks remain)', async () => {
@@ -435,14 +434,14 @@ test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
         code_challenge: pkce.code_challenge,
         code_challenge_method: pkce.code_challenge_method,
     });
-    assert.equal(authorizeRes.status, 201);
+    assertStrictEquals(authorizeRes.status, 201);
     const { code } = await authorizeRes.json() as { code: string };
     const grantRes = await tokenGrant(db, {
         grant_type: 'authorization_code', code,
         client_id: 'web',
         code_verifier: pkce.verifier,
     });
-    assert.equal(grantRes.status, 201);
+    assertStrictEquals(grantRes.status, 201);
     const { access_token: accessToken } =
         await grantRes.json() as { access_token: string };
     const refreshToken = refreshTokenFromSetCookie(grantRes);
@@ -454,7 +453,7 @@ test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
             'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/', accessToken,
         ),
     );
-    assert.equal(before.status, 200);
+    assertStrictEquals(before.status, 200);
 
     // Revoke the whole chain.
     const revokeRes = await handleRequest(db, req(
@@ -462,7 +461,7 @@ test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
         `/identities/XXZruirZyAOoRpNxaDnpSA/tokens/${rootJti}/revocation`,
         accessToken, {},
     ));
-    assert.equal(revokeRes.status, 201);
+    assertStrictEquals(revokeRes.status, 201);
 
     // ACCESS still passes the gate (≤15-min staleness covenant).
     const afterAccess = await handleRequest(
@@ -470,14 +469,14 @@ test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
             'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/', accessToken,
         ),
     );
-    assert.equal(afterAccess.status, 200);
+    assertStrictEquals(afterAccess.status, 200);
 
     // REFRESH grant is denied at mint path.
     const refreshRes = await tokenGrant(db, {
         grant_type: 'refresh',
         refresh_token: refreshToken,
     });
-    assert.equal(refreshRes.status, 401);
+    assertStrictEquals(refreshRes.status, 401);
 });
 
 // -- 5: GATE 3 (Phase 13 Task 7) — the code-spend guard's -------
@@ -505,7 +504,7 @@ async function dbWithCodeLoginUser(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('authorizationCodeSpent: byte-identical pre-tx (the plain'
+Deno.test('authorizationCodeSpent: byte-identical pre-tx (the plain'
 + ' adapter) vs in-tx (an open db.transaction view sharing'
 + ' grantAuthorizationCode\'s own table list) — the'
 + ' membershipExistsFor / deriveIdentityTokenEventsForJti'
@@ -518,7 +517,7 @@ test('authorizationCodeSpent: byte-identical pre-tx (the plain'
         code_challenge: pkce.code_challenge,
         code_challenge_method: pkce.code_challenge_method,
     });
-    assert.equal(authorizeRes.status, 201);
+    assertStrictEquals(authorizeRes.status, 201);
     const { code } = await authorizeRes.json() as { code: string };
     const derivedId = await deriveAuthorizationCodeId(code);
 
@@ -533,15 +532,15 @@ test('authorizationCodeSpent: byte-identical pre-tx (the plain'
             view, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
         ),
     );
-    assert.equal(inTxBefore, preTxBefore);
-    assert.equal(preTxBefore, false);
+    assertStrictEquals(inTxBefore, preTxBefore);
+    assertStrictEquals(preTxBefore, false);
 
     const grantRes = await tokenGrant(db, {
         grant_type: 'authorization_code', code,
         client_id: 'web',
         code_verifier: pkce.verifier,
     });
-    assert.equal(grantRes.status, 201);
+    assertStrictEquals(grantRes.status, 201);
 
     const preTxAfter = await authorizationCodeSpent(
         db, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
@@ -552,35 +551,35 @@ test('authorizationCodeSpent: byte-identical pre-tx (the plain'
             view, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
         ),
     );
-    assert.equal(inTxAfter, preTxAfter);
-    assert.equal(preTxAfter, true);
+    assertStrictEquals(inTxAfter, preTxAfter);
+    assertStrictEquals(preTxAfter, true);
 });
 
 // -- 6: NESTED WIRE — collection under the identity; flat
 // -- prefix RETIRED; omit-PUT stamps identity_id from path ----
 
-test('GET /identities/XXZruirZyAOoRpNxaDnpSA/tokens is a 200 array',
+Deno.test('GET /identities/XXZruirZyAOoRpNxaDnpSA/tokens is a 200 array',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(
         db, req('GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
             , DEV_TOKEN),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const rows = await res.json() as unknown;
-    assert.ok(Array.isArray(rows));
+    assert(Array.isArray(rows));
 });
 
-test('GET /identity-tokens is retired (router 404)',
+Deno.test('GET /identity-tokens is retired (router 404)',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(
         db, req('GET', '/identity-tokens', DEV_TOKEN),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('GET stamps identity_id from the path when PUT omits it',
+Deno.test('GET stamps identity_id from the path when PUT omits it',
 async () => {
     const db = await freshDb();
     const id = generateIdentifier();
@@ -592,30 +591,30 @@ async () => {
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + id,
         DEV_TOKEN, withoutIdentity,
     ));
-    assert.ok(put.status === 200 || put.status === 201);
+    assert(put.status === 200 || put.status === 201);
     const list = await handleRequest(
         db, req('GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
             , DEV_TOKEN),
     );
-    assert.equal(list.status, 200);
+    assertStrictEquals(list.status, 200);
     const rows = await list.json() as readonly {
         readonly id: string;
         readonly identity_id: string;
     }[];
     const row = rows.find(r => r.id === id);
-    assert.ok(row, 'omitted-id event is in the collection');
-    assert.equal(row.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assert(row, 'omitted-id event is in the collection');
+    assertStrictEquals(row.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
     const leaf = await handleRequest(db, req(
         'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + id, DEV_TOKEN,
     ));
-    assert.equal(leaf.status, 200);
+    assertStrictEquals(leaf.status, 200);
     const one = await leaf.json() as {
         readonly identity_id: string;
     };
-    assert.equal(one.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(one.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
-test('GET /identities/:id/tokens dual-reads leftover flat',
+Deno.test('GET /identities/:id/tokens dual-reads leftover flat',
 async () => {
     const db = await freshDb();
     const id = generateIdentifier();
@@ -653,12 +652,12 @@ async () => {
         db, req('GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
             , DEV_TOKEN),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const rows = await res.json() as readonly {
         readonly id: string;
         readonly identity_id: string;
     }[];
     const row = rows.find(r => r.id === id);
-    assert.ok(row, 'leftover flat event is in the collection');
-    assert.equal(row.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assert(row, 'leftover flat event is in the collection');
+    assertStrictEquals(row.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
 });

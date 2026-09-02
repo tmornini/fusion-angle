@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     buildSaveEvents,
     buildRevivals,
@@ -65,7 +64,7 @@ function baseEdge(
 
 const EMPTY: StoredGraph = { nodes: [], edges: [] };
 
-test('buildFlowGraphDelta matches buildSaveEvents'
+Deno.test('buildFlowGraphDelta matches buildSaveEvents'
 + ' on add/move/delete/member/attribute', () => {
     const baseline: StoredGraph = {
         nodes: [
@@ -134,10 +133,10 @@ test('buildFlowGraphDelta matches buildSaveEvents'
     const server = buildFlowGraphDelta(
         baseline, working, FLOW_ID, makeMint(), AT,
     );
-    assert.deepEqual(server, client);
+    assertEquals(server, client);
 });
 
-test('buildFlowGraphRevivals matches buildRevivals'
+Deno.test('buildFlowGraphRevivals matches buildRevivals'
 + ' entity order and at (eventIds mint-shaped)', () => {
     const current: StoredGraph = {
         nodes: [baseNode('n-live')],
@@ -163,8 +162,8 @@ test('buildFlowGraphRevivals matches buildRevivals'
     const server = buildFlowGraphRevivals(
         current, target, makeMint(), AT,
     );
-    assert.equal(server.length, client.length);
-    assert.deepEqual(
+    assertStrictEquals(server.length, client.length);
+    assertEquals(
         server.map(r => ({
             entityId: r.entityId, at: r.at,
         })),
@@ -174,15 +173,15 @@ test('buildFlowGraphRevivals matches buildRevivals'
     );
 });
 
-test('empty-to-empty twin deltas are identical', () => {
+Deno.test('empty-to-empty twin deltas are identical', () => {
     const client = buildSaveEvents(
         EMPTY, EMPTY, FLOW_ID, makeMint(), AT,
     );
     const server = buildFlowGraphDelta(
         EMPTY, EMPTY, FLOW_ID, makeMint(), AT,
     );
-    assert.deepEqual(server, client);
-    assert.deepEqual(client, {
+    assertEquals(server, client);
+    assertEquals(client, {
         nodes: [],
         edges: [],
         deletions: [],

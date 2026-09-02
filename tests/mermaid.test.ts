@@ -1,5 +1,12 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertNotMatch,
+    assertNotStrictEquals,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import {
     generateMermaid,
     mermaidIdOf,
@@ -23,17 +30,17 @@ const minimalGraph = {
     edges: [],
 } as const;
 
-test('generateMermaid emits flowchart LR header', () => {
+Deno.test('generateMermaid emits flowchart LR header', () => {
     const result = generateMermaid(
         minimalGraph as never,
     );
-    assert.equal(
+    assertStrictEquals(
         result.split('\n')[0],
         'flowchart LR',
     );
 });
 
-test('generateMermaid emits start with stadium brackets', () => {
+Deno.test('generateMermaid emits start with stadium brackets', () => {
     const id = generateIdentifier();
     const result = generateMermaid({
         ...minimalGraph,
@@ -50,12 +57,12 @@ test('generateMermaid emits start with stadium brackets', () => {
             },
         ],
     } as never);
-    assert.ok(result.includes(
+    assert(result.includes(
         mermaidIdOf(id) + '([Begin])',
     ));
 });
 
-test('generateMermaid emits complete with triple parens', () => {
+Deno.test('generateMermaid emits complete with triple parens', () => {
     const id = generateIdentifier();
     const result = generateMermaid({
         ...minimalGraph,
@@ -72,12 +79,12 @@ test('generateMermaid emits complete with triple parens', () => {
             },
         ],
     } as never);
-    assert.ok(result.includes(
+    assert(result.includes(
         mermaidIdOf(id) + '(((Archive)))',
     ));
 });
 
-test('generateMermaid mermaid ids are injective', () => {
+Deno.test('generateMermaid mermaid ids are injective', () => {
     const dashBytes = new Uint8Array(16);
     dashBytes[0] = 62 << 2;
     const underBytes = new Uint8Array(16);
@@ -88,20 +95,20 @@ test('generateMermaid mermaid ids are injective', () => {
     for (let i = 0; i < dashId.length; i++) {
         if (dashId[i] !== underId[i]) {
             diffs += 1;
-            assert.equal(dashId[i], '-');
-            assert.equal(underId[i], '_');
+            assertStrictEquals(dashId[i], '-');
+            assertStrictEquals(underId[i], '_');
         }
     }
-    assert.equal(diffs, 1);
-    assert.notEqual(
+    assertStrictEquals(diffs, 1);
+    assertNotStrictEquals(
         mermaidIdOf(dashId),
         mermaidIdOf(underId),
     );
-    assert.match(
+    assertMatch(
         mermaidIdOf(dashId),
         /^[0-9a-f]{32}$/,
     );
-    assert.match(
+    assertMatch(
         mermaidIdOf(underId),
         /^[0-9a-f]{32}$/,
     );
@@ -132,15 +139,15 @@ test('generateMermaid mermaid ids are injective', () => {
     } as never);
     const dashHex = mermaidIdOf(dashId);
     const underHex = mermaidIdOf(underId);
-    assert.ok(result.includes(dashHex + '[Dash]'));
-    assert.ok(
+    assert(result.includes(dashHex + '[Dash]'));
+    assert(
         result.includes(underHex + '[Under]'),
     );
-    assert.ok(!result.includes(dashId));
-    assert.ok(!result.includes(underId));
+    assert(!result.includes(dashId));
+    assert(!result.includes(underId));
 });
 
-test('generateMermaid emits labeled edges', () => {
+Deno.test('generateMermaid emits labeled edges', () => {
     const fromId = generateIdentifier();
     const toId = generateIdentifier();
     const result = generateMermaid({
@@ -171,14 +178,14 @@ test('generateMermaid emits labeled edges', () => {
             },
         ],
     } as never);
-    assert.ok(result.includes(
+    assert(result.includes(
         mermaidIdOf(fromId)
             + ' -->|go| '
             + mermaidIdOf(toId),
     ));
 });
 
-test('generateMermaid emits unlabeled edges', () => {
+Deno.test('generateMermaid emits unlabeled edges', () => {
     const fromId = generateIdentifier();
     const toId = generateIdentifier();
     const result = generateMermaid({
@@ -209,15 +216,15 @@ test('generateMermaid emits unlabeled edges', () => {
             },
         ],
     } as never);
-    assert.ok(result.includes(
+    assert(result.includes(
         mermaidIdOf(fromId)
             + ' --> '
             + mermaidIdOf(toId),
     ));
-    assert.doesNotMatch(result, /\|/);
+    assertNotMatch(result, /\|/);
 });
 
-test('generateMermaid quotes labels with special chars', () => {
+Deno.test('generateMermaid quotes labels with special chars', () => {
     const id = generateIdentifier();
     const result = generateMermaid({
         ...minimalGraph,
@@ -233,13 +240,13 @@ test('generateMermaid quotes labels with special chars', () => {
             },
         ],
     } as never);
-    assert.ok(result.includes(
+    assert(result.includes(
         mermaidIdOf(id)
             + '["Has [bracket]"]',
     ));
 });
 
-test('parseMermaid extracts simple flowchart', () => {
+Deno.test('parseMermaid extracts simple flowchart', () => {
     const text = [
         'flowchart LR',
         '  a[Alpha]',
@@ -247,20 +254,20 @@ test('parseMermaid extracts simple flowchart', () => {
         '  a --> b',
     ].join('\n');
     const parsed = parseMermaid(text);
-    assert.equal(parsed.nodes.length, 2);
-    assert.equal(parsed.edges.length, 1);
-    assert.equal(
+    assertStrictEquals(parsed.nodes.length, 2);
+    assertStrictEquals(parsed.edges.length, 1);
+    assertStrictEquals(
         parsed.nodes[0]?.name, 'Alpha',
     );
-    assert.equal(
+    assertStrictEquals(
         parsed.edges[0]?.fromId, 'a',
     );
-    assert.equal(
+    assertStrictEquals(
         parsed.edges[0]?.toId, 'b',
     );
 });
 
-test('parseMermaid recognizes start and complete', () => {
+Deno.test('parseMermaid recognizes start and complete', () => {
     const text = [
         'flowchart LR',
         '  s([Start])',
@@ -273,11 +280,11 @@ test('parseMermaid recognizes start and complete', () => {
     const end = parsed.nodes.find(
         n => n.isArchive,
     );
-    assert.equal(start?.name, 'Start');
-    assert.equal(end?.name, 'End');
+    assertStrictEquals(start?.name, 'Start');
+    assertStrictEquals(end?.name, 'End');
 });
 
-test('parseMermaid extracts labeled edges', () => {
+Deno.test('parseMermaid extracts labeled edges', () => {
     const text = [
         'flowchart LR',
         '  a[A]',
@@ -285,12 +292,12 @@ test('parseMermaid extracts labeled edges', () => {
         '  a -->|approved| b',
     ].join('\n');
     const parsed = parseMermaid(text);
-    assert.equal(
+    assertStrictEquals(
         parsed.edges[0]?.name, 'approved',
     );
 });
 
-test('mermaid round-trip preserves structure', () => {
+Deno.test('mermaid round-trip preserves structure', () => {
     const startId = generateIdentifier();
     const midId = generateIdentifier();
     const endId = generateIdentifier();
@@ -337,17 +344,17 @@ test('mermaid round-trip preserves structure', () => {
     } as never;
     const text = generateMermaid(original);
     const parsed = parseMermaid(text);
-    assert.equal(parsed.nodes.length, 3);
-    assert.equal(parsed.edges.length, 2);
-    assert.equal(
+    assertStrictEquals(parsed.nodes.length, 3);
+    assertStrictEquals(parsed.edges.length, 2);
+    assertStrictEquals(
         parsed.nodes.filter(n => n.isCreate).length,
         1,
     );
-    assert.equal(
+    assertStrictEquals(
         parsed.nodes.filter(n => n.isArchive).length,
         1,
     );
-    assert.equal(
+    assertStrictEquals(
         parsed.edges[1]?.name, 'done',
     );
 });
@@ -355,7 +362,7 @@ test('mermaid round-trip preserves structure', () => {
 // Mermaid is topology only: node task
 // instructions deliberately do NOT round-trip.
 // Pin it so a future reader does not "fix" it.
-test('mermaid drops node task instructions', () => {
+Deno.test('mermaid drops node task instructions', () => {
     const id = generateIdentifier();
     const text = generateMermaid({
         ...minimalGraph,
@@ -373,19 +380,19 @@ test('mermaid drops node task instructions', () => {
         ],
         edges: [],
     } as never);
-    assert.ok(
+    assert(
         !text.includes('SECRET INSTRUCTIONS'),
     );
 });
 
-test('parseMermaid throws on an unsupported diagram type', () => {
-    assert.throws(
+Deno.test('parseMermaid throws on an unsupported diagram type', () => {
+    assertThrows(
         () => parseMermaid('sequenceDiagram\n  A->>B: hi'),
-        /Unsupported mermaid diagram/,
+        Error, 'Unsupported mermaid diagram',
     );
 });
 
-test('parseMermaid parses a state diagram pseudo-states',
+Deno.test('parseMermaid parses a state diagram pseudo-states',
 () => {
     const result = parseMermaid(
         'stateDiagram-v2\n'
@@ -394,13 +401,13 @@ test('parseMermaid parses a state diagram pseudo-states',
     );
     // [*] resolves to Create/Archive pseudo nodes.
     const names = result.nodes.map(n => n.name);
-    assert.ok(names.includes('Active'));
-    assert.ok(names.includes('Create'));
-    assert.ok(names.includes('Archive'));
-    assert.equal(result.edges.length, 2);
+    assert(names.includes('Active'));
+    assert(names.includes('Create'));
+    assert(names.includes('Archive'));
+    assertStrictEquals(result.edges.length, 2);
 });
 
-test('parseMermaid keeps edge label begin', () => {
+Deno.test('parseMermaid keeps edge label begin', () => {
     const text = [
         'flowchart LR',
         '  s([Create])',
@@ -410,16 +417,16 @@ test('parseMermaid keeps edge label begin', () => {
         '  a -->|submit| e',
     ].join('\n');
     const parsed = parseMermaid(text);
-    assert.equal(parsed.edges.length, 2);
-    assert.equal(
+    assertStrictEquals(parsed.edges.length, 2);
+    assertStrictEquals(
         parsed.edges[0]?.name, 'begin',
     );
-    assert.equal(
+    assertStrictEquals(
         parsed.edges[1]?.name, 'submit',
     );
 });
 
-test(
+Deno.test(
     'generateMermaid round-trip keeps begin',
     () => {
         const startId = generateIdentifier();
@@ -470,11 +477,11 @@ test(
         } as never;
         const text = generateMermaid(original);
         const parsed = parseMermaid(text);
-        assert.equal(parsed.edges.length, 2);
+        assertStrictEquals(parsed.edges.length, 2);
         const names = parsed.edges
             .map(e => e.name)
             .sort();
-        assert.deepEqual(
+        assertEquals(
             names, ['begin', 'submit'],
         );
     },

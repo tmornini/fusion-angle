@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertMatch,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
@@ -19,7 +23,7 @@ const validIdea = {
     state: 'active',
 };
 
-test('public PUT without Operation-ID is 400',
+Deno.test('public PUT without Operation-ID is 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -35,10 +39,10 @@ async () => {
             body: JSON.stringify(validIdea),
         }),
     );
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('public PUT with a short Operation-ID is 400',
+Deno.test('public PUT with a short Operation-ID is 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -53,10 +57,10 @@ async () => {
             operationId: 'too-short',
         }),
     );
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('public PUT with non-canonical Operation-ID'
+Deno.test('public PUT with non-canonical Operation-ID'
 + ' is 400',
 async () => {
     const db = memoryDbAdapter();
@@ -72,12 +76,12 @@ async () => {
             operationId: 'AAAAAAAAAAAAAAAAAAAA-B',
         }),
     );
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const body = await res.json() as { error: string };
-    assert.match(body.error, /identifier/);
+    assertMatch(body.error, /identifier/);
 });
 
-test('GET without Operation-ID is not 400',
+Deno.test('GET without Operation-ID is not 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -90,10 +94,10 @@ async () => {
             },
         }),
     );
-    assert.notEqual(res.status, 400);
+    assertNotStrictEquals(res.status, 400);
 });
 
-test('public PUT with Operation-ID stores both columns',
+Deno.test('public PUT with Operation-ID stores both columns',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -108,23 +112,23 @@ async () => {
             operationId: TEST_OPERATION_ID,
         }),
     );
-    assert.equal(res.status, 201);
-    assert.equal(
+    assertStrictEquals(res.status, 201);
+    assertStrictEquals(
         res.headers.get('Operation-ID'),
         TEST_OPERATION_ID,
     );
     const rows = await db.messagePairs.getAll();
     const written = rows.find((r) => r.uri_id === 'gBbNAWlPwMfXZvevoUPhFQ');
-    assert.ok(written);
-    assert.equal(written.method, 'PUT');
-    assert.equal(written.operation_id, TEST_OPERATION_ID);
+    assert(written);
+    assertStrictEquals(written.method, 'PUT');
+    assertStrictEquals(written.operation_id, TEST_OPERATION_ID);
 });
 
 // 22-char id distinct from TEST_OPERATION_ID so the
 // envelope pin cannot pass by accident on fixture ids.
 const ROTATION_OP = 'RotationOpId000000000w';
 
-test('rotation envelope copies Operation-ID onto every'
+Deno.test('rotation envelope copies Operation-ID onto every'
 + ' token-event pair',
 async () => {
     const db = memoryDbAdapter();
@@ -145,7 +149,7 @@ async () => {
             },
         }),
     );
-    assert.equal(seed.status, 201);
+    assertStrictEquals(seed.status, 201);
     const before = new Set(
         (await db.messagePairs.getAll()).map((r) => r.id),
     );
@@ -160,26 +164,26 @@ async () => {
             operationId: ROTATION_OP,
         }),
     );
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const fresh = (await db.messagePairs.getAll())
         .filter((r) => !before.has(r.id));
-    assert.ok(fresh.length > 1);
+    assert(fresh.length > 1);
     const outer = fresh.find((r) =>
         r.uri_collection
             === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
                 + 'kHAXckusBqJjgcJLEuEurg/rotation/',
     );
-    assert.ok(outer);
-    assert.equal(outer.operation_id, ROTATION_OP);
+    assert(outer);
+    assertStrictEquals(outer.operation_id, ROTATION_OP);
     for (const row of fresh) {
-        assert.equal(
+        assertStrictEquals(
             row.operation_id, ROTATION_OP,
             row.uri_collection + row.uri_id,
         );
     }
 });
 
-test('unauthenticated invitation write is 401, not 400',
+Deno.test('unauthenticated invitation write is 401, not 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -197,5 +201,5 @@ async () => {
             },
         ),
     );
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
 });

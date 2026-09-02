@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertMatch, assertStrictEquals } from '@std/assert';
 import {
     STORAGE_KEY_THEME,
 } from '../web-app/app/storage-keys.ts';
@@ -7,6 +6,13 @@ import {
     persistThemePreference,
     initListeners,
 } from '../web-app/app/state.ts';
+import { withLocalStorage } from
+    './fixtures/local-storage.ts';
+
+const NULL_STORAGE: Partial<Storage> = {
+    getItem: () => null,
+    setItem: () => {},
+};
 
 type ThemeButton = {
     innerHTML: string;
@@ -25,10 +31,6 @@ function installThemeDom(
     mobile: ThemeButton,
 ): void {
     const g = globalThis as Record<string, unknown>;
-    g.localStorage = {
-        getItem: () => null,
-        setItem: () => {},
-    };
     const root = {
         setAttribute: () => {},
         classList: { toggle: () => {} },
@@ -45,10 +47,10 @@ function installThemeDom(
     };
 }
 
-test(
+Deno.test(
     'a cross-tab theme storage event repaints the'
     + ' toggle icon',
-    () => {
+    () => withLocalStorage(NULL_STORAGE, () => {
         const desktop = makeButton();
         const mobile = makeButton();
         installThemeDom(desktop, mobile);
@@ -78,31 +80,30 @@ test(
         try {
             initListeners();
             persistThemePreference('light');
-            assert.match(desktop.innerHTML, /circle cx="12"/);
-            assert.match(mobile.innerHTML, /circle cx="12"/);
-            assert.equal(storageListeners.length, 1);
+            assertMatch(desktop.innerHTML, /circle cx="12"/);
+            assertMatch(mobile.innerHTML, /circle cx="12"/);
+            assertStrictEquals(storageListeners.length, 1);
             storageListeners[0]!({
                 key: STORAGE_KEY_THEME,
                 newValue: 'dark',
             });
-            assert.match(
+            assertMatch(
                 desktop.innerHTML, /M12 3a6 6 0 0 0 9 9/,
             );
-            assert.match(
+            assertMatch(
                 mobile.innerHTML, /M12 3a6 6 0 0 0 9 9/,
             );
         } finally {
-            delete g.localStorage;
             delete g.document;
             delete g.window;
         }
-    },
+    }),
 );
 
-test(
+Deno.test(
     'a prefers-color-scheme change event applies '
     + 'data-theme while preference is system',
-    () => {
+    () => withLocalStorage(NULL_STORAGE, () => {
         const g =
             globalThis as Record<string, unknown>;
         const attrs: Record<string, string> = {};
@@ -110,10 +111,6 @@ test(
             (e: { matches: boolean }) => void
         > = [];
         let matches = false;
-        g.localStorage = {
-            getItem: () => null,
-            setItem: () => {},
-        };
         g.document = {
             documentElement: {
                 setAttribute: (
@@ -144,17 +141,16 @@ test(
         try {
             initListeners();
             persistThemePreference('system');
-            assert.equal(attrs['data-theme'], 'light');
-            assert.equal(mediaListeners.length, 1);
+            assertStrictEquals(attrs['data-theme'], 'light');
+            assertStrictEquals(mediaListeners.length, 1);
             matches = true;
             mediaListeners[0]!({ matches: true });
-            assert.equal(attrs['data-theme'], 'dark');
+            assertStrictEquals(attrs['data-theme'], 'dark');
         } finally {
-            delete g.localStorage;
             delete g.document;
             delete g.window;
         }
-    },
+    }),
 );
 
 type ThemeMq = {
@@ -190,19 +186,15 @@ function makeThemeMq(
     };
 }
 
-test(
+Deno.test(
     'a MediaQueryList change on a later matchMedia '
     + 'call applies data-theme while preference is '
     + 'system',
-    () => {
+    () => withLocalStorage(NULL_STORAGE, () => {
         const g =
             globalThis as Record<string, unknown>;
         const attrs: Record<string, string> = {};
         let matches = true;
-        g.localStorage = {
-            getItem: () => null,
-            setItem: () => {},
-        };
         g.document = {
             documentElement: {
                 setAttribute: (
@@ -222,7 +214,7 @@ test(
         try {
             initListeners();
             persistThemePreference('system');
-            assert.equal(attrs['data-theme'], 'dark');
+            assertStrictEquals(attrs['data-theme'], 'dark');
             matches = false;
             const win = g.window as {
                 matchMedia: (q: string) => ThemeMq;
@@ -230,11 +222,10 @@ test(
             win.matchMedia(
                 '(prefers-color-scheme: dark)',
             ).dispatchChange();
-            assert.equal(attrs['data-theme'], 'light');
+            assertStrictEquals(attrs['data-theme'], 'light');
         } finally {
-            delete g.localStorage;
             delete g.document;
             delete g.window;
         }
-    },
+    }),
 );

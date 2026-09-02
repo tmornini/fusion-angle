@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assertEquals, assertMatch, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -271,7 +270,7 @@ async function seedFlow(
             },
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
 async function seedWorkOrder(
@@ -289,7 +288,7 @@ async function seedWorkOrder(
             position: 1,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
@@ -301,7 +300,7 @@ async function seedWorkOrder(
             at: AT,
         },
     ));
-    assert.equal(join.status, 201);
+    assertStrictEquals(join.status, 201);
 }
 
 async function seedLiveType(
@@ -316,7 +315,7 @@ async function seedLiveType(
             state: 'active',
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedAttribute(
@@ -328,7 +327,7 @@ async function seedAttribute(
     const put = await handleRequest(db, req(
         'PUT', ATTRS + attrId, token, body,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedWritableText(
@@ -358,7 +357,7 @@ async function seedInstance(
         'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     return put.headers.get('ETag')!;
 }
 
@@ -378,7 +377,7 @@ async function seedFlowTypeJoin(
             at: AT,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function bindInstance(
@@ -396,7 +395,7 @@ async function bindInstance(
             record_type_id: TYPE_ID,
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
 // Place the WO on n-step by leaving n-create (no required).
@@ -413,7 +412,7 @@ async function placeOnStep(
         token,
         pureMoveBody(eventId, NODE_STEP),
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
 async function baseSeed(): Promise<{
@@ -440,7 +439,7 @@ async function baseSeed(): Promise<{
 
 // --- A3 / W10 pins ---
 
-test(
+Deno.test(
     '1 pure move UNBOUND at required node → 400 bind',
     async () => {
         const { db, adminToken } = await baseSeed();
@@ -455,15 +454,15 @@ test(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-unbound', NODE_TARGET),
         ));
-        assert.equal(res.status, 400);
-        assert.deepEqual(await res.json(), {
+        assertStrictEquals(res.status, 400);
+        assertEquals(await res.json(), {
             error:
                 'work order has no instance binding',
         });
     },
 );
 
-test(
+Deno.test(
     '2 pure move bound + head satisfies → 204',
     async () => {
         const { db, adminToken } = await baseSeed();
@@ -482,11 +481,11 @@ test(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-ok', NODE_TARGET),
         ));
-        assert.equal(res.status, 201);
+        assertStrictEquals(res.status, 201);
     },
 );
 
-test(
+Deno.test(
     '3 pure move bound + head missing ref → 400 attr',
     async () => {
         const { db, adminToken } = await baseSeed();
@@ -504,19 +503,19 @@ test(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-miss', NODE_TARGET),
         ));
-        assert.equal(res.status, 400);
+        assertStrictEquals(res.status, 400);
         const err = await res.json() as {
             error: string;
         };
-        assert.match(
+        assertMatch(
             err.error,
             /required attribute\(s\) missing at exit/,
         );
-        assert.match(err.error, /Title/);
+        assertMatch(err.error, /Title/);
     },
 );
 
-test(
+Deno.test(
     '4 value-bearing fills ref in THIS delta → 204',
     async () => {
         const { db, adminToken } = await baseSeed();
@@ -544,11 +543,11 @@ test(
             }),
             { [IF_MATCH_HEADER]: etag },
         ));
-        assert.equal(res.status, 201);
+        assertStrictEquals(res.status, 201);
     },
 );
 
-test(
+Deno.test(
     '5 value-bearing CLEARING the ref → 400',
     async () => {
         const { db, adminToken } = await baseSeed();
@@ -579,19 +578,19 @@ test(
             }),
             { [IF_MATCH_HEADER]: etag },
         ));
-        assert.equal(res.status, 400);
+        assertStrictEquals(res.status, 400);
         const err = await res.json() as {
             error: string;
         };
-        assert.match(
+        assertMatch(
             err.error,
             /required attribute\(s\) missing at exit/,
         );
-        assert.match(err.error, /Title/);
+        assertMatch(err.error, /Title/);
     },
 );
 
-test(
+Deno.test(
     '6 no required refs: unbound pure move → 204',
     async () => {
         const { db, adminToken } = await baseSeed();
@@ -604,11 +603,11 @@ test(
             'POST', TRANSITION_FREE, adminToken,
             pureMoveBody('te-free', NODE_FREE),
         ));
-        assert.equal(res.status, 201);
+        assertStrictEquals(res.status, 201);
     },
 );
 
-test(
+Deno.test(
     '7 ladder: ACL 403 before required-exit 400',
     async () => {
         const {
@@ -654,8 +653,8 @@ test(
             }),
             { [IF_MATCH_HEADER]: etag },
         ));
-        assert.equal(res.status, 403);
-        assert.deepEqual(await res.json(), {
+        assertStrictEquals(res.status, 403);
+        assertEquals(await res.json(), {
             error:
                 'forbidden: attribute '
                 + ATTR_LOCKED
@@ -665,7 +664,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     '8 graph ref outside bound type → 400 residual',
     async () => {
         const { db, adminToken } = await baseSeed();
@@ -686,14 +685,14 @@ test(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-foreign', NODE_TARGET),
         ));
-        assert.equal(res.status, 400);
+        assertStrictEquals(res.status, 400);
         const err = await res.json() as {
             error: string;
         };
-        assert.match(
+        assertMatch(
             err.error,
             /required attribute\(s\) missing at exit/,
         );
-        assert.match(err.error, new RegExp(ATTR_FOREIGN));
+        assertMatch(err.error, new RegExp(ATTR_FOREIGN));
     },
 );

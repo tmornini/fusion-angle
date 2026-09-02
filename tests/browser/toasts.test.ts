@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import { useBrowser, withAdminPage, type Page } from
     './fixtures.ts';
 import { registryUrl } from
@@ -23,7 +22,7 @@ async function openInviteDialog(
     await page.waitFor('#invite-member-dialog[open]');
 }
 
-test('the close button detaches a toast inside its fade',
+Deno.test('the close button detaches a toast inside its fade',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         await openInviteDialog(page, origin.baseUrl);
@@ -53,7 +52,7 @@ async () => {
     });
 });
 
-test('the stack caps at five toasts',
+Deno.test('the stack caps at five toasts',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         await openInviteDialog(page, origin.baseUrl);
@@ -65,6 +64,6 @@ async () => {
             + `return n >= ${MAX_TOASTS} ? n : null; })()`,
             'stack filled',
         );
-        assert.equal(count, MAX_TOASTS);
+        assertStrictEquals(count, MAX_TOASTS);
     });
 });

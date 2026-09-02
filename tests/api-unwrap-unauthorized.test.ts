@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assertInstanceOf,
+    assertMatch,
+    assertNotInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     GET, UnauthorizedError, RequestError,
@@ -16,19 +21,15 @@ async function freshDb() {
 // UnauthorizedError — the one signal runtime recovery keys on
 // to decide "refresh, do not bounce." It is ALSO an Error, so
 // catch sites that match `instanceof Error` are unaffected.
-test('a 401 through a verb is an UnauthorizedError', async () => {
+Deno.test('a 401 through a verb is an UnauthorizedError', async () => {
     const db = await freshDb();
     const tok = await expiredToken();
-    await assert.rejects(
+    const err = await assertRejects(
         () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tok),
-        (err: unknown) => {
-            assert.ok(err instanceof UnauthorizedError);
-            assert.ok(err instanceof Error);
-            assert.match(
-                (err as UnauthorizedError).reason,
-                /invalid_token/);
-            return true;
-        });
+    ) as UnauthorizedError;
+    assertInstanceOf(err, UnauthorizedError);
+    assertInstanceOf(err, Error);
+    assertMatch(err.reason, /invalid_token/);
 });
 
 // A 403 is authorization, not authentication: a live token
@@ -36,36 +37,32 @@ test('a 401 through a verb is an UnauthorizedError', async () => {
 // recovery would loop refreshing a token that is already fine.
 // It IS a RequestError carrying status 403 — and still an Error,
 // so `instanceof Error` catch sites are unaffected.
-test('a 403 through a verb is a RequestError carrying status 403',
+Deno.test('a 403 through a verb is a RequestError carrying status 403',
 async () => {
     const db = await freshDb();   // no role granted
     const tok = await devToken();
-    await assert.rejects(
+    const err = await assertRejects(
         () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tok),
-        (err: unknown) => {
-            assert.ok(err instanceof RequestError);
-            assert.ok(err instanceof Error);
-            assert.ok(!(err instanceof UnauthorizedError));
-            assert.equal((err as RequestError).status, 403);
-            assert.match((err as Error).message, /forbidden/);
-            return true;
-        });
+    ) as RequestError;
+    assertInstanceOf(err, RequestError);
+    assertInstanceOf(err, Error);
+    assertNotInstanceOf(err, UnauthorizedError);
+    assertStrictEquals(err.status, 403);
+    assertMatch(err.message, /forbidden/);
 });
 
 // A 404 likewise carries its status, so the web layer can branch
 // on it (a clean "not found" message) instead of string-matching
 // server prose. Only 401 is special-cased into UnauthorizedError.
-test('a 404 through a verb is a RequestError carrying status 404',
+Deno.test('a 404 through a verb is a RequestError carrying status 404',
 async () => {
     const db = await freshDb();
     const tok = await devToken();
-    await assert.rejects(
+    const err = await assertRejects(
         () => GET(db, 'no-such-resource', tok),
-        (err: unknown) => {
-            assert.ok(err instanceof RequestError);
-            assert.ok(err instanceof Error);
-            assert.ok(!(err instanceof UnauthorizedError));
-            assert.equal((err as RequestError).status, 404);
-            return true;
-        });
+    ) as RequestError;
+    assertInstanceOf(err, RequestError);
+    assertInstanceOf(err, Error);
+    assertNotInstanceOf(err, UnauthorizedError);
+    assertStrictEquals(err.status, 404);
 });

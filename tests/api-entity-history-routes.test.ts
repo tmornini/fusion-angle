@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -70,7 +74,7 @@ function assertDesc(rows: HistoryEvent[]): void {
         const ordered =
             prev.at > cur.at
             || (prev.at === cur.at && prev.id > cur.id);
-        assert.ok(
+        assert(
             ordered,
             'history must be (at, id) DESC',
         );
@@ -116,7 +120,7 @@ async function seedIdeaLifecycle(
             ),
         ),
     );
-    assert.equal(g.status, 201);
+    assertStrictEquals(g.status, 201);
     const t = await handleRequest(
         db,
         req(
@@ -131,16 +135,16 @@ async function seedIdeaLifecycle(
             ),
         ),
     );
-    assert.equal(t.status, 201);
+    assertStrictEquals(t.status, 201);
 }
 
 function versionOf(res: Response): string {
     const tag = parseIfMatch(res.headers.get('ETag') ?? '');
-    assert.ok(tag !== undefined, 'PUT must advertise ETag');
+    assert(tag !== undefined, 'PUT must advertise ETag');
     return tag;
 }
 
-test(
+Deno.test(
     'GET organizations/:id/ideas/:id/versions/ 200 DESC; /history 404; '
     + '/versions/:etag serves that revision',
     async () => {
@@ -160,7 +164,7 @@ test(
                 ),
             ),
         );
-        assert.equal(genesis.status, 201);
+        assertStrictEquals(genesis.status, 201);
         const xDyDkxEPwtcNmJVknUHDsg = versionOf(genesis);
         const later = await handleRequest(
             db,
@@ -176,36 +180,36 @@ test(
                 ),
             ),
         );
-        assert.equal(later.status, 201);
+        assertStrictEquals(later.status, 201);
         const v2 = versionOf(later);
-        assert.notEqual(xDyDkxEPwtcNmJVknUHDsg, v2);
+        assertNotStrictEquals(xDyDkxEPwtcNmJVknUHDsg, v2);
 
         const index = await handleRequest(
             db,
             req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id +
                 '/versions/', DEV_TOKEN),
         );
-        assert.equal(index.status, 200);
+        assertStrictEquals(index.status, 200);
         const rows = await index.json() as {
             id: string;
             title: string;
             state: string;
         }[];
-        assert.equal(rows.length, 2);
-        assert.equal(rows[0]!.id, id);
-        assert.equal(rows[0]!.title, 'Hist Idea Revised');
-        assert.equal(rows[0]!.state, 'in_review');
-        assert.equal(rows[1]!.id, id);
-        assert.equal(rows[1]!.title, 'Hist Idea');
-        assert.equal(rows[1]!.state, 'active');
-        assert.equal('state_at' in rows[0]!, false);
+        assertStrictEquals(rows.length, 2);
+        assertStrictEquals(rows[0]!.id, id);
+        assertStrictEquals(rows[0]!.title, 'Hist Idea Revised');
+        assertStrictEquals(rows[0]!.state, 'in_review');
+        assertStrictEquals(rows[1]!.id, id);
+        assertStrictEquals(rows[1]!.title, 'Hist Idea');
+        assertStrictEquals(rows[1]!.state, 'active');
+        assertStrictEquals('state_at' in rows[0]!, false);
 
         const retired = await handleRequest(
             db,
             req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id +
                 '/history', DEV_TOKEN),
         );
-        assert.equal(retired.status, 404);
+        assertStrictEquals(retired.status, 404);
 
         const first = await handleRequest(
             db,
@@ -216,16 +220,16 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(first.status, 200);
+        assertStrictEquals(first.status, 200);
         const firstBody = await first.json() as {
             id: string;
             title: string;
             state: string;
         };
-        assert.equal(firstBody.id, id);
-        assert.equal(firstBody.title, 'Hist Idea');
-        assert.equal(firstBody.state, 'active');
-        assert.equal(versionOf(first), xDyDkxEPwtcNmJVknUHDsg);
+        assertStrictEquals(firstBody.id, id);
+        assertStrictEquals(firstBody.title, 'Hist Idea');
+        assertStrictEquals(firstBody.state, 'active');
+        assertStrictEquals(versionOf(first), xDyDkxEPwtcNmJVknUHDsg);
 
         const second = await handleRequest(
             db,
@@ -236,19 +240,19 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(second.status, 200);
+        assertStrictEquals(second.status, 200);
         const secondBody = await second.json() as {
             id: string;
             title: string;
             state: string;
         };
-        assert.equal(secondBody.title, 'Hist Idea Revised');
-        assert.equal(secondBody.state, 'in_review');
-        assert.equal(versionOf(second), v2);
+        assertStrictEquals(secondBody.title, 'Hist Idea Revised');
+        assertStrictEquals(secondBody.state, 'in_review');
+        assertStrictEquals(versionOf(second), v2);
     },
 );
 
-test(
+Deno.test(
     'GET organizations/:id/ideas/:id/versions/: 200 DESC current-first',
     async () => {
         const db = await freshDb();
@@ -259,21 +263,21 @@ test(
             req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id +
                 '/versions/', DEV_TOKEN),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const rows = await res.json() as {
             id: string;
             state: string;
         }[];
-        assert.equal(rows.length, 2);
-        assert.equal(rows[0]!.id, id);
-        assert.equal(rows[0]!.state, 'in_review');
-        assert.equal(rows[1]!.id, id);
-        assert.equal(rows[1]!.state, 'active');
-        assert.equal('state_at' in rows[0]!, false);
+        assertStrictEquals(rows.length, 2);
+        assertStrictEquals(rows[0]!.id, id);
+        assertStrictEquals(rows[0]!.state, 'in_review');
+        assertStrictEquals(rows[1]!.id, id);
+        assertStrictEquals(rows[1]!.state, 'active');
+        assertStrictEquals('state_at' in rows[0]!, false);
     },
 );
 
-test(
+Deno.test(
     'GET organizations/:id/ideas/:id/versions/ foreign'
     + ' → 404 at this address',
     async () => {
@@ -289,7 +293,7 @@ test(
                 ),
             ),
         );
-        assert.equal(list.status, 200);
+        assertStrictEquals(list.status, 200);
         const foreign =
             (await list.json() as { id: string }[])[0]!;
         const res = await handleRequest(
@@ -301,16 +305,16 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             body.error,
             'Not found: ideas/' + foreign.id,
         );
     },
 );
 
-test(
+Deno.test(
     'GET organizations/:id/ideas/:id/versions/ absent → 404',
     async () => {
         const db = await freshDb();
@@ -324,16 +328,16 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             body.error,
             'Not found: ideas/' + missing,
         );
     },
 );
 
-test(
+Deno.test(
     'GET organizations/:id/ideas/:id/versions/ is 200',
     async () => {
         const db = await freshDb();
@@ -348,14 +352,14 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const rows = await res.json() as {
             id: string;
             state: string;
         }[];
-        assert.equal(rows.length, 2);
-        assert.equal(rows[0]!.id, id);
-        assert.equal(rows[0]!.state, 'in_review');
+        assertStrictEquals(rows.length, 2);
+        assertStrictEquals(rows[0]!.id, id);
+        assertStrictEquals(rows[0]!.state, 'in_review');
     },
 );
 
@@ -399,7 +403,7 @@ async function seedProjectLifecycle(
             ),
         ),
     );
-    assert.equal(g.status, 201);
+    assertStrictEquals(g.status, 201);
     const t = await handleRequest(
         db,
         req(
@@ -414,10 +418,10 @@ async function seedProjectLifecycle(
             ),
         ),
     );
-    assert.equal(t.status, 201);
+    assertStrictEquals(t.status, 201);
 }
 
-test(
+Deno.test(
     'GET organizations/:id/projects/:id/versions: 200 DESC current-first',
     async () => {
         const db = await freshDb();
@@ -432,21 +436,21 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const rows = await res.json() as {
             id: string;
             state: string;
         }[];
-        assert.equal(rows.length, 2);
-        assert.equal(rows[0]!.id, id);
-        assert.equal(rows[0]!.state, 'under_review');
-        assert.equal(rows[1]!.id, id);
-        assert.equal(rows[1]!.state, 'submitted');
-        assert.equal('state_at' in rows[0]!, false);
+        assertStrictEquals(rows.length, 2);
+        assertStrictEquals(rows[0]!.id, id);
+        assertStrictEquals(rows[0]!.state, 'under_review');
+        assertStrictEquals(rows[1]!.id, id);
+        assertStrictEquals(rows[1]!.state, 'submitted');
+        assertStrictEquals('state_at' in rows[0]!, false);
     },
 );
 
-test(
+Deno.test(
     'GET organizations/:id/projects/:id/versions foreign'
     + ' → 404 at this address',
     async () => {
@@ -462,7 +466,7 @@ test(
                 ),
             ),
         );
-        assert.equal(list.status, 200);
+        assertStrictEquals(list.status, 200);
         const foreign =
             (await list.json() as { id: string }[])[0]!;
         const res = await handleRequest(
@@ -474,16 +478,16 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             body.error,
             'Not found: projects/' + foreign.id,
         );
     },
 );
 
-test(
+Deno.test(
     'GET organizations/:id/projects/:id/versions absent → 404',
     async () => {
         const db = await freshDb();
@@ -497,9 +501,9 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             body.error,
             'Not found: projects/' + missing,
         );
@@ -541,7 +545,7 @@ async function seedRecordLifecycle(
             ),
         ),
     );
-    assert.equal(g.status, 201);
+    assertStrictEquals(g.status, 201);
     const t = await handleRequest(
         db,
         req(
@@ -556,10 +560,10 @@ async function seedRecordLifecycle(
             ),
         ),
     );
-    assert.equal(t.status, 201);
+    assertStrictEquals(t.status, 201);
 }
 
-test(
+Deno.test(
     'GET nested record-types/:id/versions: 200 DESC current-first',
     async () => {
         const db = await freshDb();
@@ -574,21 +578,21 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const rows = await res.json() as {
             id: string;
             state: string;
         }[];
-        assert.equal(rows.length, 2);
-        assert.equal(rows[0]!.id, id);
-        assert.equal(rows[0]!.state, 'archived');
-        assert.equal(rows[1]!.id, id);
-        assert.equal(rows[1]!.state, 'active');
-        assert.equal('state_at' in rows[0]!, false);
+        assertStrictEquals(rows.length, 2);
+        assertStrictEquals(rows[0]!.id, id);
+        assertStrictEquals(rows[0]!.state, 'archived');
+        assertStrictEquals(rows[1]!.id, id);
+        assertStrictEquals(rows[1]!.state, 'active');
+        assertStrictEquals('state_at' in rows[0]!, false);
     },
 );
 
-test(
+Deno.test(
     'GET nested record-types/:id/versions foreign → 404',
     async () => {
         const db = await sharedMockDb();
@@ -603,7 +607,7 @@ test(
                 ),
             ),
         );
-        assert.equal(list.status, 200);
+        assertStrictEquals(list.status, 200);
         const foreign =
             (await list.json() as { id: string }[])[0]!;
         const res = await handleRequest(
@@ -615,16 +619,16 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             body.error,
             'Not found: record_types/' + foreign.id,
         );
     },
 );
 
-test(
+Deno.test(
     'GET nested record-types/:id/versions absent → 404',
     async () => {
         const db = await freshDb();
@@ -638,9 +642,9 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             body.error,
             'Not found: record_types/' + missing,
         );
@@ -697,9 +701,9 @@ async function seedFlowLifecycle(
             ),
         ),
     );
-    assert.equal(g.status, 201);
+    assertStrictEquals(g.status, 201);
     const headId = g.headers.get('Response-ID');
-    assert.ok(headId !== null);
+    assert(headId !== null);
     const t = await handleRequest(
         db,
         req(
@@ -721,11 +725,11 @@ async function seedFlowLifecycle(
             ).headers.get('ETag')! },
         ),
     );
-    assert.equal(t.status, 201);
+    assertStrictEquals(t.status, 201);
     return { ev1, ev2 };
 }
 
-test(
+Deno.test(
     'GET organizations/:id/flows/:id/versions: 200 DESC current-first',
     async () => {
         const db = await freshDb();
@@ -742,18 +746,18 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const rows = await res.json() as HistoryEvent[];
-        assert.equal(rows.length, 2);
-        assert.equal(rows[0]!.id, ev2);
-        assert.equal(rows[0]!.state, 'updated');
-        assert.equal(rows[1]!.id, ev1);
-        assert.equal(rows[1]!.state, 'active');
+        assertStrictEquals(rows.length, 2);
+        assertStrictEquals(rows[0]!.id, ev2);
+        assertStrictEquals(rows[0]!.state, 'updated');
+        assertStrictEquals(rows[1]!.id, ev1);
+        assertStrictEquals(rows[1]!.state, 'active');
         assertDesc(rows);
     },
 );
 
-test(
+Deno.test(
     'GET flows/:id/versions/ etag is the pair id,'
     + ' not version',
     async () => {
@@ -774,9 +778,9 @@ test(
                 ),
             ),
         );
-        assert.equal(genesis.status, 201);
+        assertStrictEquals(genesis.status, 201);
         const pairId = versionOf(genesis);
-        assert.equal(isIdentifier(pairId), true);
+        assertStrictEquals(isIdentifier(pairId), true);
 
         const res = await handleRequest(
             db,
@@ -787,19 +791,19 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const rows = await res.json() as HistoryEvent[];
-        assert.equal(rows.length, 1);
-        assert.equal(rows[0]!.etag, pairId);
-        assert.equal(
+        assertStrictEquals(rows.length, 1);
+        assertStrictEquals(rows[0]!.etag, pairId);
+        assertStrictEquals(
             isIdentifier(rows[0]!.etag ?? ''),
             true,
         );
-        assert.equal('version' in rows[0]!, false);
+        assertStrictEquals('version' in rows[0]!, false);
     },
 );
 
-test(
+Deno.test(
     'GET flows/:id/versions/ A→B→A has three etags',
     async () => {
         const db = await freshDb();
@@ -821,7 +825,7 @@ test(
                 ),
             ),
         );
-        assert.equal(first.status, 201);
+        assertStrictEquals(first.status, 201);
         const etagA = versionOf(first);
         const second = await handleRequest(
             db,
@@ -838,7 +842,7 @@ test(
                 { 'if-match': first.headers.get('ETag')! },
             ),
         );
-        assert.equal(second.status, 201);
+        assertStrictEquals(second.status, 201);
         const etagB = versionOf(second);
         const third = await handleRequest(
             db,
@@ -855,11 +859,11 @@ test(
                 { 'if-match': second.headers.get('ETag')! },
             ),
         );
-        assert.equal(third.status, 201);
+        assertStrictEquals(third.status, 201);
         const etagA2 = versionOf(third);
-        assert.notEqual(etagA, etagB);
-        assert.notEqual(etagB, etagA2);
-        assert.notEqual(etagA, etagA2);
+        assertNotStrictEquals(etagA, etagB);
+        assertNotStrictEquals(etagB, etagA2);
+        assertNotStrictEquals(etagA, etagA2);
 
         const res = await handleRequest(
             db,
@@ -869,20 +873,20 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const rows = await res.json() as HistoryEvent[];
-        assert.equal(rows.length, 3);
+        assertStrictEquals(rows.length, 3);
         const etags = rows.map((row) => row.etag);
-        assert.deepEqual(etags, [etagA2, etagB, etagA]);
-        assert.equal(new Set(etags).size, 3);
+        assertEquals(etags, [etagA2, etagB, etagA]);
+        assertStrictEquals(new Set(etags).size, 3);
         for (const etag of etags) {
-            assert.equal(isIdentifier(etag ?? ''), true);
+            assertStrictEquals(isIdentifier(etag ?? ''), true);
         }
-        assert.equal('version' in rows[0]!, false);
+        assertStrictEquals('version' in rows[0]!, false);
     },
 );
 
-test(
+Deno.test(
     'GET organizations/:id/flows/:id/versions foreign'
     + ' → 404 at this address',
     async () => {
@@ -898,7 +902,7 @@ test(
                 ),
             ),
         );
-        assert.equal(list.status, 200);
+        assertStrictEquals(list.status, 200);
         const foreign =
             (await list.json() as { id: string }[])[0]!;
         const res = await handleRequest(
@@ -910,16 +914,16 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             body.error,
             'Not found: flows/' + foreign.id,
         );
     },
 );
 
-test(
+Deno.test(
     'GET organizations/:id/flows/:id/versions absent → 404',
     async () => {
         const db = await freshDb();
@@ -933,9 +937,9 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             body.error,
             'Not found: flows/' + missing,
         );
@@ -973,7 +977,7 @@ async function seedObjectiveLifecycle(
             ),
         ),
     );
-    assert.equal(g.status, 201);
+    assertStrictEquals(g.status, 201);
     const t = await handleRequest(
         db,
         req(
@@ -987,10 +991,10 @@ async function seedObjectiveLifecycle(
             ),
         ),
     );
-    assert.equal(t.status, 201);
+    assertStrictEquals(t.status, 201);
 }
 
-test(
+Deno.test(
     'GET organizations/:id/objectives/:id/versions: 200 DESC current-first',
     async () => {
         const db = await freshDb();
@@ -1005,7 +1009,7 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const rows = await res.json() as {
             id: string;
             state: string;
@@ -1013,27 +1017,27 @@ test(
             at: string;
             member_id: string;
         }[];
-        assert.equal(rows.length, 2);
-        assert.equal(rows[0]!.id, id);
-        assert.equal(rows[0]!.state, 'archived');
-        assert.equal(rows[1]!.id, id);
-        assert.equal(rows[1]!.state, 'active');
-        assert.equal('state_at' in rows[0]!, false);
-        assert.equal(typeof rows[0]!.etag, 'string');
-        assert.notEqual(rows[0]!.etag, '');
-        assert.notEqual(
+        assertStrictEquals(rows.length, 2);
+        assertStrictEquals(rows[0]!.id, id);
+        assertStrictEquals(rows[0]!.state, 'archived');
+        assertStrictEquals(rows[1]!.id, id);
+        assertStrictEquals(rows[1]!.state, 'active');
+        assertStrictEquals('state_at' in rows[0]!, false);
+        assertStrictEquals(typeof rows[0]!.etag, 'string');
+        assertNotStrictEquals(rows[0]!.etag, '');
+        assertNotStrictEquals(
             rows[0]!.etag, rows[1]!.etag,
         );
-        assert.ok(rows[0]!.at >= rows[1]!.at);
-        assert.equal(typeof rows[0]!.member_id, 'string');
-        assert.notEqual(rows[0]!.member_id, '');
-        assert.equal(
+        assert(rows[0]!.at >= rows[1]!.at);
+        assertStrictEquals(typeof rows[0]!.member_id, 'string');
+        assertNotStrictEquals(rows[0]!.member_id, '');
+        assertStrictEquals(
             rows[0]!.member_id, rows[1]!.member_id,
         );
     },
 );
 
-test(
+Deno.test(
     'GET organizations/:id/objectives/:id/versions foreign'
     + ' → 404 at this address',
     async () => {
@@ -1049,7 +1053,7 @@ test(
                 ),
             ),
         );
-        assert.equal(list.status, 200);
+        assertStrictEquals(list.status, 200);
         const foreign =
             (await list.json() as { id: string }[])[0]!;
         const res = await handleRequest(
@@ -1061,16 +1065,16 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             body.error,
             'Not found: objectives/' + foreign.id,
         );
     },
 );
 
-test(
+Deno.test(
     'GET organizations/:id/objectives/:id/versions absent → 404',
     async () => {
         const db = await freshDb();
@@ -1084,9 +1088,9 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             body.error,
             'Not found: objectives/' + missing,
         );

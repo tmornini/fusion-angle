@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { loadInto } from
     '../web-app/app/loading-states.ts';
 import { html } from '../web-app/app/safe-html.ts';
@@ -20,7 +19,7 @@ function makeStubEl(): {
     };
 }
 
-test(
+Deno.test(
     'an empty fetch renders the empty state and'
     + ' calls onEmpty, never onData',
     async () => {
@@ -40,9 +39,9 @@ test(
             },
             onData: () => { dataCalls += 1; },
         });
-        assert.equal(emptied, 1);
-        assert.equal(dataCalls, 0);
-        assert.ok(
+        assertStrictEquals(emptied, 1);
+        assertStrictEquals(dataCalls, 0);
+        assert(
             el.innerHTML.includes(
                 'No Widgets Yet',
             ),
@@ -50,7 +49,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'a non-empty fetch calls onData, never'
     + ' onEmpty',
     async () => {
@@ -72,12 +71,12 @@ test(
                 received = data;
             },
         });
-        assert.equal(emptied, 0);
-        assert.deepEqual(received, [1]);
+        assertStrictEquals(emptied, 0);
+        assertEquals(received, [1]);
     },
 );
 
-test(
+Deno.test(
     'a rejecting fetch renders the error state'
     + ' and calls neither hook',
     async () => {
@@ -99,9 +98,9 @@ test(
             },
             onData: () => { dataCalls += 1; },
         });
-        assert.equal(emptied, 0);
-        assert.equal(dataCalls, 0);
-        assert.ok(
+        assertStrictEquals(emptied, 0);
+        assertStrictEquals(dataCalls, 0);
+        assert(
             el.innerHTML.includes('Try Again'),
         );
     },

@@ -1,5 +1,9 @@
-import { after, before, test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { connectPostgres } from
     '../api/postgres-client.ts';
 import {
@@ -34,19 +38,19 @@ import {
 // Skip when POSTGRES_URL is unset so ./validate stays
 // Postgres-free.
 
-const POSTGRES_URL = process.env['POSTGRES_URL'];
+const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const AT = '2026-01-01T00:00:00.000000Z';
 const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const FLOW_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/';
 
 function schemaName(): string {
-    const base = process.env['SCHEMA_NAME']
+    const base = Deno.env.get('SCHEMA_NAME')
         ?? (
             'fusion_test_'
             + String(Date.now())
             + '_'
-            + String(process.pid)
+            + String(Deno.pid)
         );
     const name = base + '_races';
     if (!IDENT.test(name)) {
@@ -202,9 +206,9 @@ function delay(ms: number): Promise<void> {
 }
 
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
-    test(
+    Deno.test(
         'postgres races skipped without POSTGRES_URL',
-        { skip: 'POSTGRES_URL is unset' },
+        { ignore: true }, // POSTGRES_URL is unset
         () => {},
     );
 } else {
@@ -220,7 +224,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         () => {},
     );
 
-    before(async () => {
+    Deno.test.beforeAll(async () => {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
@@ -228,7 +232,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await seedAdminSchema(db);
     });
 
-    after(async () => {
+    Deno.test.afterAll(async () => {
         try {
             await sql.unsafe(
                 'DROP SCHEMA IF EXISTS '
@@ -240,7 +244,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         }
     });
 
-    test('two first-writers: one 201, not a double insert',
+    Deno.test('two first-writers: one 201, not a double insert',
     async () => {
         const token = await organizationToken();
         const id = generateIdentifier();
@@ -261,14 +265,16 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 `;
                 raced = Promise.all([
                     handleRequest(db, req(
-                        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                        'PUT',
+                        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                             + '' + id, token,
                         flowDocument('A', generateIdentifier()),
                         undefined,
                         generateIdentifier(),
                     )),
                     handleRequest(db, req(
-                        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                        'PUT',
+                        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                             + '' + id, token,
                         flowDocument('B', generateIdentifier()),
                         undefined,
@@ -277,19 +283,19 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 ]);
                 await delay(300);
             });
-            assert.ok(raced !== undefined);
+            assert(raced !== undefined);
             const [left, right] = await raced;
             const statuses = [left.status, right.status];
-            assert.equal(
+            assertStrictEquals(
                 statuses.filter((s) => s === 201).length,
                 1,
             );
-            assert.ok(
+            assert(
                 statuses.some((s) =>
                     s === 412 || s === 428,
                 ),
             );
-            assert.equal(
+            assertStrictEquals(
                 await putHeadsAt(db, FLOW_PREFIX, id),
                 1,
             );
@@ -298,21 +304,21 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         }
     });
 
-    test('If-Match race: one 201, one 412', async () => {
+    Deno.test('If-Match race: one 201, one 412', async () => {
         const token = await organizationToken();
         const id = generateIdentifier();
         const created = await handleRequest(db, req(
             'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token
                 , flowCreate(id),
         ));
-        assert.equal(created.status, 201);
+        assertStrictEquals(created.status, 201);
         const live = await handleRequest(
             db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + id, token),
         );
-        assert.equal(live.status, 200);
+        assertStrictEquals(live.status, 200);
         const etag = live.headers.get('ETag');
-        assert.ok(etag !== null && etag !== '');
+        assert(etag !== null && etag !== '');
         const heads = await db.messagePairs.getAllWhere(
             'uri_collection', FLOW_PREFIX,
         );
@@ -325,7 +331,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                         ? -1
                         : b.id.localeCompare(a.id),
             )[0];
-        assert.ok(liveHead !== undefined);
+        assert(liveHead !== undefined);
         const holder = connectPostgres(
             urlWithSearchPath(POSTGRES_URL, schema),
         );
@@ -342,7 +348,8 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 `;
                 raced = Promise.all([
                     handleRequest(db, req(
-                        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                        'PUT',
+                        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                             + '' + id, token,
                         flowDocument(
                             'Left', generateIdentifier(),
@@ -351,7 +358,8 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                         generateIdentifier(),
                     )),
                     handleRequest(db, req(
-                        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                        'PUT',
+                        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                             + '' + id, token,
                         flowDocument(
                             'Right', generateIdentifier(),
@@ -362,14 +370,14 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 ]);
                 await delay(300);
             });
-            assert.ok(raced !== undefined);
+            assert(raced !== undefined);
             const [left, right] = await raced;
             const statuses = [left.status, right.status];
-            assert.equal(
+            assertStrictEquals(
                 statuses.filter((s) => s === 201).length,
                 1,
             );
-            assert.equal(
+            assertStrictEquals(
                 statuses.filter((s) => s === 412).length,
                 1,
             );
@@ -378,7 +386,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         }
     });
 
-    test('exact-hash dedup keeps one pair', async () => {
+    Deno.test('exact-hash dedup keeps one pair', async () => {
         const token = await organizationToken();
         const body = ideaDocument(
             'Dedup', 'ev-race-dedup',
@@ -396,15 +404,17 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 body, undefined, op,
             )),
         ]);
-        assert.equal(left.status, 201);
-        assert.equal(right.status, 201);
-        assert.equal(
-            await messagePairsAt(db, IDEA_PREFIX, 'rZrIDSkakoKzerGHZzJnJw'),
+        assertStrictEquals(left.status, 201);
+        assertStrictEquals(right.status, 201);
+        assertStrictEquals(
+            await messagePairsAt(
+                db, IDEA_PREFIX, 'rZrIDSkakoKzerGHZzJnJw',
+            ),
             1,
         );
     });
 
-    test('live deadlock maps to loud 500',
+    Deno.test('live deadlock maps to loud 500',
     { timeout: 8000 },
     async () => {
         const leftHeld = Promise.withResolvers<void>();
@@ -437,14 +447,14 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const rejected = settled.filter(
             (row) => row.status === 'rejected',
         );
-        assert.ok(rejected.length >= 1);
+        assert(rejected.length >= 1);
         const error = rejected[0]?.reason;
-        assert.ok(error instanceof ApiError);
-        assert.equal(error.status, HTTP_INTERNAL_ERROR);
-        assert.equal(error.message, 'deadlock');
+        assert(error instanceof ApiError);
+        assertStrictEquals(error.status, HTTP_INTERNAL_ERROR);
+        assertStrictEquals(error.message, 'deadlock');
     });
 
-    test('live statement timeout maps to 504',
+    Deno.test('live statement timeout maps to 504',
     async () => {
         const holder = connectPostgres(
             urlWithSearchPath(POSTGRES_URL, schema),
@@ -467,7 +477,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                         ))}
                     )
                 `;
-                await assert.rejects(
+                const error = await assertRejects(
                     () => tight.transaction(
                         ['message_pairs'],
                         'readonly',
@@ -475,12 +485,13 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                             txn as PostgresTx
                         ).lock(label),
                     ),
-                    (error: unknown) =>
-                        error instanceof ApiError
-                        && error.status
-                            === HTTP_GATEWAY_TIMEOUT
-                        && error.message
-                            === 'gateway timeout',
+                ) as ApiError;
+                assertInstanceOf(error, ApiError);
+                assertStrictEquals(
+                    error.status, HTTP_GATEWAY_TIMEOUT,
+                );
+                assertStrictEquals(
+                    error.message, 'gateway timeout',
                 );
             });
         } finally {

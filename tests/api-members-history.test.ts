@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
@@ -24,7 +23,7 @@ function req(
     });
 }
 
-test(
+Deno.test(
     'GET members/:id/versions is retired 404',
     async () => {
         const db = memoryDbAdapter();
@@ -38,11 +37,11 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
     },
 );
 
-test(
+Deno.test(
     'GET members/:id/versions absent is retired 404',
     async () => {
         const db = memoryDbAdapter();
@@ -55,6 +54,6 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
     },
 );

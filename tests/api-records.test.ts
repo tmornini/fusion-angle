@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertRejects, assertStrictEquals } from '@std/assert';
 import {
     GET, PUT, DELETE,
 } from '../api/api.ts';
@@ -26,18 +25,18 @@ const ATTR = ATTRS + 'UQBiHFcwJeCDSnmkPBoYRA';
 
 // record-types
 
-test(
+Deno.test(
     'GET nested record-types returns an empty array'
     + ' on an empty db',
     async () => {
         const db = await freshDb();
         const out =
             await GET<unknown[]>(db, TYPES, DEV_TOKEN);
-        assert.deepEqual(out, []);
+        assertEquals(out, []);
     },
 );
 
-test(
+Deno.test(
     'PUT nested record-types/:id then GET round-trips',
     async () => {
         const db = await freshDb();
@@ -56,15 +55,15 @@ test(
             position: number;
             state: string;
         }>(db, TYPE, DEV_TOKEN);
-        assert.equal(stored.id, 'rbfHGatkwQzGZJVXKJEeyw');
-        assert.equal(stored.name, 'Customer');
-        assert.equal(stored.position, 1);
-        assert.equal(stored.state, 'active');
-        assert.equal('state_at' in stored, false);
+        assertStrictEquals(stored.id, 'rbfHGatkwQzGZJVXKJEeyw');
+        assertStrictEquals(stored.name, 'Customer');
+        assertStrictEquals(stored.position, 1);
+        assertStrictEquals(stored.state, 'active');
+        assertStrictEquals('state_at' in stored, false);
     },
 );
 
-test(
+Deno.test(
     'DELETE nested record-types/:id removes the type',
     async () => {
         const db = await freshDb();
@@ -77,7 +76,7 @@ test(
             state: 'active',
         }, DEV_TOKEN);
         await DELETE(db, TYPE, DEV_TOKEN);
-        await assert.rejects(
+        await assertRejects(
             () => GET(db, TYPE, DEV_TOKEN),
         );
     },
@@ -85,7 +84,7 @@ test(
 
 // nested attributes
 
-test(
+Deno.test(
     'GET nested attributes returns an empty array',
     async () => {
         const db = await freshDb();
@@ -100,11 +99,11 @@ test(
         const out = await GET<unknown[]>(
             db, ATTRS, DEV_TOKEN,
         );
-        assert.deepEqual(out, []);
+        assertEquals(out, []);
     },
 );
 
-test(
+Deno.test(
     'PUT nested attributes/:id then GET round-trips',
     async () => {
         const db = await freshDb();
@@ -128,15 +127,15 @@ test(
             record_type_id: string;
             attribute_type: string;
         }>(db, ATTR, DEV_TOKEN);
-        assert.equal(stored.id, 'UQBiHFcwJeCDSnmkPBoYRA');
-        assert.equal(stored.record_type_id, 'rbfHGatkwQzGZJVXKJEeyw');
-        assert.equal(
+        assertStrictEquals(stored.id, 'UQBiHFcwJeCDSnmkPBoYRA');
+        assertStrictEquals(stored.record_type_id, 'rbfHGatkwQzGZJVXKJEeyw');
+        assertStrictEquals(
             stored.attribute_type, 'text',
         );
     },
 );
 
-test(
+Deno.test(
     'DELETE nested attributes/:id removes the row',
     async () => {
         const db = await freshDb();
@@ -156,7 +155,7 @@ test(
             constraints: [],
         }, DEV_TOKEN);
         await DELETE(db, ATTR, DEV_TOKEN);
-        await assert.rejects(
+        await assertRejects(
             () => GET(db, ATTR, DEV_TOKEN),
         );
     },
@@ -165,7 +164,7 @@ test(
 // flow-records (nested under
 // organizations/:id/flows/:id/records) — UNTOUCHED
 
-test(
+Deno.test(
     'GET organizations/:id/flows/:id/records returns an empty array',
     async () => {
         const db = await freshDb();
@@ -173,11 +172,11 @@ test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/records/', DEV_TOKEN,
         );
-        assert.deepEqual(out, []);
+        assertEquals(out, []);
     },
 );
 
-test(
+Deno.test(
     'PUT organizations/:id/flows/:id/records/:frid then GET round-trips a'
     + ' binding',
     async () => {
@@ -197,12 +196,12 @@ test(
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aEsGMmBEFaVdWihhHXwCbw/records/dCnpryxCNwuTnCrBBDIMOw'
             , DEV_TOKEN);
-        assert.equal(stored.flow_id, 'aEsGMmBEFaVdWihhHXwCbw');
-        assert.equal(stored.record_id, 'rbfHGatkwQzGZJVXKJEeyw');
+        assertStrictEquals(stored.flow_id, 'aEsGMmBEFaVdWihhHXwCbw');
+        assertStrictEquals(stored.record_id, 'rbfHGatkwQzGZJVXKJEeyw');
     },
 );
 
-test(
+Deno.test(
     'DELETE organizations/:id/flows/:id/records/:frid removes the binding',
     async () => {
         const db = await freshDb();
@@ -219,7 +218,7 @@ test(
                 + 'aEsGMmBEFaVdWihhHXwCbw/records/dCnpryxCNwuTnCrBBDIMOw'
                 , DEV_TOKEN,
         );
-        await assert.rejects(
+        await assertRejects(
             () => GET(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + 'aEsGMmBEFaVdWihhHXwCbw/records/'

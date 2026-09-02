@@ -1,9 +1,14 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -251,7 +256,7 @@ async function seedFlow(
             },
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
 async function seedWorkOrder(
@@ -268,7 +273,7 @@ async function seedWorkOrder(
             position: 1,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
@@ -280,7 +285,7 @@ async function seedWorkOrder(
             at: AT,
         },
     ));
-    assert.equal(join.status, 201);
+    assertStrictEquals(join.status, 201);
 }
 
 async function seedLiveType(
@@ -295,7 +300,7 @@ async function seedLiveType(
             state: 'active',
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedAttribute(
@@ -307,7 +312,7 @@ async function seedAttribute(
     const put = await handleRequest(db, req(
         'PUT', ATTRS + attrId, token, body,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedWritableText(
@@ -339,7 +344,7 @@ async function seedInstance(
         'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     return put.headers.get('ETag')!;
 }
 
@@ -359,7 +364,7 @@ async function seedFlowTypeJoin(
             at: AT,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function bindInstance(
@@ -379,7 +384,7 @@ async function bindInstance(
             record_type_id: recordTypeId,
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
 async function seededBound(): Promise<{
@@ -422,7 +427,7 @@ async function seededBound(): Promise<{
 
 // --- 1. set/clear dialect ---
 
-test('duplicate attribute_id in set → 400',
+Deno.test('duplicate attribute_id in set → 400',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
@@ -435,12 +440,12 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(err.error, /duplicate attribute_id/);
+    assertMatch(err.error, /duplicate attribute_id/);
 });
 
-test('set∩clear overlap → 400',
+Deno.test('set∩clear overlap → 400',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
@@ -454,12 +459,12 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(err.error, /set and clear/);
+    assertMatch(err.error, /set and clear/);
 });
 
-test("set value '' → 400",
+Deno.test("set value '' → 400",
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
@@ -471,12 +476,12 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(err.error, /empty/i);
+    assertMatch(err.error, /empty/i);
 });
 
-test('set+clear keys present but both empty → 400',
+Deno.test('set+clear keys present but both empty → 400',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
@@ -488,9 +493,9 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(
+    assertMatch(
         err.error,
         /non-empty set or clear/,
     );
@@ -498,22 +503,22 @@ async () => {
 
 // --- 2. If-Match ladder ---
 
-test('value-bearing missing If-Match → 428',
+Deno.test('value-bearing missing If-Match → 428',
 async () => {
     const { db, adminToken } = await seededBound();
     const res = await handleRequest(db, req(
         'POST', TRANSITION, adminToken,
         valueBody(),
     ));
-    assert.equal(res.status, 428);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 428);
+    assertEquals(await res.json(), {
         error:
             'If-Match is required to transition with'
             + ' set/clear at ' + TRANSITION,
     });
 });
 
-test('value-bearing malformed If-Match → 400',
+Deno.test('value-bearing malformed If-Match → 400',
 async () => {
     const { db, adminToken } = await seededBound();
     const malformed = [
@@ -529,11 +534,11 @@ async () => {
             valueBody({ eventId: 'te-mal-' + raw }),
             { [IF_MATCH_HEADER]: raw },
         ));
-        assert.equal(
+        assertStrictEquals(
             res.status, 400,
             'malformed If-Match: ' + raw,
         );
-        assert.deepEqual(await res.json(), {
+        assertEquals(await res.json(), {
             error:
                 'If-Match must carry exactly one'
                 + ' strong validator',
@@ -541,7 +546,7 @@ async () => {
     }
 });
 
-test('value-bearing stale If-Match → 412',
+Deno.test('value-bearing stale If-Match → 412',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const first = await handleRequest(db, req(
@@ -557,7 +562,7 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const stale = await handleRequest(db, req(
         'POST', TRANSITION, adminToken,
         valueBody({
@@ -571,15 +576,15 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(stale.status, 412);
-    assert.deepEqual(await stale.json(), {
+    assertStrictEquals(stale.status, 412);
+    assertEquals(await stale.json(), {
         error:
             'If-Match does not match the current '
             + 'instance at ' + INSTANCE_DETAIL,
     });
 });
 
-test('value-bearing fresh If-Match → 204; head advances',
+Deno.test('value-bearing fresh If-Match → 204; head advances',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const before = await instancePairCount(db);
@@ -595,39 +600,39 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const get = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, adminToken,
     ));
-    assert.equal(get.status, 200);
+    assertStrictEquals(get.status, 200);
     const body = await get.json() as {
         values: { attribute_id: string; value: string }[];
     };
-    assert.deepEqual(body.values, [
+    assertEquals(body.values, [
         { attribute_id: ATTR_ID, value: 'World' },
     ]);
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assert.ok(head !== undefined);
+    assert(head !== undefined);
     const getEtag = get.headers.get('ETag');
-    assert.ok(
+    assert(
         getEtag !== null
         && isIdentifier(getEtag.slice(1, -1)),
     );
-    assert.equal(getEtag, strongEtagOf(head.messagePairId));
-    assert.notEqual(
+    assertStrictEquals(getEtag, strongEtagOf(head.messagePairId));
+    assertNotStrictEquals(
         get.headers.get('ETag'),
         etag,
     );
-    assert.equal(
+    assertStrictEquals(
         await instancePairCount(db),
         before + 1,
         'one revision pair on the instance',
     );
 });
 
-test('pure move WITH If-Match → 400',
+Deno.test('pure move WITH If-Match → 400',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
@@ -635,10 +640,10 @@ async () => {
         pureMoveBody('te-pure-if'),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test(
+Deno.test(
     'pure move does not advance instance etag; '
     + 'held If-Match PATCH is 201',
     async () => {
@@ -648,7 +653,7 @@ test(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-pure-etag'),
         ));
-        assert.equal(move.status, 201);
+        assertStrictEquals(move.status, 201);
         const patch = await handleRequest(db, req(
             'PATCH', INSTANCE_DETAIL, adminToken,
             {
@@ -661,11 +666,11 @@ test(
             },
             { [IF_MATCH_HEADER]: etag },
         ));
-        assert.equal(patch.status, 201);
+        assertStrictEquals(patch.status, 201);
     },
 );
 
-test(
+Deno.test(
     'value-bearing transition then stale instance '
     + 'PATCH is 412',
     async () => {
@@ -684,7 +689,7 @@ test(
             }),
             { [IF_MATCH_HEADER]: etag },
         ));
-        assert.equal(tx.status, 201);
+        assertStrictEquals(tx.status, 201);
         const patch = await handleRequest(db, req(
             'PATCH', INSTANCE_DETAIL, adminToken,
             {
@@ -697,13 +702,13 @@ test(
             },
             { [IF_MATCH_HEADER]: etag },
         ));
-        assert.equal(patch.status, 412);
+        assertStrictEquals(patch.status, 412);
     },
 );
 
 // --- 3. A2 presence ---
 
-test('set present + missing instance_id → 400',
+Deno.test('set present + missing instance_id → 400',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
@@ -711,15 +716,15 @@ async () => {
         valueBody({ includeInstanceId: false }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(
+    assertMatch(
         err.error,
         /instance_id and.*record_type_id are required/,
     );
 });
 
-test('set present + missing record_type_id → 400',
+Deno.test('set present + missing record_type_id → 400',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
@@ -727,15 +732,15 @@ async () => {
         valueBody({ includeRecordTypeId: false }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(
+    assertMatch(
         err.error,
         /instance_id and.*record_type_id are required/,
     );
 });
 
-test('pure move carrying instance_id → 400',
+Deno.test('pure move carrying instance_id → 400',
 async () => {
     const { db, adminToken } = await seededBound();
     const res = await handleRequest(db, req(
@@ -744,12 +749,12 @@ async () => {
             instance_id: INSTANCE_ID,
         },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(err.error, /forbidden on a pure move/);
+    assertMatch(err.error, /forbidden on a pure move/);
 });
 
-test('pure move carrying record_type_id → 400',
+Deno.test('pure move carrying record_type_id → 400',
 async () => {
     const { db, adminToken } = await seededBound();
     const res = await handleRequest(db, req(
@@ -758,14 +763,14 @@ async () => {
             record_type_id: TYPE_ID,
         },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(err.error, /forbidden on a pure move/);
+    assertMatch(err.error, /forbidden on a pure move/);
 });
 
 // --- 4. bind assert ---
 
-test('body bind ≠ current bind → 400',
+Deno.test('body bind ≠ current bind → 400',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
@@ -773,15 +778,15 @@ async () => {
         valueBody({ instanceId: INSTANCE_OTHER }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(
+    assertMatch(
         err.error,
         /do not match the work order's binding/,
     );
 });
 
-test('value-bearing on UNBOUND WO → 400',
+Deno.test('value-bearing on UNBOUND WO → 400',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
@@ -792,15 +797,15 @@ async () => {
         valueBody({ eventId: 'te-unbound' }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 400);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 400);
+    assertEquals(await res.json(), {
         error: 'work order has no instance binding',
     });
 });
 
 // --- 5. ACL ---
 
-test('set naming role-locked attribute → 403',
+Deno.test('set naming role-locked attribute → 403',
 async () => {
     const {
         db, adminToken, memberToken, etag,
@@ -833,8 +838,8 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 403);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
         error:
             'forbidden: attribute '
             + ATTR_LOCKED
@@ -842,7 +847,7 @@ async () => {
     });
 });
 
-test('CLEAR naming role-locked attribute → 403',
+Deno.test('CLEAR naming role-locked attribute → 403',
 async () => {
     const {
         db, adminToken, memberToken,
@@ -889,7 +894,7 @@ async () => {
             },
             { [IF_MATCH_HEADER]: headEtag! },
         ));
-        assert.equal(patch.status, 201);
+        assertStrictEquals(patch.status, 201);
         headEtag = patch.headers.get('ETag');
     }
     const res = await handleRequest(db, req(
@@ -902,8 +907,8 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: headEtag! },
     ));
-    assert.equal(res.status, 403);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
         error:
             'forbidden: attribute '
             + ATTR_LOCKED
@@ -911,7 +916,7 @@ async () => {
     });
 });
 
-test('admin bypasses role-locked attribute ACL',
+Deno.test('admin bypasses role-locked attribute ACL',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     await seedAttribute(db, adminToken, ATTR_LOCKED, {
@@ -936,12 +941,12 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 });
 
 // --- 6. constraints ---
 
-test('type-nonconforming value → 400',
+Deno.test('type-nonconforming value → 400',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     await seedAttribute(db, adminToken, ATTR_NUM, {
@@ -966,14 +971,14 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(err.error, /finite number/);
+    assertMatch(err.error, /finite number/);
 });
 
 // --- 7. one tx ---
 
-test('fresh success grows requests by EXACTLY 2',
+Deno.test('fresh success grows requests by EXACTLY 2',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const before = await requestCount(db);
@@ -982,14 +987,14 @@ async () => {
         valueBody({ eventId: 'te-tx-2' }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 201);
-    assert.equal(
+    assertStrictEquals(res.status, 201);
+    assertStrictEquals(
         await requestCount(db),
         before + 2,
     );
 });
 
-test('pre-tx failure grows requests by 0',
+Deno.test('pre-tx failure grows requests by 0',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const before = await requestCount(db);
@@ -1005,8 +1010,8 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 400);
-    assert.equal(
+    assertStrictEquals(res.status, 400);
+    assertStrictEquals(
         await requestCount(db),
         before,
     );
@@ -1014,7 +1019,7 @@ async () => {
 
 // --- 8. race ---
 
-test('two concurrent value-bearing same If-Match → '
+Deno.test('two concurrent value-bearing same If-Match → '
 + '[204, 412] and one revision',
 async () => {
     const { db, adminToken, etag } = await seededBound();
@@ -1047,11 +1052,11 @@ async () => {
             { [IF_MATCH_HEADER]: etag },
         )),
     ]);
-    assert.deepEqual(
+    assertEquals(
         [a.status, b.status].sort(),
         [201, 412],
     );
-    assert.equal(
+    assertStrictEquals(
         await instancePairCount(db),
         beforePairs + 1,
         'exactly one revision pair',
@@ -1060,7 +1065,7 @@ async () => {
 
 // --- 9. byte-identical resend ---
 
-test('byte-identical resend → 204 replay, no second '
+Deno.test('byte-identical resend → 204 replay, no second '
 + 'revision',
 async () => {
     const { db, adminToken, etag } = await seededBound();
@@ -1080,20 +1085,20 @@ async () => {
         'POST', TRANSITION, adminToken, body,
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const afterFirst = await instancePairCount(db);
     const afterFirstReq = await requestCount(db);
     const replay = await handleRequest(db, req(
         'POST', TRANSITION, adminToken, body,
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(replay.status, 201);
-    assert.equal(
+    assertStrictEquals(replay.status, 201);
+    assertStrictEquals(
         await instancePairCount(db),
         afterFirst,
         'no second revision on replay',
     );
-    assert.equal(
+    assertStrictEquals(
         await requestCount(db),
         afterFirstReq,
         'no second operation message pair on replay',
@@ -1102,7 +1107,7 @@ async () => {
 
 // --- 10. honest miss ---
 
-test('absent WO transition (instance shape) → 404',
+Deno.test('absent WO transition (instance shape) → 404',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
@@ -1113,10 +1118,10 @@ async () => {
         valueBody({ eventId: 'te-absent' }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('absent WO pure-move transition → 404',
+Deno.test('absent WO pure-move transition → 404',
 async () => {
     const { db, adminToken } = await seededBound();
     const res = await handleRequest(db, req(
@@ -1126,6 +1131,6 @@ async () => {
         adminToken,
         pureMoveBody('te-absent-pure'),
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 

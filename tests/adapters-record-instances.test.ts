@@ -1,6 +1,11 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import {
+    assert,
+    assertInstanceOf,
+    assertNotMatch,
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -68,7 +73,7 @@ async function seededCtx() {
     return { db, ctx };
 }
 
-test(
+Deno.test(
     'instance create → list → patch → 412 → retry →'
     + ' delete → history',
     async () => {
@@ -83,16 +88,16 @@ test(
                 },
             ],
         );
-        assert.ok(created.etag.length > 0);
+        assert(created.etag.length > 0);
 
         // list embeds etag
         const list = await getRecordInstances(
             ctx, TYPE_ID,
         );
-        assert.equal(list.length, 1);
-        assert.equal(list[0]!.id, INSTANCE_ID);
-        assert.equal(list[0]!.etag, created.etag);
-        assert.equal(
+        assertStrictEquals(list.length, 1);
+        assertStrictEquals(list[0]!.id, INSTANCE_ID);
+        assertStrictEquals(list[0]!.etag, created.etag);
+        assertStrictEquals(
             list[0]!.values.get(ATTR_ID), 'v0',
         );
 
@@ -100,8 +105,8 @@ test(
         const detail = await getRecordInstance(
             ctx, TYPE_ID, INSTANCE_ID,
         );
-        assert.equal(detail.etag, created.etag);
-        assert.equal(
+        assertStrictEquals(detail.etag, created.etag);
+        assertStrictEquals(
             detail.values.get(ATTR_ID), 'v0',
         );
 
@@ -116,10 +121,10 @@ test(
                 ],
             },
         );
-        assert.notEqual(patched.etag, detail.etag);
+        assertNotStrictEquals(patched.etag, detail.etag);
 
         // stale If-Match → 412 (no auto-retry)
-        await assert.rejects(
+        const err = await assertRejects(
             () => patchRecordInstance(
                 ctx, TYPE_ID, INSTANCE_ID,
                 detail.etag, {
@@ -131,21 +136,15 @@ test(
                     ],
                 },
             ),
-            (err: unknown) => {
-                assert.ok(err instanceof RequestError);
-                assert.equal(
-                    err.status,
-                    HTTP_PRECONDITION_FAILED,
-                );
-                return true;
-            },
-        );
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
 
         // re-read → retry with fresh etag
         const fresh = await getRecordInstance(
             ctx, TYPE_ID, INSTANCE_ID,
         );
-        assert.equal(fresh.etag, patched.etag);
+        assertStrictEquals(fresh.etag, patched.etag);
         const retried = await patchRecordInstance(
             ctx, TYPE_ID, INSTANCE_ID, fresh.etag, {
                 set: [
@@ -156,23 +155,23 @@ test(
                 ],
             },
         );
-        assert.notEqual(retried.etag, fresh.etag);
+        assertNotStrictEquals(retried.etag, fresh.etag);
 
         const afterRetry = await getRecordInstance(
             ctx, TYPE_ID, INSTANCE_ID,
         );
-        assert.equal(
+        assertStrictEquals(
             afterRetry.values.get(ATTR_ID), 'v2',
         );
-        assert.equal(afterRetry.etag, retried.etag);
+        assertStrictEquals(afterRetry.etag, retried.etag);
 
         // history DESC: head first
         const history = await getRecordInstanceHistory(
             ctx, TYPE_ID, INSTANCE_ID,
         );
-        assert.ok(history.length >= 3);
-        assert.equal(history[0]!.etag, retried.etag);
-        assert.equal(
+        assert(history.length >= 3);
+        assertStrictEquals(history[0]!.etag, retried.etag);
+        assertStrictEquals(
             history[0]!.values.get(ATTR_ID), 'v2',
         );
 
@@ -183,33 +182,33 @@ test(
         const afterDelete = await getRecordInstances(
             ctx, TYPE_ID,
         );
-        assert.equal(afterDelete.length, 0);
-        await assert.rejects(
+        assertStrictEquals(afterDelete.length, 0);
+        await assertRejects(
             () => getRecordInstance(
                 ctx, TYPE_ID, INSTANCE_ID,
             ),
-            /Not found/,
+            Error,
+            'Not found',
         );
     },
 );
 
-test(
+Deno.test(
     'InstanceHistoryWire has no version; etag is'
     + ' not 64-hex',
     () => {
-        const src = readFileSync(
+        const src = Deno.readTextFileSync(
             'web-app/app/adapters/record-instances.ts',
-            'utf8',
         );
         const start = src.indexOf(
             'interface InstanceHistoryWire',
         );
-        assert.ok(start >= 0);
+        assert(start >= 0);
         const wire = src.slice(
             start,
             src.indexOf('function instancesPath'),
         );
-        assert.doesNotMatch(wire, /\bversion\b/);
-        assert.doesNotMatch(src, /64-hex/);
+        assertNotMatch(wire, /\bversion\b/);
+        assertNotMatch(src, /64-hex/);
     },
 );

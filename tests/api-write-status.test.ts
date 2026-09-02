@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -94,11 +93,11 @@ async function storedResponseAt(
         'uri_collection', prefix,
     )).filter((row) => row.uri_id === uriId);
     const last = requests[requests.length - 1];
-    assert.ok(last !== undefined, 'no stored request');
+    assert(last !== undefined, 'no stored request');
     const stored = await db.messagePairs.getById(last.id);
-    assert.ok(stored !== undefined, 'no stored response');
+    assert(stored !== undefined, 'no stored response');
     const model = parseWire(stored.response);
-    assert.equal(model.startLine.kind, 'response');
+    assertStrictEquals(model.startLine.kind, 'response');
     return {
         requestId: last.id,
         method: last.method,
@@ -109,7 +108,7 @@ async function storedResponseAt(
     };
 }
 
-test('first PUT is 201 and stores a 200 start-line',
+Deno.test('first PUT is 201 and stores a 200 start-line',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -118,20 +117,20 @@ async () => {
             + 'yNqCXXgKLCqDESGScIzYrQ', token,
         ideaDocument('First', 'ev-ws-1'),
     ));
-    assert.equal(res.status, 201);
-    assert.equal(
+    assertStrictEquals(res.status, 201);
+    assertStrictEquals(
         res.headers.get('Operation-ID'),
         TEST_OPERATION_ID,
     );
     const stored = await storedResponseAt(
         db, IDEA_PREFIX, 'yNqCXXgKLCqDESGScIzYrQ',
     );
-    assert.equal(stored.method, 'PUT');
-    assert.equal(stored.status, 200);
-    assert.equal(stored.hasOperationId, false);
+    assertStrictEquals(stored.method, 'PUT');
+    assertStrictEquals(stored.status, 200);
+    assertStrictEquals(stored.hasOperationId, false);
 });
 
-test('document GET detail ETag equals Response-ID',
+Deno.test('document GET detail ETag equals Response-ID',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -142,21 +141,21 @@ async () => {
             'GetEtag', 'ev-ws-get-etag',
         )),
     );
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const putId = put.headers.get('Response-ID');
-    assert.ok(putId !== null && isIdentifier(putId));
-    assert.equal(put.headers.get('ETag'), strongEtagOf(putId));
+    assert(putId !== null && isIdentifier(putId));
+    assertStrictEquals(put.headers.get('ETag'), strongEtagOf(putId));
     const got = await handleRequest(
         db, req('GET', path, token),
     );
-    assert.equal(got.status, 200);
+    assertStrictEquals(got.status, 200);
     const getId = got.headers.get('Response-ID');
-    assert.ok(getId !== null && isIdentifier(getId));
-    assert.equal(got.headers.get('ETag'), strongEtagOf(getId));
-    assert.equal(getId, putId);
+    assert(getId !== null && isIdentifier(getId));
+    assertStrictEquals(got.headers.get('ETag'), strongEtagOf(getId));
+    assertStrictEquals(getId, putId);
 });
 
-test('same-body PUT is 200 and does not append',
+Deno.test('same-body PUT is 200 and does not append',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -166,15 +165,15 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'yjsYYXruOryrZjnfLsgSJg', token, body),
     );
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const firstId = first.headers.get('Response-ID');
-    assert.ok(firstId !== null && isIdentifier(firstId));
+    assert(firstId !== null && isIdentifier(firstId));
     const firstEtag = first.headers.get('ETag');
-    assert.equal(firstEtag, strongEtagOf(firstId));
+    assertStrictEquals(firstEtag, strongEtagOf(firstId));
     const before = await pairsAt(
         db, IDEA_PREFIX, 'yjsYYXruOryrZjnfLsgSJg',
     );
-    assert.equal(before, 1);
+    assertStrictEquals(before, 1);
     const second = await handleRequest(
         db,
         new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
@@ -189,15 +188,15 @@ async () => {
             body: JSON.stringify(body),
         }),
     );
-    assert.equal(second.status, 200);
-    assert.equal(second.headers.get('ETag'), firstEtag);
-    assert.equal(
+    assertStrictEquals(second.status, 200);
+    assertStrictEquals(second.headers.get('ETag'), firstEtag);
+    assertStrictEquals(
         await pairsAt(db, IDEA_PREFIX, 'yjsYYXruOryrZjnfLsgSJg'),
         1,
     );
 });
 
-test('exact retry returns the original 201',
+Deno.test('exact retry returns the original 201',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -207,7 +206,7 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'yggAqfvrChBmrMfrOilSUg', token, body),
     );
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const firstId = first.headers.get('Response-ID');
     const firstOp = first.headers.get('Operation-ID');
     const firstBytes = await first.text();
@@ -216,21 +215,21 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'yggAqfvrChBmrMfrOilSUg', token, body),
     );
-    assert.equal(second.status, 201);
-    assert.equal(
+    assertStrictEquals(second.status, 201);
+    assertStrictEquals(
         second.headers.get('Operation-ID'), firstOp,
     );
-    assert.equal(
+    assertStrictEquals(
         second.headers.get('Response-ID'), firstId,
     );
-    assert.equal(await second.text(), firstBytes);
-    assert.equal(
+    assertStrictEquals(await second.text(), firstBytes);
+    assertStrictEquals(
         await pairsAt(db, IDEA_PREFIX, 'yggAqfvrChBmrMfrOilSUg'),
         1,
     );
 });
 
-test('DELETE live is 204 and appends',
+Deno.test('DELETE live is 204 and appends',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -240,23 +239,23 @@ async () => {
         token,
         membershipDocument('yTCVdPetYIGKpMKGzQJxPQ'),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const before = await pairsAt(
         db, MEMBERSHIP_PREFIX, 'yTCVdPetYIGKpMKGzQJxPQ',
     );
-    assert.equal(before, 1);
+    assertStrictEquals(before, 1);
     const del = await handleRequest(db, req(
         'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             + 'yTCVdPetYIGKpMKGzQJxPQ',
         token,
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const stored = await storedResponseAt(
         db, MEMBERSHIP_PREFIX, 'yTCVdPetYIGKpMKGzQJxPQ',
     );
-    assert.equal(stored.method, 'DELETE');
-    assert.equal(stored.status, 204);
-    assert.equal(
+    assertStrictEquals(stored.method, 'DELETE');
+    assertStrictEquals(stored.status, 204);
+    assertStrictEquals(
         await pairsAt(
             db, MEMBERSHIP_PREFIX, 'yTCVdPetYIGKpMKGzQJxPQ',
         ),
@@ -264,7 +263,7 @@ async () => {
     );
 });
 
-test('DELETE already-gone is 204 and does not append',
+Deno.test('DELETE already-gone is 204 and does not append',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -279,11 +278,11 @@ async () => {
             + 'yPsWmFGqnMtjifSSmvZrUw',
         token,
     ));
-    assert.equal(first.status, 204);
+    assertStrictEquals(first.status, 204);
     const before = await pairsAt(
         db, MEMBERSHIP_PREFIX, 'yPsWmFGqnMtjifSSmvZrUw',
     );
-    assert.equal(before, 2);
+    assertStrictEquals(before, 2);
     const second = await handleRequest(
         db,
         new Request(
@@ -299,8 +298,8 @@ async () => {
             },
         ),
     );
-    assert.equal(second.status, 204);
-    assert.equal(
+    assertStrictEquals(second.status, 204);
+    assertStrictEquals(
         await pairsAt(
             db, MEMBERSHIP_PREFIX, 'yPsWmFGqnMtjifSSmvZrUw',
         ),
@@ -308,7 +307,7 @@ async () => {
     );
 });
 
-test('DELETE never-written is 404 and stores nothing',
+Deno.test('DELETE never-written is 404 and stores nothing',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -316,11 +315,11 @@ async () => {
     const res = await handleRequest(db, req(
         'DELETE', '/memberships/yatHlUsoiwxMlkqjKvCVGQ', token,
     ));
-    assert.equal(res.status, 404);
-    assert.equal(
+    assertStrictEquals(res.status, 404);
+    assertStrictEquals(
         (await db.messagePairs.getAll()).length, before,
     );
-    assert.equal(
+    assertStrictEquals(
         await pairsAt(
             db, MEMBERSHIP_PREFIX, 'yatHlUsoiwxMlkqjKvCVGQ',
         ),
@@ -328,7 +327,7 @@ async () => {
     );
 });
 
-test('empty-body PUT is a live document, not a delete',
+Deno.test('empty-body PUT is a live document, not a delete',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -343,22 +342,22 @@ async () => {
             },
         }),
     );
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const responseId = res.headers.get('Response-ID');
-    assert.ok(
+    assert(
         responseId !== null && isIdentifier(responseId),
     );
-    assert.equal(
+    assertStrictEquals(
         res.headers.get('ETag'),
         strongEtagOf(responseId),
     );
     const stored = await storedResponseAt(
         db, IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
     );
-    assert.equal(stored.method, 'PUT');
-    assert.equal(stored.status, 200);
+    assertStrictEquals(stored.method, 'PUT');
+    assertStrictEquals(stored.status, 200);
     const live = await messageStore(db).get(
         IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
     );
-    assert.ok(live !== undefined, 'empty PUT must live');
+    assert(live !== undefined, 'empty PUT must live');
 });

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -47,18 +46,18 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('PUT objectives 405s (no put handler wired)',
+Deno.test('PUT objectives 405s (no put handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
 // Task 10: PATCH alphabet — no objectives-family patch yet.
-test('PATCH organizations/:id/objectives/:id 405s (no patch handler'
+Deno.test('PATCH organizations/:id/objectives/:id 405s (no patch handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -66,10 +65,10 @@ test('PATCH organizations/:id/objectives/:id 405s (no patch handler'
         'PATCH', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE objectives 405s (no delete handler wired)',
+Deno.test('DELETE objectives 405s (no delete handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -77,22 +76,22 @@ async () => {
         db, req('DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + '', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST organizations/:id/objectives/:id 405s (no post handler wired)',
-async () => {
+Deno.test('POST organizations/:id/objectives/:id 405s (no post handler'
++ ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/objectives/:id 405s (no delete handler wired)',
-async () => {
+Deno.test('DELETE organizations/:id/objectives/:id 405s (no delete'
++ ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -100,32 +99,32 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST organizations/:id/objectives/:id/revisions 405s (no post handler'
-+ ' wired)', async () => {
+Deno.test('POST organizations/:id/objectives/:id/revisions 405s (no post'
++ ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg/revisions/', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT organizations/:id/objectives/:id/revisions 405s (no put handler'
-+ ' wired)', async () => {
+Deno.test('PUT organizations/:id/objectives/:id/revisions 405s (no put'
++ ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg/revisions/', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/objectives/:id/revisions'
+Deno.test('DELETE organizations/:id/objectives/:id/revisions'
     + ' 405s (no delete handler'
 + ' wired)', async () => {
     const db = await freshDb();
@@ -135,10 +134,10 @@ test('DELETE organizations/:id/objectives/:id/revisions'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg/revisions/', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('GET organizations/:id/objectives/:id/revisions/:rid'
+Deno.test('GET organizations/:id/objectives/:id/revisions/:rid'
     + ' 405s (no get handler'
 + ' wired)', async () => {
     const db = await freshDb();
@@ -149,10 +148,10 @@ test('GET organizations/:id/objectives/:id/revisions/:rid'
             + 'ohqxgUBEaFQwYbXsonRPmg/revisions/rOEPOcVMQdJiiiMuiiEhlg'
             , token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST organizations/:id/objectives/:id/revisions/:rid 405s (no post'
+Deno.test('POST organizations/:id/objectives/:id/revisions/:rid 405s (no post'
 + ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -161,11 +160,11 @@ test('POST organizations/:id/objectives/:id/revisions/:rid 405s (no post'
             + 'ohqxgUBEaFQwYbXsonRPmg/revisions/rOEPOcVMQdJiiiMuiiEhlg'
             , token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/objectives/:id/revisions/:rid 405s (no delete'
-+ ' handler wired)', async () => {
+Deno.test('DELETE organizations/:id/objectives/:id/revisions/:rid 405s (no'
++ ' delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -174,11 +173,11 @@ test('DELETE organizations/:id/objectives/:id/revisions/:rid 405s (no delete'
             + 'ohqxgUBEaFQwYbXsonRPmg/revisions/rOEPOcVMQdJiiiMuiiEhlg',
             token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST organizations/:id/projects/:id/objective-baseline-scores 405s (no'
-+ ' post handler wired)', async () => {
+Deno.test('POST organizations/:id/projects/:id/objective-baseline-scores 405s'
++ ' (no post handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -187,11 +186,11 @@ test('POST organizations/:id/projects/:id/objective-baseline-scores 405s (no'
             + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/',
         token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT organizations/:id/projects/:id/objective-baseline-scores 405s (no'
-+ ' put handler wired)', async () => {
+Deno.test('PUT organizations/:id/projects/:id/objective-baseline-scores 405s'
++ ' (no put handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -200,10 +199,10 @@ test('PUT organizations/:id/projects/:id/objective-baseline-scores 405s (no'
             + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/',
         token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/projects/:id'
+Deno.test('DELETE organizations/:id/projects/:id'
     + '/objective-baseline-scores 405s (no'
 + ' delete handler wired)', async () => {
     const db = await freshDb();
@@ -214,11 +213,11 @@ test('DELETE organizations/:id/projects/:id'
             + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/',
         token,
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('GET organizations/:id/projects/:id/objective-baseline-scores/:sid 405s'
-+ ' (no get handler wired)', async () => {
+Deno.test('GET organizations/:id/projects/:id/objective-baseline-scores/:sid'
++ ' 405s (no get handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -228,11 +227,11 @@ test('GET organizations/:id/projects/:id/objective-baseline-scores/:sid 405s'
             + 'syWUUcdBSbBgMwBiCrgbDw',
         token,
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST organizations/:id/projects/:id/objective-baseline-scores/:sid 405s'
-+ ' (no post handler wired)', async () => {
+Deno.test('POST organizations/:id/projects/:id/objective-baseline-scores/:sid'
++ ' 405s (no post handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -242,11 +241,11 @@ test('POST organizations/:id/projects/:id/objective-baseline-scores/:sid 405s'
             + 'syWUUcdBSbBgMwBiCrgbDw',
         token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/projects/:id/objective-baseline-scores/:sid'
-+ ' 405s (no delete handler wired)', async () => {
+Deno.test('DELETE organizations/:id/projects/:id/objective-baseline-scores'
++ '/:sid 405s (no delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -256,11 +255,11 @@ test('DELETE organizations/:id/projects/:id/objective-baseline-scores/:sid'
             + 'syWUUcdBSbBgMwBiCrgbDw',
         token,
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST organizations/:id/projects/:id/objective-actual-scores 405s (no'
-+ ' post handler wired)', async () => {
+Deno.test('POST organizations/:id/projects/:id/objective-actual-scores 405s'
++ ' (no post handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -269,11 +268,11 @@ test('POST organizations/:id/projects/:id/objective-actual-scores 405s (no'
             + 'pnXmXrxOWayANgDLdCjuBw/objective-actual-scores/',
         token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT organizations/:id/projects/:id/objective-actual-scores 405s (no put'
-+ ' handler wired)', async () => {
+Deno.test('PUT organizations/:id/projects/:id/objective-actual-scores 405s'
++ ' (no put handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -282,11 +281,11 @@ test('PUT organizations/:id/projects/:id/objective-actual-scores 405s (no put'
             + 'pnXmXrxOWayANgDLdCjuBw/objective-actual-scores/',
         token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/projects/:id/objective-actual-scores 405s (no'
-+ ' delete handler wired)', async () => {
+Deno.test('DELETE organizations/:id/projects/:id/objective-actual-scores'
++ ' 405s (no delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -295,10 +294,10 @@ test('DELETE organizations/:id/projects/:id/objective-actual-scores 405s (no'
             + 'pnXmXrxOWayANgDLdCjuBw/objective-actual-scores/',
         token,
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('GET organizations/:id/projects/:id'
+Deno.test('GET organizations/:id/projects/:id'
     + '/objective-actual-scores/:sid 405s (no'
 + ' get handler wired)', async () => {
     const db = await freshDb();
@@ -310,11 +309,11 @@ test('GET organizations/:id/projects/:id'
             + 'syWUUcdBSbBgMwBiCrgbDw',
         token,
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST organizations/:id/projects/:id/objective-actual-scores/:sid 405s'
-+ ' (no post handler wired)', async () => {
+Deno.test('POST organizations/:id/projects/:id/objective-actual-scores/:sid'
++ ' 405s (no post handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -324,11 +323,11 @@ test('POST organizations/:id/projects/:id/objective-actual-scores/:sid 405s'
             + 'syWUUcdBSbBgMwBiCrgbDw',
         token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/projects/:id/objective-actual-scores/:sid 405s'
-+ ' (no delete handler wired)', async () => {
+Deno.test('DELETE organizations/:id/projects/:id/objective-actual-scores/:sid'
++ ' 405s (no delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -338,5 +337,5 @@ test('DELETE organizations/:id/projects/:id/objective-actual-scores/:sid 405s'
             + 'syWUUcdBSbBgMwBiCrgbDw',
         token,
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });

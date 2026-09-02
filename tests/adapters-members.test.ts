@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { adminContext } from './context-fixtures.ts';
 import { deriveIdentityPii } from
     '../api/derive-identity-spine.ts';
@@ -33,7 +32,7 @@ function buildHumanMember(
     };
 }
 
-test(
+Deno.test(
     'postHumanMemberCreation persists identity'
     + ' PII and a seat',
     async () => {
@@ -51,20 +50,20 @@ test(
         const row = await ctx.GET<{
             id: string; kind: string; title: string;
         }>('identities/xdaJyuuPyHfffCGLhqDrOQ');
-        assert.equal(row.kind, 'person');
-        assert.equal(row.title, 'Engineer');
+        assertStrictEquals(row.kind, 'person');
+        assertStrictEquals(row.title, 'Engineer');
         const pii = await deriveIdentityPii(db, 'xdaJyuuPyHfffCGLhqDrOQ');
-        assert.equal(pii.name, 'Alice');
+        assertStrictEquals(pii.name, 'Alice');
         const seat = await ctx.GET<{
             identity_id: string; type: string;
         }>('organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             + 'xdaJyuuPyHfffCGLhqDrOQ');
-        assert.equal(seat.identity_id, 'xdaJyuuPyHfffCGLhqDrOQ');
-        assert.equal(seat.type, 'member');
+        assertStrictEquals(seat.identity_id, 'xdaJyuuPyHfffCGLhqDrOQ');
+        assertStrictEquals(seat.type, 'member');
     },
 );
 
-test(
+Deno.test(
     'putHumanMember updates the identity profile',
     async () => {
         const { db, ctx } = await adminContext();
@@ -84,11 +83,11 @@ test(
         const after = await ctx.GET<{
             id: string; title: string;
         }>('identities/xdaJyuuPyHfffCGLhqDrOQ');
-        assert.equal(after.title, 'Lead');
+        assertStrictEquals(after.title, 'Lead');
     },
 );
 
-test('featuredHumanMembers keeps only members with a dept',
+Deno.test('featuredHumanMembers keeps only members with a dept',
 () => {
     const mk = (present: boolean) =>
         ({ department: () => present
@@ -98,34 +97,34 @@ test('featuredHumanMembers keeps only members with a dept',
     const result = featuredHumanMembers([
         mk(true), mk(false), mk(true),
     ]);
-    assert.equal(result.length, 2);
+    assertStrictEquals(result.length, 2);
 });
 
-test('featuredHumanMembers caps the list at six', () => {
+Deno.test('featuredHumanMembers caps the list at six', () => {
     const mk = () =>
         ({ department: () =>
             ({ present: true, label: 'Eng' }) }) as
             unknown as HumanMember;
     const ten = Array.from({ length: 10 }, mk);
-    assert.equal(featuredHumanMembers(ten).length, 6);
+    assertStrictEquals(featuredHumanMembers(ten).length, 6);
 });
 
-test('a { kind } identity reads as an absent profile',
+Deno.test('a { kind } identity reads as an absent profile',
 async () => {
     const { ctx } = await adminContext();
     const id = generateIdentifier();
     await ctx.PUT('identities/' + id, { kind: 'person' });
-    assert.deepEqual(
+    assertEquals(
         await getHumanMemberProfile(ctx, id),
         { present: false },
     );
 });
 
-test('a full identity document reads 1:1', async () => {
+Deno.test('a full identity document reads 1:1', async () => {
     const { db, ctx } = await adminContext();
     const id = generateIdentifier();
     await seedHumanMember(db, id, 'Whole Profile');
-    assert.deepEqual(
+    assertEquals(
         await getHumanMemberProfile(ctx, id),
         {
             present: true,

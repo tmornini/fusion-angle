@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     postBootstrap,
@@ -11,14 +10,14 @@ import { seededMockDb } from './mock-seed.ts';
 // Privilege is membership type:"admin" — claim roles bake
 // from that type at mint. No role-grants family.
 
-test('bootstrap seeds current as admin', async () => {
+Deno.test('bootstrap seeds current as admin', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postBootstrap(db);
     const rows = await deriveMembershipsForIdentity(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     );
-    assert.ok(
+    assert(
         rows.some(
             m => m.organization_id === 'AjdvjuECVZEgZoFajaIEkg'
                 && m.type === 'admin',
@@ -26,12 +25,12 @@ test('bootstrap seeds current as admin', async () => {
     );
 });
 
-test('mock data seeds current as admin', async () => {
+Deno.test('mock data seeds current as admin', async () => {
     const db = await seededMockDb();
     const rows = await deriveMembershipsForIdentity(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     );
-    assert.ok(
+    assert(
         rows.some(
             m => m.organization_id === 'AjdvjuECVZEgZoFajaIEkg'
                 && m.type === 'admin',

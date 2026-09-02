@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import './hmac-test-key.ts';
 import './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
@@ -21,16 +20,16 @@ async function tokenFor(sub: string): Promise<string> {
     });
 }
 
-test('identity is resolved once from the token', async () => {
+Deno.test('identity is resolved once from the token', async () => {
     const ctx = createRequestContext(
         memoryDbAdapter(), await tokenFor('XXZruirZyAOoRpNxaDnpSA'));
-    assert.equal(ctx.identity.id, 'XXZruirZyAOoRpNxaDnpSA');
-    assert.equal(ctx.identity, ctx.identity);
+    assertStrictEquals(ctx.identity.id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(ctx.identity, ctx.identity);
 });
 
-test('an anonymous token yields the anonymous principal',
+Deno.test('an anonymous token yields the anonymous principal',
 async () => {
     const ctx = createRequestContext(
         memoryDbAdapter(), await tokenFor(ANONYMOUS_ID));
-    assert.equal(ctx.identity.id, ANONYMOUS_ID);
+    assertStrictEquals(ctx.identity.id, ANONYMOUS_ID);
 });

@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals,
+    assertMatch,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { HttpMessageError } from '../shared/http-message/types.ts';
 import {
@@ -16,62 +20,62 @@ const jsonResponse = HttpMessage.fromWire(
     '{"user":{"name":"bob"},"items":[10,20]}',
 );
 
-test('queries a string member of a JSON body', () => {
-    assert.equal(
+Deno.test('queries a string member of a JSON body', () => {
+    assertStrictEquals(
         jsonResponse.query('body.user.name').toText(),
         'bob',
     );
 });
 
-test('queries a numeric member of a JSON body array', () => {
-    assert.equal(
+Deno.test('queries a numeric member of a JSON body array', () => {
+    assertStrictEquals(
         jsonResponse.query('body.items.1').toNumber(),
         20,
     );
 });
 
-test('a missing body member is absent', () => {
-    assert.equal(
+Deno.test('a missing body member is absent', () => {
+    assertStrictEquals(
         jsonResponse.query('body.user.age').exists(),
         false,
     );
 });
 
-test('a body query is absent without a codec', () => {
+Deno.test('a body query is absent without a codec', () => {
     const text = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'content-type: application/xml\r\n' +
         '\r\n' +
         'hello',
     );
-    assert.equal(text.query('body.anything').exists(), false);
+    assertStrictEquals(text.query('body.anything').exists(), false);
 });
 
-test('a body query is absent with no body', () => {
+Deno.test('a body query is absent with no body', () => {
     const empty = HttpMessage.fromWire('GET / HTTP/1.1\r\n\r\n');
-    assert.equal(empty.query('body.x').exists(), false);
+    assertStrictEquals(empty.query('body.x').exists(), false);
 });
 
-test('withBody encodes JSON and derives content-type', () => {
+Deno.test('withBody encodes JSON and derives content-type', () => {
     const message = HttpMessage
         .fromWire('POST /x HTTP/1.1\r\n\r\n')
         .withBody('application/json', { ok: true });
-    assert.equal(
+    assertStrictEquals(
         message.query('header.content-type').toText(),
         'application/json',
     );
-    assert.equal(message.query('body.ok').toBoolean(), true);
+    assertStrictEquals(message.query('body.ok').toBoolean(), true);
 });
 
-test('withBody derives content-length on the wire', () => {
+Deno.test('withBody derives content-length on the wire', () => {
     const message = HttpMessage
         .fromWire('POST /x HTTP/1.1\r\n\r\n')
         .withBody('application/json', { a: 1 });
-    assert.match(message.toWire(), /content-length: 7\r\n/);
+    assertMatch(message.toWire(), /content-length: 7\r\n/);
 });
 
-test('withBody throws for an unregistered media type', () => {
-    assert.throws(
+Deno.test('withBody throws for an unregistered media type', () => {
+    assertThrows(
         () => HttpMessage
             .fromWire('POST / HTTP/1.1\r\n\r\n')
             .withBody('application/xml', 'hi'),
@@ -79,14 +83,14 @@ test('withBody throws for an unregistered media type', () => {
     );
 });
 
-test('a malformed JSON body is absent on query', () => {
+Deno.test('a malformed JSON body is absent on query', () => {
     const message = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'content-type: application/json\r\n' +
         '\r\n' +
         'not json',
     );
-    assert.equal(message.query('body.x').exists(), false);
+    assertStrictEquals(message.query('body.x').exists(), false);
 });
 
 const thingCodec = {
@@ -97,7 +101,7 @@ const thingCodec = {
         Octets.fromLatin1(String(v)),
 };
 
-test('a non-JSON codec body is not inlined as JSON', () => {
+Deno.test('a non-JSON codec body is not inlined as JSON', () => {
     const registry = new BodyRegistry([thingCodec]);
     const message = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
@@ -105,63 +109,65 @@ test('a non-JSON codec body is not inlined as JSON', () => {
         registry,
     );
     const body = JSON.parse(message.toJson()).body;
-    assert.equal(typeof body, 'string');
+    assertStrictEquals(typeof body, 'string');
 });
 
-test('form codec decodes urlencoded to an object', () => {
-    assert.deepEqual(
+Deno.test('form codec decodes urlencoded to an object', () => {
+    assertEquals(
         formBodyCodec.decode(Octets.fromLatin1('a=1&b=two')),
         { a: '1', b: 'two' },
     );
 });
 
-test('form codec keeps the last value on duplicate keys', () => {
-    assert.deepEqual(
+Deno.test('form codec keeps the last value on duplicate keys', () => {
+    assertEquals(
         formBodyCodec.decode(Octets.fromLatin1('a=1&a=2')),
         { a: '2' },
     );
 });
 
-test('form codec encodes an object to urlencoded', () => {
+Deno.test('form codec encodes an object to urlencoded', () => {
     const octets = formBodyCodec.encode({ a: '1'
         , b: 'two' });
-    assert.equal(octets.toLatin1(), 'a=1&b=two');
+    assertStrictEquals(octets.toLatin1(), 'a=1&b=two');
 });
 
-test('form codec rejects a non-string field', () => {
-    assert.throws(
+Deno.test('form codec rejects a non-string field', () => {
+    assertThrows(
         () => formBodyCodec.encode({ a: 1 }),
         HttpMessageError,
     );
 });
 
-test('text codec round-trips UTF-8', () => {
+Deno.test('text codec round-trips UTF-8', () => {
     const octets = textBodyCodec.encode('café');
-    assert.equal(textBodyCodec.decode(octets), 'café');
+    assertStrictEquals(textBodyCodec.decode(octets), 'café');
 });
 
-test('withBody round-trips a text/plain body', () => {
+Deno.test('withBody round-trips a text/plain body', () => {
     const message = HttpMessage
         .fromWire('POST /x HTTP/1.1\r\n\r\n')
         .withBody('text/plain', 'hello');
-    assert.equal(message.body().decoded().toText(), 'hello');
+    assertStrictEquals(message.body().decoded().toText(), 'hello');
 });
 
-test('withBody round-trips a form body by field', () => {
+Deno.test('withBody round-trips a form body by field', () => {
     const message = HttpMessage
         .fromWire('POST /x HTTP/1.1\r\n\r\n')
         .withBody(
             'application/x-www-form-urlencoded',
             { a: 'AjdvjuECVZEgZoFajaIEkg', b: 'two' },
         );
-    assert.equal(message.query('body.a').toText(), 'AjdvjuECVZEgZoFajaIEkg');
-    assert.equal(message.query('body.b').toText(), 'two');
+    assertStrictEquals(
+        message.query('body.a').toText(), 'AjdvjuECVZEgZoFajaIEkg',
+    );
+    assertStrictEquals(message.query('body.b').toText(), 'two');
 });
 
-test('a text/plain body is base64 in the JSON form', () => {
+Deno.test('a text/plain body is base64 in the JSON form', () => {
     const message = HttpMessage
         .fromWire('POST /x HTTP/1.1\r\n\r\n')
         .withBody('text/plain', 'hi');
     const body = JSON.parse(message.toJson()).body;
-    assert.equal(typeof body, 'string');
+    assertStrictEquals(typeof body, 'string');
 });

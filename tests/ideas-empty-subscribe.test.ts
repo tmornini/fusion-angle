@@ -1,7 +1,8 @@
+import { assert, assertStrictEquals } from '@std/assert';
 import './hmac-test-key.ts';
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
+import { withLocalStorageAsync } from
+    './fixtures/local-storage.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -38,25 +39,32 @@ function makeListStub(): {
     };
 }
 
-test(
+Deno.test(
     'an empty initial ideas load still subscribes'
     + ' to cross-tab changes',
-    async () => {
+    () => withLocalStorageAsync(
+        (() => {
+            const storage = new Map<
+                string, string
+            >();
+            return {
+                getItem: (k: string) =>
+                    storage.get(k) ?? null,
+                setItem: (
+                    k: string, v: string,
+                ) => {
+                    storage.set(k, v);
+                },
+                removeItem: (k: string) => {
+                    storage.delete(k);
+                },
+            };
+        })(),
+        async () => {
         const g = globalThis as Record<
             string, unknown
         >;
         const listStub = makeListStub();
-        const storage = new Map<string, string>();
-        g['localStorage'] = {
-            getItem: (k: string) =>
-                storage.get(k) ?? null,
-            setItem: (k: string, v: string) => {
-                storage.set(k, v);
-            },
-            removeItem: (k: string) => {
-                storage.delete(k);
-            },
-        };
         g['window'] = {
             matchMedia: () => ({
                 matches: false,
@@ -94,7 +102,7 @@ test(
             const hasSchema = await initAdapter(
                 () => db,
             );
-            assert.equal(hasSchema, true);
+            assertStrictEquals(hasSchema, true);
             putSessionToken(
                 await organizationToken(),
             );
@@ -102,7 +110,7 @@ test(
                 '../web-app/ideas/index.ts'
             );
             await init();
-            assert.ok(
+            assert(
                 listStub.innerHTML.includes(
                     'No Ideas Yet',
                 ),
@@ -174,7 +182,7 @@ test(
                 );
             }
             poster.close();
-            assert.ok(
+            assert(
                 listStub.innerHTML.includes(
                     'Cross-tab idea',
                 ),
@@ -182,10 +190,18 @@ test(
                 + ' the first cross-tab bell',
             );
         } finally {
-            delete g['localStorage'];
+            // The divorce point opened ONE channel per
+            // process when init subscribed; a test process
+            // has no unload to reclaim it, so release it
+            // here — after the assertion above.
+            const { deleteNotificationChannel } =
+                await import(
+                    '../web-app/app/adapters/broadcast-channel.ts'
+                );
+            deleteNotificationChannel();
             delete g['window'];
             delete g['MutationObserver'];
             delete g['document'];
         }
-    },
+    }),
 );

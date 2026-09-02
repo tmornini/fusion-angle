@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertRejects, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -65,26 +64,26 @@ async function memberOf(organizations: string[]) {
     return db;
 }
 
-test('putIdentityDefaultOrganization sets the caller default org',
+Deno.test('putIdentityDefaultOrganization sets the caller default org',
 async () => {
     const db = await memberOf(['AjdvjuECVZEgZoFajaIEkg']);
     const ctx = createRequestContext(db, await devToken());
     await putIdentityDefaultOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg');
-    assert.equal(await getIdentityDefaultOrganization(ctx)
+    assertStrictEquals(await getIdentityDefaultOrganization(ctx)
         , 'AjdvjuECVZEgZoFajaIEkg');
 });
 
-test('getIdentityDefaultOrganization is null when never SET',
+Deno.test('getIdentityDefaultOrganization is null when never SET',
 async () => {
     const db = await memberOf(['AjdvjuECVZEgZoFajaIEkg']);
     const ctx = createRequestContext(db, await devToken());
-    assert.equal(await getIdentityDefaultOrganization(ctx), null);
+    assertStrictEquals(await getIdentityDefaultOrganization(ctx), null);
 });
 
-test('putIdentityDefaultOrganization rejects a non-member org',
+Deno.test('putIdentityDefaultOrganization rejects a non-member org',
 async () => {
     const db = await memberOf(['AjdvjuECVZEgZoFajaIEkg']);
     const ctx = createRequestContext(db, await devToken());
-    await assert.rejects(
+    await assertRejects(
         () => putIdentityDefaultOrganization(ctx, 'BBjWJsjYIDkTRKIIPrzWRw'));
 });

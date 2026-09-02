@@ -1,13 +1,27 @@
-// Same module-eval stubs as flows-detail-shortcuts,
-// plus SVGElement: restoreCanvasFocus type-tests
-// candidates with `instanceof SVGElement` before
-// calling focus(). The fake class IS the stub, so its
-// instances pass the check.
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-};
+import {
+    assertEquals,
+    assertNotStrictEquals,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
+import {
+    canvasFocusOf, restoreCanvasFocus,
+} from '../web-app/flows/detail.ts';
+import {
+    buildInteractionState,
+    canvasFocusInputOf,
+    withCanvasFocusRestore,
+} from '../web-app/app/flow-interactions.ts';
+import { reduceFsm } from
+    '../web-app/app/flow-fsm-reduce.ts';
+
+// None of flows/detail.ts, flow-interactions.ts, or
+// flow-fsm-reduce.ts reads localStorage (checked against
+// the full product tree). Same window/document stubs as
+// flows-detail-shortcuts, plus SVGElement:
+// restoreCanvasFocus type-tests candidates with
+// `instanceof SVGElement` before calling focus(). The
+// fake class IS the stub, so its instances pass the check.
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -85,22 +99,6 @@ class FakeWrap {
 // @ts-expect-error — Node global stub
 globalThis.SVGElement = FakeSvgElement;
 
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-
-const { canvasFocusOf, restoreCanvasFocus } =
-    await import('../web-app/flows/detail.ts');
-const {
-    buildInteractionState,
-    canvasFocusInputOf,
-    withCanvasFocusRestore,
-} = await import(
-    '../web-app/app/flow-interactions.ts'
-);
-const { reduceFsm } = await import(
-    '../web-app/app/flow-fsm-reduce.ts'
-);
-
 type FsmState = ReturnType<
     typeof buildInteractionState
 >;
@@ -125,12 +123,12 @@ function wrapWithNode(): {
     return { wrap, g, text };
 }
 
-test(
+Deno.test(
     'canvasFocusOf finds the node id from a <text>'
     + ' child inside the wrap',
     () => {
         const { wrap, text } = wrapWithNode();
-        assert.deepEqual(
+        assertEquals(
             canvasFocusOf(
                 asElement(text), asElement(wrap),
             ),
@@ -139,14 +137,14 @@ test(
     },
 );
 
-test('canvasFocusOf finds an edge id', () => {
+Deno.test('canvasFocusOf finds an edge id', () => {
     const wrap = new FakeWrap();
     const g = new FakeSvgElement({
         'data-edge-id': 'e1',
     });
     g.parentElement = wrap;
     wrap.edges = [g];
-    assert.deepEqual(
+    assertEquals(
         canvasFocusOf(
             asElement(g), asElement(wrap),
         ),
@@ -154,25 +152,25 @@ test('canvasFocusOf finds an edge id', () => {
     );
 });
 
-test(
+Deno.test(
     'canvasFocusOf yields null for null, an outside'
     + ' element, and the wrap itself',
     () => {
         const { wrap } = wrapWithNode();
-        assert.equal(
+        assertStrictEquals(
             canvasFocusOf(null, asElement(wrap)),
             null,
         );
         const outside = new FakeSvgElement({
             'data-node-id': 'n9',
         });
-        assert.equal(
+        assertStrictEquals(
             canvasFocusOf(
                 asElement(outside), asElement(wrap),
             ),
             null,
         );
-        assert.equal(
+        assertStrictEquals(
             canvasFocusOf(
                 asElement(wrap), asElement(wrap),
             ),
@@ -181,7 +179,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'restoreCanvasFocus focuses the matching id once'
     + ' with preventScroll',
     () => {
@@ -197,15 +195,15 @@ test(
             { kind: 'node', id: 'n1' },
             asElement(wrap),
         );
-        assert.deepEqual(
+        assertEquals(
             target.focusCalls,
             [{ preventScroll: true }],
         );
-        assert.equal(other.focusCalls.length, 0);
+        assertStrictEquals(other.focusCalls.length, 0);
     },
 );
 
-test(
+Deno.test(
     'restoreCanvasFocus is inert for a missing id and'
     + ' for null',
     () => {
@@ -219,7 +217,7 @@ test(
             asElement(wrap),
         );
         restoreCanvasFocus(null, asElement(wrap));
-        assert.equal(survivor.focusCalls.length, 0);
+        assertStrictEquals(survivor.focusCalls.length, 0);
     },
 );
 
@@ -270,7 +268,7 @@ function focusinInto(
     return reduceFsm(state, input).state;
 }
 
-test(
+Deno.test(
     'a restore inside withCanvasFocusRestore leaves'
     + ' the pointer selection alone',
     () => {
@@ -288,15 +286,15 @@ test(
                 );
             },
         );
-        assert.equal(node.focusCalls.length, 1);
-        assert.deepEqual(state.selection, {
+        assertStrictEquals(node.focusCalls.length, 1);
+        assertEquals(state.selection, {
             kind: 'edge',
             edgeId: 'e1',
         });
     },
 );
 
-test(
+Deno.test(
     'a focusin outside a restore still promotes the'
     + ' focused node to the selection',
     () => {
@@ -309,19 +307,19 @@ test(
             { kind: 'node', id: 'n1' },
             asElement(wrap),
         );
-        assert.deepEqual(state.selection, {
+        assertEquals(state.selection, {
             kind: 'nodes',
             nodeIds: new Set(['n1']),
         });
     },
 );
 
-test(
+Deno.test(
     'withCanvasFocusRestore releases the mark when'
     + ' the restore throws',
     () => {
         const { wrap, node } = wrapForRestore();
-        assert.throws(() => {
+        assertThrows(() => {
             withCanvasFocusRestore(
                 asElement(wrap),
                 () => {
@@ -329,7 +327,7 @@ test(
                 },
             );
         });
-        assert.notEqual(
+        assertNotStrictEquals(
             canvasFocusInputOf(
                 asElement(node), asElement(wrap),
             ),

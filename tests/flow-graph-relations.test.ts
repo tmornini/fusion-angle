@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals } from '@std/assert';
 import {
     currentNodeMemberIds,
     currentNodeAttributes,
@@ -48,18 +47,18 @@ const edgeRow = (
 
 // ── currentNodeMemberIds ──────────────
 
-test('an added member with no later removal is current',
+Deno.test('an added member with no later removal is current',
 () => {
     const rows = [
         memberRow('AjdvjuECVZEgZoFajaIEkg', 'n1', 'mFNSxZqywTSMXhgUTdTqtA'
             , 'added',
             '2026-01-01T00:00:00.000000Z'),
     ];
-    assert.deepEqual(
+    assertEquals(
         currentNodeMemberIds(rows, 'n1'), ['mFNSxZqywTSMXhgUTdTqtA']);
 });
 
-test('a later removal drops the member', () => {
+Deno.test('a later removal drops the member', () => {
     const rows = [
         memberRow('AjdvjuECVZEgZoFajaIEkg', 'n1', 'mFNSxZqywTSMXhgUTdTqtA'
             , 'added',
@@ -68,11 +67,11 @@ test('a later removal drops the member', () => {
             , 'removed',
             '2026-02-01T00:00:00.000000Z'),
     ];
-    assert.deepEqual(
+    assertEquals(
         currentNodeMemberIds(rows, 'n1'), []);
 });
 
-test('a re-add after removal restores the member', () => {
+Deno.test('a re-add after removal restores the member', () => {
     const rows = [
         memberRow('AjdvjuECVZEgZoFajaIEkg', 'n1', 'mFNSxZqywTSMXhgUTdTqtA'
             , 'added',
@@ -83,21 +82,21 @@ test('a re-add after removal restores the member', () => {
         memberRow('3', 'n1', 'mFNSxZqywTSMXhgUTdTqtA', 'added',
             '2026-03-01T00:00:00.000000Z'),
     ];
-    assert.deepEqual(
+    assertEquals(
         currentNodeMemberIds(rows, 'n1'), ['mFNSxZqywTSMXhgUTdTqtA']);
 });
 
-test('a same-instant removal beats the add, either order',
+Deno.test('a same-instant removal beats the add, either order',
 () => {
     const at = '2026-03-01T00:00:00.000000Z';
-    assert.deepEqual(
+    assertEquals(
         currentNodeMemberIds([
             memberRow('AjdvjuECVZEgZoFajaIEkg', 'n1'
                 , 'mFNSxZqywTSMXhgUTdTqtA', 'added', at),
             memberRow('BBjWJsjYIDkTRKIIPrzWRw', 'n1'
                 , 'mFNSxZqywTSMXhgUTdTqtA', 'removed', at),
         ], 'n1'), []);
-    assert.deepEqual(
+    assertEquals(
         currentNodeMemberIds([
             memberRow('AjdvjuECVZEgZoFajaIEkg', 'n1'
                 , 'mFNSxZqywTSMXhgUTdTqtA', 'removed', at),
@@ -106,7 +105,7 @@ test('a same-instant removal beats the add, either order',
         ], 'n1'), []);
 });
 
-test('members are isolated per node', () => {
+Deno.test('members are isolated per node', () => {
     const rows = [
         memberRow('AjdvjuECVZEgZoFajaIEkg', 'n1', 'mFNSxZqywTSMXhgUTdTqtA'
             , 'added',
@@ -114,27 +113,27 @@ test('members are isolated per node', () => {
         memberRow('BBjWJsjYIDkTRKIIPrzWRw', 'n2', 'm2', 'added',
             '2026-01-01T00:00:00.000000Z'),
     ];
-    assert.deepEqual(
+    assertEquals(
         currentNodeMemberIds(rows, 'n1'), ['mFNSxZqywTSMXhgUTdTqtA']);
-    assert.deepEqual(
+    assertEquals(
         currentNodeMemberIds(rows, 'n2'), ['m2']);
 });
 
 // ── currentNodeAttributes ─────────────
 
-test('an added attribute is current with its payload', () => {
+Deno.test('an added attribute is current with its payload', () => {
     const rows = [
         attrRow('AjdvjuECVZEgZoFajaIEkg', 'n1', 'UQTJZvCoKlFjEoDlDUwekw'
             , 'editable', true, 'added',
             '2026-01-01T00:00:00.000000Z'),
     ];
-    assert.deepEqual(
+    assertEquals(
         currentNodeAttributes(rows, 'n1'),
         [{ attributeId: 'UQTJZvCoKlFjEoDlDUwekw', mode: 'editable',
             isRequired: true }]);
 });
 
-test('a later removal drops the attribute', () => {
+Deno.test('a later removal drops the attribute', () => {
     const rows = [
         attrRow('AjdvjuECVZEgZoFajaIEkg', 'n1', 'UQTJZvCoKlFjEoDlDUwekw'
             , 'editable', true, 'added',
@@ -143,11 +142,11 @@ test('a later removal drops the attribute', () => {
             , 'editable', true, 'removed',
             '2026-02-01T00:00:00.000000Z'),
     ];
-    assert.deepEqual(
+    assertEquals(
         currentNodeAttributes(rows, 'n1'), []);
 });
 
-test('a mode change is a new add whose payload wins', () => {
+Deno.test('a mode change is a new add whose payload wins', () => {
     const rows = [
         attrRow('AjdvjuECVZEgZoFajaIEkg', 'n1', 'UQTJZvCoKlFjEoDlDUwekw'
             , 'editable', false, 'added',
@@ -156,15 +155,15 @@ test('a mode change is a new add whose payload wins', () => {
             , 'readonly', true, 'added',
             '2026-02-01T00:00:00.000000Z'),
     ];
-    assert.deepEqual(
+    assertEquals(
         currentNodeAttributes(rows, 'n1'),
         [{ attributeId: 'UQTJZvCoKlFjEoDlDUwekw', mode: 'readonly',
             isRequired: true }]);
 });
 
-test('a same-instant removal beats the attribute add', () => {
+Deno.test('a same-instant removal beats the attribute add', () => {
     const at = '2026-03-01T00:00:00.000000Z';
-    assert.deepEqual(
+    assertEquals(
         currentNodeAttributes([
             attrRow('AjdvjuECVZEgZoFajaIEkg', 'n1', 'UQTJZvCoKlFjEoDlDUwekw'
                 , 'editable', true,
@@ -173,7 +172,7 @@ test('a same-instant removal beats the attribute add', () => {
                 , 'editable', true,
                 'removed', at),
         ], 'n1'), []);
-    assert.deepEqual(
+    assertEquals(
         currentNodeAttributes([
             attrRow('AjdvjuECVZEgZoFajaIEkg', 'n1', 'UQTJZvCoKlFjEoDlDUwekw'
                 , 'editable', true,
@@ -184,7 +183,7 @@ test('a same-instant removal beats the attribute add', () => {
         ], 'n1'), []);
 });
 
-test('attributes are isolated per node', () => {
+Deno.test('attributes are isolated per node', () => {
     const rows = [
         attrRow('AjdvjuECVZEgZoFajaIEkg', 'n1', 'UQTJZvCoKlFjEoDlDUwekw'
             , 'editable', false, 'added',
@@ -193,11 +192,11 @@ test('attributes are isolated per node', () => {
             , 'readonly', true, 'added',
             '2026-01-01T00:00:00.000000Z'),
     ];
-    assert.deepEqual(
+    assertEquals(
         currentNodeAttributes(rows, 'n1'),
         [{ attributeId: 'UQTJZvCoKlFjEoDlDUwekw', mode: 'editable',
             isRequired: false }]);
-    assert.deepEqual(
+    assertEquals(
         currentNodeAttributes(rows, 'n2'),
         [{ attributeId: 'UZgNCkZlSJcSaAmAJuSkcw', mode: 'readonly',
             isRequired: true }]);
@@ -205,7 +204,7 @@ test('attributes are isolated per node', () => {
 
 // ── reassembleStoredGraph ─────────────
 
-test('reassembly maps node rows to domain GraphNodes', () => {
+Deno.test('reassembly maps node rows to domain GraphNodes', () => {
     const node: FlowNodeEntity = {
         id: 'n1', flow_id: 'ZOousbbnzpqlxJExVAruYQ', name: 'Draft',
         position_x: 12, position_y: 34,
@@ -225,7 +224,7 @@ test('reassembly maps node rows to domain GraphNodes', () => {
     ];
     const graph = reassembleStoredGraph(
         [node], [], members, attrs);
-    assert.deepEqual(graph, {
+    assertEquals(graph, {
         nodes: [{
             id: 'n1', name: 'Draft',
             positionX: 12, positionY: 34,
@@ -239,19 +238,19 @@ test('reassembly maps node rows to domain GraphNodes', () => {
     });
 });
 
-test('reassembly maps edge rows to domain GraphEdges', () => {
+Deno.test('reassembly maps edge rows to domain GraphEdges', () => {
     const graph = reassembleStoredGraph(
         [], [edgeRow('YiJPbufDpkyrZcZCYbUJpg', 'ZOousbbnzpqlxJExVAruYQ'
             , 'next', 'n1', 'n2',
             '2026-01-01T00:00:00.000000Z')], [], []);
-    assert.deepEqual(graph, {
+    assertEquals(graph, {
         nodes: [],
         edges: [{ id: 'YiJPbufDpkyrZcZCYbUJpg', name: 'next',
             fromNodeId: 'n1', toNodeId: 'n2' }],
     });
 });
 
-test('reassembly draws each node members from its own rows',
+Deno.test('reassembly draws each node members from its own rows',
 () => {
     const nodes = [
         nodeRow('n1', 'ZOousbbnzpqlxJExVAruYQ', 'A',
@@ -268,13 +267,13 @@ test('reassembly draws each node members from its own rows',
     ];
     const graph = reassembleStoredGraph(
         nodes, [], members, []);
-    assert.deepEqual(
+    assertEquals(
         graph.nodes.map(n => n.memberIds),
         [['mFNSxZqywTSMXhgUTdTqtA'], ['m2']]);
 });
 
-test('reassembly of empty relations is an empty graph', () => {
-    assert.deepEqual(
+Deno.test('reassembly of empty relations is an empty graph', () => {
+    assertEquals(
         reassembleStoredGraph([], [], [], []),
         { nodes: [], edges: [] });
 });

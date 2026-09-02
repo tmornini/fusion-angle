@@ -1,72 +1,76 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertThrows } from '@std/assert';
 import {
     notificationEventFromWire,
+    type NotificationEvent,
 } from '../api/notifications.ts';
 
 // The cross-tab wire shape is validated at the adapter —
 // a malformed message throws instead of handing subscribers
 // a corrupt notification event.
 
-test('a well-formed full event round-trips', () => {
-    assert.deepEqual(
+Deno.test('a well-formed full event round-trips', () => {
+    assertEquals(
         notificationEventFromWire({ kind: 'full' }),
         { kind: 'full' },
     );
 });
 
-test('a well-formed scoped event round-trips', () => {
-    const event = {
+Deno.test('a well-formed scoped event round-trips', () => {
+    const event: NotificationEvent = {
         kind: 'scoped',
         organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
         identityIds: ['ada'],
     };
-    assert.deepEqual(
+    assertEquals(
         notificationEventFromWire(event), event,
     );
 });
 
-test('an empty scoped event round-trips', () => {
-    const event = {
+Deno.test('an empty scoped event round-trips', () => {
+    const event: NotificationEvent = {
         kind: 'scoped',
         organizationIds: [],
         identityIds: [],
     };
-    assert.deepEqual(
+    assertEquals(
         notificationEventFromWire(event), event,
     );
 });
 
-test('an unknown kind throws', () => {
-    assert.throws(
+Deno.test('an unknown kind throws', () => {
+    assertThrows(
         () => notificationEventFromWire({ kind: 'other' }),
-        /malformed notification event/,
+        Error,
+        'malformed notification event',
     );
 });
 
-test('a scoped event missing organizationIds throws', () => {
-    assert.throws(
+Deno.test('a scoped event missing organizationIds throws', () => {
+    assertThrows(
         () => notificationEventFromWire({
             kind: 'scoped', identityIds: [],
         }),
-        /malformed notification event/,
+        Error,
+        'malformed notification event',
     );
 });
 
-test('non-string array elements throw', () => {
-    assert.throws(
+Deno.test('non-string array elements throw', () => {
+    assertThrows(
         () => notificationEventFromWire({
             kind: 'scoped',
             organizationIds: ['AjdvjuECVZEgZoFajaIEkg', 7],
             identityIds: [],
         }),
-        /malformed notification event/,
+        Error,
+        'malformed notification event',
     );
 });
 
-test('a null message throws', () => {
-    assert.throws(
+Deno.test('a null message throws', () => {
+    assertThrows(
         () => notificationEventFromWire(null),
-        /malformed notification event/,
+        Error,
+        'malformed notification event',
     );
 });

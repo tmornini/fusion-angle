@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -135,13 +140,13 @@ async function wireReachableOrganizations(
         '/identities/' + identityId + '/organizations/',
         await membershipClaimToken(db, identityId),
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     return (await res.json()) as OrganizationEntity[];
 }
 
 // ---- leg 1: collection wire equals derive PER CALLER ---------
 
-test('leg 1: GET /identities/:id/organizations/ wire'
+Deno.test('leg 1: GET /identities/:id/organizations/ wire'
 + ' equals derive for a MULTI-organization caller'
 + ' (current: STARK + ORGANIZATION_TWO) and a'
 + ' SINGLE-organization caller (buildMembers()[0])'
@@ -160,23 +165,23 @@ async () => {
                 db, identityId,
             ),
         );
-        assert.deepEqual(wire, derived);
+        assertEquals(wire, derived);
         const expectedCount =
             identityId === MULTI_ORGANIZATION_IDENTITY_ID
                 ? 2 : 1;
-        assert.equal(wire.length, expectedCount);
+        assertStrictEquals(wire.length, expectedCount);
     }
     // Phase Final Stage B: organizations table retired.
 });
 
 // ---- leg 2: :id wire equals derive for each seeded org -------
 
-test('leg 2: the unfiltered collection + :id wire equals'
+Deno.test('leg 2: the unfiltered collection + :id wire equals'
 + ' derive for BOTH seeded organizations', async () => {
     const db = await seededDb();
     const derivedAll = sortById(await deriveOrganizations(db));
-    assert.equal(derivedAll.length, 2);
-    assert.deepEqual(
+    assertStrictEquals(derivedAll.length, 2);
+    assertEquals(
         derivedAll.map((o) => o.id).sort(),
         [STARK_ORGANIZATION, ORGANIZATION_TWO].sort(),
     );
@@ -190,50 +195,49 @@ test('leg 2: the unfiltered collection + :id wire equals'
         const res = await handleRequest(db, req(
             'GET', '/organizations/' + organizationId, token,
         ));
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const wireText = await res.text();
         const derived = await deriveOrganization(
             db, organizationId,
         );
-        assert.equal(wireText, JSON.stringify(derived));
+        assertStrictEquals(wireText, JSON.stringify(derived));
     }
     // Phase Final Stage B: organizations table retired.
 });
 
 // ---- leg 2b: the bootstrap singleton ---------------------------
 
-test('leg 2b: the bootstrap singleton organization — a'
+Deno.test('leg 2b: the bootstrap singleton organization — a'
 + ' SEPARATE fixture (postBootstrap), never the full'
 + ' mock-data seed', async () => {
     const db = await bootstrappedDb();
     const derivedAll = await deriveOrganizations(db);
-    assert.equal(derivedAll.length, 1);
+    assertStrictEquals(derivedAll.length, 1);
 
     const derived = await deriveOrganization(
         db, STARK_ORGANIZATION,
     );
-    assert.equal(derived.id, STARK_ORGANIZATION);
+    assertStrictEquals(derived.id, STARK_ORGANIZATION);
     // Phase Final Stage B: organizations table retired.
 });
 
 // ---- leg 3: non-member 403 / absent 404 shapes ----------------
 
-test('leg 3a: deriveOrganization throws the store-shaped'
+Deno.test('leg 3a: deriveOrganization throws the store-shaped'
 + ' EntityNotFoundError "Not found: organizations/<id>" for'
 + ' a genuinely missing id', async () => {
     const db = await seededDb();
     const missingId = 'no-such-organization';
     const expectedMessage =
         'Not found: organizations/' + missingId;
-    await assert.rejects(
+    const err = await assertRejects(
         () => deriveOrganization(db, missingId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedMessage,
-    );
+    ) as Error;
+    assertInstanceOf(err, EntityNotFoundError);
+    assertStrictEquals(err.message, expectedMessage);
 });
 
-test('leg 3b: the pre-dispatch membership-fence 403 — a'
+Deno.test('leg 3b: the pre-dispatch membership-fence 403 — a'
 + ' SINGLE-organization caller (STARK) requesting an EXISTING'
 + ' but foreign organization (ORGANIZATION_TWO) gets the'
 + ' forbidden body',
@@ -245,8 +249,8 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', '/organizations/' + ORGANIZATION_TWO, token,
     ));
-    assert.equal(res.status, 403);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
         error: 'forbidden: organizations/' + ORGANIZATION_TWO
             + ' belongs to a different organization',
     });
@@ -254,7 +258,7 @@ async () => {
 
 // ---- leg 4: the live PUT chain ---------------------------------
 
-test('leg 4: PUT /organizations/:id then wire + derive agree'
+Deno.test('leg 4: PUT /organizations/:id then wire + derive agree'
 + ' on the updated entity', async () => {
     const db = await seededDb();
     const adminToken = await organizationToken(
@@ -267,15 +271,15 @@ test('leg 4: PUT /organizations/:id then wire + derive agree'
         'PUT', '/organizations/' + STARK_ORGANIZATION,
         adminToken, updatedFields,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const putBody = await put.json() as OrganizationEntity;
-    assert.equal(putBody.name, 'Stark Industries Renamed');
+    assertStrictEquals(putBody.name, 'Stark Industries Renamed');
 
     const derived = await deriveOrganization(
         db, STARK_ORGANIZATION,
     );
-    assert.deepEqual(derived, putBody);
-    assert.equal(derived.name, 'Stark Industries Renamed');
+    assertEquals(derived, putBody);
+    assertStrictEquals(derived.name, 'Stark Industries Renamed');
     const stored = JSON.parse(
         await storedPutBodyText(
             db, '/organizations/', STARK_ORGANIZATION,
@@ -287,20 +291,20 @@ test('leg 4: PUT /organizations/:id then wire + derive agree'
         method: 'PUT',
         body: updatedFields,
     });
-    assert.equal(Object.keys(expected).at(-1), 'id');
-    assert.deepEqual(stored, expected);
+    assertStrictEquals(Object.keys(expected).at(-1), 'id');
+    assertEquals(stored, expected);
     // Phase Final Stage B: organizations table retired.
 });
 
 // ---- leg 5: no organizations states event (precondition) -----
 
-test('leg 5: SEED-STATE — no organizations states event'
+Deno.test('leg 5: SEED-STATE — no organizations states event'
 + ' exists for either seeded organization', async () => {
     await seededDb();
     for (const _organizationId of [
         STARK_ORGANIZATION, ORGANIZATION_TWO,
     ]) {
-        assert.deepEqual(
+        assertEquals(
             [], [], // states table retired
         );
     }
@@ -308,7 +312,7 @@ test('leg 5: SEED-STATE — no organizations states event'
 
 // ---- leg 6: the key-order pin -----------------------------------
 
-test('leg 6: key-order pin — derived entity JSON key order is'
+Deno.test('leg 6: key-order pin — derived entity JSON key order is'
 + ' id-LAST (organizationEntityOf departs from the'
 + ' seven-sibling id-first entityOf convention on purpose)',
 async () => {
@@ -319,22 +323,22 @@ async () => {
         const derived = await deriveOrganization(
             db, organizationId,
         );
-        assert.equal(Object.keys(derived).at(-1), 'id');
+        assertStrictEquals(Object.keys(derived).at(-1), 'id');
     }
 });
 
 // Writer matches GET: successBody is organizationEntityOf
 // (id-last). The id-first pin is deleted.
-test('leg 6b: organizations/:id successBody is id-last',
+Deno.test('leg 6b: organizations/:id successBody is id-last',
 () => {
     const entry = WRITE_RESPONSE_SPECS['organizations/:id'];
-    assert.ok(entry !== undefined && 'successBody' in entry);
+    assert(entry !== undefined && 'successBody' in entry);
     const body = entry.successBody!(
         [STARK_ORGANIZATION],
         organizationRow('Stark Industries Renamed'),
         'XXZruirZyAOoRpNxaDnpSA',
         undefined,
     ) as { id: string };
-    assert.equal(Object.keys(body).at(-1), 'id');
-    assert.equal(body.id, STARK_ORGANIZATION);
+    assertStrictEquals(Object.keys(body).at(-1), 'id');
+    assertStrictEquals(body.id, STARK_ORGANIZATION);
 });

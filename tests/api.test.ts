@@ -1,5 +1,11 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertMatch,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     GET, PUT, POST,
     RequestError,
@@ -13,7 +19,7 @@ import {
 import {
     DEV_TOKEN, organizationToken,
 } from './token-fixtures.ts';
-import { captureConsole } from './console-capture.ts';
+import { captureConsole } from './fixtures/console-capture.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
@@ -27,34 +33,36 @@ async function freshDb() {
     return db;
 }
 
-test('GET on unknown route throws', async () => {
+Deno.test('GET on unknown route throws', async () => {
     const db = await freshDb();
-    await assert.rejects(
+    const err = await assertRejects(
         () => GET(db, 'nonexistent-table', DEV_TOKEN),
-        /Route not found|404|not found/i,
+    ) as Error;
+    assertMatch(
+        err.message, /Route not found|404|not found/i,
     );
 });
 
-test('GET ideas returns array', async () => {
+Deno.test('GET ideas returns array', async () => {
     const db = await freshDb();
     const ideas =
         await GET<unknown[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + '', DEV_TOKEN);
-    assert.deepEqual(ideas, []);
+    assertEquals(ideas, []);
 });
 
-test('GET organizations/:id/ideas/:id throws on missing', async () => {
+Deno.test('GET organizations/:id/ideas/:id throws on missing', async () => {
     const db = await freshDb();
-    await assert.rejects(
+    const err = await assertRejects(
         () => GET(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + generateIdentifier()
             , DEV_TOKEN),
-        /Not found|404/,
-    );
+    ) as Error;
+    assertMatch(err.message, /Not found|404/);
 });
 
-test('PUT then GET round-trips an entity', async () => {
+Deno.test('PUT then GET round-trips an entity', async () => {
     const db = await freshDb();
     const payload = {
         id: 'fndCYAsXazdzMUlEGMNIZw',
@@ -76,39 +84,38 @@ test('PUT then GET round-trips an entity', async () => {
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
         );
-    assert.equal(fetched.title, 'Test');
+    assertStrictEquals(fetched.title, 'Test');
 });
 
 // Unknown-route write is a router 404 and writes nothing.
 // Document-plane idempotency/collision is pinned by family
 // tests; this pin is the generic writes-nothing force.
-test(
+Deno.test(
     'PUT on an unknown route is a router 404',
     async () => {
         const db = await freshDb();
-        await assert.rejects(
+        const err = await assertRejects(
             () => PUT(db, 'oRAKQvKtOmSHMZEjhEXaRw/x1', {
                 entity_id: 'YiJPbufDpkyrZcZCYbUJpg',
                 state: 'active',
                 at: '2026-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
-            (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 404,
-        );
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, 404);
     },
 );
 
-test('GET organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+Deno.test('GET organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
     + ' normalizes to collection', async () => {
     const db = await freshDb();
     const result =
         await GET<unknown[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + '', DEV_TOKEN);
-    assert.deepEqual(result, []);
+    assertEquals(result, []);
 });
 
-test(
+Deno.test(
     'GET seats returns the persisted humans',
     async () => {
         const db = await freshDb();
@@ -118,13 +125,13 @@ test(
             await GET<{ id: string }[]>(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
                 await organizationToken());
-        assert.ok(
+        assert(
             members.some(row => row.id === humanId),
         );
     },
 );
 
-test(
+Deno.test(
     'GET ai-agents returns persisted agents',
     async () => {
         const db = await freshDb();
@@ -134,68 +141,68 @@ test(
         const ais =
             await GET<unknown[]>(
                 db, 'ai-agents/', DEV_TOKEN);
-        assert.equal(ais.length, 1);
+        assertStrictEquals(ais.length, 1);
     },
 );
 
-test(
+Deno.test(
     'PUT ai-agents/:id validates body',
     async () => {
         const db = await freshDb();
-        await assert.rejects(
+        const err = await assertRejects(
             () => PUT(db, 'ai-agents/'
                 + generateIdentifier(), {
                 rogue_field: 'extra',
             }, DEV_TOKEN),
-            /unexpected key|missing/,
-        );
+        ) as Error;
+        assertMatch(err.message, /unexpected key|missing/);
     },
 );
 
-test(
+Deno.test(
     'POST on a route with no post handler is'
     + ' 405 Method Not Allowed',
     async () => {
         const db = await freshDb();
-        await assert.rejects(
+        const err = await assertRejects(
             () => POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 , {}, DEV_TOKEN),
-            /not allowed/i,
-        );
+        ) as Error;
+        assertMatch(err.message, /not allowed/i);
     },
 );
 
-test(
+Deno.test(
     'POST on an unknown route is 404',
     async () => {
         const db = await freshDb();
-        await assert.rejects(
+        const err = await assertRejects(
             () => POST(
                 db, 'no-such-resource', {}, DEV_TOKEN,
             ),
-            /not found|404/i,
-        );
+        ) as Error;
+        assertMatch(err.message, /not found|404/i);
     },
 );
 
-test(
+Deno.test(
     'a path with the wrong number of segments'
     + ' matches no route and is 404',
     async () => {
         const db = await freshDb();
-        await assert.rejects(
+        const err = await assertRejects(
             () => GET(
                 db,
                 'members/' + generateIdentifier()
                     + '/extra',
                 DEV_TOKEN,
             ),
-            /not found|404/i,
-        );
+        ) as Error;
+        assertMatch(err.message, /not found|404/i);
     },
 );
 
-test(
+Deno.test(
     'PUT with a malformed JSON body is 400 Bad'
     + ' Request, not 500',
     async () => {
@@ -219,17 +226,17 @@ test(
                 },
             ),
         );
-        assert.equal(response.status, 400);
+        assertStrictEquals(response.status, 400);
         const { error } =
             (await response.json()) as {
                 error: string;
             };
-        assert.match(error, /Invalid JSON body/);
-        assert.match(error, /PUT/);
+        assertMatch(error, /Invalid JSON body/);
+        assertMatch(error, /PUT/);
     },
 );
 
-test(
+Deno.test(
     'POST with a malformed JSON body is 400 Bad'
     + ' Request, not 500',
     async () => {
@@ -252,17 +259,17 @@ test(
                 },
             ),
         );
-        assert.equal(response.status, 400);
+        assertStrictEquals(response.status, 400);
         const { error } =
             (await response.json()) as {
                 error: string;
             };
-        assert.match(error, /Invalid JSON body/);
-        assert.match(error, /POST/);
+        assertMatch(error, /Invalid JSON body/);
+        assertMatch(error, /POST/);
     },
 );
 
-test(
+Deno.test(
     'the 500 fallback body never carries fault detail',
     async () => {
         const db = await freshDb();
@@ -301,13 +308,13 @@ test(
                     }),
                 ),
             );
-        assert.equal(response.status, 500);
+        assertStrictEquals(response.status, 500);
         const { error } =
             (await response.json()) as {
                 error: string;
             };
-        assert.equal(error, 'internal error');
-        assert.ok(
+        assertStrictEquals(error, 'internal error');
+        assert(
             calls.some(args =>
                 args.includes('request failed')),
             'the domain-boundary catch must keep'
@@ -316,7 +323,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'PUT with valid-JSON non-object bodies is 400'
     + ' Bad Request, not 500',
     async () => {
@@ -343,7 +350,7 @@ test(
                     },
                 ),
             );
-            assert.equal(
+            assertStrictEquals(
                 response.status, 400,
                 'body ' + raw,
             );
@@ -351,7 +358,7 @@ test(
                 (await response.json()) as {
                     error: string;
                 };
-            assert.match(
+            assertMatch(
                 error, /Invalid JSON body/,
             );
         }

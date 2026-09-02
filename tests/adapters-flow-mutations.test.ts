@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -114,7 +113,7 @@ async function createBaseFlow(
     });
 }
 
-test(
+Deno.test(
     'postFlowCreation creates flow plus link',
     async () => {
         const { ctx } = await setupMemDb();
@@ -126,9 +125,9 @@ test(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw',
         );
-        assert.equal(flow.id, 'aEsGMmBEFaVdWihhHXwCbw');
-        assert.equal(flow.name, 'Test Flow');
-        assert.equal(
+        assertStrictEquals(flow.id, 'aEsGMmBEFaVdWihhHXwCbw');
+        assertStrictEquals(flow.name, 'Test Flow');
+        assertStrictEquals(
             flow.lock_timeout,
             DEFAULT_LOCK_TIMEOUT,
         );
@@ -144,14 +143,14 @@ test(
         const link = links.find(
             l => l.flow_id === 'aEsGMmBEFaVdWihhHXwCbw',
         );
-        assert.ok(link);
-        assert.equal(
+        assert(link);
+        assertStrictEquals(
             link.project_id, projectId,
         );
     },
 );
 
-test(
+Deno.test(
     'postFlowCreation emits an active state event',
     async () => {
         const { ctx } = await setupMemDb();
@@ -161,14 +160,14 @@ test(
                 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
             );
-        assert.equal(events.length, 1);
+        assertStrictEquals(events.length, 1);
         const ev = events[0]!;
-        assert.equal(ev.entity_id, 'aEsGMmBEFaVdWihhHXwCbw');
-        assert.equal(ev.state, 'active');
+        assertStrictEquals(ev.entity_id, 'aEsGMmBEFaVdWihhHXwCbw');
+        assertStrictEquals(ev.state, 'active');
     },
 );
 
-test(
+Deno.test(
     'putFlow emits an updated state event',
     async () => {
         const { ctx } = await setupMemDb();
@@ -187,16 +186,16 @@ test(
                 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
             );
-        assert.equal(events.length, 2);
+        assertStrictEquals(events.length, 2);
         // Family history is DESC — current first.
         const states = events.map(e => e.state);
-        assert.deepEqual(
+        assertEquals(
             states, ['updated', 'active'],
         );
     },
 );
 
-test(
+Deno.test(
     'putFlow persists every FlowSaveShape field',
     async () => {
         const { ctx } = await setupMemDb();
@@ -228,22 +227,22 @@ test(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw',
         );
-        assert.equal(flow.name, 'Renamed');
-        assert.equal(flow.is_locked, true);
-        assert.equal(flow.is_auto_layout, true);
-        assert.equal(flow.is_auto_fit, true);
-        assert.equal(flow.lock_timeout, 600);
+        assertStrictEquals(flow.name, 'Renamed');
+        assertStrictEquals(flow.is_locked, true);
+        assertStrictEquals(flow.is_auto_layout, true);
+        assertStrictEquals(flow.is_auto_fit, true);
+        assertStrictEquals(flow.lock_timeout, 600);
         const graph =
             flow.graph as unknown as StoredGraph;
-        assert.equal(graph.nodes.length, 3);
-        assert.equal(graph.edges.length, 1);
-        assert.equal(
+        assertStrictEquals(graph.nodes.length, 3);
+        assertStrictEquals(graph.edges.length, 1);
+        assertStrictEquals(
             graph.edges[0]!.id, edgeId,
         );
     },
 );
 
-test(
+Deno.test(
     'putFlow replaces graph fully'
     + ' (no bleed-through from prior writes)',
     async () => {
@@ -280,13 +279,13 @@ test(
         );
         const graph =
             flow.graph as unknown as StoredGraph;
-        assert.equal(graph.nodes.length, 1);
-        assert.equal(graph.nodes[0]!.id, aId);
-        assert.equal(graph.edges.length, 0);
+        assertStrictEquals(graph.nodes.length, 1);
+        assertStrictEquals(graph.nodes[0]!.id, aId);
+        assertStrictEquals(graph.edges.length, 0);
     },
 );
 
-test(
+Deno.test(
     'putFlow last-write-wins'
     + ' across two starting-from-same callers',
     async () => {
@@ -323,16 +322,16 @@ test(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw',
         );
-        assert.equal(flow.name, 'caller-B');
+        assertStrictEquals(flow.name, 'caller-B');
         const graph =
             flow.graph as unknown as StoredGraph;
-        assert.equal(graph.nodes.length, 2);
-        assert.ok(
+        assertStrictEquals(graph.nodes.length, 2);
+        assert(
             graph.nodes.some(
                 n => n.id === bAdded,
             ),
         );
-        assert.ok(
+        assert(
             !graph.nodes.some(
                 n => n.id === aAdded,
             ),
@@ -343,7 +342,7 @@ test(
 // publishing-a-version-then-saving RETIRED (Phase 15 Task 7)
 // with the versions routes.
 
-test(
+Deno.test(
     'PUT organizations/:id/flows/:id replays identically'
     + ' as one updated event',
     async () => {
@@ -380,7 +379,7 @@ test(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
         );
-        assert.equal(events.length, 2);
+        assertStrictEquals(events.length, 2);
     },
 );
 
@@ -394,7 +393,7 @@ test(
 // SAVE to restore to (a flow_versions row is no longer read at
 // all) and the POST body shrinks to the state trio's two free
 // fields.
-test(
+Deno.test(
     'POST organizations/:id/flows/:id/undo posts the updated event'
     + ' at the caller time',
     async () => {
@@ -429,14 +428,14 @@ test(
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
         );
         // Family history is DESC — index 0 is current.
-        assert.equal(
+        assertStrictEquals(
             events[0]!.at,
             '2099-01-02T00:00:00.000000Z',
         );
     },
 );
 
-test(
+Deno.test(
     'redo document-PUT posts the updated event at the'
     + ' caller time',
     async () => {
@@ -476,7 +475,7 @@ test(
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
         );
         // Family history is DESC — index 0 is current.
-        assert.equal(
+        assertStrictEquals(
             events[0]!.at,
             '2099-01-03T00:00:00.000000Z',
         );
@@ -502,7 +501,7 @@ test(
 // write, which genuinely 412s via the real gate since the head
 // has moved. The retry's SECOND attempt must recompute — not
 // replay — the revivals.
-test(
+Deno.test(
     'putFlow C6 retry recomputes revivals per attempt:'
     + ' a node tombstoned mid-retry is restored, not'
     + ' left invisible by a stale (once-computed)'
@@ -589,17 +588,17 @@ test(
             { nodes: [start, complete, mid], edges: [] },
         );
 
-        assert.equal(
+        assertStrictEquals(
             putCalls, 2,
             'exactly one 412 retry happened',
         );
-        assert.ok(
+        assert(
             secondBody, 'the retry attempt PUT a body',
         );
         const revivals = (
             secondBody as Record<string, unknown>
         ).revivals as { entityId: string }[];
-        assert.ok(
+        assert(
             revivals.some(r => r.entityId === midId),
             'the recomputed retry restores the node the'
             + ' race just tombstoned — a revivals list'
@@ -614,7 +613,7 @@ test(
         );
         const graph =
             flow.graph as unknown as StoredGraph;
-        assert.ok(
+        assert(
             graph.nodes.some(n => n.id === midId),
             'mid reappears once its restore rides the'
             + ' retry that actually lands',

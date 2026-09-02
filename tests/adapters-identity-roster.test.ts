@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals, fail } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -28,7 +27,7 @@ async function setup() {
     };
 }
 
-test('getIdentityRoster joins pii; person carries fields',
+Deno.test('getIdentityRoster joins pii; person carries fields',
 async () => {
     const { ctx } = await setup();
     await postIdentityCreation(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
@@ -40,19 +39,19 @@ async () => {
     });
     const roster = await getIdentityRoster(ctx);
     const row = roster.find(r => r.id === 'pnXmXrxOWayANgDLdCjuBw');
-    assert.ok(row, 'roster row for pnXmXrxOWayANgDLdCjuBw exists');
-    assert.equal(row.kind, 'person');
+    assert(row, 'roster row for pnXmXrxOWayANgDLdCjuBw exists');
+    assertStrictEquals(row.kind, 'person');
     if (row.kind === 'person' && !row.pii.erased) {
-        assert.equal(row.pii.name, 'Ada');
-        assert.equal(row.pii.email, 'ada@x.io');
-        assert.equal(row.pii.phone, '555');
-        assert.equal(row.pii.bio, 'builds');
+        assertStrictEquals(row.pii.name, 'Ada');
+        assertStrictEquals(row.pii.email, 'ada@x.io');
+        assertStrictEquals(row.pii.phone, '555');
+        assertStrictEquals(row.pii.bio, 'builds');
     } else {
-        assert.fail('expected a present-pii person row');
+        fail('expected a present-pii person row');
     }
 });
 
-test('getIdentityRoster reports a nameless service unnamed',
+Deno.test('getIdentityRoster reports a nameless service unnamed',
 async () => {
     const { ctx } = await setup();
     await postIdentityCreation(ctx, 'syWUUcdBSbBgMwBiCrgbDw', {
@@ -60,16 +59,16 @@ async () => {
     });
     const roster = await getIdentityRoster(ctx);
     const row = roster.find(r => r.id === 'syWUUcdBSbBgMwBiCrgbDw');
-    assert.ok(row, 'roster row for syWUUcdBSbBgMwBiCrgbDw exists');
-    assert.equal(row.kind, 'service');
+    assert(row, 'roster row for syWUUcdBSbBgMwBiCrgbDw exists');
+    assertStrictEquals(row.kind, 'service');
     if (row.kind === 'service') {
-        assert.equal(row.service.named, false);
+        assertStrictEquals(row.service.named, false);
     } else {
-        assert.fail('expected a service row');
+        fail('expected a service row');
     }
 });
 
-test('getIdentityRoster leaves a service unnamed'
+Deno.test('getIdentityRoster leaves a service unnamed'
 + ' (agents are not identities)',
 async () => {
     const { ctx } = await setup();
@@ -79,16 +78,16 @@ async () => {
     });
     const roster = await getIdentityRoster(ctx);
     const row = roster.find(r => r.id === serviceId);
-    assert.ok(row, 'roster row for service exists');
-    assert.equal(row.kind, 'service');
+    assert(row, 'roster row for service exists');
+    assertStrictEquals(row.kind, 'service');
     if (row.kind === 'service') {
-        assert.equal(row.service.named, false);
+        assertStrictEquals(row.service.named, false);
     } else {
-        assert.fail('expected a service row');
+        fail('expected a service row');
     }
 });
 
-test('getIdentityRoster reports erased person as erased',
+Deno.test('getIdentityRoster reports erased person as erased',
 async () => {
     const { ctx } = await setup();
     await postIdentityCreation(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
@@ -101,12 +100,12 @@ async () => {
     await ctx.DELETE('identities/pnXmXrxOWayANgDLdCjuBw/pii');
     const roster = await getIdentityRoster(ctx);
     const row = roster.find(r => r.id === 'pnXmXrxOWayANgDLdCjuBw');
-    assert.ok(row, 'roster row for pnXmXrxOWayANgDLdCjuBw exists');
-    assert.equal(row.kind, 'person');
-    assert.equal(row.pii.erased, true);
+    assert(row, 'roster row for pnXmXrxOWayANgDLdCjuBw exists');
+    assertStrictEquals(row.kind, 'person');
+    assertStrictEquals(row.pii.erased, true);
 });
 
-test('getProviderEvents returns one identity\'s link log',
+Deno.test('getProviderEvents returns one identity\'s link log',
 async () => {
     const { ctx } = await setup();
     await ctx.PUT('identities/pnXmXrxOWayANgDLdCjuBw/providers/'
@@ -129,14 +128,14 @@ async () => {
         at: '2026-01-03T00:00:00.000000Z',
     });
     const events = await getProviderEvents(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assert.equal(events.length, 2);
-    assert.equal(
+    assertStrictEquals(events.length, 2);
+    assertStrictEquals(
         events.every(e => e.providerSubject === 'g-1'),
         true,
     );
 });
 
-test('getTokenChainsFor groups one identity\'s tokens',
+Deno.test('getTokenChainsFor groups one identity\'s tokens',
 async () => {
     const { ctx } = await setup();
     const chain2 = generateIdentifier();
@@ -170,12 +169,12 @@ async () => {
         at: '2026-01-04T00:00:00.000000Z',
     });
     const chains = await getTokenChainsFor(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assert.equal(chains.length, 2);
+    assertStrictEquals(chains.length, 2);
     const WeXjAaAxGSpLpamfEuvcww = chains.find(
         c => c.chainId === 'WeXjAaAxGSpLpamfEuvcww');
-    assert.ok(WeXjAaAxGSpLpamfEuvcww, 'chain WeXjAaAxGSpLpamfEuvcww present');
-    assert.equal(WeXjAaAxGSpLpamfEuvcww.events.length, 2);
+    assert(WeXjAaAxGSpLpamfEuvcww, 'chain WeXjAaAxGSpLpamfEuvcww present');
+    assertStrictEquals(WeXjAaAxGSpLpamfEuvcww.events.length, 2);
     const second = chains.find(c => c.chainId === chain2);
-    assert.ok(second, 'second chain present');
-    assert.equal(second.events.length, 1);
+    assert(second, 'second chain present');
+    assertStrictEquals(second.events.length, 1);
 });

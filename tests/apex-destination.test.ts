@@ -1,42 +1,49 @@
-import { test, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     APEX_SIGNED_IN,
     APEX_SIGNED_OUT,
     resolveApexLocation,
     probeRefreshSession,
 } from '../web-app/app/apex-destination.ts';
+import { deleteRefreshChannel } from
+    '../web-app/app/adapters/session-refresh-mutex.ts';
 
 const originalFetch = globalThis.fetch;
 
-afterEach(() => {
+// The single-flight mutex opens ONE refresh channel per
+// process, lazily, and a test process has no unload to
+// reclaim it. Release after each test, so the handle never
+// outlives the test that opened it; the next probe reopens
+// it.
+Deno.test.afterEach(() => {
     globalThis.fetch = originalFetch;
+    deleteRefreshChannel();
 });
 
-test('a live session hops to dashboard', async () => {
-    assert.equal(
+Deno.test('a live session hops to dashboard', async () => {
+    assertStrictEquals(
         await resolveApexLocation(async () => true),
         APEX_SIGNED_IN,
     );
-    assert.equal(
+    assertStrictEquals(
         APEX_SIGNED_IN,
         'dashboard/index.html',
     );
 });
 
-test('a dead session hops to landing', async () => {
-    assert.equal(
+Deno.test('a dead session hops to landing', async () => {
+    assertStrictEquals(
         await resolveApexLocation(async () => false),
         APEX_SIGNED_OUT,
     );
-    assert.equal(
+    assertStrictEquals(
         APEX_SIGNED_OUT,
         'landing/index.html',
     );
 });
 
-test('a probe fault hops to landing', async () => {
-    assert.equal(
+Deno.test('a probe fault hops to landing', async () => {
+    assertStrictEquals(
         await resolveApexLocation(async () => {
             throw new Error('network');
         }),
@@ -44,48 +51,48 @@ test('a probe fault hops to landing', async () => {
     );
 });
 
-test('probeRefreshSession posts a cookie refresh grant',
+Deno.test('probeRefreshSession posts a cookie refresh grant',
 async () => {
     let posts = 0;
     globalThis.fetch = async (input, init) => {
         posts += 1;
-        assert.equal(
+        assertStrictEquals(
             String(input),
             '/api/authentication/token',
         );
-        assert.equal(init?.method, 'POST');
-        assert.equal(init?.credentials, 'same-origin');
+        assertStrictEquals(init?.method, 'POST');
+        assertStrictEquals(init?.credentials, 'same-origin');
         const body = JSON.parse(String(init?.body)) as {
             grant_type?: unknown;
         };
-        assert.equal(body.grant_type, 'refresh');
+        assertStrictEquals(body.grant_type, 'refresh');
         return new Response(
             JSON.stringify({ access_token: 'fresh-access' }),
             { status: 200 },
         );
     };
-    assert.equal(await probeRefreshSession(), true);
-    assert.equal(posts, 1);
+    assertStrictEquals(await probeRefreshSession(), true);
+    assertStrictEquals(posts, 1);
 });
 
-test('probeRefreshSession treats 401 as unsigned',
+Deno.test('probeRefreshSession treats 401 as unsigned',
 async () => {
     globalThis.fetch = async () => new Response(
         JSON.stringify({ error: 'invalid_grant' }),
         { status: 401 },
     );
-    assert.equal(await probeRefreshSession(), false);
+    assertStrictEquals(await probeRefreshSession(), false);
 });
 
-test('ok without access_token is unsigned', async () => {
+Deno.test('ok without access_token is unsigned', async () => {
     globalThis.fetch = async () => new Response(
         JSON.stringify({ token_type: 'Bearer' }),
         { status: 200 },
     );
-    assert.equal(await probeRefreshSession(), false);
+    assertStrictEquals(await probeRefreshSession(), false);
 });
 
-test('concurrent probes share one refresh POST',
+Deno.test('concurrent probes share one refresh POST',
 async () => {
     let posts = 0;
     globalThis.fetch = async () => {
@@ -99,7 +106,7 @@ async () => {
         probeRefreshSession(),
         probeRefreshSession(),
     ]);
-    assert.equal(a, true);
-    assert.equal(b, true);
-    assert.equal(posts, 1);
+    assertStrictEquals(a, true);
+    assertStrictEquals(b, true);
+    assertStrictEquals(posts, 1);
 });

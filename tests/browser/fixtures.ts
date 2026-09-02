@@ -3,10 +3,6 @@
 // test, compositor input, condition waits. Runs only
 // under ./test-browser (FUSION_ANGLE_STATIC_ROOT).
 
-import { after, before } from 'node:test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -59,7 +55,7 @@ export type Origin = {
 
 export async function startOrigin(): Promise<Origin> {
     const staticRoot =
-        process.env['FUSION_ANGLE_STATIC_ROOT'];
+        Deno.env.get('FUSION_ANGLE_STATIC_ROOT');
     if (staticRoot === undefined || staticRoot === '') {
         throw new Error(
             'FUSION_ANGLE_STATIC_ROOT is required'
@@ -353,16 +349,16 @@ export class Browser {
     }
 
     static async launch(): Promise<Browser> {
-        const attach = process.env['CHROME_DEBUG_URL'];
+        const attach = Deno.env.get('CHROME_DEBUG_URL');
         if (attach !== undefined && attach !== '') {
             return new Browser(
                 await CdpClient.connect(attach), null, null,
             );
         }
-        const userDataDir = mkdtempSync(join(
-            process.env['TMPDIR'] ?? tmpdir(),
-            'fusion-browser-',
-        ));
+        // makeTempDirSync honours TMPDIR itself.
+        const userDataDir = Deno.makeTempDirSync({
+            prefix: 'fusion-browser-',
+        });
         // launchChrome spawns detached and unrefs, so an
         // orphan outlives this process and holds its
         // profile. Release both on every failure path,
@@ -384,10 +380,16 @@ export class Browser {
                 client, chrome, userDataDir,
             );
         } catch (error) {
-            killProcessTree(chrome);
-            rmSync(userDataDir, {
-                recursive: true, force: true,
-            });
+            // killProcessTree walks a ps snapshot and can
+            // throw, so the profile's removal nests inside
+            // it rather than following it.
+            try {
+                killProcessTree(chrome);
+            } finally {
+                Deno.removeSync(userDataDir, {
+                    recursive: true,
+                });
+            }
             throw error;
         }
     }
@@ -396,7 +398,20 @@ export class Browser {
         const created = await this.client.send(
             'Target.createBrowserContext',
         ) as { browserContextId: string };
-        return this.newPageIn(created.browserContextId);
+        // The caller disposes the context through the id
+        // the Page carries, so a newPageIn reject would
+        // strand a Chrome-side context nobody can name.
+        // Dispose it here, then rethrow the real failure.
+        try {
+            return await this.newPageIn(
+                created.browserContextId,
+            );
+        } catch (error) {
+            await this.disposeContext(
+                created.browserContextId,
+            );
+            throw error;
+        }
     }
 
     async newPageIn(contextId: string): Promise<Page> {
@@ -443,23 +458,33 @@ export class Browser {
         );
     }
 
+    // Each release runs even if the one before it
+    // throws. killProcessTree can, and a throw between
+    // the socket and the profile would leave a detached
+    // Chrome holding a directory nothing later removes.
     async close(): Promise<void> {
-        this.client.close();
-        killProcessTree(this.chrome);
-        if (this.userDataDir !== null) {
-            rmSync(this.userDataDir, {
-                recursive: true, force: true,
-            });
+        try {
+            this.client.close();
+        } finally {
+            try {
+                killProcessTree(this.chrome);
+            } finally {
+                if (this.userDataDir !== null) {
+                    Deno.removeSync(this.userDataDir, {
+                        recursive: true,
+                    });
+                }
+            }
         }
     }
 }
 
 export function useBrowser(): { get(): Browser } {
     let browser: Browser | null = null;
-    before(async () => {
+    Deno.test.beforeAll(async () => {
         browser = await Browser.launch();
     });
-    after(async () => {
+    Deno.test.afterAll(async () => {
         await browser?.close();
     });
     return {
@@ -523,22 +548,24 @@ export async function withAdminPage(
     fn: (page: Page, origin: Origin) => Promise<void>,
 ): Promise<void> {
     await withTimeout((async () => {
+        // One try per acquisition, so a later failure
+        // still releases the earlier resource. Disposing
+        // the context closes its targets, so page.close()
+        // is redundant — and a redundant reject would
+        // strand the listener.
         const origin = await startOrigin();
-        const page = await browser.newPage();
         try {
-            await signIn(page, origin, ADMIN_EMAIL);
-            await fn(page, origin);
-        } finally {
-            // disposeBrowserContext closes every target in
-            // the context, so page.close() is redundant —
-            // and a redundant reject would strand both the
-            // releases below. Nest them so the listener
-            // closes even if the context does not.
+            const page = await browser.newPage();
             try {
-                await browser.disposeContext(page.contextId);
+                await signIn(page, origin, ADMIN_EMAIL);
+                await fn(page, origin);
             } finally {
-                await origin.close();
+                await browser.disposeContext(
+                    page.contextId,
+                );
             }
+        } finally {
+            await origin.close();
         }
     })(), 'withAdminPage');
 }

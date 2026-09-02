@@ -1,9 +1,8 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertMatch } from '@std/assert';
 import { buildBipolarGaugeSvg } from
     '../web-app/app/presenters/gauge.ts';
 
-test('measured zero renders an apex marker', () => {
+Deno.test('measured zero renders an apex marker', () => {
     const html = buildBipolarGaugeSvg(
         { value: 0, label: 'Baseline', display: '0' },
         {
@@ -13,13 +12,13 @@ test('measured zero renders an apex marker', () => {
         },
         'gauge-zero', 'small',
     ).toString();
-    assert.ok(
+    assert(
         html.includes('gauge-arc-zero-mark'),
         'a measured 0 should emit the apex zero marker',
     );
 });
 
-test('absent value renders no apex marker', () => {
+Deno.test('absent value renders no apex marker', () => {
     const html = buildBipolarGaugeSvg(
         {
             value: undefined,
@@ -33,13 +32,13 @@ test('absent value renders no apex marker', () => {
         },
         'gauge-absent', 'small',
     ).toString();
-    assert.ok(
+    assert(
         !html.includes('gauge-arc-zero-mark'),
         'no measurement should emit no marker',
     );
 });
 
-test('nonzero value still renders a filled arc', () => {
+Deno.test('nonzero value still renders a filled arc', () => {
     const html = buildBipolarGaugeSvg(
         { value: 50, label: 'Baseline', display: '+50' },
         {
@@ -49,11 +48,11 @@ test('nonzero value still renders a filled arc', () => {
         },
         'gauge-nonzero', 'small',
     ).toString();
-    assert.ok(
+    assert(
         html.includes('gauge-arc-bipolar-half'),
         'a nonzero value should emit a filled arc path',
     );
-    assert.ok(
+    assert(
         !html.includes('gauge-arc-zero-mark'),
         'a nonzero value should not emit the zero marker',
     );
@@ -61,7 +60,7 @@ test('nonzero value still renders a filled arc', () => {
 
 const SVG_PATH_DATA = /^[MmZzLlHhVvCcSsQqTtAa0-9 .,eE+-]+$/;
 
-test('empty bipolar gauge path data is SVG grammar', () => {
+Deno.test('empty bipolar gauge path data is SVG grammar', () => {
     const html = buildBipolarGaugeSvg(
         {
             value: undefined,
@@ -78,8 +77,8 @@ test('empty bipolar gauge path data is SVG grammar', () => {
     const paths = [
         ...html.matchAll(/\bd="([^"]*)"/g),
     ].map(m => m[1]!);
-    assert.ok(paths.length >= 2);
+    assert(paths.length >= 2);
     for (const d of paths) {
-        assert.match(d, SVG_PATH_DATA, 'path d ' + d);
+        assertMatch(d, SVG_PATH_DATA, 'path d ' + d);
     }
 });

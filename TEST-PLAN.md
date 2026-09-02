@@ -242,7 +242,7 @@ them separately. Abort on any AT red.
 - [ ] **AT1** Run `deno check --frozen api shared server
   tests web-app`. PASS: exits 0; no diagnostics emitted.
   Pin: exploratory — the command is its own witness
-- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check tests/*.test.ts` for the main suite, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; both suites report `ok | N passed | 0 failed`, today `ok | 3485 passed | 0 failed | 7 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite.
+- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/*.test.ts` for the main `Deno.test` suite, written against `@std/assert`, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; both suites report `ok | N passed | 0 failed`, today `ok | 3489 passed | 0 failed | 7 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite.
   Pin: exploratory — the command is its own witness
 - [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1's `deno check --frozen api shared server tests web-app` and AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `build`, `serve`, `crank`, `test`, `test-postgres`, `validate`, `generate-schema-svg`, `generate-api-documentation`, `measure`, `postgres-wipe`, `postgres-lib`, and `postgres-seed`, plus `deno.json`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
   Pin: exploratory — the command is its own witness
@@ -251,21 +251,25 @@ them separately. Abort on any AT red.
   up and before `./build --no-zip`. The
   suite creates and drops its own
   `fusion_test_*` schema. PASS: exits 0,
-  `ok | 51 passed | 0 failed` across the
+  `ok | 52 passed | 0 failed` across the
   seven files. `./validate` stays
   Postgres-free.
   Pin: exploratory — the command is its own witness
 - [ ] **AT5** Crank runs `./test-browser` after AT4 and
   before `./build --no-zip`. It bundles the client with
   `deno bundle` into `$TMPDIR` and runs `TZ=UTC deno
-  test --frozen --no-check --allow-env --allow-read
-  --allow-write --allow-net --allow-run --preload
-  ./tests/hmac-test-key.ts --preload
-  ./tests/local-storage-stub.ts tests/browser/*.test.ts`
-  serially against an in-process origin on the memory
-  backend, one Chrome browser context per test. Needs
-  Chrome (`CHROME` or `CHROME_DEBUG_URL`). PASS: exits
-  0, `fail 0`. `./test-all` runs AT1–AT3 then AT5.
+  test --frozen --no-check --sanitize-resources
+  --allow-env --allow-read --allow-write --allow-net
+  --allow-run --preload ./tests/hmac-test-key.ts
+  --preload ./tests/local-storage-stub.ts
+  tests/browser/*.test.ts`, `Deno.test` suites against
+  `@std/assert`, serially against an in-process origin
+  on the memory backend, one Chrome browser context per
+  test. The ops sanitizer stays off: `useBrowser()` opens
+  one CDP WebSocket per file in `Deno.test.beforeAll`,
+  so its pending receive always crosses a test boundary.
+  Needs Chrome (`CHROME` or `CHROME_DEBUG_URL`). PASS:
+  exits 0, `fail 0`. `./test-all` runs AT1–AT3 then AT5.
   Pin: exploratory — the command is its own witness
 
 ---

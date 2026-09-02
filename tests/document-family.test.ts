@@ -1,5 +1,11 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -96,7 +102,7 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 // wiring.entityOf (id first, trio last). Pinned to literals —
 // the shape of a document PUT's successBody. -------
 
-test('documentWriteResponseSpec produces the ideas'
+Deno.test('documentWriteResponseSpec produces the ideas'
 + ' successBody', () => {
     const wiring = documentFamilyWiring('ideas')!;
     const body = {
@@ -108,7 +114,7 @@ test('documentWriteResponseSpec produces the ideas'
     const actual = documentWriteResponseSpec(wiring)
         .successBody!(['AjdvjuECVZEgZoFajaIEkg', 'gVvtDIaqhnkXZQcxZeSuiw']
             , body, 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
-    assert.deepEqual(actual, {
+    assertEquals(actual, {
         id: 'gVvtDIaqhnkXZQcxZeSuiw'
             , organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 'T', position: 1, problem_statement: 'p',
@@ -118,7 +124,7 @@ test('documentWriteResponseSpec produces the ideas'
     });
 });
 
-test('documentWriteResponseSpec produces the projects'
+Deno.test('documentWriteResponseSpec produces the projects'
 + ' successBody', () => {
     const wiring = documentFamilyWiring('projects')!;
     const body = {
@@ -132,7 +138,7 @@ test('documentWriteResponseSpec produces the projects'
             ['AjdvjuECVZEgZoFajaIEkg', PROJECT_1], body
                 , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
         );
-    assert.deepEqual(actual, {
+    assertEquals(actual, {
         id: PROJECT_1, organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 'T', description: 'd', progress: 5,
         start_date: '2026-01-01', target_end_date: '2026-02-01',
@@ -141,30 +147,30 @@ test('documentWriteResponseSpec produces the projects'
     });
 });
 
-test('documentWriteResponseSpec produces the identities'
+Deno.test('documentWriteResponseSpec produces the identities'
 + ' successBody (G3 entityOf)', () => {
     const wiring = documentFamilyWiring('identities')!;
     const body = { kind: 'person' };
     const actual = documentWriteResponseSpec(wiring)
         .successBody!([ID_1], body, 'XXZruirZyAOoRpNxaDnpSA'
             , 'AjdvjuECVZEgZoFajaIEkg');
-    assert.deepEqual(actual, { id: ID_1, kind: 'person' });
+    assertEquals(actual, { id: ID_1, kind: 'person' });
 });
 
-test('leftover roster families have no document wiring',
+Deno.test('leftover roster families have no document wiring',
 () => {
     for (const family of [
         'memberships', 'members',
         'ai-members', 'human-members',
     ]) {
-        assert.equal(
+        assertStrictEquals(
             documentFamilyWiring(family), undefined,
             family,
         );
     }
 });
 
-test('documentWriteResponseSpec produces the ai-agents'
+Deno.test('documentWriteResponseSpec produces the ai-agents'
 + ' successBody (G3 entityOf, request-body key order)',
 () => {
     const wiring = documentFamilyWiring('ai-agents')!;
@@ -176,13 +182,13 @@ test('documentWriteResponseSpec produces the ai-agents'
     const actual = documentWriteResponseSpec(wiring)
         .successBody!([AG_1], body, 'XXZruirZyAOoRpNxaDnpSA'
             , 'AjdvjuECVZEgZoFajaIEkg');
-    assert.deepEqual(actual, { id: AG_1, ...body });
+    assertEquals(actual, { id: AG_1, ...body });
 });
 
 // -- (b) documentEntityRoute('simple') dispatches PUT to the
 // wiring's documentOp and GET to the derived entity. --------
 
-test('documentEntityRoute (simple arm) PUTs through the'
+Deno.test('documentEntityRoute (simple arm) PUTs through the'
 + ' wiring documentOp and GETs the derived entity', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -217,7 +223,7 @@ test('documentEntityRoute (simple arm) PUTs through the'
             , 'XXZruirZyAOoRpNxaDnpSA', messagePair,
         'AjdvjuECVZEgZoFajaIEkg', [], AT, TEST_OPERATION_ID,
     );
-    assert.equal(
+    assertStrictEquals(
         (written as { title: string }).title, 'Generic',
     );
     const got = await route.get!(
@@ -225,7 +231,7 @@ test('documentEntityRoute (simple arm) PUTs through the'
             , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
         [],
     );
-    assert.deepEqual(got, await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg'
+    assertEquals(got, await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg'
         , 'gZsGVjTnvrgHQLzbKnQckg'));
 });
 
@@ -371,7 +377,7 @@ async function withSyntheticLockedFamily<T>(
     }
 }
 
-test('locked arm: genesis with neither header passes',
+Deno.test('locked arm: genesis with neither header passes',
 async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -380,21 +386,21 @@ async () => {
             'PUT', '/' + TEST_FAMILY + '/XufQcWIKhZshfJYOVNeUSw', token,
             { v: 'first' },
         ));
-        assert.equal(res.status, 201);
-        assert.equal(res.headers.get('Follows'), null);
-        assert.equal(res.headers.get('Supersedes'), null);
+        assertStrictEquals(res.status, 201);
+        assertStrictEquals(res.headers.get('Follows'), null);
+        assertStrictEquals(res.headers.get('Supersedes'), null);
         const responseId = res.headers.get('Response-ID');
-        assert.ok(
+        assert(
             responseId !== null && isIdentifier(responseId),
         );
-        assert.equal(
+        assertStrictEquals(
             res.headers.get('ETag'),
             strongEtagOf(responseId),
         );
     });
 });
 
-test('locked arm: GET ETag equals Response-ID',
+Deno.test('locked arm: GET ETag equals Response-ID',
 async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -404,27 +410,27 @@ async () => {
         const put = await handleRequest(db, req(
             'PUT', path, token, { v: 'first' },
         ));
-        assert.equal(put.status, 201);
+        assertStrictEquals(put.status, 201);
         const got = await handleRequest(db, req(
             'GET', path, token,
         ));
-        assert.equal(got.status, 200);
+        assertStrictEquals(got.status, 200);
         const responseId = got.headers.get('Response-ID');
-        assert.ok(
+        assert(
             responseId !== null && isIdentifier(responseId),
         );
-        assert.equal(
+        assertStrictEquals(
             got.headers.get('ETag'),
             strongEtagOf(responseId),
         );
-        assert.equal(
+        assertStrictEquals(
             got.headers.get('ETag'),
             put.headers.get('ETag'),
         );
     });
 });
 
-test('locked arm: If-Match with the pair id succeeds; a'
+Deno.test('locked arm: If-Match with the pair id succeeds; a'
 + ' stale token 412s; live head with no pin 428s',
 async () => {
     await withSyntheticLockedFamily(async () => {
@@ -435,10 +441,10 @@ async () => {
         const genesis = await handleRequest(db, req(
             'PUT', path, token, { v: 'first' },
         ));
-        assert.equal(genesis.status, 201);
+        assertStrictEquals(genesis.status, 201);
         const pairId = genesis.headers.get('Response-ID');
-        assert.ok(pairId !== null);
-        assert.equal(
+        assert(pairId !== null);
+        assertStrictEquals(
             genesis.headers.get('ETag'),
             strongEtagOf(pairId),
         );
@@ -446,20 +452,20 @@ async () => {
             'PUT', path, token, { v: 'second' },
             { [IF_MATCH_HEADER]: strongEtagOf(pairId) },
         ));
-        assert.equal(matched.status, 201);
+        assertStrictEquals(matched.status, 201);
         const stale = await handleRequest(db, req(
             'PUT', path, token, { v: 'third' },
             { [IF_MATCH_HEADER]: strongEtagOf(pairId) },
         ));
-        assert.equal(stale.status, 412);
+        assertStrictEquals(stale.status, 412);
         const unpinned = await handleRequest(db, req(
             'PUT', path, token, { v: 'fourth' },
         ));
-        assert.equal(unpinned.status, 428);
+        assertStrictEquals(unpinned.status, 428);
     });
 });
 
-test('locked arm: A then B then A yields three distinct'
+Deno.test('locked arm: A then B then A yields three distinct'
 + ' ETags',
 async () => {
     await withSyntheticLockedFamily(async () => {
@@ -470,34 +476,34 @@ async () => {
         const first = await handleRequest(db, req(
             'PUT', path, token, { v: 'A' },
         ));
-        assert.equal(first.status, 201);
+        assertStrictEquals(first.status, 201);
         const tagA = first.headers.get('ETag')!;
         const second = await handleRequest(db, req(
             'PUT', path, token, { v: 'B' },
             { [IF_MATCH_HEADER]: tagA },
         ));
-        assert.equal(second.status, 201);
+        assertStrictEquals(second.status, 201);
         const tagB = second.headers.get('ETag')!;
         const third = await handleRequest(db, req(
             'PUT', path, token, { v: 'A' },
             { [IF_MATCH_HEADER]: tagB },
         ));
-        assert.equal(third.status, 201);
+        assertStrictEquals(third.status, 201);
         const tagA2 = third.headers.get('ETag')!;
-        assert.notEqual(tagA, tagB);
-        assert.notEqual(tagB, tagA2);
-        assert.notEqual(tagA, tagA2);
-        assert.equal(
+        assertNotStrictEquals(tagA, tagB);
+        assertNotStrictEquals(tagB, tagA2);
+        assertNotStrictEquals(tagA, tagA2);
+        assertStrictEquals(
             tagA, strongEtagOf(first.headers.get(
                 'Response-ID',
             )!),
         );
-        assert.equal(
+        assertStrictEquals(
             tagB, strongEtagOf(second.headers.get(
                 'Response-ID',
             )!),
         );
-        assert.equal(
+        assertStrictEquals(
             tagA2, strongEtagOf(third.headers.get(
                 'Response-ID',
             )!),
@@ -505,7 +511,7 @@ async () => {
     });
 });
 
-test('locked arm: a sibling route under the SAME family'
+Deno.test('locked arm: a sibling route under the SAME family'
 + ' prefix stays simple (keyed by routePattern, never the'
 + ' bare first segment)', async () => {
     await withSyntheticLockedFamily(async () => {
@@ -516,18 +522,18 @@ test('locked arm: a sibling route under the SAME family'
         const first = await handleRequest(db, req(
             'PUT', path, token, { v: 'first' },
         ));
-        assert.equal(first.status, 201);
+        assertStrictEquals(first.status, 201);
         // A second PUT, still with NO If-Match — if the
         // gate mistakenly keyed the locked arm off TEST_FAMILY
         // alone, this would 428 (head present, echo absent).
         const second = await handleRequest(db, req(
             'PUT', path, token, { v: 'second' },
         ));
-        assert.equal(second.status, 201);
+        assertStrictEquals(second.status, 201);
     });
 });
 
-test('locked arm: head present, If-Match absent, 428s',
+Deno.test('locked arm: head present, If-Match absent, 428s',
 async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -540,8 +546,8 @@ async () => {
             'PUT', '/' + TEST_FAMILY + '/YHvbnJSZHECuziaHXcsKpw', token,
             { v: 'second' },
         ));
-        assert.equal(res.status, 428);
-        assert.equal(
+        assertStrictEquals(res.status, 428);
+        assertStrictEquals(
             (await res.json()).error,
             'If-Match is required to PUT /'
             + TEST_FAMILY + '/YHvbnJSZHECuziaHXcsKpw',
@@ -549,7 +555,7 @@ async () => {
     });
 });
 
-test('locked arm: a stale If-Match echo 412s', async () => {
+Deno.test('locked arm: a stale If-Match echo 412s', async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
         const token = await organizationToken();
@@ -564,8 +570,8 @@ test('locked arm: a stale If-Match echo 412s', async () => {
                 generateIdentifier(),
             ) },
         ));
-        assert.equal(res.status, 412);
-        assert.equal(
+        assertStrictEquals(res.status, 412);
+        assertStrictEquals(
             (await res.json()).error,
             'If-Match does not match the current document at '
             + '/' + TEST_FAMILY + '/YIuEjXvCwXAgrpyvcvLJjg',
@@ -573,7 +579,7 @@ test('locked arm: a stale If-Match echo 412s', async () => {
     });
 });
 
-test('locked arm: a matching echo stores no predecessor'
+Deno.test('locked arm: a matching echo stores no predecessor'
 + ' columns or headers', async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -588,13 +594,13 @@ test('locked arm: a matching echo stores no predecessor'
             { v: 'second' },
             { [IF_MATCH_HEADER]: firstEtag },
         ));
-        assert.equal(second.status, 201);
-        assert.equal(second.headers.get('Follows'), null);
-        assert.equal(second.headers.get('Supersedes'), null);
+        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.headers.get('Follows'), null);
+        assertStrictEquals(second.headers.get('Supersedes'), null);
         const secondId = second.headers.get('Response-ID')!;
         const stored = (await db.messagePairs.getAll())
             .find((row) => row.id === secondId);
-        assert.equal(
+        assertStrictEquals(
             stored !== undefined
                 && !('follows' in stored)
                 && !('supersedes' in stored),
@@ -603,7 +609,7 @@ test('locked arm: a matching echo stores no predecessor'
     });
 });
 
-test('locked arm: byte-identical resend replays the stored'
+Deno.test('locked arm: byte-identical resend replays the stored'
 + ' response, headers un-re-minted (fast-path-first ordering)',
 async () => {
     await withSyntheticLockedFamily(async () => {
@@ -620,24 +626,24 @@ async () => {
             { [IF_MATCH_HEADER]: firstEtag },
         );
         const edit = await handleRequest(db, editRequest.clone());
-        assert.equal(edit.status, 201);
+        assertStrictEquals(edit.status, 201);
         const editDate = edit.headers.get('Date');
         // A byte-identical resend of the edit: its echo (firstId)
         // is now STALE against the new head (the edit's own id),
         // yet it must replay — never 412 — because the fast path
         // runs BEFORE the four-outcome table.
         const resend = await handleRequest(db, editRequest.clone());
-        assert.equal(resend.status, 201);
-        assert.equal(resend.headers.get('Date'), editDate);
-        assert.equal(
+        assertStrictEquals(resend.status, 201);
+        assertStrictEquals(resend.headers.get('Date'), editDate);
+        assertStrictEquals(
             resend.headers.get('Response-ID'),
             edit.headers.get('Response-ID'),
         );
-        assert.equal((await db.messagePairs.getAll()).length, 4);
+        assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     });
 });
 
-test('locked arm: a fresh-keyed replay echoing a superseded'
+Deno.test('locked arm: a fresh-keyed replay echoing a superseded'
 + ' head 412s', async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -661,11 +667,11 @@ test('locked arm: a fresh-keyed replay echoing a superseded'
             { v: 'first' },
             { [IF_MATCH_HEADER]: genesisEtag },
         ));
-        assert.equal(res.status, 412);
+        assertStrictEquals(res.status, 412);
     });
 });
 
-test('locked arm: two writers racing the SAME echo — the'
+Deno.test('locked arm: two writers racing the SAME echo — the'
 + ' second aborts via the in-tx head re-read', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -718,14 +724,13 @@ test('locked arm: two writers racing the SAME echo — the'
     await testDocumentOp(
         db, 'race', { v: 'a' }, 'XXZruirZyAOoRpNxaDnpSA', writerA,
     );
-    await assert.rejects(
+    const err = await assertRejects(
         () => testDocumentOp(
             db, 'race', { v: 'b' }, 'XXZruirZyAOoRpNxaDnpSA', writerB,
         ),
-        (err: unknown) =>
-            err instanceof ApiError
-            && err.status === HTTP_PRECONDITION_FAILED,
-    );
+    ) as ApiError;
+    assertInstanceOf(err, ApiError);
+    assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
 });
 
 // The e2e sibling of the storage-level race above: TWO PUTs
@@ -738,7 +743,7 @@ test('locked arm: two writers racing the SAME echo — the'
 // BOTH racers observe genesis as their head and pass the
 // pre-dispatch echo check before either's write commits — the
 // SECOND-dispatched racer's in-tx re-read then 412s.
-test('locked arm: two concurrent PUTs echoing the same head —'
+Deno.test('locked arm: two concurrent PUTs echoing the same head —'
 + ' the loser 412s via the in-tx head re-read',
 async () => {
     await withSyntheticLockedFamily(async () => {
@@ -761,11 +766,11 @@ async () => {
         ]);
         const statuses =
             [first.status, second.status].sort();
-        assert.deepEqual(statuses, [201, 412]);
+        assertEquals(statuses, [201, 412]);
         const loser = first.status === 412 ? first : second;
         const loserBody =
             await loser.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             loserBody.error,
             'If-Match does not match the current document at '
             + path,
@@ -778,24 +783,24 @@ async () => {
                     + TEST_FAMILY + '/'
                 && row.uri_id === 'YRLOudHOEHboXTwRDwLUTg',
         );
-        assert.equal(atPath.length, 2);
+        assertStrictEquals(atPath.length, 2);
         // Genesis + exactly one winner write landed; the
         // loser stored NOTHING — no partial write survives.
-        assert.equal(messagePairs.length, 4);
+        assertStrictEquals(messagePairs.length, 4);
     });
 });
 
-test('withSyntheticLockedFamily leaves no residue behind',
+Deno.test('withSyntheticLockedFamily leaves no residue behind',
 () => {
-    assert.equal(documentFamilyWiring(TEST_FAMILY), undefined);
-    assert.equal(
+    assertStrictEquals(documentFamilyWiring(TEST_FAMILY), undefined);
+    assertStrictEquals(
         MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.has(TEST_PATTERN), false,
     );
-    assert.equal(
+    assertStrictEquals(
         DOCUMENT_CLASS_ROUTE_PATTERNS.has(TEST_PATTERN), false,
     );
-    assert.equal(WRITE_RESPONSE_SPECS[TEST_PATTERN], undefined);
-    assert.equal(
+    assertStrictEquals(WRITE_RESPONSE_SPECS[TEST_PATTERN], undefined);
+    assertStrictEquals(
         FAMILY_REGISTRY.find(
             (entry) => entry.family === TEST_FAMILY,
         ),
@@ -888,7 +893,7 @@ async function deleteStatelessDocumentMessagePair(
     );
 }
 
-test('stateless lifecycle: a trio-less document PUT derives'
+Deno.test('stateless lifecycle: a trio-less document PUT derives'
 + ' through documentGetHandler with no throw', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -897,12 +902,12 @@ test('stateless lifecycle: a trio-less document PUT derives'
         db, ['AjdvjuECVZEgZoFajaIEkg', SL_1], 'XXZruirZyAOoRpNxaDnpSA'
             , 'AjdvjuECVZEgZoFajaIEkg', [],
     );
-    assert.deepEqual(got, {
+    assertEquals(got, {
         id: SL_1, organization_id: 'AjdvjuECVZEgZoFajaIEkg', v: 'first',
     });
 });
 
-test('stateless lifecycle: documentCollectionGetHandler skips'
+Deno.test('stateless lifecycle: documentCollectionGetHandler skips'
 + ' the per-document history walk too', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -910,35 +915,29 @@ test('stateless lifecycle: documentCollectionGetHandler skips'
     const rows = await documentCollectionGetHandler(
         statelessWiring,
     )(db, [], 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg', []);
-    assert.deepEqual(rows, [
+    assertEquals(rows, [
         { id: SL_2, organization_id: 'AjdvjuECVZEgZoFajaIEkg'
             , v: 'listed' },
     ]);
 });
 
-test('stateless lifecycle: a DELETE head 404s carrying'
+Deno.test('stateless lifecycle: a DELETE head 404s carrying'
 + ' notFoundTable, never the family', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await putStatelessDocumentMessagePair(db, SL_3, { v: 'first' });
     await deleteStatelessDocumentMessagePair(db, SL_3);
-    await assert.rejects(
-        documentGetHandler(statelessWiring)(
+    const error = await assertRejects(
+        () => documentGetHandler(statelessWiring)(
             db, ['AjdvjuECVZEgZoFajaIEkg', SL_3], 'XXZruirZyAOoRpNxaDnpSA'
                 , 'AjdvjuECVZEgZoFajaIEkg', [],
         ),
-        (error: unknown) => {
-            assert.ok(error instanceof EntityNotFoundError);
-            assert.equal(
-                (error as EntityNotFoundError).table,
-                STATELESS_TABLE,
-            );
-            return true;
-        },
-    );
+    ) as EntityNotFoundError;
+    assertInstanceOf(error, EntityNotFoundError);
+    assertStrictEquals(error.table, STATELESS_TABLE);
 });
 
-test('stateless lifecycle: a DELETE head is absent from the'
+Deno.test('stateless lifecycle: a DELETE head is absent from the'
 + ' collection too', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -947,5 +946,5 @@ test('stateless lifecycle: a DELETE head is absent from the'
     const rows = await documentCollectionGetHandler(
         statelessWiring,
     )(db, [], 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg', []);
-    assert.deepEqual(rows, []);
+    assertEquals(rows, []);
 });

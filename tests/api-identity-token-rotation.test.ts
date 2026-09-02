@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertInstanceOf,
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     POST,
     PUT,
@@ -58,58 +62,56 @@ function rotate(
     );
 }
 
-test(
+Deno.test(
     'rotating a live jti returns its successor',
     async () => {
         const db = await seededDb();
         const { jti: next } = await rotate(db, ROOT_JTI);
-        assert.notEqual(next, ROOT_JTI);
+        assertNotStrictEquals(next, ROOT_JTI);
         // issued(root) + rotated(root) + issued(next) = 3
         const rows = await deriveIdentityTokens(db);
-        assert.equal(rows.length, 3);
-        assert.equal(
+        assertStrictEquals(rows.length, 3);
+        assertStrictEquals(
             latestActionForJti(rows, ROOT_JTI), 'rotated');
-        assert.equal(
+        assertStrictEquals(
             latestActionForJti(rows, next), 'issued');
     },
 );
 
-test(
+Deno.test(
     'replaying a rotated-away jti is a 409 that revokes'
         + ' the chain',
     async () => {
         const db = await seededDb();
         const { jti: next } = await rotate(db, ROOT_JTI);
-        await assert.rejects(
+        const err = await assertRejects(
             () => rotate(db, ROOT_JTI),
-            (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 409,
-        );
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, 409);
         const rows = await deriveIdentityTokens(db);
-        assert.equal(
+        assertStrictEquals(
             latestActionForJti(rows, ROOT_JTI), 'revoked');
-        assert.equal(
+        assertStrictEquals(
             latestActionForJti(rows, next), 'revoked');
     },
 );
 
-test(
+Deno.test(
     'rotating an unknown jti is a 409 that appends nothing',
     async () => {
         const db = await seededDb();
-        await assert.rejects(
+        const err = await assertRejects(
             () => rotate(db, generateIdentifier()),
-            (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 409,
-        );
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, 409);
         const rows = await deriveIdentityTokens(db);
-        assert.equal(rows.length, 1);
+        assertStrictEquals(rows.length, 1);
     },
 );
 
-test(
+Deno.test(
     'revocation kills every jti in the chain',
     async () => {
         const db = await seededDb();
@@ -120,14 +122,14 @@ test(
             DEV_TOKEN,
         );
         const rows = await deriveIdentityTokens(db);
-        assert.equal(
+        assertStrictEquals(
             latestActionForJti(rows, ROOT_JTI), 'revoked');
-        assert.equal(
+        assertStrictEquals(
             latestActionForJti(rows, next), 'revoked');
     },
 );
 
-test(
+Deno.test(
     'revoking an unknown jti is an idempotent no-op',
     async () => {
         const db = await seededDb();
@@ -138,6 +140,6 @@ test(
             DEV_TOKEN,
         );
         const rows = await deriveIdentityTokens(db);
-        assert.equal(rows.length, 1);
+        assertStrictEquals(rows.length, 1);
     },
 );

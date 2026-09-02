@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -8,7 +7,7 @@ import {
 } from
     '../web-app/app/adapters/flow-mutations.ts';
 
-test(
+Deno.test(
     'awaitFlowSave waits for queued work',
     async () => {
         let release: () => void = () => {};
@@ -28,14 +27,14 @@ test(
             done = true;
         });
         await Promise.resolve();
-        assert.equal(done, false);
+        assertStrictEquals(done, false);
         release();
         await waiting;
-        assert.equal(done, true);
+        assertStrictEquals(done, true);
     },
 );
 
-test(
+Deno.test(
     'awaitFlowSave with no queue is idle',
     async () => {
         await awaitFlowSave(

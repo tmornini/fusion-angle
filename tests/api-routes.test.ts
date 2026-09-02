@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import { GET } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { devToken } from './token-fixtures.ts';
@@ -52,7 +51,7 @@ const COLLECTION_ROUTES: readonly string[] = [
 ];
 
 for (const route of COLLECTION_ROUTES) {
-    test(
+    Deno.test(
         `GET ${route} returns an array on an empty`
         + ` db`,
         async () => {
@@ -61,7 +60,7 @@ for (const route of COLLECTION_ROUTES) {
             const rows =
                 await GET<unknown[]>(
                     db, route, await devToken());
-            assert.ok(
+            assert(
                 Array.isArray(rows),
                 route + ' should return an array',
             );
@@ -72,7 +71,7 @@ for (const route of COLLECTION_ROUTES) {
 // Enumeration lives on the identity nest. A
 // SINGLE-organization caller sees only their own
 // membership org, never every seeded org.
-test('GET /identities/:id/organizations/ self-fences'
+Deno.test('GET /identities/:id/organizations/ self-fences'
 + ' to the path identity\'s own memberships',
 async () => {
     const db = await seededMockDb();
@@ -83,5 +82,5 @@ async () => {
             + '/organizations/',
         await devToken(singleOrganizationIdentityId),
     );
-    assert.equal(rows.length, 1);
+    assertStrictEquals(rows.length, 1);
 });

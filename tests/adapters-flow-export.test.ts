@@ -1,11 +1,11 @@
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-};
-
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
+import { withLocalStorageAsync } from
+    './fixtures/local-storage.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -58,6 +58,11 @@ import type {
 import {
     asStoredGraph,
 } from '../api/validators.ts';
+
+const NULL_STORAGE: Partial<Storage> = {
+    getItem: () => null,
+    setItem: () => {},
+};
 
 async function setup(): Promise<{
     db: MemoryDbAdapter;
@@ -153,10 +158,10 @@ async function readPairGraph(
     );
 }
 
-test(
+Deno.test(
     'postFlowFromBackup round-trip preserves'
     + ' node members AND attributes',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { ctx } = await setup();
         const newFlowId = generateIdentifier();
         const projectId = generateIdentifier();
@@ -175,7 +180,7 @@ test(
         );
 
         // Two nodes should be imported
-        assert.equal(
+        assertStrictEquals(
             graph.nodes.length, 2,
             'expected 2 imported nodes',
         );
@@ -184,44 +189,44 @@ test(
         const startNode = graph.nodes.find(
             n => n.isCreate,
         );
-        assert.ok(
+        assert(
             startNode,
             'start node must be present',
         );
 
         // Members preserved
-        assert.deepEqual(
+        assertEquals(
             startNode.memberIds,
             ['mFNSxZqywTSMXhgUTdTqtA'],
             'memberIds must be preserved',
         );
 
         // Attributes preserved — mode and isRequired
-        assert.equal(
+        assertStrictEquals(
             startNode.attributes.length, 1,
             'must have exactly 1 attribute',
         );
         const attr = startNode.attributes[0]!;
-        assert.equal(
+        assertStrictEquals(
             attr.attributeId, attributeId,
         );
-        assert.equal(
+        assertStrictEquals(
             attr.mode, 'readonly',
         );
-        assert.equal(
+        assertStrictEquals(
             attr.isRequired, true,
         );
-    },
+    }),
 );
 
 // F5/F43: mermaid import must POST graphDelta (the flow
 // row no longer carries a graph blob). A simple stateDiagram
 // with one intermediate state seeds start + intermediate
 // + complete via the import auto-wire path.
-test(
+Deno.test(
     'postFlowFromMermaid creates a flow with'
     + ' a message-plane graph from simple .mmd',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { ctx } = await setup();
         const flowId = generateIdentifier();
         const mmd = [
@@ -233,34 +238,34 @@ test(
         const result = await postFlowFromMermaid(
             ctx, flowId, mmd, generateIdentifier(),
         );
-        assert.equal(result.flowId, flowId);
+        assertStrictEquals(result.flowId, flowId);
 
         const graph = await readPairGraph(
             ctx, flowId,
         );
-        assert.ok(
+        assert(
             graph.nodes.length >= 2,
             'expected start + complete at minimum',
         );
-        assert.ok(
+        assert(
             graph.nodes.some(n => n.isCreate),
             'start node present',
         );
-        assert.ok(
+        assert(
             graph.nodes.some(n => n.isArchive),
             'complete node present',
         );
-        assert.ok(
+        assert(
             graph.edges.length >= 1,
             'at least one edge after auto-wire',
         );
-    },
+    }),
 );
 
-test(
+Deno.test(
     'flowchart mmd with begin round-trips'
     + ' through postFlowFromMermaid',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { ctx } = await setup();
         const flowId = generateIdentifier();
         const startId = generateIdentifier();
@@ -333,15 +338,15 @@ test(
         const names = graph.edges
             .map(e => e.name)
             .sort();
-        assert.deepEqual(
+        assertEquals(
             names, ['begin', 'submit'],
         );
-    },
+    }),
 );
 
-test(
+Deno.test(
     'zip sidecar mermaid ids stay injective',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { ctx } = await setup();
         const dashBytes = new Uint8Array(16);
         dashBytes[0] = 62 << 2;
@@ -408,7 +413,7 @@ test(
         const sidecar = entries.find(
             e => e.name === 'sidecar.json',
         );
-        assert.ok(sidecar, 'sidecar.json');
+        assert(sidecar, 'sidecar.json');
         const parsed = JSON.parse(
             new TextDecoder().decode(
                 sidecar.data,
@@ -422,32 +427,32 @@ test(
         };
         const dashHex = mermaidIdOf(dashId);
         const underHex = mermaidIdOf(underId);
-        assert.notEqual(dashHex, underHex);
+        assertNotStrictEquals(dashHex, underHex);
         const ids = parsed.nodes.map(
             n => n.mermaidId,
         );
-        assert.equal(
+        assertStrictEquals(
             new Set(ids).size, ids.length,
         );
-        assert.ok(ids.includes(dashHex));
-        assert.ok(ids.includes(underHex));
-        assert.ok(!ids.includes(dashId));
-        assert.ok(!ids.includes(underId));
-        assert.ok(
+        assert(ids.includes(dashHex));
+        assert(ids.includes(underHex));
+        assert(!ids.includes(dashId));
+        assert(!ids.includes(underId));
+        assert(
             !ids.includes(
                 dashId.replaceAll('-', '_'),
             ),
         );
         const edge = parsed.edges[0];
-        assert.equal(edge?.mermaidFrom, dashHex);
-        assert.equal(edge?.mermaidTo, underHex);
-    },
+        assertStrictEquals(edge?.mermaidFrom, dashHex);
+        assertStrictEquals(edge?.mermaidTo, underHex);
+    }),
 );
 
-test(
+Deno.test(
     'zip Create New keeps begin edges and'
     + ' sidecar positions with Auto Layout off',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { ctx } = await setup();
         const sourceId = generateIdentifier();
         const startId = generateIdentifier();
@@ -529,32 +534,32 @@ test(
         const graph = await getFlowGraph(
             ctx, importedId,
         );
-        assert.equal(graph.isAutoLayout, false);
+        assertStrictEquals(graph.isAutoLayout, false);
         const names = graph.edges
             .map(e => e.name)
             .sort();
-        assert.deepEqual(
+        assertEquals(
             names, ['begin', 'submit'],
         );
         const capture = graph.nodes.find(
             n => n.name === 'Capture',
         );
-        assert.ok(capture);
-        assert.equal(capture.positionX, 0);
-        assert.equal(capture.positionY, 30);
+        assert(capture);
+        assertStrictEquals(capture.positionX, 0);
+        assertStrictEquals(capture.positionY, 30);
         const create = graph.nodes.find(
             n => n.isCreate,
         );
-        assert.ok(create);
-        assert.equal(create.positionX, -190);
-        assert.equal(create.positionY, 30);
-    },
+        assert(create);
+        assertStrictEquals(create.positionX, -190);
+        assertStrictEquals(create.positionY, 30);
+    }),
 );
 
-test(
+Deno.test(
     'zip mermaid path reads sidecar.json'
     + ' positions and begin edges',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { ctx } = await setup();
         const sourceId = generateIdentifier();
         const startId = generateIdentifier();
@@ -633,18 +638,18 @@ test(
         const graph = await getFlowGraph(
             ctx, importedId,
         );
-        assert.equal(graph.isAutoLayout, false);
+        assertStrictEquals(graph.isAutoLayout, false);
         const names = graph.edges
             .map(e => e.name)
             .sort();
-        assert.deepEqual(
+        assertEquals(
             names, ['begin', 'submit'],
         );
         const capture = graph.nodes.find(
             n => n.name === 'Capture',
         );
-        assert.ok(capture);
-        assert.equal(capture.positionX, 0);
-        assert.equal(capture.positionY, 30);
-    },
+        assert(capture);
+        assertStrictEquals(capture.positionX, 0);
+        assertStrictEquals(capture.positionY, 30);
+    }),
 );

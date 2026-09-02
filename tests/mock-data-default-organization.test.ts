@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -23,7 +22,7 @@ async function mockSeeded(): Promise<MemoryDbAdapter> {
 // default-organization ROW halves stripped — message-plane
 // oracles only.
 
-test('every membership-bearing person has a'
+Deno.test('every membership-bearing person has a'
 + ' default-organization document',
 async () => {
     const db = await mockSeeded();
@@ -35,22 +34,22 @@ async () => {
         const defaults = await deriveDefaultOrganization(
             db, id,
         );
-        assert.ok(
+        assert(
             defaults.length > 0,
             'person ' + id
                 + ' lacks a default-organization document');
     }
 });
 
-test("the seeded 'XXZruirZyAOoRpNxaDnpSA' default resolves to org 1",
+Deno.test("the seeded 'XXZruirZyAOoRpNxaDnpSA' default resolves to org 1",
 async () => {
     const db = await mockSeeded();
-    assert.equal(
+    assertStrictEquals(
         await identityDefaultOrganization(db, 'XXZruirZyAOoRpNxaDnpSA')
             , 'AjdvjuECVZEgZoFajaIEkg');
 });
 
-test("bootstrap seeds 'XXZruirZyAOoRpNxaDnpSA' a default-organization"
+Deno.test("bootstrap seeds 'XXZruirZyAOoRpNxaDnpSA' a default-organization"
 + ' document for organization 1',
 async () => {
     const db = memoryDbAdapter();
@@ -59,7 +58,7 @@ async () => {
     const defaults = await deriveDefaultOrganization(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     );
-    assert.ok(
+    assert(
         defaults.some(d => d.organization_id === 'AjdvjuECVZEgZoFajaIEkg'),
         "current has no default-organization document"
             + ' for organization 1');

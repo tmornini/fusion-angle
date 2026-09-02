@@ -1,11 +1,15 @@
 // Preload for ./test. Deno ships a real Web Storage
 // global: assigning globalThis.localStorage is ignored,
 // `localStorage.setItem = fn` stores a key, and the
-// store persists across processes. Thirty-three test
-// files stub localStorage by assignment. Installing a
-// writable in-memory fake first makes every such stub
-// take effect and keeps every test off persistent
-// storage. Node-neutral.
+// store persists across processes. This in-memory fake
+// is the baseline every test runs against; nineteen test
+// files layer a per-test fake on top of it via
+// tests/fixtures/local-storage.ts's withLocalStorage /
+// withLocalStorageAsync, which restores this baseline in
+// a finally so no per-test fake outlives its test.
+// Installing this baseline first keeps every test off
+// persistent storage regardless of whether it stubs
+// further. Node-neutral.
 const store = new Map<string, string>();
 
 Object.defineProperty(globalThis, 'localStorage', {

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertMatch, assertStrictEquals } from '@std/assert';
 import type {
     AttributeType,
     Constraint,
@@ -27,14 +26,14 @@ function makeAttribute(
     };
 }
 
-test(
+Deno.test(
     'validateAttributeValue returns no'
     + ' violations for a null value',
     () => {
         const attribute = makeAttribute('text', [
             { kind: 'regex', pattern: '^abc$' },
         ]);
-        assert.deepEqual(
+        assertEquals(
             validateAttributeValue(
                 attribute, null,
             ),
@@ -43,14 +42,14 @@ test(
     },
 );
 
-test(
+Deno.test(
     'validateAttributeValue returns no'
     + ' violations for an empty string value',
     () => {
         const attribute = makeAttribute('text', [
             { kind: 'regex', pattern: '^abc$' },
         ]);
-        assert.deepEqual(
+        assertEquals(
             validateAttributeValue(
                 attribute, '',
             ),
@@ -59,7 +58,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'validateAttributeValue returns a regex'
     + ' violation when the value does not match',
     () => {
@@ -69,23 +68,23 @@ test(
         const out = validateAttributeValue(
             attribute, 'xyz',
         );
-        assert.equal(out.length, 1);
-        assert.equal(out[0]!.kind, 'regex');
+        assertStrictEquals(out.length, 1);
+        assertStrictEquals(out[0]!.kind, 'regex');
         if (out[0]!.kind !== 'regex') return;
-        assert.equal(out[0]!.attributeId, 'a-x');
-        assert.equal(out[0]!.attributeName, 'Code');
-        assert.equal(out[0]!.pattern, '^abc$');
+        assertStrictEquals(out[0]!.attributeId, 'a-x');
+        assertStrictEquals(out[0]!.attributeName, 'Code');
+        assertStrictEquals(out[0]!.pattern, '^abc$');
     },
 );
 
-test(
+Deno.test(
     'validateAttributeValue passes when the'
     + ' regex matches',
     () => {
         const attribute = makeAttribute('text', [
             { kind: 'regex', pattern: '^abc$' },
         ]);
-        assert.deepEqual(
+        assertEquals(
             validateAttributeValue(
                 attribute, 'abc',
             ),
@@ -94,7 +93,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'validateAttributeValue returns a range_min'
     + ' violation for a number below the bound',
     () => {
@@ -104,21 +103,21 @@ test(
         const out = validateAttributeValue(
             attribute, '5',
         );
-        assert.equal(out.length, 1);
-        assert.equal(out[0]!.kind, 'range_min');
+        assertStrictEquals(out.length, 1);
+        assertStrictEquals(out[0]!.kind, 'range_min');
         if (out[0]!.kind !== 'range_min') return;
-        assert.equal(out[0]!.min, '10');
+        assertStrictEquals(out[0]!.min, '10');
     },
 );
 
-test(
+Deno.test(
     'validateAttributeValue passes when number is'
     + ' on the range_min boundary',
     () => {
         const attribute = makeAttribute('number', [
             { kind: 'range_min', min: '10' },
         ]);
-        assert.deepEqual(
+        assertEquals(
             validateAttributeValue(
                 attribute, '10',
             ),
@@ -127,7 +126,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'validateAttributeValue returns a range_max'
     + ' violation for a number above the bound',
     () => {
@@ -137,14 +136,14 @@ test(
         const out = validateAttributeValue(
             attribute, '150',
         );
-        assert.equal(out.length, 1);
-        assert.equal(out[0]!.kind, 'range_max');
+        assertStrictEquals(out.length, 1);
+        assertStrictEquals(out[0]!.kind, 'range_max');
         if (out[0]!.kind !== 'range_max') return;
-        assert.equal(out[0]!.max, '100');
+        assertStrictEquals(out[0]!.max, '100');
     },
 );
 
-test(
+Deno.test(
     'validateAttributeValue returns a range_min'
     + ' violation for a date before the bound'
     + ' (lexicographic compare)',
@@ -155,25 +154,25 @@ test(
         const out = validateAttributeValue(
             attribute, '2025-06-15',
         );
-        assert.equal(out.length, 1);
-        assert.equal(out[0]!.kind, 'range_min');
+        assertStrictEquals(out.length, 1);
+        assertStrictEquals(out[0]!.kind, 'range_min');
     },
 );
 
-test(
+Deno.test(
     'validateAttributeValue passes when date is'
     + ' on or after range_min bound',
     () => {
         const attribute = makeAttribute('date', [
             { kind: 'range_min', min: '2026-01-01' },
         ]);
-        assert.deepEqual(
+        assertEquals(
             validateAttributeValue(
                 attribute, '2026-01-01',
             ),
             [],
         );
-        assert.deepEqual(
+        assertEquals(
             validateAttributeValue(
                 attribute, '2027-12-31',
             ),
@@ -182,7 +181,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'validateAttributeValue returns a range_max'
     + ' violation for a date after the bound',
     () => {
@@ -192,14 +191,14 @@ test(
         const out = validateAttributeValue(
             attribute, '2100-01-01',
         );
-        assert.equal(out.length, 1);
-        assert.equal(out[0]!.kind, 'range_max');
+        assertStrictEquals(out.length, 1);
+        assertStrictEquals(out[0]!.kind, 'range_max');
         if (out[0]!.kind !== 'range_max') return;
-        assert.equal(out[0]!.max, '2099-12-31');
+        assertStrictEquals(out[0]!.max, '2099-12-31');
     },
 );
 
-test(
+Deno.test(
     'validateAttributeValue collects multiple'
     + ' violations when an attribute has both'
     + ' range_min and range_max constraints',
@@ -211,25 +210,25 @@ test(
         const tooLow = validateAttributeValue(
             attribute, '5',
         );
-        assert.equal(tooLow.length, 1);
-        assert.equal(
+        assertStrictEquals(tooLow.length, 1);
+        assertStrictEquals(
             tooLow[0]!.kind, 'range_min',
         );
         const tooHigh = validateAttributeValue(
             attribute, '100',
         );
-        assert.equal(tooHigh.length, 1);
-        assert.equal(
+        assertStrictEquals(tooHigh.length, 1);
+        assertStrictEquals(
             tooHigh[0]!.kind, 'range_max',
         );
         const ok = validateAttributeValue(
             attribute, '25',
         );
-        assert.deepEqual(ok, []);
+        assertEquals(ok, []);
     },
 );
 
-test(
+Deno.test(
     'formatViolation formats date range_min using'
     + ' an idiomatic date phrase',
     () => {
@@ -245,13 +244,13 @@ test(
             },
             attribute,
         );
-        assert.match(out, /Start Date/);
-        assert.match(out, /on or after/);
-        assert.match(out, /2026-01-01/);
+        assertMatch(out, /Start Date/);
+        assertMatch(out, /on or after/);
+        assertMatch(out, /2026-01-01/);
     },
 );
 
-test(
+Deno.test(
     'formatViolation formats date range_max using'
     + ' an idiomatic date phrase',
     () => {
@@ -267,13 +266,13 @@ test(
             },
             attribute,
         );
-        assert.match(out, /End Date/);
-        assert.match(out, /on or before/);
-        assert.match(out, /2099-12-31/);
+        assertMatch(out, /End Date/);
+        assertMatch(out, /on or before/);
+        assertMatch(out, /2099-12-31/);
     },
 );
 
-test(
+Deno.test(
     'formatViolation formats number range_min'
     + ' using at-least phrasing',
     () => {
@@ -289,13 +288,13 @@ test(
             },
             attribute,
         );
-        assert.match(out, /Count/);
-        assert.match(out, /at least/);
-        assert.match(out, /10/);
+        assertMatch(out, /Count/);
+        assertMatch(out, /at least/);
+        assertMatch(out, /10/);
     },
 );
 
-test(
+Deno.test(
     'formatViolation formats regex violation',
     () => {
         const attribute = makeAttribute('text', [
@@ -310,13 +309,13 @@ test(
             },
             attribute,
         );
-        assert.match(out, /Code/);
-        assert.match(out, /pattern/);
-        assert.match(out, /\^x\$/);
+        assertMatch(out, /Code/);
+        assertMatch(out, /pattern/);
+        assertMatch(out, /\^x\$/);
     },
 );
 
-test(
+Deno.test(
     'formatViolation formats required violation',
     () => {
         const attribute = makeAttribute('text', [], {
@@ -330,7 +329,7 @@ test(
             },
             attribute,
         );
-        assert.match(out, /Title/);
-        assert.match(out, /required/);
+        assertMatch(out, /Title/);
+        assertMatch(out, /required/);
     },
 );

@@ -7,8 +7,7 @@
 // @ts-expect-error — Node global stub
 globalThis.window = {};
 
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     createChannel,
     createSubscriptionChannel,
@@ -22,28 +21,39 @@ import {
     organizationToken,
     reachableToken,
 } from './token-fixtures.ts';
+import { deleteNotificationChannel } from
+    '../web-app/app/adapters/broadcast-channel.ts';
 
-test('subscribe receives subsequent send', () => {
+// The divorce point opens ONE channel per process, lazily,
+// and a test process has no unload to reclaim it. Release
+// after each test, so the handle never outlives the test
+// that opened it; the next subscription reopens it and
+// getChannel re-registers dispatch on the new handle.
+Deno.test.afterEach(() => {
+    deleteNotificationChannel();
+});
+
+Deno.test('subscribe receives subsequent send', () => {
     const ch = createChannel<number>();
     let received: number | null = null;
     ch.subscribe(v => { received = v; });
     ch.send(42);
-    assert.equal(received, 42);
+    assertStrictEquals(received, 42);
 });
 
-test('multiple subscribers all receive', () => {
+Deno.test('multiple subscribers all receive', () => {
     const ch = createChannel<string>();
     const seen: string[] = [];
     ch.subscribe(v => seen.push('a:' + v));
     ch.subscribe(v => seen.push('b:' + v));
     ch.send('hi');
-    assert.deepEqual(
+    assertEquals(
         seen,
         ['a:hi', 'b:hi'],
     );
 });
 
-test('unsubscribe stops delivery', () => {
+Deno.test('unsubscribe stops delivery', () => {
     const ch = createChannel<number>();
     let count = 0;
     const unsub = ch.subscribe(() => {
@@ -52,18 +62,18 @@ test('unsubscribe stops delivery', () => {
     ch.send(1);
     unsub();
     ch.send(2);
-    assert.equal(count, 1);
+    assertStrictEquals(count, 1);
 });
 
-test('subscribe after send does not get past values', () => {
+Deno.test('subscribe after send does not get past values', () => {
     const ch = createChannel<number>();
     ch.send(1);
     let received: number | null = null;
     ch.subscribe(v => { received = v; });
-    assert.equal(received, null);
+    assertStrictEquals(received, null);
 });
 
-test('unsubscribe is idempotent', () => {
+Deno.test('unsubscribe is idempotent', () => {
     const ch = createChannel<void>();
     let survivorCalls = 0;
     const unsub = ch.subscribe(() => {});
@@ -73,15 +83,15 @@ test('unsubscribe is idempotent', () => {
     ch.send();
     // the second unsubscribe must not evict the
     // other subscriber
-    assert.equal(survivorCalls, 1);
+    assertStrictEquals(survivorCalls, 1);
 });
 
-test('send with no subscribers is a no-op', () => {
+Deno.test('send with no subscribers is a no-op', () => {
     const ch = createChannel<number>();
-    assert.doesNotThrow(() => ch.send(1));
+    ch.send(1);
 });
 
-test('subscribeOnce delivers exactly once', () => {
+Deno.test('subscribeOnce delivers exactly once', () => {
     const ch = createChannel<void>();
     let calls = 0;
     subscribeOnce(ch.subscribe, () => {
@@ -89,10 +99,10 @@ test('subscribeOnce delivers exactly once', () => {
     });
     ch.send();
     ch.send();
-    assert.equal(calls, 1);
+    assertStrictEquals(calls, 1);
 });
 
-test(
+Deno.test(
     'subscribeOnce tears down before fn runs',
     () => {
         const ch = createChannel<void>();
@@ -105,7 +115,7 @@ test(
             ch.send();
         });
         ch.send();
-        assert.equal(calls, 1);
+        assertStrictEquals(calls, 1);
     },
 );
 
@@ -126,7 +136,7 @@ async function deliver(): Promise<void> {
     }
 }
 
-test('a full event fires regardless of session', async () => {
+Deno.test('a full event fires regardless of session', async () => {
     const ch = createSubscriptionChannel();
     let fired = 0;
     ch.subscribe(() => { fired += 1; });
@@ -134,10 +144,10 @@ test('a full event fires regardless of session', async () => {
     poster.postMessage({ kind: 'full' });
     await deliver();
     poster.close();
-    assert.equal(fired, 1);
+    assertStrictEquals(fired, 1);
 });
 
-test(
+Deno.test(
     'a full event fires during an unseeded session',
     async () => {
         // Mirrors the boot-time race: another tab posts before
@@ -150,11 +160,11 @@ test(
         poster.postMessage({ kind: 'full' });
         await deliver();
         poster.close();
-        assert.equal(fired, 1);
+        assertStrictEquals(fired, 1);
     },
 );
 
-test(
+Deno.test(
     'a scoped event during an unseeded session does not throw'
     + ' and does not fire',
     async () => {
@@ -170,11 +180,11 @@ test(
         });
         await deliver();
         poster.close();
-        assert.equal(fired, 0);
+        assertStrictEquals(fired, 0);
     },
 );
 
-test(
+Deno.test(
     'a scoped event naming the active organization fires',
     async () => {
         putSessionToken(
@@ -192,11 +202,11 @@ test(
         });
         await deliver();
         poster.close();
-        assert.equal(fired, 1);
+        assertStrictEquals(fired, 1);
     },
 );
 
-test('a scoped event naming this identity fires', async () => {
+Deno.test('a scoped event naming this identity fires', async () => {
     putSessionToken(await reachableToken('XXZruirZyAOoRpNxaDnpSA', []));
     const ch = createSubscriptionChannel();
     let fired = 0;
@@ -209,13 +219,13 @@ test('a scoped event naming this identity fires', async () => {
     });
     await deliver();
     poster.close();
-    assert.equal(fired, 1);
+    assertStrictEquals(fired, 1);
 });
 
 // K29: a flat (un-exchanged) login token has reachable orgs
 // but no active org claim. Score writes post org ids with
 // empty identityIds; the tab must still refresh.
-test(
+Deno.test(
     'a scoped event naming a reachable org fires'
     + ' on a flat session',
     async () => {
@@ -234,11 +244,11 @@ test(
         });
         await deliver();
         poster.close();
-        assert.equal(fired, 1);
+        assertStrictEquals(fired, 1);
     },
 );
 
-test(
+Deno.test(
     'a scoped event naming neither is a miss',
     async () => {
         putSessionToken(
@@ -256,11 +266,11 @@ test(
         });
         await deliver();
         poster.close();
-        assert.equal(fired, 0);
+        assertStrictEquals(fired, 0);
     },
 );
 
-test('notify posts a scoped event other tabs hear',
+Deno.test('notify posts a scoped event other tabs hear',
 async () => {
     putSessionToken(
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
@@ -281,15 +291,15 @@ async () => {
     ch.notify();
     await deliver();
     listener.close();
-    assert.equal(local, 1);
-    assert.deepEqual(seen, [{
+    assertStrictEquals(local, 1);
+    assertEquals(seen, [{
         kind: 'scoped',
         organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
         identityIds: ['XXZruirZyAOoRpNxaDnpSA'],
     }]);
 });
 
-test('notify on a flat session names reachable orgs',
+Deno.test('notify on a flat session names reachable orgs',
 async () => {
     putSessionToken(
         await reachableToken('XXZruirZyAOoRpNxaDnpSA'
@@ -305,14 +315,14 @@ async () => {
     createSubscriptionChannel().notify();
     await deliver();
     listener.close();
-    assert.deepEqual(seen, [{
+    assertEquals(seen, [{
         kind: 'scoped',
         organizationIds: ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw'],
         identityIds: ['XXZruirZyAOoRpNxaDnpSA'],
     }]);
 });
 
-test('notify with a non-jwt seed posts full',
+Deno.test('notify with a non-jwt seed posts full',
 async () => {
     putSessionToken('reminted-access');
     const seen: unknown[] = [];
@@ -325,10 +335,10 @@ async () => {
     createSubscriptionChannel().notify();
     await deliver();
     listener.close();
-    assert.deepEqual(seen, [{ kind: 'full' }]);
+    assertEquals(seen, [{ kind: 'full' }]);
 });
 
-test('a scoped event with a non-jwt seed does not throw'
+Deno.test('a scoped event with a non-jwt seed does not throw'
     + ' and does not fire',
 async () => {
     putSessionToken('reminted-access');
@@ -345,5 +355,5 @@ async () => {
     });
     await deliver();
     poster.close();
-    assert.equal(fired, 0);
+    assertStrictEquals(fired, 0);
 });

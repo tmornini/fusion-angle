@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { GET, handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { routes, matchRoute } from
@@ -18,19 +17,19 @@ import { seededMockDb } from './mock-seed.ts';
 
 const BASE = 'http://localhost';
 
-test('GET /organizations is not a live collection',
+Deno.test('GET /organizations is not a live collection',
 () => {
-    assert.equal(
+    assertStrictEquals(
         matchRoute(routes, pathSegmentsOf('/organizations')),
         null,
     );
-    assert.equal(
+    assertStrictEquals(
         matchRoute(routes, pathSegmentsOf('/organizations/')),
         null,
     );
 });
 
-test('GET /identities/:id/organizations/ lists'
+Deno.test('GET /identities/:id/organizations/ lists'
     + ' authorized organizations', async () => {
     const db = await seededMockDb();
     const identityId = buildMembers()[0]!.id;
@@ -39,10 +38,10 @@ test('GET /identities/:id/organizations/ lists'
         'identities/' + identityId + '/organizations/',
         await devToken(identityId),
     );
-    assert.equal(rows.length, 1);
+    assertStrictEquals(rows.length, 1);
 });
 
-test('GET /organizations 404s when authenticated',
+Deno.test('GET /organizations 404s when authenticated',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -59,11 +58,11 @@ async () => {
                 },
             }),
         );
-        assert.equal(res.status, 404, path);
+        assertStrictEquals(res.status, 404, path);
     }
 });
 
-test('GET identities/:id/organizations/ is self or'
+Deno.test('GET identities/:id/organizations/ is self or'
     + ' admin', async () => {
     const db = await seededMockDb();
     const otherId = buildMembers()[0]!.id;
@@ -79,10 +78,10 @@ test('GET identities/:id/organizations/ is self or'
             },
         ),
     );
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
 });
 
-test('admin GET lists the path identity seats',
+Deno.test('admin GET lists the path identity seats',
 async () => {
     const db = await seededMockDb();
     const identityId = buildMembers()[0]!.id;
@@ -101,10 +100,10 @@ async () => {
             ],
         }),
     );
-    assert.equal(rows.length, 1);
+    assertStrictEquals(rows.length, 1);
 });
 
-test('org-less GET identities/:id/organizations/'
+Deno.test('org-less GET identities/:id/organizations/'
     + ' returns an empty list', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -113,5 +112,5 @@ test('org-less GET identities/:id/organizations/'
         'identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
         await devToken(),
     );
-    assert.deepEqual(rows, []);
+    assertEquals(rows, []);
 });

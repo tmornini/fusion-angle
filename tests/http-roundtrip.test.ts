@@ -1,42 +1,41 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 
-test('round-trips a canonical header-only request', () => {
+Deno.test('round-trips a canonical header-only request', () => {
     const wire =
         'GET / HTTP/1.1\r\n' +
         'host: example.com\r\n' +
         '\r\n';
     const message = HttpMessage.fromWire(wire);
-    assert.equal(message.toWire(), wire);
+    assertStrictEquals(message.toWire(), wire);
 });
 
-test('canonicalizes field-name case to lower', () => {
+Deno.test('canonicalizes field-name case to lower', () => {
     const message = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\nHost: example.com\r\n\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.toWire(),
         'GET / HTTP/1.1\r\nhost: example.com\r\n\r\n',
     );
 });
 
-test('round-trips a response with a multi-word reason', () => {
+Deno.test('round-trips a response with a multi-word reason', () => {
     const wire =
         'HTTP/1.1 404 Not Found\r\n' +
         'content-type: text/plain\r\n' +
         '\r\n';
-    assert.equal(HttpMessage.fromWire(wire).toWire(), wire);
+    assertStrictEquals(HttpMessage.fromWire(wire).toWire(), wire);
 });
 
-test('sorts header fields by name, ascending', () => {
+Deno.test('sorts header fields by name, ascending', () => {
     const message = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\n' +
         'host: example.com\r\n' +
         'accept: text/html\r\n' +
         '\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.toWire(),
         'GET / HTTP/1.1\r\n' +
         'accept: text/html\r\n' +
@@ -45,7 +44,7 @@ test('sorts header fields by name, ascending', () => {
     );
 });
 
-test('preserves relative order of same-name fields', () => {
+Deno.test('preserves relative order of same-name fields', () => {
     const message = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\n' +
         'set-cookie: a=1\r\n' +
@@ -53,7 +52,7 @@ test('preserves relative order of same-name fields', () => {
         'set-cookie: b=2\r\n' +
         '\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.toWire(),
         'GET / HTTP/1.1\r\n' +
         'host: example.com\r\n' +
@@ -63,7 +62,7 @@ test('preserves relative order of same-name fields', () => {
     );
 });
 
-test('derives content-length from the body, not the field', () => {
+Deno.test('derives content-length from the body, not the field', () => {
     const message = HttpMessage.fromWire(
         'POST /things HTTP/1.1\r\n' +
         'host: example.com\r\n' +
@@ -71,7 +70,7 @@ test('derives content-length from the body, not the field', () => {
         '\r\n' +
         'hello',
     );
-    assert.equal(
+    assertStrictEquals(
         message.toWire(),
         'POST /things HTTP/1.1\r\n' +
         'content-length: 5\r\n' +

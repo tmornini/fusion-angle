@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     documentMessagePairsAt,
     deriveDocumentsAt,
@@ -60,40 +59,40 @@ async function storedMessagePairAt(
 // load-bearing once a family's create pair shares the
 // document address (flows).
 
-test('2-arg documentMessagePairsAt decodes a PUT pair',
+Deno.test('2-arg documentMessagePairsAt decodes a PUT pair',
 async () => {
     const messagePair = await storedMessagePairAt('PUT', 200);
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
     const fromOne = documentMessagePairsAt(
         [messagePair], prefix,
     );
-    assert.equal(fromOne.length, 1);
-    assert.equal(fromOne[0]!.method, 'PUT');
-    assert.equal(fromOne[0]!.at, messagePair.response_at);
+    assertStrictEquals(fromOne.length, 1);
+    assertStrictEquals(fromOne[0]!.method, 'PUT');
+    assertStrictEquals(fromOne[0]!.at, messagePair.response_at);
 });
 
-test('documentMessagePairsAt excludes a POST pair at a'
+Deno.test('documentMessagePairsAt excludes a POST pair at a'
 + ' document address', async () => {
     const messagePair = await storedMessagePairAt('POST', 200);
     const messagePairs = documentMessagePairsAt(
         [messagePair],
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
-    assert.equal(messagePairs.length, 0);
+    assertStrictEquals(messagePairs.length, 0);
 });
 
-test('documentMessagePairsAt includes a PUT pair at a'
+Deno.test('documentMessagePairsAt includes a PUT pair at a'
 + ' document address', async () => {
     const messagePair = await storedMessagePairAt('PUT', 200);
     const messagePairs = documentMessagePairsAt(
         [messagePair],
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
-    assert.equal(messagePairs.length, 1);
-    assert.equal(messagePairs[0]!.method, 'PUT');
+    assertStrictEquals(messagePairs.length, 1);
+    assertStrictEquals(messagePairs[0]!.method, 'PUT');
 });
 
-test('documentMessagePairsAt includes a DELETE pair at a'
+Deno.test('documentMessagePairsAt includes a DELETE pair at a'
 + ' document address', async () => {
     const messagePair = await storedMessagePairAt(
         'DELETE', 204,
@@ -102,16 +101,16 @@ test('documentMessagePairsAt includes a DELETE pair at a'
         [messagePair],
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
-    assert.equal(messagePairs.length, 1);
-    assert.equal(messagePairs[0]!.method, 'DELETE');
+    assertStrictEquals(messagePairs.length, 1);
+    assertStrictEquals(messagePairs[0]!.method, 'DELETE');
 });
 
-test('deriveDocumentsAt never sees a POST-only address',
+Deno.test('deriveDocumentsAt never sees a POST-only address',
 async () => {
     const messagePair = await storedMessagePairAt('POST', 200);
     const documents = deriveDocumentsAt(
         [messagePair],
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
-    assert.equal(documents.size, 0);
+    assertStrictEquals(documents.size, 0);
 });

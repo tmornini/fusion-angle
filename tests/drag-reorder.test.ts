@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import {
     computeNewPosition,
     dropIndex,
@@ -18,7 +17,7 @@ function rects(
     );
 }
 
-test(
+Deno.test(
     'dropIndex returns slot when cursor below'
     + ' midpoint without hysteresis',
     () => {
@@ -29,13 +28,13 @@ test(
         );
         // cursor at 60 is past midpoint (50) of
         // first item, so the next slot (1) wins.
-        assert.equal(
+        assertStrictEquals(
             dropIndex(60, null, items), 1,
         );
     },
 );
 
-test(
+Deno.test(
     'dropIndex respects hysteresis when'
     + ' lastIdx === current slot',
     () => {
@@ -47,13 +46,13 @@ test(
         // hysteresis cursor at 55 would advance
         // to slot 1. With lastIdx=0 the boundary
         // shifts to 50 + 8 = 58, so slot 0 sticks.
-        assert.equal(
+        assertStrictEquals(
             dropIndex(55, 0, items), 0,
         );
     },
 );
 
-test(
+Deno.test(
     'dropIndex respects hysteresis when'
     + ' lastIdx === next slot',
     () => {
@@ -65,127 +64,127 @@ test(
         // hysteresis cursor at 45 stays on slot 0.
         // With lastIdx=1 the boundary shifts to
         // 50 - 8 = 42, so slot 1 holds.
-        assert.equal(
+        assertStrictEquals(
             dropIndex(45, 1, items), 1,
         );
     },
 );
 
-test(
+Deno.test(
     'computeNewPosition returns FIRST_POSITION'
     + ' on empty list',
     () => {
-        assert.equal(
+        assertStrictEquals(
             computeNewPosition([], 0), FIRST_POSITION,
         );
     },
 );
 
-test(
+Deno.test(
     'computeNewPosition prepends with negative'
     + ' gap when idx is 0',
     () => {
-        assert.equal(
+        assertStrictEquals(
             computeNewPosition([5, 10, 15], 0),
             4,
         );
     },
 );
 
-test(
+Deno.test(
     'computeNewPosition appends with positive'
     + ' gap when idx >= length',
     () => {
-        assert.equal(
+        assertStrictEquals(
             computeNewPosition([5, 10, 15], 3),
             16,
         );
     },
 );
 
-test(
+Deno.test(
     'computeNewPosition inserts midway between'
     + ' neighbors',
     () => {
-        assert.equal(
+        assertStrictEquals(
             computeNewPosition([5, 10, 15], 1),
             7.5,
         );
     },
 );
 
-test(
+Deno.test(
     'computeNewPosition inserts midway between'
     + ' neighbors at end',
     () => {
-        assert.equal(
+        assertStrictEquals(
             computeNewPosition([5, 10, 15], 2),
             12.5,
         );
     },
 );
 
-test(
+Deno.test(
     'positionBetween returns the midpoint of two'
     + ' integer positions',
     () => {
-        assert.equal(positionBetween(5, 10), 7.5);
+        assertStrictEquals(positionBetween(5, 10), 7.5);
     },
 );
 
-test(
+Deno.test(
     'positionBetween wedges between adjacent'
     + ' fractional positions',
     () => {
-        assert.equal(positionBetween(7, 7.5), 7.25);
+        assertStrictEquals(positionBetween(7, 7.5), 7.25);
     },
 );
 
-test(
+Deno.test(
     'positionBetween handles a negative-anchor'
     + ' prepend chain',
     () => {
-        assert.equal(positionBetween(-1, 1), 0);
+        assertStrictEquals(positionBetween(-1, 1), 0);
     },
 );
 
-test(
+Deno.test(
     'nextPosition returns FIRST_POSITION on'
     + ' empty list',
     () => {
-        assert.equal(nextPosition([]), FIRST_POSITION);
+        assertStrictEquals(nextPosition([]), FIRST_POSITION);
     },
 );
 
-test(
+Deno.test(
     'nextPosition appends one POSITION_GAP past'
     + ' the last integer entry',
     () => {
-        assert.equal(nextPosition([5, 10, 15]), 16);
+        assertStrictEquals(nextPosition([5, 10, 15]), 16);
     },
 );
 
-test(
+Deno.test(
     'nextPosition preserves fractional baseline'
     + ' when appending',
     () => {
-        assert.equal(nextPosition([7.5]), 8.5);
+        assertStrictEquals(nextPosition([7.5]), 8.5);
     },
 );
 
-test(
+Deno.test(
     'followTranslateY writes translateY of the'
     + ' pointer delta',
     () => {
-        assert.equal(
+        assertStrictEquals(
             followTranslateY(100, 130),
             'translateY(30px)',
         );
-        assert.equal(
+        assertStrictEquals(
             followTranslateY(100, 70),
             'translateY(-30px)',
         );
-        assert.equal(
+        assertStrictEquals(
             followTranslateY(50, 50),
             'translateY(0px)',
         );

@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     PUT,
     DELETE,
@@ -115,7 +119,7 @@ function freshClaimBody() {
     };
 }
 
-test('a fresh claim appends one claimed event', async () => {
+Deno.test('a fresh claim appends one claimed event', async () => {
     const db = await seededDb();
     await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -123,12 +127,12 @@ test('a fresh claim appends one claimed event', async () => {
         freshClaimBody(), DEV_TOKEN,
     );
     const events = await claimEventsFor(db);
-    assert.equal(events.length, 1);
-    assert.equal(events[0]!.state, 'claimed');
-    assert.equal(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(events.length, 1);
+    assertStrictEquals(events[0]!.state, 'claimed');
+    assertStrictEquals(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
-test(
+Deno.test(
     'a repeat claim by the holder is an idempotent no-op',
     async () => {
         const db = await seededDb();
@@ -143,12 +147,12 @@ test(
             freshClaimBody(), DEV_TOKEN,
         );
         const events = await claimEventsFor(db);
-        assert.equal(events.length, 1);
-        assert.equal(events[0]!.state, 'claimed');
+        assertStrictEquals(events.length, 1);
+        assertStrictEquals(events[0]!.state, 'claimed');
     },
 );
 
-test(
+Deno.test(
     'a live claim by another member is a 409',
     async () => {
         const db = await seededDb();
@@ -162,23 +166,22 @@ test(
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             freshClaimBody(), await devToken(OTHER),
         );
-        await assert.rejects(
+        const err = await assertRejects(
             () => PUT(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                     + 'yNSSnbrpacodQTzUEcdEVA/claim',
                 freshClaimBody(), DEV_TOKEN,
             ),
-            (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 409,
-        );
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, 409);
         const events = await claimEventsFor(db);
-        assert.equal(events.length, 1);
-        assert.equal(events[0]!.member_id, OTHER);
+        assertStrictEquals(events.length, 1);
+        assertStrictEquals(events[0]!.member_id, OTHER);
     },
 );
 
-test(
+Deno.test(
     'an expired claim is superseded atomically',
     async () => {
         const db = await seededDb();
@@ -204,18 +207,18 @@ test(
             freshClaimBody(), DEV_TOKEN,
         );
         const events = await claimEventsFor(db);
-        assert.deepEqual(
+        assertEquals(
             events.map(ev => ev.state),
             ['claimed', 'claim_expired', 'claimed'],
         );
         // claim_expired names the PRIOR claimant; the new
         // claimed names the caller.
-        assert.equal(events[1]!.member_id, OTHER);
-        assert.equal(events[2]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+        assertStrictEquals(events[1]!.member_id, OTHER);
+        assertStrictEquals(events[2]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
-test(
+Deno.test(
     'a released claim allows a fresh claim',
     async () => {
         const db = await seededDb();
@@ -249,16 +252,16 @@ test(
             freshClaimBody(), DEV_TOKEN,
         );
         const events = await claimEventsFor(db);
-        assert.deepEqual(
+        assertEquals(
             events.map(ev => ev.state),
             ['claimed', 'claim_released', 'claimed'],
         );
-        assert.equal(events[0]!.member_id, OTHER);
-        assert.equal(events[2]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+        assertStrictEquals(events[0]!.member_id, OTHER);
+        assertStrictEquals(events[2]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
-test(
+Deno.test(
     'claim stamps the caller-minted claimed id + at',
     async () => {
         const db = await seededDb();
@@ -279,15 +282,15 @@ test(
             DEV_TOKEN,
         );
         const events = await claimEventsFor(db);
-        assert.equal(events.length, 1);
+        assertStrictEquals(events.length, 1);
         const ev = events[0]!;
-        assert.equal(ev.id, claimEventId);
-        assert.equal(ev.at, claimAt);
-        assert.equal(ev.state, 'claimed');
+        assertStrictEquals(ev.id, claimEventId);
+        assertStrictEquals(ev.at, claimAt);
+        assertStrictEquals(ev.state, 'claimed');
     },
 );
 
-test(
+Deno.test(
     'claim over a stale prior consumes the expire pair',
     async () => {
         const db = await seededDb();
@@ -323,17 +326,17 @@ test(
         );
         const events = await claimEventsFor(db);
         // prior seeded event + expire + new claim = 3.
-        assert.equal(events.length, 3);
+        assertStrictEquals(events.length, 3);
         const expireEv = events[1]!;
-        assert.equal(expireEv.id, expireEventId);
-        assert.equal(expireEv.at, expireAt);
-        assert.equal(expireEv.state, 'claim_expired');
+        assertStrictEquals(expireEv.id, expireEventId);
+        assertStrictEquals(expireEv.at, expireAt);
+        assertStrictEquals(expireEv.state, 'claim_expired');
         // Author of expire = prior claimant, not the caller.
-        assert.equal(expireEv.member_id, PRIOR_HOLDER);
+        assertStrictEquals(expireEv.member_id, PRIOR_HOLDER);
         const claimEv = events[2]!;
-        assert.equal(claimEv.id, claimEventId);
-        assert.equal(claimEv.at, claimAt);
-        assert.equal(claimEv.state, 'claimed');
+        assertStrictEquals(claimEv.id, claimEventId);
+        assertStrictEquals(claimEv.at, claimAt);
+        assertStrictEquals(claimEv.state, 'claimed');
     },
 );
 
@@ -357,7 +360,7 @@ test(
 // regression even though it cannot force a live interleaving
 // today. Pass-first on the OLD (row-plane) path; held unchanged
 // through the message-plane flip.
-test(
+Deno.test(
     'two-actor contention: exactly one claimed event lands and'
     + ' exactly one request gets the byte-exact 409 body — never'
     + ' which actor wins',
@@ -377,14 +380,14 @@ test(
                 tokenOther, freshClaimBody(),
             )),
         ]);
-        assert.deepEqual([a.status, b.status].sort(), [201, 409]);
+        assertEquals([a.status, b.status].sort(), [201, 409]);
         const loser = a.status === 409 ? a : b;
-        assert.deepEqual(
+        assertEquals(
             await loser.json(),
             { error: 'work order is already claimed' },
         );
         const events = await claimEventsFor(db);
-        assert.equal(
+        assertStrictEquals(
             events.filter((ev) => ev.state === 'claimed').length,
             1,
         );
@@ -396,7 +399,7 @@ test(
 // does not exist must map to the SAME EntityNotFoundError
 // bytes the store already emits. Held unchanged through the
 // document-head re-anchor (null head → same throw).
-test(
+Deno.test(
     'claim on a nonexistent work order is a byte-exact 404',
     async () => {
         const db = await seededDb();
@@ -408,8 +411,8 @@ test(
             DEV_TOKEN,
             freshClaimBody(),
         ));
-        assert.equal(response.status, 404);
-        assert.deepEqual(
+        assertStrictEquals(response.status, 404);
+        assertEquals(
             await response.json(),
             {
                 error:
@@ -419,19 +422,19 @@ test(
     },
 );
 
-test('GET claim 404s when unclaimed', async () => {
+Deno.test('GET claim 404s when unclaimed', async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', DEV_TOKEN,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error: 'Not found: work_order_claims/yNSSnbrpacodQTzUEcdEVA',
     });
 });
 
-test('GET claim returns facts; expired is still a row',
+Deno.test('GET claim returns facts; expired is still a row',
 async () => {
     const db = await seededDb();
     const expiresAt = '2099-12-31T00:00:00.000000Z';
@@ -446,8 +449,8 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', DEV_TOKEN,
     ));
-    assert.equal(live.status, 200);
-    assert.deepEqual(await live.json(), {
+    assertStrictEquals(live.status, 200);
+    assertEquals(await live.json(), {
         member_id: 'XXZruirZyAOoRpNxaDnpSA',
         expires_at: expiresAt,
     });
@@ -477,18 +480,18 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNXXsTEwShOozlQCEWKIIw/claim', DEV_TOKEN,
     ));
-    assert.equal(expired.status, 200);
+    assertStrictEquals(expired.status, 200);
     const body = await expired.json() as {
         member_id: string;
         expires_at: string;
     };
-    assert.equal(body.member_id, STALE);
-    assert.equal(
+    assertStrictEquals(body.member_id, STALE);
+    assertStrictEquals(
         body.expires_at, '2020-01-01T00:05:00.000000Z',
     );
 });
 
-test('DELETE claim releases; GET then 404s', async () => {
+Deno.test('DELETE claim releases; GET then 404s', async () => {
     const db = await seededDb();
     await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -499,11 +502,11 @@ test('DELETE claim releases; GET then 404s', async () => {
         'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', DEV_TOKEN,
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const get = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', DEV_TOKEN,
     ));
-    assert.equal(get.status, 404);
+    assertStrictEquals(get.status, 404);
 });
 

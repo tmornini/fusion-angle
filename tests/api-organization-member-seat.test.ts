@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -63,7 +62,7 @@ function seatsPrefix(organization: string): string {
         + '/members/';
 }
 
-test('accept writes the seat at the invitation'
+Deno.test('accept writes the seat at the invitation'
 + ' organization, copying Operation-ID', async () => {
     const db = await seededMockDb();
     const admin = await organizationToken(
@@ -77,7 +76,7 @@ test('accept writes the seat at the invitation'
             grantAt: '2026-06-05T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 200);
+    assertStrictEquals(grant.status, 200);
 
     const accept = await handleRequest(db, req(
         'PUT',
@@ -92,7 +91,7 @@ test('accept writes the seat at the invitation'
             at: '2026-06-05T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assertStrictEquals(accept.status, 204);
 
     const prefix = seatsPrefix(ORGANIZATION_TWO);
     const [requests] = await Promise.all([
@@ -105,26 +104,26 @@ test('accept writes the seat at the invitation'
         requests, prefix,
     ).filter((messagePair) => messagePair.uriId === SARAH_ID
         && messagePair.method === 'PUT');
-    assert.equal(seats.length, 1);
-    assert.deepEqual(seats[0]!.body, {
+    assertStrictEquals(seats.length, 1);
+    assertEquals(seats[0]!.body, {
         type: 'member',
         at: '2026-06-05T00:00:01.000000Z',
     });
     const written = requests.find(
         (row) => row.uri_id === SARAH_ID,
     );
-    assert.ok(written);
-    assert.equal(
+    assert(written);
+    assertStrictEquals(
         written.operation_id, TEST_OPERATION_ID,
     );
-    assert.equal(
+    assertStrictEquals(
         await membershipExistsFor(
             db, ORGANIZATION_TWO, SARAH_ID),
         true,
     );
 });
 
-test('mint bakes claim roles from a seat, not a'
+Deno.test('mint bakes claim roles from a seat, not a'
 + ' memberships/:id row', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -177,20 +176,20 @@ test('mint bakes claim roles from a seat, not a'
     );
     const minted = await handleRequest(
         db, tokenRequest);
-    assert.equal(minted.status, 201);
+    assertStrictEquals(minted.status, 201);
     const payload = await minted.json() as {
         access_token: string;
     };
     const claims = decodeAccessToken(
         payload.access_token);
-    assert.deepEqual(
+    assertEquals(
         claims.roles,
         ['admin:AjdvjuECVZEgZoFajaIEkg'],
     );
-    assert.deepEqual(claims.organizations, ['AjdvjuECVZEgZoFajaIEkg']);
+    assertEquals(claims.organizations, ['AjdvjuECVZEgZoFajaIEkg']);
 });
 
-test('write authorizer 403s a foreign seat path',
+Deno.test('write authorizer 403s a foreign seat path',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -218,19 +217,19 @@ async () => {
             + generateIdentifier(),
         tokenB, { type: 'member', at: AT },
     ));
-    assert.equal(foreign.status, 403);
+    assertStrictEquals(foreign.status, 403);
     const wire = await foreign.json() as {
         error: string;
     };
-    assert.equal(
+    assertStrictEquals(
         wire.error,
         'forbidden: path organization does not'
             + ' match the token organization',
     );
     const authorizer = writeAuthorizerFor(
         SEAT_DETAIL, 'PUT');
-    assert.ok(authorizer);
-    assert.equal(authorizer.idParamIndex, 1);
+    assert(authorizer);
+    assertStrictEquals(authorizer.idParamIndex, 1);
 });
 
 async function mintedOrganizations(
@@ -254,7 +253,7 @@ async function mintedOrganizations(
             },
         ),
     );
-    assert.equal(minted.status, 201);
+    assertStrictEquals(minted.status, 201);
     const payload = await minted.json() as {
         access_token: string;
     };
@@ -263,7 +262,7 @@ async function mintedOrganizations(
     ).organizations;
 }
 
-test('live admin PUT of a seat 201s and GETs back;'
+Deno.test('live admin PUT of a seat 201s and GETs back;'
 + ' DELETE then mint omits that organization',
 async () => {
     const db = memoryDbAdapter();
@@ -277,26 +276,26 @@ async () => {
     const created = await handleRequest(db, req(
         'PUT', path, admin, body,
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
     const got = await handleRequest(db, req(
         'GET', path, admin,
     ));
-    assert.equal(got.status, 200);
-    assert.deepEqual(await got.json(), {
+    assertStrictEquals(got.status, 200);
+    assertEquals(await got.json(), {
         id: identity,
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         identity_id: identity,
         ...body,
     });
-    assert.deepEqual(
+    assertEquals(
         await mintedOrganizations(db, identity),
         ['AjdvjuECVZEgZoFajaIEkg'],
     );
     const removed = await handleRequest(db, req(
         'DELETE', path, admin,
     ));
-    assert.equal(removed.status, 204);
-    assert.equal(
+    assertStrictEquals(removed.status, 204);
+    assertStrictEquals(
         await mintedOrganizations(db, identity),
         undefined,
     );

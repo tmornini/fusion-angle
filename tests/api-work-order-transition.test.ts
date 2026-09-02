@@ -1,9 +1,14 @@
 import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
+import {
     workOrderLifecycleStatesFor,
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
 import {
     POST,
     PUT,
@@ -119,7 +124,7 @@ async function appendLegacyTransition(
     );
 }
 
-test(
+Deno.test(
     'a transition writes the target state event authored'
     + ' by the actor',
     async () => {
@@ -135,15 +140,15 @@ test(
             DEV_TOKEN,
         );
         const events = await eventsFor(db);
-        assert.equal(events.length, 1);
-        assert.equal(events[0]!.state, 'n-next');
-        assert.equal(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+        assertStrictEquals(events.length, 1);
+        assertStrictEquals(events[0]!.state, 'n-next');
+        assertStrictEquals(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
 // Spec W2 / Task 8: value-bearing legacy fold is stored-
 // data truth — append below the gate, not the live wire.
-test(
+Deno.test(
     'a transition folds field values onto the message plane'
     + ' alongside the transition event',
     async () => {
@@ -189,8 +194,8 @@ test(
             transitionAt: nowUtc(),
         });
         const events = await eventsFor(db);
-        assert.equal(events.length, 1);
-        assert.equal(events[0]!.state, 'n-next');
+        assertStrictEquals(events.length, 1);
+        assertStrictEquals(events[0]!.state, 'n-next');
         // Phase Final Task 2: SFV row plane empty; message-plane
         // transition fold rides work-order history.
         // Phase Final Stage B: state_field_values retired.
@@ -200,8 +205,8 @@ test(
         const transition = history.find(
             (row) => row.id === TRANSITION_EVENT_ID,
         );
-        assert.ok(transition !== undefined);
-        assert.deepEqual(transition!.field_values, [{
+        assert(transition !== undefined);
+        assertEquals(transition!.field_values, [{
             id: FIELD_VALUE_ID,
             attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
             value: 'high',
@@ -209,7 +214,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'the optional claim release fires when carried, authored'
     + ' by the actor',
     async () => {
@@ -247,17 +252,17 @@ test(
             DEV_TOKEN,
         );
         const events = await eventsFor(db);
-        assert.deepEqual(
+        assertEquals(
             events.map(ev => ev.state),
             ['claimed', 'n-next', 'claim_released'],
         );
-        assert.equal(events[1]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
-        assert.equal(events[2]!.state, 'claim_released');
-        assert.equal(events[2]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+        assertStrictEquals(events[1]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+        assertStrictEquals(events[2]!.state, 'claim_released');
+        assertStrictEquals(events[2]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
-test(
+Deno.test(
     'no claim release fires when release is null',
     async () => {
         const db = await seededDb();
@@ -272,8 +277,8 @@ test(
             DEV_TOKEN,
         );
         const events = await eventsFor(db);
-        assert.equal(events.length, 1);
-        assert.equal(
+        assertStrictEquals(events.length, 1);
+        assertStrictEquals(
             events.some(ev => ev.state === 'claim_released'),
             false,
         );
@@ -282,7 +287,7 @@ test(
 
 // Task 8: legacy fold validation remains on the below-
 // facade tier (gate rejects the fieldValues key first).
-test(
+Deno.test(
     'a field value missing attribute_id is a 400 and'
     + ' leaves zero events (gate re-homes store validation)',
     async () => {
@@ -290,7 +295,7 @@ test(
         // Phase Final Task 2: validateStateFieldValueEntity
         // runs in the dual-tolerant validator (no SFV put).
         // A malformed fold 400s pre-tx — zero events.
-        await assert.rejects(
+        await assertRejects(
             () => appendLegacyTransition(db, {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
@@ -314,15 +319,14 @@ test(
                 release: null,
                 transitionAt: nowUtc(),
             }),
-            (err: unknown) =>
-                err instanceof ValidationError,
+            ValidationError,
         );
         const events = await eventsFor(db);
-        assert.equal(events.length, 0);
+        assertStrictEquals(events.length, 0);
         // Failed gate left no lifecycle → history 404s
         // (empty lifecycle), not an empty field_values array
         // under a ghost event id.
-        await assert.rejects(
+        await assertRejects(
             () => workOrderHistoryFor(
                 db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
             ),
@@ -331,11 +335,11 @@ test(
     },
 );
 
-test(
+Deno.test(
     'a transition body with an unexpected key is a 400',
     async () => {
         const db = await seededDb();
-        await assert.rejects(
+        const err = await assertRejects(
             () => POST(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                     + 'yNSSnbrpacodQTzUEcdEVA/transition', {
@@ -347,12 +351,11 @@ test(
                 },
                 DEV_TOKEN,
             ),
-            (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 400,
-        );
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, 400);
         const events = await eventsFor(db);
-        assert.equal(events.length, 0);
+        assertStrictEquals(events.length, 0);
     },
 );
 
@@ -361,7 +364,7 @@ test(
 // transitionEventId is rejected. Task 8: pin stays on the
 // below-facade dual-tolerant validator (live gate retires
 // the key first).
-test(
+Deno.test(
     'a field value with a dangling state_event_id is a 400',
     async () => {
         const db = await seededDb();
@@ -387,7 +390,7 @@ test(
             },
             DEV_TOKEN,
         );
-        await assert.rejects(
+        await assertRejects(
             () => appendLegacyTransition(db, {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
@@ -404,24 +407,20 @@ test(
                 release: null,
                 transitionAt: nowUtc(),
             }),
-            (err: unknown) =>
-                err instanceof ValidationError
-                && err.message.includes(
-                    'state_event_id must equal'
-                    + ' transitionEventId',
-                ),
+            ValidationError,
+            'state_event_id must equal transitionEventId',
         );
         const events = await eventsFor(db);
-        assert.equal(events.length, 0);
+        assertStrictEquals(events.length, 0);
         // Phase Final Stage B: state_field_values retired.
     },
 );
 
-test(
+Deno.test(
     'a field value with an absent state_event_id is a 400',
     async () => {
         const db = await seededDb();
-        await assert.rejects(
+        await assertRejects(
             () => appendLegacyTransition(db, {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
@@ -437,19 +436,15 @@ test(
                 release: null,
                 transitionAt: nowUtc(),
             }),
-            (err: unknown) =>
-                err instanceof ValidationError
-                && err.message.includes(
-                    'state_event_id must equal'
-                    + ' transitionEventId',
-                ),
+            ValidationError,
+            'state_event_id must equal transitionEventId',
         );
         const events = await eventsFor(db);
-        assert.equal(events.length, 0);
+        assertStrictEquals(events.length, 0);
     },
 );
 
-test(
+Deno.test(
     'transitionAt is recorded as the transition event at',
     async () => {
         const db = await seededDb();
@@ -467,13 +462,13 @@ test(
             DEV_TOKEN,
         );
         const events = await eventsFor(db);
-        assert.equal(events.length, 1);
-        assert.equal(events[0]!.state, 'n-next');
-        assert.equal(events[0]!.at, callerAt);
+        assertStrictEquals(events.length, 1);
+        assertStrictEquals(events[0]!.state, 'n-next');
+        assertStrictEquals(events[0]!.at, callerAt);
     },
 );
 
-test(
+Deno.test(
     'release.at is recorded as the release event at',
     async () => {
         const db = await seededDb();
@@ -509,9 +504,9 @@ test(
         );
         const events = await eventsFor(db);
         // events: claimed, n-next, claim_released
-        assert.equal(events[1]!.state, 'n-next');
-        assert.equal(events[1]!.at, transitionAt);
-        assert.equal(events[2]!.state, 'claim_released');
-        assert.equal(events[2]!.at, releaseAt);
+        assertStrictEquals(events[1]!.state, 'n-next');
+        assertStrictEquals(events[1]!.at, transitionAt);
+        assertStrictEquals(events[2]!.state, 'claim_released');
+        assertStrictEquals(events[2]!.at, releaseAt);
     },
 );

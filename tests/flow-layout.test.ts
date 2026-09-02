@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import {
     computeLayout,
     edgeWaypointKey,
@@ -8,118 +13,118 @@ import {
     wouldBeCycle,
 } from '../web-app/app/flow-layout.ts';
 
-test('edgeWaypointKey concatenates with arrow', () => {
-    assert.equal(
+Deno.test('edgeWaypointKey concatenates with arrow', () => {
+    assertStrictEquals(
         edgeWaypointKey('a', 'b'),
         'a->b',
     );
 });
 
-test('buildAdjacency groups successors per source', () => {
+Deno.test('buildAdjacency groups successors per source', () => {
     const adj = buildAdjacency([
         { fromId: 'a', toId: 'b' },
         { fromId: 'a', toId: 'c' },
         { fromId: 'b', toId: 'c' },
     ]);
-    assert.deepEqual(
+    assertEquals(
         adj.get('a'), ['b', 'c'],
     );
-    assert.deepEqual(
+    assertEquals(
         adj.get('b'), ['c'],
     );
-    assert.equal(adj.get('c'), undefined);
+    assertStrictEquals(adj.get('c'), undefined);
 });
 
-test('isReachable finds direct neighbor', () => {
+Deno.test('isReachable finds direct neighbor', () => {
     const adj = buildAdjacency([
         { fromId: 'a', toId: 'b' },
     ]);
-    assert.ok(isReachable('a', 'b', adj));
+    assert(isReachable('a', 'b', adj));
 });
 
-test('isReachable finds transitive reach', () => {
+Deno.test('isReachable finds transitive reach', () => {
     const adj = buildAdjacency([
         { fromId: 'a', toId: 'b' },
         { fromId: 'b', toId: 'c' },
         { fromId: 'c', toId: 'd' },
     ]);
-    assert.ok(isReachable('a', 'd', adj));
+    assert(isReachable('a', 'd', adj));
 });
 
-test('isReachable returns false for unreachable', () => {
+Deno.test('isReachable returns false for unreachable', () => {
     const adj = buildAdjacency([
         { fromId: 'a', toId: 'b' },
         { fromId: 'c', toId: 'd' },
     ]);
-    assert.equal(
+    assertStrictEquals(
         isReachable('a', 'd', adj),
         false,
     );
 });
 
-test('isReachable handles self-loop without infinite loop', () => {
+Deno.test('isReachable handles self-loop without infinite loop', () => {
     const adj = buildAdjacency([
         { fromId: 'a', toId: 'a' },
     ]);
-    assert.ok(isReachable('a', 'a', adj));
+    assert(isReachable('a', 'a', adj));
 });
 
-test('isReachable handles cycle without infinite loop', () => {
+Deno.test('isReachable handles cycle without infinite loop', () => {
     const adj = buildAdjacency([
         { fromId: 'a', toId: 'b' },
         { fromId: 'b', toId: 'a' },
     ]);
-    assert.equal(
+    assertStrictEquals(
         isReachable('a', 'c', adj),
         false,
     );
 });
 
-test('wouldBeCycle: forward edge in DAG is fine', () => {
+Deno.test('wouldBeCycle: forward edge in DAG is fine', () => {
     const edges = [
         { fromId: 'a', toId: 'b' },
         { fromId: 'b', toId: 'c' },
     ];
-    assert.equal(
+    assertStrictEquals(
         wouldBeCycle('a', 'c', edges),
         false,
     );
 });
 
-test('wouldBeCycle: backward edge creates cycle', () => {
+Deno.test('wouldBeCycle: backward edge creates cycle', () => {
     const edges = [
         { fromId: 'a', toId: 'b' },
         { fromId: 'b', toId: 'c' },
     ];
-    assert.ok(
+    assert(
         wouldBeCycle('c', 'a', edges),
     );
 });
 
-test('wouldBeCycle: self-edge is a cycle', () => {
-    assert.ok(
+Deno.test('wouldBeCycle: self-edge is a cycle', () => {
+    assert(
         wouldBeCycle('a', 'a', []),
     );
 });
 
-test('wouldBeCycle: parallel edges (same direction) not cycle', () => {
+Deno.test('wouldBeCycle: parallel edges (same direction) not cycle', () => {
     const edges = [
         { fromId: 'a', toId: 'b' },
     ];
-    assert.equal(
+    assertStrictEquals(
         wouldBeCycle('a', 'b', edges),
         false,
     );
 });
 
-test('wouldBeCycle: detects deep transitive cycle', () => {
+Deno.test('wouldBeCycle: detects deep transitive cycle', () => {
     const edges = [
         { fromId: 'a', toId: 'b' },
         { fromId: 'b', toId: 'c' },
         { fromId: 'c', toId: 'd' },
         { fromId: 'd', toId: 'e' },
     ];
-    assert.ok(
+    assert(
         wouldBeCycle('e', 'a', edges),
     );
 });
@@ -135,33 +140,33 @@ function lin(
     };
 }
 
-test(
+Deno.test(
     'computeLayout: an empty graph yields empty maps',
     () => {
         const r = computeLayout({
             nodes: [], edges: [],
             canvasWidth: 0, canvasHeight: 0,
         });
-        assert.equal(r.positions.size, 0);
-        assert.equal(r.waypoints.size, 0);
+        assertStrictEquals(r.positions.size, 0);
+        assertStrictEquals(r.waypoints.size, 0);
     },
 );
 
-test(
+Deno.test(
     'computeLayout: throws when there is no start node',
     () => {
-        assert.throws(
+        const err = assertThrows(
             () => computeLayout({
                 nodes: [lin('a')],
                 edges: [],
                 canvasWidth: 0, canvasHeight: 0,
             }),
-            /no start node/i,
-        );
+        ) as Error;
+        assertMatch(err.message, /no start node/i);
     },
 );
 
-test(
+Deno.test(
     'computeLayout: a linear chain reads start before'
     + ' complete',
     () => {
@@ -177,14 +182,14 @@ test(
             ],
             canvasWidth: 0, canvasHeight: 0,
         });
-        assert.ok(
+        assert(
             r.positions.get('s')!.x
                 < r.positions.get('z')!.x,
         );
     },
 );
 
-test(
+Deno.test(
     'computeLayout: every input node gets a distinct'
     + ' position',
     () => {
@@ -205,7 +210,7 @@ test(
         });
         const ids = ['s', 'a', 'b', 'z'];
         for (const id of ids) {
-            assert.ok(
+            assert(
                 r.positions.has(id),
                 `missing position for ${id}`,
             );
@@ -216,11 +221,11 @@ test(
                 return `${p.x},${p.y}`;
             }),
         );
-        assert.equal(seen.size, 4);
+        assertStrictEquals(seen.size, 4);
     },
 );
 
-test(
+Deno.test(
     'computeLayout: Archive is pinned to the rightmost'
     + ' column when Sugiyama places it interior',
     () => {
@@ -250,7 +255,7 @@ test(
         const maxX = Math.max(
             sPos.x, aPos.x, bPos.x, zPos.x,
         );
-        assert.equal(
+        assertStrictEquals(
             zPos.x, maxX,
             'Archive at rightmost column',
         );
@@ -258,7 +263,7 @@ test(
             p => Math.abs(p.x - maxX) < 0.5,
         );
         for (const p of sharing) {
-            assert.ok(
+            assert(
                 zPos.y >= p.y,
                 'Archive at bottom of rightmost column',
             );
@@ -290,7 +295,7 @@ function distinctRows(
     return rows.size;
 }
 
-test(
+Deno.test(
     'computeLayout: a Create->Archive shortcut routes'
     + ' through a waypoint when Archive is terminal',
     () => {
@@ -316,14 +321,14 @@ test(
         const wp = r.waypoints.get(
             edgeWaypointKey('s', 'z'),
         );
-        assert.ok(
+        assert(
             wp !== undefined && wp.length >= 1,
             'Create->Archive must route through a waypoint',
         );
     },
 );
 
-test(
+Deno.test(
     'computeLayout: a real canvas does not upscale node'
     + ' spacing beyond the natural layout (fan)',
     () => {
@@ -350,7 +355,7 @@ test(
             nodes, edges,
             canvasWidth: 0, canvasHeight: 0,
         });
-        assert.ok(
+        assert(
             bboxMaxDim(big.positions)
                 <= bboxMaxDim(nat.positions) + 1,
             'canvas must not stretch node spacing',
@@ -358,7 +363,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'computeLayout: a wrapped (snake) layout keeps'
     + ' comfortable spacing, not canvas-filling stretch',
     () => {
@@ -385,11 +390,11 @@ test(
             nodes, edges,
             canvasWidth: 0, canvasHeight: 0,
         });
-        assert.ok(
+        assert(
             distinctRows(big.positions) >= 2,
             'expected the chain to wrap into rows',
         );
-        assert.ok(
+        assert(
             bboxMaxDim(big.positions)
                 <= bboxMaxDim(nat.positions) + 1,
             'wrapped layout must not stretch to fill',
@@ -397,7 +402,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'computeLayout: a long chain wraps to more rows rather'
     + ' than overflowing the canvas width',
     () => {
@@ -430,7 +435,7 @@ test(
             if (p.x < minX) minX = p.x;
             if (p.x > maxX) maxX = p.x;
         }
-        assert.ok(
+        assert(
             (maxX - minX) <= 1400,
             'wrapped row must fit the canvas width',
         );
@@ -452,7 +457,7 @@ function edge(fromId: string, toId: string) {
     return { fromId, toId, labelWidth: 0 };
 }
 
-test(
+Deno.test(
     'computeLayout: Create heads its column when an'
     + ' orphan precedes it in input order',
     () => {
@@ -466,14 +471,14 @@ test(
             edges: [edge('s', 'a'), edge('a', 'z')],
             canvasWidth: 0, canvasHeight: 0,
         });
-        assert.equal(
+        assertStrictEquals(
             columnOf(r.positions, 's')[0], 's',
             'Create heads its column',
         );
     },
 );
 
-test(
+Deno.test(
     'computeLayout: Create heads its column beside a'
     + ' second root, and Archive ends its',
     () => {
@@ -492,18 +497,18 @@ test(
             ],
             canvasWidth: 0, canvasHeight: 0,
         });
-        assert.equal(
+        assertStrictEquals(
             columnOf(r.positions, 's')[0], 's',
             'Create heads its column',
         );
-        assert.equal(
+        assertStrictEquals(
             columnOf(r.positions, 'z').at(-1), 'z',
             'Archive ends its column',
         );
     },
 );
 
-test(
+Deno.test(
     'computeLayout: Archive ends its column when the'
     + ' relative mirror would fire',
     () => {
@@ -524,14 +529,14 @@ test(
             ],
             canvasWidth: 0, canvasHeight: 0,
         });
-        assert.equal(
+        assertStrictEquals(
             columnOf(r.positions, 'z').at(-1), 'z',
             'Archive ends its column under the mirror',
         );
     },
 );
 
-test(
+Deno.test(
     'computeLayout: a wrapped chain keeps Create'
     + ' leftmost past an orphan',
     () => {
@@ -556,7 +561,7 @@ test(
         for (const p of r.positions.values()) {
             if (p.x < minX) minX = p.x;
         }
-        assert.equal(
+        assertStrictEquals(
             r.positions.get('s')!.x, minX,
             'Create leads the serpentine',
         );

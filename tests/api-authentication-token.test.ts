@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -14,7 +19,7 @@ import {
 } from './mock-seed.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { captureConsole } from './console-capture.ts';
+import { captureConsole } from './fixtures/console-capture.ts';
 import {
     makeAssertionSigner,
 } from './client-assertion-fixtures.ts';
@@ -126,16 +131,16 @@ function tokenRequest(body: Record<string, unknown>): Request {
     });
 }
 
-test('a missing bearer is 401 invalid_token', async () => {
+Deno.test('a missing bearer is 401 invalid_token', async () => {
     const db = await freshDb();
     const res = await handleRequest(
         db, new Request(`${BASE}/members`));
-    assert.equal(res.status, 401);
-    assert.deepEqual(
+    assertStrictEquals(res.status, 401);
+    assertEquals(
         await res.json(), { error: 'invalid_token' });
 });
 
-test('a failed client assertion is 401 invalid_client',
+Deno.test('a failed client assertion is 401 invalid_client',
 async () => {
     const db = await freshDb();
     await seedClientRegistration(
@@ -146,38 +151,38 @@ async () => {
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: 'not-a-jwt',
     }));
-    assert.equal(res.status, 401);
-    assert.deepEqual(
+    assertStrictEquals(res.status, 401);
+    assertEquals(
         await res.json(), { error: 'invalid_client' });
 });
 
-test('an unknown authorization code is 401 invalid_grant',
+Deno.test('an unknown authorization code is 401 invalid_grant',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'ghost',
     }));
-    assert.equal(res.status, 401);
-    assert.deepEqual(
+    assertStrictEquals(res.status, 401);
+    assertEquals(
         await res.json(), { error: 'invalid_grant' });
 });
 
-test('the token endpoint is reachable without a Bearer',
+Deno.test('the token endpoint is reachable without a Bearer',
 async () => {
     const db = await freshDb();
     // exempt route: no Authorization header still reaches the
     // handler — a 400 from the grant, not a 401 from the gate
     const res = await handleRequest(db, tokenRequest({}));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('an unknown grant_type is a 400 with no side effects',
+Deno.test('an unknown grant_type is a 400 with no side effects',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(
         db, tokenRequest({ grant_type: 'wat' }));
-    assert.equal(res.status, 400);
-    assert.equal(
+    assertStrictEquals(res.status, 400);
+    assertStrictEquals(
         (await deriveIdentityTokens(db)).length, 0);
 });
 
@@ -185,7 +190,7 @@ async () => {
 // client_id A is not redeemable under client_id B. Same shared
 // 401 as unknown/spent/expired — grant-first, no mint.
 // Two codes: mismatch first (codes are single-use), then match.
-test('an authorization code is bound to its issuing client',
+Deno.test('an authorization code is bound to its issuing client',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
@@ -198,8 +203,8 @@ async () => {
         code: 'code-for-a',
         client_id: 'client-b',
     }));
-    assert.equal(mismatch.status, 401);
-    assert.deepEqual(
+    assertStrictEquals(mismatch.status, 401);
+    assertEquals(
         await mismatch.json(),
         { error: INVALID_CODE_ERROR },
     );
@@ -208,7 +213,7 @@ async () => {
         code: 'code-for-match',
         client_id: 'client-a',
     }));
-    assert.equal(match.status, 201);
+    assertStrictEquals(match.status, 201);
 });
 
 // PKCE S256 (RFC 7636): when authorize stored a code_challenge,
@@ -222,7 +227,7 @@ async function s256Challenge(
     return bytesToBase64Url(await sha256Bytes(verifier));
 }
 
-test('authorization_code with PKCE accepts a matching verifier',
+Deno.test('authorization_code with PKCE accepts a matching verifier',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
@@ -238,10 +243,10 @@ async () => {
         client_id: 'web',
         code_verifier: verifier,
     }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 });
 
-test('authorization_code with PKCE rejects a wrong verifier',
+Deno.test('authorization_code with PKCE rejects a wrong verifier',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
@@ -258,14 +263,14 @@ async () => {
         client_id: 'web',
         code_verifier: 'pkce-verifier-WRONG',
     }));
-    assert.equal(res.status, 401);
-    assert.deepEqual(
+    assertStrictEquals(res.status, 401);
+    assertEquals(
         await res.json(),
         { error: INVALID_CODE_ERROR },
     );
 });
 
-test('authorization_code with PKCE rejects a missing verifier',
+Deno.test('authorization_code with PKCE rejects a missing verifier',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
@@ -281,8 +286,8 @@ async () => {
         code: 'pkce-code-none',
         client_id: 'web',
     }));
-    assert.equal(res.status, 401);
-    assert.deepEqual(
+    assertStrictEquals(res.status, 401);
+    assertEquals(
         await res.json(),
         { error: INVALID_CODE_ERROR },
     );
@@ -303,11 +308,11 @@ function refreshTokenFromSetCookie(res: Response): string {
     const cookie = setCookieHeader(res);
     const match = /(?:^|[\n,])\s*refresh_token=([^;\n]+)/
         .exec(cookie);
-    assert.ok(match, 'Set-Cookie missing refresh_token');
+    assert(match, 'Set-Cookie missing refresh_token');
     return match[1]!.trim();
 }
 
-test('token JSON has no refresh_token; Set-Cookie is HttpOnly',
+Deno.test('token JSON has no refresh_token; Set-Cookie is HttpOnly',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
@@ -317,18 +322,18 @@ async () => {
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
     }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const body = await res.json() as Record<string, unknown>;
-    assert.equal(body['refresh_token'], undefined);
-    assert.equal(typeof body['access_token'], 'string');
+    assertStrictEquals(body['refresh_token'], undefined);
+    assertStrictEquals(typeof body['access_token'], 'string');
     const cookie = setCookieHeader(res);
-    assert.match(cookie, /refresh_token=/);
-    assert.match(cookie, /HttpOnly/i);
-    assert.match(cookie, /Path=\/api\/authentication/);
-    assert.match(cookie, /SameSite=Strict/i);
+    assertMatch(cookie, /refresh_token=/);
+    assertMatch(cookie, /HttpOnly/i);
+    assertMatch(cookie, /Path=\/api\/authentication/);
+    assertMatch(cookie, /SameSite=Strict/i);
 });
 
-test('authorization_code grant issues a gate-valid token pair',
+Deno.test('authorization_code grant issues a gate-valid token pair',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);   // 'XXZruirZyAOoRpNxaDnpSA' is admin
@@ -338,36 +343,36 @@ async () => {
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
     }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const body = await res.json() as {
         access_token: string;
         token_type: string; expires_in: number;
     };
-    assert.equal(body.token_type, 'Bearer');
-    assert.ok(body.access_token.length > 0);
-    assert.equal(
+    assertStrictEquals(body.token_type, 'Bearer');
+    assert(body.access_token.length > 0);
+    assertStrictEquals(
         (body as { refresh_token?: unknown }).refresh_token,
         undefined,
     );
     const refreshToken = refreshTokenFromSetCookie(res);
-    assert.ok(refreshToken.length > 0);
+    assert(refreshToken.length > 0);
     // act.sub carries the acting client (RFC 8693 shape,
     // mirroring token-exchange); sub stays the user. The
     // refresh token never carries act.
     const claims = decodeAccessToken(body.access_token);
-    assert.equal(claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
-    assert.equal(claims.act?.sub, 'web');
-    assert.equal(
+    assertStrictEquals(claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(claims.act?.sub, 'web');
+    assertStrictEquals(
         decodeAccessToken(refreshToken).act,
         undefined,
     );
     // the minted access token passes the SP-3 gate
     const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
         + '', body.access_token);
-    assert.ok(Array.isArray(rows));
+    assert(Array.isArray(rows));
 });
 
-test('replaying a consumed code is a 401 no-op', async () => {
+Deno.test('replaying a consumed code is a 401 no-op', async () => {
     const db = await freshDb();
     await seedAuthorizationCodeMessagePair(
         db, 'the-code', 'XXZruirZyAOoRpNxaDnpSA', 'web');
@@ -375,19 +380,19 @@ test('replaying a consumed code is a 401 no-op', async () => {
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
     }));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const before = (await deriveIdentityTokens(db)).length;
     const replay = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
     }));
-    assert.equal(replay.status, 401);
+    assertStrictEquals(replay.status, 401);
     // no new token chain minted on the replay
-    assert.equal(
+    assertStrictEquals(
         (await deriveIdentityTokens(db)).length, before);
 });
 
-test(
+Deno.test(
     'concurrent authorization_code grants spend the'
     + ' code exactly once',
     async () => {
@@ -407,22 +412,22 @@ test(
                 client_id: 'web',
             })),
         ]);
-        assert.deepEqual(
+        assertEquals(
             [a.status, b.status].sort(), [201, 401],
         );
-        assert.equal(
+        assertStrictEquals(
             (await deriveIdentityTokens(db)).length, 1,
             'exactly one token chain minted',
         );
     },
 );
 
-test('an unknown code is a 401', async () => {
+Deno.test('an unknown code is a 401', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'ghost',
     }));
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
 });
 
 // GATE 3 (Phase 13 Task 7): the code-spend guard's three 401
@@ -432,7 +437,7 @@ test('an unknown code is a 401', async () => {
 // authorizationCodeSpent, api/authentication.ts) makes no
 // distinction between them at the wire, exactly as the retired
 // codeState-driven guard never did either.
-test('GATE 3: unknown / spent / raced code all 401 with the'
+Deno.test('GATE 3: unknown / spent / raced code all 401 with the'
 + ' SAME byte-exact body', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
@@ -440,8 +445,8 @@ test('GATE 3: unknown / spent / raced code all 401 with the'
     const unknown = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'ghost',
     }));
-    assert.equal(unknown.status, 401);
-    assert.deepEqual(
+    assertStrictEquals(unknown.status, 401);
+    assertEquals(
         await unknown.json(), { error: INVALID_CODE_ERROR });
 
     await seedAuthorizationCodeMessagePair(
@@ -451,14 +456,14 @@ test('GATE 3: unknown / spent / raced code all 401 with the'
         code: 'the-code-spent',
         client_id: 'web',
     }));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const spent = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code',
         code: 'the-code-spent',
         client_id: 'web',
     }));
-    assert.equal(spent.status, 401);
-    assert.deepEqual(
+    assertStrictEquals(spent.status, 401);
+    assertEquals(
         await spent.json(), { error: INVALID_CODE_ERROR });
 
     await seedAuthorizationCodeMessagePair(
@@ -475,9 +480,9 @@ test('GATE 3: unknown / spent / raced code all 401 with the'
             client_id: 'web',
         })),
     ]);
-    assert.deepEqual([a.status, b.status].sort(), [201, 401]);
+    assertEquals([a.status, b.status].sort(), [201, 401]);
     const raced = a.status === 401 ? a : b;
-    assert.deepEqual(
+    assertEquals(
         await raced.json(), { error: INVALID_CODE_ERROR });
 
     // The derived id itself: a live-minted spend is visible on
@@ -485,7 +490,7 @@ test('GATE 3: unknown / spent / raced code all 401 with the'
     // guard above already checked internally.
     const derivedId =
         await deriveAuthorizationCodeId('the-code-spent');
-    assert.equal(
+    assertStrictEquals(
         await authorizationCodeSpent(db, derivedId, 'XXZruirZyAOoRpNxaDnpSA'),
         true);
 });
@@ -506,7 +511,7 @@ async function initialPair(
     };
 }
 
-test('refresh grant rotates from the Cookie, not the body',
+Deno.test('refresh grant rotates from the Cookie, not the body',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
@@ -520,20 +525,20 @@ async () => {
             },
             body: JSON.stringify({ grant_type: 'refresh' }),
         }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const body = await res.json() as Record<string, unknown>;
-    assert.equal(body['refresh_token'], undefined);
-    assert.ok(typeof body['access_token'] === 'string');
-    assert.notEqual(
+    assertStrictEquals(body['refresh_token'], undefined);
+    assert(typeof body['access_token'] === 'string');
+    assertNotStrictEquals(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
-    assert.ok(Array.isArray(
+    assert(Array.isArray(
         await GET(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
             body['access_token'] as string,
         )));
 });
 
-test('stale body refresh_token loses to a live Cookie',
+Deno.test('stale body refresh_token loses to a live Cookie',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
@@ -542,7 +547,7 @@ async () => {
         grant_type: 'refresh',
         refresh_token: pair1.refresh_token,
     }));
-    assert.equal(rotated.status, 201);
+    assertStrictEquals(rotated.status, 201);
     const liveCookie = refreshTokenFromSetCookie(rotated);
     const res = await handleRequest(db, new Request(
         `${BASE}/authentication/token`, {
@@ -556,16 +561,16 @@ async () => {
                 refresh_token: pair1.refresh_token,
             }),
         }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const body = await res.json() as {
         access_token: string;
     };
-    assert.ok(Array.isArray(
+    assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , body.access_token)));
 });
 
-test('refresh rotates to a new pair', async () => {
+Deno.test('refresh rotates to a new pair', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const pair1 = await initialPair(db);
@@ -573,18 +578,18 @@ test('refresh rotates to a new pair', async () => {
         grant_type: 'refresh',
         refresh_token: pair1.refresh_token,
     }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const pair2 = await res.json() as {
         access_token: string;
     };
-    assert.notEqual(
+    assertNotStrictEquals(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
-    assert.ok(Array.isArray(
+    assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , pair2.access_token)));
 });
 
-test('replaying a rotated refresh token revokes the chain',
+Deno.test('replaying a rotated refresh token revokes the chain',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
@@ -601,26 +606,26 @@ async () => {
         grant_type: 'refresh',
         refresh_token: pair1.refresh_token,
     }));
-    assert.equal(replay.status, 401);
+    assertStrictEquals(replay.status, 401);
     // the whole chain is dead — even the new refresh fails
     const after = await handleRequest(db, tokenRequest({
         grant_type: 'refresh',
         refresh_token: pair2.refresh_token,
     }));
-    assert.equal(after.status, 401);
+    assertStrictEquals(after.status, 401);
 });
 
-test('an invalid refresh token is a 401 no-op', async () => {
+Deno.test('an invalid refresh token is a 401 no-op', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'refresh', refresh_token: 'not.a.jwt',
     }));
-    assert.equal(res.status, 401);
-    assert.equal(
+    assertStrictEquals(res.status, 401);
+    assertStrictEquals(
         (await deriveIdentityTokens(db)).length, 0);
 });
 
-test('token-exchange shapes sub=subject and act=actor',
+Deno.test('token-exchange shapes sub=subject and act=actor',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
@@ -629,18 +634,18 @@ async () => {
         subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
         actor_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
     }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const body = await res.json() as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
-    assert.equal(claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
-    assert.equal(claims.act?.sub, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(claims.act?.sub, 'XXZruirZyAOoRpNxaDnpSA');
     // the delegated token passes the gate (current = admin)
-    assert.ok(Array.isArray(
+    assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , body.access_token)));
 });
 
-test('token-exchange 201 has no refresh Set-Cookie',
+Deno.test('token-exchange 201 has no refresh Set-Cookie',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
@@ -654,8 +659,8 @@ async () => {
             },
             body: JSON.stringify({ grant_type: 'refresh' }),
         }));
-    assert.equal(rotated.status, 201);
-    assert.match(setCookieHeader(rotated), /refresh_token=/);
+    assertStrictEquals(rotated.status, 201);
+    assertMatch(setCookieHeader(rotated), /refresh_token=/);
     const access = (await rotated.json() as {
         access_token: string;
     }).access_token;
@@ -664,15 +669,15 @@ async () => {
         subject_token: access,
         actor_token: access,
     }));
-    assert.equal(exchange.status, 201);
+    assertStrictEquals(exchange.status, 201);
     const body = await exchange.json() as Record<
         string, unknown
     >;
-    assert.equal(body['refresh_token'], undefined);
-    assert.equal(setCookieHeader(exchange), '');
+    assertStrictEquals(body['refresh_token'], undefined);
+    assertStrictEquals(setCookieHeader(exchange), '');
 });
 
-test('token-exchange denies cross-party delegation',
+Deno.test('token-exchange denies cross-party delegation',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
@@ -683,29 +688,29 @@ async () => {
         subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
         actor_token: await devToken('agent-7'),
     }));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
     const body = await res.json() as { error: string };
-    assert.match(body.error, /self-delegation/);
+    assertMatch(body.error, /self-delegation/);
     // grant-first: a denied exchange mints nothing
-    assert.equal(
+    assertStrictEquals(
         (await deriveIdentityTokens(db)).length, before);
 });
 
-test('token-exchange rejects unverifiable tokens with 401',
+Deno.test('token-exchange rejects unverifiable tokens with 401',
 async () => {
     const db = await freshDb();
     // missing tokens, and a structurally-present but unsigned
     // token, both fail verification (signature/exp/aud)
-    assert.equal((await handleRequest(db, tokenRequest({
+    assertStrictEquals((await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
     }))).status, 401);
-    assert.equal((await handleRequest(db, tokenRequest({
+    assertStrictEquals((await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
         subject_token: 'a.b.c', actor_token: 'a.b.c',
     }))).status, 401);
 });
 
-test('token-exchange into a member org carries org + orgs',
+Deno.test('token-exchange into a member org carries org + orgs',
 async () => {
     const db = await freshDb();
     await seedMembershipMessagePair(db, 'm-current', {
@@ -720,14 +725,14 @@ async () => {
         actor_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
         organization: 'AjdvjuECVZEgZoFajaIEkg',
     }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const body = await res.json() as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
-    assert.equal(claims.organization, 'AjdvjuECVZEgZoFajaIEkg');
-    assert.deepEqual(claims.organizations, ['AjdvjuECVZEgZoFajaIEkg']);
+    assertStrictEquals(claims.organization, 'AjdvjuECVZEgZoFajaIEkg');
+    assertEquals(claims.organizations, ['AjdvjuECVZEgZoFajaIEkg']);
 });
 
-test('token-exchange into a non-member org is 403',
+Deno.test('token-exchange into a non-member org is 403',
 async () => {
     const db = await freshDb();
     // current is a member of 'AjdvjuECVZEgZoFajaIEkg' but not org '7'
@@ -745,13 +750,13 @@ async () => {
         actor_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
         organization: '7',
     }));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
     // grant-first: a denied exchange mints nothing
-    assert.equal(
+    assertStrictEquals(
         (await deriveIdentityTokens(db)).length, before);
 });
 
-test('a flat exchange carries orgs but no active org',
+Deno.test('a flat exchange carries orgs but no active org',
 async () => {
     const db = await freshDb();
     await seedMembershipMessagePair(db, 'm-current', {
@@ -765,11 +770,11 @@ async () => {
         subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
         actor_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
     }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const body = await res.json() as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
-    assert.equal(claims.organization, undefined);
-    assert.deepEqual(claims.organizations, ['AjdvjuECVZEgZoFajaIEkg']);
+    assertStrictEquals(claims.organization, undefined);
+    assertEquals(claims.organizations, ['AjdvjuECVZEgZoFajaIEkg']);
 });
 
 const activeClient = {
@@ -794,7 +799,7 @@ async function signedClientSetup() {
     };
 }
 
-test('client_credentials issues a gate-valid token', async () => {
+Deno.test('client_credentials issues a gate-valid token', async () => {
     const db = await freshDb();
     // the service principal (client id) holds an admin role
     await seedMembershipMessagePair(db, 'm-svc', {
@@ -811,17 +816,17 @@ test('client_credentials issues a gate-valid token', async () => {
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const body = await res.json() as { access_token: string };
-    assert.ok(Array.isArray(
+    assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , body.access_token)));
-    assert.notEqual(
+    assertNotStrictEquals(
         decodeAccessToken(body.access_token).jti, 'assert-1',
     );
 });
 
-test('a second client_credentials grant with the same jti'
+Deno.test('a second client_credentials grant with the same jti'
 + ' is 401 invalid_grant and mints nothing', async () => {
     const db = await freshDb();
     await seedMembershipMessagePair(db, 'm-svc-replay', {
@@ -838,7 +843,7 @@ test('a second client_credentials grant with the same jti'
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const before = await db.messagePairs.getAll();
     const grantCount = before.filter((row) =>
         row.uri_collection === '/authentication/token/',
@@ -851,18 +856,18 @@ test('a second client_credentials grant with the same jti'
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
-    assert.equal(second.status, 401);
-    assert.deepEqual(
+    assertStrictEquals(second.status, 401);
+    assertEquals(
         await second.json(), { error: 'invalid_grant' },
     );
     const after = await db.messagePairs.getAll();
-    assert.equal(
+    assertStrictEquals(
         after.filter((row) =>
             row.uri_collection === '/authentication/token/',
         ).length,
         grantCount,
     );
-    assert.equal(
+    assertStrictEquals(
         after.filter((row) =>
             row.uri_collection ===
                 '/identities/uYaHKbNeVUcsFjuooOjMew/tokens/'
@@ -872,7 +877,7 @@ test('a second client_credentials grant with the same jti'
     );
 });
 
-test('an expired assertion-jti ticket is still spent',
+Deno.test('an expired assertion-jti ticket is still spent',
 async () => {
     const db = await freshDb();
     await seedMembershipMessagePair(db, 'm-svc-expired', {
@@ -919,16 +924,16 @@ async () => {
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
-    assert.equal(res.status, 401);
-    assert.deepEqual(
+    assertStrictEquals(res.status, 401);
+    assertEquals(
         await res.json(), { error: 'invalid_grant' },
     );
-    assert.equal(
+    assertStrictEquals(
         (await deriveIdentityTokens(db)).length, 0,
     );
 });
 
-test('client_credentials refuses an unsigned assertion',
+Deno.test('client_credentials refuses an unsigned assertion',
 async () => {
     const db = await freshDb();
     const { client } = await signedClientSetup();
@@ -947,12 +952,12 @@ async () => {
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: forged,
     }));
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
     const body = await res.json() as { error: string };
-    assert.equal(body.error, 'invalid_client');
+    assertStrictEquals(body.error, 'invalid_client');
 });
 
-test('client_credentials with a malformed assertion is 401',
+Deno.test('client_credentials with a malformed assertion is 401',
 async () => {
     const db = await freshDb();
     await seedClientRegistration(
@@ -963,20 +968,20 @@ async () => {
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: 'not-a-jwt',
     }));
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
 });
 
-test('client_credentials for an unknown client is 401',
+Deno.test('client_credentials for an unknown client is 401',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
         client_id: 'ghost', client_assertion: 'a.b.c',
     }));
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
 });
 
-test('a registration-read fault is a 500, never 401',
+Deno.test('a registration-read fault is a 500, never 401',
 async () => {
     const db = await freshDb();
     // Only an EntityNotFoundError means 'unknown client';
@@ -997,8 +1002,8 @@ async () => {
             client_assertion: 'a.b.c',
         })),
     );
-    assert.equal(res.status, 500);
-    assert.ok(
+    assertStrictEquals(res.status, 500);
+    assert(
         calls.some(args =>
             args.includes('request failed')),
         'the domain-boundary catch must keep'
@@ -1006,7 +1011,7 @@ async () => {
     );
 });
 
-test('client_credentials for a disabled registration is 401',
+Deno.test('client_credentials for a disabled registration is 401',
 async () => {
     const db = await freshDb();
     const { client, assertion } =
@@ -1019,12 +1024,12 @@ async () => {
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
     const body = await res.json() as { error: string };
-    assert.match(body.error, /client is disabled/);
+    assertMatch(body.error, /client is disabled/);
 });
 
-test('client_credentials without the grant type is 400',
+Deno.test('client_credentials without the grant type is 400',
 async () => {
     const db = await freshDb();
     const { client, assertion } =
@@ -1037,10 +1042,10 @@ async () => {
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('client_credentials for a deregistered client is 401',
+Deno.test('client_credentials for a deregistered client is 401',
 async () => {
     const db = await freshDb();
     const { client, assertion } =
@@ -1052,9 +1057,9 @@ async () => {
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
     const body = await res.json() as { error: string };
-    assert.match(body.error, /unknown client/);
+    assertMatch(body.error, /unknown client/);
 });
 
 // A person identity with a password and no seat anywhere,
@@ -1068,7 +1073,7 @@ const UNSEATED_PASSWORD = 'unseated-s3cret';
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 const STARK_ADMIN = 'XXZruirZyAOoRpNxaDnpSA';
 
-test('unseated password grant has no org claims',
+Deno.test('unseated password grant has no org claims',
 async () => {
     const db = await seededMockDb();
     await seedPersonIdentity(db, UNSEATED, {
@@ -1110,7 +1115,7 @@ async () => {
             }),
         }),
     );
-    assert.equal(authorized.status, 201);
+    assertStrictEquals(authorized.status, 201);
     const { code } = await authorized.json() as {
         code: string;
     };
@@ -1121,17 +1126,17 @@ async () => {
             code_verifier: verifier,
         }),
     );
-    assert.equal(exchanged.status, 201);
+    assertStrictEquals(exchanged.status, 201);
     const exchangedBody = await exchanged.json() as {
         access_token: string;
     };
     const exchangedClaims = decodeAccessToken(
         exchangedBody.access_token,
     );
-    assert.equal(
+    assertStrictEquals(
         exchangedClaims.organization, undefined,
     );
-    assert.equal(
+    assertStrictEquals(
         exchangedClaims.organizations, undefined,
     );
     const seats = await handleRequest(db, new Request(
@@ -1144,8 +1149,8 @@ async () => {
             },
         },
     ));
-    assert.equal(seats.status, 200);
-    assert.deepEqual(await seats.json(), []);
+    assertStrictEquals(seats.status, 200);
+    assertEquals(await seats.json(), []);
     const refreshToken =
         refreshTokenFromSetCookie(exchanged);
     const refreshed = await handleRequest(
@@ -1163,17 +1168,17 @@ async () => {
             },
         ),
     );
-    assert.equal(refreshed.status, 201);
+    assertStrictEquals(refreshed.status, 201);
     const refreshedBody = await refreshed.json() as {
         access_token: string;
     };
     const refreshedClaims = decodeAccessToken(
         refreshedBody.access_token,
     );
-    assert.equal(
+    assertStrictEquals(
         refreshedClaims.organization, undefined,
     );
-    assert.equal(
+    assertStrictEquals(
         refreshedClaims.organizations, undefined,
     );
     const gAdminToken = await claimToken({
@@ -1200,7 +1205,7 @@ async () => {
             }),
         },
     ));
-    assert.equal(granted.status, 200);
+    assertStrictEquals(granted.status, 200);
     const pending = await handleRequest(db, new Request(
         `${BASE}/identities/` + UNSEATED
             + '/invitations/',
@@ -1211,23 +1216,23 @@ async () => {
             },
         },
     ));
-    assert.equal(pending.status, 200);
+    assertStrictEquals(pending.status, 200);
     const invitations = await pending.json() as {
         state: string;
     }[];
-    assert.equal(invitations.length, 1);
-    assert.equal(invitations[0]!.state, 'pending');
+    assertStrictEquals(invitations.length, 1);
+    assertStrictEquals(invitations[0]!.state, 'pending');
     const reachableClaims = decodeAccessToken(
         await reachableToken(UNSEATED, []),
     );
-    assert.deepEqual(
+    assertEquals(
         reachableClaims.organizations, [],
     );
-    assert.deepEqual(
+    assertEquals(
         exchangedClaims.organizations ?? [],
         reachableClaims.organizations ?? [],
     );
-    assert.deepEqual(
+    assertEquals(
         refreshedClaims.organizations ?? [],
         reachableClaims.organizations ?? [],
     );

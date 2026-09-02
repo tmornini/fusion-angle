@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -80,7 +79,7 @@ function putProject(
 // exercises a genuine arrival-order-vs-state_at divergence, so an
 // arrival-order regression would pass every existing case there
 // silently.
-test(
+Deno.test(
     'a later deleted PUT tombs the project',
     async () => {
         const db = await seededDb();
@@ -96,11 +95,11 @@ test(
             'deleted', '2020-01-01T00:00:00.000000Z',
             generateIdentifier(),
         );
-        assert.equal(res.status, 201);
+        assertStrictEquals(res.status, 201);
         const projects = await deriveProjects(
             db, STARK_ORGANIZATION,
         );
-        assert.equal(
+        assertStrictEquals(
             projects.some(
                 (project) => project.id === projectId,
             ),
@@ -109,7 +108,7 @@ test(
         const history = await deriveProjectStateHistory(
             db, STARK_ORGANIZATION, projectId,
         );
-        assert.deepEqual(
+        assertEquals(
             history.map((entry) => entry.state),
             ['submitted', 'deleted'],
         );

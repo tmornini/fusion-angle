@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { TABLE_NAMES, MESSAGE_TABLES } from
     '../api/db.ts';
 import {
@@ -9,26 +8,26 @@ import {
 // Phase Final Stage B Task 4: TABLE_NAMES shrinks as doomed
 // tables delete. Pin permanent survivors and tables this
 // commit just dropped.
-test('TABLE_NAMES keeps the permanent survivors', () => {
+Deno.test('TABLE_NAMES keeps the permanent survivors', () => {
     for (const name of [
         'message_pairs',
     ] as const) {
-        assert.ok(
+        assert(
             TABLE_NAMES.includes(name),
             `TABLE_NAMES missing survivor ${name}`,
         );
     }
 });
 
-test('MESSAGE_TABLES is TABLE_NAMES', () => {
-    assert.equal(MESSAGE_TABLES, TABLE_NAMES);
-    assert.deepEqual(
+Deno.test('MESSAGE_TABLES is TABLE_NAMES', () => {
+    assertStrictEquals(MESSAGE_TABLES, TABLE_NAMES);
+    assertEquals(
         [...MESSAGE_TABLES],
         ['message_pairs'],
     );
 });
 
-test(
+Deno.test(
     'TABLE_NAMES drops clients and ideas..objectives'
     + ' and roster',
     () => {
@@ -69,7 +68,7 @@ test(
             'organizations',
             'states',
         ] as const) {
-            assert.ok(
+            assert(
                 !TABLE_NAMES.includes(name),
                 `${name} still in TABLE_NAMES`,
             );
@@ -77,7 +76,7 @@ test(
     },
 );
 
-test('MemoryDbAdapter exposes message stores', async () => {
+Deno.test('MemoryDbAdapter exposes message stores', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await db.messagePairs.put('pair-1', {
@@ -93,6 +92,6 @@ test('MemoryDbAdapter exposes message stores', async () => {
         operation_id: '0123456789ABCDEFGHIJKw',
     });
     const rows = await db.messagePairs.getAll();
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]!.id, 'pair-1');
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.id, 'pair-1');
 });

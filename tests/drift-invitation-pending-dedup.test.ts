@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import { pendingInvitationFor } from
     '../api/invitations-domain.ts';
@@ -43,7 +42,7 @@ function req(
     });
 }
 
-test('Step 0: pendingInvitationFor over live grant/decline/'
+Deno.test('Step 0: pendingInvitationFor over live grant/decline/'
 + ' re-grant — declined-reinvite is the drift pin (message'
 + ' plane)',
 async () => {
@@ -54,7 +53,7 @@ async () => {
     const inviteeEmail = 'sarah.chen@company.com';
 
     // Nothing granted yet: no pending.
-    assert.equal(
+    assertStrictEquals(
         await pendingInvitationFor(
             db, ORGANIZATION_TWO, inviteeId,
         ),
@@ -71,10 +70,10 @@ async () => {
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 200);
+    assertStrictEquals(grant.status, 200);
     const afterGrant = await pendingInvitationFor(
         db, ORGANIZATION_TWO, inviteeId);
-    assert.equal(afterGrant?.id, 'hhLDowecKAZZsoTcnjSQrg');
+    assertStrictEquals(afterGrant?.id, 'hhLDowecKAZZsoTcnjSQrg');
 
     // Decline: no longer pending — declined is terminal.
     const invitee = await organizationToken(
@@ -90,8 +89,8 @@ async () => {
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(decline.status, 204);
-    assert.equal(
+    assertStrictEquals(decline.status, 204);
+    assertStrictEquals(
         await pendingInvitationFor(
             db, ORGANIZATION_TWO, inviteeId,
         ),
@@ -111,14 +110,14 @@ async () => {
             grantAt: '2026-06-01T00:00:02.000000Z',
         },
     ));
-    assert.equal(regrant.status, 200);
+    assertStrictEquals(regrant.status, 200);
     const candidates = (await deriveInvitations(db))
         .filter(inv => inv.organization_id === ORGANIZATION_TWO
             && inv.identity_id === inviteeId);
-    assert.equal(candidates.length, 2);   // both documents
+    assertStrictEquals(candidates.length, 2);   // both documents
     const afterRegrant = await pendingInvitationFor(
         db, ORGANIZATION_TWO, inviteeId);
-    assert.equal(afterRegrant?.id, 'hjPGoZqbkGJVvYQFoLWXCA');
+    assertStrictEquals(afterRegrant?.id, 'hjPGoZqbkGJVvYQFoLWXCA');
 
     // Accept the fresh one: no pending again.
     const accept = await handleRequest(db, req(
@@ -133,8 +132,8 @@ async () => {
             at: '2026-06-01T00:00:03.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
-    assert.equal(
+    assertStrictEquals(accept.status, 204);
+    assertStrictEquals(
         await pendingInvitationFor(
             db, ORGANIZATION_TWO, inviteeId,
         ),

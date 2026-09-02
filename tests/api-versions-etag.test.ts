@@ -1,5 +1,8 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import { routes, matchRoute } from
     '../api/routes.ts';
 import { pathSegmentsOf } from
@@ -39,13 +42,13 @@ function match(path: string) {
     );
 }
 
-test('idea versions list requires a slash',
+Deno.test('idea versions list requires a slash',
 () => {
-    assert.ok(match(
+    assert(match(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/fndCYAsXazdzMUlEGMNIZw/'
             + 'versions/',
     ));
-    assert.equal(
+    assertStrictEquals(
         match(
             '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'fndCYAsXazdzMUlEGMNIZw/versions',
@@ -54,26 +57,26 @@ test('idea versions list requires a slash',
     );
 });
 
-test('idea snapshot is :etag not :version',
+Deno.test('idea snapshot is :etag not :version',
 () => {
     const row = match(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/fndCYAsXazdzMUlEGMNIZw/'
             + 'versions/YiJPbufDpkyrZcZCYbUJpg',
     );
-    assert.ok(row);
-    assert.equal(
+    assert(row);
+    assertStrictEquals(
         row.route.segments.at(-1),
         ':etag',
     );
 });
 
-test('work-order per-item history stays /history',
+Deno.test('work-order per-item history stays /history',
 () => {
-    assert.ok(match(
+    assert(match(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'xdaJyuuPyHfffCGLhqDrOQ/history',
     ));
-    assert.equal(
+    assertStrictEquals(
         match(
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'xdaJyuuPyHfffCGLhqDrOQ'
@@ -93,8 +96,8 @@ function hasLiteral(pattern: string): boolean {
     );
 }
 
-test('bulk work-order history is absent', () => {
-    assert.equal(
+Deno.test('bulk work-order history is absent', () => {
+    assertStrictEquals(
         hasLiteral(
             'organizations/:id/work-orders/history',
         ),
@@ -103,31 +106,31 @@ test('bulk work-order history is absent', () => {
     const captured = match(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/history',
     );
-    assert.ok(captured);
-    assert.equal(captured.route.segments.at(-1), ':id');
-    assert.equal(match('/work-orders/history'), null);
+    assert(captured);
+    assertStrictEquals(captured.route.segments.at(-1), ':id');
+    assertStrictEquals(match('/work-orders/history'), null);
 });
 
-test('bulk objective versions is absent', () => {
-    assert.equal(
+Deno.test('bulk objective versions is absent', () => {
+    assertStrictEquals(
         hasLiteral(
             'organizations/:id/objectives/versions',
         ),
         false,
     );
-    assert.equal(
+    assertStrictEquals(
         match('/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/versions/'),
         null,
     );
     const slashless = match(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/versions',
     );
-    assert.ok(slashless);
-    assert.equal(slashless.route.segments.at(-1), ':id');
-    assert.equal(match('/objectives/versions'), null);
+    assert(slashless);
+    assertStrictEquals(slashless.route.segments.at(-1), ':id');
+    assertStrictEquals(match('/objectives/versions'), null);
 });
 
-test('registered families offer versions/ and :etag',
+Deno.test('registered families offer versions/ and :etag',
 () => {
     const lists = [
         '/identities/abc/versions/',
@@ -175,13 +178,13 @@ test('registered families offer versions/ and :etag',
     ];
     for (const path of lists) {
         const row = match(path);
-        assert.ok(row, path);
-        assert.equal(row.route.segments.at(-1), '');
+        assert(row, path);
+        assertStrictEquals(row.route.segments.at(-1), '');
     }
     for (const path of snapshots) {
         const row = match(path);
-        assert.ok(row, path);
-        assert.equal(
+        assert(row, path);
+        assertStrictEquals(
             row.route.segments.at(-1), ':etag', path,
         );
     }
@@ -244,7 +247,7 @@ async function grantDave(
             grantAt: AT,
         },
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
 }
 
 async function seedMemberOrganizations(): Promise<DbAdapter> {
@@ -261,7 +264,7 @@ async function seedMemberOrganizations(): Promise<DbAdapter> {
     return db;
 }
 
-test('org-less invitee GET identity-nest versions is 200',
+Deno.test('org-less invitee GET identity-nest versions is 200',
 async () => {
     const db = await seedInviteeWorld();
     await grantDave(db, 'hvIFfMMXNtqRPYXnChCzug');
@@ -272,7 +275,7 @@ async () => {
             + '/invitations/hvIFfMMXNtqRPYXnChCzug',
         token,
     ));
-    assert.equal(item.status, 200);
+    assertStrictEquals(item.status, 200);
     const list = await handleRequest(db, req(
         'GET',
         '/identities/' + DAVE
@@ -280,9 +283,9 @@ async () => {
             + '/versions/',
         token,
     ));
-    assert.equal(list.status, 200);
+    assertStrictEquals(list.status, 200);
     const rows = await list.json() as unknown[];
-    assert.ok(rows.length >= 1);
+    assert(rows.length >= 1);
     const snapshot = await handleRequest(db, req(
         'GET',
         '/identities/' + DAVE
@@ -290,10 +293,10 @@ async () => {
             + '/versions/nmPWmjhGfSUcdaEGaCyMZg',
         token,
     ));
-    assert.equal(snapshot.status, 404);
+    assertStrictEquals(snapshot.status, 404);
 });
 
-test('member of B GET B versions while fenced to A',
+Deno.test('member of B GET B versions while fenced to A',
 async () => {
     const db = await seedMemberOrganizations();
     const token = await claimToken({
@@ -304,33 +307,33 @@ async () => {
     const document = await handleRequest(db, req(
         'GET', '/organizations/' + ORGANIZATION_B, token,
     ));
-    assert.equal(document.status, 200);
+    assertStrictEquals(document.status, 200);
     const list = await handleRequest(db, req(
         'GET', '/organizations/' + ORGANIZATION_B + '/versions/',
         token,
     ));
-    assert.equal(list.status, 200);
+    assertStrictEquals(list.status, 200);
     const rows = await list.json() as unknown[];
-    assert.ok(rows.length >= 1);
+    assert(rows.length >= 1);
     const stored = await messageStore(db).get(
         '/organizations/', ORGANIZATION_B,
     );
-    assert.ok(stored);
+    assert(stored);
     const snapshot = await handleRequest(db, req(
         'GET',
         '/organizations/' + ORGANIZATION_B + '/versions/'
             + stored.id,
         token,
     ));
-    assert.equal(snapshot.status, 200);
+    assertStrictEquals(snapshot.status, 200);
     const ideas = await handleRequest(db, req(
         'GET', '/organizations/' + ORGANIZATION_B + '/ideas/',
         token,
     ));
-    assert.equal(ideas.status, 403);
+    assertStrictEquals(ideas.status, 403);
 });
 
-test('non-member GET B versions is 403 like the document',
+Deno.test('non-member GET B versions is 403 like the document',
 async () => {
     const db = await seedMemberOrganizations();
     const token = await organizationToken(
@@ -339,22 +342,22 @@ async () => {
     const document = await handleRequest(db, req(
         'GET', '/organizations/' + ORGANIZATION_B, token,
     ));
-    assert.equal(document.status, 403);
+    assertStrictEquals(document.status, 403);
     const list = await handleRequest(db, req(
         'GET', '/organizations/' + ORGANIZATION_B + '/versions/',
         token,
     ));
-    assert.equal(list.status, 403);
+    assertStrictEquals(list.status, 403);
     const snapshot = await handleRequest(db, req(
         'GET',
         '/organizations/' + ORGANIZATION_B
             + '/versions/nmPWmjhGfSUcdaEGaCyMZg',
         token,
     ));
-    assert.equal(snapshot.status, 403);
+    assertStrictEquals(snapshot.status, 403);
 });
 
-test('absent org versions is 404 not 403', async () => {
+Deno.test('absent org versions is 404 not 403', async () => {
     const db = await seedMemberOrganizations();
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
@@ -364,17 +367,17 @@ test('absent org versions is 404 not 403', async () => {
         '/organizations/oLbQcDdzGHmpcoUKyvlTnQ/versions/',
         token,
     ));
-    assert.equal(list.status, 404);
+    assertStrictEquals(list.status, 404);
     const snapshot = await handleRequest(db, req(
         'GET',
         '/organizations/oLbQcDdzGHmpcoUKyvlTnQ/versions/'
             + 'YiJPbufDpkyrZcZCYbUJpg',
         token,
     ));
-    assert.equal(snapshot.status, 404);
+    assertStrictEquals(snapshot.status, 404);
 });
 
-test('identities, members, and identity-nest lists are 200',
+Deno.test('identities, members, and identity-nest lists are 200',
 async () => {
     const db = await seedInviteeWorld();
     await grantDave(db, 'iBSjaSPKkHorkvpwZBBNFg');
@@ -392,9 +395,9 @@ async () => {
         const res = await handleRequest(
             db, req('GET', path, token),
         );
-        assert.equal(res.status, 200, path);
+        assertStrictEquals(res.status, 200, path);
         const rows = await res.json() as unknown[];
-        assert.ok(rows.length >= 1, path);
+        assert(rows.length >= 1, path);
     }
 });
 
@@ -405,7 +408,7 @@ async () => {
 // are different facts that share a name. This pins the
 // versions wire to the ledger fact and proves it is NOT the
 // seat's own grant time.
-test(
+Deno.test(
     'member versions at is the ledger arrival time,'
     + ' not the seat grant time',
     async () => {
@@ -419,16 +422,16 @@ test(
                 + '/members/XXZruirZyAOoRpNxaDnpSA/versions/',
             token,
         ));
-        assert.equal(list.status, 200);
+        assertStrictEquals(list.status, 200);
         const rows = await list.json() as { at: string }[];
-        assert.equal(rows.length, 1);
+        assertStrictEquals(rows.length, 1);
         const stored = await messageStore(db).get(
             seatsPrefixFor(ORGANIZATION_A),
             'XXZruirZyAOoRpNxaDnpSA',
         );
-        assert.ok(stored);
-        assert.equal(rows[0]!.at, stored.response_at);
-        assert.notEqual(rows[0]!.at, AT);
+        assert(stored);
+        assertStrictEquals(rows[0]!.at, stored.response_at);
+        assertNotStrictEquals(rows[0]!.at, AT);
     },
 );
 
@@ -439,7 +442,7 @@ test(
 // versionSnapshotsAt overwrites it with the ledger arrival
 // time. This pins the versions wire to the ledger fact and
 // proves it is NOT the invitation's own grant time.
-test(
+Deno.test(
     'invitation versions at is the ledger arrival time,'
     + ' not the invitation grant time',
     async () => {
@@ -455,14 +458,14 @@ test(
                 + invitationId + '/versions/',
             token,
         ));
-        assert.equal(list.status, 200);
+        assertStrictEquals(list.status, 200);
         const rows = await list.json() as { at: string }[];
-        assert.equal(rows.length, 1);
+        assertStrictEquals(rows.length, 1);
         const stored = await messageStore(db).get(
             '/invitations/', invitationId,
         );
-        assert.ok(stored);
-        assert.equal(rows[0]!.at, stored.response_at);
-        assert.notEqual(rows[0]!.at, AT);
+        assert(stored);
+        assertStrictEquals(rows[0]!.at, stored.response_at);
+        assertNotStrictEquals(rows[0]!.at, AT);
     },
 );

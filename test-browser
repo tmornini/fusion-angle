@@ -39,7 +39,14 @@ export FUSION_ANGLE_STATIC_ROOT="$BUNDLE"
 # Per-test bound lives in tests/browser/fixtures.ts
 # (withTimeout). deno test has no per-test timeout flag.
 # --allow-env is unscoped: Chrome spawn copies the env bag.
+# Resources only, no --sanitize-ops: useBrowser() opens the
+# CDP WebSocket once per file in Deno.test.beforeAll, so its
+# pending receive always crosses a test boundary and the ops
+# sanitizer fails every test in the file. Closing the socket
+# per test means one Chrome per test, against the one Chrome
+# per file this suite is built on.
 TZ=UTC deno test --frozen --no-check \
+    --sanitize-resources \
     --allow-env --allow-read --allow-write \
     --allow-net --allow-run \
     --preload ./tests/hmac-test-key.ts \

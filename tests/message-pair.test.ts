@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { MESSAGE_TABLES } from '../api/db.ts';
 import { requestMessageHash } from '../api/message-form.ts';
@@ -28,16 +27,16 @@ const INPUT = {
     operationId: TEST_OPERATION_ID,
 } as const;
 
-test('an org-owned pair stores at the org-nested prefix',
+Deno.test('an org-owned pair stores at the org-nested prefix',
 async () => {
     const messagePair = await formWriteMessagePair({ ...INPUT });
-    assert.equal(
+    assertStrictEquals(
         messagePair.uriCollection,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
 });
 
-test('a global-plane pair keeps its flat prefix',
+Deno.test('a global-plane pair keeps its flat prefix',
 async () => {
     const messagePair = await formWriteMessagePair({
         ...INPUT,
@@ -48,12 +47,12 @@ async () => {
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         operationId: TEST_OPERATION_ID,
     });
-    assert.equal(
+    assertStrictEquals(
         messagePair.uriCollection, '/identities/ada/pii/',
     );
 });
 
-test('nested attribute pattern stores under type attributes',
+Deno.test('nested attribute pattern stores under type attributes',
 async () => {
     const typeId = 'sJxkGGTrPegHqFbQAkXnjw';
     const messagePair = await formWriteMessagePair({
@@ -82,14 +81,14 @@ async () => {
         },
         operationId: TEST_OPERATION_ID,
     });
-    assert.equal(
+    assertStrictEquals(
         messagePair.uriCollection,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
         + typeId + '/attributes/',
     );
 });
 
-test('nested record-type detail stores at type prefix',
+Deno.test('nested record-type detail stores at type prefix',
 async () => {
     const messagePair = await formWriteMessagePair({
         ...INPUT,
@@ -108,52 +107,52 @@ async () => {
         ],
         operationId: TEST_OPERATION_ID,
     });
-    assert.equal(
+    assertStrictEquals(
         messagePair.uriCollection,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/',
     );
 });
 
-test('a formed pair binds request and response by one id',
+Deno.test('a formed pair binds request and response by one id',
 async () => {
     const messagePair = await formWriteMessagePair({ ...INPUT });
-    assert.equal(
+    assertStrictEquals(
         messagePair.uriCollection,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
-    assert.equal(messagePair.uriId, '42');
-    assert.equal(
+    assertStrictEquals(messagePair.uriId, '42');
+    assertStrictEquals(
         messagePair.requestHash,
         await requestMessageHash(messagePair.requestMessage),
     );
-    assert.equal(
+    assertStrictEquals(
         messagePair.responseHash,
         await requestMessageHash(messagePair.responseMessage),
     );
 });
 
-test('the event at rides the body byte-exact; the arrival '
+Deno.test('the event at rides the body byte-exact; the arrival '
 + 'stamp passes through verbatim', async () => {
     const messagePair = await formWriteMessagePair({ ...INPUT });
-    assert.ok(messagePair.requestMessage
+    assert(messagePair.requestMessage
         .includes('2026-01-02T03:04:05.000111Z'));
-    assert.equal(messagePair.requestAt, INPUT.requestAt);
+    assertStrictEquals(messagePair.requestAt, INPUT.requestAt);
 });
 
-test('formed response has no follows or supersedes',
+Deno.test('formed response has no follows or supersedes',
 async () => {
     const messagePair = await formWriteMessagePair({
         ...INPUT,
         operationId: TEST_OPERATION_ID,
     });
-    assert.equal(
+    assertStrictEquals(
         'follows' in messagePair, false,
     );
-    assert.equal(
+    assertStrictEquals(
         'supersedes' in messagePair, false,
     );
     const model = parseWire(messagePair.responseMessage);
-    assert.equal(
+    assertStrictEquals(
         model.fields.some(
             (f) => f.name === 'follows'
                 || f.name === 'supersedes',
@@ -162,7 +161,7 @@ async () => {
     );
 });
 
-test('append then head-read round-trips', async () => {
+Deno.test('append then head-read round-trips', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const messagePair = await formWriteMessagePair({ ...INPUT });
@@ -170,7 +169,7 @@ test('append then head-read round-trips', async () => {
         MESSAGE_TABLES,
         (view) => appendMessagePair(view, messagePair),
     );
-    assert.equal(
+    assertStrictEquals(
         await headMessagePairIdAt(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42',
         ),
@@ -178,16 +177,16 @@ test('append then head-read round-trips', async () => {
     );
     const stored =
         await storedResponseFor(db, messagePair.requestHash);
-    assert.equal(stored?.id, messagePair.id);
+    assertStrictEquals(stored?.id, messagePair.id);
     // Early request, late response: the request row keeps
     // the arrival stamp verbatim; response_at was minted
     // at append time, strictly after arrival.
     const request = await db.messagePairs.getById(messagePair.id);
-    assert.equal(request.request_at, INPUT.requestAt);
-    assert.ok(request.request_at < stored!.response_at);
+    assertStrictEquals(request.request_at, INPUT.requestAt);
+    assert(request.request_at < stored!.response_at);
 });
 
-test('a same-hash re-append writes nothing', async () => {
+Deno.test('a same-hash re-append writes nothing', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const messagePair = await formWriteMessagePair({ ...INPUT });
@@ -199,5 +198,5 @@ test('a same-hash re-append writes nothing', async () => {
             await appendMessagePair(view, replay);
         },
     );
-    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
 });

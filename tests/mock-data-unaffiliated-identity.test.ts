@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     deriveMembershipsForIdentity,
 } from '../api/derive-memberships.ts';
@@ -28,11 +27,11 @@ import { sharedMockDb } from './mock-seed.ts';
 // (boot-organization-gate, presenter-invitation-list,
 // api-invitations-fence).
 
-test('the seed yields a login-capable identity whose'
+Deno.test('the seed yields a login-capable identity whose'
 + ' derived membership ledger is empty', async () => {
     const db = await sharedMockDb();
     const unaffiliated = buildUnaffiliatedIdentity();
-    assert.deepEqual(
+    assertEquals(
         await deriveMembershipsForIdentity(
             db, unaffiliated.id,
         ),
@@ -41,35 +40,35 @@ test('the seed yields a login-capable identity whose'
     const credentials = await deriveCredentialsFor(
         db, unaffiliated.id,
     );
-    assert.equal(credentials.length, 1);
-    assert.equal(credentials[0]!.kind, 'password');
+    assertStrictEquals(credentials.length, 1);
+    assertStrictEquals(credentials[0]!.kind, 'password');
     const pii = (await deriveIdentityPiiRows(db)).find(
         (row) => row.id === unaffiliated.id,
     );
-    assert.ok(pii, 'unaffiliated identity has a PII row');
-    assert.equal(pii.email, 'riley.okafor@example.net');
+    assert(pii, 'unaffiliated identity has a PII row');
+    assertStrictEquals(pii.email, 'riley.okafor@example.net');
 });
 
-test('the unaffiliated identity holds exactly one'
+Deno.test('the unaffiliated identity holds exactly one'
 + ' pending Stark invitation', async () => {
     const db = await sharedMockDb();
     const unaffiliated = buildUnaffiliatedIdentity();
     const mine = (await deriveInvitations(db)).filter(
         (row) => row.identity_id === unaffiliated.id,
     );
-    assert.equal(mine.length, 1);
+    assertStrictEquals(mine.length, 1);
     const invitation = mine[0]!;
-    assert.equal(
+    assertStrictEquals(
         invitation.organization_id, STARK_ORGANIZATION,
     );
-    assert.equal(invitation.state, 'pending');
-    assert.equal(
+    assertStrictEquals(invitation.state, 'pending');
+    assertStrictEquals(
         await invitationOpStateFor(db, invitation.id),
         undefined,
     );
 });
 
-test('the invitee view carries the org name and the'
+Deno.test('the invitee view carries the org name and the'
 + ' inviting admin (TEST-PLAN B27 card)', async () => {
     const db = await sharedMockDb();
     const unaffiliated = buildUnaffiliatedIdentity();
@@ -77,11 +76,11 @@ test('the invitee view carries the org name and the'
         db, [unaffiliated.id], unaffiliated.id,
         undefined, [],
     ) as Record<string, unknown>[];
-    assert.equal(views.length, 1);
+    assertStrictEquals(views.length, 1);
     const view = views[0]!;
-    assert.equal(
+    assertStrictEquals(
         view['organization_name'], 'Stark Industries',
     );
-    assert.equal(view['invited_by_name'], 'Tony Stark');
-    assert.equal(view['state'], 'pending');
+    assertStrictEquals(view['invited_by_name'], 'Tony Stark');
+    assertStrictEquals(view['state'], 'pending');
 });

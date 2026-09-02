@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import { deriveFlow } from '../api/derive-flows.ts';
 import { asStoredGraph } from '../api/validators.ts';
@@ -36,7 +35,7 @@ function normalizeGraph(graph: StoredGraph): StoredGraph {
     };
 }
 
-test('seed message-plane graph equals each flow\'s'
+Deno.test('seed message-plane graph equals each flow\'s'
     + ' authored graph',
 async () => {
     const db = await seededMockDb();
@@ -51,7 +50,7 @@ async () => {
         const actual = asStoredGraph(
             derived.graph, 'derived flow ' + flow.id,
         );
-        assert.deepEqual(
+        assertEquals(
             normalizeGraph(actual),
             normalizeGraph(expected),
             'flow ' + flow.id + ' pair graph must '
@@ -60,12 +59,12 @@ async () => {
     }
 });
 
-test('Fusion Angle Flow keeps its seed id', () => {
+Deno.test('Fusion Angle Flow keeps its seed id', () => {
     const flow = buildFlows().find(
         (row) => row.name === 'Fusion Angle Flow',
     );
-    assert.ok(flow, 'Fusion Angle Flow must exist');
-    assert.equal(
+    assert(flow, 'Fusion Angle Flow must exist');
+    assertStrictEquals(
         flow!.id,
         'GgfDbXOJUvvaCekCTcvhuw',
     );

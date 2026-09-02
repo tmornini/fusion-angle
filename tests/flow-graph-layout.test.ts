@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     runFlowLayout,
     runLayoutFromInputs,
@@ -109,18 +108,18 @@ function distinctPos(
 
 // --- areNodePositionsDegenerate ------------------------------
 
-test(
+Deno.test(
     'areNodePositionsDegenerate: empty is not degenerate',
     () => {
-        assert.equal(areNodePositionsDegenerate([]), false);
+        assertStrictEquals(areNodePositionsDegenerate([]), false);
     },
 );
 
-test(
+Deno.test(
     'areNodePositionsDegenerate: a single node is not'
         + ' degenerate',
     () => {
-        assert.equal(
+        assertStrictEquals(
             areNodePositionsDegenerate([
                 node('a', { positionX: 500, positionY: 300 }),
             ]),
@@ -129,11 +128,11 @@ test(
     },
 );
 
-test(
+Deno.test(
     'areNodePositionsDegenerate: nodes piled at the origin'
         + ' are degenerate',
     () => {
-        assert.equal(
+        assertStrictEquals(
             areNodePositionsDegenerate(
                 [node('a'), node('b'), node('c')],
             ),
@@ -142,11 +141,11 @@ test(
     },
 );
 
-test(
+Deno.test(
     'areNodePositionsDegenerate: nodes piled within one'
         + ' node-rect are degenerate',
     () => {
-        assert.equal(
+        assertStrictEquals(
             areNodePositionsDegenerate([
                 node('a', { positionX: 50, positionY: 50 }),
                 node('b', { positionX: 90, positionY: 60 }),
@@ -156,11 +155,11 @@ test(
     },
 );
 
-test(
+Deno.test(
     'areNodePositionsDegenerate: a real spread is not'
         + ' degenerate',
     () => {
-        assert.equal(
+        assertStrictEquals(
             areNodePositionsDegenerate([
                 node('a', { positionX: 0, positionY: 0 }),
                 node('b', { positionX: 400, positionY: 0 }),
@@ -173,13 +172,13 @@ test(
 
 // --- runLayoutFromInputs / runFlowLayout ---------------------
 
-test('runLayoutFromInputs: empty inputs yield empty maps', () => {
+Deno.test('runLayoutFromInputs: empty inputs yield empty maps', () => {
     const r = runLayoutFromInputs([], []);
-    assert.equal(r.positions.size, 0);
-    assert.equal(r.waypoints.size, 0);
+    assertStrictEquals(r.positions.size, 0);
+    assertStrictEquals(r.waypoints.size, 0);
 });
 
-test(
+Deno.test(
     'runLayoutFromInputs: a chain lays out start before end',
     () => {
         const r = runLayoutFromInputs(
@@ -190,26 +189,26 @@ test(
             ],
             [edge('s', 'a'), edge('a', 'z')],
         );
-        assert.equal(r.positions.size, 3);
-        assert.equal(distinctPos(r.positions.values()), 3);
-        assert.ok(
+        assertStrictEquals(r.positions.size, 3);
+        assertStrictEquals(distinctPos(r.positions.values()), 3);
+        assert(
             r.positions.get('s')!.x < r.positions.get('z')!.x,
         );
     },
 );
 
-test('runFlowLayout: empty nodes yield empty maps', () => {
-    assert.equal(runFlowLayout([], []).positions.size, 0);
+Deno.test('runFlowLayout: empty nodes yield empty maps', () => {
+    assertStrictEquals(runFlowLayout([], []).positions.size, 0);
 });
 
-test(
+Deno.test(
     'runFlowLayout: a piled-up flow lays out into a real'
         + ' shape',
     () => {
         const r = runFlowLayout(sampleNodes(), sampleEdges());
-        assert.equal(r.positions.size, 5);
-        assert.equal(distinctPos(r.positions.values()), 5);
-        assert.ok(
+        assertStrictEquals(r.positions.size, 5);
+        assertStrictEquals(distinctPos(r.positions.values()), 5);
+        assert(
             r.positions.get('s')!.x < r.positions.get('z')!.x,
         );
     },
@@ -217,7 +216,7 @@ test(
 
 // --- withRenderableLayout ------------------------------------
 
-test(
+Deno.test(
     'withRenderableLayout: lays out an auto-layout flow',
     () => {
         const out = withRenderableLayout(flowGraph({
@@ -225,15 +224,15 @@ test(
             nodes: sampleNodes(),
             edges: sampleEdges(),
         }));
-        assert.equal(distinctXY(out.nodes), 5);
-        assert.ok(spanX(out.nodes) > 2 * 160);
+        assertStrictEquals(distinctXY(out.nodes), 5);
+        assert(spanX(out.nodes) > 2 * 160);
         const s = out.nodes.find(n => n.isCreate)!;
         const z = out.nodes.find(n => n.isArchive)!;
-        assert.ok(s.positionX < z.positionX);
+        assert(s.positionX < z.positionX);
     },
 );
 
-test(
+Deno.test(
     'withRenderableLayout: lays out a degenerate non-auto'
         + ' flow',
     () => {
@@ -242,12 +241,12 @@ test(
             nodes: sampleNodes(),
             edges: sampleEdges(),
         }));
-        assert.equal(distinctXY(out.nodes), 5);
-        assert.ok(spanX(out.nodes) > 2 * 160);
+        assertStrictEquals(distinctXY(out.nodes), 5);
+        assert(spanX(out.nodes) > 2 * 160);
     },
 );
 
-test(
+Deno.test(
     'withRenderableLayout: leaves a laid-out non-auto flow'
         + ' alone',
     () => {
@@ -262,7 +261,7 @@ test(
             ],
             edges: [edge('s', 'a'), edge('a', 'z')],
         }));
-        assert.deepEqual(
+        assertEquals(
             out.nodes.map(
                 n => [n.id, n.positionX, n.positionY],
             ),
@@ -271,7 +270,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'withRenderableLayout: a flow with no start node is'
         + ' returned unchanged',
     () => {
@@ -280,18 +279,18 @@ test(
             nodes: [node('a'), node('b')],
             edges: [edge('a', 'b')],
         }));
-        assert.equal(out.nodes[0]!.positionX, 0);
-        assert.equal(out.nodes[1]!.positionX, 0);
+        assertStrictEquals(out.nodes[0]!.positionX, 0);
+        assertStrictEquals(out.nodes[1]!.positionX, 0);
     },
 );
 
-test(
+Deno.test(
     'withRenderableLayout: an empty graph is returned'
         + ' unchanged',
     () => {
         const out = withRenderableLayout(flowGraph({
             isAutoLayout: true, nodes: [], edges: [],
         }));
-        assert.equal(out.nodes.length, 0);
+        assertStrictEquals(out.nodes.length, 0);
     },
 );

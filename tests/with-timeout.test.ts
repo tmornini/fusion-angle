@@ -1,15 +1,14 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertRejects } from '@std/assert';
 import { withTimeout } from './browser/fixtures.ts';
 
-test('withTimeout rejects when the body outruns the bound',
+Deno.test('withTimeout rejects when the body outruns the bound',
     async () => {
-        await assert.rejects(
+        await assertRejects(
             () => withTimeout(
                 new Promise(() => {}),
                 'never',
                 50,
             ),
-            /timed out/,
+            Error, 'timed out',
         );
     });

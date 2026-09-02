@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -38,28 +37,28 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('GET /records (authenticated) → 404 Not found',
+Deno.test('GET /records (authenticated) → 404 Not found',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('GET', '/records', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
     const body = await res.json() as { error: string };
-    assert.equal(body.error, 'Not found: /records');
+    assertStrictEquals(body.error, 'Not found: /records');
 });
 
-test('GET /records (unauthenticated) → 401 first',
+Deno.test('GET /records (unauthenticated) → 401 first',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(
         db, req('GET', '/records'),
     );
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
 });
 
-test('facade GET /organizations/AjdvjuECVZEgZoFajaIEkg/records → 404',
+Deno.test('facade GET /organizations/AjdvjuECVZEgZoFajaIEkg/records → 404',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -67,10 +66,10 @@ async () => {
         db,
         req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/records', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('member PUT nested attributes → 403',
+Deno.test('member PUT nested attributes → 403',
 async () => {
     const db = await freshDb();
     // Any sub other than 'XXZruirZyAOoRpNxaDnpSA' mints member roles
@@ -90,5 +89,5 @@ async () => {
             constraints: [],
         },
     ));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
 });

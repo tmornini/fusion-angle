@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -82,186 +81,186 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 // its own if-chain to the one terminal: 404 "Not found:
 // /<segments>".
 
-test('PUT invitations 404s (side channel never matches'
+Deno.test('PUT invitations 404s (side channel never matches'
 + ' routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('PUT', '/invitations', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE invitations 404s (side channel never matches'
+Deno.test('DELETE invitations 404s (side channel never matches'
 + ' routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/invitations', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT invitations/sent 404s (side channel never matches'
+Deno.test('PUT invitations/sent 404s (side channel never matches'
 + ' routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('PUT', '/invitations/sent', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST invitations/sent 404s (side channel never matches'
+Deno.test('POST invitations/sent 404s (side channel never matches'
 + ' routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/invitations/sent', token, {}),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE invitations/sent 404s (side channel never'
+Deno.test('DELETE invitations/sent 404s (side channel never'
 + ' matches routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/invitations/sent', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('GET invitations/:id/acceptance 404s (side channel'
+Deno.test('GET invitations/:id/acceptance 404s (side channel'
 + ' never matches routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'GET', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/acceptance', token,
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT invitations/:id/acceptance 404s (side channel'
+Deno.test('PUT invitations/:id/acceptance 404s (side channel'
 + ' never matches routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/acceptance', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE invitations/:id/acceptance 404s (side channel'
+Deno.test('DELETE invitations/:id/acceptance 404s (side channel'
 + ' never matches routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'DELETE', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/acceptance', token,
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('GET invitations/:id/decline 404s (side channel never'
+Deno.test('GET invitations/:id/decline 404s (side channel never'
 + ' matches routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'GET', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/decline', token,
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT invitations/:id/decline 404s (side channel never'
+Deno.test('PUT invitations/:id/decline 404s (side channel never'
 + ' matches routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/decline', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE invitations/:id/decline 404s (side channel'
+Deno.test('DELETE invitations/:id/decline 404s (side channel'
 + ' never matches routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'DELETE', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/decline', token,
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('GET invitations/:id/revocation 404s (side channel'
+Deno.test('GET invitations/:id/revocation 404s (side channel'
 + ' never matches routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'GET', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/revocation', token,
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT invitations/:id/revocation 404s (side channel'
+Deno.test('PUT invitations/:id/revocation 404s (side channel'
 + ' never matches routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/revocation', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE invitations/:id/revocation 404s (side channel'
+Deno.test('DELETE invitations/:id/revocation 404s (side channel'
 + ' never matches routes)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'DELETE', '/invitations/jEoYCFtPjXFEgZqZNtOcEA/revocation', token,
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
 // A wholly bogus path shape — no acceptance/decline/revocation
 // op, and not 'sent' either — falls through the SAME if-chain
 // on every verb, the "bogus path" half of U5's guard.
 
-test('GET invitations/:id (bogus path) 404s on every verb',
+Deno.test('GET invitations/:id (bogus path) 404s on every verb',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'GET', '/invitations/WatGDdZmAxtYsLoAFrOaxA', token,
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT invitations/:id (bogus path) 404s on every verb',
+Deno.test('PUT invitations/:id (bogus path) 404s on every verb',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/invitations/WatGDdZmAxtYsLoAFrOaxA', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST invitations/:id (bogus path) 404s on every verb',
+Deno.test('POST invitations/:id (bogus path) 404s on every verb',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', '/invitations/WatGDdZmAxtYsLoAFrOaxA', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('DELETE invitations/:id (bogus path) 404s on every'
+Deno.test('DELETE invitations/:id (bogus path) 404s on every'
 + ' verb', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'DELETE', '/invitations/WatGDdZmAxtYsLoAFrOaxA', token,
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });

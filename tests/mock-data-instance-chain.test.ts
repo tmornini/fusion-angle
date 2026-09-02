@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { handleRequest } from '../api/api.ts';
@@ -74,48 +73,48 @@ const LEGACY_UNION = new Map(
     ]),
 );
 
-test('A1 chain: instance history {} → 6 → 7; head = union',
+Deno.test('A1 chain: instance history {} → 6 → 7; head = union',
 async () => {
     const db = await seededDb();
     const revisions = await deriveInstanceRevisions(
         db, STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
         SEED_INSTANCE_ID,
     );
-    assert.equal(revisions.length, 3);
-    assert.equal(revisions[0]!.values.length, 0);
-    assert.equal(revisions[1]!.values.length, 6);
-    assert.equal(revisions[2]!.values.length, 7);
+    assertStrictEquals(revisions.length, 3);
+    assertStrictEquals(revisions[0]!.values.length, 0);
+    assertStrictEquals(revisions[1]!.values.length, 6);
+    assertStrictEquals(revisions[2]!.values.length, 7);
 
     const head = await deriveInstanceHead(
         db, STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
         SEED_INSTANCE_ID,
     );
-    assert.ok(head !== undefined);
-    assert.equal(head!.values.length, 7);
+    assert(head !== undefined);
+    assertStrictEquals(head!.values.length, 7);
     for (const entry of head!.values) {
-        assert.equal(
+        assertStrictEquals(
             entry.value,
             LEGACY_UNION.get(entry.attribute_id),
             'head value drift for ' + entry.attribute_id,
         );
     }
-    assert.equal(
+    assertStrictEquals(
         LEGACY_UNION.get('CPJmMPXRaBIiNdGBofUPVg'),
         'Acme Corp',
     );
-    assert.equal(
+    assertStrictEquals(
         LEGACY_UNION.get('ElVKgkCreTEHQXJZPBJDKw'),
         'Approved. Strong fit.',
     );
 });
 
-test('WO01 bind names instance + type; detail GET embeds',
+Deno.test('WO01 bind names instance + type; detail GET embeds',
 async () => {
     const db = await seededDb();
     const bind = await workOrderBindingFor(
         db, STARK_ORGANIZATION, WO01_ID,
     );
-    assert.deepEqual(bind, {
+    assertEquals(bind, {
         instanceId: SEED_INSTANCE_ID,
         recordTypeId: SEED_RECORD_TYPE_ID,
     });
@@ -127,17 +126,17 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + WO01_ID, token,
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const body = await res.json() as Record<
         string, unknown
     >;
-    assert.equal(body['instance_id'], SEED_INSTANCE_ID);
-    assert.equal(
+    assertStrictEquals(body['instance_id'], SEED_INSTANCE_ID);
+    assertStrictEquals(
         body['record_type_id'], SEED_RECORD_TYPE_ID,
     );
 });
 
-test('WO01 bind seed pair is PUT (locked verb)',
+Deno.test('WO01 bind seed pair is PUT (locked verb)',
 async () => {
     const db = await seededDb();
     const prefix =
@@ -146,16 +145,16 @@ async () => {
     const requests = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    assert.equal(requests.length, 1);
+    assertStrictEquals(requests.length, 1);
     const model = parseWire(requests[0]!.request);
-    assert.equal(model.startLine.kind, 'request');
+    assertStrictEquals(model.startLine.kind, 'request');
     if (model.startLine.kind !== 'request') {
         return;
     }
-    assert.equal(model.startLine.method, 'PUT');
+    assertStrictEquals(model.startLine.method, 'PUT');
 });
 
-test('WO01 history: Review 6 new-shape + Complete 1;'
+Deno.test('WO01 history: Review 6 new-shape + Complete 1;'
 + ' other WOs stay legacy',
 async () => {
     const db = await seededDb();
@@ -167,12 +166,12 @@ async () => {
     );
     const review = byId.get(WO01_REVIEW_EVENT_ID)!;
     const complete = byId.get(WO01_COMPLETE_EVENT_ID)!;
-    assert.equal(review.field_values.length, 6);
+    assertStrictEquals(review.field_values.length, 6);
     for (const fv of review.field_values) {
-        assert.equal(fv.id, fv.attribute_id);
+        assertStrictEquals(fv.id, fv.attribute_id);
     }
-    assert.equal(complete.field_values.length, 1);
-    assert.equal(
+    assertStrictEquals(complete.field_values.length, 1);
+    assertStrictEquals(
         complete.field_values[0]!.id,
         complete.field_values[0]!.attribute_id,
     );
@@ -186,29 +185,29 @@ async () => {
     const otherReqs = await db.messagePairs.getAllWhere(
         'uri_collection', otherPrefix,
     );
-    assert.ok(otherReqs.length > 0);
+    assert(otherReqs.length > 0);
     for (const request of otherReqs) {
         const embedded = messagePairJsonOf(
             request.request,
         ) as {
             body: Record<string, unknown>;
         };
-        assert.ok(
+        assert(
             Object.hasOwn(embedded.body, 'fieldValues'),
             'legacy body missing fieldValues',
         );
-        assert.equal(
+        assertStrictEquals(
             Object.hasOwn(embedded.body, 'instance_id'),
             false,
         );
-        assert.equal(
+        assertStrictEquals(
             Object.hasOwn(embedded.body, 'set'),
             false,
         );
     }
 });
 
-test('chain provenance: three instance pairs ordered by at;'
+Deno.test('chain provenance: three instance pairs ordered by at;'
 + ' no predecessor columns',
 async () => {
     const db = await seededDb();
@@ -229,7 +228,7 @@ async () => {
             .filter((r) => r.uri_id === SEED_INSTANCE_ID)
             .map((r) => [r.id, r]),
     );
-    assert.equal(byId.size, 3);
+    assertStrictEquals(byId.size, 3);
 
     const ordered = [...requestById.values()]
         .sort((a, b) =>
@@ -243,11 +242,11 @@ async () => {
     const reviewRev = byId.get(ordered[1]!.id)!;
     const completeRev = byId.get(ordered[2]!.id)!;
 
-    assert.ok(genesis);
-    assert.ok(reviewRev);
-    assert.ok(completeRev);
+    assert(genesis);
+    assert(reviewRev);
+    assert(completeRev);
     for (const row of [genesis, reviewRev, completeRev]) {
-        assert.equal('follows' in row, false);
-        assert.equal('supersedes' in row, false);
+        assertStrictEquals('follows' in row, false);
+        assertStrictEquals('supersedes' in row, false);
     }
 });

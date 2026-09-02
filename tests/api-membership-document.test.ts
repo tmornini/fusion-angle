@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { PUT, handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -39,13 +38,13 @@ function documentFields() {
 
 // -- 1. validateMembershipDocumentBody -----------------------
 
-test('validateMembershipDocumentBody accepts the exact'
+Deno.test('validateMembershipDocumentBody accepts the exact'
 + ' four-key body', () => {
     const doc = validateMembershipDocumentBody(documentFields());
-    assert.deepEqual(doc.entity, documentFields());
+    assertEquals(doc.entity, documentFields());
 });
 
-test('validateMembershipDocumentBody rejects a stray key with'
+Deno.test('validateMembershipDocumentBody rejects a stray key with'
 + ' the byte-identical message validateMembershipEntity'
 + ' produces for the SAME violation (the label mandate)', () => {
     const body = { ...documentFields(), bogus: 'nope' };
@@ -54,23 +53,23 @@ test('validateMembershipDocumentBody rejects a stray key with'
     try {
         validateMembershipDocumentBody(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         documentMessage = (e as ValidationError).message;
     }
     try {
         validateMembershipEntity(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         entityMessage = (e as ValidationError).message;
     }
-    assert.equal(
+    assertStrictEquals(
         documentMessage,
         'unexpected key "bogus" for MembershipEntity',
     );
-    assert.equal(documentMessage, entityMessage);
+    assertStrictEquals(documentMessage, entityMessage);
 });
 
-test('validateMembershipDocumentBody rejects each missing key,'
+Deno.test('validateMembershipDocumentBody rejects each missing key,'
 + ' byte-identical to validateMembershipEntity on both paths',
 () => {
     for (const key of [
@@ -83,27 +82,27 @@ test('validateMembershipDocumentBody rejects each missing key,'
         try {
             validateMembershipDocumentBody(body);
         } catch (e) {
-            assert.ok(e instanceof ValidationError);
+            assert(e instanceof ValidationError);
             documentMessage = (e as ValidationError).message;
         }
         try {
             validateMembershipEntity(body);
         } catch (e) {
-            assert.ok(e instanceof ValidationError);
+            assert(e instanceof ValidationError);
             entityMessage = (e as ValidationError).message;
         }
-        assert.equal(
+        assertStrictEquals(
             documentMessage,
             'missing required key "' + key
                 + '" for MembershipEntity',
         );
-        assert.equal(documentMessage, entityMessage);
+        assertStrictEquals(documentMessage, entityMessage);
     }
 });
 
 // -- 2. postMembershipDocumentOp (below-gate, MemoryDbAdapter) --
 
-test('postMembershipDocumentOp writes a seat pair',
+Deno.test('postMembershipDocumentOp writes a seat pair',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -116,14 +115,14 @@ async () => {
         db, 'toccYYkLEABmlbpHJalgtQ', body,
         'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
-    assert.deepEqual(written, body);
-    assert.equal((await db.messagePairs.getAll()).length, 1);
-    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assertEquals(written, body);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) --
 
-test('a byte-identical PUT resend to a seat converges'
+Deno.test('a byte-identical PUT resend to a seat converges'
 + ' to one stored request/response pair', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -136,14 +135,14 @@ test('a byte-identical PUT resend to a seat converges'
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             + 'toccYYkLEABmlbpHJalgtQ', body, DEV_TOKEN,
     );
-    assert.deepEqual(first, second);
+    assertEquals(first, second);
     // seedAdminSchema: org + current seat; one unique
     // toccYYkLEABmlbpHJalgtQ seat PUT. Byte-identical resend dedups.
-    assert.equal((await db.messagePairs.getAll()).length, 4);
-    assert.equal((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
-test('a seat PUT chain derives the latest body',
+Deno.test('a seat PUT chain derives the latest body',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -159,7 +158,7 @@ async () => {
             operationId: TEST_OPERATION_ID,
         }),
     );
-    assert.equal(firstPut.status, 201);
+    assertStrictEquals(firstPut.status, 201);
     const firstGet = await handleRequest(
         db,
         apiRequest({
@@ -169,12 +168,12 @@ async () => {
             token: DEV_TOKEN,
         }),
     );
-    assert.equal(firstGet.status, 200);
+    assertStrictEquals(firstGet.status, 200);
     const firstBody = await firstGet.json() as {
         type: string;
         at: string;
     };
-    assert.equal(firstBody.type, 'member');
+    assertStrictEquals(firstBody.type, 'member');
     const second = {
         type: 'admin',
         at: '2026-02-02T00:00:00.000000Z',
@@ -190,7 +189,7 @@ async () => {
             operationId: TEST_OPERATION_ID,
         }),
     );
-    assert.equal(secondPut.status, 201);
+    assertStrictEquals(secondPut.status, 201);
     const secondGet = await handleRequest(
         db,
         apiRequest({
@@ -204,11 +203,11 @@ async () => {
         type: string;
         at: string;
     };
-    assert.equal(secondBody.type, 'admin');
-    assert.equal(secondBody.at, second.at);
+    assertStrictEquals(secondBody.type, 'admin');
+    assertStrictEquals(secondBody.at, second.at);
 });
 
-test('a seat DELETE-head is absent', async () => {
+Deno.test('a seat DELETE-head is absent', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await handleRequest(
@@ -235,7 +234,7 @@ test('a seat DELETE-head is absent', async () => {
             operationId: TEST_OPERATION_ID,
         }),
     );
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const missing = await handleRequest(
         db,
         apiRequest({
@@ -245,10 +244,10 @@ test('a seat DELETE-head is absent', async () => {
             token: DEV_TOKEN,
         }),
     );
-    assert.equal(missing.status, 404);
+    assertStrictEquals(missing.status, 404);
 });
 
-test('stored PUT body equals the seat wire entity',
+Deno.test('stored PUT body equals the seat wire entity',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -267,13 +266,13 @@ async () => {
             operationId: TEST_OPERATION_ID,
         }),
     );
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const stored = JSON.parse(
         await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/members/', id,
         ),
     );
-    assert.deepEqual(stored, {
+    assertEquals(stored, {
         id,
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         identity_id: id,

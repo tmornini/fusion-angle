@@ -1,6 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { assert, assertMatch, assertNotMatch } from '@std/assert';
 import * as icons from '../web-app/app/icons.ts';
 import type { IconFn } from '../web-app/app/icons.ts';
 
@@ -18,15 +16,15 @@ const FILES = [
     'web-app/design-system/index.ts',
 ] as const;
 
-test('product chrome says Fusion Angle', () => {
+Deno.test('product chrome says Fusion Angle', () => {
     for (const path of FILES) {
-        const src = readFileSync(path, 'utf8');
-        assert.match(
+        const src = Deno.readTextFileSync(path);
+        assertMatch(
             src,
             /Fusion Angle/,
             path + ' must say Fusion Angle',
         );
-        assert.doesNotMatch(
+        assertNotMatch(
             src,
             /Fusion AI/,
             path + ' must not say Fusion AI',
@@ -34,14 +32,13 @@ test('product chrome says Fusion Angle', () => {
     }
 });
 
-test('design-system card heading is Fusion Angle Card',
+Deno.test('design-system card heading is Fusion Angle Card',
 () => {
-    const src = readFileSync(
+    const src = Deno.readTextFileSync(
         'web-app/design-system/index.ts',
-        'utf8',
     );
-    assert.match(src, /Fusion Angle Card/);
-    assert.doesNotMatch(src, /Fusion Card/);
+    assertMatch(src, /Fusion Angle Card/);
+    assertNotMatch(src, /Fusion Card/);
 });
 
 const SVG_PATH_DATA =
@@ -52,15 +49,15 @@ function pathData(markup: string): string[] {
         .map(m => m[1]!);
 }
 
-test('chrome and icon path data are SVG grammar', () => {
+Deno.test('chrome and icon path data are SVG grammar', () => {
     let count = 0;
     for (const path of FILES) {
         if (!path.endsWith('.html')) continue;
         for (const d of pathData(
-            readFileSync(path, 'utf8'),
+            Deno.readTextFileSync(path),
         )) {
             count += 1;
-            assert.match(
+            assertMatch(
                 d, SVG_PATH_DATA, path + ' path d ' + d,
             );
         }
@@ -76,10 +73,10 @@ test('chrome and icon path data are SVG grammar', () => {
         ).toString();
         for (const d of pathData(markup)) {
             count += 1;
-            assert.match(
+            assertMatch(
                 d, SVG_PATH_DATA, name + ' path d ' + d,
             );
         }
     }
-    assert.ok(count >= 60);
+    assert(count >= 60);
 });

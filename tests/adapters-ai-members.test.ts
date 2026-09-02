@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -30,7 +29,7 @@ function aiDraft(name: string) {
     };
 }
 
-test(
+Deno.test(
     'postAIMemberCreation writes PUT /ai-agents/:id',
     async () => {
         const db = memoryDbAdapter();
@@ -44,15 +43,15 @@ test(
         );
 
         const detail = await getAIMemberEntity(ctx, agentId);
-        assert.equal(detail.name, 'Claude');
+        assertStrictEquals(detail.name, 'Claude');
         const agent = await ctx.GET<{
             id: string; name: string;
         }>('ai-agents/' + agentId);
-        assert.equal(agent.name, 'Claude');
+        assertStrictEquals(agent.name, 'Claude');
     },
 );
 
-test(
+Deno.test(
     'putAIMember updates the agent document',
     async () => {
         const db = memoryDbAdapter();
@@ -68,7 +67,7 @@ test(
         );
 
         const detail = await getAIMemberEntity(ctx, agentId);
-        assert.equal(detail.name, 'Renamed');
-        assert.equal(detail.skill_focus, 'qa');
+        assertStrictEquals(detail.name, 'Renamed');
+        assertStrictEquals(detail.skill_focus, 'qa');
     },
 );

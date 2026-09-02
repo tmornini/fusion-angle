@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals,
+    assertMatch,
+    assertNotMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     RecordInstancesPresenter,
     projectInstanceFields,
@@ -23,22 +27,22 @@ function field(
     return partial;
 }
 
-test('empty instances section shows empty state', () => {
+Deno.test('empty instances section shows empty state', () => {
     const html = new RecordInstancesPresenter({
         instances: [],
         editing: null,
     }).buildCard().toString();
-    assert.match(html, /Instances/);
-    assert.match(html, /No instances yet/);
-    assert.match(
+    assertMatch(html, /Instances/);
+    assertMatch(html, /No instances yet/);
+    assertMatch(
         html, /id="record-new-instance-btn"/,
     );
-    assert.doesNotMatch(
+    assertNotMatch(
         html, /data-instance-id/,
     );
 });
 
-test(
+Deno.test(
     'list renders instance id and projected values',
     () => {
         const html = new RecordInstancesPresenter({
@@ -56,24 +60,24 @@ test(
             ],
             editing: null,
         }).buildCard().toString();
-        assert.match(html, /data-instance-id="inst-1"/);
-        assert.match(html, /inst-1/);
-        assert.match(html, /Title/);
-        assert.match(html, /Alpha/);
-        assert.match(html, /Secret/);
-        assert.match(html, /hidden-ok/);
-        assert.match(
+        assertMatch(html, /data-instance-id="inst-1"/);
+        assertMatch(html, /inst-1/);
+        assertMatch(html, /Title/);
+        assertMatch(html, /Alpha/);
+        assertMatch(html, /Secret/);
+        assertMatch(html, /hidden-ok/);
+        assertMatch(
             html,
             /data-action="edit-instance"/,
         );
-        assert.match(
+        assertMatch(
             html,
             /data-dialog-open="confirm-delete-instance"/,
         );
     },
 );
 
-test(
+Deno.test(
     'edit form: writable input, readonly text,'
     + ' unreadable omitted',
     () => {
@@ -102,39 +106,39 @@ test(
                 conflictNotice: null,
             },
         }).buildCard().toString();
-        assert.match(html, /inst-9/);
-        assert.match(
+        assertMatch(html, /inst-9/);
+        assertMatch(
             html, /data-attribute-id="a-write"/,
         );
-        assert.match(
+        assertMatch(
             html,
             /data-action="instance-field-value"/,
         );
-        assert.match(html, /value="xdaJyuuPyHfffCGLhqDrOQ"/);
-        assert.match(
+        assertMatch(html, /value="xdaJyuuPyHfffCGLhqDrOQ"/);
+        assertMatch(
             html, /data-attribute-id="a-read"/,
         );
-        assert.match(html, /ReadOnly/);
-        assert.match(html, /rOEPOcVMQdJiiiMuiiEhlg/);
+        assertMatch(html, /ReadOnly/);
+        assertMatch(html, /rOEPOcVMQdJiiiMuiiEhlg/);
         // Only one editable instance field input
         // (writable); readonly is display-only.
         const fieldInputs = html.match(
             /data-action="instance-field-value"/g,
         );
-        assert.equal(fieldInputs?.length, 1);
+        assertStrictEquals(fieldInputs?.length, 1);
         // unreadable never present
-        assert.doesNotMatch(html, /a-secret/);
-        assert.doesNotMatch(html, /Unreadable/);
-        assert.match(
+        assertNotMatch(html, /a-secret/);
+        assertNotMatch(html, /Unreadable/);
+        assertMatch(
             html, /id="record-instance-save-btn"/,
         );
-        assert.match(
+        assertMatch(
             html, /id="record-instance-cancel-btn"/,
         );
     },
 );
 
-test(
+Deno.test(
     'edit form surfaces 412 conflict notice',
     () => {
         const notice =
@@ -158,16 +162,16 @@ test(
                 conflictNotice: notice,
             },
         }).buildCard().toString();
-        assert.match(
+        assertMatch(
             html, /data-tone="warning"/,
         );
-        assert.match(
+        assertMatch(
             html, /values refreshed; re-apply/,
         );
     },
 );
 
-test(
+Deno.test(
     'projectInstanceFields drops unreadable and'
     + ' marks write vs read',
     () => {
@@ -205,7 +209,7 @@ test(
             ]),
             ['member'],
         );
-        assert.deepEqual(
+        assertEquals(
             projected.map(f => ({
                 id: f.attributeId,
                 access: f.access,
@@ -227,7 +231,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'projectInstanceFields: admin bypasses ACL',
     () => {
         const projected = projectInstanceFields(
@@ -244,14 +248,14 @@ test(
             new Map([['x', 'secret']]),
             ['admin'],
         );
-        assert.equal(projected.length, 1);
-        assert.equal(
+        assertStrictEquals(projected.length, 1);
+        assertStrictEquals(
             projected[0]!.access, 'writable',
         );
     },
 );
 
-test(
+Deno.test(
     'edit form: select attribute renders a select',
     () => {
         const html = new RecordInstancesPresenter({
@@ -271,19 +275,19 @@ test(
                 conflictNotice: null,
             },
         }).buildCard().toString();
-        assert.match(html, /<select/);
-        assert.match(
+        assertMatch(html, /<select/);
+        assertMatch(
             html, /data-attribute-id="a-choice"/,
         );
-        assert.match(html, /value="b"/);
-        assert.match(html, /selected/);
-        assert.doesNotMatch(
+        assertMatch(html, /value="b"/);
+        assertMatch(html, /selected/);
+        assertNotMatch(
             html, /<input type="text"/,
         );
     },
 );
 
-test(
+Deno.test(
     'edit form: radio attribute renders radios',
     () => {
         const html = new RecordInstancesPresenter({
@@ -303,11 +307,11 @@ test(
                 conflictNotice: null,
             },
         }).buildCard().toString();
-        assert.match(html, /type="radio"/);
-        assert.match(
+        assertMatch(html, /type="radio"/);
+        assertMatch(
             html, /data-attribute-id="a-radio"/,
         );
-        assert.doesNotMatch(
+        assertNotMatch(
             html, /<input type="text"/,
         );
     },

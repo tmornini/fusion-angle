@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assertNotStrictEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { strict as assert } from 'node:assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -48,23 +47,23 @@ import { putClientFacade } from
     '../web-app/app/adapters/facade-holder.ts';
 import { putSessionToken } from
     '../web-app/app/adapters/session-token.ts';
-
-// flow-operations.ts -> logger.ts -> preferences.ts reads
-// localStorage, absent in Node — stub it before any log.*
-// call in an error path (mirrors flow-undo-cursor.test.ts).
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: (_key: string) => null,
-    setItem: () => {},
-};
-
 import { performUndo } from
     '../web-app/app/flow-operations.ts';
+import { withLocalStorageAsync } from
+    './fixtures/local-storage.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const CANVAS_W = 800;
 const CANVAS_H = 600;
+
+// flow-operations.ts -> logger.ts -> preferences.ts reads
+// localStorage lazily, only on a log.* call in an error
+// path (mirrors flow-undo-cursor.test.ts).
+const NULL_STORAGE: Partial<Storage> = {
+    getItem: (_key: string) => null,
+    setItem: () => {},
+};
 
 function req(
     method: string,
@@ -136,7 +135,7 @@ async function createFlow(
             graphDelta: emptyDelta(),
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 }
 
 async function flowDocumentPairCount(
@@ -158,9 +157,9 @@ async function flowDocumentPairCount(
     ).length;
 }
 
-test(
+Deno.test(
     'opening a flow does not append pairs',
-    async () => {
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
         putClientFacade(wrapInPageAdapter(db));
         putSessionToken(DEV_TOKEN);
@@ -206,7 +205,7 @@ test(
         await enqueueFlowSave(
             flowId, async () => undefined,
         );
-        assert.equal(
+        assertStrictEquals(
             await flowDocumentPairCount(
                 db, flowId,
             ),
@@ -216,11 +215,11 @@ test(
             ctx, opened,
             buildFlowHistorySnapshot(true),
         );
-        assert.equal(op.kind, 'ok');
+        assertStrictEquals(op.kind, 'ok');
         if (op.kind !== 'ok') return;
-        assert.notEqual(
+        assertNotStrictEquals(
             op.freshSnap.flowName,
             'Alpha Renamed',
         );
-    },
+    }),
 );

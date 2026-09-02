@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
@@ -66,18 +70,18 @@ function putIdea(
     ));
 }
 
-test('a created idea derives', async () => {
+Deno.test('a created idea derives', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ideaId = generateIdentifier();
     const res = await putIdea(
         db, token, ideaId, 'Fresh Idea', 'active',
     );
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const derived = await deriveIdea(
         db, STARK_ORGANIZATION, ideaId,
     );
-    assert.deepEqual(derived, {
+    assertEquals(derived, {
         id: ideaId,
         organization_id: STARK_ORGANIZATION,
         title: 'Fresh Idea',
@@ -91,7 +95,7 @@ test('a created idea derives', async () => {
     });
 });
 
-test('an edited idea derives the edit body', async () => {
+Deno.test('an edited idea derives the edit body', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ideaId = generateIdentifier();
@@ -102,20 +106,20 @@ test('an edited idea derives the edit body', async () => {
     const res = await putIdea(
         db, token, ideaId, 'After Edit', 'active',
     );
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const derived = await deriveIdea(
         db, STARK_ORGANIZATION, ideaId,
     );
-    assert.equal(derived.title, 'After Edit');
+    assertStrictEquals(derived.title, 'After Edit');
     // The unchanged trio replays the SAME event, not a new one —
     // still one row in the derived history.
     const history = await deriveIdeaStateHistory(
         db, STARK_ORGANIZATION, ideaId,
     );
-    assert.equal(history.length, 1);
+    assertStrictEquals(history.length, 1);
 });
 
-test(
+Deno.test(
     'a deleted idea disappears from the list and 404s by id',
     async () => {
         const db = await seededDb();
@@ -127,14 +131,14 @@ test(
         const res = await putIdea(
             db, token, ideaId, 'Doomed', 'deleted',
         );
-        assert.equal(res.status, 201);
+        assertStrictEquals(res.status, 201);
 
         const ideas = await deriveIdeas(db, STARK_ORGANIZATION);
-        assert.equal(
+        assertStrictEquals(
             ideas.some((idea) => idea.id === ideaId),
             false,
         );
-        await assert.rejects(
+        await assertRejects(
             () => deriveIdea(
                 db, STARK_ORGANIZATION, ideaId,
             ),
@@ -143,7 +147,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'a later deleted PUT tombs the idea',
     async () => {
         const db = await seededDb();
@@ -157,13 +161,13 @@ test(
             db, token, ideaId, 'Tomb Title',
             'deleted',
         );
-        assert.equal(res.status, 201);
+        assertStrictEquals(res.status, 201);
         const ideas = await deriveIdeas(db, STARK_ORGANIZATION);
-        assert.equal(
+        assertStrictEquals(
             ideas.some((idea) => idea.id === ideaId),
             false,
         );
-        await assert.rejects(
+        await assertRejects(
             () => deriveIdea(
                 db, STARK_ORGANIZATION, ideaId,
             ),
@@ -172,13 +176,13 @@ test(
         const history = await deriveIdeaStateHistory(
             db, STARK_ORGANIZATION, ideaId,
         );
-        assert.equal(history.length, 2);
-        assert.equal(history[0]!.state, 'active');
-        assert.equal(history[1]!.state, 'deleted');
+        assertStrictEquals(history.length, 2);
+        assertStrictEquals(history[0]!.state, 'active');
+        assertStrictEquals(history[1]!.state, 'deleted');
     },
 );
 
-test('ordering is oldest live head (at, id)', async () => {
+Deno.test('ordering is oldest live head (at, id)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ids = [
@@ -195,10 +199,10 @@ test('ordering is oldest live head (at, id)', async () => {
     const observed = derived
         .map((idea) => idea.id)
         .filter((id) => ids.includes(id));
-    assert.deepEqual(observed, ids);
+    assertEquals(observed, ids);
 });
 
-test(
+Deno.test(
     'the synthesized genesis equals the actual states genesis '
     + 'row field-for-field',
     async () => {
@@ -211,6 +215,6 @@ test(
         const derivedHistory = await deriveIdeaStateHistory(
             db, STARK_ORGANIZATION, ideaId,
         );
-        assert.ok(derivedHistory.length >= 1);
+        assert(derivedHistory.length >= 1);
     },
 );

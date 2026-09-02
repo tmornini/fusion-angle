@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     GET, PUT, handleRequest,
@@ -27,43 +31,47 @@ async function freshDb() {
 
 // The verb fns always attach a Bearer header, so the
 // missing-header path is reachable only via handleRequest.
-test('rejects a request with no Authorization header',
+Deno.test('rejects a request with no Authorization header',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(
         db, new Request(
             `${BASE}/organizations/AjdvjuECVZEgZoFajaIEkg/members/`));
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
     const body = await res.json() as { error: string };
-    assert.equal(body.error, 'invalid_token');
+    assertStrictEquals(body.error, 'invalid_token');
 });
 
-test('protected route accepts a valid token', async () => {
+Deno.test('protected route accepts a valid token', async () => {
     const db = await freshDb();
     const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
         + '', await devToken());
-    assert.ok(Array.isArray(rows));
+    assert(Array.isArray(rows));
 });
 
-test('rejects an expired token', async () => {
+Deno.test('rejects an expired token', async () => {
     const db = await freshDb();
-    await assert.rejects(
+    await assertRejects(
         async () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , await expiredToken()),
-        /invalid_token/);
+        Error,
+        'invalid_token',
+    );
 });
 
-test('rejects a not-yet-valid token', async () => {
+Deno.test('rejects a not-yet-valid token', async () => {
     const db = await freshDb();
-    await assert.rejects(
+    await assertRejects(
         async () => GET(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
             await notYetValidToken(),
         ),
-        /invalid_token/);
+        Error,
+        'invalid_token',
+    );
 });
 
-test('rejects the anonymous principal on a protected route',
+Deno.test('rejects the anonymous principal on a protected route',
 async () => {
     const db = await freshDb();
     const anon = await mintAccessToken({
@@ -72,9 +80,13 @@ async () => {
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: generateIdentifier(),
     });
-    await assert.rejects(
-        () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', anon)
-            , /invalid_token/);
+    await assertRejects(
+        () => GET(
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', anon,
+        ),
+        Error,
+        'invalid_token',
+    );
 });
 
 // Per-request access-token revocation is RETIRED. Mint /
@@ -83,7 +95,7 @@ async () => {
 // the NAMED staleness covenant. These cases pin that access
 // GETs are NOT blocked by the revocation ledger mid-token.
 
-test('a logout-everywhere does not kill a live access token',
+Deno.test('a logout-everywhere does not kill a live access token',
 async () => {
     const db = await freshDb();
     // Claim-bearing access token: fence uses claim orgs/roles,
@@ -107,14 +119,14 @@ async () => {
         await devToken(),
     );
     // Still admitted — revocation bites at next mint/exchange.
-    assert.deepEqual(
+    assertEquals(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', live),
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , await devToken()),
     );
 });
 
-test('a token minted within a revocation second still'
+Deno.test('a token minted within a revocation second still'
 + ' works until exp', async () => {
     const db = await freshDb();
     const revokedAt = '2021-01-01T00:00:00.900000Z';
@@ -137,10 +149,10 @@ test('a token minted within a revocation second still'
     const rows = await GET<unknown[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', sameSecond,
     );
-    assert.ok(Array.isArray(rows));
+    assert(Array.isArray(rows));
 });
 
-test('a jti revoked in the ledger still admits the access'
+Deno.test('a jti revoked in the ledger still admits the access'
 + ' token until exp', async () => {
     const db = await freshDb();
     await PUT(
@@ -168,5 +180,5 @@ test('a jti revoked in the ledger still admits the access'
     const rows = await GET<unknown[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', await devToken(),
     );
-    assert.ok(Array.isArray(rows));
+    assert(Array.isArray(rows));
 });

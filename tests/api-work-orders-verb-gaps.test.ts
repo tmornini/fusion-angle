@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -45,7 +44,7 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('PUT work-orders 405s (no put handler wired)',
+Deno.test('PUT work-orders 405s (no put handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -53,11 +52,11 @@ async () => {
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token
             , {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
 // Task 10: PATCH alphabet — no work-orders patch yet.
-test('PATCH organizations/:id/work-orders/:id 405s (no patch handler'
+Deno.test('PATCH organizations/:id/work-orders/:id 405s (no patch handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -65,10 +64,10 @@ test('PATCH organizations/:id/work-orders/:id 405s (no patch handler'
         'PATCH', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE work-orders 405s (no delete handler wired)',
+Deno.test('DELETE work-orders 405s (no delete handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -76,21 +75,21 @@ async () => {
         db, req('DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + '', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST organizations/:id/work-orders/:id 405s (no post handler wired)',
-async () => {
+Deno.test('POST organizations/:id/work-orders/:id 405s (no post handler'
++ ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/work-orders/:id 405s'
+Deno.test('DELETE organizations/:id/work-orders/:id 405s'
     + ' (no delete handler wired)',
 async () => {
     const db = await freshDb();
@@ -100,10 +99,10 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('GET organizations/:id/work-orders/:id/claim 404s when unclaimed',
+Deno.test('GET organizations/:id/work-orders/:id/claim 404s when unclaimed',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -112,10 +111,10 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT organizations/:id/work-orders/:id/claim empty body is 400',
+Deno.test('PUT organizations/:id/work-orders/:id/claim empty body is 400',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -123,11 +122,11 @@ async () => {
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', token, {},
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('DELETE organizations/:id/work-orders/:id/claim 404s when unclaimed',
-async () => {
+Deno.test('DELETE organizations/:id/work-orders/:id/claim 404s when'
++ ' unclaimed', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -135,10 +134,10 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST organizations/:id/work-orders/:id/claim 405s (POST is gone)',
+Deno.test('POST organizations/:id/work-orders/:id/claim 405s (POST is gone)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -146,22 +145,22 @@ async () => {
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST organizations/:id/work-orders/:id/release 404s (address retired)',
-async () => {
+Deno.test('POST organizations/:id/work-orders/:id/release 404s (address'
++ ' retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/release', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('GET organizations/:id/work-orders/:id/transition 405s (no get handler'
-+ ' wired)', async () => {
+Deno.test('GET organizations/:id/work-orders/:id/transition 405s (no get'
++ ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -169,22 +168,22 @@ test('GET organizations/:id/work-orders/:id/transition 405s (no get handler'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/transition', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT organizations/:id/work-orders/:id/transition 405s (no put handler'
-+ ' wired)', async () => {
+Deno.test('PUT organizations/:id/work-orders/:id/transition 405s (no put'
++ ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/transition', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/work-orders/:id/transition 405s (no delete'
-+ ' handler wired)', async () => {
+Deno.test('DELETE organizations/:id/work-orders/:id/transition 405s (no'
++ ' delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -193,10 +192,10 @@ test('DELETE organizations/:id/work-orders/:id/transition 405s (no delete'
             + 'yNSSnbrpacodQTzUEcdEVA/transition',
             token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('GET organizations/:id/work-orders/:id/binding 405s (no get handler'
+Deno.test('GET organizations/:id/work-orders/:id/binding 405s (no get handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -205,32 +204,32 @@ test('GET organizations/:id/work-orders/:id/binding 405s (no get handler'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'xdaJyuuPyHfffCGLhqDrOQ/binding', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT organizations/:id/work-orders/:id/binding on a missing WO is 404',
-async () => {
+Deno.test('PUT organizations/:id/work-orders/:id/binding on a missing WO'
++ ' is 404', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'xdaJyuuPyHfffCGLhqDrOQ/binding', token, {},
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('POST organizations/:id/work-orders/:id/binding 405s (POST is gone)',
-async () => {
+Deno.test('POST organizations/:id/work-orders/:id/binding 405s (POST is'
++ ' gone)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'xdaJyuuPyHfffCGLhqDrOQ/binding', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/work-orders/:id/binding 405s (no delete'
+Deno.test('DELETE organizations/:id/work-orders/:id/binding 405s (no delete'
 + ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -239,10 +238,10 @@ test('DELETE organizations/:id/work-orders/:id/binding 405s (no delete'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'xdaJyuuPyHfffCGLhqDrOQ/binding', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST organizations/:id/flows/:id/work-orders 405s (no post handler'
+Deno.test('POST organizations/:id/flows/:id/work-orders 405s (no post handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -250,10 +249,10 @@ test('POST organizations/:id/flows/:id/work-orders 405s (no post handler'
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ/work-orders/', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT organizations/:id/flows/:id/work-orders 405s'
+Deno.test('PUT organizations/:id/flows/:id/work-orders 405s'
     + ' (no put handler wired)',
 async () => {
     const db = await freshDb();
@@ -262,11 +261,11 @@ async () => {
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ/work-orders/', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/flows/:id/work-orders 405s (no delete handler'
-+ ' wired)', async () => {
+Deno.test('DELETE organizations/:id/flows/:id/work-orders 405s (no'
++ ' delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -274,7 +273,7 @@ test('DELETE organizations/:id/flows/:id/work-orders 405s (no delete handler'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ/work-orders/', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
 // The DELETE 405 for this SAME address is already pinned in
@@ -284,8 +283,8 @@ test('DELETE organizations/:id/flows/:id/work-orders 405s (no delete handler'
 // that suite pinned it first, against the third-family
 // absorption.
 
-test('GET organizations/:id/flows/:id/work-orders/:woid 405s (no get handler'
-+ ' wired)', async () => {
+Deno.test('GET organizations/:id/flows/:id/work-orders/:woid 405s (no'
++ ' get handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -294,10 +293,10 @@ test('GET organizations/:id/flows/:id/work-orders/:woid 405s (no get handler'
             + 'ZOousbbnzpqlxJExVAruYQ/work-orders/yNSSnbrpacodQTzUEcdEVA'
             , token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST organizations/:id/flows/:id/work-orders/:woid'
+Deno.test('POST organizations/:id/flows/:id/work-orders/:woid'
     + ' 405s (no post handler'
 + ' wired)', async () => {
     const db = await freshDb();
@@ -307,5 +306,5 @@ test('POST organizations/:id/flows/:id/work-orders/:woid'
             + 'ZOousbbnzpqlxJExVAruYQ/work-orders/yNSSnbrpacodQTzUEcdEVA'
             , token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });

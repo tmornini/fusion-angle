@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 
 // url-params.ts -> location.ts reads window.location.search.
 // Stub a minimal window so getUrlParam/getUrlParams work.
@@ -19,27 +18,27 @@ const {
 
 // --- buildQueryString (pure) ---
 
-test('buildQueryString encodes a single param', () => {
-    assert.equal(
+Deno.test('buildQueryString encodes a single param', () => {
+    assertStrictEquals(
         buildQueryString({ id: 'abc' }),
         'id=abc',
     );
 });
 
-test('buildQueryString joins multiple params', () => {
-    assert.equal(
+Deno.test('buildQueryString joins multiple params', () => {
+    assertStrictEquals(
         buildQueryString({ a: '1'
             , b: '2' }),
         'a=1&b=2',
     );
 });
 
-test('buildQueryString returns empty for no params', () => {
-    assert.equal(buildQueryString({}), '');
+Deno.test('buildQueryString returns empty for no params', () => {
+    assertStrictEquals(buildQueryString({}), '');
 });
 
-test('buildQueryString percent-encodes values', () => {
-    assert.equal(
+Deno.test('buildQueryString percent-encodes values', () => {
+    assertStrictEquals(
         buildQueryString({ q: 'a b&c' }),
         'q=a+b%26c',
     );
@@ -47,43 +46,43 @@ test('buildQueryString percent-encodes values', () => {
 
 // --- getUrlParam (reads stubbed window) ---
 
-test('getUrlParam returns the named value', () => {
+Deno.test('getUrlParam returns the named value', () => {
     setSearch('?id=42&tab=details');
-    assert.equal(getUrlParam('id'), '42');
-    assert.equal(getUrlParam('tab'), 'details');
+    assertStrictEquals(getUrlParam('id'), '42');
+    assertStrictEquals(getUrlParam('tab'), 'details');
 });
 
-test('getUrlParam returns null for absent param', () => {
+Deno.test('getUrlParam returns null for absent param', () => {
     setSearch('?id=42');
-    assert.equal(getUrlParam('missing'), null);
+    assertStrictEquals(getUrlParam('missing'), null);
 });
 
-test('getUrlParam returns null for empty search', () => {
+Deno.test('getUrlParam returns null for empty search', () => {
     setSearch('');
-    assert.equal(getUrlParam('id'), null);
+    assertStrictEquals(getUrlParam('id'), null);
 });
 
-test('getUrlParam decodes percent-encoded values', () => {
+Deno.test('getUrlParam decodes percent-encoded values', () => {
     setSearch('?q=a%20b');
-    assert.equal(getUrlParam('q'), 'a b');
+    assertStrictEquals(getUrlParam('q'), 'a b');
 });
 
 // --- getUrlParams (reads stubbed window) ---
 
-test('getUrlParams returns all params as a record', () => {
+Deno.test('getUrlParams returns all params as a record', () => {
     setSearch('?id=42&tab=details');
-    assert.deepEqual(getUrlParams(), {
+    assertEquals(getUrlParams(), {
         id: '42',
         tab: 'details',
     });
 });
 
-test('getUrlParams returns empty record for empty search', () => {
+Deno.test('getUrlParams returns empty record for empty search', () => {
     setSearch('');
-    assert.deepEqual(getUrlParams(), {});
+    assertEquals(getUrlParams(), {});
 });
 
-test('getUrlParams last value wins on repeated key', () => {
+Deno.test('getUrlParams last value wins on repeated key', () => {
     setSearch('?id=1&id=2');
-    assert.deepEqual(getUrlParams(), { id: '2' });
+    assertEquals(getUrlParams(), { id: '2' });
 });

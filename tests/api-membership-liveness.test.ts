@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -35,7 +34,7 @@ async function deleteMembership(
                 'operation-id': TEST_OPERATION_ID,
             },
         }));
-    assert.equal(res.status, 204);
+    assertStrictEquals(res.status, 204);
 }
 
 function putDefaultOrganization(
@@ -63,32 +62,32 @@ async function adminDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('a live member passes the membership fence',
+Deno.test('a live member passes the membership fence',
 async () => {
     const db = await adminDb();
     const res = await handleRequest(
         db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , await organizationToken()));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
 });
 
-test('a revoked membership does not stop access mid-token',
+Deno.test('a revoked membership does not stop access mid-token',
 async () => {
     const db = await adminDb();
     const token = await organizationToken();
     const before = await handleRequest(
         db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/', token));
-    assert.equal(before.status, 200);
+    assertStrictEquals(before.status, 200);
     // Claim-based fence: de-membership lands on the message plane
     // but the existing token's organizations claim still holds
     // until mint/refresh/exchange or exp.
     await deleteMembership(db, 'XXZruirZyAOoRpNxaDnpSA');
     const after = await handleRequest(
         db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/', token));
-    assert.equal(after.status, 200);
+    assertStrictEquals(after.status, 200);
 });
 
-test('a flat token denies when SET is not a live seat'
+Deno.test('a flat token denies when SET is not a live seat'
 + ' and no PRIMARY remains',
 async () => {
     const db = await adminDb();
@@ -98,10 +97,10 @@ async () => {
     const pin = await handleRequest(db, putDefaultOrganization(
         await devToken(), 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
     ));
-    assert.equal(pin.status, 201);
+    assertStrictEquals(pin.status, 201);
     await deleteMembership(db, 'XXZruirZyAOoRpNxaDnpSA');
     const res = await handleRequest(
         db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , await devToken()));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
 });

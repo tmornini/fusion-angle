@@ -1,5 +1,6 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals, assertRejects, assertStrictEquals,
+} from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 
 const aMessagePair = {
@@ -15,7 +16,7 @@ const aMessagePair = {
     operation_id: '0123456789ABCDEFGHIJKw',
 };
 
-test(
+Deno.test(
     'a view commits writes atomically',
     async () => {
         const db = memoryDbAdapter();
@@ -31,16 +32,16 @@ test(
         const messagePair = await db.messagePairs.getById(
             'syWUUcdBSbBgMwBiCrgbDw',
         );
-        assert.equal(messagePair.id, 'syWUUcdBSbBgMwBiCrgbDw');
+        assertStrictEquals(messagePair.id, 'syWUUcdBSbBgMwBiCrgbDw');
     },
 );
 
-test(
+Deno.test(
     'a throw inside the view rolls back',
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        await assert.rejects(
+        await assertRejects(
             () => db.transaction(
                 ['message_pairs'],
                 async (view) => {
@@ -50,14 +51,14 @@ test(
                     throw new Error('boom');
                 },
             ),
-            /boom/,
+            Error, 'boom',
         );
         const messagePairs = await db.messagePairs.getAll();
-        assert.deepEqual(messagePairs, []);
+        assertEquals(messagePairs, []);
     },
 );
 
-test(
+Deno.test(
     'stores in the view share one uncommitted buffer',
     async () => {
         const db = memoryDbAdapter();
@@ -73,12 +74,12 @@ test(
                 return view.messagePairs.getAll();
             },
         );
-        assert.equal(seen.length, 1);
-        assert.equal(seen[0]!.id, 'syWUUcdBSbBgMwBiCrgbDw');
+        assertStrictEquals(seen.length, 1);
+        assertStrictEquals(seen[0]!.id, 'syWUUcdBSbBgMwBiCrgbDw');
     },
 );
 
-test(
+Deno.test(
     'a nested view transaction joins the open tx',
     async () => {
         const db = memoryDbAdapter();
@@ -99,16 +100,16 @@ test(
         const messagePair = await db.messagePairs.getById(
             'syWUUcdBSbBgMwBiCrgbDw',
         );
-        assert.equal(messagePair.id, 'syWUUcdBSbBgMwBiCrgbDw');
+        assertStrictEquals(messagePair.id, 'syWUUcdBSbBgMwBiCrgbDw');
     },
 );
 
-test(
+Deno.test(
     'a nested write rolls back with the outer tx',
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        await assert.rejects(
+        await assertRejects(
             () => db.transaction(
                 ['message_pairs'],
                 async (view) => {
@@ -123,20 +124,20 @@ test(
                     throw new Error('boom');
                 },
             ),
-            /boom/,
+            Error, 'boom',
         );
-        assert.deepEqual(
+        assertEquals(
             await db.messagePairs.getAll(), [],
         );
     },
 );
 
-test(
+Deno.test(
     'a nested out-of-scope table throws a clear error',
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        await assert.rejects(
+        await assertRejects(
             () => db.transaction(
                 ['message_pairs'],
                 async (view) => {
@@ -146,12 +147,12 @@ test(
                     );
                 },
             ),
-            /other/,
+            Error, 'other',
         );
     },
 );
 
-test(
+Deno.test(
     'reads work through readTransaction',
     async () => {
         const db = memoryDbAdapter();
@@ -161,32 +162,32 @@ test(
             ['message_pairs'],
             (view) => view.messagePairs.getAll(),
         );
-        assert.equal(seen.length, 1);
-        assert.equal(seen[0]!.id, 'syWUUcdBSbBgMwBiCrgbDw');
+        assertStrictEquals(seen.length, 1);
+        assertStrictEquals(seen[0]!.id, 'syWUUcdBSbBgMwBiCrgbDw');
     },
 );
 
-test(
+Deno.test(
     'a put through readTransaction rejects',
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        await assert.rejects(
+        await assertRejects(
             () => db.readTransaction(
                 ['message_pairs'],
                 (view) => view.messagePairs.put(
                     'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                 ),
             ),
-            /readonly transaction/,
+            Error, 'readonly transaction',
         );
-        assert.deepEqual(
+        assertEquals(
             await db.messagePairs.getAll(), [],
         );
     },
 );
 
-test(
+Deno.test(
     'nested readTransaction inside transaction re-enters',
     async () => {
         const db = memoryDbAdapter();
@@ -205,9 +206,9 @@ test(
                 );
             },
         );
-        assert.equal(seen.length, 1);
-        assert.equal(seen[0]!.id, 'syWUUcdBSbBgMwBiCrgbDw');
-        assert.equal(
+        assertStrictEquals(seen.length, 1);
+        assertStrictEquals(seen[0]!.id, 'syWUUcdBSbBgMwBiCrgbDw');
+        assertStrictEquals(
             (await db.messagePairs.getById('syWUUcdBSbBgMwBiCrgbDw')).id
                 , 'syWUUcdBSbBgMwBiCrgbDw',
         );

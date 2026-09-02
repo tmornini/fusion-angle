@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -66,7 +65,7 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('get returns the live PUT and ignores POST',
+Deno.test('get returns the live PUT and ignores POST',
 async () => {
     const db = await freshDb();
     const put = await writePair(db, {
@@ -82,10 +81,10 @@ async () => {
     const got = await messageStore(db).get(
         COLLECTION, 'XufQcWIKhZshfJYOVNeUSw',
     );
-    assert.equal(got?.id, put.id);
+    assertStrictEquals(got?.id, put.id);
 });
 
-test('get returns undefined when head is DELETE',
+Deno.test('get returns undefined when head is DELETE',
 async () => {
     const db = await freshDb();
     await writePair(db, {
@@ -100,10 +99,10 @@ async () => {
     const got = await messageStore(db).get(
         COLLECTION, 'XufQcWIKhZshfJYOVNeUSw',
     );
-    assert.equal(got, undefined);
+    assertStrictEquals(got, undefined);
 });
 
-test('getCollection is oldest live head first',
+Deno.test('getCollection is oldest live head first',
 async () => {
     const db = await freshDb();
     await writePair(db, {
@@ -119,13 +118,13 @@ async () => {
     const rows = await messageStore(db).getCollection(
         COLLECTION,
     );
-    assert.deepEqual(rows, [
+    assertEquals(rows, [
         { name: 'a' },
         { name: 'b' },
     ]);
 });
 
-test('getAllWhereBody matches one JSON fact',
+Deno.test('getAllWhereBody matches one JSON fact',
 async () => {
     const db = await freshDb();
     await writePair(db, {
@@ -140,6 +139,6 @@ async () => {
     });
     const hits = await messageStore(db)
         .getAllWhereBody(COLLECTION, { code: 'abc' });
-    assert.equal(hits.length, 1);
-    assert.equal(hits[0]!.uri_id, 'XufQcWIKhZshfJYOVNeUSw');
+    assertStrictEquals(hits.length, 1);
+    assertStrictEquals(hits[0]!.uri_id, 'XufQcWIKhZshfJYOVNeUSw');
 });

@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assert, assertMatch, assertStrictEquals } from '@std/assert';
 import { deriveIdeaStateHistory } from
     '../api/derive-ideas.ts';
-import assert from 'node:assert/strict';
 import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
@@ -248,14 +247,14 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             + 'hwpssRPdIjwzeMdYPAhqrw', org1Token,
         ideaPutBody('hwpssRPdIjwzeMdYPAhqrw', 'Invariant Idea'),
     ));
-    assert.equal(firstIdea.status, 201);
+    assertStrictEquals(firstIdea.status, 201);
     const secondIdea = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'hwpssRPdIjwzeMdYPAhqrw', org1Token,
         ideaPutBody('hwpssRPdIjwzeMdYPAhqrw', 'Invariant Idea Revised'),
     ));
-    assert.equal(secondIdea.status, 201);
-    assert.equal(
+    assertStrictEquals(secondIdea.status, 201);
+    assertStrictEquals(
         secondIdea.headers.get('Supersedes'), null,
     );
 
@@ -268,7 +267,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             state: 'in_review',
         },
     ));
-    assert.equal(stateAppend.status, 201);
+    assertStrictEquals(stateAppend.status, 201);
 
     // Create POST (records, org 2) — Task 4's bundle: the
     // operation message pair, its synthesized
@@ -292,7 +291,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             }],
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     // DELETE — a fresh PUT then its tombstone (records, org 2).
     const recordPut = await handleRequest(db, req(
@@ -302,12 +301,12 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             'ilBpwTboUzfhEGOmnoFkiQ', 'Invariant Record', ORGANIZATION_TWO,
         ),
     ));
-    assert.equal(recordPut.status, 201);
+    assertStrictEquals(recordPut.status, 201);
     const recordDeleted = await handleRequest(db, req(
         'DELETE', '/organizations/' + ORGANIZATION_TWO
             + '/record-types/ilBpwTboUzfhEGOmnoFkiQ', org2Token,
     ));
-    assert.equal(recordDeleted.status, 204);
+    assertStrictEquals(recordDeleted.status, 204);
 
     // Entity PUT (work-orders, org 1) — the entity-PUT hash path,
     // shared code but never route-exercised in this mixed batch
@@ -317,7 +316,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             + 'jAzfROfUUwRELEudEFwdGw', org1Token,
         workOrderFields('INV-WO-1', STARK_ORGANIZATION),
     ));
-    assert.equal(workOrderPut.status, 201);
+    assertStrictEquals(workOrderPut.status, 201);
 
     // Operation POST (identity-tokens — global, not org-
     // nested): revoke a pre-seeded chain. The seed itself rides
@@ -335,14 +334,14 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             action: 'issued', chain_id: INV_CHAIN_1, at: AT,
         },
     ));
-    assert.equal(tokenRootPut.status, 201);
+    assertStrictEquals(tokenRootPut.status, 201);
     const revoked = await handleRequest(db, req(
         'POST',
         '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/hwrugEJrEVicRwurEJxFvw/'
             + 'revocation',
         org1Token, {},
     ));
-    assert.equal(revoked.status, 201);
+    assertStrictEquals(revoked.status, 201);
 
     // Genesis document PUT (flows, org 1) — a fresh id needs no
     // If-Match under the locked class.
@@ -351,7 +350,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             + 'hoKOMoVEGhFjVEMIIFBbOQ', org1Token,
         flowDocumentBody('Invariant Flow', INV_FLOW_1_EV),
     ));
-    assert.equal(flowGenesis.status, 201);
+    assertStrictEquals(flowGenesis.status, 201);
 
     // Work-order CREATE (org 1) — a genesis POST, joined to the
     // flow just created above: three pairs land (the
@@ -367,7 +366,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             'hoKOMoVEGhFjVEMIIFBbOQ', STARK_ORGANIZATION,
         ),
     ));
-    assert.equal(workOrderCreated.status, 201);
+    assertStrictEquals(workOrderCreated.status, 201);
 
     // A FAILED write: 404 on an unknown route — must add
     // nothing to either table. (A claim conflict 409 still
@@ -380,18 +379,18 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             at: '2026-02-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(failed.status, 404);
+    assertStrictEquals(failed.status, 404);
 
     return db;
 }
 
-test('every stored request message re-hashes to its own'
+Deno.test('every stored request message re-hashes to its own'
 + ' message_hash', async () => {
     const db = await seededWithMixedBatch();
     const requests = await db.messagePairs.getAll();
-    assert.ok(requests.length > 0);
+    assert(requests.length > 0);
     for (const row of requests) {
-        assert.equal(
+        assertStrictEquals(
             await requestMessageHash(row.request),
             row.request_hash,
             'requests row ' + row.id + ' hash mismatch',
@@ -409,15 +408,15 @@ test('every stored request message re-hashes to its own'
 const BEARER_JWT =
     /Bearer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/;
 
-test('stored request messages carry the live bearer JWT',
+Deno.test('stored request messages carry the live bearer JWT',
 async () => {
     const db = await seededWithMixedBatch();
     const requests = await db.messagePairs.getAll();
-    assert.ok(requests.length > 0);
+    assert(requests.length > 0);
     const withBearer = requests.filter(
         row => BEARER_JWT.test(row.request),
     );
-    assert.ok(
+    assert(
         withBearer.length > 0,
         'no stored request carried a bearer JWT',
     );
@@ -426,7 +425,7 @@ async () => {
 const RFC3339_ZULU_MICROS =
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 
-test('every pair\'s envelope timestamps are RFC-3339 zulu'
+Deno.test('every pair\'s envelope timestamps are RFC-3339 zulu'
 + ' with 6-digit sub-second precision, and the request'
 + ' strictly precedes its own response', async () => {
     const db = await seededWithMixedBatch();
@@ -434,19 +433,19 @@ test('every pair\'s envelope timestamps are RFC-3339 zulu'
     const responsesById = new Map(
         (await db.messagePairs.getAll()).map(r => [r.id, r]),
     );
-    assert.ok(requests.length > 0);
+    assert(requests.length > 0);
     for (const request of requests) {
-        assert.match(
+        assertMatch(
             request.request_at, RFC3339_ZULU_MICROS,
             'request ' + request.id + ' at is malformed',
         );
         const response = responsesById.get(request.id);
-        assert.ok(response, 'no response for ' + request.id);
-        assert.match(
+        assert(response, 'no response for ' + request.id);
+        assertMatch(
             response!.response_at, RFC3339_ZULU_MICROS,
             'response ' + request.id + ' at is malformed',
         );
-        assert.ok(
+        assert(
             request.request_at < response!.response_at,
             'pair ' + request.id + ' response at does not'
                 + ' strictly follow its request at',
@@ -459,7 +458,7 @@ test('every pair\'s envelope timestamps are RFC-3339 zulu'
 // reproduce the entity's ACTUAL genesis row on the states
 // ledger — proof the shadow-ledger request is not merely
 // present but semantically faithful to what was really written.
-test('a seeded idea\'s create-pair request reproduces its'
+Deno.test('a seeded idea\'s create-pair request reproduces its'
 + ' actual genesis row in states', async () => {
     const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
@@ -470,7 +469,7 @@ test('a seeded idea\'s create-pair request reproduces its'
                 === `/organizations/${STARK_ORGANIZATION}`
                     + '/ideas/',
     );
-    assert.ok(createRow, 'no create pair for the seeded idea');
+    assert(createRow, 'no create pair for the seeded idea');
     const parsed = messagePairJsonOf(createRow!.request) as {
         body: {
             state: string;
@@ -480,7 +479,7 @@ test('a seeded idea\'s create-pair request reproduces its'
         db, STARK_ORGANIZATION, idea.id,
     );
     const genesis = history[0];
-    assert.ok(genesis, 'derived state missing');
-    assert.equal(genesis.entity_id, idea.id);
-    assert.equal(genesis.state, parsed.body.state);
+    assert(genesis, 'derived state missing');
+    assertStrictEquals(genesis.entity_id, idea.id);
+    assertStrictEquals(genesis.state, parsed.body.state);
 });

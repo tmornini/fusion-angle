@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { nowUtc } from '../api/types.ts';
@@ -175,7 +180,7 @@ async function bulkRowsFor(
     );
 }
 
-test('workOrderLifecycleStatesFor: birth-claimed create alone'
+Deno.test('workOrderLifecycleStatesFor: birth-claimed create alone'
 + ' matches the bulk subset AND the row-plane oracle', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -198,20 +203,20 @@ test('workOrderLifecycleStatesFor: birth-claimed create alone'
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const scoped = sortByAtId(
         await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.equal(scoped.length, 3);
-    assert.deepEqual(scoped, await bulkRowsFor(db, workOrderId));
+    assertStrictEquals(scoped.length, 3);
+    assertEquals(scoped, await bulkRowsFor(db, workOrderId));
     // Phase Final Task 2: states ROW half stripped — no
     // row-plane oracle.
 });
 
-test('workOrderLifecycleStatesFor: a full chain — birth, a'
+Deno.test('workOrderLifecycleStatesFor: a full chain — birth, a'
 + ' transition with field values, a releasing transition, an'
 + ' entity PUT, a fresh re-claim, and an idempotent re-claim —'
 + ' matches the bulk subset AND the row-plane oracle at the end',
@@ -237,7 +242,7 @@ async () => {
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     // Task 8 CUT: legacy fieldValues below the gate
     // (stored-data fold; live wire rejects the key).
@@ -276,7 +281,7 @@ async () => {
             transitionAt: transition2At,
         },
     ));
-    assert.equal(transition2.status, 201);
+    assertStrictEquals(transition2.status, 201);
 
     const entityPut = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -286,7 +291,7 @@ async () => {
             position: 2,
         },
     ));
-    assert.equal(entityPut.status, 201);
+    assertStrictEquals(entityPut.status, 201);
 
     const claimFreshAt = nowUtc();
     const claimFresh = await handleRequest(db, req(
@@ -299,7 +304,7 @@ async () => {
             expireAt: claimFreshAt,
         },
     ));
-    assert.equal(claimFresh.status, 201);
+    assertStrictEquals(claimFresh.status, 201);
 
     const claimRepeatAt = nowUtc();
     const claimRepeat = await handleRequest(db, req(
@@ -312,7 +317,7 @@ async () => {
             expireAt: claimRepeatAt,
         },
     ));
-    assert.equal(claimRepeat.status, 201);
+    assertStrictEquals(claimRepeat.status, 201);
 
     // birth(3) + transition1(1) + transition2(2) + PUT(0) +
     // fresh claim(1) + idempotent repeat(0) = 7.
@@ -321,8 +326,8 @@ async () => {
             db, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.equal(scoped.length, 7);
-    assert.deepEqual(scoped, await bulkRowsFor(db, workOrderId));
+    assertStrictEquals(scoped.length, 7);
+    assertEquals(scoped, await bulkRowsFor(db, workOrderId));
     // Phase Final Task 2: states ROW half stripped — no
     // row-plane oracle.
 });
@@ -334,7 +339,7 @@ async () => {
 // event and matches the bulk subset. Claim history sees the
 // same row (it rides the replayed half, not gate 5a's states
 // address).
-test('workOrderLifecycleStatesFor: a release op\'s'
+Deno.test('workOrderLifecycleStatesFor: a release op\'s'
 + ' claim_released is INCLUDED, matching'
 + ' deriveWorkOrderLifecycle\'s own bulk subset — claim-history'
 + ' sees it too', async () => {
@@ -359,7 +364,7 @@ test('workOrderLifecycleStatesFor: a release op\'s'
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const release = await handleRequest(db, req(
         'DELETE',
@@ -367,27 +372,27 @@ test('workOrderLifecycleStatesFor: a release op\'s'
             + '/claim',
         token,
     ));
-    assert.equal(release.status, 204);
+    assertStrictEquals(release.status, 204);
 
     const scoped = sortByAtId(
         await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.equal(scoped.length, 4);
-    assert.deepEqual(scoped, await bulkRowsFor(db, workOrderId));
+    assertStrictEquals(scoped.length, 4);
+    assertEquals(scoped, await bulkRowsFor(db, workOrderId));
     const released = scoped.find(
         (row) => row.state === 'claim_released',
     );
-    assert.ok(released !== undefined);
-    assert.equal(released!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assert(released !== undefined);
+    assertStrictEquals(released!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
     const claimHistory = sortByAtId(
         await workOrderClaimHistoryFor(
             db, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.equal(claimHistory.length, 4);
-    assert.ok(
+    assertStrictEquals(claimHistory.length, 4);
+    assert(
         claimHistory.some(
             (row) => row.state === 'claim_released',
         ),
@@ -398,7 +403,7 @@ test('workOrderLifecycleStatesFor: a release op\'s'
 // The claim gate's OWN source (Phase 14 Task 4): release rides
 // the replayed half, so claim history includes it; a later
 // reclaim sees the release and appends a fresh claimed.
-test('workOrderClaimHistoryFor: a release op\'s claim_released'
+Deno.test('workOrderClaimHistoryFor: a release op\'s claim_released'
 + ' is included, and a later reclaim sees the release',
 async () => {
     const db = await seededDb();
@@ -422,7 +427,7 @@ async () => {
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const release = await handleRequest(db, req(
         'DELETE',
@@ -430,15 +435,15 @@ async () => {
             + '/claim',
         token,
     ));
-    assert.equal(release.status, 204);
+    assertStrictEquals(release.status, 204);
 
     const afterRelease = sortByAtId(
         await workOrderClaimHistoryFor(
             db, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.equal(afterRelease.length, 4);
-    assert.deepEqual(
+    assertStrictEquals(afterRelease.length, 4);
+    assertEquals(
         afterRelease.slice(0, 3).map((row) => row.id),
         [
             WORKORDERID_EV1,
@@ -446,8 +451,10 @@ async () => {
             WORKORDERID_EV3,
         ],
     );
-    assert.equal(afterRelease.at(-1)?.state, 'claim_released');
-    assert.equal(afterRelease.at(-1)?.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(afterRelease.at(-1)?.state, 'claim_released');
+    assertStrictEquals(
+        afterRelease.at(-1)?.member_id, 'XXZruirZyAOoRpNxaDnpSA',
+    );
 
     const claimAt = nowUtc();
     const reclaim = await handleRequest(db, req(
@@ -460,14 +467,14 @@ async () => {
             expireAt: claimAt,
         },
     ));
-    assert.equal(reclaim.status, 201);
+    assertStrictEquals(reclaim.status, 201);
 
     const afterReclaim = sortByAtId(
         await workOrderClaimHistoryFor(
             db, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.deepEqual(
+    assertEquals(
         afterReclaim.map((row) => row.state),
         [
             N_START, N_MIDDLE, 'claimed',
@@ -476,15 +483,13 @@ async () => {
     );
 });
 
-test('workOrderLifecycleStatesFor: a never-created work-order id'
+Deno.test('workOrderLifecycleStatesFor: a never-created work-order id'
 + ' derives an empty array, no throw', async () => {
     const db = await seededDb();
-    await assert.doesNotReject(
-        () => workOrderLifecycleStatesFor(
-            db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
-        ),
+    await workOrderLifecycleStatesFor(
+        db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
     );
-    assert.deepEqual(
+    assertEquals(
         await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
         ),
@@ -496,7 +501,7 @@ test('workOrderLifecycleStatesFor: a never-created work-order id'
 // field_values from transition pairs (DESC; index 0 current).
 // Transition rows carry {id, attribute_id, value}; claim/
 // birth/release rows carry []. Empty → missedReadError.
-test('workOrderHistoryFor: folds field_values onto transition'
+Deno.test('workOrderHistoryFor: folds field_values onto transition'
 + ' events, [] on claim/birth/release, DESC current-first',
 async () => {
     const db = await seededDb();
@@ -520,7 +525,7 @@ async () => {
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     // Task 8 CUT: legacy fieldValues below the gate.
     const transitionAt = nowUtc();
@@ -557,24 +562,24 @@ async () => {
             + '/claim',
         token,
     ));
-    assert.equal(release.status, 204);
+    assertStrictEquals(release.status, 204);
 
     const history = await workOrderHistoryFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
     // birth(3) + transition(1) + release(1) = 5, DESC.
-    assert.equal(history.length, 5);
-    assert.equal(history[0]!.state, 'claim_released');
-    assert.deepEqual(history[0]!.field_values, []);
+    assertStrictEquals(history.length, 5);
+    assertStrictEquals(history[0]!.state, 'claim_released');
+    assertEquals(history[0]!.field_values, []);
 
     const transitionRow = history.find(
         (row) => row.id === WORKORDERID_TE1,
     );
-    assert.ok(transitionRow !== undefined);
-    assert.equal(transitionRow!.state, N_MIDDLE);
+    assert(transitionRow !== undefined);
+    assertStrictEquals(transitionRow!.state, N_MIDDLE);
     // Field values sorted by id ascending (stateFieldValuesFrom
     // parity).
-    assert.deepEqual(transitionRow!.field_values, [
+    assertEquals(transitionRow!.field_values, [
         {
             id: WORKORDERID_FV1,
             attribute_id: ATTR_SEVERITY,
@@ -590,9 +595,9 @@ async () => {
     const claimed = history.find(
         (row) => row.id === WORKORDERID_EV3,
     );
-    assert.ok(claimed !== undefined);
-    assert.equal(claimed!.state, 'claimed');
-    assert.deepEqual(claimed!.field_values, []);
+    assert(claimed !== undefined);
+    assertStrictEquals(claimed!.state, 'claimed');
+    assertEquals(claimed!.field_values, []);
 
     // ASC lifecycle without fold matches history without
     // field_values, reversed.
@@ -601,7 +606,7 @@ async () => {
             db, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.deepEqual(
+    assertEquals(
         history.map((row) => ({
             id: row.id,
             entity_id: row.entity_id,
@@ -613,16 +618,17 @@ async () => {
     );
 });
 
-test('workOrderHistoryFor: empty lifecycle throws'
+Deno.test('workOrderHistoryFor: empty lifecycle throws'
 + ' EntityNotFoundError for an absent id', async () => {
     const db = await seededDb();
-    await assert.rejects(
+    const err = await assertRejects(
         () => workOrderHistoryFor(
             db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
         ),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message
-                === 'Not found: work_orders/oYnbiWXzroVnyolOhmkBIQ',
+    ) as Error;
+    assertInstanceOf(err, EntityNotFoundError);
+    assertStrictEquals(
+        err.message,
+        'Not found: work_orders/oYnbiWXzroVnyolOhmkBIQ',
     );
 });

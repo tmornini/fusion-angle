@@ -1,10 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     subscribeEventListener,
 } from '../web-app/app/adapters/event-listener.ts';
 
-test('subscribeEventListener adds; the returned fn removes',
+Deno.test('subscribeEventListener adds; the returned fn removes',
     () => {
         const target = new EventTarget();
         let fired = 0;
@@ -12,8 +11,8 @@ test('subscribeEventListener adds; the returned fn removes',
             target, 'ping', () => { fired += 1; },
         );
         target.dispatchEvent(new Event('ping'));
-        assert.equal(fired, 1);
+        assertStrictEquals(fired, 1);
         unsubscribe();
         target.dispatchEvent(new Event('ping'));
-        assert.equal(fired, 1);
+        assertStrictEquals(fired, 1);
     });

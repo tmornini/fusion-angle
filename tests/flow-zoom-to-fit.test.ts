@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     fitBoxToCanvas,
     nodeBoundsBox,
@@ -13,11 +12,11 @@ const CANVAS_W = 1200;
 const CANVAS_H = 800;
 const PANEL = 288;
 
-test('nodeBoundsBox returns null for empty input', () => {
-    assert.equal(nodeBoundsBox([]), null);
+Deno.test('nodeBoundsBox returns null for empty input', () => {
+    assertStrictEquals(nodeBoundsBox([]), null);
 });
 
-test(
+Deno.test(
     'nodeBoundsBox spans every node rectangle'
     + ' (position to position + node size)',
     () => {
@@ -25,15 +24,15 @@ test(
             { x: -200, y: -100 },
             { x: 200, y: 100 },
         ]);
-        assert.ok(box);
-        assert.equal(box.minX, -200);
-        assert.equal(box.minY, -100);
-        assert.equal(box.maxX, 200 + NODE_WIDTH);
-        assert.equal(box.maxY, 100 + NODE_HEIGHT);
+        assert(box);
+        assertStrictEquals(box.minX, -200);
+        assertStrictEquals(box.minY, -100);
+        assertStrictEquals(box.maxX, 200 + NODE_WIDTH);
+        assertStrictEquals(box.maxY, 100 + NODE_HEIGHT);
     },
 );
 
-test(
+Deno.test(
     'fitBoxToCanvas with panelOffsetPx=0 reproduces'
     + ' today\'s full-canvas centered fit',
     () => {
@@ -44,21 +43,21 @@ test(
         const r = fitBoxToCanvas(
             box, CANVAS_W, CANVAS_H, 0,
         );
-        assert.ok(r);
+        assert(r);
         const cx =
             ((-200) + (200 + NODE_WIDTH)) / 2;
         const cy =
             ((-100) + (100 + NODE_HEIGHT)) / 2;
         const vb = r.viewBox;
-        assert.ok(
+        assert(
             Math.abs((vb.x + vb.w / 2) - cx)
                 < 0.001,
         );
-        assert.ok(
+        assert(
             Math.abs((vb.y + vb.h / 2) - cy)
                 < 0.001,
         );
-        assert.ok(
+        assert(
             Math.abs(
                 vb.w / vb.h
                 - CANVAS_W / CANVAS_H,
@@ -67,7 +66,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'fitBoxToCanvas with panel offset centers content'
     + ' in the right visible region (panel is'
     + ' on the left)',
@@ -79,13 +78,13 @@ test(
         const r = fitBoxToCanvas(
             box, CANVAS_W, CANVAS_H, PANEL,
         );
-        assert.ok(r);
+        assert(r);
         const cx =
             ((-300) + (300 + NODE_WIDTH)) / 2;
         const vb = r.viewBox;
         const pixelXOfContentCenter =
             (cx - vb.x) * CANVAS_W / vb.w;
-        assert.ok(
+        assert(
             Math.abs(
                 pixelXOfContentCenter
                 - (CANVAS_W + PANEL) / 2,
@@ -94,7 +93,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'fitBoxToCanvas with panel offset preserves'
     + ' canvas aspect ratio in viewBox',
     () => {
@@ -105,9 +104,9 @@ test(
         const r = fitBoxToCanvas(
             box, CANVAS_W, CANVAS_H, PANEL,
         );
-        assert.ok(r);
+        assert(r);
         const vb = r.viewBox;
-        assert.ok(
+        assert(
             Math.abs(
                 vb.w / vb.h
                 - CANVAS_W / CANVAS_H,
@@ -116,7 +115,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'fitBoxToCanvas with panel offset fits content'
     + ' in effectiveW pixels (width-bound)',
     () => {
@@ -127,7 +126,7 @@ test(
         const r = fitBoxToCanvas(
             box, CANVAS_W, CANVAS_H, PANEL,
         );
-        assert.ok(r);
+        assert(r);
         const vb = r.viewBox;
         const effectiveW = CANVAS_W - PANEL;
         const contentW =
@@ -136,7 +135,7 @@ test(
             contentW + 70 * 2;
         const contentPixelW =
             padded * CANVAS_W / vb.w;
-        assert.ok(
+        assert(
             Math.abs(contentPixelW - effectiveW)
                 < 0.5,
             'content width-bound: should fill'
@@ -145,7 +144,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'fitBoxToCanvas clamps zoom to MAX_ZOOM for'
     + ' tiny content with panel offset',
     () => {
@@ -155,12 +154,12 @@ test(
         const r = fitBoxToCanvas(
             box, CANVAS_W, CANVAS_H, PANEL,
         );
-        assert.ok(r);
-        assert.ok(r.zoom <= 2.0 + 0.001);
+        assert(r);
+        assert(r.zoom <= 2.0 + 0.001);
     },
 );
 
-test(
+Deno.test(
     'fitBoxToCanvas panel offset shifts content'
     + ' pixel position from full-canvas center'
     + ' to right-visible center (panel on left)',
@@ -175,8 +174,8 @@ test(
         const rOEPOcVMQdJiiiMuiiEhlg = fitBoxToCanvas(
             box, CANVAS_W, CANVAS_H, PANEL,
         );
-        assert.ok(r0);
-        assert.ok(rOEPOcVMQdJiiiMuiiEhlg);
+        assert(r0);
+        assert(rOEPOcVMQdJiiiMuiiEhlg);
         const cx =
             ((-100) + (100 + NODE_WIDTH)) / 2;
         const pixelX0 =
@@ -185,16 +184,16 @@ test(
         const pixelX1 =
             (cx - rOEPOcVMQdJiiiMuiiEhlg.viewBox.x)
                 * CANVAS_W / rOEPOcVMQdJiiiMuiiEhlg.viewBox.w;
-        assert.ok(
+        assert(
             Math.abs(pixelX0 - CANVAS_W / 2)
                 < 0.5,
         );
-        assert.ok(
+        assert(
             Math.abs(
                 pixelX1 - (CANVAS_W + PANEL) / 2,
             ) < 0.5,
         );
-        assert.ok(pixelX1 > pixelX0);
+        assert(pixelX1 > pixelX0);
     },
 );
 
@@ -204,7 +203,7 @@ test(
 // box carries edge/waypoint geometry that bows
 // below the lowest node. This is the property the
 // getBBox-measured bounds rely on.
-test(
+Deno.test(
     'fitBoxToCanvas viewBox contains a box that'
     + ' extends far beyond the node cluster',
     () => {
@@ -217,21 +216,21 @@ test(
         const r = fitBoxToCanvas(
             box, CANVAS_W, CANVAS_H, 0,
         );
-        assert.ok(r);
+        assert(r);
         const vb = r.viewBox;
-        assert.ok(
+        assert(
             vb.y <= box.minY + 0.001,
             'viewBox top covers box top',
         );
-        assert.ok(
+        assert(
             vb.y + vb.h >= box.maxY - 0.001,
             'viewBox bottom covers the low dip',
         );
-        assert.ok(
+        assert(
             vb.x <= box.minX + 0.001,
             'viewBox left covers box left',
         );
-        assert.ok(
+        assert(
             vb.x + vb.w >= box.maxX - 0.001,
             'viewBox right covers box right',
         );

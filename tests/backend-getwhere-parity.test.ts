@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { MemoryStorageBackend }
     from '../api/backend-memory.ts';
 import type { StorageBackend } from '../api/db.ts';
@@ -65,45 +64,45 @@ function byScan(
 }
 
 for (const { name, make } of BACKENDS) {
-    test(
+    Deno.test(
         `${name}: getWhere equals getAll filter for one`,
         async () => {
             const backend = make();
             await seed(backend, SAMPLE);
             const got = await byIndex(backend, 'y');
-            assert.deepEqual(got, await byScan(backend, 'y'));
-            assert.equal(got.length, 1);
+            assertEquals(got, await byScan(backend, 'y'));
+            assertStrictEquals(got.length, 1);
         },
     );
 
-    test(
+    Deno.test(
         `${name}: getWhere keeps order across N matches`,
         async () => {
             const backend = make();
             await seed(backend, SAMPLE);
             const got = await byIndex(backend, 'x');
-            assert.deepEqual(got, await byScan(backend, 'x'));
-            assert.deepEqual(got.map(r => r.id), ['a', 'c']);
+            assertEquals(got, await byScan(backend, 'x'));
+            assertEquals(got.map(r => r.id), ['a', 'c']);
         },
     );
 
-    test(
+    Deno.test(
         `${name}: getWhere is empty for an absent key`,
         async () => {
             const backend = make();
             await seed(backend, SAMPLE);
             const got = await byIndex(backend, 'z');
-            assert.deepEqual(got, await byScan(backend, 'z'));
-            assert.deepEqual(got, []);
+            assertEquals(got, await byScan(backend, 'z'));
+            assertEquals(got, []);
         },
     );
 
-    test(
+    Deno.test(
         `${name}: getWhere is empty on an empty table`,
         async () => {
             const backend = make();
             await seed(backend, []);
-            assert.deepEqual(await byIndex(backend, 'x'), []);
+            assertEquals(await byIndex(backend, 'x'), []);
         },
     );
 }

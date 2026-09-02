@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import {
     validateIdentityProviderEntity,
 } from '../api/validators.ts';
@@ -47,20 +52,20 @@ const goodRow = {
     at: '2026-06-03T00:00:00.000000Z',
 };
 
-test('validates an identity-provider link', () => {
-    assert.deepEqual(
+Deno.test('validates an identity-provider link', () => {
+    assertEquals(
         validateIdentityProviderEntity(goodRow), goodRow);
 });
 
-test('rejects an unknown action', () => {
-    assert.throws(() =>
+Deno.test('rejects an unknown action', () => {
+    assertThrows(() =>
         validateIdentityProviderEntity({
             ...goodRow, action: 'merged',
         }));
 });
 
-test('rejects an extra key', () => {
-    assert.throws(() =>
+Deno.test('rejects an extra key', () => {
+    assertThrows(() =>
         validateIdentityProviderEntity({
             ...goodRow, extra: 1,
         }));
@@ -69,17 +74,17 @@ test('rejects an extra key', () => {
 // Phase Final Stage B: identity_providers table retired —
 // store append pins live on message-plane document tests.
 
-test('an anonymous principal cannot read providers',
+Deno.test('an anonymous principal cannot read providers',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const anon = createRequestContext(
         db, await devToken('anonymous'));
-    await assert.rejects(() => getProvidersFor(anon
+    await assertRejects(() => getProvidersFor(anon
         , 'prBESZPjJDiuXCeZLmbiVw'));
 });
 
-test('linked providers are latest by at, not array order',
+Deno.test('linked providers are latest by at, not array order',
 async () => {
     const { db, ctx } = await adminCtx();
     // Appended in REVERSE chronological order: the later
@@ -97,12 +102,12 @@ async () => {
         ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw', action: 'unlinked',
         at: '2026-01-01T00:00:00.000000Z',
     });
-    assert.deepEqual(
+    assertEquals(
         await getProvidersFor(ctx, 'prBESZPjJDiuXCeZLmbiVw'), ['google']);
 });
 
 // G4: stored PUT = identityProviderEntityOf (GET derive).
-test('stored PUT body equals identityProviderEntityOf',
+Deno.test('stored PUT body equals identityProviderEntityOf',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -114,7 +119,7 @@ async () => {
         body: goodRow,
         operationId: TEST_OPERATION_ID,
     }));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const stored = JSON.parse(
         await storedPutBodyText(
             db, '/identities/XXZruirZyAOoRpNxaDnpSA/providers/', id,
@@ -126,16 +131,16 @@ async () => {
         method: 'PUT',
         body: goodRow,
     });
-    assert.equal(Object.keys(expected)[0], 'id');
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(
+    assertStrictEquals(Object.keys(expected)[0], 'id');
+    assertEquals(stored, expected);
+    assertEquals(
         stored, await deriveIdentityProvider(db, 'XXZruirZyAOoRpNxaDnpSA'
             , id),
     );
-    assert.deepEqual(stored, await put.json());
+    assertEquals(stored, await put.json());
 });
 
-test('GET stamps identity_id from the path when PUT omits it',
+Deno.test('GET stamps identity_id from the path when PUT omits it',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -153,35 +158,35 @@ async () => {
         body: withoutIdentity,
         operationId: TEST_OPERATION_ID,
     }));
-    assert.ok(put.status === 200 || put.status === 201);
+    assert(put.status === 200 || put.status === 201);
     const list = await handleRequest(db, apiRequest({
         method: 'GET',
         path: '/identities/XXZruirZyAOoRpNxaDnpSA/providers/',
         token: DEV_TOKEN,
         operationId: TEST_OPERATION_ID,
     }));
-    assert.equal(list.status, 200);
+    assertStrictEquals(list.status, 200);
     const rows = await list.json() as readonly {
         readonly id: string;
         readonly identity_id: string;
     }[];
     const row = rows.find(r => r.id === id);
-    assert.ok(row, 'omitted-id event is in the collection');
-    assert.equal(row.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assert(row, 'omitted-id event is in the collection');
+    assertStrictEquals(row.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
     const leaf = await handleRequest(db, apiRequest({
         method: 'GET',
         path: '/identities/XXZruirZyAOoRpNxaDnpSA/providers/' + id,
         token: DEV_TOKEN,
         operationId: TEST_OPERATION_ID,
     }));
-    assert.equal(leaf.status, 200);
+    assertStrictEquals(leaf.status, 200);
     const one = await leaf.json() as {
         readonly identity_id: string;
     };
-    assert.equal(one.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(one.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
-test('PUT 400s when identity_id disagrees with the path',
+Deno.test('PUT 400s when identity_id disagrees with the path',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -196,10 +201,10 @@ async () => {
         },
         operationId: TEST_OPERATION_ID,
     }));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('derive dual-reads leftover flat provider pairs',
+Deno.test('derive dual-reads leftover flat provider pairs',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -233,15 +238,15 @@ async () => {
     );
     const rows = await deriveIdentityProvidersFor(db
         , 'prBESZPjJDiuXCeZLmbiVw');
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]!.id, id);
-    assert.deepEqual(
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.id, id);
+    assertEquals(
         rows[0],
         await deriveIdentityProvider(db, 'prBESZPjJDiuXCeZLmbiVw', id),
     );
 });
 
-test('same event id on both planes — nested wins',
+Deno.test('same event id on both planes — nested wins',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -282,9 +287,9 @@ async () => {
     });
     const rows = await deriveIdentityProvidersFor(db
         , 'prBESZPjJDiuXCeZLmbiVw');
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]!.provider, 'nested-github');
-    assert.equal(
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.provider, 'nested-github');
+    assertStrictEquals(
         (await deriveIdentityProvider(db, 'prBESZPjJDiuXCeZLmbiVw'
             , id)).provider,
         'nested-github',

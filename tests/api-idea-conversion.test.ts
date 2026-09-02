@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { GET, POST, PUT } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -123,7 +122,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test(
+Deno.test(
     'POST organizations/:id/ideas/:id/conversion writes the project, the'
     + ' promoted idea, two events, and N baselines in one'
     + ' operation',
@@ -162,9 +161,9 @@ test(
             organization_id: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN);
-        assert.equal(project.title, 'Promoted Project');
+        assertStrictEquals(project.title, 'Promoted Project');
         // The fence stamped the bound org — never the body.
-        assert.equal(project.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
+        assertStrictEquals(project.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
 
         // The idea moved to 'promoted', authored by the actor.
         // bare per-entity current-state alias RETIRED
@@ -176,16 +175,18 @@ test(
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gVvtDIaqhnkXZQcxZeSuiw/versions/', DEV_TOKEN);
         const ideaCurrent = ideaHistory[0]!;
-        assert.equal(ideaCurrent.id, 'gVvtDIaqhnkXZQcxZeSuiw');
-        assert.equal(ideaCurrent.state, 'promoted');
+        assertStrictEquals(ideaCurrent.id, 'gVvtDIaqhnkXZQcxZeSuiw');
+        assertStrictEquals(ideaCurrent.state, 'promoted');
 
         // The new project entered at its initial state, also
         // authored by the actor.
         const projectEvents = await deriveProjectStateHistory(db
             , 'AjdvjuECVZEgZoFajaIEkg', 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(projectEvents.length, 1);
-        assert.equal(projectEvents[0]!.state, 'submitted');
-        assert.equal(projectEvents[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+        assertStrictEquals(projectEvents.length, 1);
+        assertStrictEquals(projectEvents[0]!.state, 'submitted');
+        assertStrictEquals(
+            projectEvents[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
+        );
 
         const mine = await GET<
             ProjectObjectiveBaselineScoreEntity[]
@@ -195,16 +196,16 @@ test(
                 + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/',
             DEV_TOKEN,
         );
-        assert.equal(mine.length, 2);
+        assertStrictEquals(mine.length, 2);
         const byObj = new Map(
             mine.map(b => [b.objective_id, b.score]),
         );
-        assert.equal(byObj.get(OBJ_1), 50);
-        assert.equal(byObj.get(OBJ_2), -25);
+        assertStrictEquals(byObj.get(OBJ_1), 50);
+        assertStrictEquals(byObj.get(OBJ_2), -25);
     },
 );
 
-test(
+Deno.test(
     'POST organizations/:id/ideas/:id/conversion also'
     + ' appends document message pairs at the project\'s'
     + ' and the idea\'s own addresses',
@@ -244,9 +245,9 @@ test(
         // N=2 here) + three schema/bootstrap pairs = 11.
         const allRequests = await db.messagePairs.getAll();
         const allResponses = await db.messagePairs.getAll();
-        assert.equal(allRequests.length, 10);
-        assert.equal(allResponses.length, 10);
-        assert.equal(allRequests.length, allResponses.length);
+        assertStrictEquals(allRequests.length, 10);
+        assertStrictEquals(allResponses.length, 10);
+        assertStrictEquals(allRequests.length, allResponses.length);
 
         const atProjectAddress = allRequests.filter(
             (r) =>
@@ -254,23 +255,25 @@ test(
                     + 'projects/'
                 && r.uri_id === 'psZcIMMgiSomMHzDxcUnYQ',
         );
-        assert.equal(atProjectAddress.length, 1);
+        assertStrictEquals(atProjectAddress.length, 1);
         const responsesAtProjectAddress = allResponses.filter(
             (r) =>
                 r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'projects/'
                 && r.uri_id === 'psZcIMMgiSomMHzDxcUnYQ',
         );
-        assert.equal(responsesAtProjectAddress.length, 1);
+        assertStrictEquals(responsesAtProjectAddress.length, 1);
 
         const request = atProjectAddress[0]!;
         // The requester is the caller, never the idea's author.
-        assert.equal(request.requester_identity_id, 'XXZruirZyAOoRpNxaDnpSA');
+        assertStrictEquals(
+            request.requester_identity_id, 'XXZruirZyAOoRpNxaDnpSA',
+        );
 
         const parsed = pairJsonOf(request.request) as {
             body: Record<string, unknown>;
         };
-        assert.deepEqual(parsed.body, {
+        assertEquals(parsed.body, {
             ...projectFields('Promoted Project'),
             state: 'submitted',
         });
@@ -284,14 +287,14 @@ test(
                     + 'ideas/'
                 && r.uri_id === 'gVvtDIaqhnkXZQcxZeSuiw',
         );
-        assert.equal(atIdeaAddress.length, 2);
+        assertStrictEquals(atIdeaAddress.length, 2);
         const responsesAtIdeaAddress = allResponses.filter(
             (r) =>
                 r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'ideas/'
                 && r.uri_id === 'gVvtDIaqhnkXZQcxZeSuiw',
         );
-        assert.equal(responsesAtIdeaAddress.length, 2);
+        assertStrictEquals(responsesAtIdeaAddress.length, 2);
 
         // The conversion's idea pair is the one carrying
         // 'promoted' (the seed carried 'approved').
@@ -301,16 +304,16 @@ test(
             }).body;
             return body['state'] === 'promoted';
         })!;
-        assert.ok(ideaRequest);
+        assert(ideaRequest);
         // The requester is the caller, never the idea's author.
-        assert.equal(
+        assertStrictEquals(
             ideaRequest.requester_identity_id, 'XXZruirZyAOoRpNxaDnpSA',
         );
 
         const ideaParsed = pairJsonOf(ideaRequest.request) as {
             body: Record<string, unknown>;
         };
-        assert.deepEqual(ideaParsed.body, {
+        assertEquals(ideaParsed.body, {
             ...ideaFields('Source Idea'),
             state: 'promoted',
         });
@@ -333,17 +336,17 @@ test(
                     r.uri_collection === baselinesPrefix
                     && r.uri_id === id,
             );
-            assert.equal(atBaselineAddress.length, 1);
+            assertStrictEquals(atBaselineAddress.length, 1);
             const responsesAtBaselineAddress = allResponses
                 .filter(
                     (r) =>
                         r.uri_collection === baselinesPrefix
                         && r.uri_id === id,
                 );
-            assert.equal(responsesAtBaselineAddress.length, 1);
+            assertStrictEquals(responsesAtBaselineAddress.length, 1);
 
             const baselineRequest = atBaselineAddress[0]!;
-            assert.equal(
+            assertStrictEquals(
                 baselineRequest.requester_identity_id,
                 'XXZruirZyAOoRpNxaDnpSA',
             );
@@ -354,12 +357,12 @@ test(
             // baseline's `fields` VERBATIM — exactly
             // {project_id, objective_id, score, member_id,
             // at}, no more, no less.
-            assert.deepEqual(baselineParsed.body, fields);
+            assertEquals(baselineParsed.body, fields);
         }
     },
 );
 
-test(
+Deno.test(
     'POST organizations/:id/ideas/:id/conversion ignores a raw colliding'
     + ' states row (states ROW half stripped)',
     async () => {
@@ -392,13 +395,13 @@ test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN,
         );
-        assert.equal(project.id, 'pnXmXrxOWayANgDLdCjuBw');
+        assertStrictEquals(project.id, 'pnXmXrxOWayANgDLdCjuBw');
         const ideaHistory = await GET<{ state: string }[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'gVvtDIaqhnkXZQcxZeSuiw/versions/', DEV_TOKEN,
         );
         // Family history is DESC — index 0 is current.
         const ideaCurrent = ideaHistory[0]!;
-        assert.equal(ideaCurrent.state, 'promoted');
+        assertStrictEquals(ideaCurrent.state, 'promoted');
     },
 );

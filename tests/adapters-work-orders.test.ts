@@ -1,7 +1,13 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
-import { strict as assert } from 'node:assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -282,7 +288,7 @@ async function seedBareWorkOrder(
 
 // ── postWorkOrderCreation ─────────
 
-test(
+Deno.test(
     'postWorkOrderCreation seeds work order, '
     + 'flow link, and three state events in one '
     + 'call',
@@ -298,8 +304,8 @@ test(
 
         // Phase Final Task 2: WO + join on message plane.
         const wo = await getWorkOrder(ctx, woId);
-        assert.equal(wo.id, woId);
-        assert.equal(wo.position, 1);
+        assertStrictEquals(wo.id, woId);
+        assertStrictEquals(wo.position, 1);
         // Phase Final Stage B: work_orders +
         // flow_work_orders tables retired — message plane
         // is residual pin.
@@ -308,30 +314,30 @@ test(
             await workOrderLifecycleStatesFor(db, 'AjdvjuECVZEgZoFajaIEkg'
                 , woId);
         // start node, post-start, claimed
-        assert.equal(events.length, 3);
+        assertStrictEquals(events.length, 3);
         const nonClaim = events.filter(
             (e: StateEntity) =>
                 e.state !== 'claimed',
         );
-        assert.equal(nonClaim.length, 2);
-        assert.equal(
+        assertStrictEquals(nonClaim.length, 2);
+        assertStrictEquals(
             nonClaim[0]!.state, START_NODE,
         );
-        assert.equal(
+        assertStrictEquals(
             nonClaim[1]!.state, MIDDLE_NODE,
         );
         const claims = events.filter(
             (e: StateEntity) =>
                 e.state === 'claimed',
         );
-        assert.equal(claims.length, 1);
-        assert.equal(
+        assertStrictEquals(claims.length, 1);
+        assertStrictEquals(
             claims[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
         );
     },
 );
 
-test(
+Deno.test(
     'postWorkOrderCreation appends past a'
     + ' fractional baseline without renumbering',
     async () => {
@@ -357,11 +363,11 @@ test(
 
         // Phase Final Task 2: position from message-plane GET.
         const second = await getWorkOrder(ctx, secondId);
-        assert.equal(second.position, 8.5);
+        assertStrictEquals(second.position, 8.5);
     },
 );
 
-test(
+Deno.test(
     'postWorkOrderCreation throws '
     + 'when flow has no start node',
     async () => {
@@ -382,17 +388,18 @@ test(
             ],
         };
         await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', graph);
-        await assert.rejects(
+        await assertRejects(
             () =>
                 createWorkOrder(
                     ctx, 'ZOousbbnzpqlxJExVAruYQ',
                 ),
-            /no start node/,
+            Error,
+            'no start node',
         );
     },
 );
 
-test(
+Deno.test(
     'postWorkOrderCreation throws '
     + 'when start has multiple '
     + 'outgoing edges',
@@ -426,17 +433,18 @@ test(
             ],
         };
         await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', graph);
-        await assert.rejects(
+        await assertRejects(
             () =>
                 createWorkOrder(
                     ctx, 'ZOousbbnzpqlxJExVAruYQ',
                 ),
-            /exactly one outgoing edge/,
+            Error,
+            'exactly one outgoing edge',
         );
     },
 );
 
-test(
+Deno.test(
     'postWorkOrderCreation increments '
     + 'position across calls',
     async () => {
@@ -449,13 +457,13 @@ test(
             (await getWorkOrder(ctx, a)).position,
             (await getWorkOrder(ctx, b)).position,
         ].sort();
-        assert.deepEqual(
+        assertEquals(
             positions, [1, 2],
         );
     },
 );
 
-test(
+Deno.test(
     'postWorkOrderCreation freezes '
     + 'flow_graph against subsequent '
     + 'flow edits',
@@ -478,15 +486,15 @@ test(
         const middle = wo.flowGraph.nodes.find(
             n => n.id === MIDDLE_NODE,
         );
-        assert.equal(middle!.name, 'Doing work');
-        assert.notEqual(middle!.name, 'EDITED');
-        assert.equal('flowId' in wo.flowGraph, false);
+        assertStrictEquals(middle!.name, 'Doing work');
+        assertNotStrictEquals(middle!.name, 'EDITED');
+        assertStrictEquals('flowId' in wo.flowGraph, false);
     },
 );
 
 // ── postWorkOrderTransition ───────
 
-test(
+Deno.test(
     'postWorkOrderTransition records '
     + 'transition state event and releases the '
     + 'claim',
@@ -503,12 +511,12 @@ test(
             await getWorkOrderCurrentNodeId(
                 ctx, woId,
             );
-        assert.equal(beforeNode, MIDDLE_NODE);
+        assertStrictEquals(beforeNode, MIDDLE_NODE);
         const beforeClaim =
             await getWorkOrderActiveClaim(
                 ctx, woId, DEFAULT_LOCK_TIMEOUT,
             );
-        assert.ok(beforeClaim !== null);
+        assert(beforeClaim !== null);
 
         await postWorkOrderTransition(ctx, {
             workOrderId: woId,
@@ -520,16 +528,16 @@ test(
             await getWorkOrderCurrentNodeId(
                 ctx, woId,
             );
-        assert.equal(afterNode, FINISH_NODE);
+        assertStrictEquals(afterNode, FINISH_NODE);
         const afterClaim =
             await getWorkOrderActiveClaim(
                 ctx, woId, DEFAULT_LOCK_TIMEOUT,
             );
-        assert.equal(afterClaim, null);
+        assertStrictEquals(afterClaim, null);
     },
 );
 
-test(
+Deno.test(
     'postWorkOrderTransition succeeds '
     + 'when no live claim exists',
     async () => {
@@ -556,14 +564,14 @@ test(
                 ctx, woId,
             );
         // start, post-start, after-transition
-        assert.equal(events.length, 3);
-        assert.equal(
+        assertStrictEquals(events.length, 3);
+        assertStrictEquals(
             events.at(-1)!.toNodeId, FINISH_NODE,
         );
     },
 );
 
-test(
+Deno.test(
     'postWorkOrderTransition throws '
     + 'when edge id does not exist',
     async () => {
@@ -573,14 +581,15 @@ test(
             await createWorkOrder(
                 ctx, 'ZOousbbnzpqlxJExVAruYQ',
             );
-        await assert.rejects(
+        await assertRejects(
             () =>
                 postWorkOrderTransition(ctx, {
                     workOrderId: woId,
                     edgeId: generateIdentifier(),
                     values: {},
                 }),
-            /Edge not found/,
+            Error,
+            'Edge not found',
         );
     },
 );
@@ -653,7 +662,7 @@ async function seedTypeInstanceAndJoin(
     );
 }
 
-test(
+Deno.test(
     'postWorkOrderTransition value-bearing sets'
     + ' only changed values on the instance head',
     async () => {
@@ -676,10 +685,10 @@ test(
         const head = await getRecordInstance(
             ctx, RT_ID, INST_ID,
         );
-        assert.equal(
+        assertStrictEquals(
             head.values.get(ATTR_ID), 'xDyDkxEPwtcNmJVknUHDsg',
         );
-        assert.equal(
+        assertStrictEquals(
             await getWorkOrderCurrentNodeId(
                 ctx, woId,
             ),
@@ -688,7 +697,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'postWorkOrderTransition 412s when the snapshot'
     + ' etag is stale against a concurrent PATCH',
     async () => {
@@ -714,25 +723,23 @@ test(
                 }],
             },
         );
-        await assert.rejects(
+        const err = await assertRejects(
             () => postWorkOrderTransition(ctx, {
                 workOrderId: woId,
                 edgeId: EDGE_MIDDLE_FINISH,
                 values: { [ATTR_ID]: 'vStale' },
                 instanceEtag: loaded.etag,
             }),
-            (err: unknown) =>
-                err instanceof RequestError
-                && err.status
-                    === HTTP_PRECONDITION_FAILED,
-        );
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
         const head = await getRecordInstance(
             ctx, RT_ID, INST_ID,
         );
-        assert.equal(
+        assertStrictEquals(
             head.values.get(ATTR_ID), 'vB',
         );
-        assert.equal(
+        assertStrictEquals(
             await getWorkOrderCurrentNodeId(
                 ctx, woId,
             ),
@@ -741,7 +748,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'postWorkOrderTransition blank pending clears'
     + ' a set head value',
     async () => {
@@ -763,13 +770,13 @@ test(
         const head = await getRecordInstance(
             ctx, RT_ID, INST_ID,
         );
-        assert.equal(
+        assertStrictEquals(
             head.values.has(ATTR_ID), false,
         );
     },
 );
 
-test(
+Deno.test(
     'postWorkOrderTransition pure move when'
     + ' pending equals head omits set/clear',
     async () => {
@@ -796,11 +803,11 @@ test(
         const after = await getRecordInstance(
             ctx, RT_ID, INST_ID,
         );
-        assert.equal(after.etag, before.etag);
-        assert.equal(
+        assertStrictEquals(after.etag, before.etag);
+        assertStrictEquals(
             after.values.get(ATTR_ID), 'v0',
         );
-        assert.equal(
+        assertStrictEquals(
             await getWorkOrderCurrentNodeId(
                 ctx, woId,
             ),
@@ -809,7 +816,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'putWorkOrderBinding embeds instance on'
     + ' the work-order GET',
     async () => {
@@ -821,14 +828,14 @@ test(
             ctx, woId, INST_ID, RT_ID,
         );
         const wo = await getWorkOrder(ctx, woId);
-        assert.equal(wo.instanceId, INST_ID);
-        assert.equal(wo.recordTypeId, RT_ID);
+        assertStrictEquals(wo.instanceId, INST_ID);
+        assertStrictEquals(wo.recordTypeId, RT_ID);
     },
 );
 
 // ── putWorkOrderClaim ────────────
 
-test(
+Deno.test(
     'putWorkOrderClaim records a fresh '
     + 'claimed state event',
     async () => {
@@ -847,12 +854,12 @@ test(
             await getWorkOrderActiveClaim(
                 ctx, woId, DEFAULT_LOCK_TIMEOUT,
             );
-        assert.ok(claim !== null);
-        assert.equal(claim.memberId, 'XXZruirZyAOoRpNxaDnpSA');
+        assert(claim !== null);
+        assertStrictEquals(claim.memberId, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
-test(
+Deno.test(
     'putWorkOrderClaim is idempotent — a repeat '
     + 'claim by the holder appends no duplicate',
     async () => {
@@ -880,7 +887,7 @@ test(
         // route reads and appends in one
         // transaction, so the holder's repeat
         // claim is a no-op.
-        assert.equal(
+        assertStrictEquals(
             claimed.length, 2,
             'expected exactly 2 claimed events,'
             + ' got ' + claimed.length,
@@ -895,7 +902,7 @@ import {
 } from
 '../web-app/app/adapters/work-orders-queries.ts';
 
-test(
+Deno.test(
     'getFlowWorkOrderEntities returns the seeded '
     + 'flow-work-order rows for the asked flow only',
     async () => {
@@ -934,14 +941,14 @@ test(
         // parent flow — each flow surfaces only its own join.
         const flow1Rows =
             await getFlowWorkOrderEntities(ctx, flow1);
-        assert.equal(flow1Rows.length, 1);
-        assert.equal(
+        assertStrictEquals(flow1Rows.length, 1);
+        assertStrictEquals(
             flow1Rows[0]!.work_order_id, 'yNSSnbrpacodQTzUEcdEVA',
         );
         const flow2Rows =
             await getFlowWorkOrderEntities(ctx, flow2);
-        assert.equal(flow2Rows.length, 1);
-        assert.equal(
+        assertStrictEquals(flow2Rows.length, 1);
+        assertStrictEquals(
             flow2Rows[0]!.work_order_id, 'yNXXsTEwShOozlQCEWKIIw',
         );
     },
@@ -949,7 +956,7 @@ test(
 
 // ── lockTimeout-aware getWorkOrderActiveClaim ────
 
-test(
+Deno.test(
     'getWorkOrderActiveClaim treats a stale '
     + 'claimed event as implicitly expired',
     async () => {
@@ -971,11 +978,11 @@ test(
         const claim = await getWorkOrderActiveClaim(
             ctx, woId, 1,
         );
-        assert.equal(claim, null);
+        assertStrictEquals(claim, null);
     },
 );
 
-test(
+Deno.test(
     'getWorkOrderActiveClaim returns the fresh '
     + 'claim when within the lock window',
     async () => {
@@ -991,14 +998,14 @@ test(
         const claim = await getWorkOrderActiveClaim(
             ctx, woId, DEFAULT_LOCK_TIMEOUT,
         );
-        assert.ok(claim !== null);
-        assert.equal(claim.memberId, 'XXZruirZyAOoRpNxaDnpSA');
+        assert(claim !== null);
+        assertStrictEquals(claim.memberId, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
 // ── fan-in getActiveClaimsByWorkOrder ────
 
-test(
+Deno.test(
     'getActiveClaimsByWorkOrder resolves every '
     + 'order claim via per-item history, honoring '
     + 'per-order lockTimeout and the work-order set',
@@ -1045,22 +1052,22 @@ test(
             await getActiveClaimsByWorkOrder(
                 ctx, timeouts,
             );
-        assert.equal(claims.size, 2);
-        assert.equal(
+        assertStrictEquals(claims.size, 2);
+        assertStrictEquals(
             claims.get(fresh1)!.memberId, 'XXZruirZyAOoRpNxaDnpSA',
         );
-        assert.ok(claims.has(fresh2));
+        assert(claims.has(fresh2));
         // Stale claim past its lockTimeout: excluded.
-        assert.equal(claims.has(stale), false);
+        assertStrictEquals(claims.has(stale), false);
         // Released claim: excluded.
-        assert.equal(claims.has(released), false);
+        assertStrictEquals(claims.has(released), false);
         // Claimed but outside the work-order set:
         // excluded (no timeout entry).
-        assert.equal(claims.has(orphan), false);
+        assertStrictEquals(claims.has(orphan), false);
     },
 );
 
-test(
+Deno.test(
     'deleteWorkOrderClaim DELETEs claim and '
     + 'derives claim_released',
     async () => {
@@ -1077,16 +1084,16 @@ test(
         const released = events.filter(
             (e) => e.state === 'claim_released',
         );
-        assert.equal(released.length, 1);
-        assert.ok(released[0]!.id.length > 0);
-        assert.ok(released[0]!.at.length > 0);
+        assertStrictEquals(released.length, 1);
+        assert(released[0]!.id.length > 0);
+        assert(released[0]!.at.length > 0);
     },
 );
 
 // Regression: transitionAt must be minted before release.at
 // so the at-ordered ledger puts claim_released last (latest
 // event wins for current-state derivation).
-test(
+Deno.test(
     'postWorkOrderTransition mints transitionAt before '
     + 'release.at — latest by at is claim_released',
     async () => {
@@ -1101,7 +1108,7 @@ test(
             await getWorkOrderActiveClaim(
                 ctx, woId, DEFAULT_LOCK_TIMEOUT,
             );
-        assert.ok(
+        assert(
             beforeClaim !== null,
             'expected a live claim before transition',
         );
@@ -1123,11 +1130,11 @@ test(
             (e: StateEntity) =>
                 e.state === 'claim_released',
         );
-        assert.ok(
+        assert(
             transitionEvt !== undefined,
             'expected a transition (finish) event',
         );
-        assert.ok(
+        assert(
             releaseEvt !== undefined,
             'expected a claim_released event',
         );
@@ -1135,7 +1142,7 @@ test(
         // release — so transitionAt < release.at must
         // hold in the at-ordered ledger, making
         // claim_released the latest (winning) event.
-        assert.ok(
+        assert(
             transitionEvt.at < releaseEvt.at,
             'transitionAt must be strictly less than'
             + ' release.at; got transition='

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertRejects, assertStrictEquals } from '@std/assert';
 import {
     buildZip,
     getZipEntries,
@@ -7,7 +6,7 @@ import {
     ZipLimitExceeded,
 } from '../web-app/app/zip.ts';
 
-test('default limits accept normal ZIP', async () => {
+Deno.test('default limits accept normal ZIP', async () => {
     const encoder = new TextEncoder();
     const zip = buildZip([
         {
@@ -22,19 +21,19 @@ test('default limits accept normal ZIP', async () => {
     const entries = await getZipEntries(
         zip, DEFAULT_ZIP_LIMITS,
     );
-    assert.equal(entries.length, 2);
+    assertStrictEquals(entries.length, 2);
     const decoder = new TextDecoder();
-    assert.equal(
+    assertStrictEquals(
         decoder.decode(entries[0]!.data),
         'hello',
     );
-    assert.equal(
+    assertStrictEquals(
         decoder.decode(entries[1]!.data),
         'world',
     );
 });
 
-test('exceeding maxEntries throws', async () => {
+Deno.test('exceeding maxEntries throws', async () => {
     const encoder = new TextEncoder();
     const files = Array.from(
         { length: 5 },
@@ -44,7 +43,7 @@ test('exceeding maxEntries throws', async () => {
         }),
     );
     const zip = buildZip(files);
-    await assert.rejects(
+    await assertRejects(
         () => getZipEntries(zip, {
             ...DEFAULT_ZIP_LIMITS,
             maxEntries: 4,
@@ -53,12 +52,12 @@ test('exceeding maxEntries throws', async () => {
     );
 });
 
-test('exceeding maxPerEntry on STORE throws', async () => {
+Deno.test('exceeding maxPerEntry on STORE throws', async () => {
     const data = new Uint8Array(1000);
     const zip = buildZip([
         { name: 'big.bin', data },
     ]);
-    await assert.rejects(
+    await assertRejects(
         () => getZipEntries(zip, {
             ...DEFAULT_ZIP_LIMITS,
             maxPerEntry: 500,
@@ -67,7 +66,7 @@ test('exceeding maxPerEntry on STORE throws', async () => {
     );
 });
 
-test('exceeding maxCompressedTotal throws', async () => {
+Deno.test('exceeding maxCompressedTotal throws', async () => {
     const encoder = new TextEncoder();
     const files = Array.from(
         { length: 3 },
@@ -77,7 +76,7 @@ test('exceeding maxCompressedTotal throws', async () => {
         }),
     );
     const zip = buildZip(files);
-    await assert.rejects(
+    await assertRejects(
         () => getZipEntries(zip, {
             ...DEFAULT_ZIP_LIMITS,
             maxCompressedTotal: 150,
@@ -86,7 +85,7 @@ test('exceeding maxCompressedTotal throws', async () => {
     );
 });
 
-test('exceeding maxDecompressedTotal throws', async () => {
+Deno.test('exceeding maxDecompressedTotal throws', async () => {
     const encoder = new TextEncoder();
     const files = Array.from(
         { length: 3 },
@@ -96,7 +95,7 @@ test('exceeding maxDecompressedTotal throws', async () => {
         }),
     );
     const zip = buildZip(files);
-    await assert.rejects(
+    await assertRejects(
         () => getZipEntries(zip, {
             ...DEFAULT_ZIP_LIMITS,
             maxDecompressedTotal: 150,
@@ -176,7 +175,7 @@ function buildDeflateZip(
     return out;
 }
 
-test(
+Deno.test(
     'malformed DEFLATE rejects and cancels the reader',
     async () => {
         // Garbage deflate-raw bytes: DecompressionStream
@@ -206,12 +205,12 @@ test(
         };
 
         try {
-            await assert.rejects(
+            await assertRejects(
                 () => getZipEntries(
                     zip, DEFAULT_ZIP_LIMITS,
                 ),
             );
-            assert.ok(
+            assert(
                 cancelCalls >= 1,
                 'inflate must cancel the reader '
                 + 'on deflate failure; cancel '
@@ -230,8 +229,8 @@ test(
             const entries = await getZipEntries(
                 okZip, DEFAULT_ZIP_LIMITS,
             );
-            assert.equal(entries.length, 1);
-            assert.equal(
+            assertStrictEquals(entries.length, 1);
+            assertStrictEquals(
                 entries[0]!.data.byteLength, 0,
             );
         } finally {

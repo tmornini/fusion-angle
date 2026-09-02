@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertMatch, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -145,34 +144,34 @@ async function putLiveType(
     const put = await handleRequest(db, req(
         'PUT', TYPE_DETAIL, adminToken, typeBody(),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
-test('GET .../attributes under live type → 200 []',
+Deno.test('GET .../attributes under live type → 200 []',
 async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
     const res = await handleRequest(db, req(
         'GET', ATTRS, adminToken,
     ));
-    assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), []);
+    assertStrictEquals(res.status, 200);
+    assertEquals(await res.json(), []);
 });
 
-test('GET .../attributes under absent type → 404 '
+Deno.test('GET .../attributes under absent type → 404 '
 + 'record_types vocabulary',
 async () => {
     const { db, adminToken } = await adminDb();
     const res = await handleRequest(db, req(
         'GET', ATTRS, adminToken,
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error: 'Not found: record_types/' + TYPE_ID,
     });
 });
 
-test('PUT create no ACL keys → 200; GET shows stamped '
+Deno.test('PUT create no ACL keys → 200; GET shows stamped '
 + 'DEFAULT_ATTRIBUTE_ACL_ROLES',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -180,9 +179,9 @@ async () => {
     const put = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, attrCore(),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const echo = await put.json() as AttributeWireRow;
-    assert.deepEqual(echo, {
+    assertEquals(echo, {
         id: ATTR_ID,
         organization_id: ORGANIZATION,
         record_type_id: TYPE_ID,
@@ -197,37 +196,37 @@ async () => {
     const get = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(get.status, 200);
+    assertStrictEquals(get.status, 200);
     const row = await get.json() as AttributeWireRow;
-    assert.deepEqual(
+    assertEquals(
         row.read_roles,
         [...DEFAULT_ATTRIBUTE_ACL_ROLES],
     );
-    assert.deepEqual(
+    assertEquals(
         row.write_roles,
         [...DEFAULT_ATTRIBUTE_ACL_ROLES],
     );
-    assert.equal(row.record_type_id, TYPE_ID);
-    assert.equal(row.organization_id, ORGANIZATION);
+    assertStrictEquals(row.record_type_id, TYPE_ID);
+    assertStrictEquals(row.organization_id, ORGANIZATION);
 });
 
-test('PUT replace without ACL keys → 400',
+Deno.test('PUT replace without ACL keys → 400',
 async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
     const first = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, attrCore(),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const second = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, attrCore({
             name: 'Renamed',
         }),
     ));
-    assert.equal(second.status, 400);
+    assertStrictEquals(second.status, 400);
 });
 
-test('PUT replace with both ACL keys, no precondition '
+Deno.test('PUT replace with both ACL keys, no precondition '
 + '→ 200 (simple class)',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -235,7 +234,7 @@ async () => {
     const first = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, attrCore(),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const second = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, attrCore({
             name: 'Renamed',
@@ -243,14 +242,14 @@ async () => {
             write_roles: ['admin'],
         }),
     ));
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
     const echo = await second.json() as AttributeWireRow;
-    assert.equal(echo.name, 'Renamed');
-    assert.deepEqual(echo.read_roles, ['admin']);
-    assert.deepEqual(echo.write_roles, ['admin']);
+    assertStrictEquals(echo.name, 'Renamed');
+    assertEquals(echo.read_roles, ['admin']);
+    assertEquals(echo.write_roles, ['admin']);
 });
 
-test('PUT member → 403',
+Deno.test('PUT member → 403',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -258,10 +257,10 @@ async () => {
     const put = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, memberToken, attrCore(),
     ));
-    assert.equal(put.status, 403);
+    assertStrictEquals(put.status, 403);
 });
 
-test('GET member → 200 including ACL arrays verbatim',
+Deno.test('GET member → 200 including ACL arrays verbatim',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -272,29 +271,29 @@ async () => {
             write_roles: ['admin'],
         }),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const get = await handleRequest(db, req(
         'GET', ATTR_DETAIL, memberToken,
     ));
-    assert.equal(get.status, 200);
+    assertStrictEquals(get.status, 200);
     const row = await get.json() as AttributeWireRow;
-    assert.deepEqual(
+    assertEquals(
         row.read_roles, ['member', 'auditor'],
     );
-    assert.deepEqual(row.write_roles, ['admin']);
+    assertEquals(row.write_roles, ['admin']);
     // Collection also lists the row for the member.
     const list = await handleRequest(db, req(
         'GET', ATTRS, memberToken,
     ));
-    assert.equal(list.status, 200);
+    assertStrictEquals(list.status, 200);
     const rows = await list.json() as AttributeWireRow[];
-    assert.equal(rows.length, 1);
-    assert.deepEqual(
+    assertStrictEquals(rows.length, 1);
+    assertEquals(
         rows[0]!.read_roles, ['member', 'auditor'],
     );
 });
 
-test('DELETE unreferenced → 204; detail 404',
+Deno.test('DELETE unreferenced → 204; detail 404',
 async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
@@ -304,18 +303,18 @@ async () => {
     const del = await handleRequest(db, req(
         'DELETE', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const get = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(get.status, 404);
-    assert.deepEqual(await get.json(), {
+    assertStrictEquals(get.status, 404);
+    assertEquals(await get.json(), {
         error:
             'Not found: record_attributes/' + ATTR_ID,
     });
 });
 
-test('DELETE with live flow-graph binding → 409',
+Deno.test('DELETE with live flow-graph binding → 409',
 async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
@@ -371,17 +370,17 @@ async () => {
             },
         },
     ));
-    assert.equal(flowCreate.status, 201);
+    assertStrictEquals(flowCreate.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(del.status, 409);
+    assertStrictEquals(del.status, 409);
     const body = await del.json() as { error: string };
-    assert.match(
+    assertMatch(
         body.error,
         new RegExp('flow\\(s\\) ' + flowId),
     );
-    assert.match(
+    assertMatch(
         body.error,
         new RegExp(
             'record attribute ' + ATTR_ID
@@ -392,10 +391,10 @@ async () => {
     const still = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(still.status, 200);
+    assertStrictEquals(still.status, 200);
 });
 
-test('DELETE while an instance head carries the value '
+Deno.test('DELETE while an instance head carries the value '
 + '→ 409 fourth leg names instance(s)',
 async () => {
     const { db, adminToken, memberToken } =
@@ -417,20 +416,20 @@ async () => {
             ],
         },
     ));
-    assert.equal(putInst.status, 201);
+    assertStrictEquals(putInst.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(del.status, 409);
+    assertStrictEquals(del.status, 409);
     const body = await del.json() as { error: string };
-    assert.match(
+    assertMatch(
         body.error,
         new RegExp(
             'record attribute ' + ATTR_ID
             + ' is referenced by',
         ),
     );
-    assert.match(
+    assertMatch(
         body.error,
         new RegExp(
             'instance\\(s\\) ' + INSTANCE_ID,
@@ -439,10 +438,10 @@ async () => {
     const still = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(still.status, 200);
+    assertStrictEquals(still.status, 200);
 });
 
-test('DELETE after PATCH clears the value → 204',
+Deno.test('DELETE after PATCH clears the value → 204',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -463,25 +462,25 @@ async () => {
             ],
         },
     ));
-    assert.equal(putInst.status, 201);
+    assertStrictEquals(putInst.status, 201);
     const etag = putInst.headers.get('ETag')!;
     const clear = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { clear: [ATTR_ID] },
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(clear.status, 201);
+    assertStrictEquals(clear.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const gone = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(gone.status, 404);
+    assertStrictEquals(gone.status, 404);
 });
 
-test('composed-op edit removedAttributeIds with a valued '
+Deno.test('composed-op edit removedAttributeIds with a valued '
 + 'instance → 409; whole batch rolls back',
 async () => {
     const { db, adminToken, memberToken } =
@@ -503,7 +502,7 @@ async () => {
             ],
         },
     ));
-    assert.equal(putInst.status, 201);
+    assertStrictEquals(putInst.status, 201);
     const requestsBefore = await db.messagePairs.getAll();
     const responsesBefore = await db.messagePairs.getAll();
     const edit = await handleRequest(db, req(
@@ -521,9 +520,9 @@ async () => {
             removedAttributeIds: [ATTR_ID],
         },
     ));
-    assert.equal(edit.status, 409);
+    assertStrictEquals(edit.status, 409);
     const err = await edit.json() as { error: string };
-    assert.match(
+    assertMatch(
         err.error,
         new RegExp(
             'instance\\(s\\) ' + INSTANCE_ID,
@@ -532,20 +531,20 @@ async () => {
     const typeGet = await handleRequest(db, req(
         'GET', TYPE_DETAIL, adminToken,
     ));
-    assert.equal(typeGet.status, 200);
+    assertStrictEquals(typeGet.status, 200);
     const typeRow = await typeGet.json() as {
         name: string;
     };
-    assert.equal(typeRow.name, 'Rental');
+    assertStrictEquals(typeRow.name, 'Rental');
     const attrGet = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(attrGet.status, 200);
-    assert.equal(
+    assertStrictEquals(attrGet.status, 200);
+    assertStrictEquals(
         (await db.messagePairs.getAll()).length,
         requestsBefore.length,
     );
-    assert.equal(
+    assertStrictEquals(
         (await db.messagePairs.getAll()).length,
         responsesBefore.length,
     );

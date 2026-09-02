@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -149,7 +148,7 @@ async function seedFlow(
             },
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
 async function seedWorkOrder(
@@ -166,7 +165,7 @@ async function seedWorkOrder(
             position: 1,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
@@ -178,7 +177,7 @@ async function seedWorkOrder(
             at: AT,
         },
     ));
-    assert.equal(join.status, 201);
+    assertStrictEquals(join.status, 201);
 }
 
 async function seedLiveType(
@@ -193,7 +192,7 @@ async function seedLiveType(
             state: 'active',
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedAttribute(
@@ -211,7 +210,7 @@ async function seedAttribute(
             write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedInstance(
@@ -230,7 +229,7 @@ async function seedInstance(
             ],
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedFlowTypeJoin(
@@ -249,7 +248,7 @@ async function seedFlowTypeJoin(
             at: AT,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function bindInstance(
@@ -268,7 +267,7 @@ async function bindInstance(
             record_type_id: TYPE_ID,
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
 async function transitionTo(
@@ -290,7 +289,7 @@ async function transitionTo(
             transitionAt: nowUtc(),
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
 // Fixture: type + instance + flow join + TWO WOs both
@@ -327,15 +326,15 @@ async function seededInFlightDb(): Promise<{
 }
 
 // 1. DELETE while WO-A in flight → 409 naming WO-A only
-test('DELETE while WO-A in-flight → 409 naming WO-A only'
+Deno.test('DELETE while WO-A in-flight → 409 naming WO-A only'
 + ' (terminal WO-B released)',
 async () => {
     const { db, token } = await seededInFlightDb();
     const res = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, token,
     ));
-    assert.equal(res.status, 409);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 409);
+    assertEquals(await res.json(), {
         error:
             'record instance ' + INSTANCE_ID
             + ' is placed in-flight on work order(s) '
@@ -344,7 +343,7 @@ async () => {
 });
 
 // 2. transition WO-A to terminal → DELETE → 204
-test('transition WO-A to terminal → DELETE → 204'
+Deno.test('transition WO-A to terminal → DELETE → 204'
 + ' (tombstone)',
 async () => {
     const { db, token } = await seededInFlightDb();
@@ -354,11 +353,11 @@ async () => {
     const res = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, token,
     ));
-    assert.equal(res.status, 204);
+    assertStrictEquals(res.status, 204);
 });
 
 // 3. unbound instance (fresh, no binds) → DELETE → 204
-test('unbound instance (fresh, no binds) → DELETE → 204',
+Deno.test('unbound instance (fresh, no binds) → DELETE → 204',
 async () => {
     const { db, token } = await seededInFlightDb();
     await seedInstance(db, token, INSTANCE_FRESH);
@@ -367,11 +366,11 @@ async () => {
         INSTANCES + INSTANCE_FRESH,
         token,
     ));
-    assert.equal(res.status, 204);
+    assertStrictEquals(res.status, 204);
 });
 
 // 4. tombstone-wins replay: repeat DELETE → 204
-test('tombstone-wins replay after terminal DELETE → 204',
+Deno.test('tombstone-wins replay after terminal DELETE → 204',
 async () => {
     const { db, token } = await seededInFlightDb();
     await transitionTo(
@@ -380,15 +379,15 @@ async () => {
     const first = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, token,
     ));
-    assert.equal(first.status, 204);
+    assertStrictEquals(first.status, 204);
     const second = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, token,
     ));
-    assert.equal(second.status, 204);
+    assertStrictEquals(second.status, 204);
 });
 
 // 5. bind-after-tombstone → 404
-test('bind-after-tombstone naming tombstoned instance'
+Deno.test('bind-after-tombstone naming tombstoned instance'
 + ' → 404',
 async () => {
     const { db, token } = await seededInFlightDb();
@@ -398,7 +397,7 @@ async () => {
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, token,
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const bind = await handleRequest(db, req(
         'PUT',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_UNBOUND
@@ -409,8 +408,8 @@ async () => {
             record_type_id: TYPE_ID,
         },
     ));
-    assert.equal(bind.status, 404);
-    assert.deepEqual(await bind.json(), {
+    assertStrictEquals(bind.status, 404);
+    assertEquals(await bind.json(), {
         error: 'Not found: record_instances/'
             + INSTANCE_ID,
     });

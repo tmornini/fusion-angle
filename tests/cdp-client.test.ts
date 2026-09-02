@@ -1,5 +1,6 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals, assertRejects, assertStrictEquals,
+} from '@std/assert';
 import {
     CdpClient,
     type CdpSocket,
@@ -40,17 +41,20 @@ type Sent = {
 const SETTLE_DEADLINE_MS = 1_000;
 
 function withinDeadline<T>(promise: Promise<T>): Promise<T> {
-    return Promise.race([
-        promise,
-        new Promise<T>((_resolve, reject) => {
-            setTimeout(() => {
-                reject(new Error('still pending'));
-            }, SETTLE_DEADLINE_MS).unref();
-        }),
-    ]);
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    const expiry = new Promise<T>((_resolve, reject) => {
+        deadline = setTimeout(() => {
+            reject(new Error('still pending'));
+        }, SETTLE_DEADLINE_MS);
+    });
+    // The race settles on the promise long before the
+    // deadline fires, leaving a pending timer the ops
+    // sanitizer reports; clear it whichever side wins.
+    return Promise.race([promise, expiry])
+        .finally(() => clearTimeout(deadline));
 }
 
-test('send carries the session id and resolves by id',
+Deno.test('send carries the session id and resolves by id',
 async () => {
     const ws = new FakeSocket();
     const cdp = CdpClient.fromSocket(ws);
@@ -58,28 +62,28 @@ async () => {
         'Runtime.evaluate', { expression: '1' }, 'S1',
     );
     const sent = JSON.parse(ws.sent[0]!) as Sent;
-    assert.equal(sent.method, 'Runtime.evaluate');
-    assert.equal(sent.sessionId, 'S1');
-    assert.deepEqual(sent.params, { expression: '1' });
+    assertStrictEquals(sent.method, 'Runtime.evaluate');
+    assertStrictEquals(sent.sessionId, 'S1');
+    assertEquals(sent.params, { expression: '1' });
     ws.receive({
         id: sent.id, sessionId: 'S1', result: { v: 1 },
     });
-    assert.deepEqual(await reply, { v: 1 });
+    assertEquals(await reply, { v: 1 });
 });
 
-test('a send without a session omits the field',
+Deno.test('a send without a session omits the field',
 async () => {
     const ws = new FakeSocket();
     const cdp = CdpClient.fromSocket(ws);
     const reply = cdp.send('Page.enable');
     const sent = JSON.parse(ws.sent[0]!) as Sent;
-    assert.equal('sessionId' in sent, false);
-    assert.equal('params' in sent, false);
+    assertStrictEquals('sessionId' in sent, false);
+    assertStrictEquals('params' in sent, false);
     ws.receive({ id: sent.id, result: {} });
-    assert.deepEqual(await reply, {});
+    assertEquals(await reply, {});
 });
 
-test('an error reply rejects with the CDP message',
+Deno.test('an error reply rejects with the CDP message',
 async () => {
     const ws = new FakeSocket();
     const cdp = CdpClient.fromSocket(ws);
@@ -89,10 +93,12 @@ async () => {
         id: sent.id,
         error: { message: 'no such method', code: -1 },
     });
-    await assert.rejects(reply, /CDP no such method/);
+    await assertRejects(
+        () => reply, Error, 'CDP no such method',
+    );
 });
 
-test('events reach listeners by method with a session',
+Deno.test('events reach listeners by method with a session',
 () => {
     const ws = new FakeSocket();
     const cdp = CdpClient.fromSocket(ws);
@@ -118,32 +124,34 @@ test('events reach listeners by method with a session',
         method: 'Network.requestWillBeSent',
         params: { requestId: 'r2' },
     });
-    assert.deepEqual(seen, [[{ requestId: 'r1' }, 'S1']]);
+    assertEquals(seen, [[{ requestId: 'r1' }, 'S1']]);
 });
 
-test('closing rejects every send still awaiting a reply',
+Deno.test('closing rejects every send still awaiting a reply',
 async () => {
     const ws = new FakeSocket();
     const cdp = CdpClient.fromSocket(ws);
     const first = cdp.send('Page.enable');
     const second = cdp.send('Runtime.enable', {}, 'S1');
     cdp.close();
-    await assert.rejects(
-        withinDeadline(first), /CDP socket closed/,
+    await assertRejects(
+        () => withinDeadline(first), Error,
+        'CDP socket closed',
     );
-    await assert.rejects(
-        withinDeadline(second), /CDP socket closed/,
+    await assertRejects(
+        () => withinDeadline(second), Error,
+        'CDP socket closed',
     );
 });
 
-test('a send after close rejects instead of orphaning',
+Deno.test('a send after close rejects instead of orphaning',
 async () => {
     const ws = new FakeSocket();
     const cdp = CdpClient.fromSocket(ws);
     cdp.close();
-    await assert.rejects(
-        withinDeadline(cdp.send('Page.enable')),
-        /CDP socket closed/,
+    await assertRejects(
+        () => withinDeadline(cdp.send('Page.enable')),
+        Error, 'CDP socket closed',
     );
-    assert.deepEqual(ws.sent, []);
+    assertEquals(ws.sent, []);
 });

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -72,10 +71,10 @@ async function putObjective(
             generateIdentifier(),
         ),
     );
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
-test(
+Deno.test(
     'GET organizations/.../objectives/versions is 400;'
     + ' trailing slash is 404',
     async () => {
@@ -96,11 +95,11 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(slashless.status, 400);
+        assertStrictEquals(slashless.status, 400);
         const slashlessBody = await slashless.json() as {
             error: string;
         };
-        assert.equal(
+        assertStrictEquals(
             slashlessBody.error,
             'id must be a 22-character identifier',
         );
@@ -114,11 +113,11 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(slashed.status, 404);
+        assertStrictEquals(slashed.status, 404);
     },
 );
 
-test(
+Deno.test(
     'GET organizations/:id/objectives/:id/versions/ is 200;'
     + ' archive/reactivate/re-archive keeps both archived',
     async () => {
@@ -152,14 +151,14 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const rows = await res.json() as VersionRow[];
-        assert.equal(rows.length, 4);
-        assert.equal(rows[0]!.id, id);
-        assert.equal(rows[0]!.state, 'archived');
+        assertStrictEquals(rows.length, 4);
+        assertStrictEquals(rows[0]!.id, id);
+        assertStrictEquals(rows[0]!.state, 'archived');
         const archived = rows.filter(
             (row) => row.state === 'archived',
         );
-        assert.equal(archived.length, 2);
+        assertStrictEquals(archived.length, 2);
     },
 );

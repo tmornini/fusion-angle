@@ -1,11 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertThrows } from '@std/assert';
 import {
     validateMembershipEntity,
 } from '../api/validators.ts';
 
-test('validates a membership body', () => {
-    assert.deepEqual(
+Deno.test('validates a membership body', () => {
+    assertEquals(
         validateMembershipEntity({
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             identity_id: 'XXZruirZyAOoRpNxaDnpSA',
@@ -21,8 +20,8 @@ test('validates a membership body', () => {
     );
 });
 
-test('rejects a membership with an extra key', () => {
-    assert.throws(() =>
+Deno.test('rejects a membership with an extra key', () => {
+    assertThrows(() =>
         validateMembershipEntity({
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             identity_id: 'XXZruirZyAOoRpNxaDnpSA',
@@ -32,8 +31,8 @@ test('rejects a membership with an extra key', () => {
         }));
 });
 
-test('rejects a membership with a bad timestamp', () => {
-    assert.throws(() =>
+Deno.test('rejects a membership with a bad timestamp', () => {
+    assertThrows(() =>
         validateMembershipEntity({
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             identity_id: 'XXZruirZyAOoRpNxaDnpSA',
@@ -42,8 +41,8 @@ test('rejects a membership with a bad timestamp', () => {
         }));
 });
 
-test('rejects a membership missing type', () => {
-    assert.throws(() =>
+Deno.test('rejects a membership missing type', () => {
+    assertThrows(() =>
         validateMembershipEntity({
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             identity_id: 'XXZruirZyAOoRpNxaDnpSA',

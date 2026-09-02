@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     PUT,
     handleRequest,
@@ -102,7 +101,7 @@ function freshClaimBody() {
 // unclaimed. Never-written and unknown addresses 404.
 // A second DELETE is 204 (already-gone).
 
-test(
+Deno.test(
     'release of a live claim is 204 and the claim history'
     + ' shows claim_released',
     async () => {
@@ -118,17 +117,17 @@ test(
                 + '/claim',
             DEV_TOKEN,
         ));
-        assert.equal(res.status, 204);
+        assertStrictEquals(res.status, 204);
         const events = await claimEventsFor(db);
         const released = events.find(
             (ev) => ev.state === 'claim_released',
         );
-        assert.ok(released !== undefined);
-        assert.equal(released!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+        assert(released !== undefined);
+        assertStrictEquals(released!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
-test(
+Deno.test(
     'DELETE claim with no row is 404; a second DELETE'
     + ' after release is 204',
     async () => {
@@ -139,7 +138,7 @@ test(
                 + '/claim',
             DEV_TOKEN,
         ));
-        assert.equal(missing.status, 404);
+        assertStrictEquals(missing.status, 404);
         await PUT(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
@@ -151,16 +150,16 @@ test(
                 + '/claim',
             DEV_TOKEN,
         ));
-        assert.equal(first.status, 204);
+        assertStrictEquals(first.status, 204);
         const second = await handleRequest(db, req(
             'DELETE',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
             DEV_TOKEN,
         ));
-        assert.equal(second.status, 204);
+        assertStrictEquals(second.status, 204);
         const events = await claimEventsFor(db);
-        assert.equal(
+        assertStrictEquals(
             events.filter(
                 (ev) => ev.state === 'claim_released',
             ).length,
@@ -169,7 +168,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'release of another member\'s live claim succeeds'
     + ' (member-tier, today\'s open-release posture)',
     async () => {
@@ -186,19 +185,19 @@ test(
                 + '/claim',
             DEV_TOKEN,
         ));
-        assert.equal(res.status, 204);
+        assertStrictEquals(res.status, 204);
         // claim_released authored by the releasing actor
         // (current), not the prior claimant (other).
         const events = await claimEventsFor(db);
         const released = events.find(
             (ev) => ev.state === 'claim_released',
         );
-        assert.ok(released !== undefined);
-        assert.equal(released!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+        assert(released !== undefined);
+        assertStrictEquals(released!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
-test(
+Deno.test(
     'DELETE claim of an unknown work order is 404',
     async () => {
         const db = await seededDb();
@@ -208,6 +207,6 @@ test(
                 + 'oWslHMRoFMtRnPHtccdMeA/claim',
             DEV_TOKEN,
         ));
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
     },
 );

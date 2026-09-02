@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from '@std/assert';
 import {
     buildGraphSvg,
 } from '../web-app/app/flow-graph.ts';
@@ -59,17 +58,17 @@ function render(
     ).toString();
 }
 
-test(
+Deno.test(
     'a hostile node id renders escaped in'
     + ' data-node-id',
     () => {
         const out = render(
             [node(HOSTILE_ID)], [],
         );
-        assert.ok(
+        assert(
             !out.includes(HOSTILE_ID),
         );
-        assert.ok(
+        assert(
             out.includes(
                 'data-node-id="'
                 + HOSTILE_ID_ESCAPED
@@ -79,7 +78,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'a hostile edge id renders escaped in'
     + ' data-edge-id',
     () => {
@@ -96,17 +95,17 @@ test(
             ],
             [edge(HOSTILE_ID, 'a', 'b')],
         );
-        assert.ok(
+        assert(
             !out.includes(HOSTILE_ID),
         );
-        assert.ok(
+        assert(
             out.includes(
                 'data-edge-id="'
                 + HOSTILE_ID_ESCAPED
                 + '"',
             ),
         );
-        assert.ok(
+        assert(
             out.includes(
                 'data-edge-ref="'
                 + HOSTILE_ID_ESCAPED
@@ -116,7 +115,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'a hostile edge id from the Create node'
     + ' renders escaped in data-edge-ref',
     () => {
@@ -134,10 +133,10 @@ test(
             ],
             [edge(HOSTILE_ID, 'a', 'b')],
         );
-        assert.ok(
+        assert(
             !out.includes(HOSTILE_ID),
         );
-        assert.ok(
+        assert(
             out.includes(
                 'data-edge-ref="'
                 + HOSTILE_ID_ESCAPED
@@ -147,14 +146,14 @@ test(
     },
 );
 
-test(
+Deno.test(
     'an ampersand in a node id renders as'
     + ' a character entity',
     () => {
         const out = render(
             [node('a&b')], [],
         );
-        assert.ok(
+        assert(
             out.includes(
                 'data-node-id="a&amp;b"',
             ),

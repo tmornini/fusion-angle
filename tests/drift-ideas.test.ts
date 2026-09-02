@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -144,7 +148,7 @@ const SEEDED_IDEAS = buildIdeas().map((idea, index) => ({
     success_metrics: idea.success_metrics,
 }));
 
-test('seeded GET /ideas wire equals stored live PUT bodies',
+Deno.test('seeded GET /ideas wire equals stored live PUT bodies',
 async () => {
     const db = await seededDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
@@ -159,19 +163,19 @@ async () => {
                 token,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const prefix = '/organizations/'
             + organization + '/ideas/';
-        assert.equal(
+        assertStrictEquals(
             await res.text(),
             await storedCollectionText(db, prefix),
         );
         const derived = await deriveIdeas(db, organization);
-        assert.ok(derived.length > 0);
+        assert(derived.length > 0);
     }
 });
 
-test('per-idea GET wire equals the stored PUT body',
+Deno.test('per-idea GET wire equals the stored PUT body',
 async () => {
     const db = await seededDb();
     for (const seed of SEEDED_IDEAS) {
@@ -186,22 +190,22 @@ async () => {
                 token,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const prefix = '/organizations/'
             + seed.organization + '/ideas/';
-        assert.equal(
+        assertStrictEquals(
             await res.text(),
             await storedPutBodyText(db, prefix, seed.id),
         );
         const derived = await deriveIdea(
             db, seed.organization, seed.id,
         );
-        assert.equal(derived.title, seed.title);
-        assert.equal(derived.position, seed.position);
+        assertStrictEquals(derived.title, seed.title);
+        assertStrictEquals(derived.position, seed.position);
     }
 });
 
-test('a foreign-org idea id 404s on GET and on derive',
+Deno.test('a foreign-org idea id 404s on GET and on derive',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_IDEAS.find(
@@ -216,13 +220,13 @@ async () => {
                 , token,
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
     const body = await res.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         body.error,
         'Not found: ideas/' + foreign.id,
     );
-    await assert.rejects(
+    await assertRejects(
         () => deriveIdea(db, 'BBjWJsjYIDkTRKIIPrzWRw', foreign.id),
         EntityNotFoundError,
     );
@@ -230,7 +234,7 @@ async () => {
 
 // Live fixtures inserted NON-LEX (z, then a, then m) so
 // oldest live head (at, id) is insertion, not id-lex.
-test('GET /ideas is oldest live head (at, id) first; '
+Deno.test('GET /ideas is oldest live head (at, id) first; '
 + 'bodies equal GET /organizations/:id/ideas/:id (minus Date)',
 async () => {
     const db = await seededDb();
@@ -261,10 +265,10 @@ async () => {
                 , token,
             ideaDocument(f.title, 'active', f.at, f.ev),
         ));
-        assert.equal(put.status, 201);
+        assertStrictEquals(put.status, 201);
         // PUT response is canonicalJson (sorted keys) from
         // the stored pair; values match WRITE_RESPONSE_SPECS.
-        assert.deepEqual(
+        assertEquals(
             await put.json(),
             wireIdeaGet(f.id, f.title, 'active', f.at, f.ev),
         );
@@ -274,15 +278,15 @@ async () => {
     const res = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', token),
     );
-    assert.equal(res.status, 200);
-    assert.ok(res.headers.get('Date'));
-    assert.equal(res.headers.get('ETag'), null);
+    assertStrictEquals(res.status, 200);
+    assert(res.headers.get('Date'));
+    assertStrictEquals(res.headers.get('ETag'), null);
     const list = await res.json() as { id: string }[];
     const added = list.filter((row) =>
         [
             IDEA_DRIFT_Z, IDEA_DRIFT_A, IDEA_DRIFT_M,
         ].includes(row.id));
-    assert.deepEqual(
+    assertEquals(
         added.map((row) => row.id),
         [IDEA_DRIFT_Z, IDEA_DRIFT_A, IDEA_DRIFT_M],
     );
@@ -292,12 +296,12 @@ async () => {
             db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + row.id, token),
         );
-        assert.equal(single.status, 200);
-        assert.equal(
+        assertStrictEquals(single.status, 200);
+        assertStrictEquals(
             await single.text(),
             await storedPutBodyText(db, prefix, row.id),
         );
-        assert.deepEqual(
+        assertEquals(
             JSON.parse(await storedPutBodyText(
                 db, prefix, row.id,
             )),
@@ -306,7 +310,7 @@ async () => {
     }
 });
 
-test('derived history keeps the FIRST arrival\'s authorship'
+Deno.test('derived history keeps the FIRST arrival\'s authorship'
 + ' on a same-trio resend by a different member', async () => {
     const db = await seededDb();
     await seedOrganizationMember(db, MEMBER_B);
@@ -338,8 +342,8 @@ test('derived history keeps the FIRST arrival\'s authorship'
     const derived = await deriveIdeaStateHistory(
         db, 'AjdvjuECVZEgZoFajaIEkg', ideaId,
     );
-    assert.equal(derived.length, 1);
-    assert.equal(derived[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(derived.length, 1);
+    assertStrictEquals(derived[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 
     // Wire entity reflects the SECOND title; authorship of the
     // head event stays on member A. GET streams the stored PUT.
@@ -347,8 +351,8 @@ test('derived history keeps the FIRST arrival\'s authorship'
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId, tokenA),
     );
-    assert.equal(getRes.status, 200);
-    assert.equal(
+    assertStrictEquals(getRes.status, 200);
+    assertStrictEquals(
         await getRes.text(),
         await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', ideaId,
@@ -356,7 +360,7 @@ test('derived history keeps the FIRST arrival\'s authorship'
     );
 });
 
-test('submission PUT/GET wire matches literal reconstruction',
+Deno.test('submission PUT/GET wire matches literal reconstruction',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -380,7 +384,7 @@ async () => {
             + '/submissions/uUxVMlhmrrgaNuqzpdGCUw',
         token, subBody,
     ));
-    assert.equal(putRes.status, 201);
+    assertStrictEquals(putRes.status, 201);
     // derive / GET insertion order (id, idea_id, member_id, at).
     const expectedSub = {
         id: 'uUxVMlhmrrgaNuqzpdGCUw',
@@ -389,30 +393,30 @@ async () => {
         at: '2026-02-01T00:00:01.000000Z',
     };
     // PUT response is canonicalJson (sorted keys); values match.
-    assert.deepEqual(await putRes.json(), expectedSub);
+    assertEquals(await putRes.json(), expectedSub);
     const listRes = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
             + '/submissions/', token,
     ));
-    assert.equal(listRes.status, 200);
-    assert.equal(
+    assertStrictEquals(listRes.status, 200);
+    assertStrictEquals(
         await listRes.text(),
         JSON.stringify([expectedSub]),
     );
     const derived = await deriveIdeaSubmissions(
         db, 'AjdvjuECVZEgZoFajaIEkg', ideaId,
     );
-    assert.deepEqual(derived, [expectedSub]);
+    assertEquals(derived, [expectedSub]);
 });
 
-test('seeded idea submissions: derive non-empty for every'
+Deno.test('seeded idea submissions: derive non-empty for every'
 + ' seeded idea, per org', async () => {
     const db = await seededDb();
     for (const { id, organization } of SEEDED_IDEAS) {
         const derived = await deriveIdeaSubmissions(
             db, organization, id,
         );
-        assert.ok(
+        assert(
             derived.length > 0,
             'seeded submission missing for ' + id,
         );
@@ -425,14 +429,14 @@ test('seeded idea submissions: derive non-empty for every'
                 + '/ideas/' + id + '/submissions/',
             token,
         ));
-        assert.equal(res.status, 200);
-        assert.equal(
+        assertStrictEquals(res.status, 200);
+        assertStrictEquals(
             await res.text(), JSON.stringify(derived),
         );
     }
 });
 
-test('live-write lifecycle: create + edit + transition +'
+Deno.test('live-write lifecycle: create + edit + transition +'
 + ' delete, wire and derive agree', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -468,9 +472,9 @@ test('live-write lifecycle: create + edit + transition +'
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId, token),
     );
-    assert.equal(beforeDelete.status, 200);
+    assertStrictEquals(beforeDelete.status, 200);
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
-    assert.equal(
+    assertStrictEquals(
         await beforeDelete.text(),
         await storedPutBodyText(db, prefix, ideaId),
     );
@@ -491,12 +495,12 @@ test('live-write lifecycle: create + edit + transition +'
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId, token),
     );
-    assert.equal(afterDelete.status, 200);
-    assert.equal(
+    assertStrictEquals(afterDelete.status, 200);
+    assertStrictEquals(
         await afterDelete.text(),
         await storedPutBodyText(db, prefix, ideaId),
     );
-    await assert.rejects(
+    await assertRejects(
         () => deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg', ideaId),
         EntityNotFoundError,
     );
@@ -504,17 +508,17 @@ test('live-write lifecycle: create + edit + transition +'
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', token),
     );
     const list = await listRes.json() as { id: string }[];
-    assert.equal(
+    assertStrictEquals(
         list.some((idea) => idea.id === ideaId), true,
     );
 
     const derivedHistory = await deriveIdeaStateHistory(
         db, 'AjdvjuECVZEgZoFajaIEkg', ideaId,
     );
-    assert.equal(derivedHistory.length, 3);
+    assertStrictEquals(derivedHistory.length, 3);
 });
 
-test('live approve then convert: derived idea history'
+Deno.test('live approve then convert: derived idea history'
 + ' includes \'promoted\'', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -569,13 +573,13 @@ test('live approve then convert: derived idea history'
             baselines: [],
         },
     ));
-    assert.equal(convert.status, 201);
+    assertStrictEquals(convert.status, 201);
 
     const derived = await deriveIdeaStateHistory(
         db, 'AjdvjuECVZEgZoFajaIEkg', ideaId,
     );
-    assert.equal(derived.length, 3);
-    assert.ok(
+    assertStrictEquals(derived.length, 3);
+    assert(
         derived.some((event) => event.state === 'promoted'),
     );
     // Entity GET streams the stored PUT (conversion document).
@@ -583,8 +587,8 @@ test('live approve then convert: derived idea history'
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId, token),
     );
-    assert.equal(getRes.status, 200);
-    assert.equal(
+    assertStrictEquals(getRes.status, 200);
+    assertStrictEquals(
         await getRes.text(),
         await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', ideaId,
@@ -596,7 +600,7 @@ test('live approve then convert: derived idea history'
 // whose state_at sorts BELOW genesis does NOT displace genesis
 // as lifecycle-current. Head body fields (title) may reflect
 // the later arrival; the GET trio must stay genesis.
-test('GET idea trio is lifecycle-current under clock skew'
+Deno.test('GET idea trio is lifecycle-current under clock skew'
 + ' (genesis-wins-under-skew, case 7d)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -612,7 +616,7 @@ test('GET idea trio is lifecycle-current under clock skew'
             'Genesis Title', 'active', genesisAt, genesisEv,
         ),
     ));
-    assert.equal(genesis.status, 201);
+    assertStrictEquals(genesis.status, 201);
 
     // Later arrival, earlier state_at, different state + title.
     const skewed = await handleRequest(db, req(
@@ -621,27 +625,27 @@ test('GET idea trio is lifecycle-current under clock skew'
             'Skewed Title', 'in_review', skewedAt, skewedEv,
         ),
     ));
-    assert.equal(skewed.status, 201);
+    assertStrictEquals(skewed.status, 201);
 
     const getRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId, token),
     );
-    assert.equal(getRes.status, 200);
+    assertStrictEquals(getRes.status, 200);
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
     const expected = wireIdeaGet(
         ideaId, 'Skewed Title', 'in_review', genesisAt,
         genesisEv,
     );
-    assert.deepEqual(await getRes.json(), expected);
-    assert.deepEqual(
+    assertEquals(await getRes.json(), expected);
+    assertEquals(
         JSON.parse(await storedPutBodyText(db, prefix, ideaId)),
         expected,
     );
     const derived = await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg', ideaId);
-    assert.equal(
+    assertStrictEquals(
         JSON.stringify(derived), JSON.stringify(expected),
     );
-    assert.equal(derived.title, 'Skewed Title');
-    assert.equal(derived.state, 'in_review');
+    assertStrictEquals(derived.title, 'Skewed Title');
+    assertStrictEquals(derived.state, 'in_review');
 });

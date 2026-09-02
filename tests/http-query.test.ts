@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 
 const request = HttpMessage.fromWire(
@@ -23,82 +22,82 @@ const chunked = HttpMessage.fromWire(
     '\r\n',
 );
 
-test('queries the request method', () => {
-    assert.equal(request.query('method').toText(), 'GET');
+Deno.test('queries the request method', () => {
+    assertStrictEquals(request.query('method').toText(), 'GET');
 });
 
-test('queries the request target', () => {
-    assert.equal(request.query('target').toText(), '/search?q=1');
+Deno.test('queries the request target', () => {
+    assertStrictEquals(request.query('target').toText(), '/search?q=1');
 });
 
-test('queries the request version', () => {
-    assert.equal(request.query('version').toText(), 'HTTP/1.1');
+Deno.test('queries the request version', () => {
+    assertStrictEquals(request.query('version').toText(), 'HTTP/1.1');
 });
 
-test('a response field is absent on a request', () => {
-    assert.equal(request.query('status').exists(), false);
+Deno.test('a response field is absent on a request', () => {
+    assertStrictEquals(request.query('status').exists(), false);
 });
 
-test('queries the response status as a number', () => {
-    assert.equal(response.query('status').toNumber(), 404);
+Deno.test('queries the response status as a number', () => {
+    assertStrictEquals(response.query('status').toNumber(), 404);
 });
 
-test('queries the response reason', () => {
-    assert.equal(response.query('reason').toText(), 'Not Found');
+Deno.test('queries the response reason', () => {
+    assertStrictEquals(response.query('reason').toText(), 'Not Found');
 });
 
-test('queries a raw header value', () => {
-    assert.equal(
+Deno.test('queries a raw header value', () => {
+    assertStrictEquals(
         request.query('header.host').toText(),
         'example.com',
     );
 });
 
-test('queries a date header through toDate', () => {
-    assert.equal(
+Deno.test('queries a date header through toDate', () => {
+    assertStrictEquals(
         request.query('header.date').toDate().getTime(),
         Date.UTC(1994, 10, 6, 8, 49, 37),
     );
 });
 
-test('an absent header is absent', () => {
-    assert.equal(request.query('header.accept').exists(), false);
+Deno.test('an absent header is absent', () => {
+    assertStrictEquals(request.query('header.accept').exists(), false);
 });
 
-test('derives content-length from the body', () => {
-    assert.equal(
+Deno.test('derives content-length from the body', () => {
+    assertStrictEquals(
         response.query('header.content-length').toNumber(),
         2,
     );
 });
 
-test('content-length is absent without a body', () => {
-    assert.equal(
+Deno.test('content-length is absent without a body', () => {
+    assertStrictEquals(
         request.query('header.content-length').exists(),
         false,
     );
 });
 
-test('derives transfer-encoding when chunked', () => {
-    assert.equal(
+Deno.test('derives transfer-encoding when chunked', () => {
+    assertStrictEquals(
         chunked.query('header.transfer-encoding').toText(),
         'chunked',
     );
 });
 
-test('content-length is absent for a chunked message', () => {
-    assert.equal(
+Deno.test('content-length is absent for a chunked message', () => {
+    assertStrictEquals(
         chunked.query('header.content-length').exists(),
         false,
     );
 });
 
-test('queries a trailer field', () => {
-    assert.equal(chunked.query('trailer.x-sum').toText(), 'z');
+Deno.test('queries a trailer field', () => {
+    assertStrictEquals(chunked.query('trailer.x-sum').toText(), 'z');
 });
 
-test('a trailer field is absent when not chunked', () => {
-    assert.equal(response.query('trailer.x-sum').exists(), false);
+Deno.test('a trailer field is absent when not chunked', () => {
+    assertStrictEquals(response.query('trailer.x-sum').exists(), false);
 });
 
 const typed = HttpMessage.fromWire(
@@ -116,29 +115,29 @@ const cacheable = HttpMessage.fromWire(
     '\r\n',
 );
 
-test('queries an item field bare value', () => {
-    assert.equal(
+Deno.test('queries an item field bare value', () => {
+    assertStrictEquals(
         typed.query('header.content-type').toText(),
         'text/html',
     );
 });
 
-test('queries an item field parameter', () => {
-    assert.equal(
+Deno.test('queries an item field parameter', () => {
+    assertStrictEquals(
         typed.query('header.content-type.charset').toText(),
         'utf-8',
     );
 });
 
-test('queries a dictionary member as a number', () => {
-    assert.equal(
+Deno.test('queries a dictionary member as a number', () => {
+    assertStrictEquals(
         cacheable.query('header.cache-control.max-age').toNumber(),
         3600,
     );
 });
 
-test('queries a dictionary boolean member', () => {
-    assert.equal(
+Deno.test('queries a dictionary boolean member', () => {
+    assertStrictEquals(
         cacheable
             .query('header.cache-control.no-cache')
             .toBoolean(),
@@ -146,127 +145,127 @@ test('queries a dictionary boolean member', () => {
     );
 });
 
-test('queries a list member by index', () => {
-    assert.equal(
+Deno.test('queries a list member by index', () => {
+    assertStrictEquals(
         typed.query('header.accept-encoding.1').toText(),
         'deflate',
     );
 });
 
-test('queries a list member parameter', () => {
-    assert.equal(
+Deno.test('queries a list member parameter', () => {
+    assertStrictEquals(
         typed.query('header.accept.0.q').toNumber(),
         0.8,
     );
 });
 
-test('an unregistered field stays raw', () => {
-    assert.equal(
+Deno.test('an unregistered field stays raw', () => {
+    assertStrictEquals(
         typed.query('header.x-custom').toText(),
         'a=1;b=2',
     );
 });
 
-test('a malformed structured field falls back to raw', () => {
+Deno.test('a malformed structured field falls back to raw', () => {
     const bad = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\ncache-control: @@bad@@\r\n\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         bad.query('header.cache-control').toText(),
         '@@bad@@',
     );
 });
 
-test('a missing dictionary member is absent', () => {
-    assert.equal(
+Deno.test('a missing dictionary member is absent', () => {
+    assertStrictEquals(
         cacheable.query('header.cache-control.no-store').exists(),
         false,
     );
 });
 
-test('queries a boolean parameter (8941 ?1)', () => {
+Deno.test('queries a boolean parameter (8941 ?1)', () => {
     const message = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\ncontent-type: text/html;x=?1\r\n\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.query('header.content-type.x').toBoolean(),
         true,
     );
 });
 
-test('queries a false boolean parameter (8941 ?0)', () => {
+Deno.test('queries a false boolean parameter (8941 ?0)', () => {
     const message = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\ncontent-type: text/html;x=?0\r\n\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.query('header.content-type.x').toBoolean(),
         false,
     );
 });
 
-test('queries a quoted-string parameter (8941 string)', () => {
+Deno.test('queries a quoted-string parameter (8941 string)', () => {
     const message = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\n'
         + 'content-type: text/html;title="a b"\r\n\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.query('header.content-type.title').toText(),
         'a b',
     );
 });
 
-test('queries a string parameter with escapes', () => {
+Deno.test('queries a string parameter with escapes', () => {
     const message = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\n'
         + 'content-type: text/html;t="a\\"b"\r\n\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.query('header.content-type.t').toText(),
         'a"b',
     );
 });
 
-test('an unterminated quoted string falls back to raw', () => {
+Deno.test('an unterminated quoted string falls back to raw', () => {
     const message = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\ncontent-type: "abc\r\n\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.query('header.content-type').toText(),
         '"abc',
     );
 });
 
-test('a list with a trailing comma falls back to raw', () => {
+Deno.test('a list with a trailing comma falls back to raw', () => {
     const message = HttpMessage.fromWire(
         'GET / HTTP/1.1\r\naccept-encoding: gzip,\r\n\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.query('header.accept-encoding').toText(),
         'gzip,',
     );
 });
 
-test('indexes into an inner-list member', () => {
+Deno.test('indexes into an inner-list member', () => {
     const message = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'accept-encoding: (gzip deflate), br\r\n\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.query('header.accept-encoding.0.1').toText(),
         'deflate',
     );
-    assert.equal(
+    assertStrictEquals(
         message.query('header.accept-encoding.1').toText(),
         'br',
     );
 });
 
-test('an inner-list member has no scalar leaf', () => {
+Deno.test('an inner-list member has no scalar leaf', () => {
     const message = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'accept-encoding: (gzip deflate), br\r\n\r\n',
     );
-    assert.equal(
+    assertStrictEquals(
         message.query('header.accept-encoding.0').exists(),
         false,
     );

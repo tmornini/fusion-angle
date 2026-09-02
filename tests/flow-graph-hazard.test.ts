@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import {
     shouldShowMemberHazard,
 } from '../web-app/app/flow-graph.ts';
@@ -41,11 +40,11 @@ function edge(
     };
 }
 
-test(
+Deno.test(
     'zero members on a regular node renders danger',
     () => {
         const n = buildNode('n1', []);
-        assert.equal(
+        assertStrictEquals(
             shouldShowMemberHazard(
                 n,
                 [edge('YiJPbufDpkyrZcZCYbUJpg', 'n1', 'next')],
@@ -55,12 +54,12 @@ test(
     },
 );
 
-test(
+Deno.test(
     'one member on a regular node with outgoing'
     + ' edges renders warning',
     () => {
         const n = buildNode('n1', ['hw_1']);
-        assert.equal(
+        assertStrictEquals(
             shouldShowMemberHazard(
                 n,
                 [edge('YiJPbufDpkyrZcZCYbUJpg', 'n1', 'next')],
@@ -70,14 +69,14 @@ test(
     },
 );
 
-test(
+Deno.test(
     'two or more members with outgoing edges'
     + ' renders no hazard',
     () => {
         const n = buildNode(
             'n1', ['hw_1', 'hw_2'],
         );
-        assert.equal(
+        assertStrictEquals(
             shouldShowMemberHazard(
                 n,
                 [edge('YiJPbufDpkyrZcZCYbUJpg', 'n1', 'next')],
@@ -87,54 +86,54 @@ test(
     },
 );
 
-test(
+Deno.test(
     'one member with no outgoing edges (dead-end)'
     + ' renders danger (precedence over warning)',
     () => {
         const n = buildNode('n1', ['hw_1']);
-        assert.equal(
+        assertStrictEquals(
             shouldShowMemberHazard(n, []),
             'danger',
         );
     },
 );
 
-test(
+Deno.test(
     'a start node never renders hazard regardless'
     + ' of member count',
     () => {
         const n = buildNode('n1', [], {
             isCreate: true,
         });
-        assert.equal(
+        assertStrictEquals(
             shouldShowMemberHazard(n, []),
             null,
         );
     },
 );
 
-test(
+Deno.test(
     'a complete node never renders hazard'
     + ' regardless of member count',
     () => {
         const n = buildNode('n1', [], {
             isArchive: true,
         });
-        assert.equal(
+        assertStrictEquals(
             shouldShowMemberHazard(n, []),
             null,
         );
     },
 );
 
-test(
+Deno.test(
     'multiple members but no outgoing edges still'
     + ' renders danger (dead-end takes precedence)',
     () => {
         const n = buildNode(
             'n1', ['hw_1', 'hw_2', 'hw_3'],
         );
-        assert.equal(
+        assertStrictEquals(
             shouldShowMemberHazard(n, []),
             'danger',
         );

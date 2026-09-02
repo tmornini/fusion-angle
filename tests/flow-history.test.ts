@@ -1,5 +1,8 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     buildFlowHistorySnapshot,
     canUndoFlowEdits,
@@ -33,63 +36,63 @@ function buildVersion(
     };
 }
 
-test(
+Deno.test(
     'buildFlowHistorySnapshot(false) yields'
     + ' clean snapshot with no undo history',
     () => {
         const s = buildFlowHistorySnapshot(false);
-        assert.equal(s.hasUndoHistory, false);
-        assert.deepEqual(s.redoStack, []);
+        assertStrictEquals(s.hasUndoHistory, false);
+        assertEquals(s.redoStack, []);
     },
 );
 
-test(
+Deno.test(
     'buildFlowHistorySnapshot(true) marks'
     + ' undo history present, empty redo stack',
     () => {
         const s = buildFlowHistorySnapshot(true);
-        assert.equal(s.hasUndoHistory, true);
-        assert.deepEqual(s.redoStack, []);
+        assertStrictEquals(s.hasUndoHistory, true);
+        assertEquals(s.redoStack, []);
     },
 );
 
-test(
+Deno.test(
     'canUndoFlowEdits returns hasUndoHistory'
     + ' verbatim',
     () => {
         const yes = buildFlowHistorySnapshot(true);
         const no = buildFlowHistorySnapshot(false);
-        assert.equal(canUndoFlowEdits(yes), true);
-        assert.equal(canUndoFlowEdits(no), false);
+        assertStrictEquals(canUndoFlowEdits(yes), true);
+        assertStrictEquals(canUndoFlowEdits(no), false);
     },
 );
 
-test(
+Deno.test(
     'canRedoFlowEdits is true iff redo stack'
     + ' is non-empty',
     () => {
         const empty = buildFlowHistorySnapshot(true);
-        assert.equal(canRedoFlowEdits(empty), false);
+        assertStrictEquals(canRedoFlowEdits(empty), false);
         const filled = appendToRedoStack(
             empty, buildVersion('xDyDkxEPwtcNmJVknUHDsg'),
         );
-        assert.equal(
+        assertStrictEquals(
             canRedoFlowEdits(filled), true,
         );
     },
 );
 
-test(
+Deno.test(
     'recordFlowMutation sets hasUndoHistory'
     + ' and leaves redo stack empty (F37)',
     () => {
         const result = recordFlowMutation();
-        assert.equal(result.hasUndoHistory, true);
-        assert.deepEqual(result.redoStack, []);
+        assertStrictEquals(result.hasUndoHistory, true);
+        assertEquals(result.redoStack, []);
     },
 );
 
-test(
+Deno.test(
     'recordUndoHistoryMark sets the flag'
     + ' and preserves redo stack',
     () => {
@@ -100,43 +103,43 @@ test(
         const off = recordUndoHistoryMark(
             seeded, false,
         );
-        assert.notEqual(off, seeded);
-        assert.equal(off.hasUndoHistory, false);
-        assert.equal(off.redoStack.length, 1);
-        assert.equal(off.redoStack[0]?.id, 'xDyDkxEPwtcNmJVknUHDsg');
+        assertNotStrictEquals(off, seeded);
+        assertStrictEquals(off.hasUndoHistory, false);
+        assertStrictEquals(off.redoStack.length, 1);
+        assertStrictEquals(off.redoStack[0]?.id, 'xDyDkxEPwtcNmJVknUHDsg');
         // Input unchanged.
-        assert.equal(seeded.hasUndoHistory, true);
+        assertStrictEquals(seeded.hasUndoHistory, true);
     },
 );
 
-test(
+Deno.test(
     'appendToRedoStack pushes version'
     + ' without mutating original',
     () => {
         const s = buildFlowHistorySnapshot(true);
         const v = buildVersion('xDyDkxEPwtcNmJVknUHDsg');
         const next = appendToRedoStack(s, v);
-        assert.notEqual(next, s);
-        assert.equal(next.redoStack.length, 1);
-        assert.equal(next.redoStack[0]?.id, 'xDyDkxEPwtcNmJVknUHDsg');
-        assert.equal(next.hasUndoHistory, true);
+        assertNotStrictEquals(next, s);
+        assertStrictEquals(next.redoStack.length, 1);
+        assertStrictEquals(next.redoStack[0]?.id, 'xDyDkxEPwtcNmJVknUHDsg');
+        assertStrictEquals(next.hasUndoHistory, true);
         // Original snapshot unchanged.
-        assert.equal(s.redoStack.length, 0);
+        assertStrictEquals(s.redoStack.length, 0);
     },
 );
 
-test(
+Deno.test(
     'removeFromRedoStack on empty stack'
     + ' returns same snapshot and undefined version',
     () => {
         const s = buildFlowHistorySnapshot(true);
         const r = removeFromRedoStack(s);
-        assert.equal(r.version, undefined);
-        assert.deepEqual(r.snapshot, s);
+        assertStrictEquals(r.version, undefined);
+        assertEquals(r.snapshot, s);
     },
 );
 
-test(
+Deno.test(
     'removeFromRedoStack pops the last version'
     + ' and shortens the stack',
     () => {
@@ -149,18 +152,18 @@ test(
             v2,
         );
         const r = removeFromRedoStack(seeded);
-        assert.notEqual(r.snapshot, seeded);
-        assert.equal(r.version?.id, 'v2');
-        assert.equal(r.snapshot.redoStack.length, 1);
-        assert.equal(
+        assertNotStrictEquals(r.snapshot, seeded);
+        assertStrictEquals(r.version?.id, 'v2');
+        assertStrictEquals(r.snapshot.redoStack.length, 1);
+        assertStrictEquals(
             r.snapshot.redoStack[0]?.id, 'xDyDkxEPwtcNmJVknUHDsg',
         );
         // Input snapshot unchanged.
-        assert.equal(seeded.redoStack.length, 2);
+        assertStrictEquals(seeded.redoStack.length, 2);
     },
 );
 
-test(
+Deno.test(
     'F35 round-trip: pushing a version onto'
     + ' the redo stack then popping returns it',
     () => {
@@ -173,8 +176,8 @@ test(
             buildFlowHistorySnapshot(true);
         const pushed = appendToRedoStack(initial, v);
         const popped = removeFromRedoStack(pushed);
-        assert.deepEqual(popped.version, v);
-        assert.deepEqual(
+        assertEquals(popped.version, v);
+        assertEquals(
             popped.snapshot.redoStack, [],
         );
     },

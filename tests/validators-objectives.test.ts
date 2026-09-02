@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals, assertThrows } from '@std/assert';
 import {
     validateObjectiveEntity,
     validateObjectiveRevisionEntity,
@@ -8,30 +7,30 @@ import {
     validateProjectEntity,
 } from '../api/validators.ts';
 
-test('validateObjectiveEntity accepts valid', () => {
+Deno.test('validateObjectiveEntity accepts valid', () => {
     const v = validateObjectiveEntity({
         organization_id: 'AjdvjuECVZEgZoFajaIEkg', position: 0,
     });
-    assert.equal(v.position, 0);
+    assertStrictEquals(v.position, 0);
 });
 
-test('validateObjectiveEntity accepts fractional position',
+Deno.test('validateObjectiveEntity accepts fractional position',
     () => {
         const v = validateObjectiveEntity({
             organization_id: 'AjdvjuECVZEgZoFajaIEkg', position: 1.5,
         });
-        assert.equal(v.position, 1.5);
+        assertStrictEquals(v.position, 1.5);
     });
 
-test('validateObjectiveEntity accepts negative position',
+Deno.test('validateObjectiveEntity accepts negative position',
     () => {
         const v = validateObjectiveEntity({
             organization_id: 'AjdvjuECVZEgZoFajaIEkg', position: -1,
         });
-        assert.equal(v.position, -1);
+        assertStrictEquals(v.position, -1);
     });
 
-test('validateObjectiveRevisionEntity accepts valid', () => {
+Deno.test('validateObjectiveRevisionEntity accepts valid', () => {
     const v = validateObjectiveRevisionEntity({
         objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
         name: 'Revenue',
@@ -39,12 +38,12 @@ test('validateObjectiveRevisionEntity accepts valid', () => {
         member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
         at: '2026-05-14T00:00:00.000000Z',
     });
-    assert.equal(v.name, 'Revenue');
+    assertStrictEquals(v.name, 'Revenue');
 });
 
-test('validateObjectiveRevisionEntity rejects empty name',
+Deno.test('validateObjectiveRevisionEntity rejects empty name',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateObjectiveRevisionEntity({
                 objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
                 name: '',
@@ -52,11 +51,11 @@ test('validateObjectiveRevisionEntity rejects empty name',
                 member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-14T00:00:00.000000Z',
             }),
-            /ObjectiveRevision\.name must be non-empty/,
+            Error, 'ObjectiveRevision.name must be non-empty',
         );
     });
 
-test('validateBaselineScoreEntity accepts 0', () => {
+Deno.test('validateBaselineScoreEntity accepts 0', () => {
     const v = validateBaselineScoreEntity({
         project_id: 'pnXmXrxOWayANgDLdCjuBw',
         objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
@@ -64,12 +63,12 @@ test('validateBaselineScoreEntity accepts 0', () => {
         member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
         at: '2026-05-14T00:00:00.000000Z',
     });
-    assert.equal(v.score, 0);
+    assertStrictEquals(v.score, 0);
 });
 
-test('validateBaselineScoreEntity accepts -100 and +100',
+Deno.test('validateBaselineScoreEntity accepts -100 and +100',
     () => {
-        assert.equal(
+        assertStrictEquals(
             validateBaselineScoreEntity({
                 project_id: 'pnXmXrxOWayANgDLdCjuBw'
                     , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
@@ -79,7 +78,7 @@ test('validateBaselineScoreEntity accepts -100 and +100',
             }).score,
             -100,
         );
-        assert.equal(
+        assertStrictEquals(
             validateBaselineScoreEntity({
                 project_id: 'pnXmXrxOWayANgDLdCjuBw'
                     , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
@@ -91,9 +90,9 @@ test('validateBaselineScoreEntity accepts -100 and +100',
         );
     });
 
-test('validateBaselineScoreEntity rejects out-of-range',
+Deno.test('validateBaselineScoreEntity rejects out-of-range',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateBaselineScoreEntity({
                 project_id: 'pnXmXrxOWayANgDLdCjuBw'
                     , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
@@ -101,9 +100,9 @@ test('validateBaselineScoreEntity rejects out-of-range',
                 member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-14T00:00:00.000000Z',
             }),
-            /\[-100, \+100\]/,
+            Error, '[-100, +100]',
         );
-        assert.throws(
+        assertThrows(
             () => validateBaselineScoreEntity({
                 project_id: 'pnXmXrxOWayANgDLdCjuBw'
                     , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
@@ -111,13 +110,13 @@ test('validateBaselineScoreEntity rejects out-of-range',
                 member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-14T00:00:00.000000Z',
             }),
-            /\[-100, \+100\]/,
+            Error, '[-100, +100]',
         );
     });
 
-test('validateBaselineScoreEntity rejects non-integer',
+Deno.test('validateBaselineScoreEntity rejects non-integer',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateBaselineScoreEntity({
                 project_id: 'pnXmXrxOWayANgDLdCjuBw'
                     , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
@@ -125,11 +124,11 @@ test('validateBaselineScoreEntity rejects non-integer',
                 member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-14T00:00:00.000000Z',
             }),
-            /\[-100, \+100\]/,
+            Error, '[-100, +100]',
         );
     });
 
-test('validateActualScoreEntity accepts -50', () => {
+Deno.test('validateActualScoreEntity accepts -50', () => {
     const v = validateActualScoreEntity({
         project_id: 'pnXmXrxOWayANgDLdCjuBw'
             , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
@@ -137,12 +136,12 @@ test('validateActualScoreEntity accepts -50', () => {
         member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
         at: '2026-05-14T00:00:00.000000Z',
     });
-    assert.equal(v.score, -50);
+    assertStrictEquals(v.score, -50);
 });
 
-test('validateActualScoreEntity rejects out-of-range',
+Deno.test('validateActualScoreEntity rejects out-of-range',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateActualScoreEntity({
                 project_id: 'pnXmXrxOWayANgDLdCjuBw'
                     , objective_id: 'ohqxgUBEaFQwYbXsonRPmg',
@@ -150,11 +149,11 @@ test('validateActualScoreEntity rejects out-of-range',
                 member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
                 at: '2026-05-14T00:00:00.000000Z',
             }),
-            /\[-100, \+100\]/,
+            Error, '[-100, +100]',
         );
     });
 
-test('validateProjectEntity ignores legacy impact fields',
+Deno.test('validateProjectEntity ignores legacy impact fields',
     () => {
         const baseValid = {
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
@@ -168,11 +167,11 @@ test('validateProjectEntity ignores legacy impact fields',
             position: 0,
         };
         const v = validateProjectEntity(baseValid);
-        assert.equal(
+        assertStrictEquals(
             'estimated_impact' in (v as object),
             false,
         );
-        assert.equal(
+        assertStrictEquals(
             'actual_impact' in (v as object),
             false,
         );

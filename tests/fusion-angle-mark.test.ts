@@ -1,96 +1,87 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import {
-    existsSync,
-    readFileSync,
-} from 'node:fs';
+import { assertMatch, assertNotMatch, assertStrictEquals } from '@std/assert';
+import { existsSync } from '@std/fs';
 
-test('mark.png is committed under assets', () => {
-    assert.equal(
+Deno.test('mark.png is committed under assets', () => {
+    assertStrictEquals(
         existsSync('web-app/assets/mark.png'),
         true,
     );
 });
 
-test('iconLogo is the PNG mark, not the atom',
+Deno.test('iconLogo is the PNG mark, not the atom',
 () => {
-    const src = readFileSync(
+    const src = Deno.readTextFileSync(
         'web-app/app/icons.ts',
-        'utf8',
     );
-    assert.match(src, /mark\.png/);
-    assert.match(src, /brand-mark/);
-    assert.doesNotMatch(src, /logo-orbital/);
-    assert.doesNotMatch(src, /logo-nucleus/);
+    assertMatch(src, /mark\.png/);
+    assertMatch(src, /brand-mark/);
+    assertNotMatch(src, /logo-orbital/);
+    assertNotMatch(src, /logo-nucleus/);
 });
 
-test('sidebars use the PNG mark', () => {
+Deno.test('sidebars use the PNG mark', () => {
     for (const path of [
         'web-app/app/component-sidebar.html',
         'web-app/app/component-mobile-sidebar.html',
     ] as const) {
-        const src = readFileSync(path, 'utf8');
-        assert.match(src, /mark\.png/);
-        assert.match(src, /brand-mark/);
-        assert.doesNotMatch(src, /logo-orbital/);
-        assert.doesNotMatch(src, /logo-nucleus/);
+        const src = Deno.readTextFileSync(path);
+        assertMatch(src, /mark\.png/);
+        assertMatch(src, /brand-mark/);
+        assertNotMatch(src, /logo-orbital/);
+        assertNotMatch(src, /logo-nucleus/);
     }
 });
 
-test('brand CSS inverts the mark in light theme',
+Deno.test('brand CSS inverts the mark in light theme',
 () => {
-    const src = readFileSync(
+    const src = Deno.readTextFileSync(
         'web-app/app/styles/components-brand.css',
-        'utf8',
     );
-    assert.match(src, /\.brand-mark/);
-    assert.match(src, /invert\(1\)/);
-    assert.doesNotMatch(src, /logo-orbital/);
-    assert.doesNotMatch(src, /logo-nucleus/);
+    assertMatch(src, /\.brand-mark/);
+    assertMatch(src, /invert\(1\)/);
+    assertNotMatch(src, /logo-orbital/);
+    assertNotMatch(src, /logo-nucleus/);
 });
 
-test('favicon.svg embeds the PNG and inverts in light',
+Deno.test('favicon.svg embeds the PNG and inverts in light',
 () => {
-    const src = readFileSync(
+    const src = Deno.readTextFileSync(
         'web-app/assets/favicon.svg',
-        'utf8',
     );
-    assert.match(src, /mark\.png/);
-    assert.match(
+    assertMatch(src, /mark\.png/);
+    assertMatch(
         src,
         /prefers-color-scheme:\s*light/,
     );
-    assert.match(src, /invert\(1\)/);
-    assert.doesNotMatch(src, /logo-orbital/);
-    assert.doesNotMatch(src, /orbital/);
-    assert.doesNotMatch(src, /nucleus/);
+    assertMatch(src, /invert\(1\)/);
+    assertNotMatch(src, /logo-orbital/);
+    assertNotMatch(src, /orbital/);
+    assertNotMatch(src, /nucleus/);
 });
 
-test('build copies mark.png next to the favicons', () => {
-    const src = readFileSync('build-lib', 'utf8');
-    assert.match(
+Deno.test('build copies mark.png next to the favicons', () => {
+    const src = Deno.readTextFileSync('build-lib');
+    assertMatch(
         src,
         /cp web-app\/assets\/mark\.png/,
     );
 });
 
-test('server declares image/png for .png', () => {
-    const src = readFileSync(
+Deno.test('server declares image/png for .png', () => {
+    const src = Deno.readTextFileSync(
         'server/http-server.ts',
-        'utf8',
     );
-    assert.match(src, /'\.png': 'image\/png'/);
+    assertMatch(src, /'\.png': 'image\/png'/);
 });
 
-test('auth branding does not invert the mark',
+Deno.test('auth branding does not invert the mark',
 () => {
-    const src = readFileSync(
+    const src = Deno.readTextFileSync(
         'web-app/app/styles/components-brand.css',
-        'utf8',
     );
-    assert.match(
+    assertMatch(
         src,
         /html:not\(\[data-theme="dark"\]\) \.auth-branding \.brand-mark/,
     );
-    assert.match(src, /filter:\s*none/);
+    assertMatch(src, /filter:\s*none/);
 });

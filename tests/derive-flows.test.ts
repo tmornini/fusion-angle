@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -121,7 +120,7 @@ function putFlow(
     ));
 }
 
-test(
+Deno.test(
     'a clock-skewed transition does NOT displace genesis — '
     + 'the graph still tracks the DOCUMENT head',
     async () => {
@@ -142,12 +141,12 @@ test(
             '2026-06-01T00:00:00.000000Z', genesisEventId,
             genesisGraph,
         );
-        assert.equal(genesis.status, 201);
+        assertStrictEquals(genesis.status, 201);
         const head = await handleRequest(db, req(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + id, token,
         ));
         const etag = head.headers.get('ETag');
-        assert.ok(etag
+        assert(etag
             , 'no ETag on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + id);
 
@@ -165,7 +164,7 @@ test(
             '2020-01-01T00:00:00.000000Z', laterEventId,
             skewedGraph, { 'if-match': etag },
         );
-        assert.equal(res.status, 201);
+        assertStrictEquals(res.status, 201);
 
         // Genesis must still win the lifecycle reduction: the
         // flow stays visible despite the later-arriving
@@ -176,12 +175,12 @@ test(
         );
         // Arrival order still governs the entity's OTHER
         // fields — the two reductions are independent.
-        assert.equal(derived.name, 'Skewed Title');
+        assertStrictEquals(derived.name, 'Skewed Title');
         // Design decision 6's third-head distinction: `graph`
         // tracks the DOCUMENT head (the second, envelope-later
         // PUT) — never the lifecycle-current pair (genesis),
         // even though genesis wins the lifecycle reduction.
-        assert.deepEqual(
+        assertEquals(
             derived.graph,
             skewedGraph,
         );
@@ -189,7 +188,7 @@ test(
         const flows = await deriveFlows(
             db, STARK_ORGANIZATION,
         );
-        assert.equal(
+        assertStrictEquals(
             flows.some((flow) => flow.id === id), true,
         );
 
@@ -200,7 +199,7 @@ test(
         // ascending — the SAME order store-state.ts's
         // getAllForIn returns. The later-ARRIVED but earlier-
         // STAMPED 'deleted' event sorts FIRST; genesis SECOND.
-        assert.deepEqual(
+        assertEquals(
             history.map((entry) => ({
                 id: entry.id,
                 entity_id: entry.entity_id,
@@ -225,7 +224,7 @@ test(
     },
 );
 
-test('ordering is oldest live head (at, id)', async () => {
+Deno.test('ordering is oldest live head (at, id)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ids = [
@@ -238,11 +237,11 @@ test('ordering is oldest live head (at, id)', async () => {
             db, token, id, 'Order ' + id, 'active',
             AT, generateIdentifier(), emptyGraph(),
         );
-        assert.equal(res.status, 201);
+        assertStrictEquals(res.status, 201);
     }
     const derived = await deriveFlows(db, STARK_ORGANIZATION);
     const observed = derived
         .map((flow) => flow.id)
         .filter((id) => ids.includes(id));
-    assert.deepEqual(observed, ids);
+    assertEquals(observed, ids);
 });

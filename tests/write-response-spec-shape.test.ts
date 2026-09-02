@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertNotStrictEquals, assertStrictEquals } from '@std/assert';
 import {
     WRITE_RESPONSE_SPECS,
     type WriteResponseSpec,
@@ -153,14 +152,14 @@ const DUMMY_BODIES: Readonly<
     },
 };
 
-test('leftover roster :id specs are gone', () => {
+Deno.test('leftover roster :id specs are gone', () => {
     for (const pattern of [
         'members/:id',
         'memberships/:id',
         'ai-members/:id',
         'human-members/:id',
     ]) {
-        assert.equal(
+        assertStrictEquals(
             WRITE_RESPONSE_SPECS[pattern],
             undefined,
             pattern,
@@ -168,7 +167,7 @@ test('leftover roster :id specs are gone', () => {
     }
 });
 
-test('every write successBody returns an object or is omitted',
+Deno.test('every write successBody returns an object or is omitted',
 () => {
     for (const [pattern, entry] of Object.entries(
         WRITE_RESPONSE_SPECS,
@@ -183,13 +182,13 @@ test('every write successBody returns an object or is omitted',
                 ACTOR,
                 ORGANIZATION,
             );
-            assert.equal(
+            assertStrictEquals(
                 typeof body, 'object', pattern,
             );
-            assert.equal(
+            assertStrictEquals(
                 Array.isArray(body), false, pattern,
             );
-            assert.notEqual(body, null, pattern);
+            assertNotStrictEquals(body, null, pattern);
         }
     }
 });

@@ -1,7 +1,13 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertNotEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
@@ -282,7 +288,7 @@ async function assertPiiFenceLeg(
 
 // -- 1. identities collection parity + getById + 404 bytes ------
 
-test('identities collection wire equals derive (13 incl.'
+Deno.test('identities collection wire equals derive (13 incl.'
 + ' system; agents are not identities) + getById + 404-byte'
 + ' parity', async () => {
     const db = await seededDb();
@@ -291,46 +297,45 @@ test('identities collection wire equals derive (13 incl.'
     const derived = await derivedIdentities(
         db, GLOBAL_PLANE_PLACEHOLDER,
     );
-    assert.equal(derived.length, 13);
+    assertStrictEquals(derived.length, 13);
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const res = await handleRequest(
         db, req('GET', '/identities/', token),
     );
-    assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), derived);
+    assertStrictEquals(res.status, 200);
+    assertEquals(await res.json(), derived);
 
     for (const identity of derived) {
         const one = await derivedIdentity(
             db, GLOBAL_PLANE_PLACEHOLDER, identity.id,
         );
-        assert.deepEqual(one, identity);
+        assertEquals(one, identity);
         const leaf = await handleRequest(
             db,
             req('GET', '/identities/' + identity.id, token),
         );
-        assert.equal(leaf.status, 200);
-        assert.deepEqual(await leaf.json(), one);
+        assertStrictEquals(leaf.status, 200);
+        assertEquals(await leaf.json(), one);
     }
 
     const missingId = generateIdentifier();
     const expectedMessage = 'Not found: identities/' + missingId;
-    await assert.rejects(
+    const err = await assertRejects(
         () => derivedIdentity(
             db, GLOBAL_PLANE_PLACEHOLDER, missingId,
         ),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedMessage,
-    );
+    ) as Error;
+    assertInstanceOf(err, EntityNotFoundError);
+    assertStrictEquals(err.message, expectedMessage);
 });
 
 // -- 2. identity-pii derive/fence parity + the THREE-WAY ------
 // -- viaMembership fence legs + leaf parity + 404 bytes ---------
 // -- Flat GET /identity-pii is retired (router 404). ------------
 
-test('identity-pii derive (12 seeded slots) fenced both'
+Deno.test('identity-pii derive (12 seeded slots) fenced both'
 + ' orgs + the THREE-WAY viaMembership fence legs (co-member'
 + ' visible, FOREIGN-org hidden — orphan visible) + leaf +'
 + ' 404 bytes', async () => {
@@ -339,7 +344,7 @@ test('identity-pii derive (12 seeded slots) fenced both'
 
     // -- unfenced collection (every live slot) --
     const derivedRows = sortById(await deriveIdentityPiiRows(db));
-    assert.equal(derivedRows.length, 12);
+    assertStrictEquals(derivedRows.length, 12);
     const unaffiliated = buildUnaffiliatedIdentity();
 
     // -- fenced collection both orgs (message-plane fence) --
@@ -349,15 +354,15 @@ test('identity-pii derive (12 seeded slots) fenced both'
         const derivedFenced = sortById(
             await pairPlaneFencedPii(db, organization),
         );
-        assert.ok(derivedFenced.length > 0);
+        assert(derivedFenced.length > 0);
         // every fenced row is in the unfenced set
         const unfencedIds = new Set(derivedRows.map(r => r.id));
         for (const row of derivedFenced) {
-            assert.ok(unfencedIds.has(row.id));
+            assert(unfencedIds.has(row.id));
         }
         // Orphan Riley (member of NO org) is VISIBLE in
         // BOTH orgs' fenced PII collections.
-        assert.ok(
+        assert(
             derivedFenced.some(
                 (row) => row.id === unaffiliated.id,
             ),
@@ -367,16 +372,15 @@ test('identity-pii derive (12 seeded slots) fenced both'
     // -- per-identity leaf + 404 --
     for (const row of derivedRows) {
         const derived = await deriveIdentityPii(db, row.id);
-        assert.deepEqual(derived, row);
+        assertEquals(derived, row);
     }
     const missingId = generateIdentifier();
     const expectedMessage = 'Not found: identity_pii/' + missingId;
-    await assert.rejects(
+    const err = await assertRejects(
         () => deriveIdentityPii(db, missingId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedMessage,
-    );
+    ) as Error;
+    assertInstanceOf(err, EntityNotFoundError);
+    assertStrictEquals(err.message, expectedMessage);
 
     // -- THE THREE-WAY FENCE LEGS (gate 15) --
     const adminToken = await organizationToken(
@@ -386,7 +390,7 @@ test('identity-pii derive (12 seeded slots) fenced both'
     // co-member leg: 'XXZruirZyAOoRpNxaDnpSA' is a Stark member (seeded) with
     // a
     // seeded pii row — visible from STARK on both planes.
-    assert.equal(
+    assertStrictEquals(
         await assertPiiFenceLeg(db, STARK_ORGANIZATION
             , 'XXZruirZyAOoRpNxaDnpSA'),
         true,
@@ -416,13 +420,13 @@ test('identity-pii derive (12 seeded slots) fenced both'
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO),
         { type: 'member', at: nowUtc() },
     ));
-    assert.equal(
+    assertStrictEquals(
         await assertPiiFenceLeg(
             db, STARK_ORGANIZATION, foreignId,
         ),
         false,
     );
-    assert.equal(
+    assertStrictEquals(
         await assertPiiFenceLeg(
             db, ORGANIZATION_TWO, foreignId,
         ),
@@ -443,7 +447,7 @@ test('identity-pii derive (12 seeded slots) fenced both'
             phone: '', bio: '',
         },
     ));
-    assert.equal(
+    assertStrictEquals(
         await assertPiiFenceLeg(
             db, STARK_ORGANIZATION, orphanId,
         ),
@@ -459,19 +463,19 @@ test('identity-pii derive (12 seeded slots) fenced both'
 // -- planes, for every seeded email AND an unknown one (both -----
 // -- null, the no-enumeration shape) -------------------------------
 
-test('by-email login-shape: identityByEmail resolves every'
+Deno.test('by-email login-shape: identityByEmail resolves every'
 + ' seeded email on the message plane + unknown is null',
 async () => {
     const db = await seededDb();
     const derivedRows = await deriveIdentityPiiRows(db);
-    assert.equal(derivedRows.length, 12);
+    assertStrictEquals(derivedRows.length, 12);
     // Phase Final Stage B: identity spine tables retired.
     for (const row of derivedRows) {
-        assert.equal(
+        assertStrictEquals(
             identityByEmail(derivedRows, row.email), row.id,
         );
     }
-    assert.equal(
+    assertStrictEquals(
         identityByEmail(derivedRows, 'nobody@example.com'),
         null,
     );
@@ -480,7 +484,7 @@ async () => {
 // -- 3. credentials parity per identity + per cid + the ---------
 // -- withoutSecret projection pin + 404 bytes --------------------
 
-test('credentials per identity + per cid (13 seeded) + the'
+Deno.test('credentials per identity + per cid (13 seeded) + the'
 + ' withoutSecret projection pin + 404 bytes', async () => {
     const db = await seededDb();
     // Phase Final Stage B: identity spine tables retired.
@@ -500,24 +504,23 @@ test('credentials per identity + per cid (13 seeded) + the'
             const one = await deriveCredential(
                 db, identity.id, row.id,
             );
-            assert.deepEqual(one, row);
-            assert.equal(
+            assertEquals(one, row);
+            assertStrictEquals(
                 'secret' in withoutSecret(one), false,
             );
         }
     }
-    assert.equal(allDerived.length, 13);
+    assertStrictEquals(allDerived.length, 13);
 
     const someIdentityId = allDerived[0]!.identity_id;
     const missingCid = generateIdentifier();
     const expectedMessage =
         'Not found: identity_credentials/' + missingCid;
-    await assert.rejects(
+    const err = await assertRejects(
         () => deriveCredential(db, someIdentityId, missingCid),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedMessage,
-    );
+    ) as Error;
+    assertInstanceOf(err, EntityNotFoundError);
+    assertStrictEquals(err.message, expectedMessage);
 });
 
 // -- 3b. GATE 15 FENCE-INPUT FIX (post-session review finding): --
@@ -527,7 +530,7 @@ test('credentials per identity + per cid (13 seeded) + the'
 // -- collection's WHERE(identity_id==path) semantics must ALSO ----
 // -- exclude it under path A on both planes, regardless of org ----
 
-test('credentials fence-input fix: a mismatched write (address'
+Deno.test('credentials fence-input fix: a mismatched write (address'
 + ' under identity A, body.identity_id names B) fences on the'
 + ' ROW identity (B), never the path (A) — the leaf, checked from'
 + " BOTH A's and B's org; the collection's WHERE(identity_id=="
@@ -582,7 +585,7 @@ test('credentials fence-input fix: a mismatched write (address'
         const credential = await deriveCredential(
             db, identityA, cid,
         );
-        assert.equal(credential.identity_id, identityB);
+        assertStrictEquals(credential.identity_id, identityB);
         const owner = pairPlaneOwnerOrganization(
             memberships, credential.identity_id, organization,
         );
@@ -590,12 +593,12 @@ test('credentials fence-input fix: a mismatched write (address'
             owner === null || owner === organization;
         // B is ORGANIZATION_TWO-only: hidden from STARK,
         // visible from ORGANIZATION_TWO.
-        assert.equal(
+        assertStrictEquals(
             derivedVisible,
             organization === ORGANIZATION_TWO,
             'leaf visibility for ' + organization,
         );
-        assert.equal(
+        assertStrictEquals(
             'secret' in withoutSecret(credential), false,
         );
 
@@ -604,7 +607,7 @@ test('credentials fence-input fix: a mismatched write (address'
         const derivedCollection = (
             await deriveCredentialsFor(db, identityA)
         ).filter((row) => row.identity_id === identityA);
-        assert.deepEqual(derivedCollection, []);
+        assertEquals(derivedCollection, []);
     }
     // Phase Final Stage B: identity spine tables retired.
 });
@@ -630,7 +633,7 @@ test('credentials fence-input fix: a mismatched write (address'
 // -- TRANSITIVELY — case 2 already proves the two row sets ------
 // -- equal; this pins the JOIN's key-omission shape alone) ------
 
-test('invitations enrichment parity: the personName/'
+Deno.test('invitations enrichment parity: the personName/'
 + ' inviteeEmail JOIN (invitationsForInvitee/sentInvitations,'
 + ' api/invitations-domain.ts) built over deriveIdentityPiiRows'
 + ' deep-equals the SAME JOIN over identityPii.getAll(),'
@@ -697,17 +700,17 @@ test('invitations enrichment parity: the personName/'
 
     // ABSENT-key pinned: the erased identity carries NO
     // invited_by_name/invitee_email key — never a '' sentinel.
-    assert.deepEqual(
+    assertEquals(
         enrichedByName(derivedRows)[1], { id: 'inv-b' },
     );
-    assert.deepEqual(
+    assertEquals(
         enrichedByEmail(derivedRows)[1], { id: 'inv-b' },
     );
     // The present identity's key IS carried.
-    assert.notDeepEqual(
+    assertNotEquals(
         enrichedByName(derivedRows)[0], { id: INV_A },
     );
-    assert.notDeepEqual(
+    assertNotEquals(
         enrichedByEmail(derivedRows)[0], { id: INV_A },
     );
 });

@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertInstanceOf,
+    assertNotStrictEquals,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { routes, type Route } from '../api/routes.ts';
@@ -45,7 +49,7 @@ function pathOf(
     return '/' + segs.join('/');
 }
 
-test('malformed identifier path params are 400',
+Deno.test('malformed identifier path params are 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -102,10 +106,10 @@ async () => {
             }
         }
     }
-    assert.equal(failures.join('\n'), '');
+    assertStrictEquals(failures.join('\n'), '');
 });
 
-test('malformed :etag is the identifier-gate 400',
+Deno.test('malformed :etag is the identifier-gate 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -120,14 +124,14 @@ async () => {
         }),
     );
     const body = await res.json() as { error?: string };
-    assert.equal(res.status, 400);
-    assert.equal(
+    assertStrictEquals(res.status, 400);
+    assertStrictEquals(
         body.error,
         'etag must be a 22-character identifier',
     );
 });
 
-test('malformed :name is not the identifier-gate 400',
+Deno.test('malformed :name is not the identifier-gate 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -144,13 +148,13 @@ async () => {
         }),
     );
     const body = await res.json() as { error?: string };
-    assert.notEqual(
+    assertNotStrictEquals(
         body.error,
         'name must be a 22-character identifier',
     );
 });
 
-test('malformed instance :etag is the identifier-gate 400',
+Deno.test('malformed instance :etag is the identifier-gate 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -169,24 +173,24 @@ async () => {
         }),
     );
     const body = await res.json() as { error?: string };
-    assert.equal(res.status, 400);
-    assert.equal(
+    assertStrictEquals(res.status, 400);
+    assertStrictEquals(
         body.error,
         'etag must be a 22-character identifier',
     );
 });
 
-test('incomingContext mints when request-id is absent',
+Deno.test('incomingContext mints when request-id is absent',
 () => {
     const db = memoryDbAdapter();
     const ctx = incomingContext(
         db,
         new Request('http://localhost/ideas/'),
     );
-    assert.equal(isIdentifier(ctx.requestId), true);
+    assertStrictEquals(isIdentifier(ctx.requestId), true);
 });
 
-test('incomingContext echoes a canonical request-id',
+Deno.test('incomingContext echoes a canonical request-id',
 () => {
     const db = memoryDbAdapter();
     const id = generateIdentifier();
@@ -196,10 +200,10 @@ test('incomingContext echoes a canonical request-id',
             headers: { [REQUEST_ID_HEADER]: id },
         }),
     );
-    assert.equal(ctx.requestId, id);
+    assertStrictEquals(ctx.requestId, id);
 });
 
-test('incomingContext mints a malformed request-id',
+Deno.test('incomingContext mints a malformed request-id',
 () => {
     const db = memoryDbAdapter();
     const ctx = incomingContext(
@@ -210,13 +214,13 @@ test('incomingContext mints a malformed request-id',
             },
         }),
     );
-    assert.equal(isIdentifier(ctx.requestId), true);
-    assert.notEqual(
+    assertStrictEquals(isIdentifier(ctx.requestId), true);
+    assertNotStrictEquals(
         ctx.requestId, 'not-an-identifier',
     );
 });
 
-test('malformed Request-ID after auth is 400',
+Deno.test('malformed Request-ID after auth is 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -232,15 +236,15 @@ async () => {
             },
         }),
     );
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const body = await res.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         body.error,
         'Request-ID must be a 22-character identifier',
     );
 });
 
-test('unauthenticated malformed Request-ID is 401',
+Deno.test('unauthenticated malformed Request-ID is 401',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -258,12 +262,12 @@ async () => {
             },
         ),
     );
-    assert.equal(res.status, 401);
+    assertStrictEquals(res.status, 401);
 });
 
-test('present transition instance_id must be an'
+Deno.test('present transition instance_id must be an'
 + ' identifier', () => {
-    assert.throws(
+    const err = assertThrows(
         () => validateWorkOrderTransitionBody({
             transitionEventId: 'te-val',
             targetState: 'n-next',
@@ -277,14 +281,10 @@ test('present transition instance_id must be an'
             transitionAt:
                 '2026-01-01T00:00:00.000000Z',
         }),
-        (err: unknown) => {
-            assert.ok(err instanceof ValidationError);
-            assert.equal(
-                err.message,
-                'instance_id must be a 22-character'
-                    + ' identifier',
-            );
-            return true;
-        },
+    ) as Error;
+    assertInstanceOf(err, ValidationError);
+    assertStrictEquals(
+        err.message,
+        'instance_id must be a 22-character identifier',
     );
 });

@@ -1,5 +1,8 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     buildRequestModel,
     canonicalJson,
@@ -34,7 +37,7 @@ const validInput = {
     operationId: TEST_OPERATION_ID,
 };
 
-test('canonical JSON is stable across key permutations',
+Deno.test('canonical JSON is stable across key permutations',
 () => {
     const a = buildRequestModel({
         method: 'PUT',
@@ -54,18 +57,18 @@ test('canonical JSON is stable across key permutations',
         ],
         body: { alpha: { a: 1, b: 2 }, zebra: 1 },
     });
-    assert.equal(canonicalJson(a), canonicalJson(b));
+    assertStrictEquals(canonicalJson(a), canonicalJson(b));
 });
 
-test('the at string round-trips byte-exact', () => {
+Deno.test('the at string round-trips byte-exact', () => {
     const model = buildRequestModel({
         method: 'PUT', target: '/x', fields: [],
         body: { at: AT },
     });
-    assert.ok(canonicalJson(model).includes(AT));
+    assert(canonicalJson(model).includes(AT));
 });
 
-test('message hash covers the fields', async () => {
+Deno.test('message hash covers the fields', async () => {
     const base = {
         method: 'PUT', target: '/x',
         body: { v: 1 },
@@ -77,28 +80,28 @@ test('message hash covers the fields', async () => {
     const without = buildRequestModel(
         { ...base, fields: [] },
     );
-    assert.notEqual(
+    assertNotStrictEquals(
         await requestMessageHash(storedWire(withKey)),
         await requestMessageHash(storedWire(without)),
     );
 });
 
-test('stored pair message is serializeWire',
+Deno.test('stored pair message is serializeWire',
 async () => {
     const messagePair = await formWriteMessagePair(validInput);
-    assert.equal(
+    assertStrictEquals(
         messagePair.requestMessage.includes('\r\n\r\n'),
         true,
     );
-    assert.equal(
+    assertStrictEquals(
         messagePair.requestMessage.includes('"startLine"'),
         false,
     );
     const model = parseWire(messagePair.requestMessage);
-    assert.equal(model.startLine.kind, 'request');
+    assertStrictEquals(model.startLine.kind, 'request');
 });
 
-test('stored wire round-trips euro and emoji',
+Deno.test('stored wire round-trips euro and emoji',
 async () => {
     const model = buildRequestModel({
         method: 'PUT',
@@ -109,12 +112,12 @@ async () => {
     const wire = storedWire(model);
     const back = parseWire(wire);
     const body = HttpMessage.fromModel(back).body();
-    assert.equal(
+    assertStrictEquals(
         JSON.parse(body.toText()).note, '€😀',
     );
 });
 
-test('request hash is sha256 of Latin-1 octets',
+Deno.test('request hash is sha256 of Latin-1 octets',
 async () => {
     const model = buildRequestModel({
         method: 'PUT',
@@ -127,6 +130,6 @@ async () => {
     const want = await sha256HexOfBytes(
         Octets.fromLatin1(wire).asBytes(),
     );
-    assert.equal(got, want);
-    assert.notEqual(got, await sha256Hex(wire));
+    assertStrictEquals(got, want);
+    assertNotStrictEquals(got, await sha256Hex(wire));
 });

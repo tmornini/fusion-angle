@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertMatch, assertNotMatch } from '@std/assert';
 import { buildStatsGraphSvg }
     from '../web-app/app/flow-stats-graph.ts';
 import type {
@@ -60,54 +59,54 @@ const VB = { x: 0, y: 0, w: 600, h: 200 };
 // group (from its id attr to the next node-id attr) before asserting.
 function nodeGroup(svg: string, id: string): string {
     const at = svg.indexOf(`data-node-id="${id}"`);
-    assert.ok(at >= 0, `node ${id} not found`);
+    assert(at >= 0, `node ${id} not found`);
     const rest = svg.slice(at);
     const next = rest.indexOf('data-node-id=', 1);
     return next === -1 ? rest : rest.slice(0, next);
 }
 
-test('emits an svg with role=img and no editor affordances', () => {
+Deno.test('emits an svg with role=img and no editor affordances', () => {
     const html = buildStatsGraphSvg(model(), VB, null).toString();
-    assert.match(html, /<svg[^>]*role="img"/);
-    assert.doesNotMatch(html, /role="button"/);
-    assert.doesNotMatch(html, /\btabindex\b/);
-    assert.doesNotMatch(html, /\bdata-connect-port\b/);
-    assert.doesNotMatch(html, /\baria-current\b/);
-    assert.doesNotMatch(html, /<animate\b/);
+    assertMatch(html, /<svg[^>]*role="img"/);
+    assertNotMatch(html, /role="button"/);
+    assertNotMatch(html, /\btabindex\b/);
+    assertNotMatch(html, /\bdata-connect-port\b/);
+    assertNotMatch(html, /\baria-current\b/);
+    assertNotMatch(html, /<animate\b/);
 });
 
-test('each node carries style="--heat-t:..." and no data-heat', () => {
+Deno.test('each node carries style="--heat-t:..." and no data-heat', () => {
     const html = buildStatsGraphSvg(model(), VB, null).toString();
-    assert.match(html,
+    assertMatch(html,
         /data-node-id="a"[^>]*style="[^"]*--heat-t:\s*0\.32[^"]*"/);
-    assert.match(html,
+    assertMatch(html,
         /data-node-id="c"[^>]*data-special="start"/);
-    assert.match(html,
+    assertMatch(html,
         /data-node-id="z"[^>]*data-special="archive"/);
-    assert.doesNotMatch(html, /\bdata-heat\b/);
+    assertNotMatch(html, /\bdata-heat\b/);
 });
 
-test('regular nodes show avg-sojourn face; special nodes show —',
+Deno.test('regular nodes show avg-sojourn face; special nodes show —',
     () => {
     const html = buildStatsGraphSvg(model(), VB, null).toString();
-    assert.match(html, />8\.5m</);
-    assert.match(html, new RegExp(
+    assertMatch(html, />8\.5m</);
+    assertMatch(html, new RegExp(
         'data-node-id="c"[\\s\\S]*?'
         + 'flow-stats-node-face[^>]*>'
         + DISPLAY_ABSENT + '<',
     ));
 });
 
-test('danger hazard glyph appears when memberHazard is danger',
+Deno.test('danger hazard glyph appears when memberHazard is danger',
     () => {
     const html = buildStatsGraphSvg(model(), VB, null).toString();
-    assert.match(nodeGroup(html, 'a'),
+    assertMatch(nodeGroup(html, 'a'),
         /class="flow-stats-node-danger"/);
-    assert.doesNotMatch(nodeGroup(html, 'c'),
+    assertNotMatch(nodeGroup(html, 'c'),
         /flow-stats-node-warning|flow-stats-node-danger/);
 });
 
-test('warning hazard glyph appears when memberHazard is warning',
+Deno.test('warning hazard glyph appears when memberHazard is warning',
     () => {
     const m = model();
     const warned: FlowStatsModel = {
@@ -119,17 +118,17 @@ test('warning hazard glyph appears when memberHazard is warning',
         ),
     };
     const html = buildStatsGraphSvg(warned, VB, null).toString();
-    assert.match(nodeGroup(html, 'a'),
+    assertMatch(nodeGroup(html, 'a'),
         /class="flow-stats-node-warning"/);
 });
 
-test('edges carry data-edge-id and no interactive attributes', () => {
+Deno.test('edges carry data-edge-id and no interactive attributes', () => {
     const html = buildStatsGraphSvg(model(), VB, null).toString();
-    assert.match(html, /<g[^>]*data-edge-id="YiJPbufDpkyrZcZCYbUJpg"/);
-    assert.match(html, /<g[^>]*data-edge-id="e2"/);
+    assertMatch(html, /<g[^>]*data-edge-id="YiJPbufDpkyrZcZCYbUJpg"/);
+    assertMatch(html, /<g[^>]*data-edge-id="e2"/);
 });
 
-test('highlight set marks on-path and dims off-path nodes/edges',
+Deno.test('highlight set marks on-path and dims off-path nodes/edges',
     () => {
     const highlight = {
         nodeIds: new Set(['c', 'a']),
@@ -137,21 +136,21 @@ test('highlight set marks on-path and dims off-path nodes/edges',
     };
     const html =
         buildStatsGraphSvg(model(), VB, highlight).toString();
-    assert.match(html, /data-node-id="c"[^>]*data-on-path="true"/);
-    assert.match(html, /data-node-id="a"[^>]*data-on-path="true"/);
-    assert.match(html, /data-node-id="z"[^>]*data-dim="true"/);
-    assert.match(html
+    assertMatch(html, /data-node-id="c"[^>]*data-on-path="true"/);
+    assertMatch(html, /data-node-id="a"[^>]*data-on-path="true"/);
+    assertMatch(html, /data-node-id="z"[^>]*data-dim="true"/);
+    assertMatch(html
         , /data-edge-id="YiJPbufDpkyrZcZCYbUJpg"[^>]*data-on-path="true"/);
-    assert.match(html, /data-edge-id="e2"[^>]*data-dim="true"/);
+    assertMatch(html, /data-edge-id="e2"[^>]*data-dim="true"/);
 });
 
-test('no highlight ⇒ no data-dim or data-on-path anywhere', () => {
+Deno.test('no highlight ⇒ no data-dim or data-on-path anywhere', () => {
     const html = buildStatsGraphSvg(model(), VB, null).toString();
-    assert.doesNotMatch(html, /data-dim="true"/);
-    assert.doesNotMatch(html, /data-on-path="true"/);
+    assertNotMatch(html, /data-dim="true"/);
+    assertNotMatch(html, /data-on-path="true"/);
 });
 
-test('a back-edge gets data-cycle; forward edges do not', () => {
+Deno.test('a back-edge gets data-cycle; forward edges do not', () => {
     const m = model();
     const cyclic: FlowStatsModel = {
         ...m,
@@ -163,11 +162,11 @@ test('a back-edge gets data-cycle; forward edges do not', () => {
     };
     const html =
         buildStatsGraphSvg(cyclic, VB, null).toString();
-    assert.match(html,
+    assertMatch(html,
         /data-edge-id="e3"[^>]*data-cycle="true"/);
-    assert.doesNotMatch(html,
+    assertNotMatch(html,
         /data-edge-id="YiJPbufDpkyrZcZCYbUJpg"[^>]*data-cycle="true"/);
-    assert.doesNotMatch(html,
+    assertNotMatch(html,
         /data-edge-id="e2"[^>]*data-cycle="true"/);
 });
 
@@ -206,24 +205,24 @@ function modelWithPaths(): FlowStatsModel {
     };
 }
 
-test('buildShell contains required structural elements', () => {
+Deno.test('buildShell contains required structural elements', () => {
     const p = new FlowStatsPresenter(
         modelWithPaths(),
         { x: 0, y: 0, w: 600, h: 200 },
     );
     const s = p.buildShell().toString();
-    assert.match(s, /id="flow-stats-back"/);
-    assert.match(s,
+    assertMatch(s, /id="flow-stats-back"/);
+    assertMatch(s,
         /class="flow-stats-canvas-host"/);
-    assert.match(s,
+    assertMatch(s,
         /id="flow-stats-card"[^>]*class="[^"]*hidden/);
-    assert.match(s, /Trailing 90 days/);
+    assertMatch(s, /Trailing 90 days/);
     // no dropped nodes in this fixture
-    assert.doesNotMatch(s,
+    assertNotMatch(s,
         /omitted from this view/i);
 });
 
-test('buildShell includes footnote when droppedNodeIds non-empty',
+Deno.test('buildShell includes footnote when droppedNodeIds non-empty',
     () => {
     const m: FlowStatsModel = {
         ...modelWithPaths(),
@@ -233,13 +232,13 @@ test('buildShell includes footnote when droppedNodeIds non-empty',
     const p = new FlowStatsPresenter(
         m, { x: 0, y: 0, w: 600, h: 200 },
     );
-    assert.match(
+    assertMatch(
         p.buildShell().toString(),
         /omitted from this view/i,
     );
 });
 
-test('buildStepperBar idx 0: path label, 75%, prev disabled',
+Deno.test('buildStepperBar idx 0: path label, 75%, prev disabled',
     () => {
     const p = new FlowStatsPresenter(
         modelWithPaths(),
@@ -248,19 +247,19 @@ test('buildStepperBar idx 0: path label, 75%, prev disabled',
     const s = p.buildStepperBar(
         { selectedPathIndex: 0 },
     ).toString();
-    assert.match(s, /Path\s+1\s+of\s+3/);
-    assert.match(s,
+    assertMatch(s, /Path\s+1\s+of\s+3/);
+    assertMatch(s,
         /75%\s+of\s+12\s+work\s+orders/);
-    assert.match(s,
+    assertMatch(s,
         /data-stepper="prev"[^>]*disabled/);
     // next must NOT be disabled at idx 0
-    assert.doesNotMatch(s,
+    assertNotMatch(s,
         /data-stepper="next"[^>]*disabled/);
     // in-flight count appended
-    assert.match(s, /3\s+in\s+flight/);
+    assertMatch(s, /3\s+in\s+flight/);
 });
 
-test('buildStepperBar idx 1: prev not disabled', () => {
+Deno.test('buildStepperBar idx 1: prev not disabled', () => {
     const p = new FlowStatsPresenter(
         modelWithPaths(),
         { x: 0, y: 0, w: 600, h: 200 },
@@ -268,11 +267,11 @@ test('buildStepperBar idx 1: prev not disabled', () => {
     const s = p.buildStepperBar(
         { selectedPathIndex: 1 },
     ).toString();
-    assert.doesNotMatch(s,
+    assertNotMatch(s,
         /data-stepper="prev"[^>]*disabled/);
 });
 
-test('buildStepperBar idx 2: rest entry, next disabled', () => {
+Deno.test('buildStepperBar idx 2: rest entry, next disabled', () => {
     const p = new FlowStatsPresenter(
         modelWithPaths(),
         { x: 0, y: 0, w: 600, h: 200 },
@@ -280,13 +279,13 @@ test('buildStepperBar idx 2: rest entry, next disabled', () => {
     const s = p.buildStepperBar(
         { selectedPathIndex: 2 },
     ).toString();
-    assert.match(s, /\+\s*1\s+rarer paths/);
-    assert.match(s, /8%/);
-    assert.match(s,
+    assertMatch(s, /\+\s*1\s+rarer paths/);
+    assertMatch(s, /8%/);
+    assertMatch(s,
         /data-stepper="next"[^>]*disabled/);
 });
 
-test('buildStepperBar names the control with an eyebrow',
+Deno.test('buildStepperBar names the control with an eyebrow',
     () => {
     const p = new FlowStatsPresenter(
         modelWithPaths(),
@@ -295,21 +294,21 @@ test('buildStepperBar names the control with an eyebrow',
     const s = p.buildStepperBar(
         { selectedPathIndex: 0 },
     ).toString();
-    assert.match(s, /flow-stats-stepper-eyebrow/);
-    assert.match(s, /Most-traveled paths/);
+    assertMatch(s, /flow-stats-stepper-eyebrow/);
+    assertMatch(s, /Most-traveled paths/);
 });
 
-test('buildLegend: structure, end labels, no linear-gradient',
+Deno.test('buildLegend: structure, end labels, no linear-gradient',
     () => {
     const p = new FlowStatsPresenter(
         modelWithPaths(),
         { x: 0, y: 0, w: 600, h: 200 },
     );
     const s = p.buildLegend().toString();
-    assert.match(s, /class="flow-stats-legend"/);
-    assert.match(s, />\s*0%\s*</);
-    assert.match(s, />\s*100%\s*</);
-    assert.doesNotMatch(s,
+    assertMatch(s, /class="flow-stats-legend"/);
+    assertMatch(s, />\s*0%\s*</);
+    assertMatch(s, />\s*100%\s*</);
+    assertNotMatch(s,
         /linear-gradient\(/i);
 });
 
@@ -351,7 +350,7 @@ function nodeStat(
     };
 }
 
-test('rich card renders all stat blocks for a regular node',
+Deno.test('rich card renders all stat blocks for a regular node',
     () => {
     const p = new FlowStatsPresenter(
         modelWithPaths(),
@@ -387,29 +386,29 @@ test('rich card renders all stat blocks for a regular node',
         ],
     });
     const html = p.buildCard(s).toString();
-    assert.match(html, />\s*58%\s*</);
-    assert.match(html, /4\.8d/);
-    assert.match(html, /3d/);
+    assertMatch(html, />\s*58%\s*</);
+    assertMatch(html, /4\.8d/);
+    assertMatch(html, /3d/);
     // 777600s = 1.3 weeks (formatMinAscending
     // prefers weeks over days above 7d)
-    assert.match(html, /1\.3w/);
-    assert.match(html, />\s*138\s*</);
-    assert.match(html, />\s*124\s*</);
-    assert.match(html, />\s*12\s*</);
-    assert.match(html, />\s*~11\/wk\s*</);
-    assert.match(html, />\s*18%\s*</);
-    assert.match(html, />\s*5\s*</);
-    assert.match(html, />\s*3\s*</);
-    assert.match(html, /Lee/);
-    assert.match(html, /140%/);
-    assert.match(html, /31%/);
-    assert.doesNotMatch(html, /not in current clan/);
-    assert.match(html, /Sarah Chen, Mike OBrien/);
-    assert.match(html, /approve\s+81%/);
-    assert.match(html, /revise\s+19%/);
+    assertMatch(html, /1\.3w/);
+    assertMatch(html, />\s*138\s*</);
+    assertMatch(html, />\s*124\s*</);
+    assertMatch(html, />\s*12\s*</);
+    assertMatch(html, />\s*~11\/wk\s*</);
+    assertMatch(html, />\s*18%\s*</);
+    assertMatch(html, />\s*5\s*</);
+    assertMatch(html, />\s*3\s*</);
+    assertMatch(html, /Lee/);
+    assertMatch(html, /140%/);
+    assertMatch(html, /31%/);
+    assertNotMatch(html, /not in current clan/);
+    assertMatch(html, /Sarah Chen, Mike OBrien/);
+    assertMatch(html, /approve\s+81%/);
+    assertMatch(html, /revise\s+19%/);
 });
 
-test('sub-1/wk throughput reads <1/wk', () => {
+Deno.test('sub-1/wk throughput reads <1/wk', () => {
     const p = new FlowStatsPresenter(
         modelWithPaths(),
         { x: 0, y: 0, w: 600, h: 200 },
@@ -418,10 +417,10 @@ test('sub-1/wk throughput reads <1/wk', () => {
         id: 'a', displayName: 'Review',
         throughputPerWeek: 0.5,
     })).toString();
-    assert.match(html, />\s*<1\/wk\s*</);
+    assertMatch(html, />\s*<1\/wk\s*</);
 });
 
-test('top producer not in clan is flagged', () => {
+Deno.test('top producer not in clan is flagged', () => {
     const p = new FlowStatsPresenter(
         modelWithPaths(),
         { x: 0, y: 0, w: 600, h: 200 },
@@ -434,11 +433,11 @@ test('top producer not in clan is flagged', () => {
         },
     });
     const html = p.buildCard(s).toString();
-    assert.match(html, /Zed/);
-    assert.match(html, /not in current clan/);
+    assertMatch(html, /Zed/);
+    assertMatch(html, /not in current clan/);
 });
 
-test('special-node card is lean (no clan/producer/branch)',
+Deno.test('special-node card is lean (no clan/producer/branch)',
     () => {
     const p = new FlowStatsPresenter(
         modelWithPaths(),
@@ -449,13 +448,13 @@ test('special-node card is lean (no clan/producer/branch)',
         displayName: 'Create',
     });
     const html = p.buildCard(s).toString();
-    assert.doesNotMatch(html, /Top producer/);
-    assert.doesNotMatch(html, /Clan size/);
+    assertNotMatch(html, /Top producer/);
+    assertNotMatch(html, /Clan size/);
     // null durations render via DISPLAY_ABSENT
-    assert.match(html, new RegExp(DISPLAY_ABSENT));
+    assertMatch(html, new RegExp(DISPLAY_ABSENT));
 });
 
-test('renderCard hides the slot when nodeId is null', () => {
+Deno.test('renderCard hides the slot when nodeId is null', () => {
     const p = new FlowStatsPresenter(
         modelWithPaths(),
         { x: 0, y: 0, w: 600, h: 200 },
@@ -470,5 +469,5 @@ test('renderCard hides the slot when nodeId is null', () => {
                 ? cardEl : null,
     } as unknown as HTMLElement;
     p.renderCard(container, null);
-    assert.ok(classes.has('hidden'));
+    assert(classes.has('hidden'));
 });

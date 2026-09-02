@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { POSTGRES_DROP_SCHEMA } from
     '../api/backend-postgres.ts';
 import type { SqlClient } from
@@ -29,18 +28,18 @@ function fakeClient(): {
     return { sql, texts };
 }
 
-test('wipePostgres unsafes POSTGRES_DROP_SCHEMA',
+Deno.test('wipePostgres unsafes POSTGRES_DROP_SCHEMA',
 async () => {
     const fake = fakeClient();
     await wipePostgres(fake.sql);
-    assert.deepEqual(fake.texts, [
+    assertEquals(fake.texts, [
         POSTGRES_DROP_SCHEMA,
     ]);
 });
 
-test('render wipe command names the operator tool',
+Deno.test('render wipe command names the operator tool',
 () => {
-    assert.equal(
+    assertStrictEquals(
         renderWipeStartCommand(),
         './render-out/fusion-angle wipe',
     );

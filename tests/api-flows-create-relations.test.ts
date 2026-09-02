@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -61,7 +60,7 @@ async function getFlowGraph(
     );
 }
 
-test(
+Deno.test(
     'postFlowCreation seeds default-graph nodes'
     + ' on the message plane',
     async () => {
@@ -74,7 +73,7 @@ test(
             name: 'Rel Test Flow',
         });
         const graph = await getFlowGraph(ctx, flowId);
-        assert.equal(
+        assertStrictEquals(
             graph.nodes.length,
             2,
             'expected 2 nodes for the default graph',
@@ -82,7 +81,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'postFlowCreation: message-plane graph'
     + ' equals the default graph',
     async () => {
@@ -99,11 +98,11 @@ test(
         const { start, complete } =
             buildStartAndCompleteNodes();
 
-        assert.equal(
+        assertStrictEquals(
             graph.nodes.length, 2,
             'expected 2 nodes',
         );
-        assert.equal(
+        assertStrictEquals(
             graph.edges.length, 0,
             'expected 0 edges',
         );
@@ -115,36 +114,36 @@ test(
             n => n.isArchive,
         );
 
-        assert.ok(
+        assert(
             createNode,
             'expected a create node',
         );
-        assert.ok(
+        assert(
             archiveNode,
             'expected an archive node',
         );
-        assert.equal(
+        assertStrictEquals(
             createNode.name,
             start.name,
             'create node name',
         );
-        assert.equal(
+        assertStrictEquals(
             archiveNode.name,
             complete.name,
             'archive node name',
         );
-        assert.deepEqual(
+        assertEquals(
             createNode.memberIds, [],
             'create node has no members',
         );
-        assert.deepEqual(
+        assertEquals(
             createNode.attributes, [],
             'create node has no attributes',
         );
     },
 );
 
-test(
+Deno.test(
     'postFlowCreation: initial active state event'
     + ' still lands',
     async () => {
@@ -160,19 +159,19 @@ test(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
                 + '/versions/',
         );
-        assert.equal(events.length, 1);
+        assertStrictEquals(events.length, 1);
         const ev = events[0]!;
-        assert.equal(ev.entity_id, flowId);
-        assert.equal(ev.state, 'active');
+        assertStrictEquals(ev.entity_id, flowId);
+        assertStrictEquals(ev.state, 'active');
         // author is server-derived, not client body
-        assert.equal(
+        assertStrictEquals(
             ev.member_id, 'XXZruirZyAOoRpNxaDnpSA',
             'state event must be authored by the verified actor',
         );
     },
 );
 
-test(
+Deno.test(
     'postFlowCreation: message-plane graph has no'
     + ' edges for the default graph',
     async () => {
@@ -185,7 +184,7 @@ test(
             name: 'Edge Test Flow',
         });
         const graph = await getFlowGraph(ctx, flowId);
-        assert.equal(
+        assertStrictEquals(
             graph.edges.length, 0,
             'expected 0 edges for the default graph',
         );

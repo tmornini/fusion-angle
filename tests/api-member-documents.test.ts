@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { PUT, handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -101,7 +105,7 @@ function humanMemberFields() {
 
 // -- 1. PUT members/:id is retired ---------------------------
 
-test('PUT members/:id is retired 404', async () => {
+Deno.test('PUT members/:id is retired 404', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken();
@@ -113,10 +117,10 @@ test('PUT members/:id is retired 404', async () => {
             state_event_id: generateIdentifier(),
         },
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT members/:id with {type} alone is retired 404',
+Deno.test('PUT members/:id with {type} alone is retired 404',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -125,10 +129,10 @@ async () => {
         'PUT', '/members/nXmQQMgTtocYOzXpxijKBg', token,
         { type: 'human' },
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('PUT members/:id outside alphabet is retired 404',
+Deno.test('PUT members/:id outside alphabet is retired 404',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -141,16 +145,16 @@ async () => {
             state_event_id: generateIdentifier(),
         },
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('validateAiMemberDocumentBody accepts the exact'
+Deno.test('validateAiMemberDocumentBody accepts the exact'
 + ' four-key body', () => {
     const doc = validateAiMemberDocumentBody(aiMemberFields());
-    assert.deepEqual(doc.entity, aiMemberFields());
+    assertEquals(doc.entity, aiMemberFields());
 });
 
-test('validateAiMemberDocumentBody rejects a stray key with'
+Deno.test('validateAiMemberDocumentBody rejects a stray key with'
 + ' the byte-identical message validateAIMemberEntity produces'
 + ' for the SAME violation (the label mandate)', () => {
     const body = { ...aiMemberFields(), bogus: 'nope' };
@@ -159,23 +163,23 @@ test('validateAiMemberDocumentBody rejects a stray key with'
     try {
         validateAiMemberDocumentBody(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         documentMessage = (e as ValidationError).message;
     }
     try {
         validateAIMemberEntity(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         entityMessage = (e as ValidationError).message;
     }
-    assert.equal(
+    assertStrictEquals(
         documentMessage,
         'unexpected key "bogus" for AIMemberEntity',
     );
-    assert.equal(documentMessage, entityMessage);
+    assertStrictEquals(documentMessage, entityMessage);
 });
 
-test('validateAiMemberDocumentBody rejects each missing key,'
+Deno.test('validateAiMemberDocumentBody rejects each missing key,'
 + ' byte-identical to validateAIMemberEntity on both paths',
 () => {
     for (const key of [
@@ -188,25 +192,25 @@ test('validateAiMemberDocumentBody rejects each missing key,'
         try {
             validateAiMemberDocumentBody(body);
         } catch (e) {
-            assert.ok(e instanceof ValidationError);
+            assert(e instanceof ValidationError);
             documentMessage = (e as ValidationError).message;
         }
         try {
             validateAIMemberEntity(body);
         } catch (e) {
-            assert.ok(e instanceof ValidationError);
+            assert(e instanceof ValidationError);
             entityMessage = (e as ValidationError).message;
         }
-        assert.equal(
+        assertStrictEquals(
             documentMessage,
             'missing required key "' + key
                 + '" for AIMemberEntity',
         );
-        assert.equal(documentMessage, entityMessage);
+        assertStrictEquals(documentMessage, entityMessage);
     }
 });
 
-test('validateAiMemberDocumentBody rejects an unknown model'
+Deno.test('validateAiMemberDocumentBody rejects an unknown model'
 + ' id, byte-identical to validateAIMemberEntity on both'
 + ' paths', () => {
     const body = {
@@ -217,31 +221,31 @@ test('validateAiMemberDocumentBody rejects an unknown model'
     try {
         validateAiMemberDocumentBody(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         documentMessage = (e as ValidationError).message;
     }
     try {
         validateAIMemberEntity(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         entityMessage = (e as ValidationError).message;
     }
-    assert.equal(
+    assertStrictEquals(
         documentMessage,
         'model must be a known provider model id on'
             + ' AIMemberEntity',
     );
-    assert.equal(documentMessage, entityMessage);
+    assertStrictEquals(documentMessage, entityMessage);
 });
 
-test('validateHumanMemberDocumentBody accepts the exact'
+Deno.test('validateHumanMemberDocumentBody accepts the exact'
 + ' four-key body', () => {
     const doc =
         validateHumanMemberDocumentBody(humanMemberFields());
-    assert.deepEqual(doc.entity, humanMemberFields());
+    assertEquals(doc.entity, humanMemberFields());
 });
 
-test('validateHumanMemberDocumentBody rejects a stray key with'
+Deno.test('validateHumanMemberDocumentBody rejects a stray key with'
 + ' the byte-identical message validateHumanMemberEntity'
 + ' produces for the SAME violation (the label mandate)', () => {
     const body = { ...humanMemberFields(), bogus: 'nope' };
@@ -250,23 +254,23 @@ test('validateHumanMemberDocumentBody rejects a stray key with'
     try {
         validateHumanMemberDocumentBody(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         documentMessage = (e as ValidationError).message;
     }
     try {
         validateHumanMemberEntity(body);
     } catch (e) {
-        assert.ok(e instanceof ValidationError);
+        assert(e instanceof ValidationError);
         entityMessage = (e as ValidationError).message;
     }
-    assert.equal(
+    assertStrictEquals(
         documentMessage,
         'unexpected key "bogus" for HumanMemberEntity',
     );
-    assert.equal(documentMessage, entityMessage);
+    assertStrictEquals(documentMessage, entityMessage);
 });
 
-test('validateHumanMemberDocumentBody rejects each missing'
+Deno.test('validateHumanMemberDocumentBody rejects each missing'
 + ' key, byte-identical to validateHumanMemberEntity on both'
 + ' paths', () => {
     for (const key of [
@@ -279,27 +283,27 @@ test('validateHumanMemberDocumentBody rejects each missing'
         try {
             validateHumanMemberDocumentBody(body);
         } catch (e) {
-            assert.ok(e instanceof ValidationError);
+            assert(e instanceof ValidationError);
             documentMessage = (e as ValidationError).message;
         }
         try {
             validateHumanMemberEntity(body);
         } catch (e) {
-            assert.ok(e instanceof ValidationError);
+            assert(e instanceof ValidationError);
             entityMessage = (e as ValidationError).message;
         }
-        assert.equal(
+        assertStrictEquals(
             documentMessage,
             'missing required key "' + key
                 + '" for HumanMemberEntity',
         );
-        assert.equal(documentMessage, entityMessage);
+        assertStrictEquals(documentMessage, entityMessage);
     }
 });
 
 // -- 2. the ops (below-gate, MemoryDbAdapter) ------------------
 
-test('postMemberDocumentOp writes exactly the pair and'
+Deno.test('postMemberDocumentOp writes exactly the pair and'
 + ' reconstructs the entity return (row half stripped)',
 async () => {
     const db = memoryDbAdapter();
@@ -326,13 +330,13 @@ async () => {
         db, 'nVpWUxfKrqvVXWgWENWhbA', body,
         'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
-    assert.deepEqual(written, body);
+    assertEquals(written, body);
     // Phase Final Stage B: roster tables retired.
-    assert.equal((await db.messagePairs.getAll()).length, 1);
-    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
 });
 
-test('postAiMemberDocumentOp writes exactly the pair and'
+Deno.test('postAiMemberDocumentOp writes exactly the pair and'
 + ' reconstructs the entity return (row half stripped)',
 async () => {
     const db = memoryDbAdapter();
@@ -355,13 +359,13 @@ async () => {
         db, 'VLoTvOKjXoNVDjLLBotQXA', body,
         'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
-    assert.deepEqual(written, body);
+    assertEquals(written, body);
     // Phase Final Stage B: roster tables retired.
-    assert.equal((await db.messagePairs.getAll()).length, 1);
-    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
 });
 
-test('postHumanMemberDocumentOp writes exactly the pair and'
+Deno.test('postHumanMemberDocumentOp writes exactly the pair and'
 + ' reconstructs the entity return (row half stripped;'
 + ' below-gate only — no live PUT route)', async () => {
     const db = memoryDbAdapter();
@@ -384,10 +388,10 @@ test('postHumanMemberDocumentOp writes exactly the pair and'
         db, 'fVrMeaOxbnDcSKMPwtIEZg', body,
         'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
-    assert.deepEqual(written, body);
+    assertEquals(written, body);
     // Phase Final Stage B: roster tables retired.
-    assert.equal((await db.messagePairs.getAll()).length, 1);
-    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) —
@@ -395,46 +399,48 @@ test('postHumanMemberDocumentOp writes exactly the pair and'
 // equivalent exists for human-members/:id — it has no live PUT
 // to resend against. ----------------------------------------
 
-test('a PUT resend to retired members/:id is 404',
+Deno.test('a PUT resend to retired members/:id is 404',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await assert.rejects(
+    await assertRejects(
         () => PUT(
             db, 'members/' + generateIdentifier(), memberFields(),
             DEV_TOKEN,
         ),
-        /Not found/,
+        Error,
+        'Not found',
     );
 });
 
-test('a PUT resend to retired ai-members/:id is 404',
+Deno.test('a PUT resend to retired ai-members/:id is 404',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await assert.rejects(
+    await assertRejects(
         () => PUT(
             db, 'ai-members/' + generateIdentifier(),
             aiMemberFields(), DEV_TOKEN,
         ),
-        /Not found/,
+        Error,
+        'Not found',
     );
 });
 
-test('leftover roster families have no document wiring',
+Deno.test('leftover roster families have no document wiring',
 () => {
     for (const family of [
         'members', 'ai-members', 'human-members',
         'memberships',
     ]) {
-        assert.equal(
+        assertStrictEquals(
             documentFamilyWiring(family), undefined,
             family,
         );
     }
 });
 
-test('stored PUT body members/:id route is retired',
+Deno.test('stored PUT body members/:id route is retired',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -446,10 +452,10 @@ async () => {
     const put = await handleRequest(
         db, req('PUT', '/members/' + id, token, body),
     );
-    assert.equal(put.status, 404);
+    assertStrictEquals(put.status, 404);
 });
 
-test('stored PUT body equals aiMemberDocumentEntityOf'
+Deno.test('stored PUT body equals aiMemberDocumentEntityOf'
 + ' route is retired',
 async () => {
     const db = memoryDbAdapter();
@@ -459,10 +465,10 @@ async () => {
     const put = await handleRequest(
         db, req('PUT', '/ai-members/' + id, DEV_TOKEN, body),
     );
-    assert.equal(put.status, 404);
+    assertStrictEquals(put.status, 404);
 });
 
-test('a PUT to retired human-members/:id is 404',
+Deno.test('a PUT to retired human-members/:id is 404',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -475,5 +481,5 @@ async () => {
             humanMemberFields(),
         ),
     );
-    assert.equal(put.status, 404);
+    assertStrictEquals(put.status, 404);
 });

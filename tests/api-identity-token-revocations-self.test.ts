@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -61,7 +65,7 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('admin GET nested revocation 200s after PUT',
+Deno.test('admin GET nested revocation 200s after PUT',
 async () => {
     const db = await freshDb();
     const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
@@ -71,17 +75,17 @@ async () => {
     const put = await handleRequest(db, req(
         'PUT', path, token, { at },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const get = await handleRequest(
         db, req('GET', path, token),
     );
-    assert.equal(get.status, 200);
-    assert.deepEqual(await get.json(), {
+    assertStrictEquals(get.status, 200);
+    assertEquals(await get.json(), {
         id: rid, identity_id: 'nkgaOHZISTQrILTfPThWCA', at,
     });
 });
 
-test('PUT /identity-token-revocations/:rid is retired'
+Deno.test('PUT /identity-token-revocations/:rid is retired'
 + ' (router 404)', async () => {
     const db = await freshDb();
     const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
@@ -93,15 +97,15 @@ test('PUT /identity-token-revocations/:rid is retired'
             at: '2026-01-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
     const body = await res.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         body.error,
         'Not found: /identity-token-revocations/ZvdHDQyBmhARRFlOirQLwg',
     );
 });
 
-test('GET /identity-token-revocations/:rid is retired'
+Deno.test('GET /identity-token-revocations/:rid is retired'
 + ' (router 404)', async () => {
     const db = await freshDb();
     const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
@@ -110,20 +114,20 @@ test('GET /identity-token-revocations/:rid is retired'
         'PUT', nestedPath('nkgaOHZISTQrILTfPThWCA', 'ZtxCJjftJTLNZUfZXpgpSA'),
         token, { at },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const res = await handleRequest(db, req(
         'GET', '/identity-token-revocations/ZtxCJjftJTLNZUfZXpgpSA',
         token,
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
     const body = await res.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         body.error,
         'Not found: /identity-token-revocations/ZtxCJjftJTLNZUfZXpgpSA',
     );
 });
 
-test('a member PUT identities/:id/token-revocations/:rid'
+Deno.test('a member PUT identities/:id/token-revocations/:rid'
 + " naming itself succeeds 2xx, matching the admin path's"
 + ' exact success shape, and lands both the row and its'
 + ' pair', async () => {
@@ -135,14 +139,14 @@ test('a member PUT identities/:id/token-revocations/:rid'
         'PUT', nestedPath('nkgaOHZISTQrILTfPThWCA', rid), token,
         { identity_id: 'nkgaOHZISTQrILTfPThWCA', at },
     ));
-    assert.equal(res.status, 201);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 201);
+    assertEquals(await res.json(), {
         id: rid, identity_id: 'nkgaOHZISTQrILTfPThWCA', at,
     });
     const row = await deriveTokenRevocation(
         db, 'nkgaOHZISTQrILTfPThWCA', rid,
     );
-    assert.deepEqual(
+    assertEquals(
         row, { id: rid, identity_id: 'nkgaOHZISTQrILTfPThWCA', at },
     );
     const requests = await db.messagePairs.getAll();
@@ -151,17 +155,17 @@ test('a member PUT identities/:id/token-revocations/:rid'
             === '/identities/nkgaOHZISTQrILTfPThWCA/token-revocations/'
             && r.uri_id === rid,
     );
-    assert.ok(own);
+    assert(own);
     const responses = await db.messagePairs.getAll();
     const ownResponse = responses.find(
         r => r.uri_collection
             === '/identities/nkgaOHZISTQrILTfPThWCA/token-revocations/'
             && r.uri_id === rid,
     );
-    assert.ok(ownResponse);
+    assert(ownResponse);
 });
 
-test('logout-everywhere success clears the refresh cookie',
+Deno.test('logout-everywhere success clears the refresh cookie',
 async () => {
     const db = await freshDb();
     const token = await organizationToken('nkgaOHZISTQrILTfPThWCA');
@@ -174,20 +178,20 @@ async () => {
             at: '2026-01-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const cookies = typeof res.headers.getSetCookie
         === 'function'
         ? res.headers.getSetCookie()
         : [res.headers.get('Set-Cookie') ?? ''];
     const cookie = cookies.join('\n');
-    assert.match(cookie, /refresh_token=/);
-    assert.match(cookie, /Max-Age=0/);
-    assert.match(cookie, /HttpOnly/i);
-    assert.match(cookie, /Path=\/api\/authentication/);
-    assert.match(cookie, /SameSite=Strict/i);
+    assertMatch(cookie, /refresh_token=/);
+    assertMatch(cookie, /Max-Age=0/);
+    assertMatch(cookie, /HttpOnly/i);
+    assertMatch(cookie, /Path=\/api\/authentication/);
+    assertMatch(cookie, /SameSite=Strict/i);
 });
 
-test('org-less self-revoke PUT 201s and clears the'
+Deno.test('org-less self-revoke PUT 201s and clears the'
 + ' refresh cookie', async () => {
     const db = await freshDb();
     const token = await reachableToken(
@@ -199,25 +203,25 @@ test('org-less self-revoke PUT 201s and clears the'
         token,
         { at: '2026-01-01T00:00:00.000000Z' },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const cookies = typeof res.headers.getSetCookie
         === 'function'
         ? res.headers.getSetCookie()
         : [res.headers.get('Set-Cookie') ?? ''];
     const cookie = cookies.join('\n');
-    assert.match(cookie, /refresh_token=/);
-    assert.match(cookie, /Max-Age=0/);
+    assertMatch(cookie, /refresh_token=/);
+    assertMatch(cookie, /Max-Age=0/);
     const row = await deriveTokenRevocation(
         db, 'nkgaOHZISTQrILTfPThWCA', rid,
     );
-    assert.deepEqual(row, {
+    assertEquals(row, {
         id: rid,
         identity_id: 'nkgaOHZISTQrILTfPThWCA',
         at: '2026-01-01T00:00:00.000000Z',
     });
 });
 
-test('org-less GET nested revocation still 403s',
+Deno.test('org-less GET nested revocation still 403s',
 async () => {
     const db = await freshDb();
     const admin = await organizationToken(
@@ -229,17 +233,17 @@ async () => {
         'PUT', path, admin,
         { at: '2026-01-01T00:00:00.000000Z' },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const token = await reachableToken(
         'nkgaOHZISTQrILTfPThWCA', [],
     );
     const get = await handleRequest(
         db, req('GET', path, token),
     );
-    assert.equal(get.status, 403);
+    assertStrictEquals(get.status, 403);
 });
 
-test('org-less PUT naming another identity 403s',
+Deno.test('org-less PUT naming another identity 403s',
 async () => {
     const db = await freshDb();
     const token = await reachableToken(
@@ -256,15 +260,15 @@ async () => {
             at: '2026-01-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
     const requests = await db.messagePairs.getAll();
-    assert.equal(
+    assertStrictEquals(
         requests.filter(r => r.uri_id === rid).length,
         0,
     );
 });
 
-test("a member's self-revoke: ACCESS still works until exp"
+Deno.test("a member's self-revoke: ACCESS still works until exp"
 + ' (NAMED ≤15-min covenant); REFRESH grant is 401ed',
 async () => {
     const db = await freshDb();
@@ -287,12 +291,12 @@ async () => {
         memberToken,
         { identity_id: 'nkgaOHZISTQrILTfPThWCA', at: revokeAt },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const still = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , memberToken),
     );
-    assert.equal(still.status, 200);
+    assertStrictEquals(still.status, 200);
     const refresh = await handleRequest(
         db,
         new Request('http://localhost/authentication/token', {
@@ -306,13 +310,13 @@ async () => {
             }),
         }),
     );
-    assert.equal(refresh.status, 401);
-    assert.deepEqual(await refresh.json(), {
+    assertStrictEquals(refresh.status, 401);
+    assertEquals(await refresh.json(), {
         error: 'token revoked',
     });
 });
 
-test('a member PUT naming ANOTHER identity 403s, byte-pinned'
+Deno.test('a member PUT naming ANOTHER identity 403s, byte-pinned'
 + ' to the SAME wording authorizeRequest returned, and'
 + ' writes no row', async () => {
     const db = await freshDb();
@@ -326,13 +330,13 @@ test('a member PUT naming ANOTHER identity 403s, byte-pinned'
             at: '2026-01-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 403);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
         error: 'forbidden: PUT ' + path
             + ' requires a role this principal lacks',
     });
     const requests = await db.messagePairs.getAll();
-    assert.equal(
+    assertStrictEquals(
         requests.filter(
             r => r.uri_id === rid,
         ).length,
@@ -340,7 +344,7 @@ test('a member PUT naming ANOTHER identity 403s, byte-pinned'
     );
 });
 
-test('stored PUT body equals tokenRevocationEntityOf',
+Deno.test('stored PUT body equals tokenRevocationEntityOf',
 async () => {
     const db = await freshDb();
     const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
@@ -352,7 +356,7 @@ async () => {
     const put = await handleRequest(db, req(
         'PUT', nestedPath('nkgaOHZISTQrILTfPThWCA', id), token, fields,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const stored = JSON.parse(
         await storedPutBodyText(
             db, '/identities/nkgaOHZISTQrILTfPThWCA/token-revocations/', id,
@@ -364,16 +368,16 @@ async () => {
         method: 'PUT',
         body: fields,
     });
-    assert.equal(Object.keys(expected)[0], 'id');
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(
+    assertStrictEquals(Object.keys(expected)[0], 'id');
+    assertEquals(stored, expected);
+    assertEquals(
         stored,
         await deriveTokenRevocation(db, 'nkgaOHZISTQrILTfPThWCA', id),
     );
-    assert.deepEqual(stored, await put.json());
+    assertEquals(stored, await put.json());
 });
 
-test('the admin path is unchanged: an admin PUT naming'
+Deno.test('the admin path is unchanged: an admin PUT naming'
 + ' ANOTHER identity still succeeds 2xx', async () => {
     const db = await freshDb();
     const adminToken = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
@@ -384,13 +388,13 @@ test('the admin path is unchanged: an admin PUT naming'
         adminToken,
         { identity_id: 'nkgaOHZISTQrILTfPThWCA', at },
     ));
-    assert.equal(res.status, 201);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 201);
+    assertEquals(await res.json(), {
         id: rid, identity_id: 'nkgaOHZISTQrILTfPThWCA', at,
     });
 });
 
-test('PUT stamps identity_id from the path when omitted',
+Deno.test('PUT stamps identity_id from the path when omitted',
 async () => {
     const db = await freshDb();
     const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
@@ -400,13 +404,13 @@ async () => {
         'PUT', nestedPath('nkgaOHZISTQrILTfPThWCA', rid),
         token, { at },
     ));
-    assert.equal(res.status, 201);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 201);
+    assertEquals(await res.json(), {
         id: rid, identity_id: 'nkgaOHZISTQrILTfPThWCA', at,
     });
 });
 
-test('PUT identity_id that disagrees with the path 400s',
+Deno.test('PUT identity_id that disagrees with the path 400s',
 async () => {
     const db = await freshDb();
     const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
@@ -419,5 +423,5 @@ async () => {
             at: '2026-01-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });

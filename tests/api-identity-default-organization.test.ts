@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -75,7 +74,7 @@ function getDefaultOrganization(token: string, identityId: string) {
         });
 }
 
-test('PUT default-organization sets it and GET returns it',
+Deno.test('PUT default-organization sets it and GET returns it',
 async () => {
     const db = await freshDb();
     await seedMembership(db, 'XXZruirZyAOoRpNxaDnpSA'
@@ -84,16 +83,16 @@ async () => {
     const put = await handleRequest(
         db, putDefaultOrganization(token, 'XXZruirZyAOoRpNxaDnpSA'
             , 'AjdvjuECVZEgZoFajaIEkg'));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const got = await handleRequest(
         db, getDefaultOrganization(token, 'XXZruirZyAOoRpNxaDnpSA'));
-    assert.equal(got.status, 200);
+    assertStrictEquals(got.status, 200);
     const body = await got.json() as
         { organization_id: string };
-    assert.equal(body.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
+    assertStrictEquals(body.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
 });
 
-test('PUT a non-seat organization is 400', async () => {
+Deno.test('PUT a non-seat organization is 400', async () => {
     const db = await freshDb();
     await seedMembership(db, 'XXZruirZyAOoRpNxaDnpSA'
         , 'AjdvjuECVZEgZoFajaIEkg');
@@ -101,20 +100,20 @@ test('PUT a non-seat organization is 400', async () => {
     const res = await handleRequest(
         db, putDefaultOrganization(token, 'XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw'));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('PUT to another identity tree is forbidden', async () => {
+Deno.test('PUT to another identity tree is forbidden', async () => {
     const db = await freshDb();
     const other = generateIdentifier();
     await seedMembership(db, other, 'AjdvjuECVZEgZoFajaIEkg');
     const token = await devToken();   // sub = current
     const res = await handleRequest(
         db, putDefaultOrganization(token, other, 'AjdvjuECVZEgZoFajaIEkg'));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
 });
 
-test('PUT the same organization twice is one document',
+Deno.test('PUT the same organization twice is one document',
 async () => {
     const db = await freshDb();
     await seedMembership(db, 'XXZruirZyAOoRpNxaDnpSA'
@@ -132,29 +131,29 @@ async () => {
     const rows = await deriveDefaultOrganization(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     );
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]!.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
 });
 
-test('GET 404s when never SET', async () => {
+Deno.test('GET 404s when never SET', async () => {
     const db = await freshDb();
     await seedMembership(db, 'XXZruirZyAOoRpNxaDnpSA'
         , 'AjdvjuECVZEgZoFajaIEkg');
     const token = await devToken();
     const got = await handleRequest(
         db, getDefaultOrganization(token, 'XXZruirZyAOoRpNxaDnpSA'));
-    assert.equal(got.status, 404);
+    assertStrictEquals(got.status, 404);
 });
 
-test('GET 404s for an organization-less identity', async () => {
+Deno.test('GET 404s for an organization-less identity', async () => {
     const db = await freshDb();
     const token = await devToken();
     const got = await handleRequest(
         db, getDefaultOrganization(token, 'XXZruirZyAOoRpNxaDnpSA'));
-    assert.equal(got.status, 404);
+    assertStrictEquals(got.status, 404);
 });
 
-test('PUT without organization_id returns 400', async () => {
+Deno.test('PUT without organization_id returns 400', async () => {
     const db = await freshDb();
     await seedMembership(db, 'XXZruirZyAOoRpNxaDnpSA'
         , 'AjdvjuECVZEgZoFajaIEkg');
@@ -173,10 +172,10 @@ test('PUT without organization_id returns 400', async () => {
             },
         ),
     );
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('revoke leaves the SET default-organization document',
+Deno.test('revoke leaves the SET default-organization document',
 async () => {
     const db = await freshDb();
     await seedMembership(db, 'XXZruirZyAOoRpNxaDnpSA'
@@ -200,7 +199,7 @@ async () => {
             },
         ),
     );
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const revoked = await handleRequest(
         db, new Request(
             `${BASE}/organizations/`
@@ -218,7 +217,7 @@ async () => {
             },
         ),
     );
-    assert.equal(revoked.status, 204);
+    assertStrictEquals(revoked.status, 204);
     const got = await handleRequest(
         db, new Request(
             `${BASE}/identities/XXZruirZyAOoRpNxaDnpSA/default-organization`
@@ -229,14 +228,14 @@ async () => {
             },
         ),
     );
-    assert.equal(got.status, 200);
+    assertStrictEquals(got.status, 200);
     const body = await got.json() as {
         organization_id: string;
     };
-    assert.equal(body.organization_id, 'BBjWJsjYIDkTRKIIPrzWRw');
+    assertStrictEquals(body.organization_id, 'BBjWJsjYIDkTRKIIPrzWRw');
 });
 
-test('GET identities/:id/default-organization'
+Deno.test('GET identities/:id/default-organization'
     + ' matches the table', () => {
     const match = matchRoute(
         routes,
@@ -245,7 +244,7 @@ test('GET identities/:id/default-organization'
                 + '/default-organization',
         ),
     );
-    assert.ok(match);
-    assert.equal(typeof match.route.get, 'function');
-    assert.equal(typeof match.route.put, 'function');
+    assert(match);
+    assertStrictEquals(typeof match.route.get, 'function');
+    assertStrictEquals(typeof match.route.put, 'function');
 });

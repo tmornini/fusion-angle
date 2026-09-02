@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals,
+    assertNotStrictEquals,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -204,7 +208,7 @@ async function setupOneWorkOrder(): Promise<{
 
 // -- Tests ------------------------------------
 
-test(
+Deno.test(
     'buildInboxItems returns an empty array in'
     + ' active mode with no work orders',
     () => {
@@ -212,11 +216,11 @@ test(
             [], new Map(), new Map(),
             new Map(), 'active',
         );
-        assert.deepEqual(items, []);
+        assertEquals(items, []);
     },
 );
 
-test(
+Deno.test(
     'buildInboxItems returns an empty array in'
     + ' archived mode with no work orders',
     () => {
@@ -224,11 +228,11 @@ test(
             [], new Map(), new Map(),
             new Map(), 'archived',
         );
-        assert.deepEqual(items, []);
+        assertEquals(items, []);
     },
 );
 
-test(
+Deno.test(
     'buildInboxItems surfaces an unclaimed,'
     + ' in-progress work order as an active item',
     async () => {
@@ -241,28 +245,28 @@ test(
             workOrders, transitionsByWo,
             new Map(), memberMap, 'active',
         );
-        assert.equal(items.length, 1);
+        assertStrictEquals(items.length, 1);
         const item = items[0]!;
-        assert.equal(item.flowName, 'Test flow');
-        assert.equal(item.stateName, 'Doing work');
-        assert.equal(item.completed, false);
-        assert.equal(
+        assertStrictEquals(item.flowName, 'Test flow');
+        assertStrictEquals(item.stateName, 'Doing work');
+        assertStrictEquals(item.completed, false);
+        assertStrictEquals(
             typeof item.displayId, 'string',
         );
-        assert.notEqual(item.displayId, '');
-        assert.equal(
+        assertNotStrictEquals(item.displayId, '');
+        assertStrictEquals(
             item.transitionerName,
             'Demo Test',
         );
-        assert.equal(
+        assertStrictEquals(
             typeof item.lastTransitionedAt,
             'string',
         );
-        assert.equal(item.claimedByName, null);
+        assertStrictEquals(item.claimedByName, null);
     },
 );
 
-test(
+Deno.test(
     'buildInboxItems excludes an in-progress'
     + ' work order from archived mode',
     async () => {
@@ -275,11 +279,11 @@ test(
             workOrders, transitionsByWo,
             new Map(), memberMap, 'archived',
         );
-        assert.deepEqual(items, []);
+        assertEquals(items, []);
     },
 );
 
-test(
+Deno.test(
     'buildInboxItems surfaces a claimed,'
     + ' unfinished work order as an active item'
     + ' naming its claimant',
@@ -292,19 +296,19 @@ test(
         } = await tables();
         // postWorkOrderCreation already minted a
         // fresh claim event, so it is active.
-        assert.equal(activeClaimsByWo.size, 1);
+        assertStrictEquals(activeClaimsByWo.size, 1);
         const items = buildInboxItems(
             workOrders, transitionsByWo,
             activeClaimsByWo, memberMap, 'active',
         );
-        assert.equal(items.length, 1);
-        assert.equal(
+        assertStrictEquals(items.length, 1);
+        assertStrictEquals(
             items[0]!.claimedByName, 'Demo Test',
         );
     },
 );
 
-test(
+Deno.test(
     'buildInboxItems shows a finished work order'
     + ' in archived mode and hides it from active',
     async () => {
@@ -325,7 +329,7 @@ test(
         const {
             workOrders, transitionsByWo, memberMap,
         } = await tables();
-        assert.deepEqual(
+        assertEquals(
             buildInboxItems(
                 workOrders, transitionsByWo,
                 new Map(), memberMap, 'active',
@@ -336,12 +340,12 @@ test(
             workOrders, transitionsByWo,
             new Map(), memberMap, 'archived',
         );
-        assert.equal(archived.length, 1);
-        assert.equal(archived[0]!.completed, true);
+        assertStrictEquals(archived.length, 1);
+        assertStrictEquals(archived[0]!.completed, true);
     },
 );
 
-test(
+Deno.test(
     'buildInboxItems sorts items by work-order'
     + ' position with non-monotonic fractional'
     + ' values',
@@ -390,14 +394,14 @@ test(
             tables.memberMap,
             'active',
         );
-        assert.deepEqual(
+        assertEquals(
             items.map(i => i.position),
             [2.5, 5, 7.5],
         );
     },
 );
 
-test(
+Deno.test(
     'buildInboxItems throws when a work order'
     + ' has no transitions',
     async () => {
@@ -405,17 +409,17 @@ test(
             await setupOneWorkOrder();
         const { workOrders, memberMap } =
             await tables();
-        assert.throws(
+        assertThrows(
             () => buildInboxItems(
                 workOrders, new Map(),
                 new Map(), memberMap, 'active',
             ),
-            /no transitions/,
+            Error, 'no transitions',
         );
     },
 );
 
-test(
+Deno.test(
     'buildInboxItems carries the current'
     + " node's task instructions",
     async () => {
@@ -464,14 +468,14 @@ test(
             workOrders, transitionsByWo,
             new Map(), memberMap, 'active',
         );
-        assert.equal(
+        assertStrictEquals(
             items[0]!.taskInstructions,
             '# Verify totals',
         );
     },
 );
 
-test(
+Deno.test(
     'buildInboxItems leaves taskInstructions'
     + ' empty when the node has none',
     async () => {
@@ -484,13 +488,13 @@ test(
             workOrders, transitionsByWo,
             new Map(), memberMap, 'active',
         );
-        assert.equal(
+        assertStrictEquals(
             items[0]!.taskInstructions, '',
         );
     },
 );
 
-test(
+Deno.test(
     'buildInboxItems keeps deriving after an'
     + ' edge delete and undo restore the graph',
     async () => {
@@ -547,13 +551,13 @@ test(
         const {
             workOrders, transitionsByWo, memberMap,
         } = await tables();
-        assert.equal(workOrders.length, 2);
+        assertStrictEquals(workOrders.length, 2);
         // Claims ignored: the graph-derivation
         // path alone. Both work orders derive.
         const items = buildInboxItems(
             workOrders, transitionsByWo,
             new Map(), memberMap, 'active',
         );
-        assert.equal(items.length, 2);
+        assertStrictEquals(items.length, 2);
     },
 );

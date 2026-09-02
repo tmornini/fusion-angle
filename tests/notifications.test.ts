@@ -1,12 +1,12 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertThrows } from '@std/assert';
 import {
     identityTargetsFor,
     notificationEventFromWire,
+    type NotificationEvent,
 } from '../api/notifications.ts';
 
-test('an identities route targets the path identity', () => {
-    assert.deepEqual(
+Deno.test('an identities route targets the path identity', () => {
+    assertEquals(
         identityTargetsFor(
             'identities/:id/pii', ['ada'], undefined,
         ),
@@ -14,8 +14,8 @@ test('an identities route targets the path identity', () => {
     );
 });
 
-test('a body identity_id is a target', () => {
-    assert.deepEqual(
+Deno.test('a body identity_id is a target', () => {
+    assertEquals(
         identityTargetsFor(
             'organizations/:id/ideas/:id', ['42'],
             { identity_id: 'ada' },
@@ -24,9 +24,9 @@ test('a body identity_id is a target', () => {
     );
 });
 
-test('a nested token-revocation targets the path identity',
+Deno.test('a nested token-revocation targets the path identity',
 () => {
-    assert.deepEqual(
+    assertEquals(
         identityTargetsFor(
             'identities/:id/token-revocations/:rid',
             ['ada', 't1'],
@@ -36,27 +36,27 @@ test('a nested token-revocation targets the path identity',
     );
 });
 
-test('no identity facet yields no targets', () => {
-    assert.deepEqual(
+Deno.test('no identity facet yields no targets', () => {
+    assertEquals(
         identityTargetsFor('organizations/:id/ideas/:id', ['42'], {}),
         [],
     );
 });
 
-test('malformed wire events throw', () => {
-    assert.throws(
+Deno.test('malformed wire events throw', () => {
+    assertThrows(
         () => notificationEventFromWire({ tables: [] }),
-        /malformed notification event/,
+        Error, 'malformed notification event',
     );
 });
 
-test('scoped wire events round-trip', () => {
-    const event = {
+Deno.test('scoped wire events round-trip', () => {
+    const event: NotificationEvent = {
         kind: 'scoped',
         organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
         identityIds: [],
     };
-    assert.deepEqual(
+    assertEquals(
         notificationEventFromWire(event), event,
     );
 });

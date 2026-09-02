@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -24,7 +23,7 @@ async function setup() {
 // Phase Final Task 2: identity_credentials ROW half stripped —
 // event count and active state live on the message plane.
 
-test('ledger retains set, rotate, revoke; latest wins',
+Deno.test('ledger retains set, rotate, revoke; latest wins',
 async () => {
     const { db, ctx } = await setup();
     await seedIdentityCredential(db, 'pnXmXrxOWayANgDLdCjuBw'
@@ -46,14 +45,14 @@ async () => {
         ctx, 'pnXmXrxOWayANgDLdCjuBw', 'password',
     );
     const events = await deriveCredentialsFor(db, 'pnXmXrxOWayANgDLdCjuBw');
-    assert.equal(events.length, 3);   // retained
+    assertStrictEquals(events.length, 3);   // retained
     // Phase Final Stage B: identity spine tables retired.
     const state =
         await getIdentityCredentialState(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assert.equal(state.active.length, 0); // revoked
+    assertStrictEquals(state.active.length, 0); // revoked
 });
 
-test('the secret never leaves the state adapter',
+Deno.test('the secret never leaves the state adapter',
 async () => {
     const { db, ctx } = await setup();
     await seedIdentityCredential(db, 'pnXmXrxOWayANgDLdCjuBw'
@@ -66,15 +65,15 @@ async () => {
     });
     const state =
         await getIdentityCredentialState(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assert.equal('secret' in state, false);
-    assert.equal(
+    assertStrictEquals('secret' in state, false);
+    assertStrictEquals(
         JSON.stringify(state)
             .includes('super-secret'),
         false,
     );
 });
 
-test('credential state is latest by at, not array order',
+Deno.test('credential state is latest by at, not array order',
 async () => {
     const { db, ctx } = await setup();
     // Appended in REVERSE chronological order: the later
@@ -97,5 +96,5 @@ async () => {
     });
     const state =
         await getIdentityCredentialState(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assert.deepEqual(state.active, ['password']);
+    assertEquals(state.active, ['password']);
 });

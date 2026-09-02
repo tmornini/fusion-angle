@@ -1,5 +1,6 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertEquals, assertRejects, assertStrictEquals,
+} from '@std/assert';
 import { HistoryEntityStore }
     from '../api/store-history-entity.ts';
 import { MemoryStorageBackend }
@@ -21,7 +22,7 @@ async function primedBackend(): Promise<MemoryStorageBackend> {
     return backend;
 }
 
-test('HistoryEntityStore.put invokes the validator',
+Deno.test('HistoryEntityStore.put invokes the validator',
     async () => {
         const backend = await primedBackend();
         let seen: Record<string, unknown> | null = null;
@@ -33,23 +34,23 @@ test('HistoryEntityStore.put invokes the validator',
             },
         );
         await store.put('a', { n: 7 });
-        assert.deepEqual(seen, { n: 7 });
+        assertEquals(seen, { n: 7 });
     });
 
-test('HistoryEntityStore.put rethrows validator errors',
+Deno.test('HistoryEntityStore.put rethrows validator errors',
     async () => {
         const backend = await primedBackend();
         const store = new HistoryEntityStore<Thing>(
             'things', backendRunner(backend),
             () => { throw new Error('nope'); },
         );
-        await assert.rejects(
+        await assertRejects(
             () => store.put('a', { n: 1 }),
-            /nope/,
+            Error, 'nope',
         );
     });
 
-test('HistoryEntityStore.put writes the validator output',
+Deno.test('HistoryEntityStore.put writes the validator output',
     async () => {
         const backend = await primedBackend();
         const store = new HistoryEntityStore<Thing>(
@@ -59,12 +60,12 @@ test('HistoryEntityStore.put writes the validator output',
             }),
         );
         const written = await store.put('a', { n: 7 });
-        assert.equal(written.n, 8);
+        assertStrictEquals(written.n, 8);
         const fetched = await store.getById('a');
-        assert.equal(fetched.n, 8);
+        assertStrictEquals(fetched.n, 8);
     });
 
-test(
+Deno.test(
     'HistoryEntityStore.putMany upserts every entry',
     async () => {
         const backend = await primedBackend();
@@ -79,10 +80,10 @@ test(
             ],
             [],
         );
-        assert.equal(
+        assertStrictEquals(
             (await store.getById('a')).n, 1,
         );
-        assert.equal(
+        assertStrictEquals(
             (await store.getById('b')).n, 2,
         );
     },

@@ -1,6 +1,5 @@
+import { assertEquals } from '@std/assert';
 import './hmac-test-key.ts';
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
 import {
     resolveCredentialDecision,
 } from '../web-app/app/credential-resolution.ts';
@@ -29,50 +28,50 @@ async function pair() {
     };
 }
 
-test('no credentials resolves to login', () => {
-    assert.deepEqual(
+Deno.test('no credentials resolves to login', () => {
+    assertEquals(
         resolveCredentialDecision(null, 5_000),
         { kind: 'login' });
 });
 
-test('a live access token resolves to install', async () => {
+Deno.test('a live access token resolves to install', async () => {
     const creds = await pair();
-    assert.deepEqual(
+    assertEquals(
         resolveCredentialDecision(creds, ACCESS - 1),
         { kind: 'install', accessToken: creds.accessToken });
 });
 
-test('a dead access but live refresh resolves to refresh',
+Deno.test('a dead access but live refresh resolves to refresh',
 async () => {
     const creds = await pair();
-    assert.deepEqual(
+    assertEquals(
         resolveCredentialDecision(creds, ACCESS + 1),
         { kind: 'refresh', refreshToken: creds.refreshToken });
 });
 
-test('both tokens dead resolves to login', async () => {
+Deno.test('both tokens dead resolves to login', async () => {
     const creds = await pair();
-    assert.deepEqual(
+    assertEquals(
         resolveCredentialDecision(creds, REFRESH + 1),
         { kind: 'login' });
 });
 
-test('now === access exp counts the access dead (refresh)',
+Deno.test('now === access exp counts the access dead (refresh)',
 async () => {
     const creds = await pair();
     // at exactly the access exp the token is dead (now >= exp),
     // refresh still live → refresh, never install.
-    assert.deepEqual(
+    assertEquals(
         resolveCredentialDecision(creds, ACCESS),
         { kind: 'refresh', refreshToken: creds.refreshToken });
 });
 
-test('now === refresh exp counts the refresh dead (login)',
+Deno.test('now === refresh exp counts the refresh dead (login)',
 async () => {
     const creds = await pair();
     // access already dead; now exactly at refresh exp → both
     // dead → login.
-    assert.deepEqual(
+    assertEquals(
         resolveCredentialDecision(creds, REFRESH),
         { kind: 'login' });
 });

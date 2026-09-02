@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assertStrictEquals } from '@std/assert';
 import { deriveFlowStateHistory } from
     '../api/derive-flows.ts';
-import { strict as assert } from 'node:assert';
 import { GET, POST } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
@@ -85,7 +84,7 @@ function createBody() {
     };
 }
 
-test(
+Deno.test(
     'POST flows writes the flow, its project link, and an'
     + " 'active' state event in one operation",
     async () => {
@@ -100,9 +99,9 @@ test(
             organization_id: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aEsGMmBEFaVdWihhHXwCbw', DEV_TOKEN);
-        assert.equal(flow.name, 'My Flow');
+        assertStrictEquals(flow.name, 'My Flow');
         // The fence stamped the bound org — never the body.
-        assert.equal(flow.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
+        assertStrictEquals(flow.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
 
         // Phase Final Task 2: project_flows row half stripped —
         // join derives from the message plane.
@@ -112,25 +111,25 @@ test(
             flow_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'pnXmXrxOWayANgDLdCjuBw/flows/', DEV_TOKEN);
-        assert.equal(links.length, 1);
-        assert.equal(links[0]!.id, body.projectFlowId);
-        assert.equal(links[0]!.project_id, 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(links[0]!.flow_id, 'aEsGMmBEFaVdWihhHXwCbw');
+        assertStrictEquals(links.length, 1);
+        assertStrictEquals(links[0]!.id, body.projectFlowId);
+        assertStrictEquals(links[0]!.project_id, 'pnXmXrxOWayANgDLdCjuBw');
+        assertStrictEquals(links[0]!.flow_id, 'aEsGMmBEFaVdWihhHXwCbw');
 
         const events = await deriveFlowStateHistory(db
             , 'AjdvjuECVZEgZoFajaIEkg', 'aEsGMmBEFaVdWihhHXwCbw');
         // Phase Final Stage B: states table retired.
-        assert.equal(events.length, 1);
+        assertStrictEquals(events.length, 1);
         const ev = events[0]! as StateEntity;
-        assert.equal(ev.id, body.initialStateEventId);
-        assert.equal(ev.state, 'active');
+        assertStrictEquals(ev.id, body.initialStateEventId);
+        assertStrictEquals(ev.state, 'active');
         // The event is authored by the verified caller, never
         // the body.
-        assert.equal(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+        assertStrictEquals(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
-test(
+Deno.test(
     'POST flows ignores a raw colliding states row'
     + ' (states ROW half stripped)',
     async () => {
@@ -146,16 +145,16 @@ test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw', DEV_TOKEN,
         );
-        assert.equal(flow.id, 'aEsGMmBEFaVdWihhHXwCbw');
+        assertStrictEquals(flow.id, 'aEsGMmBEFaVdWihhHXwCbw');
         const flowEvents = await deriveFlowStateHistory(
             db, 'AjdvjuECVZEgZoFajaIEkg', 'aEsGMmBEFaVdWihhHXwCbw',
         );
-        assert.equal(flowEvents.length, 1);
-        assert.equal(flowEvents[0]!.state, 'active');
+        assertStrictEquals(flowEvents.length, 1);
+        assertStrictEquals(flowEvents[0]!.state, 'active');
     },
 );
 
-test(
+Deno.test(
     'POST flows stamps the initial event with the'
     + ' caller-supplied initialStateAt',
     async () => {
@@ -175,7 +174,7 @@ test(
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
             DEV_TOKEN,
         );
-        assert.equal(events.length, 1);
-        assert.equal(events[0]!.at, AT);
+        assertStrictEquals(events.length, 1);
+        assertStrictEquals(events[0]!.at, AT);
     },
 );

@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertMatch,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import { verifyPassword } from
     '../shared/password-hash.ts';
 import {
@@ -10,24 +14,24 @@ import {
 import { deriveCredentialsFor } from
     '../api/derive-identity-spine.ts';
 
-test('testHashPassword emits pbkdf2 PHC with i=1',
+Deno.test('testHashPassword emits pbkdf2 PHC with i=1',
 async () => {
     const phc = await testHashPassword('s3cret');
-    assert.match(
+    assertMatch(
         phc,
         /^\$pbkdf2-sha256\$i=1\$[^$]+\$[^$]+$/,
     );
-    assert.equal(
+    assertStrictEquals(
         await verifyPassword('s3cret', phc),
         true,
     );
-    assert.equal(
+    assertStrictEquals(
         await verifyPassword('wrong', phc),
         false,
     );
 });
 
-test('seededMockDb seeds verifying current password',
+Deno.test('seededMockDb seeds verifying current password',
 async () => {
     const db = await seededMockDb();
     const rows = await deriveCredentialsFor(
@@ -36,23 +40,23 @@ async () => {
     const passwordCred = rows.find(
         r => r.kind === 'password',
     );
-    assert.ok(passwordCred, 'password credential present');
-    assert.match(
+    assert(passwordCred, 'password credential present');
+    assertMatch(
         passwordCred.secret,
         /^\$pbkdf2-sha256\$i=1\$/,
     );
 });
 
-test('sharedMockDb returns the same adapter instance',
+Deno.test('sharedMockDb returns the same adapter instance',
 async () => {
     const a = await sharedMockDb();
     const b = await sharedMockDb();
-    assert.equal(a, b);
+    assertStrictEquals(a, b);
 });
 
-test('seededMockDb returns a fresh adapter each call',
+Deno.test('seededMockDb returns a fresh adapter each call',
 async () => {
     const a = await seededMockDb();
     const b = await seededMockDb();
-    assert.notEqual(a, b);
+    assertNotStrictEquals(a, b);
 });

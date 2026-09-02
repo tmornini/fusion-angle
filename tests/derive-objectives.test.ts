@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -45,7 +44,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('deriveObjectiveStateHistory returns the trio walk in'
+Deno.test('deriveObjectiveStateHistory returns the trio walk in'
 + ' (state_at, id) order with echo dedup', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -73,14 +72,14 @@ test('deriveObjectiveStateHistory returns the trio walk in'
     const history = await deriveObjectiveStateHistory(
         db, STARK_ORGANIZATION, id,
     );
-    assert.deepEqual(
+    assertEquals(
         history.map((r) => r.state),
         ['active', 'archived'],
     );
 });
 
-test('GET organizations/:id/objectives/:id/versions carries the objective'
-+ ' trio rows (DESC current-first)', async () => {
+Deno.test('GET organizations/:id/objectives/:id/versions carries the'
++ ' objective trio rows (DESC current-first)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const id = generateIdentifier();
@@ -100,14 +99,14 @@ test('GET organizations/:id/objectives/:id/versions carries the objective'
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
             + '/versions/', token,
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const rows = JSON.parse(await res.text()) as {
         id: string; state: string;
     }[];
-    assert.equal(rows.length, 2);
-    assert.equal(rows[0]!.id, id);
-    assert.equal(rows[0]!.state, 'archived');
-    assert.equal(rows[1]!.id, id);
-    assert.equal(rows[1]!.state, 'active');
-    assert.equal('state_at' in rows[0]!, false);
+    assertStrictEquals(rows.length, 2);
+    assertStrictEquals(rows[0]!.id, id);
+    assertStrictEquals(rows[0]!.state, 'archived');
+    assertStrictEquals(rows[1]!.id, id);
+    assertStrictEquals(rows[1]!.state, 'active');
+    assertStrictEquals('state_at' in rows[0]!, false);
 });

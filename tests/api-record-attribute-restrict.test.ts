@@ -1,7 +1,12 @@
-import { test } from 'node:test';
+import {
+    assertEquals,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+    assertStringIncludes,
+} from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { strict as assert } from 'node:assert';
 import {
     DELETE,
     GET,
@@ -184,7 +189,7 @@ function workOrderNodeBinding(
 // NO edges leg; AttributeReferrers names only valueCount /
 // flowIds / workOrderIds. Short type-level + unit proof, not
 // an edges scan.
-test(
+Deno.test(
     'prove attribute bindings cannot reach flow edges',
     () => {
         type GraphEdgeHasNoAttributes =
@@ -192,17 +197,17 @@ test(
                 ? never
                 : true;
         const edgeTypeProof: GraphEdgeHasNoAttributes = true;
-        assert.equal(edgeTypeProof, true);
+        assertStrictEquals(edgeTypeProof, true);
 
         const edgeKeys: readonly (keyof GraphEdge)[] = [
             'id', 'name', 'fromNodeId', 'toNodeId',
         ];
-        assert.equal(
+        assertStrictEquals(
             (edgeKeys as readonly string[])
                 .includes('attributes'),
             false,
         );
-        assert.equal(
+        assertStrictEquals(
             (TABLE_NAMES as readonly string[])
                 .includes('flow_edge_attributes'),
             false,
@@ -230,14 +235,14 @@ test(
                 : never;
         const referrerShapeProof: OnlyKnownReferrerKeys =
             true;
-        assert.equal(referrerShapeProof, true);
+        assertStrictEquals(referrerShapeProof, true);
         const sample: AttributeReferrers = {
             valueCount: 0,
             flowIds: [],
             workOrderIds: [],
             instanceIds: [],
         };
-        assert.deepEqual(
+        assertEquals(
             Object.keys(sample).sort(),
             [
                 'flowIds',
@@ -249,7 +254,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'an unreferenced attribute deletes cleanly',
     async () => {
         const db = await seededDb();
@@ -259,10 +264,10 @@ test(
         await DELETE(
             db, ATTR1_PATH, DEV_TOKEN,
         );
-        assert.equal(
+        assertStrictEquals(
             (await db.messagePairs.getAll()).length, before + 1,
         );
-        await assert.rejects(
+        await assertRejects(
             () => GET(
                 db, ATTR1_PATH, DEV_TOKEN,
             ),
@@ -274,7 +279,7 @@ test(
 // for RESTRICT DELETE. Wire-seeded attribute (pairs exist) so
 // the head response body stamps organization_id; DELETE is
 // 204 and wire GET 404s.
-test(
+Deno.test(
     'message-plane organization_id deletes a wire-seeded'
     + ' unreferenced attribute (Task 1(a) parity)',
     async () => {
@@ -289,11 +294,11 @@ test(
         const before = await GET<{
             organization_id: string;
         }>(db, ATTR_PAIR_PATH, DEV_TOKEN);
-        assert.equal(before.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
+        assertStrictEquals(before.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
         await DELETE(
             db, ATTR_PAIR_PATH, DEV_TOKEN,
         );
-        await assert.rejects(
+        await assertRejects(
             () => GET(
                 db, ATTR_PAIR_PATH, DEV_TOKEN,
             ),
@@ -369,7 +374,7 @@ async function seedFieldValueReferrer(
     );
 }
 
-test(
+Deno.test(
     'a field-value referrer blocks deletion with 409',
     async () => {
         const db = await seededDb();
@@ -377,27 +382,24 @@ test(
             db, 'VXTdVVRluJDRBqbXWZBntA', FIELD_VALUE_ID,
             'High',
         );
-        await assert.rejects(
+        const err = await assertRejects(
             () => DELETE(
                 db, ATTR1_PATH,
                 DEV_TOKEN,
             ),
-            (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 409
-                && /1 state field value/.test(
-                    err.message,
-                ),
-        );
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, 409);
+        assertStringIncludes(err.message, '1 state field value');
         // RESTRICT 409: attribute still served on message plane.
         const still = await GET<{ id: string }>(
             db, ATTR1_PATH, DEV_TOKEN,
         );
-        assert.equal(still.id, 'VXTdVVRluJDRBqbXWZBntA');
+        assertStrictEquals(still.id, 'VXTdVVRluJDRBqbXWZBntA');
     },
 );
 
-test(
+Deno.test(
     'a live node-attribute binding blocks deletion'
     + ' naming the flow',
     async () => {
@@ -406,20 +408,21 @@ test(
             flowId: 'ZOousbbnzpqlxJExVAruYQ', nodeId: NODE_1,
             attributeId: 'VXTdVVRluJDRBqbXWZBntA',
         });
-        await assert.rejects(
+        const err = await assertRejects(
             () => DELETE(
                 db, ATTR1_PATH,
                 DEV_TOKEN,
             ),
-            (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 409
-                && /flow\(s\) ZOousbbnzpqlxJExVAruYQ/.test(err.message),
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, 409);
+        assertStringIncludes(
+            err.message, 'flow(s) ZOousbbnzpqlxJExVAruYQ',
         );
     },
 );
 
-test(
+Deno.test(
     'a removed node-attribute binding does not block'
     + ' deletion',
     async () => {
@@ -447,10 +450,10 @@ test(
             db, ATTR1_PATH, DEV_TOKEN,
         );
         // Phase Final Stage B: tombstone pair lands; GET 404s.
-        assert.equal(
+        assertStrictEquals(
             (await db.messagePairs.getAll()).length, before + 1,
         );
-        await assert.rejects(
+        await assertRejects(
             () => GET(
                 db, ATTR1_PATH, DEV_TOKEN,
             ),
@@ -458,7 +461,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'attribute on multiple nodes counts the flow once',
     async () => {
         const db = await seededDb();
@@ -483,27 +486,23 @@ test(
                 at: AT,
             }],
         });
-        await assert.rejects(
+        const err = await assertRejects(
             () => DELETE(
                 db, ATTR1_PATH,
                 DEV_TOKEN,
             ),
-            (err: unknown) => {
-                if (!(err instanceof RequestError)) {
-                    return false;
-                }
-                if (err.status !== 409) return false;
-                // flow ZOousbbnzpqlxJExVAruYQ appears exactly once in the
-                // message
-                const matches =
-                    err.message.match(/ZOousbbnzpqlxJExVAruYQ/g) ?? [];
-                return matches.length === 1;
-            },
-        );
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, 409);
+        // flow ZOousbbnzpqlxJExVAruYQ appears exactly once in the
+        // message
+        const matches =
+            err.message.match(/ZOousbbnzpqlxJExVAruYQ/g) ?? [];
+        assertStrictEquals(matches.length, 1);
     },
 );
 
-test(
+Deno.test(
     'a work-order binding blocks deletion naming it',
     async () => {
         const db = await seededDb();
@@ -569,22 +568,21 @@ test(
             stateEventAts: [AT, AT, AT],
             states: [NODE_HOST, NODE_HOST, 'claimed'],
         }, DEV_TOKEN);
-        await assert.rejects(
+        const err = await assertRejects(
             () => DELETE(
                 db, ATTR1_PATH,
                 DEV_TOKEN,
             ),
-            (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 409
-                && /work order\(s\) yNSSnbrpacodQTzUEcdEVA/.test(
-                    err.message,
-                ),
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, 409);
+        assertStringIncludes(
+            err.message, 'work order(s) yNSSnbrpacodQTzUEcdEVA',
         );
     },
 );
 
-test(
+Deno.test(
     'a referenced removal rolls back the whole'
     + ' record-write batch',
     async () => {
@@ -600,7 +598,7 @@ test(
         );
         const requestsBefore = await db.messagePairs.getAll();
         const responsesBefore = await db.messagePairs.getAll();
-        await assert.rejects(
+        const err = await assertRejects(
             () => POST(db
                 , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
                 kind: 'edit',
@@ -618,27 +616,26 @@ test(
                 state: 'active',
                 removedAttributeIds: ['VXTdVVRluJDRBqbXWZBntA'],
             }, DEV_TOKEN),
-            (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 409,
-        );
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, 409);
         // the batch applied NOTHING: message-plane document
         // survives and zero pairs append
         const record = await GET<{ name: string }>(
             db, TYPE_PATH, DEV_TOKEN,
         );
-        assert.equal(record.name, 'Asset');
+        assertStrictEquals(record.name, 'Asset');
         const attr = await GET<{ id: string }>(
             db, ATTR1_PATH, DEV_TOKEN,
         );
-        assert.equal(attr.id, 'VXTdVVRluJDRBqbXWZBntA');
+        assertStrictEquals(attr.id, 'VXTdVVRluJDRBqbXWZBntA');
         // pair-balance: the whole bundle is pairs-or-nothing,
         // so a 409 rollback appends NEITHER table any rows.
-        assert.equal(
+        assertStrictEquals(
             (await db.messagePairs.getAll()).length,
             requestsBefore.length,
         );
-        assert.equal(
+        assertStrictEquals(
             (await db.messagePairs.getAll()).length,
             responsesBefore.length,
         );

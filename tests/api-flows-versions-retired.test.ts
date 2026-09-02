@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -52,7 +51,7 @@ function flowBody() {
     };
 }
 
-test('pair-chain GET flow versions; table-backed vid 404',
+Deno.test('pair-chain GET flow versions; table-backed vid 404',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -62,23 +61,23 @@ async () => {
         req('PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'cyLfilTEOVYoZqXJMakKAQ', token, flowBody()),
     );
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 
     const index = await handleRequest(
         db,
         req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'cyLfilTEOVYoZqXJMakKAQ/versions/', token),
     );
-    assert.equal(index.status, 200);
+    assertStrictEquals(index.status, 200);
     const rows = await index.json() as { id: string }[];
-    assert.ok(rows.length >= 1);
+    assert(rows.length >= 1);
 
     const retired = await handleRequest(
         db,
         req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'cyLfilTEOVYoZqXJMakKAQ/history', token),
     );
-    assert.equal(retired.status, 404);
+    assertStrictEquals(retired.status, 404);
 
     const tableVid = await handleRequest(
         db,
@@ -88,14 +87,14 @@ async () => {
             token,
         ),
     );
-    assert.equal(tableVid.status, 404);
+    assertStrictEquals(tableVid.status, 404);
 
     const missing = await handleRequest(
         db,
         req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'nnoFIBfkCuGxgiGxhQpcCQ/versions/', token),
     );
-    assert.equal(missing.status, 404);
+    assertStrictEquals(missing.status, 404);
 
     const writePaths = [
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/cyLfilTEOVYoZqXJMakKAQ/'
@@ -108,7 +107,7 @@ async () => {
             const res = await handleRequest(
                 db, req(method, path, token, {}),
             );
-            assert.equal(
+            assertStrictEquals(
                 res.status, 405,
                 method + ' ' + path,
             );

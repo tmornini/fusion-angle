@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
@@ -94,12 +93,12 @@ async function grant(
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
 }
 
 // -- invitationOpStateFor --------------------------------------
 
-test('invitationOpStateFor: byte-identical pre-tx (the plain'
+Deno.test('invitationOpStateFor: byte-identical pre-tx (the plain'
 + ' adapter) vs in-tx (an open db.transaction view sharing'
 + ' acceptInvitation\'s own table list) — the membershipExistsFor'
 + ' precedent', async () => {
@@ -118,7 +117,7 @@ test('invitationOpStateFor: byte-identical pre-tx (the plain'
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assertStrictEquals(accept.status, 204);
 
     // Phase Final Task 2: memberships ROW half stripped from
     // acceptInvitation's tx list.
@@ -128,8 +127,8 @@ test('invitationOpStateFor: byte-identical pre-tx (the plain'
         acceptTxTables,
         (view) => invitationOpStateFor(view, id),
     );
-    assert.equal(inTx, preTx);
-    assert.equal(preTx, 'accepted');
+    assertStrictEquals(inTx, preTx);
+    assertStrictEquals(preTx, 'accepted');
 
     // A never-granted id, same parity.
     const preTxMissing = await invitationOpStateFor(
@@ -140,13 +139,13 @@ test('invitationOpStateFor: byte-identical pre-tx (the plain'
         (view) =>
             invitationOpStateFor(view, NO_SUCH_INVITATION),
     );
-    assert.equal(inTxMissing, preTxMissing);
-    assert.equal(preTxMissing, undefined);
+    assertStrictEquals(inTxMissing, preTxMissing);
+    assertStrictEquals(preTxMissing, undefined);
 });
 
 // -- invitationLifecycleStatesFor --------------------------------
 
-test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
+Deno.test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
 + ' plain adapter) vs in-tx (an open db.transaction view sharing'
 + ' revokeInvitation\'s own table list)', async () => {
     const db = await seededDb();
@@ -163,7 +162,7 @@ test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(revoke.status, 204);
+    assertStrictEquals(revoke.status, 204);
 
     const revokeTxTables = MESSAGE_TABLES;
     const preTx = await invitationLifecycleStatesFor(db, id);
@@ -171,8 +170,8 @@ test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
         revokeTxTables,
         (view) => invitationLifecycleStatesFor(view, id),
     );
-    assert.deepEqual(inTx, preTx);
-    assert.equal(preTx.length, 2);
+    assertEquals(inTx, preTx);
+    assertStrictEquals(preTx.length, 2);
 
     const preTxMissing = await invitationLifecycleStatesFor(
         db, NO_SUCH_INVITATION,
@@ -184,8 +183,8 @@ test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
                 view, NO_SUCH_INVITATION,
             ),
     );
-    assert.deepEqual(inTxMissing, preTxMissing);
-    assert.deepEqual(preTxMissing, []);
+    assertEquals(inTxMissing, preTxMissing);
+    assertEquals(preTxMissing, []);
 });
 
 // -- workOrderLifecycleStatesFor ---------------------------------
@@ -234,7 +233,7 @@ function workOrderFlowGraph(
 
 const EMPTY_FLOW_ID = 'GgfDbXOJUvvaCekCTcvhuw';
 
-test('workOrderLifecycleStatesFor: byte-identical pre-tx (the'
+Deno.test('workOrderLifecycleStatesFor: byte-identical pre-tx (the'
 + ' plain adapter) vs in-tx (an open db.transaction view sharing'
 + ' postWorkOrderClaimOp\'s own table list)', async () => {
     const db = await seededDb();
@@ -263,7 +262,7 @@ test('workOrderLifecycleStatesFor: byte-identical pre-tx (the'
             states: [N_START, N_MIDDLE, 'claimed'],
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     // Phase Final Task 2: work_orders dropped from claim tx.
     const claimTxTables = MESSAGE_TABLES;
@@ -276,8 +275,8 @@ test('workOrderLifecycleStatesFor: byte-identical pre-tx (the'
             view, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.deepEqual(inTx, preTx);
-    assert.equal(preTx.length, 3);
+    assertEquals(inTx, preTx);
+    assertStrictEquals(preTx.length, 3);
 
     const preTxMissing = await workOrderLifecycleStatesFor(
         db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
@@ -288,8 +287,8 @@ test('workOrderLifecycleStatesFor: byte-identical pre-tx (the'
             view, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
         ),
     );
-    assert.deepEqual(inTxMissing, preTxMissing);
-    assert.deepEqual(preTxMissing, []);
+    assertEquals(inTxMissing, preTxMissing);
+    assertEquals(preTxMissing, []);
 });
 
 // -- workOrderClaimHistoryFor -------------------------------------
@@ -298,7 +297,7 @@ test('workOrderLifecycleStatesFor: byte-identical pre-tx (the'
 // pin as workOrderLifecycleStatesFor above, over
 // postWorkOrderClaimOp's REAL table list (this core's only
 // live caller since this task).
-test('workOrderClaimHistoryFor: byte-identical pre-tx (the'
+Deno.test('workOrderClaimHistoryFor: byte-identical pre-tx (the'
 + ' plain adapter) vs in-tx (an open db.transaction view sharing'
 + ' postWorkOrderClaimOp\'s own table list)', async () => {
     const db = await seededDb();
@@ -327,7 +326,7 @@ test('workOrderClaimHistoryFor: byte-identical pre-tx (the'
             states: [N_START, N_MIDDLE, 'claimed'],
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     // Phase Final Task 2: work_orders dropped from claim tx.
     const claimTxTables = MESSAGE_TABLES;
@@ -340,8 +339,8 @@ test('workOrderClaimHistoryFor: byte-identical pre-tx (the'
             view, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.deepEqual(inTx, preTx);
-    assert.equal(preTx.length, 3);
+    assertEquals(inTx, preTx);
+    assertStrictEquals(preTx.length, 3);
 
     const preTxMissing = await workOrderClaimHistoryFor(
         db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
@@ -352,6 +351,6 @@ test('workOrderClaimHistoryFor: byte-identical pre-tx (the'
             view, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
         ),
     );
-    assert.deepEqual(inTxMissing, preTxMissing);
-    assert.deepEqual(preTxMissing, []);
+    assertEquals(inTxMissing, preTxMissing);
+    assertEquals(preTxMissing, []);
 });

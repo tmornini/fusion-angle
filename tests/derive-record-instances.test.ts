@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -96,7 +95,7 @@ async function emptyDb(): Promise<MemoryDbAdapter> {
 
 // -- pure: revisionValuesOf ---------------------------------
 
-test(
+Deno.test(
     'revisionValuesOf reads genesis set dialect',
     () => {
         const values = revisionValuesOf({
@@ -105,37 +104,37 @@ test(
                 val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
             ],
         });
-        assert.deepEqual(values, [
+        assertEquals(values, [
             val('a', 'AjdvjuECVZEgZoFajaIEkg'),
             val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
     },
 );
 
-test(
+Deno.test(
     'revisionValuesOf reads revision values dialect',
     () => {
         const values = revisionValuesOf({
             values: [val('a', 'AjdvjuECVZEgZoFajaIEkg')],
         });
-        assert.deepEqual(values, [val('a', 'AjdvjuECVZEgZoFajaIEkg')]);
+        assertEquals(values, [val('a', 'AjdvjuECVZEgZoFajaIEkg')]);
     },
 );
 
-test(
+Deno.test(
     'revisionValuesOf prefers values over set',
     () => {
         const values = revisionValuesOf({
             values: [val('a', 'AjdvjuECVZEgZoFajaIEkg')],
             set: [val('b', 'BBjWJsjYIDkTRKIIPrzWRw')],
         });
-        assert.deepEqual(values, [val('a', 'AjdvjuECVZEgZoFajaIEkg')]);
+        assertEquals(values, [val('a', 'AjdvjuECVZEgZoFajaIEkg')]);
     },
 );
 
 // -- pure: mergeInstanceValues ------------------------------
 
-test(
+Deno.test(
     'mergeInstanceValues applies set overwrites',
     () => {
         const merged = mergeInstanceValues(
@@ -143,14 +142,14 @@ test(
                 , 'BBjWJsjYIDkTRKIIPrzWRw')],
             { set: [val('a', '3')] },
         );
-        assert.deepEqual(merged, [
+        assertEquals(merged, [
             val('a', '3'),
             val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
     },
 );
 
-test(
+Deno.test(
     'mergeInstanceValues clear removes attribute'
     + ' (ABSENT, not null/empty)',
     () => {
@@ -158,15 +157,15 @@ test(
             [val('a', '3'), val('b', 'BBjWJsjYIDkTRKIIPrzWRw')],
             { clear: ['b'] },
         );
-        assert.deepEqual(merged, [val('a', '3')]);
-        assert.equal(
+        assertEquals(merged, [val('a', '3')]);
+        assertStrictEquals(
             merged.some((v) => v.attribute_id === 'b'),
             false,
         );
     },
 );
 
-test(
+Deno.test(
     'mergeInstanceValues clear of already-absent'
     + ' is a no-op',
     () => {
@@ -175,11 +174,11 @@ test(
             head,
             { clear: ['z'] },
         );
-        assert.deepEqual(merged, head);
+        assertEquals(merged, head);
     },
 );
 
-test(
+Deno.test(
     'mergeInstanceValues emits attribute_id-lex order',
     () => {
         const merged = mergeInstanceValues(
@@ -187,14 +186,14 @@ test(
                 , 'BBjWJsjYIDkTRKIIPrzWRw')],
             { set: [val('a', '3')] },
         );
-        assert.deepEqual(
+        assertEquals(
             merged.map((v) => v.attribute_id),
             ['a', 'm', 'z'],
         );
     },
 );
 
-test(
+Deno.test(
     'mergeInstanceValues applies set then clear',
     () => {
         const merged = mergeInstanceValues(
@@ -205,16 +204,16 @@ test(
                 clear: ['b', 'c'],
             },
         );
-        assert.deepEqual(merged, [val('a', '3')]);
+        assertEquals(merged, [val('a', '3')]);
     },
 );
 
 // -- prefix -------------------------------------------------
 
-test(
+Deno.test(
     'instancesUriPrefix nests under type',
     () => {
-        assert.equal(
+        assertStrictEquals(
             instancesUriPrefix(ORGANIZATION, TYPE_ID),
             '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'sleWPUnGznNnXLzcfFswjg'
@@ -225,7 +224,7 @@ test(
 
 // -- head / collection / revisions --------------------------
 
-test(
+Deno.test(
     'deriveInstanceHead after genesis PUT only'
     + ' → full set as values',
     async () => {
@@ -243,7 +242,7 @@ test(
         const head = await deriveInstanceHead(
             db, ORGANIZATION, TYPE_ID, INST_A,
         );
-        assert.deepEqual(head, {
+        assertEquals(head, {
             id: INST_A,
             messagePairId,
             values: [
@@ -254,7 +253,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'deriveInstanceHead after revision PUT'
     + ' → full state from NEW head (no fold)',
     async () => {
@@ -285,7 +284,7 @@ test(
         const head = await deriveInstanceHead(
             db, ORGANIZATION, TYPE_ID, INST_A,
         );
-        assert.deepEqual(head, {
+        assertEquals(head, {
             id: INST_A,
             messagePairId: revisionId,
             values: [
@@ -296,7 +295,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'deriveInstanceHead when DELETE is last'
     + ' → undefined',
     async () => {
@@ -314,22 +313,22 @@ test(
         const head = await deriveInstanceHead(
             db, ORGANIZATION, TYPE_ID, INST_A,
         );
-        assert.equal(head, undefined);
+        assertStrictEquals(head, undefined);
     },
 );
 
-test(
+Deno.test(
     'deriveInstanceHead absent address → undefined',
     async () => {
         const db = await emptyDb();
         const head = await deriveInstanceHead(
             db, ORGANIZATION, TYPE_ID, 'no-such',
         );
-        assert.equal(head, undefined);
+        assertStrictEquals(head, undefined);
     },
 );
 
-test(
+Deno.test(
     'deriveInstanceCollection: two live + one'
     + ' tombstoned → two rows, id-lex',
     async () => {
@@ -359,16 +358,16 @@ test(
         const rows = await deriveInstanceCollection(
             db, ORGANIZATION, TYPE_ID,
         );
-        assert.deepEqual(
+        assertEquals(
             rows.map((r) => r.id),
             [INST_A, INST_C],
         );
-        assert.deepEqual(rows[0]!.values, [val('x', 'a')]);
-        assert.deepEqual(rows[1]!.values, [val('x', 'c')]);
+        assertEquals(rows[0]!.values, [val('x', 'a')]);
+        assertEquals(rows[1]!.values, [val('x', 'c')]);
     },
 );
 
-test(
+Deno.test(
     'deriveInstanceRevisions: genesis + 2 patches'
     + ' → 3 full-state ASC; last == head',
     async () => {
@@ -403,43 +402,45 @@ test(
         const revisions = await deriveInstanceRevisions(
             db, ORGANIZATION, TYPE_ID, INST_A,
         );
-        assert.equal(revisions.length, 3);
-        assert.equal(revisions[0]!.messagePairId, g0);
-        assert.deepEqual(revisions[0]!.values, [
+        assertStrictEquals(revisions.length, 3);
+        assertStrictEquals(revisions[0]!.messagePairId, g0);
+        assertEquals(revisions[0]!.values, [
             val('a', 'AjdvjuECVZEgZoFajaIEkg'),
             val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
-        assert.equal(revisions[1]!.messagePairId, rOEPOcVMQdJiiiMuiiEhlg);
-        assert.deepEqual(revisions[1]!.values, [
+        assertStrictEquals(
+            revisions[1]!.messagePairId, rOEPOcVMQdJiiiMuiiEhlg,
+        );
+        assertEquals(revisions[1]!.values, [
             val('a', '3'),
             val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
-        assert.equal(revisions[2]!.messagePairId, r2);
-        assert.deepEqual(revisions[2]!.values, [
+        assertStrictEquals(revisions[2]!.messagePairId, r2);
+        assertEquals(revisions[2]!.values, [
             val('a', '3'),
         ]);
         // ASC by (at, id); index last matches live head.
         const head = await deriveInstanceHead(
             db, ORGANIZATION, TYPE_ID, INST_A,
         );
-        assert.ok(head !== undefined);
-        assert.equal(
+        assert(head !== undefined);
+        assertStrictEquals(
             revisions[revisions.length - 1]!.messagePairId,
             head!.messagePairId,
         );
-        assert.deepEqual(
+        assertEquals(
             revisions[revisions.length - 1]!.values,
             head!.values,
         );
         // Strict ASC timestamps.
-        assert.ok(
+        assert(
             revisions[0]!.at <= revisions[1]!.at
             && revisions[1]!.at <= revisions[2]!.at,
         );
     },
 );
 
-test(
+Deno.test(
     'deriveInstanceRevisions empty when tombstoned',
     async () => {
         const db = await emptyDb();
@@ -456,17 +457,17 @@ test(
         const revisions = await deriveInstanceRevisions(
             db, ORGANIZATION, TYPE_ID, INST_A,
         );
-        assert.deepEqual(revisions, []);
+        assertEquals(revisions, []);
     },
 );
 
-test(
+Deno.test(
     'deriveInstanceRevisions empty when absent',
     async () => {
         const db = await emptyDb();
         const revisions = await deriveInstanceRevisions(
             db, ORGANIZATION, TYPE_ID, 'no-such',
         );
-        assert.deepEqual(revisions, []);
+        assertEquals(revisions, []);
     },
 );

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     initials,
     pluralize,
@@ -11,75 +10,75 @@ import {
     SECONDS_PER_DAY,
 } from '../web-app/app/format.ts';
 
-test('initials returns first letter of single name', () => {
-    assert.equal(initials('Alice'), 'A');
+Deno.test('initials returns first letter of single name', () => {
+    assertStrictEquals(initials('Alice'), 'A');
 });
 
-test('initials concatenates multi-word firsts', () => {
-    assert.equal(initials('Alice Bob'), 'AB');
-    assert.equal(
+Deno.test('initials concatenates multi-word firsts', () => {
+    assertStrictEquals(initials('Alice Bob'), 'AB');
+    assertStrictEquals(
         initials('Alice Bob Carol'),
         'ABC',
     );
 });
 
-test('initials skips multiple spaces', () => {
-    assert.equal(
+Deno.test('initials skips multiple spaces', () => {
+    assertStrictEquals(
         initials('Alice  Bob'),
         'AB',
     );
 });
 
-test('pluralize returns singular for count=1', () => {
-    assert.equal(
+Deno.test('pluralize returns singular for count=1', () => {
+    assertStrictEquals(
         pluralize(1, 'cat'), 'cat',
     );
 });
 
-test('pluralize returns plural for count!=1', () => {
-    assert.equal(
+Deno.test('pluralize returns plural for count!=1', () => {
+    assertStrictEquals(
         pluralize(0, 'cat'), 'cats',
     );
-    assert.equal(
+    assertStrictEquals(
         pluralize(2, 'cat'), 'cats',
     );
-    assert.equal(
+    assertStrictEquals(
         pluralize(99, 'cat'), 'cats',
     );
 });
 
-test('trimStrings trims string properties', () => {
+Deno.test('trimStrings trims string properties', () => {
     const out = trimStrings({
         a: '  hello  ',
         b: ' world ',
     });
-    assert.deepEqual(
+    assertEquals(
         out,
         { a: 'hello', b: 'world' },
     );
 });
 
-test('trimStrings preserves non-string values', () => {
+Deno.test('trimStrings preserves non-string values', () => {
     const out = trimStrings({
         s: '  hi  ',
         n: 42,
         b: true,
     });
-    assert.deepEqual(
+    assertEquals(
         out,
         { s: 'hi', n: 42, b: true },
     );
 });
 
-test('displayText returns value or em-dash', () => {
-    assert.equal(displayText('foo'), 'foo');
-    assert.equal(
+Deno.test('displayText returns value or em-dash', () => {
+    assertStrictEquals(displayText('foo'), 'foo');
+    assertStrictEquals(
         displayText(''), DISPLAY_ABSENT,
     );
 });
 
-test('toDateInputValue extracts YYYY-MM-DD', () => {
-    assert.equal(
+Deno.test('toDateInputValue extracts YYYY-MM-DD', () => {
+    assertStrictEquals(
         toDateInputValue(
             '2026-04-26T12:00:00Z',
         ),
@@ -87,18 +86,18 @@ test('toDateInputValue extracts YYYY-MM-DD', () => {
     );
 });
 
-test('toDateInputValue empty for empty', () => {
-    assert.equal(
+Deno.test('toDateInputValue empty for empty', () => {
+    assertStrictEquals(
         toDateInputValue(''), '',
     );
 });
 
-test('SECONDS_PER_DAY equals 86400', () => {
-    assert.equal(SECONDS_PER_DAY, 86400);
+Deno.test('SECONDS_PER_DAY equals 86400', () => {
+    assertStrictEquals(SECONDS_PER_DAY, 86400);
 });
 
-test('formatDate surfaces corruption, never the dash', () => {
+Deno.test('formatDate surfaces corruption, never the dash', () => {
     // Timestamps are gate-validated; a corrupt value inside
     // the walls must render visibly, not as legitimate absence.
-    assert.equal(formatDate('not-a-date'), 'Invalid Date');
+    assertStrictEquals(formatDate('not-a-date'), 'Invalid Date');
 });

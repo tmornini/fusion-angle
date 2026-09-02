@@ -1,38 +1,37 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals } from '@std/assert';
 import { pathSegmentsOf } from
     '../api/path-segments.ts';
 
-test('collection slash keeps a trailing empty',
+Deno.test('collection slash keeps a trailing empty',
 () => {
-    assert.deepEqual(
+    assertEquals(
         pathSegmentsOf('/identities/'),
         ['identities', ''],
     );
 });
 
-test('slashless collection has no empty', () => {
-    assert.deepEqual(
+Deno.test('slashless collection has no empty', () => {
+    assertEquals(
         pathSegmentsOf('/identities'),
         ['identities'],
     );
 });
 
-test('item has no trailing empty', () => {
-    assert.deepEqual(
+Deno.test('item has no trailing empty', () => {
+    assertEquals(
         pathSegmentsOf('/identities/abc'),
         ['identities', 'abc'],
     );
 });
 
-test('item with trailing slash keeps empty',
+Deno.test('item with trailing slash keeps empty',
 () => {
-    assert.deepEqual(
+    assertEquals(
         pathSegmentsOf('/identities/abc/'),
         ['identities', 'abc', ''],
     );
 });
 
-test('root is empty', () => {
-    assert.deepEqual(pathSegmentsOf('/'), []);
+Deno.test('root is empty', () => {
+    assertEquals(pathSegmentsOf('/'), []);
 });

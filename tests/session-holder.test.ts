@@ -1,6 +1,5 @@
+import { assertStrictEquals } from '@std/assert';
 import './hmac-test-key.ts';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
 import {
     getSessionToken,
     putSessionToken,
@@ -19,60 +18,60 @@ import {
     reachableToken,
 } from './token-fixtures.ts';
 
-test('defaults to an anonymous-principal token', async () => {
+Deno.test('defaults to an anonymous-principal token', async () => {
     deleteSessionToken();
     await postSessionSeed();
     const p = principalFromToken(getSessionToken());
-    assert.equal(p.id, ANONYMOUS_ID);
+    assertStrictEquals(p.id, ANONYMOUS_ID);
 });
 
-test('returns the established token once set', () => {
+Deno.test('returns the established token once set', () => {
     putSessionToken('header.body.sig');
-    assert.equal(getSessionToken(), 'header.body.sig');
+    assertStrictEquals(getSessionToken(), 'header.body.sig');
     deleteSessionToken();
 });
 
-test('the anonymous seed is not org-scoped', async () => {
+Deno.test('the anonymous seed is not org-scoped', async () => {
     deleteSessionToken();
     await postSessionSeed();
-    assert.equal(sessionIsOrganizationScoped(), false);
+    assertStrictEquals(sessionIsOrganizationScoped(), false);
     deleteSessionToken();
 });
 
-test('a flat token (no org claim) is not org-scoped', async () => {
+Deno.test('a flat token (no org claim) is not org-scoped', async () => {
     putSessionToken(await devToken());
-    assert.equal(sessionIsOrganizationScoped(), false);
+    assertStrictEquals(sessionIsOrganizationScoped(), false);
     deleteSessionToken();
 });
 
-test('an org-exchanged token is org-scoped', async () => {
+Deno.test('an org-exchanged token is org-scoped', async () => {
     putSessionToken(await organizationToken());
-    assert.equal(sessionIsOrganizationScoped(), true);
+    assertStrictEquals(sessionIsOrganizationScoped(), true);
     deleteSessionToken();
 });
 
-test('a token with reachable orgs has one', async () => {
+Deno.test('a token with reachable orgs has one', async () => {
     putSessionToken(await reachableToken());
-    assert.equal(sessionHasReachableOrganization(), true);
+    assertStrictEquals(sessionHasReachableOrganization(), true);
     deleteSessionToken();
 });
 
-test('a flat token (no orgs claim) has none', async () => {
+Deno.test('a flat token (no orgs claim) has none', async () => {
     // devToken always carries organizations; empty orgs is
     // the no-reachability shape (reachableToken([],)).
     putSessionToken(await reachableToken('XXZruirZyAOoRpNxaDnpSA', []));
-    assert.equal(sessionHasReachableOrganization(), false);
+    assertStrictEquals(sessionHasReachableOrganization(), false);
     deleteSessionToken();
 });
 
-test('an empty reachable set has none', async () => {
+Deno.test('an empty reachable set has none', async () => {
     putSessionToken(await reachableToken('XXZruirZyAOoRpNxaDnpSA', []));
-    assert.equal(sessionHasReachableOrganization(), false);
+    assertStrictEquals(sessionHasReachableOrganization(), false);
     deleteSessionToken();
 });
 
-test('unseeded session predicates are false', () => {
+Deno.test('unseeded session predicates are false', () => {
     deleteSessionToken();
-    assert.equal(sessionIsOrganizationScoped(), false);
-    assert.equal(sessionHasReachableOrganization(), false);
+    assertStrictEquals(sessionIsOrganizationScoped(), false);
+    assertStrictEquals(sessionHasReachableOrganization(), false);
 });

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import {
     postNotificationEvent,
     subscribeNotificationEvents,
@@ -9,22 +8,20 @@ import {
 // is created in Node, so the test runner never hangs on an
 // open handle and neither call throws. The real cross-tab
 // behavior is a browser regression case (TEST-PLAN.md).
-test(
+Deno.test(
     'postNotificationEvent is inert without a browser',
     () => {
-        assert.doesNotThrow(
-            () => postNotificationEvent({ kind: 'full' }),
-        );
+        postNotificationEvent({ kind: 'full' });
     },
 );
 
-test(
+Deno.test(
     'subscribeNotificationEvents returns a no-op unsubscribe',
     () => {
         const unsubscribe = subscribeNotificationEvents(
             () => {},
         );
-        assert.equal(typeof unsubscribe, 'function');
-        assert.doesNotThrow(() => unsubscribe());
+        assertStrictEquals(typeof unsubscribe, 'function');
+        unsubscribe();
     },
 );

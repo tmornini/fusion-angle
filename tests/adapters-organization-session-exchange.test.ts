@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertRejects, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -65,7 +64,7 @@ async function memberOf(organizations: string[]) {
     return db;
 }
 
-test('exchanges a member token for an org-scoped token',
+Deno.test('exchanges a member token for an org-scoped token',
 async () => {
     const db = await memberOf(['A']);
     const token = await devToken('XXZruirZyAOoRpNxaDnpSA');
@@ -73,59 +72,63 @@ async () => {
     const scoped = await postOrganizationSessionExchange(
         ctx, token, 'A');
     const principal = principalFromToken(scoped);
-    assert.equal(principal.organization, 'A');
-    assert.equal(principal.id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(principal.organization, 'A');
+    assertStrictEquals(principal.id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
-test('a non-member org exchange is rejected', async () => {
+Deno.test('a non-member org exchange is rejected', async () => {
     const db = await memberOf(['A']);
     const token = await devToken('XXZruirZyAOoRpNxaDnpSA');
     const ctx = createRequestContext(db, token);
-    await assert.rejects(
+    await assertRejects(
         () => postOrganizationSessionExchange(ctx, token, 'B'));
 });
 
-test('shouldShowOrganizationSwitcher only at two or more orgs', () => {
-    assert.equal(shouldShowOrganizationSwitcher([]), false);
-    assert.equal(
+Deno.test('shouldShowOrganizationSwitcher only at two or more orgs', () => {
+    assertStrictEquals(shouldShowOrganizationSwitcher([]), false);
+    assertStrictEquals(
         shouldShowOrganizationSwitcher([{ id: 'A' }]), false);
-    assert.equal(
+    assertStrictEquals(
         shouldShowOrganizationSwitcher([{ id: 'A' }, { id: 'B' }]),
         true);
 });
 
-test('resolveActiveOrganization prefers a reachable persisted choice',
+Deno.test('resolveActiveOrganization prefers a reachable persisted choice',
 () => {
-    assert.equal(
+    assertStrictEquals(
         resolveActiveOrganization(['AjdvjuECVZEgZoFajaIEkg'
             , 'BBjWJsjYIDkTRKIIPrzWRw'], 'BBjWJsjYIDkTRKIIPrzWRw', null)
             , 'BBjWJsjYIDkTRKIIPrzWRw');
 });
 
-test('resolveActiveOrganization prefers a reachable identity default',
+Deno.test('resolveActiveOrganization prefers a reachable identity default',
 () => {
-    assert.equal(
+    assertStrictEquals(
         resolveActiveOrganization(['AjdvjuECVZEgZoFajaIEkg'
             , 'BBjWJsjYIDkTRKIIPrzWRw'], null, 'BBjWJsjYIDkTRKIIPrzWRw')
             , 'BBjWJsjYIDkTRKIIPrzWRw');
 });
 
-test('resolveActiveOrganization falls back to the first reachable',
+Deno.test('resolveActiveOrganization falls back to the first reachable',
 () => {
-    assert.equal(
+    assertStrictEquals(
         resolveActiveOrganization(['AjdvjuECVZEgZoFajaIEkg'
             , 'BBjWJsjYIDkTRKIIPrzWRw'], null, null)
             , 'AjdvjuECVZEgZoFajaIEkg');
-    assert.equal(
+    assertStrictEquals(
         resolveActiveOrganization(['AjdvjuECVZEgZoFajaIEkg'
             , 'BBjWJsjYIDkTRKIIPrzWRw'], 'stale', '9')
             , 'AjdvjuECVZEgZoFajaIEkg');
 });
 
-test('resolveActiveOrganization returns a single membership directly',
+Deno.test('resolveActiveOrganization returns a single membership directly',
 () => {
-    assert.equal(resolveActiveOrganization(['BBjWJsjYIDkTRKIIPrzWRw'], null
-        , null), 'BBjWJsjYIDkTRKIIPrzWRw');
-    assert.equal(resolveActiveOrganization(['BBjWJsjYIDkTRKIIPrzWRw']
+    assertStrictEquals(
+        resolveActiveOrganization(
+            ['BBjWJsjYIDkTRKIIPrzWRw'], null, null,
+        ),
+        'BBjWJsjYIDkTRKIIPrzWRw',
+    );
+    assertStrictEquals(resolveActiveOrganization(['BBjWJsjYIDkTRKIIPrzWRw']
         , 'AjdvjuECVZEgZoFajaIEkg', null), 'BBjWJsjYIDkTRKIIPrzWRw');
 });

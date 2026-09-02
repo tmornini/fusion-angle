@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     HTTP_PRECONDITION_REQUIRED,
 } from '../api/http-errors.ts';
@@ -20,47 +19,47 @@ const TAG =
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     + 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-test('HTTP_PRECONDITION_REQUIRED is 428', () => {
-    assert.equal(HTTP_PRECONDITION_REQUIRED, 428);
+Deno.test('HTTP_PRECONDITION_REQUIRED is 428', () => {
+    assertStrictEquals(HTTP_PRECONDITION_REQUIRED, 428);
 });
 
-test('parseIfMatch rejects a quoted 64-hex', () => {
-    assert.equal(
+Deno.test('parseIfMatch rejects a quoted 64-hex', () => {
+    assertStrictEquals(
         parseIfMatch('"' + TAG + '"'),
         undefined,
     );
 });
 
-test('parseIfMatch accepts a quoted identifier', () => {
+Deno.test('parseIfMatch accepts a quoted identifier', () => {
     const id = generateIdentifier();
-    assert.equal(isIdentifier(id), true);
-    assert.equal(parseIfMatch('"' + id + '"'), id);
+    assertStrictEquals(isIdentifier(id), true);
+    assertStrictEquals(parseIfMatch('"' + id + '"'), id);
 });
 
-test('parseIfMatch: * → undefined (caller 400s)', () => {
-    assert.equal(parseIfMatch('*'), undefined);
+Deno.test('parseIfMatch: * → undefined (caller 400s)', () => {
+    assertStrictEquals(parseIfMatch('*'), undefined);
 });
 
-test('parseIfMatch: list → undefined', () => {
-    assert.equal(parseIfMatch('"a", "b"'), undefined);
+Deno.test('parseIfMatch: list → undefined', () => {
+    assertStrictEquals(parseIfMatch('"a", "b"'), undefined);
 });
 
-test('parseIfMatch: weak → undefined', () => {
-    assert.equal(parseIfMatch('W/"abc"'), undefined);
+Deno.test('parseIfMatch: weak → undefined', () => {
+    assertStrictEquals(parseIfMatch('W/"abc"'), undefined);
 });
 
-test('parseIfMatch: unquoted → undefined', () => {
-    assert.equal(parseIfMatch('abc'), undefined);
+Deno.test('parseIfMatch: unquoted → undefined', () => {
+    assertStrictEquals(parseIfMatch('abc'), undefined);
 });
 
-test('strongEtagOf quotes the tag', () => {
-    assert.equal(strongEtagOf(TAG), '"' + TAG + '"');
+Deno.test('strongEtagOf quotes the tag', () => {
+    assertStrictEquals(strongEtagOf(TAG), '"' + TAG + '"');
 });
 
-test('attachEtag sets ETag on Response.json and'
+Deno.test('attachEtag sets ETag on Response.json and'
 + ' returns the same Response', () => {
     const response = Response.json({ ok: true });
     const out = attachEtag(response, TAG);
-    assert.equal(out, response);
-    assert.equal(out.headers.get('ETag'), '"' + TAG + '"');
+    assertStrictEquals(out, response);
+    assertStrictEquals(out.headers.get('ETag'), '"' + TAG + '"');
 });

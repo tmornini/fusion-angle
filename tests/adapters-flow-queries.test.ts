@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -141,7 +140,7 @@ async function seedProject(
     });
 }
 
-test(
+Deno.test(
     'getFlowGraph returns the parsed graph'
     + ' with metadata and counts',
     async () => {
@@ -176,26 +175,26 @@ test(
             createRequestContext(db, await organizationToken())
                 , 'aEsGMmBEFaVdWihhHXwCbw',
         );
-        assert.equal(g.id, 'aEsGMmBEFaVdWihhHXwCbw');
-        assert.equal(g.name, 'Flow aEsGMmBEFaVdWihhHXwCbw');
-        assert.equal(g.isLocked, false);
-        assert.equal(g.isAutoLayout, false);
-        assert.equal(g.isAutoFit, false);
-        assert.equal(
+        assertStrictEquals(g.id, 'aEsGMmBEFaVdWihhHXwCbw');
+        assertStrictEquals(g.name, 'Flow aEsGMmBEFaVdWihhHXwCbw');
+        assertStrictEquals(g.isLocked, false);
+        assertStrictEquals(g.isAutoLayout, false);
+        assertStrictEquals(g.isAutoFit, false);
+        assertStrictEquals(
             g.lockTimeout, DEFAULT_LOCK_TIMEOUT,
         );
-        assert.equal(g.nodes.length, 3);
-        assert.equal(g.edges.length, 2);
-        assert.ok(
+        assertStrictEquals(g.nodes.length, 3);
+        assertStrictEquals(g.edges.length, 2);
+        assert(
             g.nodes.some(n => n.id === midId),
         );
-        assert.ok(
+        assert(
             g.edges.some(e => e.id === edge2Id),
         );
     },
 );
 
-test(
+Deno.test(
     'getFlowGraph reflects flag changes'
     + ' saved on the flow',
     async () => {
@@ -221,15 +220,15 @@ test(
             createRequestContext(db, await organizationToken())
                 , 'aEsGMmBEFaVdWihhHXwCbw',
         );
-        assert.equal(g.name, 'Locked Flow');
-        assert.equal(g.isLocked, true);
-        assert.equal(g.isAutoLayout, true);
-        assert.equal(g.isAutoFit, true);
-        assert.equal(g.lockTimeout, 900);
+        assertStrictEquals(g.name, 'Locked Flow');
+        assertStrictEquals(g.isLocked, true);
+        assertStrictEquals(g.isAutoLayout, true);
+        assertStrictEquals(g.isAutoFit, true);
+        assertStrictEquals(g.lockTimeout, 900);
     },
 );
 
-test(
+Deno.test(
     'getFlowsByProject returns only flows'
     + ' linked to the given project',
     async () => {
@@ -258,17 +257,17 @@ test(
         );
         const p1Ids = p1Flows
             .map(f => f.id).sort();
-        assert.deepEqual(
+        assertEquals(
             p1Ids, [
                 'aEsGMmBEFaVdWihhHXwCbw', flow2,
             ].sort(),
         );
-        assert.equal(p2Flows.length, 1);
-        assert.equal(p2Flows[0]!.id, flow3);
+        assertStrictEquals(p2Flows.length, 1);
+        assertStrictEquals(p2Flows[0]!.id, flow3);
     },
 );
 
-test(
+Deno.test(
     'getFlowsByProject returns an empty list'
     + ' for a project with no flows',
     async () => {
@@ -283,11 +282,11 @@ test(
                 db, await organizationToken(),
             ), generateIdentifier(),
         );
-        assert.deepEqual(rows, []);
+        assertEquals(rows, []);
     },
 );
 
-test(
+Deno.test(
     'getFlowsByProject carries node and'
     + ' edge counts for each flow',
     async () => {
@@ -309,13 +308,13 @@ test(
             createRequestContext(db, await organizationToken())
                 , 'pnXmXrxOWayANgDLdCjuBw',
         );
-        assert.equal(rows.length, 1);
-        assert.equal(rows[0]!.nodeCount, 2);
-        assert.equal(rows[0]!.edgeCount, 1);
+        assertStrictEquals(rows.length, 1);
+        assertStrictEquals(rows[0]!.nodeCount, 2);
+        assertStrictEquals(rows[0]!.edgeCount, 1);
     },
 );
 
-test(
+Deno.test(
     'getFlowsWithProjectNames pairs each'
     + ' flow with its project name',
     async () => {
@@ -334,22 +333,22 @@ test(
         const pairs = await getFlowsWithProjectNames(
             createRequestContext(db, await organizationToken()),
         );
-        assert.equal(pairs.length, 2);
+        assertStrictEquals(pairs.length, 2);
         const byFlow = new Map(
             pairs.map(
                 p => [p.summary.id, p.projectName],
             ),
         );
-        assert.equal(
+        assertStrictEquals(
             byFlow.get('aEsGMmBEFaVdWihhHXwCbw'), 'Project One',
         );
-        assert.equal(
+        assertStrictEquals(
             byFlow.get(flow2), 'Project Two',
         );
     },
 );
 
-test(
+Deno.test(
     'getFlowsWithProjectNames yields undefined'
     + ' when the linked project is gone',
     async () => {
@@ -361,15 +360,15 @@ test(
         const pairs = await getFlowsWithProjectNames(
             createRequestContext(db, await organizationToken()),
         );
-        assert.equal(pairs.length, 1);
-        assert.equal(pairs[0]!.summary.id, 'aEsGMmBEFaVdWihhHXwCbw');
-        assert.equal(
+        assertStrictEquals(pairs.length, 1);
+        assertStrictEquals(pairs[0]!.summary.id, 'aEsGMmBEFaVdWihhHXwCbw');
+        assertStrictEquals(
             pairs[0]!.projectName, undefined,
         );
     },
 );
 
-test(
+Deno.test(
     'getFlowsWithProjectNames includes node'
     + ' and edge counts in the summary',
     async () => {
@@ -397,17 +396,17 @@ test(
         const pairs = await getFlowsWithProjectNames(
             createRequestContext(db, await organizationToken()),
         );
-        assert.equal(pairs.length, 1);
-        assert.equal(
+        assertStrictEquals(pairs.length, 1);
+        assertStrictEquals(
             pairs[0]!.summary.nodeCount, 3,
         );
-        assert.equal(
+        assertStrictEquals(
             pairs[0]!.summary.edgeCount, 2,
         );
     },
 );
 
-test(
+Deno.test(
     'getProjectFlowEntities returns the link rows',
     async () => {
         const { db } = await setupMemDb();
@@ -429,19 +428,19 @@ test(
             await getProjectFlowEntities(
                 createRequestContext(db, await organizationToken()),
             );
-        assert.equal(rows.length, 2);
+        assertStrictEquals(rows.length, 2);
         const link1 = rows.find(
             r => r.flow_id === 'aEsGMmBEFaVdWihhHXwCbw',
         )!;
-        assert.equal(link1.project_id, 'pnXmXrxOWayANgDLdCjuBw');
+        assertStrictEquals(link1.project_id, 'pnXmXrxOWayANgDLdCjuBw');
         const link2 = rows.find(
             r => r.flow_id === flow2,
         )!;
-        assert.equal(link2.project_id, 'prBESZPjJDiuXCeZLmbiVw');
+        assertStrictEquals(link2.project_id, 'prBESZPjJDiuXCeZLmbiVw');
     },
 );
 
-test(
+Deno.test(
     'getProjectFlowEntities is empty when no'
     + ' flows have been created',
     async () => {
@@ -449,11 +448,11 @@ test(
         const rows = await getProjectFlowEntities(
             createRequestContext(db, await organizationToken()),
         );
-        assert.deepEqual(rows, []);
+        assertEquals(rows, []);
     },
 );
 
-test(
+Deno.test(
     'a project-flow link added via the wire PUT'
     + ' surfaces in getFlowsByProject',
     async () => {
@@ -481,8 +480,8 @@ test(
             createRequestContext(db, await organizationToken())
                 , 'psZcIMMgiSomMHzDxcUnYQ',
         );
-        assert.equal(rows.length, 1);
-        assert.equal(rows[0]!.id, 'aEsGMmBEFaVdWihhHXwCbw');
+        assertStrictEquals(rows.length, 1);
+        assertStrictEquals(rows[0]!.id, 'aEsGMmBEFaVdWihhHXwCbw');
     },
 );
 
@@ -492,7 +491,7 @@ test(
 // scaled-up "Archive" rect.
 const LAYOUT_TEST_FLOW_ID = 'DDUhYDIRInXtIrRraxcyHQ';
 
-test(
+Deno.test(
     'getFlowGraph lays out an auto-layout flow whose'
     + ' stored positions are placeholders',
     async () => {
@@ -504,7 +503,7 @@ test(
         const xs = g.nodes.map(n => n.positionX);
         const spanX =
             Math.max(...xs) - Math.min(...xs);
-        assert.ok(
+        assert(
             spanX > 2 * NODE_WIDTH,
             `expected a real x-span, got ${spanX}`,
         );
@@ -513,14 +512,14 @@ test(
                 n => `${n.positionX},${n.positionY}`,
             ),
         ).size;
-        assert.equal(distinct, g.nodes.length);
+        assertStrictEquals(distinct, g.nodes.length);
         const start = g.nodes.find(n => n.isCreate)!;
         const end = g.nodes.find(n => n.isArchive)!;
-        assert.ok(start.positionX < end.positionX);
+        assert(start.positionX < end.positionX);
     },
 );
 
-test(
+Deno.test(
     'the Layout Test flow keeps the ruled covenant:'
     + ' Create min x, Archive max x, inside the y range',
     async () => {
@@ -535,19 +534,19 @@ test(
         const ys = g.nodes.map(n => n.positionY);
         const start = g.nodes.find(n => n.isCreate)!;
         const end = g.nodes.find(n => n.isArchive)!;
-        assert.equal(
+        assertStrictEquals(
             start.positionX, Math.min(...xs),
             'Create at min x',
         );
-        assert.equal(
+        assertStrictEquals(
             end.positionX, Math.max(...xs),
             'Archive at max x',
         );
-        assert.ok(
+        assert(
             start.positionY <= end.positionY,
             'Create never below Archive',
         );
-        assert.ok(
+        assert(
             start.positionY > Math.min(...ys)
             || end.positionY < Math.max(...ys),
             'on a fan the pair sits inside the y range,'

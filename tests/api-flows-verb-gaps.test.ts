@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -44,7 +43,7 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('DELETE organizations/:id/flows/:id 405s (no delete handler wired)',
+Deno.test('DELETE organizations/:id/flows/:id 405s (no delete handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -53,11 +52,11 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
 // Task 10: PATCH alphabet — no flows-family patch yet.
-test('PATCH organizations/:id/flows/:id 405s (no patch handler wired)',
+Deno.test('PATCH organizations/:id/flows/:id 405s (no patch handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -65,14 +64,14 @@ async () => {
         'PATCH', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
 // POST organizations/:id/flows/:id/versions/:vid verb-gap RETIRED with the
 // versions routes (Phase 15 Task 7) — router 404, not 405.
 
-test('GET organizations/:id/projects/:id/flows/:pfid 405s (no get handler'
-+ ' wired)', async () => {
+Deno.test('GET organizations/:id/projects/:id/flows/:pfid 405s (no get'
++ ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -80,11 +79,11 @@ test('GET organizations/:id/projects/:id/flows/:pfid 405s (no get handler'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'pnXmXrxOWayANgDLdCjuBw/flows/qXdXbgQMkiANkXUSvLPFiQ', token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE organizations/:id/flows/:id/work-orders/:woid 405s (no delete'
-+ ' handler wired)', async () => {
+Deno.test('DELETE organizations/:id/flows/:id/work-orders/:woid 405s (no'
++ ' delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -92,10 +91,10 @@ test('DELETE organizations/:id/flows/:id/work-orders/:woid 405s (no delete'
             + 'ZOousbbnzpqlxJExVAruYQ/work-orders/yNSSnbrpacodQTzUEcdEVA'
             , token,
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT organizations/:id/flows/:id/undo 405s (no put handler wired)',
+Deno.test('PUT organizations/:id/flows/:id/undo 405s (no put handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -103,7 +102,7 @@ async () => {
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ/undo', token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
 // Task 4 (R1/E5): redo folds into the locked save — the
@@ -112,8 +111,8 @@ async () => {
 // all (404), not a method-absent 405 against a still-live
 // segment. Additive pin: today (pre-fold) this same request
 // still 204s.
-test('POST organizations/:id/flows/:id/redo 404s (route retired; redo now'
-+ ' rides client document-PUT only)', async () => {
+Deno.test('POST organizations/:id/flows/:id/redo 404s (route retired;'
++ ' redo now rides client document-PUT only)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -154,5 +153,5 @@ test('POST organizations/:id/flows/:id/redo 404s (route retired; redo now'
             revivals: [],
         },
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });

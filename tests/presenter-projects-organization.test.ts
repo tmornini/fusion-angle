@@ -1,52 +1,32 @@
-// state.ts (transitively imported via core.ts ->
-// presenters) reads localStorage and window /
-// document at module-eval time, which Node lacks.
-// Stub before any import, then load presenter
-// modules with dynamic import() so the stubs are
-// in place. Same pattern as logger.test.ts.
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-};
+import { assert, assertMatch, assertStrictEquals } from '@std/assert';
+import { Project } from '../api/types.ts';
+import { DISPLAY_ABSENT } from '../web-app/app/format.ts';
+import { ProjectView } from
+    '../web-app/app/adapters/projects.ts';
+import { Organization } from
+    '../web-app/app/adapters/admin.ts';
+import { ProjectPresenter } from
+    '../web-app/app/presenters/project.ts';
+import {
+    ProjectDetailPresenter,
+    ProjectDetailEditPresenter,
+    projectDraftFromView,
+} from '../web-app/app/presenters/project-detail.ts';
+import {
+    OrganizationPresenter,
+    OrganizationEditPresenter,
+} from '../web-app/app/presenters/organization.ts';
+
+// None of these seven modules reads localStorage (checked
+// against the full product tree); window/document are
+// stubbed because the detail presenters below walk a real
+// DOM tree via renderShell/mutateSlot.
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
-
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-
-const {
-    Project,
-} = await import('../api/types.ts');
-const { DISPLAY_ABSENT } = await import(
-    '../web-app/app/format.ts'
-);
-const { ProjectView } = await import(
-    '../web-app/app/adapters/projects.ts'
-);
-const { Organization } = await import(
-    '../web-app/app/adapters/admin.ts'
-);
-const { ProjectPresenter } = await import(
-    '../web-app/app/presenters/project.ts'
-);
-const {
-    ProjectDetailPresenter,
-    ProjectDetailEditPresenter,
-    projectDraftFromView,
-} = await import(
-    '../web-app/app/presenters/project-detail.ts'
-);
-const {
-    OrganizationPresenter,
-    OrganizationEditPresenter,
-} = await import(
-    '../web-app/app/presenters/organization.ts'
-);
 
 // Recording stub for the detail presenters, which
 // write into a container via setHtml/$required.
@@ -152,7 +132,7 @@ function makeStats() {
 
 // ---- ProjectPresenter (project.ts) ----
 
-test(
+Deno.test(
     'ProjectPresenter.buildCard renders title,'
     + ' status label and timeline progress',
     () => {
@@ -164,28 +144,28 @@ test(
         );
         const out = p.buildCard(false)
             .toString();
-        assert.match(out, /Gemini/);
-        assert.match(out, /Archived/);
+        assertMatch(out, /Gemini/);
+        assertMatch(out, /Archived/);
         // archived projects show 100% timeline
-        assert.match(out, /100%/);
-        assert.match(
+        assertMatch(out, /100%/);
+        assertMatch(
             out, /data-project-card="pr-1"/,
         );
     },
 );
 
-test(
+Deno.test(
     'ProjectPresenter.buildCard includes a drag'
     + ' grip only when showGrip is true',
     () => {
         const p = new ProjectPresenter(
             makeProject({}),
         );
-        assert.match(
+        assertMatch(
             p.buildCard(true).toString(),
             /drag-handle/,
         );
-        assert.equal(
+        assertStrictEquals(
             p.buildCard(false)
                 .toString()
                 .includes('drag-handle'),
@@ -194,7 +174,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'ProjectPresenter.buildStateBadge carries'
     + ' state and dimmed data attributes',
     () => {
@@ -203,24 +183,24 @@ test(
         );
         const dimmed = p.buildStateBadge(false)
             .toString();
-        assert.match(
+        assertMatch(
             dimmed, /data-state="under_review"/,
         );
-        assert.match(dimmed, /data-dimmed="true"/);
+        assertMatch(dimmed, /data-dimmed="true"/);
         const lit = p.buildStateBadge(true)
             .toString();
-        assert.match(lit, /data-dimmed="false"/);
-        assert.equal(p.idForLink(), 'pr-1');
-        assert.equal(
+        assertMatch(lit, /data-dimmed="false"/);
+        assertStrictEquals(p.idForLink(), 'pr-1');
+        assertStrictEquals(
             p.stateGroup(), 'under_review',
         );
-        assert.equal(p.positionSortKey(), 0);
+        assertStrictEquals(p.positionSortKey(), 0);
     },
 );
 
 // ---- ProjectDetailPresenter (project-detail.ts) ----
 
-test(
+Deno.test(
     'ProjectDetailPresenter renders a read view'
     + ' with title, description and'
     + ' summary/metrics sections',
@@ -237,20 +217,20 @@ test(
         new ProjectDetailPresenter(view, [])
             .renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, /Apollo/);
-        assert.match(out, /Go to the moon\./);
-        assert.match(out, /Project Summary/);
-        assert.match(out, /Metrics/);
-        assert.match(
+        assertMatch(out, /Apollo/);
+        assertMatch(out, /Go to the moon\./);
+        assertMatch(out, /Project Summary/);
+        assertMatch(out, /Metrics/);
+        assertMatch(
             out, /data-project-action="edit"/,
         );
-        assert.equal(
+        assertStrictEquals(
             out.includes('Unknown'), false,
         );
     },
 );
 
-test(
+Deno.test(
     'ProjectDetailPresenter renders the absent'
     + ' placeholder for zero-valued cost baseline',
     () => {
@@ -264,18 +244,18 @@ test(
         new ProjectDetailPresenter(view, [])
             .renderShell(rec.container);
         const out = rec.allHtml();
-        assert.ok(
+        assert(
             out.includes(DISPLAY_ABSENT),
             'zero baselines should render'
             + ' DISPLAY_ABSENT',
         );
-        assert.equal(
+        assertStrictEquals(
             out.includes('Unknown'), false,
         );
     },
 );
 
-test(
+Deno.test(
     'ProjectDetailPresenter offers a New Flow'
     + ' button for approved projects and a'
     + ' gating message otherwise',
@@ -289,8 +269,8 @@ test(
             [],
         ).renderShell(approvedRec.container);
         const approved = approvedRec.allHtml();
-        assert.match(approved, /New Flow/);
-        assert.equal(
+        assertMatch(approved, /New Flow/);
+        assertStrictEquals(
             approved.includes('Approve to add flows'),
             false,
         );
@@ -306,11 +286,11 @@ test(
             [],
         ).renderShell(draftRec.container);
         const draft = draftRec.allHtml();
-        assert.match(draft, /Approve to add flows/);
+        assertMatch(draft, /Approve to add flows/);
     },
 );
 
-test(
+Deno.test(
     'ProjectDetailPresenter renders a flow card'
     + ' with the flow name and node/edge counts',
     () => {
@@ -328,14 +308,14 @@ test(
             },
         ]).renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, /Onboarding/);
-        assert.match(out, /5 nodes/);
-        assert.match(out, /4 edges/);
-        assert.match(out, /data-flow-id="f-1"/);
+        assertMatch(out, /Onboarding/);
+        assertMatch(out, /5 nodes/);
+        assertMatch(out, /4 edges/);
+        assertMatch(out, /data-flow-id="f-1"/);
     },
 );
 
-test(
+Deno.test(
     'ProjectDetailEditPresenter renders an'
     + ' editable title input, state select and'
     + ' Save/Cancel actions',
@@ -350,22 +330,22 @@ test(
             view, [], draft,
         ).renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(
+        assertMatch(
             out, /data-project-field="title"/,
         );
-        assert.match(
+        assertMatch(
             out, /data-project-field="state"/,
         );
-        assert.match(
+        assertMatch(
             out, /data-project-field="description"/,
         );
-        assert.match(
+        assertMatch(
             out, /data-project-action="save"/,
         );
-        assert.match(
+        assertMatch(
             out, /data-project-action="cancel"/,
         );
-        assert.equal(
+        assertStrictEquals(
             out.includes(
                 'data-project-action="edit"',
             ),
@@ -376,23 +356,23 @@ test(
 
 // ---- OrganizationPresenter (organization.ts) ----
 
-test(
+Deno.test(
     'OrganizationPresenter.buildPage renders the'
     + ' org name, domain, and an Edit action',
     () => {
         const out = new OrganizationPresenter(
             makeOrganization(), makeStats(),
         ).buildPage().toString();
-        assert.match(out, /Acme Innovations/);
-        assert.match(out, /acme\.example/);
-        assert.match(out, /data-org-action="edit"/);
-        assert.equal(
+        assertMatch(out, /Acme Innovations/);
+        assertMatch(out, /acme\.example/);
+        assertMatch(out, /data-org-action="edit"/);
+        assertStrictEquals(
             out.includes('Unknown'), false,
         );
     },
 );
 
-test(
+Deno.test(
     'OrganizationPresenter.buildPage renders'
     + ' overview stats and usage bars with'
     + ' XXZruirZyAOoRpNxaDnpSA/limit values',
@@ -400,16 +380,16 @@ test(
         const out = new OrganizationPresenter(
             makeOrganization(), makeStats(),
         ).buildPage().toString();
-        assert.match(out, /Active People/);
-        assert.match(out, /Projects/);
-        assert.match(out, /Ideas/);
-        assert.match(out, /Usage Overview/);
+        assertMatch(out, /Active People/);
+        assertMatch(out, /Projects/);
+        assertMatch(out, /Ideas/);
+        assertMatch(out, /Usage Overview/);
         // a usage bar prints "current / limit"
-        assert.match(out, /12 \/ 50/);
+        assertMatch(out, /12 \/ 50/);
     },
 );
 
-test(
+Deno.test(
     'OrganizationEditPresenter.buildPage renders'
     + ' editable name/domain inputs and'
     + ' Save/Cancel actions',
@@ -420,15 +400,15 @@ test(
             makeStats(),
             organization.toGeneralInfoDraft(),
         ).buildPage().toString();
-        assert.match(out, /data-org-field="name"/);
-        assert.match(
+        assertMatch(out, /data-org-field="name"/);
+        assertMatch(
             out, /data-org-field="domain"/,
         );
-        assert.match(out, /data-org-action="save"/);
-        assert.match(
+        assertMatch(out, /data-org-action="save"/);
+        assertMatch(
             out, /data-org-action="cancel"/,
         );
-        assert.equal(
+        assertStrictEquals(
             out.includes('data-org-action="edit"'),
             false,
         );

@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import {
     median,
     mean,
@@ -16,35 +21,35 @@ import {
 
 // --- trimExtremes ---
 
-test('trimExtremes empty throws', () => {
-    assert.throws(
+Deno.test('trimExtremes empty throws', () => {
+    const err = assertThrows(
         () => trimExtremes([]),
-        /empty/i,
-    );
+    ) as Error;
+    assertMatch(err.message, /empty/i);
 });
 
-test('trimExtremes rejects bad fraction', () => {
-    assert.throws(
+Deno.test('trimExtremes rejects bad fraction', () => {
+    const err1 = assertThrows(
         () => trimExtremes([1], -0.1),
-        /fraction/i,
-    );
-    assert.throws(
+    ) as Error;
+    assertMatch(err1.message, /fraction/i);
+    const err2 = assertThrows(
         () => trimExtremes([1], 0.5),
-        /fraction/i,
-    );
-    assert.throws(
+    ) as Error;
+    assertMatch(err2.message, /fraction/i);
+    const err3 = assertThrows(
         () => trimExtremes([1], NaN),
-        /fraction/i,
-    );
+    ) as Error;
+    assertMatch(err3.message, /fraction/i);
 });
 
-test('trimExtremes n=25 at 10% drops 3 each tail', () => {
+Deno.test('trimExtremes n=25 at 10% drops 3 each tail', () => {
     // ceil(25 × 0.10) = 3 each side
     const values = [];
     for (let i = 1; i <= 25; i++) {
         values.push(i);
     }
-    assert.deepEqual(
+    assertEquals(
         trimExtremes(values),
         [
             4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
@@ -53,32 +58,32 @@ test('trimExtremes n=25 at 10% drops 3 each tail', () => {
     );
 });
 
-test('trimExtremes n=5 at 10% drops 1 each tail', () => {
+Deno.test('trimExtremes n=5 at 10% drops 1 each tail', () => {
     // ceil(5 × 0.10) = 1 each side
     const input = [5, 1, 4, 2, 3];
-    assert.deepEqual(
+    assertEquals(
         trimExtremes(input),
         [2, 3, 4],
     );
     // Input not mutated.
-    assert.deepEqual(input, [5, 1, 4, 2, 3]);
+    assertEquals(input, [5, 1, 4, 2, 3]);
 });
 
-test('trimExtremes n=2 keeps all (cap)', () => {
+Deno.test('trimExtremes n=2 keeps all (cap)', () => {
     // ceil(2 × 0.10) = 1, but maxDrop is 0
-    assert.deepEqual(
+    assertEquals(
         trimExtremes([2, 1]),
         [1, 2],
     );
 });
 
-test('trimExtremes drops 10% each tail', () => {
+Deno.test('trimExtremes drops 10% each tail', () => {
     // n=20 → ceil(20×0.10)=2 each side
     const values = [];
     for (let i = 1; i <= 20; i++) {
         values.push(i);
     }
-    assert.deepEqual(
+    assertEquals(
         trimExtremes(values),
         [
             3, 4, 5, 6, 7, 8, 9, 10,
@@ -87,8 +92,8 @@ test('trimExtremes drops 10% each tail', () => {
     );
 });
 
-test('trimExtremes fraction 0 is identity sorted', () => {
-    assert.deepEqual(
+Deno.test('trimExtremes fraction 0 is identity sorted', () => {
+    assertEquals(
         trimExtremes([3, 1, 2], 0),
         [1, 2, 3],
     );
@@ -96,67 +101,66 @@ test('trimExtremes fraction 0 is identity sorted', () => {
 
 // --- median ---
 
-test('median odd length returns middle value', () => {
-    assert.equal(median([3, 1, 2]), 2);
-    assert.equal(median([9]), 9);
-    assert.equal(median([5, 1, 4, 2, 3]), 3);
+Deno.test('median odd length returns middle value', () => {
+    assertStrictEquals(median([3, 1, 2]), 2);
+    assertStrictEquals(median([9]), 9);
+    assertStrictEquals(median([5, 1, 4, 2, 3]), 3);
 });
 
-test('median even length averages two middle', () => {
-    assert.equal(median([1, 2]), 1.5);
-    assert.equal(median([4, 1, 3, 2]), 2.5);
-    assert.equal(median([10, 20, 30, 40]), 25);
+Deno.test('median even length averages two middle', () => {
+    assertStrictEquals(median([1, 2]), 1.5);
+    assertStrictEquals(median([4, 1, 3, 2]), 2.5);
+    assertStrictEquals(median([10, 20, 30, 40]), 25);
 });
 
-test('median empty throws', () => {
-    assert.throws(
-        () => median([]),
-        /empty/i,
-    );
+Deno.test('median empty throws', () => {
+    const err = assertThrows(() => median([])) as Error;
+    assertMatch(err.message, /empty/i);
 });
 
-test('median does not mutate input', () => {
+Deno.test('median does not mutate input', () => {
     const input = [3, 1, 2];
     const copy = input.slice();
     median(input);
-    assert.deepEqual(input, copy);
+    assertEquals(input, copy);
 });
 
 // --- mean / sample σ / budget ---
 
-test('mean of simple series', () => {
-    assert.equal(mean([1, 2, 3]), 2);
-    assert.equal(mean([10]), 10);
-    assert.equal(mean([2, 4]), 3);
+Deno.test('mean of simple series', () => {
+    assertStrictEquals(mean([1, 2, 3]), 2);
+    assertStrictEquals(mean([10]), 10);
+    assertStrictEquals(mean([2, 4]), 3);
 });
 
-test('mean empty throws', () => {
-    assert.throws(() => mean([]), /empty/i);
+Deno.test('mean empty throws', () => {
+    const err = assertThrows(() => mean([])) as Error;
+    assertMatch(err.message, /empty/i);
 });
 
-test('sampleStandardDeviation known series', () => {
+Deno.test('sampleStandardDeviation known series', () => {
     // {2,4,4,4,5,5,7,9}: mean=5, Σ(x−μ)²=32
     // sample σ = √(32/7) ≈ 2.138…
     const sd = sampleStandardDeviation(
         [2, 4, 4, 4, 5, 5, 7, 9],
     );
-    assert.ok(
+    assert(
         Math.abs(sd - Math.sqrt(32 / 7)) < 1e-12,
     );
 });
 
-test('sampleStandardDeviation single is 0', () => {
-    assert.equal(sampleStandardDeviation([42]), 0);
+Deno.test('sampleStandardDeviation single is 0', () => {
+    assertStrictEquals(sampleStandardDeviation([42]), 0);
 });
 
-test('sampleStandardDeviation empty throws', () => {
-    assert.throws(
+Deno.test('sampleStandardDeviation empty throws', () => {
+    const err = assertThrows(
         () => sampleStandardDeviation([]),
-        /empty/i,
-    );
+    ) as Error;
+    assertMatch(err.message, /empty/i);
 });
 
-test(
+Deno.test(
     'budgetReadyMsFromSamples is mean + sigmas×σ'
     + ' ceiled',
     () => {
@@ -164,25 +168,25 @@ test(
         // mean=29/6; sample σ=√(41/30)
         // 29/6 + 1.5×√(41/30) ≈ 6.587 → ceil 7
         const values = [2, 4, 4, 4, 5, 5, 7, 9];
-        assert.equal(
+        assertStrictEquals(
             budgetReadyMsFromSamples(values, 1.5),
             7,
         );
         // mean of [1,2]=1.5, σ=√0.5
         // 1.5 + 1.5×√0.5 ≈ 2.5607 → 3
-        assert.equal(
+        assertStrictEquals(
             budgetReadyMsFromSamples([1, 2], 1.5),
             3,
         );
         // Zero sigmas → ceil(mean)
-        assert.equal(
+        assertStrictEquals(
             budgetReadyMsFromSamples([1.1, 1.1], 0),
             2,
         );
     },
 );
 
-test(
+Deno.test(
     'budgetReadyMsFromSamples trims 10% each tail',
     () => {
         // n=20: drop 1,2 and 19,20; mean of 3..18 = 10.5
@@ -191,39 +195,39 @@ test(
         for (let i = 1; i <= 20; i++) {
             values.push(i);
         }
-        assert.equal(
+        assertStrictEquals(
             budgetReadyMsFromSamples(values, 0),
             11,
         );
     },
 );
 
-test('budgetReadyMsFromSamples rejects bad sigmas', () => {
-    assert.throws(
+Deno.test('budgetReadyMsFromSamples rejects bad sigmas', () => {
+    const err1 = assertThrows(
         () => budgetReadyMsFromSamples([1], -1),
-        /sigmas/i,
-    );
-    assert.throws(
+    ) as Error;
+    assertMatch(err1.message, /sigmas/i);
+    const err2 = assertThrows(
         () => budgetReadyMsFromSamples([1], NaN),
-        /sigmas/i,
-    );
+    ) as Error;
+    assertMatch(err2.message, /sigmas/i);
 });
 
 // --- statsForPage ---
 
-test('statsForPage min/median/max readyMs', () => {
+Deno.test('statsForPage min/median/max readyMs', () => {
     // n=2: ceil trim is capped, so both samples remain
     const runs: PageRun[] = [
         { readyMs: 100, phases: {} },
         { readyMs: 300, phases: {} },
     ];
     const s = statsForPage(runs);
-    assert.equal(s.readyMs.min, 100);
-    assert.equal(s.readyMs.median, 200);
-    assert.equal(s.readyMs.max, 300);
+    assertStrictEquals(s.readyMs.min, 100);
+    assertStrictEquals(s.readyMs.median, 200);
+    assertStrictEquals(s.readyMs.max, 300);
 });
 
-test('statsForPage phase medians across runs', () => {
+Deno.test('statsForPage phase medians across runs', () => {
     const runs: PageRun[] = [
         {
             readyMs: 100,
@@ -240,19 +244,19 @@ test('statsForPage phase medians across runs', () => {
     ];
     const s = statsForPage(runs);
     // boot:db-open across all three: 10, 30, 20 → 20
-    assert.equal(s.phases['boot:db-open'], 20);
+    assertStrictEquals(s.phases['boot:db-open'], 20);
     // fetch only in runs 0 and 2: 40, 60 → 50
-    assert.equal(s.phases['fetch'], 50);
+    assertStrictEquals(s.phases['fetch'], 50);
 });
 
-test('statsForPage empty runs throws', () => {
-    assert.throws(
+Deno.test('statsForPage empty runs throws', () => {
+    const err = assertThrows(
         () => statsForPage([]),
-        /empty/i,
-    );
+    ) as Error;
+    assertMatch(err.message, /empty/i);
 });
 
-test('statsForPage trims extremes on readyMs', () => {
+Deno.test('statsForPage trims extremes on readyMs', () => {
     // n=20 → drop two lowest and two highest
     const runs: PageRun[] = [];
     for (let i = 1; i <= 19; i++) {
@@ -260,10 +264,10 @@ test('statsForPage trims extremes on readyMs', () => {
     }
     runs.push({ readyMs: 1000, phases: {} });
     const s = statsForPage(runs);
-    assert.equal(s.readyMs.min, 3);
-    assert.equal(s.readyMs.max, 18);
+    assertStrictEquals(s.readyMs.min, 3);
+    assertStrictEquals(s.readyMs.max, 18);
     // 3..18 (16 values, even): (10+11)/BBjWJsjYIDkTRKIIPrzWRw = 10.5
-    assert.equal(s.readyMs.median, 10.5);
+    assertStrictEquals(s.readyMs.median, 10.5);
 });
 
 // --- compareBudgets ---
@@ -281,31 +285,31 @@ function page(
     };
 }
 
-test('compareBudgets under budget is ok', () => {
+Deno.test('compareBudgets under budget is ok', () => {
     const verdict = compareBudgets(
         { dashboard: page(100) },
         { dashboard: { readyMs: 200 } },
     );
-    assert.deepEqual(verdict, { ok: true });
+    assertEquals(verdict, { ok: true });
 });
 
-test('compareBudgets equal budget is ok', () => {
+Deno.test('compareBudgets equal budget is ok', () => {
     const verdict = compareBudgets(
         { dashboard: page(200) },
         { dashboard: { readyMs: 200 } },
     );
-    assert.deepEqual(verdict, { ok: true });
+    assertEquals(verdict, { ok: true });
 });
 
-test('compareBudgets over budget lists offender', () => {
+Deno.test('compareBudgets over budget lists offender', () => {
     const verdict = compareBudgets(
         { dashboard: page(250) },
         { dashboard: { readyMs: 200 } },
     );
-    assert.equal(verdict.ok, false);
+    assertStrictEquals(verdict.ok, false);
     if (verdict.ok) return;
-    assert.equal(verdict.offenders.length, 1);
-    assert.deepEqual(verdict.offenders[0], {
+    assertStrictEquals(verdict.offenders.length, 1);
+    assertEquals(verdict.offenders[0], {
         page: 'dashboard',
         reason: 'over-budget',
         medianReadyMs: 250,
@@ -313,14 +317,14 @@ test('compareBudgets over budget lists offender', () => {
     });
 });
 
-test('compareBudgets missing-budget for measured page', () => {
+Deno.test('compareBudgets missing-budget for measured page', () => {
     const verdict = compareBudgets(
         { ideas: page(100) },
         {},
     );
-    assert.equal(verdict.ok, false);
+    assertStrictEquals(verdict.ok, false);
     if (verdict.ok) return;
-    assert.deepEqual(verdict.offenders, [
+    assertEquals(verdict.offenders, [
         {
             page: 'ideas',
             reason: 'missing-budget',
@@ -329,14 +333,14 @@ test('compareBudgets missing-budget for measured page', () => {
     ]);
 });
 
-test('compareBudgets unknown-page for stale budget', () => {
+Deno.test('compareBudgets unknown-page for stale budget', () => {
     const verdict = compareBudgets(
         {},
         { retired: { readyMs: 500 } },
     );
-    assert.equal(verdict.ok, false);
+    assertStrictEquals(verdict.ok, false);
     if (verdict.ok) return;
-    assert.deepEqual(verdict.offenders, [
+    assertEquals(verdict.offenders, [
         {
             page: 'retired',
             reason: 'unknown-page',
@@ -345,7 +349,7 @@ test('compareBudgets unknown-page for stale budget', () => {
     ]);
 });
 
-test('compareBudgets lists every offender', () => {
+Deno.test('compareBudgets lists every offender', () => {
     const verdict = compareBudgets(
         {
             dashboard: page(300),
@@ -356,24 +360,24 @@ test('compareBudgets lists every offender', () => {
             retired: { readyMs: 500 },
         },
     );
-    assert.equal(verdict.ok, false);
+    assertStrictEquals(verdict.ok, false);
     if (verdict.ok) return;
     const reasons = Object.fromEntries(
         verdict.offenders.map(
             (o) => [o.page, o.reason],
         ),
     );
-    assert.deepEqual(reasons, {
+    assertEquals(reasons, {
         dashboard: 'over-budget',
         ideas: 'missing-budget',
         retired: 'unknown-page',
     });
-    assert.equal(verdict.offenders.length, 3);
+    assertStrictEquals(verdict.offenders.length, 3);
 });
 
 // --- shapeHistoryLine ---
 
-test('shapeHistoryLine maps median stats', () => {
+Deno.test('shapeHistoryLine maps median stats', () => {
     const line = shapeHistoryLine({
         at: '2026-07-12T00:00:00.000Z',
         sha: 'abc123',
@@ -406,11 +410,11 @@ test('shapeHistoryLine maps median stats', () => {
             },
         },
     });
-    assert.equal(line.at, '2026-07-12T00:00:00.000Z');
-    assert.equal(line.sha, 'abc123');
-    assert.equal(line.runs, 5);
-    assert.equal(line.machine.platform, 'darwin');
-    assert.deepEqual(line.pages, {
+    assertStrictEquals(line.at, '2026-07-12T00:00:00.000Z');
+    assertStrictEquals(line.sha, 'abc123');
+    assertStrictEquals(line.runs, 5);
+    assertStrictEquals(line.machine.platform, 'darwin');
+    assertEquals(line.pages, {
         dashboard: {
             readyMs: 100,
             phases: {
@@ -427,7 +431,7 @@ test('shapeHistoryLine maps median stats', () => {
 
 // --- formatReport ---
 
-test('formatReport includes page names and numbers', () => {
+Deno.test('formatReport includes page names and numbers', () => {
     const report = formatReport({
         ideas: {
             readyMs: {
@@ -446,14 +450,14 @@ test('formatReport includes page names and numbers', () => {
             phases: { 'boot:db-open': 12 },
         },
     });
-    assert.match(report, /dashboard/);
-    assert.match(report, /ideas/);
-    assert.match(report, /100/);
-    assert.match(report, /250/);
-    assert.match(report, /boot:db-open/);
-    assert.match(report, /fetch/);
+    assertMatch(report, /dashboard/);
+    assertMatch(report, /ideas/);
+    assertMatch(report, /100/);
+    assertMatch(report, /250/);
+    assertMatch(report, /boot:db-open/);
+    assertMatch(report, /fetch/);
     // sorted page keys: dashboard before ideas
     const dashIdx = report.indexOf('dashboard');
     const ideasIdx = report.indexOf('ideas');
-    assert.ok(dashIdx < ideasIdx);
+    assert(dashIdx < ideasIdx);
 });

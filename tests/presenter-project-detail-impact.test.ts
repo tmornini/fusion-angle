@@ -1,31 +1,29 @@
-// state.ts (transitively imported) reads localStorage
-// at module-eval time; stub before any presenter import.
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-};
+import {
+    assertMatch,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
+import { Project } from '../api/types.ts';
+import type {
+    ObjectiveEntity,
+} from '../api/types.ts';
+import { ProjectView } from
+    '../web-app/app/adapters/projects.ts';
+import {
+    ProjectDetailPresenter,
+} from '../web-app/app/presenters/project-detail.ts';
+
+// None of api/types.ts, adapters/projects.ts, or
+// presenters/project-detail.ts reads localStorage (checked
+// against the full product tree); window/document are
+// stubbed because ProjectDetailPresenter walks a real DOM
+// tree via renderShell/mutateSlot.
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
-
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-
-const { Project } = await import('../api/types.ts');
-const { ProjectView } = await import(
-    '../web-app/app/adapters/projects.ts'
-);
-const { ProjectDetailPresenter } = await import(
-    '../web-app/app/presenters/project-detail.ts'
-);
-
-import type {
-    ObjectiveEntity,
-} from '../api/types.ts';
 
 function makeRecordingContainer(): {
     container: HTMLElement;
@@ -106,7 +104,7 @@ const baselineFull = [
       at: '2026-01-02T00:00:00.000000Z' },
 ];
 
-test(
+Deno.test(
     'detail metrics card renders the Impact label',
     () => {
         const view = new ProjectView(
@@ -119,12 +117,12 @@ test(
         new ProjectDetailPresenter(view, [])
             .renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, /Impact/);
-        assert.match(out, /pts/);
+        assertMatch(out, /Impact/);
+        assertMatch(out, /pts/);
     },
 );
 
-test(
+Deno.test(
     'Impact variance renders muted dash when actuals absent',
     () => {
         const view = new ProjectView(
@@ -141,7 +139,7 @@ test(
         // and confirm the variance row in that
         // neighborhood does not advertise a tone.
         const impactStart = out.indexOf('Impact');
-        assert.notEqual(impactStart, -1,
+        assertNotStrictEquals(impactStart, -1,
             'Impact label not found in output');
         const impactSection = out.slice(impactStart);
         // The next "metric-cell" or end of output
@@ -151,12 +149,12 @@ test(
         const block = nextCell === -1
             ? impactSection
             : impactSection.slice(0, nextCell);
-        assert.equal(
+        assertStrictEquals(
             block.includes('variance-good'),
             false,
             'absent actuals must not claim improvement',
         );
-        assert.equal(
+        assertStrictEquals(
             block.includes('variance-bad'),
             false,
             'absent actuals must not claim regression',
@@ -164,7 +162,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'Impact variance renders tone when fully scored',
     () => {
         const actuals = [
@@ -189,11 +187,11 @@ test(
         const out = rec.allHtml();
         // Impact actuals (60, 40) > baseline (50, 30):
         // higher is better → tone is variance-good.
-        assert.match(out, /variance-good/);
+        assertMatch(out, /variance-good/);
     },
 );
 
-test(
+Deno.test(
     'metrics card heading reads Project Metrics',
     () => {
         const view = new ProjectView(
@@ -206,6 +204,6 @@ test(
         new ProjectDetailPresenter(view, [])
             .renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, /Project Metrics/);
+        assertMatch(out, /Project Metrics/);
     },
 );

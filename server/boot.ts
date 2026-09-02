@@ -18,6 +18,7 @@ import {
     assertUtf8,
     assertNoLegacyMessageTables,
     assertSchemaMarker,
+    bootErrorMessage,
 } from './postgres-gate.ts';
 import {
     setPasswordHasher,
@@ -143,21 +144,36 @@ function installSigterm(
 export async function main(
     siteRoot: URL,
     args: readonly string[],
-): Promise<void> {
-    const running = await boot(
-        (name) => Deno.env.get(name),
-        args,
-        fromFileUrl(siteRoot),
-    );
-    Deno.stdout.writeSync(enc.encode(
-        JSON.stringify({
-            at: new Date().toISOString(),
-            level: 'info',
-            message: 'listening',
-            port: running.port,
-        }) + '\n',
-    ));
-    installSigterm(() => running.close());
-    // Returning would Deno.exit the compiled binary.
-    await new Promise<never>(() => {});
+): Promise<number> {
+    try {
+        const running = await boot(
+            (name) => Deno.env.get(name),
+            args,
+            fromFileUrl(siteRoot),
+        );
+        Deno.stdout.writeSync(enc.encode(
+            JSON.stringify({
+                at: new Date().toISOString(),
+                level: 'info',
+                message: 'listening',
+                port: running.port,
+            }) + '\n',
+        ));
+        installSigterm(() => running.close());
+    } catch (error: unknown) {
+        // bootErrorMessage collapses anything off the
+        // allowlist to 'boot failed', so POSTGRES_URL
+        // cannot ride a raw message into the logs.
+        Deno.stderr.writeSync(enc.encode(
+            JSON.stringify({
+                at: new Date().toISOString(),
+                level: 'error',
+                message: bootErrorMessage(error),
+            }) + '\n',
+        ));
+        return 1;
+    }
+    // Returning would Deno.exit the compiled binary, so
+    // the listening path never settles this promise.
+    return await new Promise<never>(() => {});
 }

@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertNotStrictEquals,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -26,7 +30,7 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-test(
+Deno.test(
     'memberName returns name for known human id',
     () => {
         const u1 = generateIdentifier();
@@ -36,22 +40,23 @@ test(
                 makeHumanMember(u1, 'Alice Adams'),
             ],
         ]);
-        assert.equal(
+        assertStrictEquals(
             memberName(map, u1),
             'Alice Adams',
         );
     },
 );
 
-test('memberName throws for unknown id', () => {
+Deno.test('memberName throws for unknown id', () => {
     const map = new Map<MemberId, Member>();
-    assert.throws(
+    assertThrows(
         () => memberName(map, generateIdentifier()),
-        /unknown member/,
+        Error,
+        'unknown member',
     );
 });
 
-test(
+Deno.test(
     'getHumanMemberMap fetches members via adapter',
     async () => {
         const db = memoryDbAdapter();
@@ -60,20 +65,20 @@ test(
         await seedHumanMember(db, u1, 'Alice Adams');
         const ctx = createRequestContext(db, DEV_TOKEN);
         const map = await getHumanMemberMap(ctx);
-        assert.ok(map.has(u1));
+        assert(map.has(u1));
         const pii = map.get(u1)?.pii();
-        assert.ok(pii !== undefined && !pii.erased);
+        assert(pii !== undefined && !pii.erased);
         if (pii !== undefined && !pii.erased) {
-            assert.equal(pii.name, 'Alice Adams');
+            assertStrictEquals(pii.name, 'Alice Adams');
         }
-        assert.equal(
+        assertStrictEquals(
             memberName(map, u1),
             'Alice Adams',
         );
     },
 );
 
-test('Fresh ctx re-fetches each call', async () => {
+Deno.test('Fresh ctx re-fetches each call', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const u1 = generateIdentifier();
@@ -86,14 +91,14 @@ test('Fresh ctx re-fetches each call', async () => {
     const m2 = await getHumanMemberMap(
         createRequestContext(db, DEV_TOKEN),
     );
-    assert.notEqual(mFNSxZqywTSMXhgUTdTqtA, m2);
-    assert.ok(mFNSxZqywTSMXhgUTdTqtA.has(u1));
-    assert.ok(!mFNSxZqywTSMXhgUTdTqtA.has(u2));
-    assert.ok(m2.has(u1));
-    assert.ok(m2.has(u2));
+    assertNotStrictEquals(mFNSxZqywTSMXhgUTdTqtA, m2);
+    assert(mFNSxZqywTSMXhgUTdTqtA.has(u1));
+    assert(!mFNSxZqywTSMXhgUTdTqtA.has(u2));
+    assert(m2.has(u1));
+    assert(m2.has(u2));
 });
 
-test(
+Deno.test(
     'getCurrentHumanMember returns the identity',
     async () => {
         const db = memoryDbAdapter();
@@ -104,24 +109,24 @@ test(
         const row = await getCurrentHumanMember(
             createRequestContext(db, DEV_TOKEN),
         );
-        assert.equal(row.id, 'XXZruirZyAOoRpNxaDnpSA');
+        assertStrictEquals(row.id, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
 
-test(
+Deno.test(
     'RequestContext requestId is stable'
     + ' and unique',
     () => {
         const db = memoryDbAdapter();
         const a = createRequestContext(db, DEV_TOKEN);
         const b = createRequestContext(db, DEV_TOKEN);
-        assert.equal(
+        assertStrictEquals(
             a.requestId, a.requestId,
         );
-        assert.notEqual(
+        assertNotStrictEquals(
             a.requestId, b.requestId,
         );
-        assert.ok(a.requestId.length > 0);
+        assert(a.requestId.length > 0);
     },
 );
 
@@ -129,7 +134,7 @@ test(
 // hoist it so incomingContext reuses it (message-plane request
 // message carries the header) instead of minting a second
 // unrelated trace that reportFault cannot correlate.
-test(
+Deno.test(
     'client requestId rides the wire as request-id',
     async () => {
         const db = memoryDbAdapter();
@@ -140,7 +145,7 @@ test(
             { kind: 'person' },
         );
         const rows = await db.messagePairs.getAll();
-        assert.ok(
+        assert(
             rows.some(
                 r => r.request.includes(
                     '\nrequest-id: ' + ctx.requestId,

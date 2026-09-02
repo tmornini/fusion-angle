@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -305,7 +304,7 @@ async function seedKnownBaseline(
     await putFlow(ctx, flowId, save(base.nodes, base.edges));
 }
 
-test(
+Deno.test(
     'PUT /organizations/:id/flows/:id ROUND-TRIP: message-plane graph'
     + ' equals the intended saved graph',
     async () => {
@@ -323,24 +322,24 @@ test(
         // node c deleted, edge e2 deleted
         const nodeIds = graph.nodes
             .map(n => n.id).sort();
-        assert.deepEqual(
+        assertEquals(
             nodeIds, [NODE_A, NODE_B].sort(),
         );
         const edgeIds = graph.edges.map(e => e.id);
-        assert.deepEqual(edgeIds, [EDGE_AB]);
+        assertEquals(edgeIds, [EDGE_AB]);
 
         const a = graph.nodes
             .find(n => n.id === NODE_A)!;
         // node a moved
-        assert.equal(a.positionX, 999);
-        assert.equal(a.positionY, 888);
+        assertStrictEquals(a.positionX, 999);
+        assertStrictEquals(a.positionY, 888);
         // member m2 removed from a, mFNSxZqywTSMXhgUTdTqtA kept
-        assert.deepEqual(a.memberIds.sort(), ['mFNSxZqywTSMXhgUTdTqtA']);
+        assertEquals(a.memberIds.sort(), ['mFNSxZqywTSMXhgUTdTqtA']);
         // attribute x mode changed, y removed, z added
         const aAttrs = [...a.attributes]
             .sort((p, q) =>
                 p.attributeId.localeCompare(q.attributeId));
-        assert.deepEqual(
+        assertEquals(
             aAttrs,
             [
                 {
@@ -360,11 +359,11 @@ test(
         const b = graph.nodes
             .find(n => n.id === NODE_B)!;
         // MEMBER_TWO added to b
-        assert.deepEqual(b.memberIds.sort(), [MEMBER_TWO]);
+        assertEquals(b.memberIds.sort(), [MEMBER_TWO]);
     },
 );
 
-test(
+Deno.test(
     'PUT /organizations/:id/flows/:id APPEND-ONLY: removed/re-added/'
     + 'changed leave new graphDelta events, never splice',
     async () => {
@@ -386,7 +385,7 @@ test(
                 && row.member_id === MEMBER_TWO,
         );
         const aM2Actions = aM2.map(r => r.action).sort();
-        assert.deepEqual(
+        assertEquals(
             aM2Actions, ['added', 'removed'],
             'removed member leaves a removed event beside'
             + ' the original added event',
@@ -396,8 +395,8 @@ test(
             row => row.flow_node_id === NODE_B
                 && row.member_id === MEMBER_TWO,
         );
-        assert.equal(bM2.length, 1);
-        assert.equal(bM2[0]!.action, 'added');
+        assertStrictEquals(bM2.length, 1);
+        assertStrictEquals(bM2[0]!.action, 'added');
 
         // x on a: baseline 'added' (editable) then a NEW
         // 'added' (readonly) — prior event UNMUTATED.
@@ -405,7 +404,7 @@ test(
             row => row.flow_node_id === NODE_A
                 && row.attribute_id === ATTR_X,
         );
-        assert.equal(
+        assertStrictEquals(
             aX.length, 2,
             'mode change appends a new added event',
         );
@@ -415,24 +414,24 @@ test(
         const readonlyRow = aX.find(
             r => r.mode === 'readonly',
         );
-        assert.ok(
+        assert(
             editableRow,
             'the original editable event is untouched',
         );
-        assert.ok(readonlyRow);
+        assert(readonlyRow);
         // y on a removed: an 'added' then a 'removed'
         const aY = attributeEvents.filter(
             row => row.flow_node_id === NODE_A
                 && row.attribute_id === ATTR_Y,
         );
-        assert.deepEqual(
+        assertEquals(
             aY.map(r => r.action).sort(),
             ['added', 'removed'],
         );
     },
 );
 
-test(
+Deno.test(
     'PUT /organizations/:id/flows/:id IDEMPOTENCY: replaying one delta'
     + ' body twice leaves pair graph unchanged',
     async () => {
@@ -468,7 +467,7 @@ test(
         await putFlow(spyCtx, flowId, save(
             working.nodes, working.edges,
         ));
-        assert.ok(captured, 'a PUT body was captured');
+        assert(captured, 'a PUT body was captured');
 
         const firstGraph = norm(
             await messagePairPlaneGraph(ctx, flowId),
@@ -484,11 +483,11 @@ test(
         const replayGraph = norm(
             await messagePairPlaneGraph(ctx, flowId),
         );
-        assert.deepEqual(replayGraph, firstGraph);
+        assertEquals(replayGraph, firstGraph);
     },
 );
 
-test(
+Deno.test(
     'PUT /organizations/:id/flows/:id message-plane graph equals the'
     + ' intended working graph after save',
     async () => {
@@ -511,11 +510,11 @@ test(
             nodes: working.nodes,
             edges: working.edges,
         };
-        assert.deepEqual(norm(blob), norm(intended));
+        assertEquals(norm(blob), norm(intended));
     },
 );
 
-test(
+Deno.test(
     'PUT /organizations/:id/flows/:id still emits exactly one updated event'
     + ' (existing covenant intact)',
     async () => {
@@ -531,7 +530,7 @@ test(
                 + '/versions/',
         );
         // Family history is DESC — current first.
-        assert.deepEqual(
+        assertEquals(
             events.map(e => e.state),
             ['updated', 'updated', 'active'],
         );

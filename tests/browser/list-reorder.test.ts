@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     stays,
     useBrowser,
@@ -23,7 +22,7 @@ async function openProjects(
     await page.ready('projects');
     await page.waitFor(HANDLE);
     const order = await page.evaluate<string[]>(ORDER);
-    assert.ok(order.length >= 3, 'three or more projects');
+    assert(order.length >= 3, 'three or more projects');
     return order;
 }
 
@@ -31,7 +30,7 @@ function onProjects(path: string): boolean {
     return path.endsWith('/projects/index.html');
 }
 
-test('a captured drag reorders, persists, and stays put',
+Deno.test('a captured drag reorders, persists, and stays put',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         const before = await openProjects(page, origin.baseUrl);
@@ -46,28 +45,28 @@ async () => {
             'first card lands in the second slot',
         );
         await stays(page, 'location.pathname', STAY_MS);
-        assert.ok(onProjects(
+        assert(onProjects(
             await page.evaluate<string>('location.pathname'),
         ));
         const after = await openProjects(page, origin.baseUrl);
-        assert.equal(after[0], before[1]);
-        assert.equal(after[1], before[0]);
+        assertStrictEquals(after[0], before[1]);
+        assertStrictEquals(after[1], before[0]);
     });
 });
 
-test('a plain click on the reorder handle does not navigate',
+Deno.test('a plain click on the reorder handle does not navigate',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         await openProjects(page, origin.baseUrl);
         await page.click(HANDLE);
         await stays(page, 'location.pathname', STAY_MS);
-        assert.ok(onProjects(
+        assert(onProjects(
             await page.evaluate<string>('location.pathname'),
         ));
     });
 });
 
-test('arrow keys on a focused handle move the card',
+Deno.test('arrow keys on a focused handle move the card',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         const before = await openProjects(page, origin.baseUrl);
@@ -83,6 +82,6 @@ async () => {
             `document.querySelector('[aria-live="polite"].sr-only')
                 ?.textContent ?? ''`,
         );
-        assert.ok(live.startsWith('Moved to position 2 of '), live);
+        assert(live.startsWith('Moved to position 2 of '), live);
     });
 });

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import { useBrowser, withAdminPage, type Page } from
     './fixtures.ts';
 import { CANVAS, ONBOARDING, WRAP, openFlow } from
@@ -18,7 +17,7 @@ async function focusCanvas(page: Page): Promise<void> {
     );
 }
 
-test('Space under Auto-Fit toasts and does not enter pan',
+Deno.test('Space under Auto-Fit toasts and does not enter pan',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         await openFlow(page, origin, ONBOARDING);
@@ -30,11 +29,11 @@ async () => {
             + `${JSON.stringify(AUTOFIT_TOAST)}))`,
             'auto-fit toast',
         );
-        assert.equal(await page.evaluate<boolean>(PAN_ON), false);
+        assertStrictEquals(await page.evaluate<boolean>(PAN_ON), false);
     });
 });
 
-test('Space toggles pan mode and a drag pans the viewBox',
+Deno.test('Space toggles pan mode and a drag pans the viewBox',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         await openFlow(page, origin, ONBOARDING);

@@ -93,20 +93,30 @@ defaults.
 ## Gates
 
 `./validate` composes `deno check --frozen api shared
-server tests web-app`, then `./test` — `deno test
---frozen --parallel --no-check` with three preloads,
-in two TZ passes: `TZ=UTC` on `tests/*.test.ts`, then
-`TZ=Pacific/Honolulu` on `tests/tz/*.test.ts` — then
-78-character lint of code and scripts (not `.md`),
-the `org` identifier ban under `api/`,
-`web-app/`, `tests/`, and `shared/`, then
-`generate-schema-svg --check` and
+server tests web-app`, then `./test` — `Deno.test`
+suites written against `@std/assert`, run as `deno
+test --frozen --parallel --no-check
+--sanitize-ops --sanitize-resources` with three
+preloads, in two TZ passes: `TZ=UTC` on
+`tests/*.test.ts`, then `TZ=Pacific/Honolulu` on
+`tests/tz/*.test.ts` — then 78-character lint of code
+and scripts (not `.md`), the `org` identifier ban
+under `api/`, `web-app/`, `tests/`, and `shared/`,
+then `generate-schema-svg --check` and
 `generate-api-documentation --check`, both `deno run`.
 Clean tree for `./build`, `./crank`, and `./measure`.
 
-`./test` takes 9.6 s where Node took 16.2 s.
-`--no-check` costs nothing: `deno check` has already
-covered `tests/`.
+`./test` takes 9.5 s with the sanitizers on, against
+9.6 s for Deno before Part 5 turned them on and 16.2 s
+for the old Node `node --test` baseline. `--no-check`
+costs nothing: `deno check` has already covered
+`tests/`. `./test-postgres` carries the same two
+sanitizer flags; `./test-browser` carries
+`--sanitize-resources` only, because `useBrowser()`
+opens one CDP WebSocket per file in
+`Deno.test.beforeAll`, whose pending receive always
+crosses a test boundary — the reason lives in that
+script's own comment block.
 
 `./test-browser` needs Chrome (`CHROME` or
 `CHROME_DEBUG_URL`); it bundles with `deno bundle`
@@ -223,7 +233,17 @@ create their own — never pass the Agent tool `isolation`.
 - `measurements/` — budgets, history, measure-viz
 - `server/` — boot, HTTP adapter, seed/wipe, throttle
 - `shared/` — wire schema + utilities; never imports `api/`
-- `tests/` — `node:test` (memory; `tests/tz/` TZ pass)
+- `tests/` — `Deno.test` (memory; `tests/tz/` TZ pass);
+  `tests/fixtures/` holds the shared per-test seams:
+  `console-capture.ts` (swap a `console` method for a
+  recording stub for one body), `local-storage.ts`
+  (swap `globalThis.localStorage` for one body via
+  `defineProperty`, sync or async, restoring the
+  previous value in a `finally`), and
+  `fetch-discarding-body.ts` (a `fetch` that cancels
+  the response body so the resource sanitizer does not
+  see it as a leak, for tests that assert only status
+  and headers)
 - `web-app/` — pages, adapters, presenters, CSS
 
 Run `ls`.

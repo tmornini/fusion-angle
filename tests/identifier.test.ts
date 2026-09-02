@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import {
     IDENTIFIER_ASCII_LENGTH,
     IDENTIFIER_BYTE_LENGTH,
@@ -15,68 +19,68 @@ const FINALS = new Set(['A', 'Q', 'g', 'w']);
 const ALPHABET =
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
-test('generateIdentifier returns 22 canonical chars',
+Deno.test('generateIdentifier returns 22 canonical chars',
 () => {
     const id = generateIdentifier();
-    assert.equal(id.length, IDENTIFIER_ASCII_LENGTH);
-    assert.equal(isIdentifier(id), true);
-    assert.ok(FINALS.has(id[21]!));
+    assertStrictEquals(id.length, IDENTIFIER_ASCII_LENGTH);
+    assertStrictEquals(isIdentifier(id), true);
+    assert(FINALS.has(id[21]!));
 });
 
-test('isIdentifier rejects 21, 23, bad final, + / =',
+Deno.test('isIdentifier rejects 21, 23, bad final, + / =',
 () => {
     const good = generateIdentifier();
-    assert.equal(isIdentifier(good.slice(0, 21)), false);
-    assert.equal(isIdentifier(good + 'A'), false);
+    assertStrictEquals(isIdentifier(good.slice(0, 21)), false);
+    assertStrictEquals(isIdentifier(good + 'A'), false);
     const badFinal = good.slice(0, 21) + 'B';
-    assert.equal(isIdentifier(badFinal), false);
-    assert.equal(isIdentifier('+' + good.slice(1)), false);
-    assert.equal(
+    assertStrictEquals(isIdentifier(badFinal), false);
+    assertStrictEquals(isIdentifier('+' + good.slice(1)), false);
+    assertStrictEquals(
         isIdentifier(good.slice(0, 21) + '/'), false);
-    assert.equal(isIdentifier(good + '=='), false);
+    assertStrictEquals(isIdentifier(good + '=='), false);
 });
 
-test('decode(encode(b)) and encode(decode(s)) round-trip',
+Deno.test('decode(encode(b)) and encode(decode(s)) round-trip',
 () => {
     for (let i = 0; i < 200; i++) {
         const bytes = new Uint8Array(IDENTIFIER_BYTE_LENGTH);
         crypto.getRandomValues(bytes);
         const text = encodeIdentifier(bytes);
-        assert.equal(isIdentifier(text), true);
-        assert.deepEqual(
+        assertStrictEquals(isIdentifier(text), true);
+        assertEquals(
             [...decodeIdentifier(text)], [...bytes]);
-        assert.equal(
+        assertStrictEquals(
             encodeIdentifier(decodeIdentifier(text)),
             text);
     }
 });
 
-test('NIL_IDENTIFIER is 16 zero bytes and canonical',
+Deno.test('NIL_IDENTIFIER is 16 zero bytes and canonical',
 () => {
-    assert.equal(isIdentifier(NIL_IDENTIFIER), true);
-    assert.deepEqual(
+    assertStrictEquals(isIdentifier(NIL_IDENTIFIER), true);
+    assertEquals(
         [...decodeIdentifier(NIL_IDENTIFIER)],
         [...new Uint8Array(16)]);
-    assert.equal(
+    assertStrictEquals(
         encodeIdentifier(new Uint8Array(16)),
         NIL_IDENTIFIER);
 });
 
-test('encodeIdentifier rejects the wrong length', () => {
-    assert.throws(
+Deno.test('encodeIdentifier rejects the wrong length', () => {
+    assertThrows(
         () => encodeIdentifier(new Uint8Array(15)));
-    assert.throws(
+    assertThrows(
         () => encodeIdentifier(new Uint8Array(17)));
 });
 
-test('decodeIdentifier rejects non-canonical text', () => {
-    assert.throws(() => decodeIdentifier('short'));
+Deno.test('decodeIdentifier rejects non-canonical text', () => {
+    assertThrows(() => decodeIdentifier('short'));
     const good = generateIdentifier();
-    assert.throws(
+    assertThrows(
         () => decodeIdentifier(good.slice(0, 21) + 'B'));
 });
 
-test('compareIdentifiers agrees with byte memcmp', () => {
+Deno.test('compareIdentifiers agrees with byte memcmp', () => {
     function memcmp(
         a: Uint8Array, b: Uint8Array,
     ): number {
@@ -93,7 +97,7 @@ test('compareIdentifiers agrees with byte memcmp', () => {
         crypto.getRandomValues(bb);
         const a = encodeIdentifier(ab);
         const b = encodeIdentifier(bb);
-        assert.equal(
+        assertStrictEquals(
             sign(compareIdentifiers(a, b)),
             sign(memcmp(ab, bb)));
     }
@@ -111,7 +115,7 @@ test('compareIdentifiers agrees with byte memcmp', () => {
         for (let j = 0; j < cases.length; j++) {
             const a = cases[i]!;
             const b = cases[j]!;
-            assert.equal(
+            assertStrictEquals(
                 sign(compareIdentifiers(a, b)),
                 sign(i - j),
                 a + ' vs ' + b);
@@ -119,15 +123,15 @@ test('compareIdentifiers agrees with byte memcmp', () => {
     }
 });
 
-test('10,000 mints are distinct', () => {
+Deno.test('10,000 mints are distinct', () => {
     const seen = new Set<string>();
     for (let i = 0; i < 10000; i++) {
         seen.add(generateIdentifier());
     }
-    assert.equal(seen.size, 10000);
+    assertStrictEquals(seen.size, 10000);
 });
 
-test('6-bit symbols are uniform', () => {
+Deno.test('6-bit symbols are uniform', () => {
     const counts = new Map<string, number>();
     for (const ch of ALPHABET) counts.set(ch, 0);
     const n = 20000;
@@ -141,7 +145,7 @@ test('6-bit symbols are uniform', () => {
     const tolerance = expected * 0.08;
     for (const ch of ALPHABET) {
         const count = counts.get(ch)!;
-        assert.ok(
+        assert(
             Math.abs(count - expected) < tolerance,
             `Char "${ch}" appeared ${count}, expected ~`
             + expected.toFixed(0));

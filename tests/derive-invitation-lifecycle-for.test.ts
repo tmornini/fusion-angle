@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -66,7 +65,7 @@ async function grant(
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     return grantEventId;
 }
 
@@ -78,7 +77,7 @@ async function bulkRowsFor(
         .sort((a, b) => compareIdentifiers(a.id, b.id));
 }
 
-test('invitationLifecycleStatesFor: pending-only (granted,'
+Deno.test('invitationLifecycleStatesFor: pending-only (granted,'
 + ' unanswered) matches deriveInvitationStates\'s own subset',
 async () => {
     const db = await seededDb();
@@ -87,13 +86,13 @@ async () => {
     await grant(db, id, 'sarah.chen@company.com', grantEventId);
 
     const scoped = await invitationLifecycleStatesFor(db, id);
-    assert.equal(scoped.length, 1);
-    assert.equal(scoped[0]!.state, 'pending');
-    assert.equal(scoped[0]!.id, grantEventId);
-    assert.deepEqual(scoped, await bulkRowsFor(db, id));
+    assertStrictEquals(scoped.length, 1);
+    assertStrictEquals(scoped[0]!.state, 'pending');
+    assertStrictEquals(scoped[0]!.id, grantEventId);
+    assertEquals(scoped, await bulkRowsFor(db, id));
 });
 
-test('invitationLifecycleStatesFor: accepted carries both the'
+Deno.test('invitationLifecycleStatesFor: accepted carries both the'
 + ' pending and accepted rows, matching the bulk subset',
 async () => {
     const db = await seededDb();
@@ -112,18 +111,18 @@ async () => {
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assertStrictEquals(accept.status, 204);
 
     const scoped = await invitationLifecycleStatesFor(db, id);
-    assert.equal(scoped.length, 2);
-    assert.deepEqual(
+    assertStrictEquals(scoped.length, 2);
+    assertEquals(
         scoped.map((row) => row.state).sort(),
         ['accepted', 'pending'],
     );
-    assert.deepEqual(scoped, await bulkRowsFor(db, id));
+    assertEquals(scoped, await bulkRowsFor(db, id));
 });
 
-test('invitationLifecycleStatesFor: declined carries both the'
+Deno.test('invitationLifecycleStatesFor: declined carries both the'
 + ' pending and declined rows, matching the bulk subset',
 async () => {
     const db = await seededDb();
@@ -141,18 +140,18 @@ async () => {
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(decline.status, 204);
+    assertStrictEquals(decline.status, 204);
 
     const scoped = await invitationLifecycleStatesFor(db, id);
-    assert.equal(scoped.length, 2);
-    assert.deepEqual(
+    assertStrictEquals(scoped.length, 2);
+    assertEquals(
         scoped.map((row) => row.state).sort(),
         ['declined', 'pending'],
     );
-    assert.deepEqual(scoped, await bulkRowsFor(db, id));
+    assertEquals(scoped, await bulkRowsFor(db, id));
 });
 
-test('invitationLifecycleStatesFor: revoked carries both the'
+Deno.test('invitationLifecycleStatesFor: revoked carries both the'
 + ' pending and revoked rows, matching the bulk subset',
 async () => {
     const db = await seededDb();
@@ -170,27 +169,23 @@ async () => {
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(revoke.status, 204);
+    assertStrictEquals(revoke.status, 204);
 
     const scoped = await invitationLifecycleStatesFor(db, id);
-    assert.equal(scoped.length, 2);
-    assert.deepEqual(
+    assertStrictEquals(scoped.length, 2);
+    assertEquals(
         scoped.map((row) => row.state).sort(),
         ['pending', 'revoked'],
     );
-    assert.deepEqual(scoped, await bulkRowsFor(db, id));
+    assertEquals(scoped, await bulkRowsFor(db, id));
 });
 
-test('invitationLifecycleStatesFor: a never-granted id derives'
+Deno.test('invitationLifecycleStatesFor: a never-granted id derives'
 + ' an empty array, no throw', async () => {
     const db = await seededDb();
-    await assert.doesNotReject(
-        () => invitationLifecycleStatesFor(
-            db, generateIdentifier(),
-        ),
-    );
+    await invitationLifecycleStatesFor(db, generateIdentifier());
     const missingId = generateIdentifier();
-    assert.deepEqual(
+    assertEquals(
         await invitationLifecycleStatesFor(db, missingId),
         [],
     );
@@ -199,7 +194,7 @@ test('invitationLifecycleStatesFor: a never-granted id derives'
 // -- the phantom-echo exclusion (finding 1: "Document existence --
 // -- is the grant proof") ----------------------------------------
 
-test('invitationLifecycleStatesFor: a duplicate-grant\'s'
+Deno.test('invitationLifecycleStatesFor: a duplicate-grant\'s'
 + ' PHANTOM echo id (an operation message pair with no document)'
 + ' derives an EMPTY array — never a false \'pending\' row',
 async () => {
@@ -224,14 +219,14 @@ async () => {
             grantAt: '2026-06-01T00:00:02.000000Z',
         },
     ));
-    assert.equal(echoRes.status, 200);
+    assertStrictEquals(echoRes.status, 200);
     const echoBody = await echoRes.json() as { id: string };
-    assert.equal(echoBody.id, freshId);
+    assertStrictEquals(echoBody.id, freshId);
 
-    assert.deepEqual(
+    assertEquals(
         await invitationLifecycleStatesFor(db, echoId), [],
     );
-    assert.deepEqual(
+    assertEquals(
         await bulkRowsFor(db, echoId), [],
     );
 
@@ -240,6 +235,6 @@ async () => {
     const freshRows = await invitationLifecycleStatesFor(
         db, freshId,
     );
-    assert.equal(freshRows.length, 1);
-    assert.equal(freshRows[0]!.state, 'pending');
+    assertStrictEquals(freshRows.length, 1);
+    assertStrictEquals(freshRows[0]!.state, 'pending');
 });

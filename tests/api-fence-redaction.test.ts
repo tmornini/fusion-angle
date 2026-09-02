@@ -1,12 +1,11 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertRejects, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import { MissingTableError } from '../api/db.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { reachableToken } from
     './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { captureConsole } from './console-capture.ts';
+import { captureConsole } from './fixtures/console-capture.ts';
 
 // Phase 12 Task 1: the pre-dispatch fence reads (handleRequest's
 // two ownership-fence regions, api/api.ts) redact a thrown fault
@@ -24,7 +23,7 @@ async function freshDb() {
     return db;
 }
 
-test(
+Deno.test(
     'a Region A fence-read fault (fenceRequest itself) redacts'
     + ' to the fixed 500',
     async () => {
@@ -62,11 +61,11 @@ test(
                     }),
                 ),
             );
-        assert.equal(response.status, 500);
+        assertStrictEquals(response.status, 500);
         const { error } =
             (await response.json()) as { error: string };
-        assert.equal(error, 'internal error');
-        assert.ok(
+        assertStrictEquals(error, 'internal error');
+        assert(
             calls.some(args =>
                 args.includes('fence read failed')),
             'the fence catch must keep console evidence',
@@ -74,7 +73,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'a MissingTableError fence fault still propagates,'
     + ' never redacted to the fixed 500',
     async () => {
@@ -92,7 +91,7 @@ test(
             return original(column, key);
         };
         const flatToken = await reachableToken();
-        await assert.rejects(
+        await assertRejects(
             () => handleRequest(
                 db,
                 new Request('http://localhost/organizations/'
@@ -103,7 +102,7 @@ test(
                     },
                 }),
             ),
-            (e: unknown) => e instanceof MissingTableError,
+            MissingTableError,
         );
     },
 );

@@ -1,5 +1,4 @@
-import { test, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertMatch, assertStrictEquals } from '@std/assert';
 import {
     verifyPassword,
     setPasswordHasher,
@@ -10,25 +9,25 @@ import {
     scryptDerive,
 } from '../server/scrypt-hash.ts';
 
-afterEach(() => {
+Deno.test.afterEach(() => {
     setPasswordHasher(null);
     setScryptDerive(null);
 });
 
 
-test('scryptHash then verifyPassword round-trips',
+Deno.test('scryptHash then verifyPassword round-trips',
 async () => {
     setScryptDerive(scryptDerive);
     const phc = await scryptHash('s3cret');
-    assert.match(
+    assertMatch(
         phc,
         /^\$scrypt\$ln=17,r=8,p=1\$[^$]+\$[^$]+$/,
     );
-    assert.equal(
+    assertStrictEquals(
         await verifyPassword('s3cret', phc),
         true,
     );
-    assert.equal(
+    assertStrictEquals(
         await verifyPassword('wrong', phc),
         false,
     );

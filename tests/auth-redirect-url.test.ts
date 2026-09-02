@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     encodeReturnTarget,
     decodeReturnTarget,
@@ -13,10 +12,10 @@ function throughWire(target: string): string {
     return new URLSearchParams(url.toString()).get('return')!;
 }
 
-test('a page with nested params round-trips the wire', () => {
+Deno.test('a page with nested params round-trips the wire', () => {
     const target = encodeReturnTarget(
         'flow-detail', { flowId: 'a', tab: 'b' });
-    assert.deepEqual(
+    assertEquals(
         decodeReturnTarget(throughWire(target)),
         {
             page: 'flow-detail',
@@ -24,43 +23,43 @@ test('a page with nested params round-trips the wire', () => {
         });
 });
 
-test('a bare page encodes without a query', () => {
-    assert.equal(
+Deno.test('a bare page encodes without a query', () => {
+    assertStrictEquals(
         encodeReturnTarget('dashboard', {}), 'dashboard');
 });
 
-test('an absent return resolves to the default page', () => {
-    assert.deepEqual(
+Deno.test('an absent return resolves to the default page', () => {
+    assertEquals(
         decodeReturnTarget(null),
         { page: DEFAULT_POST_LOGIN_PAGE, params: {} });
 });
 
-test('a known gated page with no params decodes plainly', () => {
-    assert.deepEqual(
+Deno.test('a known gated page with no params decodes plainly', () => {
+    assertEquals(
         decodeReturnTarget('members'),
         { page: 'members', params: {} });
 });
 
-test('a raw URL return is rejected to the default', () => {
-    assert.deepEqual(
+Deno.test('a raw URL return is rejected to the default', () => {
+    assertEquals(
         decodeReturnTarget('https://evil.com/pwn'),
         { page: DEFAULT_POST_LOGIN_PAGE, params: {} });
-    assert.deepEqual(
+    assertEquals(
         decodeReturnTarget('//evil.com'),
         { page: DEFAULT_POST_LOGIN_PAGE, params: {} });
 });
 
-test('an exempt page return is rejected to the default', () => {
+Deno.test('an exempt page return is rejected to the default', () => {
     // auth/landing are login-free; returning to them post-login
     // is pointless, so they fall to the default.
-    assert.deepEqual(
+    assertEquals(
         decodeReturnTarget('auth'),
         { page: DEFAULT_POST_LOGIN_PAGE, params: {} });
 });
 
-test('a retired snapshots return falls to default',
+Deno.test('a retired snapshots return falls to default',
 () => {
-    assert.deepEqual(
+    assertEquals(
         decodeReturnTarget('snapshots'),
         {
             page: DEFAULT_POST_LOGIN_PAGE,

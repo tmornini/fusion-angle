@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import {
     Project,
     ProjectView,
@@ -50,7 +49,7 @@ const twoObjectives: ObjectiveEntity[] = [
     },
 ];
 
-test(
+Deno.test(
     'impactBaselineMean returns null with no scores',
     () => {
         const v = new ProjectView(
@@ -59,11 +58,11 @@ test(
             [],
             [],
         );
-        assert.equal(v.impactBaselineMean(), null);
+        assertStrictEquals(v.impactBaselineMean(), null);
     },
 );
 
-test(
+Deno.test(
     'impactBaselineMean returns score for single objective',
     () => {
         const baseline = [
@@ -78,11 +77,11 @@ test(
             baseline,
             [],
         );
-        assert.equal(v.impactBaselineMean(), 50);
+        assertStrictEquals(v.impactBaselineMean(), 50);
     },
 );
 
-test(
+Deno.test(
     'impactBaselineMean takes latest score per objective',
     () => {
         const baseline = [
@@ -101,11 +100,11 @@ test(
             baseline,
             [],
         );
-        assert.equal(v.impactBaselineMean(), 60);
+        assertStrictEquals(v.impactBaselineMean(), 60);
     },
 );
 
-test(
+Deno.test(
     'impactBaselineMean weights by position',
     () => {
         // ohqxgUBEaFQwYbXsonRPmg at position 0 (weight 1.0), o2 at
@@ -129,11 +128,11 @@ test(
             baseline,
             [],
         );
-        assert.equal(v.impactBaselineMean(), 50);
+        assertStrictEquals(v.impactBaselineMean(), 50);
     },
 );
 
-test(
+Deno.test(
     'impactActualMean is null when not fully scored',
     () => {
         const baseline = [
@@ -159,11 +158,11 @@ test(
             baseline,
             actual,
         );
-        assert.equal(v.impactActualMean(), null);
+        assertStrictEquals(v.impactActualMean(), null);
     },
 );
 
-test(
+Deno.test(
     'impactActualMean weights actuals when fully scored',
     () => {
         // baselined ohqxgUBEaFQwYbXsonRPmg, o2 → both must have actuals.
@@ -198,11 +197,11 @@ test(
             baseline,
             actual,
         );
-        assert.equal(v.impactActualMean(), 40);
+        assertStrictEquals(v.impactActualMean(), 40);
     },
 );
 
-test(
+Deno.test(
     'impactActualMean ignores actuals for un-baselined objs',
     () => {
         // Only ohqxgUBEaFQwYbXsonRPmg baselined. Actuals for
@@ -232,6 +231,6 @@ test(
             baseline,
             actual,
         );
-        assert.equal(v.impactActualMean(), 70);
+        assertStrictEquals(v.impactActualMean(), 70);
     },
 );

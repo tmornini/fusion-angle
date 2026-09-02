@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from '@std/assert';
 import { OrganizationObjectivesPresenter } from
     '../web-app/app/presenters/organization-objectives.ts';
 import type { ObjectiveEntity } from '../api/types.ts';
@@ -26,40 +25,40 @@ const archivedAt = new Map([
     ['o3', '2026-03-15T00:00:00.000000Z'],
 ]);
 
-test('renders active section with each active objective',
+Deno.test('renders active section with each active objective',
     () => {
         const p = new OrganizationObjectivesPresenter(
             activeObjs, archivedObjs, defs, archivedAt,
         );
         const html = p.buildBox().toString();
-        assert.ok(html.includes('Increase incomes'));
-        assert.ok(html.includes('Lower expenses'));
-        assert.ok(html.includes(
+        assert(html.includes('Increase incomes'));
+        assert(html.includes('Lower expenses'));
+        assert(html.includes(
             'data-objective-id="ohqxgUBEaFQwYbXsonRPmg"'));
-        assert.ok(html.includes('data-objective-id="o2"'));
+        assert(html.includes('data-objective-id="o2"'));
     });
 
-test('renders archived section under active', () => {
+Deno.test('renders archived section under active', () => {
     const p = new OrganizationObjectivesPresenter(
         activeObjs, archivedObjs, defs, archivedAt,
     );
     const html = p.buildBox().toString();
-    assert.ok(html.includes('Old Quarterly'));
-    assert.ok(html.includes('Archived'));
+    assert(html.includes('Old Quarterly'));
+    assert(html.includes('Archived'));
 });
 
-test('renders add-objective affordance', () => {
+Deno.test('renders add-objective affordance', () => {
     const p = new OrganizationObjectivesPresenter(
         activeObjs, archivedObjs, defs, archivedAt,
     );
     const html = p.buildBox().toString();
-    assert.ok(html.includes('data-action="add-objective"'));
+    assert(html.includes('data-action="add-objective"'));
 });
 
-test('empty state when no objectives', () => {
+Deno.test('empty state when no objectives', () => {
     const p = new OrganizationObjectivesPresenter(
         [], [], new Map(), new Map(),
     );
     const html = p.buildBox().toString();
-    assert.ok(html.toLowerCase().includes('no objectives'));
+    assert(html.toLowerCase().includes('no objectives'));
 });

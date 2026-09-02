@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertMatch, assertStrictEquals } from '@std/assert';
 import {
     verifyClientAssertion,
 } from '../api/client-assertion.ts';
@@ -39,18 +38,18 @@ function freshClaims(): Record<string, unknown> {
 }
 
 for (const alg of ['RS256', 'ES256'] as const) {
-    test(`a ${alg}-signed assertion verifies`, async () => {
+    Deno.test(`a ${alg}-signed assertion verifies`, async () => {
         const signer = await makeAssertionSigner(alg);
         const assertion = await signer.sign(freshClaims());
         const verdict = await verifyClientAssertion(
             assertion, clientWith(signer.jwks), NOW,
         );
-        assert.deepEqual(verdict, {
+        assertEquals(verdict, {
             valid: true, jti: 'assert-1', exp: NOW + 300,
         });
     });
 
-    test(`a ${alg} signature from an unregistered key`
+    Deno.test(`a ${alg} signature from an unregistered key`
         + ' is refused', async () => {
         const signer = await makeAssertionSigner(alg);
         const impostor = await makeAssertionSigner(alg);
@@ -59,11 +58,11 @@ for (const alg of ['RS256', 'ES256'] as const) {
         const verdict = await verifyClientAssertion(
             assertion, clientWith(signer.jwks), NOW,
         );
-        assert.equal(verdict.valid, false);
+        assertStrictEquals(verdict.valid, false);
     });
 }
 
-test('a tampered payload fails verification', async () => {
+Deno.test('a tampered payload fails verification', async () => {
     const signer = await makeAssertionSigner('RS256');
     const assertion = await signer.sign(freshClaims());
     const [h, , s] = assertion.split('.');
@@ -75,10 +74,10 @@ test('a tampered payload fails verification', async () => {
     const verdict = await verifyClientAssertion(
         spliced, clientWith(signer.jwks), NOW,
     );
-    assert.equal(verdict.valid, false);
+    assertStrictEquals(verdict.valid, false);
 });
 
-test('symmetric and none algorithms are refused',
+Deno.test('symmetric and none algorithms are refused',
 async () => {
     const signer = await makeAssertionSigner('RS256');
     const client = clientWith(signer.jwks);
@@ -89,14 +88,14 @@ async () => {
         const verdict = await verifyClientAssertion(
             assertion, client, NOW,
         );
-        assert.equal(verdict.valid, false, alg);
-        assert.match(
+        assertStrictEquals(verdict.valid, false, alg);
+        assertMatch(
             (verdict as { reason: string }).reason,
             /unsupported assertion alg/);
     }
 });
 
-test('an expired assertion is refused', async () => {
+Deno.test('an expired assertion is refused', async () => {
     const signer = await makeAssertionSigner('RS256');
     const assertion = await signer.sign({
         ...freshClaims(), exp: NOW - 1,
@@ -104,33 +103,33 @@ test('an expired assertion is refused', async () => {
     const verdict = await verifyClientAssertion(
         assertion, clientWith(signer.jwks), NOW,
     );
-    assert.equal(verdict.valid, false);
-    assert.match(
+    assertStrictEquals(verdict.valid, false);
+    assertMatch(
         (verdict as { reason: string }).reason,
         /expired/);
 });
 
-test('a missing exp is refused', async () => {
+Deno.test('a missing exp is refused', async () => {
     const signer = await makeAssertionSigner('RS256');
     const { exp: _exp, ...rest } = freshClaims();
     const assertion = await signer.sign(rest);
     const verdict = await verifyClientAssertion(
         assertion, clientWith(signer.jwks), NOW,
     );
-    assert.equal(verdict.valid, false);
+    assertStrictEquals(verdict.valid, false);
 });
 
-test('a missing jti is refused', async () => {
+Deno.test('a missing jti is refused', async () => {
     const signer = await makeAssertionSigner('RS256');
     const { jti: _jti, ...rest } = freshClaims();
     const assertion = await signer.sign(rest);
     const verdict = await verifyClientAssertion(
         assertion, clientWith(signer.jwks), NOW,
     );
-    assert.equal(verdict.valid, false);
+    assertStrictEquals(verdict.valid, false);
 });
 
-test('a malformed jti is refused', async () => {
+Deno.test('a malformed jti is refused', async () => {
     const signer = await makeAssertionSigner('RS256');
     const assertion = await signer.sign({
         ...freshClaims(), jti: 'bad jti!',
@@ -138,10 +137,10 @@ test('a malformed jti is refused', async () => {
     const verdict = await verifyClientAssertion(
         assertion, clientWith(signer.jwks), NOW,
     );
-    assert.equal(verdict.valid, false);
+    assertStrictEquals(verdict.valid, false);
 });
 
-test('a future nbf is refused', async () => {
+Deno.test('a future nbf is refused', async () => {
     const signer = await makeAssertionSigner('RS256');
     const assertion = await signer.sign({
         ...freshClaims(), nbf: NOW + 60,
@@ -149,10 +148,10 @@ test('a future nbf is refused', async () => {
     const verdict = await verifyClientAssertion(
         assertion, clientWith(signer.jwks), NOW,
     );
-    assert.equal(verdict.valid, false);
+    assertStrictEquals(verdict.valid, false);
 });
 
-test('iss, sub, and aud must match the client',
+Deno.test('iss, sub, and aud must match the client',
 async () => {
     const signer = await makeAssertionSigner('RS256');
     const client = clientWith(signer.jwks);
@@ -167,13 +166,13 @@ async () => {
         const verdict = await verifyClientAssertion(
             assertion, client, NOW,
         );
-        assert.equal(
+        assertStrictEquals(
             verdict.valid, false,
             JSON.stringify(wrong));
     }
 });
 
-test('a kid header selects its registered key',
+Deno.test('a kid header selects its registered key',
 async () => {
     const signer =
         await makeAssertionSigner('RS256', 'key-1');
@@ -181,12 +180,12 @@ async () => {
     const verdict = await verifyClientAssertion(
         assertion, clientWith(signer.jwks), NOW,
     );
-    assert.deepEqual(verdict, {
+    assertEquals(verdict, {
         valid: true, jti: 'assert-1', exp: NOW + 300,
     });
 });
 
-test('an unknown kid matches no registered key',
+Deno.test('an unknown kid matches no registered key',
 async () => {
     const signer =
         await makeAssertionSigner('RS256', 'key-1');
@@ -196,13 +195,13 @@ async () => {
     const verdict = await verifyClientAssertion(
         assertion, clientWith(signer.jwks), NOW,
     );
-    assert.equal(verdict.valid, false);
-    assert.match(
+    assertStrictEquals(verdict.valid, false);
+    assertMatch(
         (verdict as { reason: string }).reason,
         /no registered key/);
 });
 
-test('an empty or malformed JWKS verifies nothing',
+Deno.test('an empty or malformed JWKS verifies nothing',
 async () => {
     const signer = await makeAssertionSigner('RS256');
     const assertion = await signer.sign(freshClaims());
@@ -210,11 +209,11 @@ async () => {
         const verdict = await verifyClientAssertion(
             assertion, clientWith(jwks), NOW,
         );
-        assert.equal(verdict.valid, false, jwks);
+        assertStrictEquals(verdict.valid, false, jwks);
     }
 });
 
-test('structural garbage is refused, not thrown',
+Deno.test('structural garbage is refused, not thrown',
 async () => {
     const signer = await makeAssertionSigner('RS256');
     const client = clientWith(signer.jwks);
@@ -228,6 +227,6 @@ async () => {
         const verdict = await verifyClientAssertion(
             garbage, client, NOW,
         );
-        assert.equal(verdict.valid, false, garbage);
+        assertStrictEquals(verdict.valid, false, garbage);
     }
 });

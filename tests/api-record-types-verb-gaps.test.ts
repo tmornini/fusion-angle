@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -40,75 +39,75 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('PUT .../record-types 405s (no put handler wired)',
+Deno.test('PUT .../record-types 405s (no put handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', COLLECTION, token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE .../record-types 405s (no delete handler '
+Deno.test('DELETE .../record-types 405s (no delete handler '
 + 'wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', COLLECTION, token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST .../record-types/:id 405s (no post handler '
+Deno.test('POST .../record-types/:id 405s (no post handler '
 + 'wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', DETAIL, token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT .../record-types/:id/versions 405s (no put '
+Deno.test('PUT .../record-types/:id/versions 405s (no put '
 + 'handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', HISTORY, token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST .../record-types/:id/versions 405s (no post '
+Deno.test('POST .../record-types/:id/versions 405s (no post '
 + 'handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', HISTORY, token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE .../record-types/:id/versions 405s (no '
+Deno.test('DELETE .../record-types/:id/versions 405s (no '
 + 'delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', HISTORY, token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
 // Task 10: PATCH alphabet — no nested schema patch yet.
-test('PATCH .../record-types/:id 405s (no patch'
+Deno.test('PATCH .../record-types/:id 405s (no patch'
 + ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PATCH', DETAIL, token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
 // Nested attributes verb gaps (Task 7): no collection POST;
@@ -117,52 +116,52 @@ test('PATCH .../record-types/:id 405s (no patch'
 const ATTRS = DETAIL + '/attributes/';
 const ATTR_DETAIL = ATTRS + 'VPckAwjJsTGCEkKaOOGRGw';
 
-test('POST .../attributes 405s (no create verb — '
+Deno.test('POST .../attributes 405s (no create verb — '
 + 'parity with flat family)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', ATTRS, token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PUT .../attributes 405s (no collection put)',
+Deno.test('PUT .../attributes 405s (no collection put)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', ATTRS, token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('DELETE .../attributes 405s (no collection '
+Deno.test('DELETE .../attributes 405s (no collection '
 + 'delete)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', ATTRS, token),
     );
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('POST .../attributes/:id 405s (no post on '
+Deno.test('POST .../attributes/:id 405s (no post on '
 + 'detail)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST', ATTR_DETAIL, token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PATCH .../attributes/:id 405s (no patch'
+Deno.test('PATCH .../attributes/:id 405s (no patch'
 + ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PATCH', ATTR_DETAIL, token, {},
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });

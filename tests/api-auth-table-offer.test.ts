@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals } from '@std/assert';
 import { routes } from '../api/routes.ts';
 
 function routeNamed(pattern: string) {
@@ -7,19 +6,19 @@ function routeNamed(pattern: string) {
         row.segments.join('/') === pattern);
 }
 
-test('authentication/token offers POST', () => {
+Deno.test('authentication/token offers POST', () => {
     const row = routeNamed('authentication/token');
-    assert.ok(row);
-    assert.equal(typeof row.post, 'function');
-    assert.equal(row.get, undefined);
-    assert.equal(row.put, undefined);
+    assert(row);
+    assertStrictEquals(typeof row.post, 'function');
+    assertStrictEquals(row.get, undefined);
+    assertStrictEquals(row.put, undefined);
 });
 
-test('authentication/authorize offers POST',
+Deno.test('authentication/authorize offers POST',
 () => {
     const row = routeNamed(
         'authentication/authorize',
     );
-    assert.ok(row);
-    assert.equal(typeof row.post, 'function');
+    assert(row);
+    assertStrictEquals(typeof row.post, 'function');
 });

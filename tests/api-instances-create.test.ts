@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -129,7 +134,7 @@ async function putLiveType(
     const put = await handleRequest(db, req(
         'PUT', TYPE_DETAIL, adminToken, typeBody(),
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function putAttribute(
@@ -141,7 +146,7 @@ async function putAttribute(
     const put = await handleRequest(db, req(
         'PUT', ATTRS + attrId, adminToken, body,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedWritableTextAttr(
@@ -170,7 +175,7 @@ function setBody(
 
 const WELL_FORMED_TAG = generateIdentifier();
 
-test('public instance PUT is 405', async () => {
+Deno.test('public instance PUT is 405', async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
@@ -178,10 +183,10 @@ test('public instance PUT is 405', async () => {
         'PUT', INSTANCE_DETAIL, memberToken,
         { set: [] },
     ));
-    assert.equal(res.status, 405);
+    assertStrictEquals(res.status, 405);
 });
 
-test('PATCH create without If-Match is 201',
+Deno.test('PATCH create without If-Match is 201',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -190,10 +195,10 @@ async () => {
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [] },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 });
 
-test('PATCH create with clear is 400', async () => {
+Deno.test('PATCH create with clear is 400', async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
@@ -203,10 +208,10 @@ test('PATCH create with clear is 400', async () => {
             clear: [],
         },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
 });
 
-test('PATCH create with If-Match is 412', async () => {
+Deno.test('PATCH create with If-Match is 412', async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
@@ -215,10 +220,10 @@ test('PATCH create with If-Match is 412', async () => {
         { set: [] },
         { [IF_MATCH_HEADER]: '"' + WELL_FORMED_TAG + '"' },
     ));
-    assert.equal(res.status, 412);
+    assertStrictEquals(res.status, 412);
 });
 
-test('PATCH {set:[…]} member, type exists → 201 + ETag; '
+Deno.test('PATCH {set:[…]} member, type exists → 201 + ETag; '
 + 'head shows values',
 async () => {
     const { db, adminToken, memberToken } =
@@ -231,18 +236,18 @@ async () => {
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const responseId = res.headers.get('Response-ID');
-    assert.ok(
+    assert(
         responseId !== null && responseId !== '',
         'Response-ID present',
     );
     const createEtag = res.headers.get('ETag');
-    assert.ok(
+    assert(
         createEtag !== null
         && isIdentifier(createEtag.slice(1, -1)),
     );
-    assert.notEqual(createEtag, strongEtagOf(responseId!));
+    assertNotStrictEquals(createEtag, strongEtagOf(responseId!));
     const echo = await res.json() as {
         id: string;
         organization_id: string;
@@ -250,7 +255,7 @@ async () => {
         set: { attribute_id: string; value: string }[];
         clear: string[];
     };
-    assert.deepEqual(echo, {
+    assertEquals(echo, {
         id: INSTANCE_ID,
         organization_id: ORGANIZATION,
         record_type_id: TYPE_ID,
@@ -262,18 +267,18 @@ async () => {
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assert.ok(head !== undefined);
-    assert.notEqual(head.messagePairId, responseId);
-    assert.equal(
+    assert(head !== undefined);
+    assertNotStrictEquals(head.messagePairId, responseId);
+    assertStrictEquals(
         createEtag,
         strongEtagOf(head.messagePairId),
     );
-    assert.deepEqual(head.values, [
+    assertEquals(head.values, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
 });
 
-test('PATCH {set: []} empty genesis; path-tier only',
+Deno.test('PATCH {set: []} empty genesis; path-tier only',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -281,17 +286,17 @@ async () => {
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, { set: [] },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
     const echo = await res.json() as { set: unknown[] };
-    assert.deepEqual(echo.set, []);
+    assertEquals(echo.set, []);
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assert.ok(head !== undefined);
-    assert.deepEqual(head.values, []);
+    assert(head !== undefined);
+    assertEquals(head.values, []);
 });
 
-test('PATCH create under absent type → 404 record_types',
+Deno.test('PATCH create under absent type → 404 record_types',
 async () => {
     const { db, memberToken } = await adminDb();
     const res = await handleRequest(db, req(
@@ -300,13 +305,13 @@ async () => {
             { attribute_id: ATTR_ID, value: 'x' },
         ]),
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error: 'Not found: record_types/' + TYPE_ID,
     });
 });
 
-test('PATCH create malformed If-Match → 400',
+Deno.test('PATCH create malformed If-Match → 400',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -316,14 +321,14 @@ async () => {
         { set: [] },
         { [IF_MATCH_HEADER]: '"' + 'a'.repeat(64) + '"' },
     ));
-    assert.equal(res.status, 400);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 400);
+    assertEquals(await res.json(), {
         error: 'If-Match must carry exactly one '
             + 'strong validator',
     });
 });
 
-test('PATCH create {set, clear} → 400 unexpected clear',
+Deno.test('PATCH create {set, clear} → 400 unexpected clear',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -334,15 +339,15 @@ async () => {
             clear: [ATTR_ID],
         },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(
+    assertMatch(
         err.error,
         /unexpected key "clear" for InstancePutBody/,
     );
 });
 
-test('PATCH create duplicate attribute_id in set → 400',
+Deno.test('PATCH create duplicate attribute_id in set → 400',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -356,12 +361,12 @@ async () => {
             ],
         },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(err.error, /duplicate attribute_id/);
+    assertMatch(err.error, /duplicate attribute_id/);
 });
 
-test('PATCH create value \'\' → 400 (G9)',
+Deno.test('PATCH create value \'\' → 400 (G9)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -374,12 +379,12 @@ async () => {
             ],
         },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(err.error, /empty/i);
+    assertMatch(err.error, /empty/i);
 });
 
-test('PATCH create unwritable attribute (member, '
+Deno.test('PATCH create unwritable attribute (member, '
 + 'write_roles []) → 403 all-or-nothing',
 async () => {
     const { db, adminToken, memberToken } =
@@ -404,15 +409,15 @@ async () => {
             ],
         },
     ));
-    assert.equal(res.status, 403);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
         error: 'forbidden: attribute '
             + ATTR_LOCKED
             + ' is not writable with the held roles',
     });
 });
 
-test('PATCH create admin same locked attribute → 201 '
+Deno.test('PATCH create admin same locked attribute → 201 '
 + '(bypass)',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -436,10 +441,10 @@ async () => {
             ],
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 });
 
-test('PATCH create bad value (number \'abc\') → 400 '
+Deno.test('PATCH create bad value (number \'abc\') → 400 '
 + 'naming attribute',
 async () => {
     const { db, adminToken, memberToken } =
@@ -464,16 +469,16 @@ async () => {
             ],
         },
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(
+    assertMatch(
         err.error,
         /value for attribute "Amount"/,
     );
-    assert.match(err.error, /number/i);
+    assertMatch(err.error, /number/i);
 });
 
-test('PATCH create at live head without If-Match → 428',
+Deno.test('PATCH create at live head without If-Match → 428',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -485,17 +490,17 @@ async () => {
             { attribute_id: ATTR_ID, value: 'one' },
         ]),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const second = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         setBody([
             { attribute_id: ATTR_ID, value: 'two' },
         ]),
     ));
-    assert.equal(second.status, 428);
+    assertStrictEquals(second.status, 428);
 });
 
-test('PATCH create at a tombstoned address → 409 spent',
+Deno.test('PATCH create at a tombstoned address → 409 spent',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -533,14 +538,14 @@ async () => {
             { attribute_id: ATTR_ID, value: 'after' },
         ]),
     ));
-    assert.equal(res.status, 409);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 409);
+    assertEquals(await res.json(), {
         error: 'instance already exists at '
             + INSTANCE_DETAIL,
     });
 });
 
-test('byte-identical PATCH create resend → 201 replay',
+Deno.test('byte-identical PATCH create resend → 201 replay',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -552,23 +557,23 @@ async () => {
     const first = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const originalId = first.headers.get('Response-ID')!;
     const originalEtag = first.headers.get('ETag');
     const originalBody = await first.json();
     const second = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
     ));
-    assert.equal(second.status, 201);
-    assert.equal(
+    assertStrictEquals(second.status, 201);
+    assertStrictEquals(
         second.headers.get('Response-ID'),
         originalId,
     );
-    assert.equal(
+    assertStrictEquals(
         second.headers.get('ETag'),
         originalEtag,
     );
-    assert.deepEqual(await second.json(), originalBody);
+    assertEquals(await second.json(), originalBody);
     const responses = await db.messagePairs.getAllWhere(
         'uri_collection',
         '/organizations/' + ORGANIZATION
@@ -578,10 +583,10 @@ async () => {
     const atAddress = responses.filter(
         (r) => r.uri_id === INSTANCE_ID,
     );
-    assert.equal(atAddress.length, 2);
+    assertStrictEquals(atAddress.length, 2);
 });
 
-test('same-body instance PATCH with new Operation-ID'
+Deno.test('same-body instance PATCH with new Operation-ID'
 + ' still appends 201',
 async () => {
     const { db, adminToken, memberToken } =
@@ -594,9 +599,9 @@ async () => {
     const first = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const headEtag = first.headers.get('ETag');
-    assert.ok(headEtag !== null && headEtag !== '');
+    assert(headEtag !== null && headEtag !== '');
     const prefix = '/organizations/' + ORGANIZATION
         + '/record-types/' + TYPE_ID
         + '/instances/';
@@ -610,18 +615,18 @@ async () => {
             'operation-id': generateIdentifier(),
         },
     ));
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
     const after = (await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     )).filter((row) => row.uri_id === INSTANCE_ID);
-    assert.equal(
+    assertStrictEquals(
         after.length,
         before.length + 2,
         'same-body PATCH still appends wire + revision',
     );
 });
 
-test('two creates racing one address → first 201, '
+Deno.test('two creates racing one address → first 201, '
 + 'second 428',
 async () => {
     const { db, adminToken, memberToken } =
@@ -642,7 +647,7 @@ async () => {
             ]),
         )),
     ]);
-    assert.deepEqual(
+    assertEquals(
         [a.status, b.status].sort(),
         [201, 428],
     );
@@ -655,7 +660,7 @@ async () => {
     const atAddress = responses.filter(
         (r) => r.uri_id === INSTANCE_ID,
     );
-    assert.equal(
+    assertStrictEquals(
         atAddress.length, 2,
         'winner writes wire PATCH + inner PUT',
     );

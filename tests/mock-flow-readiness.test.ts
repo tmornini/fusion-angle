@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals } from '@std/assert';
 import { sharedMockDb } from './mock-seed.ts';
 import { organizationToken } from
     './token-fixtures.ts';
@@ -8,7 +7,7 @@ import { createRequestContext } from
 import { getFlowsForCreation } from
     '../web-app/app/adapters/flow-publish.ts';
 
-test('mock admin sees Customer Onboarding and Lead-to-Close',
+Deno.test('mock admin sees Customer Onboarding and Lead-to-Close',
 async () => {
     const db = await sharedMockDb();
     const ctx = createRequestContext(
@@ -16,11 +15,11 @@ async () => {
     );
     const { ready, notReady } =
         await getFlowsForCreation(ctx);
-    assert.deepEqual(
+    assertEquals(
         ready.map((f) => f.name).sort(),
         ['Customer Onboarding', 'Lead-to-Close'],
     );
-    assert.deepEqual(
+    assertEquals(
         notReady
             .map((f) => ({
                 name: f.name,

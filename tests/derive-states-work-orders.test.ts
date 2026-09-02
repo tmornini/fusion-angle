@@ -1,5 +1,4 @@
-import { test, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -76,7 +75,7 @@ function req(
 // lockTimeout — isClaimEventExpired reads msSinceUtc, which
 // honors setClockForTest (never a body timestamp). Reset in
 // afterEach so no suite poisons the next.
-afterEach(() => {
+Deno.test.afterEach(() => {
     resetClock();
 });
 
@@ -165,7 +164,7 @@ function forWorkOrder(
 
 // -- 1. a live create births exactly the three initial events ----
 
-test('a live create births exactly the three initial state'
+Deno.test('a live create births exactly the three initial state'
 + ' events, byte-equal to the old plane', async () => {
     const db = await seed();
     const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
@@ -192,19 +191,19 @@ test('a live create births exactly the three initial state'
             '2026-05-02T00:00:00.000000Z',
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const derived = forWorkOrder(
         await deriveWorkOrderLifecycle(db), workOrderId,
     );
     // Phase Final Task 2: states ROW half stripped.
-    assert.equal(derived.length, 3);
+    assertStrictEquals(derived.length, 3);
 });
 
 // -- 2. EDGE 1: a SEEDED-shape work order births nothing, --------
 // -- and the absence never throws --------------------------------
 
-test('a SEEDED-shape work order (a bare document PUT, no create'
+Deno.test('a SEEDED-shape work order (a bare document PUT, no create'
 + ' operation message pair) derives zero rows and never throws'
 + ' — EDGE 1, the create-pair relaxation', async () => {
     const db = await seed();
@@ -219,15 +218,15 @@ test('a SEEDED-shape work order (a bare document PUT, no create'
             position: 1,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 
     const derived = await deriveWorkOrderLifecycle(db);
-    assert.deepEqual(forWorkOrder(derived, workOrderId), []);
+    assertEquals(forWorkOrder(derived, workOrderId), []);
 });
 
 // -- 3. a claim, then a claim past lockTimeout --------------------
 
-test('a claim, then a claim past lockTimeout supersedes with'
+Deno.test('a claim, then a claim past lockTimeout supersedes with'
 + ' claim_expired + claimed', async () => {
     const db = await seed();
     const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
@@ -243,7 +242,7 @@ test('a claim, then a claim past lockTimeout supersedes with'
             position: 1,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 
     const claim1At = nowUtc();
     const claim1 = await handleRequest(db, req(
@@ -256,7 +255,7 @@ test('a claim, then a claim past lockTimeout supersedes with'
             expireAt: claim1At,
         },
     ));
-    assert.equal(claim1.status, 201);
+    assertStrictEquals(claim1.status, 201);
 
     // Advance the test clock past the tiny lockTimeout so the
     // live route's isClaimEventExpired (via msSinceUtc) reads
@@ -282,13 +281,13 @@ test('a claim, then a claim past lockTimeout supersedes with'
             expireAt: expire2At,
         },
     ));
-    assert.equal(claim2.status, 201);
+    assertStrictEquals(claim2.status, 201);
 
     const derived = forWorkOrder(
         await deriveWorkOrderLifecycle(db), workOrderId,
     );
-    assert.ok(derived.length >= 0); // Phase Final Task 2: row plane empty
-    assert.deepEqual(
+    assert(derived.length >= 0); // Phase Final Task 2: row plane empty
+    assertEquals(
         derived.map((row) => row.state),
         ['claimed', 'claim_expired', 'claimed'],
     );
@@ -296,7 +295,7 @@ test('a claim, then a claim past lockTimeout supersedes with'
 
 // -- 3b. claim → release → reclaim; release with no live claim --
 
-test('claim → release → reclaim derives claimed,'
+Deno.test('claim → release → reclaim derives claimed,'
 + ' claim_released, claimed; a release with no live claim'
 + ' derives zero events', async () => {
     const db = await seed();
@@ -311,7 +310,7 @@ test('claim → release → reclaim derives claimed,'
             position: 1,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 
     // DELETE with no claim row is 404; derive stays empty.
     const bareRelease = await handleRequest(db, req(
@@ -319,8 +318,8 @@ test('claim → release → reclaim derives claimed,'
         workOrderPath(workOrderId, '/claim'),
         token,
     ));
-    assert.equal(bareRelease.status, 404);
-    assert.deepEqual(
+    assertStrictEquals(bareRelease.status, 404);
+    assertEquals(
         forWorkOrder(
             await deriveWorkOrderLifecycle(db), workOrderId,
         ),
@@ -338,14 +337,14 @@ test('claim → release → reclaim derives claimed,'
             expireAt: claim1At,
         },
     ));
-    assert.equal(claim1.status, 201);
+    assertStrictEquals(claim1.status, 201);
 
     const release = await handleRequest(db, req(
         'DELETE',
         workOrderPath(workOrderId, '/claim'),
         token,
     ));
-    assert.equal(release.status, 204);
+    assertStrictEquals(release.status, 204);
 
     const claim2At = nowUtc();
     const claim2 = await handleRequest(db, req(
@@ -358,23 +357,23 @@ test('claim → release → reclaim derives claimed,'
             expireAt: claim2At,
         },
     ));
-    assert.equal(claim2.status, 201);
+    assertStrictEquals(claim2.status, 201);
 
     const derived = forWorkOrder(
         await deriveWorkOrderLifecycle(db), workOrderId,
     );
-    assert.deepEqual(
+    assertEquals(
         derived.map((row) => row.state),
         ['claimed', 'claim_released', 'claimed'],
     );
-    assert.equal(derived[0]!.id, WORKORDERID_CE1);
-    assert.equal(derived[1]!.state, 'claim_released');
-    assert.equal(derived[2]!.id, WORKORDERID_CE2);
+    assertStrictEquals(derived[0]!.id, WORKORDERID_CE1);
+    assertStrictEquals(derived[1]!.state, 'claim_released');
+    assertStrictEquals(derived[2]!.id, WORKORDERID_CE2);
 });
 
 // -- 4. a transition, then a transition with release --------------
 
-test('a transition, then a transition with release ends the'
+Deno.test('a transition, then a transition with release ends the'
 + ' claim', async () => {
     const db = await seed();
     const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
@@ -401,7 +400,7 @@ test('a transition, then a transition with release ends the'
             '2026-05-02T00:00:00.000000Z',
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const transition1 = await handleRequest(db, req(
         'POST', workOrderPath(workOrderId, '/transition'),
@@ -412,7 +411,7 @@ test('a transition, then a transition with release ends the'
             transitionAt: '2026-05-02T00:00:01.000000Z',
         },
     ));
-    assert.equal(transition1.status, 201);
+    assertStrictEquals(transition1.status, 201);
 
     const transition2 = await handleRequest(db, req(
         'POST', workOrderPath(workOrderId, '/transition'),
@@ -427,7 +426,7 @@ test('a transition, then a transition with release ends the'
             transitionAt: '2026-05-02T00:00:02.000000Z',
         },
     ));
-    assert.equal(transition2.status, 201);
+    assertStrictEquals(transition2.status, 201);
 
     const derived = forWorkOrder(
         await deriveWorkOrderLifecycle(db), workOrderId,
@@ -435,12 +434,12 @@ test('a transition, then a transition with release ends the'
     // Phase Final Task 2: states ROW half stripped.
     // 3 births + transition1 (1, no release) + transition2
     // (target + release, 2) = 6.
-    assert.equal(derived.length, 6);
+    assertStrictEquals(derived.length, 6);
 });
 
 // -- 5. the MOVING lock_timeout case -------------------------------
 
-test('the MOVING lock_timeout case: an entity PUT changing'
+Deno.test('the MOVING lock_timeout case: an entity PUT changing'
 + ' lock_timeout mid-history sources each claim from the'
 + ' document head AS OF that claim, never a single cached'
 + ' value', async () => {
@@ -459,7 +458,7 @@ test('the MOVING lock_timeout case: an entity PUT changing'
             position: 1,
         },
     ));
-    assert.equal(put1.status, 201);
+    assertStrictEquals(put1.status, 201);
 
     const claim1At = nowUtc();
     const claim1 = await handleRequest(db, req(
@@ -472,7 +471,7 @@ test('the MOVING lock_timeout case: an entity PUT changing'
             expireAt: claim1At,
         },
     ));
-    assert.equal(claim1.status, 201);
+    assertStrictEquals(claim1.status, 201);
 
     // Shrink lock_timeout mid-history — the entity PUT that makes
     // the AS-OF lookup load-bearing: under the OLD (big) value the
@@ -488,7 +487,7 @@ test('the MOVING lock_timeout case: an entity PUT changing'
             position: 2,
         },
     ));
-    assert.equal(put2.status, 201);
+    assertStrictEquals(put2.status, 201);
 
     setClockForTest(() =>
         Date.now()
@@ -508,13 +507,13 @@ test('the MOVING lock_timeout case: an entity PUT changing'
             expireAt: expire2At,
         },
     ));
-    assert.equal(claim2.status, 201);
+    assertStrictEquals(claim2.status, 201);
 
     const derived = forWorkOrder(
         await deriveWorkOrderLifecycle(db), workOrderId,
     );
-    assert.ok(derived.length >= 0); // Phase Final Task 2: row plane empty
-    assert.deepEqual(
+    assert(derived.length >= 0); // Phase Final Task 2: row plane empty
+    assertEquals(
         derived.map((row) => row.state),
         ['claimed', 'claim_expired', 'claimed'],
     );
@@ -522,7 +521,7 @@ test('the MOVING lock_timeout case: an entity PUT changing'
 
 // -- 6. HYBRID: bare document + transition genesis + claim ------
 
-test('HYBRID: a bare document PUT plus a transition genesis'
+Deno.test('HYBRID: a bare document PUT plus a transition genesis'
 + ' and a live claim — both events ride the lifecycle'
 + ' reader (states/:id retired)', async () => {
     const db = await seed();
@@ -537,7 +536,7 @@ test('HYBRID: a bare document PUT plus a transition genesis'
             position: 1,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 
     const genesis = await handleRequest(db, req(
         'POST',
@@ -549,7 +548,7 @@ test('HYBRID: a bare document PUT plus a transition genesis'
             transitionAt: AT,
         },
     ));
-    assert.equal(genesis.status, 201);
+    assertStrictEquals(genesis.status, 201);
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
@@ -562,14 +561,14 @@ test('HYBRID: a bare document PUT plus a transition genesis'
             expireAt: claimAt,
         },
     ));
-    assert.equal(claim.status, 201);
+    assertStrictEquals(claim.status, 201);
 
     const ours = forWorkOrder(
         await deriveWorkOrderLifecycle(db), workOrderId,
     );
-    assert.deepEqual(
+    assertEquals(
         ours.map((row) => row.id),
         [WORKORDERID_GENESIS, WORKORDERID_CE1],
     );
-    assert.equal(ours.length, 2);
+    assertStrictEquals(ours.length, 2);
 });

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     latestActionForJti,
     chainIdForJti,
@@ -23,68 +22,68 @@ const T1 = '2026-01-01T00:00:00.000000Z';
 const T2 = '2026-02-01T00:00:00.000000Z';
 const T3 = '2026-03-01T00:00:00.000000Z';
 
-test('latestActionForJti returns the latest per jti', () => {
+Deno.test('latestActionForJti returns the latest per jti', () => {
     const rows = [
         ev('a', 'issued', 'WeXjAaAxGSpLpamfEuvcww', T1),
         ev('a', 'rotated', 'WeXjAaAxGSpLpamfEuvcww', T2),
     ];
-    assert.equal(latestActionForJti(rows, 'a'), 'rotated');
-    assert.equal(latestActionForJti(rows, 'unknown'), null);
+    assertStrictEquals(latestActionForJti(rows, 'a'), 'rotated');
+    assertStrictEquals(latestActionForJti(rows, 'unknown'), null);
 });
 
-test('a same-instant revoke beats an issue, either order',
+Deno.test('a same-instant revoke beats an issue, either order',
 () => {
     const issued = ev('a', 'issued', 'WeXjAaAxGSpLpamfEuvcww', T1);
     const revoked = ev('a', 'revoked', 'WeXjAaAxGSpLpamfEuvcww', T1);
-    assert.equal(
+    assertStrictEquals(
         latestActionForJti([issued, revoked], 'a'),
         'revoked');
-    assert.equal(
+    assertStrictEquals(
         latestActionForJti([revoked, issued], 'a'),
         'revoked');
 });
 
-test('a same-instant revoke beats a rotate, either order',
+Deno.test('a same-instant revoke beats a rotate, either order',
 () => {
     const rotated = ev('a', 'rotated', 'WeXjAaAxGSpLpamfEuvcww', T1);
     const revoked = ev('a', 'revoked', 'WeXjAaAxGSpLpamfEuvcww', T1);
-    assert.equal(
+    assertStrictEquals(
         latestActionForJti([rotated, revoked], 'a'),
         'revoked');
-    assert.equal(
+    assertStrictEquals(
         latestActionForJti([revoked, rotated], 'a'),
         'revoked');
 });
 
-test('chainIdForJti and jtisInChain group a lineage', () => {
+Deno.test('chainIdForJti and jtisInChain group a lineage', () => {
     const rows = [
         ev('a', 'issued', 'WeXjAaAxGSpLpamfEuvcww', T1),
         ev('a', 'rotated', 'WeXjAaAxGSpLpamfEuvcww', T2),
         ev('b', 'issued', 'WeXjAaAxGSpLpamfEuvcww', T2),
     ];
-    assert.equal(chainIdForJti(rows, 'b'), 'WeXjAaAxGSpLpamfEuvcww');
-    assert.equal(chainIdForJti(rows, 'z'), null);
-    assert.deepEqual(jtisInChain(rows, 'WeXjAaAxGSpLpamfEuvcww').sort()
+    assertStrictEquals(chainIdForJti(rows, 'b'), 'WeXjAaAxGSpLpamfEuvcww');
+    assertStrictEquals(chainIdForJti(rows, 'z'), null);
+    assertEquals(jtisInChain(rows, 'WeXjAaAxGSpLpamfEuvcww').sort()
         , ['a', 'b']);
 });
 
-test('isTokenRevoked denies only a revoked jti', () => {
+Deno.test('isTokenRevoked denies only a revoked jti', () => {
     const rows = [
         ev('a', 'issued', 'WeXjAaAxGSpLpamfEuvcww', T1),
         ev('b', 'revoked', 'c2', T1),
     ];
-    assert.equal(isTokenRevoked(rows, 'a'), false);   // live
-    assert.equal(isTokenRevoked(rows, 'b'), true);    // revoked
-    assert.equal(isTokenRevoked(rows, 'unknown'), false);
+    assertStrictEquals(isTokenRevoked(rows, 'a'), false);   // live
+    assertStrictEquals(isTokenRevoked(rows, 'b'), true);    // revoked
+    assertStrictEquals(isTokenRevoked(rows, 'unknown'), false);
 });
 
-test('identityForJti finds the owner', () => {
+Deno.test('identityForJti finds the owner', () => {
     const rows = [ev('a', 'issued', 'WeXjAaAxGSpLpamfEuvcww', T1)];
-    assert.equal(identityForJti(rows, 'a'), 'XXZruirZyAOoRpNxaDnpSA');
-    assert.equal(identityForJti(rows, 'z'), null);
+    assertStrictEquals(identityForJti(rows, 'a'), 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(identityForJti(rows, 'z'), null);
 });
 
-test('parentJtiByJti derives a successor parent, none for root',
+Deno.test('parentJtiByJti derives a successor parent, none for root',
 () => {
     const rows = [
         ev('a', 'issued', 'WeXjAaAxGSpLpamfEuvcww', T1)
@@ -97,12 +96,12 @@ test('parentJtiByJti derives a successor parent, none for root',
             ,    // c ← b (co-`at` T3)
     ];
     const parent = parentJtiByJti(rows);
-    assert.equal(parent.get('b'), 'a');
-    assert.equal(parent.get('c'), 'b');
-    assert.equal(parent.has('a'), false);   // root: no entry
+    assertStrictEquals(parent.get('b'), 'a');
+    assertStrictEquals(parent.get('c'), 'b');
+    assertStrictEquals(parent.has('a'), false);   // root: no entry
 });
 
-test('parentJtiByJti scopes the pairing within a chain', () => {
+Deno.test('parentJtiByJti scopes the pairing within a chain', () => {
     // A shared `at` across chains must NOT cross-pair: a's
     // issue (WeXjAaAxGSpLpamfEuvcww) does not adopt c2's co-instant rotated
     // jti.
@@ -110,32 +109,32 @@ test('parentJtiByJti scopes the pairing within a chain', () => {
         ev('a', 'issued', 'WeXjAaAxGSpLpamfEuvcww', T1),
         ev('z', 'rotated', 'c2', T1),
     ];
-    assert.equal(parentJtiByJti(rows).has('a'), false);
+    assertStrictEquals(parentJtiByJti(rows).has('a'), false);
 });
 
-test('planRotation rotates a live jti', () => {
+Deno.test('planRotation rotates a live jti', () => {
     const plan = planRotation(
         [ev('a', 'issued', 'WeXjAaAxGSpLpamfEuvcww', T1)], 'a', 'b', T2);
-    assert.equal(plan.kind, 'rotate');
-    assert.equal(plan.kind === 'rotate' && plan.newJti, 'b');
-    assert.equal(
+    assertStrictEquals(plan.kind, 'rotate');
+    assertStrictEquals(plan.kind === 'rotate' && plan.newJti, 'b');
+    assertStrictEquals(
         plan.kind === 'rotate' && plan.appends.length, 2);
 });
 
-test('planRotation flags replay of a rotated-away jti', () => {
+Deno.test('planRotation flags replay of a rotated-away jti', () => {
     const rows = [
         ev('a', 'issued', 'WeXjAaAxGSpLpamfEuvcww', T1),
         ev('a', 'rotated', 'WeXjAaAxGSpLpamfEuvcww', T2),
         ev('b', 'issued', 'WeXjAaAxGSpLpamfEuvcww', T2),
     ];
     const plan = planRotation(rows, 'a', 'x', T2);
-    assert.equal(plan.kind, 'replay');
+    assertStrictEquals(plan.kind, 'replay');
     // revokes every jti in the chain (a and b)
-    assert.equal(
+    assertStrictEquals(
         plan.kind === 'replay' && plan.appends.length, 2);
 });
 
-test('planRotation reports an unknown jti', () => {
-    assert.equal(
+Deno.test('planRotation reports an unknown jti', () => {
+    assertStrictEquals(
         planRotation([], 'ghost', 'x', T1).kind, 'unknown');
 });

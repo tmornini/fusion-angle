@@ -1,47 +1,27 @@
-// state.ts (transitively imported via core.ts ->
-// presenters) reads localStorage and window /
-// document at module-eval time, which Node lacks.
-// Stub before any import, then load presenter
-// modules with dynamic import() so the stubs are
-// in place. Same pattern as logger.test.ts.
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-};
+import { assertMatch, assertStrictEquals } from '@std/assert';
+import { HumanMember, AIMember } from '../api/types.ts';
+import { firstProviderModel } from './member-fixtures.ts';
+import {
+    HumanMemberDetailPresenter,
+    HumanMemberDetailEditPresenter,
+    humanMemberDraftFromMember,
+} from '../web-app/app/presenters/human-member-detail.ts';
+import {
+    AIMemberDetailPresenter,
+    AIMemberDetailEditPresenter,
+    aiMemberDraftFromMember,
+} from '../web-app/app/presenters/ai-member-detail.ts';
+
+// None of these four modules reads localStorage (checked
+// against the full product tree); window/document are
+// stubbed because the presenters below walk a real DOM
+// tree via renderShell/mutateSlot.
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
-
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-
-const {
-    HumanMember, AIMember,
-} = await import('../api/types.ts');
-
-const {
-    firstProviderModel,
-} = await import('./member-fixtures.ts');
-
-const {
-    HumanMemberDetailPresenter,
-    HumanMemberDetailEditPresenter,
-    humanMemberDraftFromMember,
-} = await import(
-    '../web-app/app/presenters/human-member-detail.ts'
-);
-
-const {
-    AIMemberDetailPresenter,
-    AIMemberDetailEditPresenter,
-    aiMemberDraftFromMember,
-} = await import(
-    '../web-app/app/presenters/ai-member-detail.ts'
-);
 
 // Recording stub: presenters write into a container
 // via setHtml on the shell, then mutateSlot calls
@@ -138,7 +118,7 @@ function makeAIMember() {
     );
 }
 
-test(
+Deno.test(
     'HumanMemberDetailPresenter renders the'
     + ' name, title, department, and'
     + ' personal-info card',
@@ -148,26 +128,26 @@ test(
             makeHumanMember(),
         ).renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, /Sarah Chen/);
-        assert.match(out, /Engineer/);
-        assert.match(out, /Engineering/);
-        assert.match(out, /sarah@example\.com/);
+        assertMatch(out, /Sarah Chen/);
+        assertMatch(out, /Engineer/);
+        assertMatch(out, /Engineering/);
+        assertMatch(out, /sarah@example\.com/);
         // Strengths card lists the seeded strength
-        assert.match(out, /Leadership/);
+        assertMatch(out, /Leadership/);
         // Edit affordance present in read mode
-        assert.match(
+        assertMatch(
             out, /data-member-action="edit"/,
         );
         // No raw "Unknown" magic string anywhere
-        assert.equal(
+        assertStrictEquals(
             out.includes('Unknown'), false,
         );
         // No lifecycle state badge.
-        assert.equal(out.includes('Active'), false);
+        assertStrictEquals(out.includes('Active'), false);
     },
 );
 
-test(
+Deno.test(
     'AIMemberDetailPresenter renders the model'
     + ' name, provider, and skill focus',
     () => {
@@ -177,24 +157,24 @@ test(
         ).renderShell(rec.container);
         const out = rec.allHtml();
         const model = firstProviderModel();
-        assert.match(out, new RegExp(model.name));
-        assert.match(
+        assertMatch(out, new RegExp(model.name));
+        assertMatch(
             out, new RegExp(model.provider),
         );
-        assert.match(
+        assertMatch(
             out,
             /Deep reasoning over long docs\./,
         );
         // No auth-token affordance remains.
-        assert.equal(
+        assertStrictEquals(
             out.includes('Auth Token'), false,
         );
         // No lifecycle state badge.
-        assert.equal(out.includes('Active'), false);
+        assertStrictEquals(out.includes('Active'), false);
     },
 );
 
-test(
+Deno.test(
     'HumanMemberDetailEditPresenter renders no'
     + ' State select',
     () => {
@@ -205,22 +185,22 @@ test(
             humanMemberDraftFromMember(member),
         ).renderShell(rec.container);
         const out = rec.allHtml();
-        assert.equal(
+        assertStrictEquals(
             out.includes('id="member-state"'),
             false,
         );
-        assert.equal(
+        assertStrictEquals(
             out.includes('data-member-field="state"'),
             false,
         );
-        assert.equal(out.includes('Active'), false);
-        assert.match(
+        assertStrictEquals(out.includes('Active'), false);
+        assertMatch(
             out, /data-member-action="save"/,
         );
     },
 );
 
-test(
+Deno.test(
     'AIMemberDetailEditPresenter renders no State'
     + ' select',
     () => {
@@ -231,28 +211,28 @@ test(
             aiMemberDraftFromMember(member),
         ).renderShell(rec.container);
         const out = rec.allHtml();
-        assert.equal(
+        assertStrictEquals(
             out.includes('id="ai-state"'), false,
         );
-        assert.equal(
+        assertStrictEquals(
             out.includes('data-member-field="state"'),
             false,
         );
-        assert.equal(
+        assertStrictEquals(
             /value="active"[\s\S]*?selected/.test(
                 out,
             ),
             false,
         );
         // Save affordance present in edit mode.
-        assert.match(
+        assertMatch(
             out, /data-member-action="save"/,
         );
         // Model select with optgroups and the
         // current model pre-selected.
-        assert.match(out, /id="ai-model"/);
-        assert.match(out, /<optgroup/);
-        assert.match(
+        assertMatch(out, /id="ai-model"/);
+        assertMatch(out, /<optgroup/);
+        assertMatch(
             out,
             new RegExp(
                 'value="'

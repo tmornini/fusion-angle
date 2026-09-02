@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertNotEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { GET } from '../api/api.ts';
 import {
@@ -31,7 +30,7 @@ async function seeded(): Promise<MemoryDbAdapter> {
 const idsOf = (rows: { id: string }[]): string[] =>
     [...rows.map(r => r.id)].sort();
 
-test('boot enumerates both demo orgs for the admin',
+Deno.test('boot enumerates both demo orgs for the admin',
 async () => {
     const db = await seeded();
     // Claim orgs are the enumerate source (mint-time snapshot).
@@ -40,12 +39,12 @@ async () => {
         , ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw']);
     const ctx = createRequestContext(db, flat);
     const organizations = await getOrganizations(ctx);
-    assert.deepEqual(
+    assertEquals(
         [...organizations.map(o => o.id)].sort(), ['AjdvjuECVZEgZoFajaIEkg'
             , 'BBjWJsjYIDkTRKIIPrzWRw']);
 });
 
-test('switching the active org re-scopes members and ideas',
+Deno.test('switching the active org re-scopes members and ideas',
 async () => {
     const db = await seeded();
     const flat = await reachableToken('XXZruirZyAOoRpNxaDnpSA'
@@ -69,24 +68,24 @@ async () => {
         await GET<{ id: string }[]>(db
             , 'organizations/BBjWJsjYIDkTRKIIPrzWRw/ideas/', tokB));
 
-    assert.ok(
+    assert(
         membersA.length > 0 && membersB.length > 0,
         'both orgs have members');
-    assert.ok(
+    assert(
         ideasA.length > 0 && ideasB.length > 0,
         'both orgs have ideas');
-    assert.notDeepEqual(
+    assertNotEquals(
         membersA, membersB, 'roster re-scopes on switch');
-    assert.notDeepEqual(
+    assertNotEquals(
         ideasA, ideasB, 'ideas re-scope on switch');
     for (const id of ideasA) {
-        assert.ok(
+        assert(
             !ideasB.includes(id),
             'org-1 ideas are fenced from org-2');
     }
 });
 
-test('a flat boot token resolves to the default org view',
+Deno.test('a flat boot token resolves to the default org view',
 async () => {
     const db = await seeded();
     const flat = await devToken('XXZruirZyAOoRpNxaDnpSA');
@@ -101,5 +100,5 @@ async () => {
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', tokA));
     // a flat token resolves to its primary org 'AjdvjuECVZEgZoFajaIEkg' (same
     // view)
-    assert.deepEqual(flatIdeas, organization1Ideas);
+    assertEquals(flatIdeas, organization1Ideas);
 });

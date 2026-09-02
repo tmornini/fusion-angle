@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assertStrictEquals } from '@std/assert';
 import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
-import { strict as assert } from 'node:assert';
 import { GET, POST } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
@@ -117,7 +116,7 @@ function createBody() {
 // halves stripped — GET derives the document; join is
 // message-plane; three state events still dual-write until
 // states-trace.
-test(
+Deno.test(
     'POST work-orders writes three state events and pair-'
     + 'plane document + join in one operation',
     async () => {
@@ -137,10 +136,10 @@ test(
                 + WO_ID,
             DEV_TOKEN,
         );
-        assert.equal(wo.display_id, 'abcd');
-        assert.equal(wo.position, 1);
+        assertStrictEquals(wo.display_id, 'abcd');
+        assertStrictEquals(wo.position, 1);
         // The fence stamped the bound org — never the body.
-        assert.equal(wo.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
+        assertStrictEquals(wo.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
 
         // Row plane empty; join lives on the message plane.
         // Phase Final Stage B: work_orders +
@@ -151,30 +150,30 @@ test(
             work_order_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ/work-orders/', DEV_TOKEN);
-        assert.equal(links.length, 1);
-        assert.equal(links[0]!.id, FWO_ID);
-        assert.equal(links[0]!.flow_id, 'ZOousbbnzpqlxJExVAruYQ');
-        assert.equal(links[0]!.work_order_id, WO_ID);
+        assertStrictEquals(links.length, 1);
+        assertStrictEquals(links[0]!.id, FWO_ID);
+        assertStrictEquals(links[0]!.flow_id, 'ZOousbbnzpqlxJExVAruYQ');
+        assertStrictEquals(links[0]!.work_order_id, WO_ID);
 
         const events = await workOrderLifecycleStatesFor(db
             , 'AjdvjuECVZEgZoFajaIEkg', WO_ID);
         // Phase Final Stage B: states table retired.
-        assert.equal(events.length, 3);
+        assertStrictEquals(events.length, 3);
         // The three events land IN ORDER: start, post-start,
         // then the creation-time claim.
         const byId = new Map(events.map(e => [e.id, e]));
-        assert.equal(byId.get(EV_1)!.state, NODE_START);
-        assert.equal(byId.get(EV_2)!.state, NODE_MIDDLE);
-        assert.equal(byId.get(EV_3)!.state, 'claimed');
+        assertStrictEquals(byId.get(EV_1)!.state, NODE_START);
+        assertStrictEquals(byId.get(EV_2)!.state, NODE_MIDDLE);
+        assertStrictEquals(byId.get(EV_3)!.state, 'claimed');
         // Every event is authored by the verified caller, never
         // the body.
         for (const ev of events as StateEntity[]) {
-            assert.equal(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+            assertStrictEquals(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
         }
     },
 );
 
-test(
+Deno.test(
     'POST work-orders threads the caller stateEventAts onto'
     + ' each state event',
     async () => {
@@ -186,28 +185,28 @@ test(
         const events = await workOrderLifecycleStatesFor(db
             , 'AjdvjuECVZEgZoFajaIEkg', WO_ID);
         // Phase Final Stage B: states table retired.
-        assert.equal(events.length, 3);
+        assertStrictEquals(events.length, 3);
         const byId = new Map(
             (events as StateEntity[]).map(e => [e.id, e]),
         );
         // Each event must carry the exact caller-supplied at,
         // not a server-stamped value.
-        assert.equal(
+        assertStrictEquals(
             byId.get(EV_1)!.at,
             '2099-01-01T00:00:00.000000Z',
         );
-        assert.equal(
+        assertStrictEquals(
             byId.get(EV_2)!.at,
             '2099-01-01T00:00:00.000001Z',
         );
-        assert.equal(
+        assertStrictEquals(
             byId.get(EV_3)!.at,
             '2099-01-01T00:00:00.000002Z',
         );
     },
 );
 
-test(
+Deno.test(
     'POST work-orders ignores a raw colliding states row'
     + ' (states ROW half stripped)',
     async () => {
@@ -224,10 +223,10 @@ test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + WO_ID, DEV_TOKEN,
         );
-        assert.equal(wo.id, WO_ID);
+        assertStrictEquals(wo.id, WO_ID);
         const woEvents = await workOrderLifecycleStatesFor(
             db, 'AjdvjuECVZEgZoFajaIEkg', WO_ID,
         );
-        assert.equal(woEvents.length, 3);
+        assertStrictEquals(woEvents.length, 3);
     },
 );

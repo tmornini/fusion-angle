@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -24,7 +23,7 @@ async function bootstrappedDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('pristine bootstrap seeds no Records', async () => {
+Deno.test('pristine bootstrap seeds no Records', async () => {
     const db = await bootstrappedDb();
     // Message plane: no records-family document message pairs. Sample
     // Records are demo content from postMockDataLoad, not
@@ -35,25 +34,25 @@ test('pristine bootstrap seeds no Records', async () => {
         r.uri_collection.includes('/records/')
         || r.uri_collection.includes('/record-attributes/')
     );
-    assert.equal(
+    assertStrictEquals(
         recordFamily.length, 0,
         'bootstrap seeds no records-family pairs',
     );
 });
 
-test(
+Deno.test(
     'pristine bootstrap seeds required infrastructure',
     async () => {
         const db = await bootstrappedDb();
         const requests = await db.messagePairs.getAll();
-        assert.ok(
+        assert(
             requests.some(r =>
                 r.uri_collection === '/identities/'
                 && r.uri_id === 'XXZruirZyAOoRpNxaDnpSA',
             ),
             'current identity seeded',
         );
-        assert.ok(
+        assert(
             requests.some(r =>
                 r.uri_collection === '/identities/'
                 && r.uri_id === SYSTEM_MEMBER_ID,
@@ -64,7 +63,7 @@ test(
         // Phase Final Task 2: organizations ROW half stripped.
         const organization = await deriveOrganization(db
             , 'AjdvjuECVZEgZoFajaIEkg');
-        assert.ok(
+        assert(
             organization.id.length > 0,
             'organization seeded',
         );

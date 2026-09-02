@@ -1,9 +1,14 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertEquals,
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { seedIdentifier } from
     '../api/mock-data/seed-kit.ts';
-import assert from 'node:assert/strict';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -243,7 +248,7 @@ async function headResponseId(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
     const id = got.headers.get('Response-ID');
-    assert.ok(id
+    assert(id
         , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
         + '' + flowId);
     return id!;
@@ -258,7 +263,7 @@ async function headEtag(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
     const tag = got.headers.get('ETag');
-    assert.ok(tag
+    assert(tag
         , 'no ETag on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
         + flowId);
     return tag!;
@@ -308,7 +313,7 @@ async function wireFlowText(
             token,
         ),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     return res.text();
 }
 
@@ -326,7 +331,7 @@ async function wireFlowsText(
             token,
         ),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     return res.text();
 }
 
@@ -334,7 +339,7 @@ function assertWireEqualsDerived(
     wireText: string,
     derived: FlowWithGraph,
 ): void {
-    assert.equal(wireText, JSON.stringify(derived));
+    assertStrictEquals(wireText, JSON.stringify(derived));
 }
 
 // The SAME reduction deriveFlow calls internally (derive-
@@ -351,7 +356,7 @@ async function derivedHeadMessagePairId(
     ]);
     const documents = deriveDocumentsAt(requests, prefix);
     const document = documents.get(flowId);
-    assert.ok(document, 'no derived document for ' + flowId);
+    assert(document, 'no derived document for ' + flowId);
     return document!.messagePairId;
 }
 
@@ -386,7 +391,7 @@ const SEEDED_PROJECT_FLOW_PROJECT_IDS = [
 
 // -- 1. seeded GET /flows wire equals deriveFlows -------------
 
-test('seeded GET /flows wire equals deriveFlows per org',
+Deno.test('seeded GET /flows wire equals deriveFlows per org',
 async () => {
     const db = await seededDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
@@ -395,14 +400,14 @@ async () => {
             db, organization,
         );
         const derived = await deriveFlows(db, organization);
-        assert.equal(wireText, JSON.stringify(derived));
-        assert.ok(derived.length > 0);
+        assertStrictEquals(wireText, JSON.stringify(derived));
+        assert(derived.length > 0);
     }
 });
 
 // -- 2. per-flow GET wire equals deriveFlow --------------------
 
-test('per-flow GET wire equals deriveFlow for every seed',
+Deno.test('per-flow GET wire equals deriveFlow for every seed',
 async () => {
     const db = await seededDb();
     for (const { id, organization } of SEEDED_FLOWS) {
@@ -416,14 +421,14 @@ async () => {
 
 // -- 3. foreign-org id 404 on GET and derive --------------------
 
-test('a foreign-org flow id 404s on GET and on derive',
+Deno.test('a foreign-org flow id 404s on GET and on derive',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_FLOWS.find(
         (seed) => seed.organization === 'AjdvjuECVZEgZoFajaIEkg',
     )!;
     const otherOrganization = 'BBjWJsjYIDkTRKIIPrzWRw';
-    await assert.rejects(
+    await assertRejects(
         () => deriveFlow(db, otherOrganization, foreign.id),
         EntityNotFoundError,
     );
@@ -438,9 +443,9 @@ async () => {
             token,
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
     const body = await res.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         body.error,
         'Not found: flows/' + foreign.id,
     );
@@ -448,7 +453,7 @@ async () => {
 
 // -- 4. state-history parity, every seeded flow ----------------
 
-test('state-history parity across every seeded flow',
+Deno.test('state-history parity across every seeded flow',
 async () => {
     const db = await seededDb();
     for (const { id, organization } of SEEDED_FLOWS) {
@@ -456,14 +461,14 @@ async () => {
             db, organization, id,
         );
         // Family history is the sole live oracle (C2).
-        assert.ok(Array.isArray(derived));
+        assert(Array.isArray(derived));
     }
 });
 
 // -- 5. project-flows wire equals derive (Phase Final Task 2:
 // -- project_flows row half stripped) --------------------------
 
-test('project-flows wire equals derive across every'
+Deno.test('project-flows wire equals derive across every'
 + ' seeded project', async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -475,16 +480,16 @@ test('project-flows wire equals derive across every'
                 + projectId +
                 '/flows/', token,
         ));
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const wireText = await res.text();
         const derived = await deriveProjectFlows(
             db, STARK_ORGANIZATION, projectId,
         );
-        assert.equal(wireText, JSON.stringify(derived));
+        assertStrictEquals(wireText, JSON.stringify(derived));
     }
 });
 
-test('the two-flows project orders both join rows'
+Deno.test('the two-flows project orders both join rows'
 + ' on wire and derive', async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -496,15 +501,15 @@ test('the two-flows project orders both join rows'
             + TWO_FLOWS_PROJECT_ID + '/flows/',
         token,
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const wire = await res.json() as { flow_id: string }[];
     const derived = await deriveProjectFlows(
         db, STARK_ORGANIZATION, TWO_FLOWS_PROJECT_ID,
     );
-    assert.equal(derived.length, 2);
-    assert.equal(JSON.stringify(wire), JSON.stringify(derived));
+    assertStrictEquals(derived.length, 2);
+    assertStrictEquals(JSON.stringify(wire), JSON.stringify(derived));
     // id-lex order is pinned by derive; wire equals derive.
-    assert.deepEqual(
+    assertEquals(
         wire.map((row) => row.flow_id),
         derived.map((row) => row.flow_id),
     );
@@ -512,7 +517,7 @@ test('the two-flows project orders both join rows'
 
 // -- 6. live-write chain, re-compared at each step -------------
 
-test('live-write chain: create, save, node delete, undo, '
+Deno.test('live-write chain: create, save, node delete, undo, '
 + 'redo, and a terminal delete — wire equals derive '
 + 'at every step', async () => {
     const db = await seededDb();
@@ -566,7 +571,7 @@ test('live-write chain: create, save, node delete, undo, '
             },
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
     let derived = await assertStep();
 
     const fullGraph = graphJson(
@@ -584,7 +589,7 @@ test('live-write chain: create, save, node delete, undo, '
         }),
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assert.equal(saved.status, 201);
+    assertStrictEquals(saved.status, 201);
     derived = await assertStep();
 
     // Further save (versions POST retired Phase 15 Task 7).
@@ -598,7 +603,7 @@ test('live-write chain: create, save, node delete, undo, '
         ),
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assert.equal(versionedSave.status, 201);
+    assertStrictEquals(versionedSave.status, 201);
     derived = await assertStep();
 
     // Node delete via save: n2 and YiJPbufDpkyrZcZCYbUJpg are tombstoned.
@@ -628,9 +633,9 @@ test('live-write chain: create, save, node delete, undo, '
         ),
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assert.equal(deletedSave.status, 201);
+    assertStrictEquals(deletedSave.status, 201);
     derived = await assertStep();
-    assert.equal(
+    assertStrictEquals(
         (derived.graph as { nodes: { id: string }[] })
             .nodes.length,
         1,
@@ -646,10 +651,10 @@ test('live-write chain: create, save, node delete, undo, '
         },
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assert.equal(undone.status, 201);
+    assertStrictEquals(undone.status, 201);
     await headResponseId(db, token, flowId);
     derived = await assertStep();
-    assert.equal(
+    assertStrictEquals(
         (derived.graph as { nodes: { id: string }[] })
             .nodes.some((n) => n.id === n2),
         true,
@@ -678,7 +683,7 @@ test('live-write chain: create, save, node delete, undo, '
         }),
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assert.equal(redone.status, 201);
+    assertStrictEquals(redone.status, 201);
     derived = await assertStep();
 
     // Terminal: a state-'deleted' document PUT — vanishes from
@@ -692,9 +697,9 @@ test('live-write chain: create, save, node delete, undo, '
         }),
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assert.equal(tombstoned.status, 201);
+    assertStrictEquals(tombstoned.status, 201);
 
-    await assert.rejects(
+    await assertRejects(
         () => deriveFlow(db, STARK_ORGANIZATION, flowId),
         EntityNotFoundError,
     );
@@ -702,29 +707,29 @@ test('live-write chain: create, save, node delete, undo, '
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + flowId, token),
     );
-    assert.equal(gone.status, 404);
+    assertStrictEquals(gone.status, 404);
     const derivedList = await deriveFlows(
         db, STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         derivedList.some((f) => f.id === flowId), false,
     );
     const listText = await wireFlowsText(
         db, STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         listText.includes('"' + flowId + '"'), false,
     );
 
     const derivedHistory = await deriveFlowStateHistory(
         db, STARK_ORGANIZATION, flowId,
     );
-    assert.ok(derivedHistory.length >= 0);
+    assert(derivedHistory.length >= 0);
 });
 
 // -- 7. live join-row chain: PUT appears, DELETE vanishes ------
 
-test('live join-row chain: PUT appears on wire/derive, '
+Deno.test('live join-row chain: PUT appears on wire/derive, '
 + 'DELETE removes it from both', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -742,20 +747,20 @@ test('live join-row chain: PUT appears on wire/derive, '
             at: AT,
         },
     ));
-    assert.equal(putRes.status, 201);
+    assertStrictEquals(putRes.status, 201);
 
     const afterPutRes = await handleRequest(
         db, req('GET', listPath, token),
     );
-    assert.equal(afterPutRes.status, 200);
+    assertStrictEquals(afterPutRes.status, 200);
     const wireAfterPut = await afterPutRes.json() as {
         id: string;
     }[];
     const derivedAfterPut = await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     );
-    assert.ok(wireAfterPut.some((row) => row.id === pfid));
-    assert.equal(
+    assert(wireAfterPut.some((row) => row.id === pfid));
+    assertStrictEquals(
         JSON.stringify(wireAfterPut),
         JSON.stringify(derivedAfterPut),
     );
@@ -764,7 +769,7 @@ test('live join-row chain: PUT appears on wire/derive, '
         'DELETE',
         listPath + pfid, token,
     ));
-    assert.equal(delRes.status, 204);
+    assertStrictEquals(delRes.status, 204);
 
     const afterDelRes = await handleRequest(
         db, req('GET', listPath, token),
@@ -775,13 +780,13 @@ test('live join-row chain: PUT appears on wire/derive, '
     const derivedAfterDelete = await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     );
-    assert.equal(
+    assertStrictEquals(
         wireAfterDelete.some((row) => row.id === pfid), false,
     );
-    assert.equal(
+    assertStrictEquals(
         derivedAfterDelete.some((row) => row.id === pfid), false,
     );
-    assert.equal(
+    assertStrictEquals(
         JSON.stringify(wireAfterDelete),
         JSON.stringify(derivedAfterDelete),
     );
@@ -789,7 +794,7 @@ test('live join-row chain: PUT appears on wire/derive, '
 
 // -- 8. duplicate-create (the R2 multiset case) ----------------
 
-test('duplicate-create: two creates, same flow id, distinct '
+Deno.test('duplicate-create: two creates, same flow id, distinct '
 + 'lifecycle events, and a fresh join row on wire/derive',
 async () => {
     const db = await seededDb();
@@ -803,14 +808,14 @@ async () => {
         db, token, flowId, pfidA, projectId,
         FLOW_DRIFT_DUP_EV_A,
     );
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const second = await createFlow(
         db, token, flowId, pfidB, projectId,
         FLOW_DRIFT_DUP_EV_B,
     );
     // The create op holds no echo of its own — a duplicate
     // create succeeds outright, never 412ing.
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
 
     // ONE flow head on wire/derive — the derived head is the
     // (at, id) winner, the second create's own document message pair.
@@ -826,8 +831,8 @@ async () => {
     const derivedHistory = await deriveFlowStateHistory(
         db, STARK_ORGANIZATION, flowId,
     );
-    assert.ok(derivedHistory.length >= 0);
-    assert.equal(derivedHistory.length, 2);
+    assert(derivedHistory.length >= 0);
+    assertStrictEquals(derivedHistory.length, 2);
 
     // TWO join rows on wire and derive (Phase Final Task 2:
     // project_flows row half stripped).
@@ -843,16 +848,16 @@ async () => {
     const derivedJoins = (await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     )).filter((row) => row.id === pfidA || row.id === pfidB);
-    assert.equal(wireJoins.length, 2);
-    assert.equal(derivedJoins.length, 2);
-    assert.deepEqual(
+    assertStrictEquals(wireJoins.length, 2);
+    assertStrictEquals(derivedJoins.length, 2);
+    assertEquals(
         sortById(wireJoins), sortById(derivedJoins),
     );
 });
 
 // -- 9. the create-op POST pair is never the derived head -----
 
-test('the create-op POST pair is not read as a document'
+Deno.test('the create-op POST pair is not read as a document'
 + ' message pair (the method-filter proof at drift altitude)',
 async () => {
     const db = await seededDb();
@@ -863,7 +868,7 @@ async () => {
         db, token, flowId, FLOWID_PF, l2cProjectId,
         FLOWID_EV,
     );
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const requests = await db.messagePairs.getAll();
     const atAddress = requests.filter(
@@ -873,7 +878,7 @@ async () => {
     );
     // Both an operation (POST, 204) pair and a document (PUT)
     // pair share the SAME uriId.
-    assert.equal(atAddress.length, 2);
+    assertStrictEquals(atAddress.length, 2);
 
     // If the POST pair leaked into the document reduction it
     // would either throw (its body has no top-level
@@ -884,8 +889,8 @@ async () => {
     const history = await deriveFlowStateHistory(
         db, STARK_ORGANIZATION, flowId,
     );
-    assert.equal(history.length, 1);
-    assert.equal(history[0]!.state, 'active');
+    assertStrictEquals(history.length, 1);
+    assertStrictEquals(history[0]!.state, 'active');
 
     const derived = await deriveFlow(
         db, STARK_ORGANIZATION, flowId,
@@ -898,7 +903,7 @@ async () => {
 
 // -- 10. sidecar insensitivity ----------------------------------
 
-test('sidecar insensitivity: graphDelta/revivals disagreeing '
+Deno.test('sidecar insensitivity: graphDelta/revivals disagreeing '
 + 'with graph derives from graph alone', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -937,7 +942,7 @@ test('sidecar insensitivity: graphDelta/revivals disagreeing '
             }],
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 
     const derived = await deriveFlow(
         db, STARK_ORGANIZATION, flowId,
@@ -945,7 +950,7 @@ test('sidecar insensitivity: graphDelta/revivals disagreeing '
     const derivedNodes = (derived.graph as {
         nodes: { id: string }[];
     }).nodes;
-    assert.deepEqual(
+    assertEquals(
         derivedNodes.map((n) => n.id), [SIDECAR_GRAPH_NODE],
     );
     const wireText = await wireFlowText(
@@ -953,7 +958,7 @@ test('sidecar insensitivity: graphDelta/revivals disagreeing '
     );
     assertWireEqualsDerived(wireText, derived);
     // graphDelta node never becomes the working graph head.
-    assert.equal(
+    assertStrictEquals(
         derivedNodes.some(
             (n) => n.id === SIDECAR_DELTA_NODE,
         ),
@@ -963,7 +968,7 @@ test('sidecar insensitivity: graphDelta/revivals disagreeing '
 
 // -- 11. the Follows-chain terminal -----------------------------
 
-test('the lock-head terminal reaches exactly the derived '
+Deno.test('the lock-head terminal reaches exactly the derived '
 + 'head pair id', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -973,7 +978,7 @@ test('the lock-head terminal reaches exactly the derived '
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
         documentBody('Genesis', FLOW_DRIFT_LOCK_HEAD_GENESIS),
     ));
-    assert.equal(genesis.status, 201);
+    assertStrictEquals(genesis.status, 201);
     const genesisId = genesis.headers.get('Response-ID')!;
     let headId = genesisId;
 
@@ -987,26 +992,26 @@ test('the lock-head terminal reaches exactly the derived '
             ),
             { 'if-match': await headEtag(db, token, flowId) },
         ));
-        assert.equal(saved.status, 201);
-        assert.equal(saved.headers.get('Follows'), null);
+        assertStrictEquals(saved.status, 201);
+        assertStrictEquals(saved.headers.get('Follows'), null);
         headId = saved.headers.get('Response-ID')!;
     }
 
     const headMessagePairId = await derivedHeadMessagePairId(
         db, STARK_ORGANIZATION, flowId,
     );
-    assert.equal(headId, headMessagePairId);
+    assertStrictEquals(headId, headMessagePairId);
 
     const derived = await deriveFlow(
         db, STARK_ORGANIZATION, flowId,
     );
-    assert.equal(derived.name, 'Save ' + (saveCount - 1));
-    assert.notEqual(headId, genesisId);
+    assertStrictEquals(derived.name, 'Save ' + (saveCount - 1));
+    assertNotStrictEquals(headId, genesisId);
 });
 
 // -- 12. a live multi-member, multi-attribute node save --------
 
-test('a live multi-member, multi-attribute node save derives '
+Deno.test('a live multi-member, multi-attribute node save derives '
 + 'content-identically on wire and derive (order-independent)',
 async () => {
     const db = await seededDb();
@@ -1066,7 +1071,7 @@ async () => {
             graph, graphDelta, revivals: [],
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 
     const derived = await deriveFlow(
         db, STARK_ORGANIZATION, flowId,
@@ -1086,11 +1091,11 @@ async () => {
         }[];
     }).nodes;
     const node = nodes.find((n) => n.id === nodeId)!;
-    assert.deepEqual(
+    assertEquals(
         [...node.memberIds].sort(),
         [AA_MEMBER, ZZ_MEMBER].sort(),
     );
-    assert.deepEqual(
+    assertEquals(
         node.attributes.map((a) => a.attribute_id).sort(),
         [AA_ATTR, ZZ_ATTR].sort(),
     );
@@ -1106,7 +1111,7 @@ async () => {
 // first. Pinned BEFORE the shared former absorbs this site, so a
 // future uniform head-read regresses here first.)
 
-test('same-join-id retry: two different flow creates reusing '
+Deno.test('same-join-id retry: two different flow creates reusing '
 + 'one project-flow id each append a chain-less join pair '
 + '(neither Supersedes nor Follows)', async () => {
     const db = await seededDb();
@@ -1118,7 +1123,7 @@ test('same-join-id retry: two different flow creates reusing '
         db, token, FLOW_DRIFT_RETRY_A, sharedPfid, projectId,
         FLOW_DRIFT_RETRY_EV_A,
     );
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
 
     // A DIFFERENT flow, a DIFFERENT operation (fresh event id) —
     // not a byte-identical resend, which would replay via the E6
@@ -1127,7 +1132,7 @@ test('same-join-id retry: two different flow creates reusing '
         db, token, FLOW_DRIFT_RETRY_B, sharedPfid, projectId,
         FLOW_DRIFT_RETRY_EV_B,
     );
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
 
     const joinPrefix = canonicalUriCollection(
         STARK_ORGANIZATION,
@@ -1137,9 +1142,9 @@ test('same-join-id retry: two different flow creates reusing '
     const joinResponses = await db.messagePairs.getAllAtAddress(
         joinPrefix, sharedPfid,
     );
-    assert.equal(joinResponses.length, 2);
+    assertStrictEquals(joinResponses.length, 2);
     for (const response of joinResponses) {
-        assert.equal('supersedes' in response, false);
-        assert.equal('follows' in response, false);
+        assertStrictEquals('supersedes' in response, false);
+        assertStrictEquals('follows' in response, false);
     }
 });

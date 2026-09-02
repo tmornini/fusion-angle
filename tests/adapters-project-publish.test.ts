@@ -1,5 +1,8 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertMatch,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
@@ -34,7 +37,7 @@ const SAMPLE_PROJECT_BODY = {
     position: 0,
 };
 
-test('validator: not ready when objectives unscored',
+Deno.test('validator: not ready when objectives unscored',
     () => {
         const r = validateProjectForApproval(
             [
@@ -53,11 +56,11 @@ test('validator: not ready when objectives unscored',
             ],
             [],
         );
-        assert.equal(r.ready, false);
-        assert.equal(r.problems.length, 2);
+        assertStrictEquals(r.ready, false);
+        assertStrictEquals(r.problems.length, 2);
     });
 
-test('validator: ready when all scored', () => {
+Deno.test('validator: ready when all scored', () => {
     const r = validateProjectForApproval(
         [{
             id: 'ohqxgUBEaFQwYbXsonRPmg',
@@ -71,11 +74,11 @@ test('validator: ready when all scored', () => {
            memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
            at: '2026-05-14T00:00:00.000000Z' }],
     );
-    assert.equal(r.ready, true);
-    assert.equal(r.problems.length, 0);
+    assertStrictEquals(r.ready, true);
+    assertStrictEquals(r.problems.length, 0);
 });
 
-test('archival validator: not ready when actuals missing',
+Deno.test('archival validator: not ready when actuals missing',
     () => {
         const r = validateProjectForArchival(
             [{ id: generateIdentifier(),
@@ -85,13 +88,13 @@ test('archival validator: not ready when actuals missing',
                at: '2026-05-14T00:00:00.000000Z' }],
             [],
         );
-        assert.equal(r.ready, false);
-        assert.equal(
+        assertStrictEquals(r.ready, false);
+        assertStrictEquals(
             r.problems[0]!.kind, 'actual_unscored',
         );
     });
 
-test('postProjectApproval moves state to approved',
+Deno.test('postProjectApproval moves state to approved',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -131,10 +134,10 @@ test('postProjectApproval moves state to approved',
         );
         await postProjectApproval(ctx, 'pnXmXrxOWayANgDLdCjuBw');
         const row = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(row.state, 'approved');
+        assertStrictEquals(row.state, 'approved');
     });
 
-test('postProjectApproval throws when not ready',
+Deno.test('postProjectApproval throws when not ready',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -151,13 +154,13 @@ test('postProjectApproval throws when not ready',
             position: 0,
             state: 'active',
         });
-        await assert.rejects(
+        const err = await assertRejects(
             () => postProjectApproval(ctx, 'pnXmXrxOWayANgDLdCjuBw'),
-            /not ready|unscored/i,
-        );
+        ) as Error;
+        assertMatch(err.message, /not ready|unscored/i);
     });
 
-test('postProjectArchival moves state to archived',
+Deno.test('postProjectArchival moves state to archived',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -194,5 +197,5 @@ test('postProjectArchival moves state to archived',
         );
         await postProjectArchival(ctx, 'pnXmXrxOWayANgDLdCjuBw');
         const row = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(row.state, 'archived');
+        assertStrictEquals(row.state, 'archived');
     });

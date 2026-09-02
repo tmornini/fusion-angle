@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -77,7 +76,7 @@ async function memberOfBothAdminInA(): Promise<{
     return { db, organizationA, organizationB };
 }
 
-test('admin type in org A does not authorize admin'
+Deno.test('admin type in org A does not authorize admin'
 + ' surfaces in org B', async () => {
     const { db, organizationA, organizationB } = await memberOfBothAdminInA();
     // Seat writes stay admin-only; member type in B must 403.
@@ -94,10 +93,10 @@ test('admin type in org A does not authorize admin'
             at: '2026-06-04T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 403);
+    assertStrictEquals(res.status, 403);
 });
 
-test('the same admin type authorizes within its own org',
+Deno.test('the same admin type authorizes within its own org',
 async () => {
     const { db, organizationA, organizationB } = await memberOfBothAdminInA();
     const res = await handleRequest(db, req(
@@ -113,10 +112,10 @@ async () => {
             at: '2026-06-04T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 });
 
-test('a flat token authorizes via its resolved membership',
+Deno.test('a flat token authorizes via its resolved membership',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -129,5 +128,5 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , await devToken('XXZruirZyAOoRpNxaDnpSA')));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
 });

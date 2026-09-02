@@ -1,5 +1,10 @@
-import { test, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -154,7 +159,7 @@ function sortById<T extends { id: string }>(
 
 // Claim-expiry legs advance the test clock (msSinceUtc seam);
 // reset so no suite poisons the next.
-afterEach(() => {
+Deno.test.afterEach(() => {
     resetClock();
 });
 
@@ -314,7 +319,7 @@ const EMPTY_FLOW_ID = 'GgfDbXOJUvvaCekCTcvhuw';
 
 // -- 1. work-orders collection wire equals derive -------------
 
-test('seeded GET /work-orders wire equals derived collection,'
+Deno.test('seeded GET /work-orders wire equals derived collection,'
 + ' Stark org', async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -324,19 +329,19 @@ test('seeded GET /work-orders wire equals derived collection,'
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             , token),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const wireText = await res.text();
     const derived = await derivedWorkOrders(
         db, STARK_ORGANIZATION,
     );
-    assert.equal(wireText, JSON.stringify(derived));
-    assert.equal(derived.length, 145);
+    assertStrictEquals(wireText, JSON.stringify(derived));
+    assertStrictEquals(derived.length, 145);
     // Phase Final Stage B: work_orders table retired.
 });
 
 // -- 2. org-2 empty collection + foreign-org 404 --------------
 
-test('org-2 carries no work orders; a foreign-org GET 404s'
+Deno.test('org-2 carries no work orders; a foreign-org GET 404s'
 + ' on wire and on derive', async () => {
     const db = await seededDb();
     const tokenTwo = await organizationToken(
@@ -350,9 +355,9 @@ test('org-2 carries no work orders; a foreign-org GET 404s'
             tokenTwo,
         ),
     );
-    assert.equal(emptyRes.status, 200);
-    assert.equal(await emptyRes.text(), '[]');
-    assert.deepEqual(
+    assertStrictEquals(emptyRes.status, 200);
+    assertStrictEquals(await emptyRes.text(), '[]');
+    assertEquals(
         await derivedWorkOrders(db, ORGANIZATION_TWO), [],
     );
 
@@ -367,23 +372,22 @@ test('org-2 carries no work orders; a foreign-org GET 404s'
             tokenTwo,
         ),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
     const body = await res.json() as { error: string };
-    assert.equal(body.error, expectedMessage);
-    await assert.rejects(
+    assertStrictEquals(body.error, expectedMessage);
+    const err = await assertRejects(
         () => derivedWorkOrder(db, ORGANIZATION_TWO, foreignId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedMessage,
-    );
+    ) as Error;
+    assertInstanceOf(err, EntityNotFoundError);
+    assertStrictEquals(err.message, expectedMessage);
 });
 
 // -- 3. per-WO GET wire equals derive across every seed -------
 
-test('per-work-order GET wire equals derive for every seed,'
+Deno.test('per-work-order GET wire equals derive for every seed,'
 + ' flow_graph compared byte-exactly', async () => {
     const db = await seededDb();
-    assert.equal(SEEDED_WORK_ORDER_IDS.length, 145);
+    assertStrictEquals(SEEDED_WORK_ORDER_IDS.length, 145);
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
@@ -393,13 +397,13 @@ test('per-work-order GET wire equals derive for every seed,'
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id
                 , token),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const wireText = await res.text();
         const derived = await derivedWorkOrder(
             db, STARK_ORGANIZATION, id,
         );
-        assert.equal(wireText, JSON.stringify(derived));
-        assert.ok(
+        assertStrictEquals(wireText, JSON.stringify(derived));
+        assert(
             typeof derived.flow_graph === 'object'
             && derived.flow_graph !== null
             && !Array.isArray(derived.flow_graph),
@@ -409,7 +413,7 @@ test('per-work-order GET wire equals derive for every seed,'
 
 // -- 4. join wire equals derive (the 39/6/100 split) + empty --
 
-test('flow-work-order join wire equals derive across every'
+Deno.test('flow-work-order join wire equals derive across every'
 + ' seeded flow (the 39/6/100 split)', async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -425,18 +429,18 @@ test('flow-work-order join wire equals derive across every'
                 token,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const wireText = await res.text();
         const derived = await deriveFlowWorkOrders(
             db, STARK_ORGANIZATION, flowId,
         );
-        assert.equal(wireText, JSON.stringify(derived));
-        assert.equal(derived.length, count);
+        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertStrictEquals(derived.length, count);
     }
     // Phase Final Stage B: flow_work_orders table retired.
 });
 
-test('a flow with no work orders derives an empty join list'
+Deno.test('a flow with no work orders derives an empty join list'
 + ' on wire and on derive', async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -451,9 +455,9 @@ test('a flow with no work orders derives an empty join list'
             token,
         ),
     );
-    assert.equal(res.status, 200);
-    assert.equal(await res.text(), '[]');
-    assert.deepEqual(
+    assertStrictEquals(res.status, 200);
+    assertStrictEquals(await res.text(), '[]');
+    assertEquals(
         await deriveFlowWorkOrders(
             db, STARK_ORGANIZATION, EMPTY_FLOW_ID,
         ),
@@ -506,12 +510,12 @@ async function assertEntityAndJoinParity(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + workOrderId, token),
     );
-    assert.equal(entityRes.status, 200);
+    assertStrictEquals(entityRes.status, 200);
     const entityText = await entityRes.text();
     const derivedEntity = await derivedWorkOrder(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assert.equal(entityText, JSON.stringify(derivedEntity));
+    assertStrictEquals(entityText, JSON.stringify(derivedEntity));
 
     const joinRes = await handleRequest(
         db,
@@ -520,17 +524,17 @@ async function assertEntityAndJoinParity(
                 '/work-orders/', token,
         ),
     );
-    assert.equal(joinRes.status, 200);
+    assertStrictEquals(joinRes.status, 200);
     const joinText = await joinRes.text();
     const derivedJoins = await deriveFlowWorkOrders(
         db, STARK_ORGANIZATION, flowId,
     );
-    assert.equal(joinText, JSON.stringify(derivedJoins));
+    assertStrictEquals(joinText, JSON.stringify(derivedJoins));
 }
 
 // -- 5. live-write chain, re-compared on both planes -----------
 
-test('live-write chain: birth-claimed create, two transitions'
+Deno.test('live-write chain: birth-claimed create, two transitions'
 + ' (one releasing the claim), an entity PUT, a fresh'
 + ' re-claim, an idempotent re-claim, a rejected foreign claim,'
 + ' and an unclaim — wire equals derive at every step',
@@ -575,7 +579,7 @@ async () => {
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Transition with 2+ field values, no release.
@@ -628,7 +632,7 @@ async () => {
             transitionAt: transition2At,
         },
     ));
-    assert.equal(transition2.status, 201);
+    assertStrictEquals(transition2.status, 201);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Entity PUT: a position bump. Its own body's flow_graph
@@ -657,11 +661,11 @@ async () => {
             position: 2,
         },
     ));
-    assert.equal(entityPut.status, 201);
+    assertStrictEquals(entityPut.status, 201);
     const putBody = await entityPut.json() as {
         flow_graph: Record<string, unknown>;
     };
-    assert.deepEqual(putBody.flow_graph, storedCreateFlowGraph);
+    assertEquals(putBody.flow_graph, storedCreateFlowGraph);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Claim by A — fresh: prior is 'claim_released', not live.
@@ -676,7 +680,7 @@ async () => {
             expireAt: claimFreshAt,
         },
     ));
-    assert.equal(claimFresh.status, 201);
+    assertStrictEquals(claimFresh.status, 201);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Repeat-claim by A — idempotent no-op: the pair appends,
@@ -697,8 +701,8 @@ async () => {
             expireAt: claimRepeatAt,
         },
     ));
-    assert.equal(claimRepeat.status, 201);
-    assert.equal(
+    assertStrictEquals(claimRepeat.status, 201);
+    assertStrictEquals(
         0 /* states table retired */,
         beforeRepeat,
     );
@@ -718,8 +722,8 @@ async () => {
             expireAt: claimRejectAt,
         },
     ));
-    assert.equal(claimReject.status, 409);
-    assert.equal(
+    assertStrictEquals(claimReject.status, 409);
+    assertStrictEquals(
         (await db.messagePairs.getAll()).length, beforeReject,
     );
     await assertEntityAndJoinParity(db, workOrderId, flowId);
@@ -732,14 +736,14 @@ async () => {
             + '/claim',
         tokenA,
     ));
-    assert.equal(unclaim.status, 204);
+    assertStrictEquals(unclaim.status, 204);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // The full chain: create(3) + transition1(1) +
     // transition2(2) + entity PUT(0) + fresh claim(1) +
     // repeat-claim(0) + rejected claim(0) + unclaim(1) = 8.
     // Release is message-plane-only — pin via lifecycle derive.
-    assert.equal(
+    assertStrictEquals(
         (await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
         )).length,
@@ -749,7 +753,7 @@ async () => {
 
 // -- 6. duplicate-create multiset -------------------------------
 
-test('duplicate-create: two creates, same work-order id, fresh'
+Deno.test('duplicate-create: two creates, same work-order id, fresh'
 + ' join id + fresh event ids/ats on the second — ONE document'
 + ' head; TWO join pairs; SIX birth state events', async () => {
     const db = await seededDb();
@@ -780,7 +784,7 @@ test('duplicate-create: two creates, same work-order id, fresh'
             '2026-05-02T00:00:00.000000Z',
         ),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
 
     const second = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
@@ -804,23 +808,23 @@ test('duplicate-create: two creates, same work-order id, fresh'
     ));
     // The create op holds no echo of its own — a duplicate
     // create succeeds outright, never 412ing.
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
 
     const entityRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + workOrderId, token),
     );
-    assert.equal(entityRes.status, 200);
+    assertStrictEquals(entityRes.status, 200);
     const derivedEntity = await derivedWorkOrder(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assert.equal(
+    assertStrictEquals(
         await entityRes.text(),
         JSON.stringify(derivedEntity),
     );
     // Phase Final Stage B: work_orders table retired.
 
-    assert.equal(
+    assertStrictEquals(
         (await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
         )).length,
@@ -830,8 +834,8 @@ test('duplicate-create: two creates, same work-order id, fresh'
     const derivedJoins = (await deriveFlowWorkOrders(
         db, STARK_ORGANIZATION, flowId,
     )).filter((row) => row.id === pfidA || row.id === pfidB);
-    assert.equal(derivedJoins.length, 2);
-    assert.deepEqual(
+    assertStrictEquals(derivedJoins.length, 2);
+    assertEquals(
         sortById(derivedJoins).map(r => r.id),
         [pfidA, pfidB].sort(),
     );
@@ -851,7 +855,7 @@ test('duplicate-create: two creates, same work-order id, fresh'
 // Bare-req idiom, no header threading — a NAMED contrast to
 // derive-flows' locked-echo idiom (work-orders is 'simple'
 // concurrency, never 'locked').
-test('document supersession: PUT #2 (byte-divergent body)'
+Deno.test('document supersession: PUT #2 (byte-divergent body)'
 + ' supersedes PUT #1; derivation returns PUT #2\'s body',
 async () => {
     const db = await seededDb();
@@ -866,9 +870,9 @@ async () => {
             position: 1,
         },
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const firstId = first.headers.get('Response-ID');
-    assert.ok(firstId);
+    assert(firstId);
 
     const second = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -878,29 +882,29 @@ async () => {
             position: 2,
         },
     ));
-    assert.equal(second.status, 201);
-    assert.equal(second.headers.get('Supersedes'), null);
+    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.headers.get('Supersedes'), null);
 
     const getRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + workOrderId, token),
     );
-    assert.equal(getRes.status, 200);
+    assertStrictEquals(getRes.status, 200);
     const derived = await derivedWorkOrder(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assert.equal(
+    assertStrictEquals(
         await getRes.text(), JSON.stringify(derived),
     );
-    assert.equal(derived.display_id, 'second');
-    assert.equal(derived.position, 2);
+    assertStrictEquals(derived.display_id, 'second');
+    assertStrictEquals(derived.position, 2);
     // Phase Final Stage B: work_orders table retired.
 });
 
 // -- 8. method-filter: the create's POST pair is never the -----
 // -- derived head (the shape-incompatibility mirror) -----------
 
-test('the create-op POST pair is not read as a document'
+Deno.test('the create-op POST pair is not read as a document'
 + ' message pair — documentMessagePairsAt returns exactly one'
 + ' pair (the PUT), and the create/document bodies share zero'
 + ' top-level keys',
@@ -932,7 +936,7 @@ async () => {
             '2026-05-03T00:00:00.000000Z',
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const prefix = canonicalUriCollection(
         STARK_ORGANIZATION
@@ -948,13 +952,13 @@ async () => {
     );
     // Both an operation (POST, 204) pair and a document (PUT)
     // pair share the SAME uriId.
-    assert.equal(atAddress.length, 2);
+    assertStrictEquals(atAddress.length, 2);
 
     const documentMessagePairs = documentMessagePairsAt(
         requests, prefix,
     ).filter((messagePair) => messagePair.uriId === workOrderId);
-    assert.equal(documentMessagePairs.length, 1);
-    assert.equal(documentMessagePairs[0]!.method, 'PUT');
+    assertStrictEquals(documentMessagePairs.length, 1);
+    assertStrictEquals(documentMessagePairs[0]!.method, 'PUT');
 
     const postRow = atAddress.find(
         (r) => decodeRequestMessage(r.request).method === 'POST',
@@ -968,7 +972,7 @@ async () => {
     const overlap = [...createBodyKeys].filter(
         (key) => documentBodyKeys.has(key),
     );
-    assert.deepEqual(overlap, []);
+    assertEquals(overlap, []);
 });
 
 // -- decode helper (test-side; mirrors tests/api-shadow-ledger- -
@@ -1417,7 +1421,7 @@ async function replayWorkOrderStates(
     return { events, fieldValues };
 }
 
-test('THE TRACE-REPLAY PROOF: a test-side replay of a live'
+Deno.test('THE TRACE-REPLAY PROOF: a test-side replay of a live'
 + ' work order\'s message pairs alone reproduces its full'
 + ' states history, event-for-event and (at, id)-ordered',
 async () => {
@@ -1457,7 +1461,7 @@ async () => {
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     // Leg 2: release — a transition carrying release, ending
     // A's birth claim (distinct from leg 8's named release
@@ -1479,7 +1483,7 @@ async () => {
             transitionAt: releaseTransitionAt,
         },
     ));
-    assert.equal(release.status, 201);
+    assertStrictEquals(release.status, 201);
 
     // The entity PUT: position bump, flow_graph held CONSTANT
     // (case 5's named invariant) — LOCKTIMEOUT SOURCING is
@@ -1509,11 +1513,11 @@ async () => {
             position: 2,
         },
     ));
-    assert.equal(entityPut.status, 201);
+    assertStrictEquals(entityPut.status, 201);
     const putBody = await entityPut.json() as {
         flow_graph: Record<string, unknown>;
     };
-    assert.deepEqual(putBody.flow_graph, storedCreateFlowGraph);
+    assertEquals(putBody.flow_graph, storedCreateFlowGraph);
 
     // Leg 3: re-claim by A — fresh (prior is 'claim_released').
     const reclaimAt = nowUtc();
@@ -1527,7 +1531,7 @@ async () => {
             expireAt: reclaimAt,
         },
     ));
-    assert.equal(reclaim.status, 201);
+    assertStrictEquals(reclaim.status, 201);
 
     // Leg 4: idempotent re-claim by A — fires milliseconds after
     // leg 3, well within the tiny lockTimeout, same actor — 0
@@ -1543,7 +1547,7 @@ async () => {
             expireAt: idempotentAt,
         },
     ));
-    assert.equal(idempotent.status, 201);
+    assertStrictEquals(idempotent.status, 201);
 
     // Advance the test clock past the tiny lockTimeout so leg
     // 3's claim genuinely reads as expired to the LIVE route's
@@ -1566,7 +1570,7 @@ async () => {
             expireAt: takeoverExpireAt,
         },
     ));
-    assert.equal(takeover.status, 201);
+    assertStrictEquals(takeover.status, 201);
 
     // Leg 6: transition with values, by B.
     // Task 8 CUT: legacy fieldValues below the gate.
@@ -1613,7 +1617,7 @@ async () => {
             transitionAt: finishTransitionAt,
         },
     ));
-    assert.equal(finish.status, 201);
+    assertStrictEquals(finish.status, 201);
 
     // Leg 8: unclaim via DELETE organizations/:id/work-orders/:id/claim
     // (deleteWorkOrderClaim's wire path), by A.
@@ -1623,7 +1627,7 @@ async () => {
             + '/claim',
         tokenA,
     ));
-    assert.equal(unclaim.status, 204);
+    assertStrictEquals(unclaim.status, 204);
 
     const replay = await replayWorkOrderStates(
         db, STARK_ORGANIZATION, workOrderId,
@@ -1634,11 +1638,11 @@ async () => {
     const derivedHistory = await workOrderLifecycleStatesFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assert.deepEqual(replay.events, derivedHistory);
+    assertEquals(replay.events, derivedHistory);
     // create(3) + release-transition(2) + reclaim(1) +
     // idempotent(0) + expired-takeover(2) + values-transition(1)
     // + finish-transition(1) + unclaim(1) = 11.
-    assert.equal(replay.events.length, 11);
+    assertStrictEquals(replay.events.length, 11);
 
     // Phase Final Task 2: SFV row plane empty; message-plane
     // transition fold rides work-order history (C4).
@@ -1653,9 +1657,9 @@ async () => {
             value: fv.value,
         })),
     );
-    assert.equal(replay.fieldValues.length, 2);
+    assertStrictEquals(replay.fieldValues.length, 2);
     // Phase Final Stage B: state_field_values table retired.
-    assert.deepEqual(
+    assertEquals(
         sortById(replay.fieldValues).map((row) => ({
             state_event_id: row.state_event_id,
             attribute_id: row.attribute_id,
@@ -1681,7 +1685,7 @@ async () => {
 // absorbs this site, so a future uniform head-read regresses
 // here first.)
 
-test('same-join-id retry: two different work-order creates '
+Deno.test('same-join-id retry: two different work-order creates '
 + 'reusing one flow-work-order id each append a chain-less '
 + 'join pair (neither Supersedes nor Follows)', async () => {
     const db = await seededDb();
@@ -1710,7 +1714,7 @@ test('same-join-id retry: two different work-order creates '
             '2026-05-03T00:00:00.000000Z',
         ),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
 
     // A DIFFERENT work order, a DIFFERENT operation (fresh event
     // ids) — not a byte-identical resend, which would replay via
@@ -1735,7 +1739,7 @@ test('same-join-id retry: two different work-order creates '
             '2026-05-03T00:00:01.000000Z',
         ),
     ));
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
 
     const joinPrefix = canonicalUriCollection(
         STARK_ORGANIZATION,
@@ -1745,9 +1749,9 @@ test('same-join-id retry: two different work-order creates '
     const joinResponses = await db.messagePairs.getAllAtAddress(
         joinPrefix, sharedFwoId,
     );
-    assert.equal(joinResponses.length, 2);
+    assertStrictEquals(joinResponses.length, 2);
     for (const response of joinResponses) {
-        assert.equal('supersedes' in response, false);
-        assert.equal('follows' in response, false);
+        assertStrictEquals('supersedes' in response, false);
+        assertStrictEquals('follows' in response, false);
     }
 });

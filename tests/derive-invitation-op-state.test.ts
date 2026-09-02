@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import type { Id } from '../api/types.ts';
@@ -89,26 +88,26 @@ async function grant(
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
 }
 
-test('invitationOpStateFor: pending (granted, unanswered)'
+Deno.test('invitationOpStateFor: pending (granted, unanswered)'
 + ' derives undefined, matching the row-plane pending default',
 async () => {
     const db = await seededDb();
     const id = generateIdentifier();
     await grant(db, id, 'sarah.chen@company.com');
 
-    assert.equal(
+    assertStrictEquals(
         await invitationOpStateFor(db, id), undefined,
     );
-    assert.equal(
+    assertStrictEquals(
         await invitationOpStateFor(db, id),
         await rowPlaneOpState(db, id),
     );
 });
 
-test('invitationOpStateFor: accepted derives \'accepted\','
+Deno.test('invitationOpStateFor: accepted derives \'accepted\','
 + ' matching the row-plane current state', async () => {
     const db = await seededDb();
     const id = generateIdentifier();
@@ -126,16 +125,16 @@ test('invitationOpStateFor: accepted derives \'accepted\','
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assertStrictEquals(accept.status, 204);
 
-    assert.equal(await invitationOpStateFor(db, id), 'accepted');
-    assert.equal(
+    assertStrictEquals(await invitationOpStateFor(db, id), 'accepted');
+    assertStrictEquals(
         await invitationOpStateFor(db, id),
         await rowPlaneOpState(db, id),
     );
 });
 
-test('invitationOpStateFor: declined derives \'declined\','
+Deno.test('invitationOpStateFor: declined derives \'declined\','
 + ' matching the row-plane current state', async () => {
     const db = await seededDb();
     const id = generateIdentifier();
@@ -152,16 +151,16 @@ test('invitationOpStateFor: declined derives \'declined\','
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(decline.status, 204);
+    assertStrictEquals(decline.status, 204);
 
-    assert.equal(await invitationOpStateFor(db, id), 'declined');
-    assert.equal(
+    assertStrictEquals(await invitationOpStateFor(db, id), 'declined');
+    assertStrictEquals(
         await invitationOpStateFor(db, id),
         await rowPlaneOpState(db, id),
     );
 });
 
-test('invitationOpStateFor: revoked derives \'revoked\','
+Deno.test('invitationOpStateFor: revoked derives \'revoked\','
 + ' matching the row-plane current state', async () => {
     const db = await seededDb();
     const id = generateIdentifier();
@@ -178,22 +177,20 @@ test('invitationOpStateFor: revoked derives \'revoked\','
             at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(revoke.status, 204);
+    assertStrictEquals(revoke.status, 204);
 
-    assert.equal(await invitationOpStateFor(db, id), 'revoked');
-    assert.equal(
+    assertStrictEquals(await invitationOpStateFor(db, id), 'revoked');
+    assertStrictEquals(
         await invitationOpStateFor(db, id),
         await rowPlaneOpState(db, id),
     );
 });
 
-test('invitationOpStateFor: a never-granted id derives'
+Deno.test('invitationOpStateFor: a never-granted id derives'
 + ' undefined, no throw', async () => {
     const db = await seededDb();
-    await assert.doesNotReject(
-        () => invitationOpStateFor(db, generateIdentifier()),
-    );
-    assert.equal(
+    await invitationOpStateFor(db, generateIdentifier());
+    assertStrictEquals(
         await invitationOpStateFor(db, generateIdentifier()),
         undefined,
     );

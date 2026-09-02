@@ -1,19 +1,18 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     createPageAbort,
     bindPageListeners,
 } from '../web-app/app/page-lifecycle.ts';
 
-test('createPageAbort pairs a controller with its signal', () => {
+Deno.test('createPageAbort pairs a controller with its signal', () => {
     const { pageAbort, signal } = createPageAbort();
-    assert.equal(signal, pageAbort.signal);
-    assert.equal(signal.aborted, false);
+    assertStrictEquals(signal, pageAbort.signal);
+    assertStrictEquals(signal.aborted, false);
     pageAbort.abort();
-    assert.equal(signal.aborted, true);
+    assertStrictEquals(signal.aborted, true);
 });
 
-test('bindPageListeners binds each handler with the signal',
+Deno.test('bindPageListeners binds each handler with the signal',
     () => {
         const calls: { type: string; signal: unknown }[] = [];
         const target = {
@@ -30,7 +29,7 @@ test('bindPageListeners binds each handler with the signal',
             click: () => {},
             input: () => {},
         }, signal);
-        assert.deepEqual(
+        assertEquals(
             calls.map(c => c.type), ['click', 'input']);
-        assert.equal(calls[0]?.signal, signal);
+        assertStrictEquals(calls[0]?.signal, signal);
     });

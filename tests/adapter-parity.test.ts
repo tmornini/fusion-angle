@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { createRequestContext }
     from '../web-app/app/adapters/shared.ts';
@@ -14,7 +13,7 @@ import {
 import { seedHumanMember } from './member-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 
-test('K5 reactivation on the memory adapter',
+Deno.test('K5 reactivation on the memory adapter',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -30,8 +29,8 @@ test('K5 reactivation on the memory adapter',
         const active = await getActiveObjectives(ctx);
         const archivedIds =
             await getArchivedObjectiveIds(ctx);
-        assert.ok(active.some(o => o.id === 'ohqxgUBEaFQwYbXsonRPmg'),
+        assert(active.some(o => o.id === 'ohqxgUBEaFQwYbXsonRPmg'),
             'ohqxgUBEaFQwYbXsonRPmg returns to active list');
-        assert.equal(archivedIds.size, 0,
+        assertStrictEquals(archivedIds.size, 0,
             'active event supersedes archived');
     });

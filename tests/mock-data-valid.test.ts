@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
@@ -120,7 +124,7 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
 
 // Phase Final Task 2 / C3: bulk deriveStates retired —
 // validate surviving family lifecycle derives.
-test('mock-data seeds non-empty derived lifecycle states',
+Deno.test('mock-data seeds non-empty derived lifecycle states',
 async () => {
     const db = await seededDb();
     const rows = [
@@ -130,38 +134,32 @@ async () => {
             db, STARK_ORGANIZATION, buildIdeas()[0]!.id,
         ),
     ];
-    assert.ok(rows.length > 0, 'derived lifecycle empty');
+    assert(rows.length > 0, 'derived lifecycle empty');
     for (const row of rows) {
-        assert.doesNotThrow(
-            () => validateStateEntity(withoutId(row)),
-            'state ' + row.id,
-        );
+        validateStateEntity(withoutId(row));
     }
 });
 
 for (const [name, getAll, validate] of TABLES) {
-    test(
+    Deno.test(
         `mock-data seeds non-empty ${name}`,
         async () => {
             const db = await seededDb();
             const rows = await getAll(db);
-            assert.ok(
+            assert(
                 rows.length > 0,
                 `${name} should not be empty`,
             );
         },
     );
 
-    test(
+    Deno.test(
         `mock-data ${name} rows pass the validator`,
         async () => {
             const db = await seededDb();
             const rows = await getAll(db);
             for (const row of rows) {
-                assert.doesNotThrow(
-                    () => validate(withoutId(row)),
-                    `row ${row.id} in ${name}`,
-                );
+                validate(withoutId(row));
             }
         },
     );
@@ -169,13 +167,13 @@ for (const [name, getAll, validate] of TABLES) {
 
 // Phase Final Task 2: ideas(+idea_submissions) seed row halves
 // stripped — validate the derived plane (message-plane truth).
-test('mock-data seeds non-empty derived ideas per org',
+Deno.test('mock-data seeds non-empty derived ideas per org',
 async () => {
     const db = await seededDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
         const ideas = await deriveIdeas(db, organization);
-        assert.ok(
+        assert(
             ideas.length > 0,
             'ideas empty in org ' + organization,
         );
@@ -189,20 +187,17 @@ async () => {
                 state: string;
             };
             void _s;
-            assert.ok(
+            assert(
                 typeof idea.state === 'string'
                 && idea.state.length > 0,
                 'idea ' + idea.id + ' missing state',
             );
-            assert.doesNotThrow(
-                () => validateIdeaEntity(entity),
-                'idea ' + idea.id,
-            );
+            validateIdeaEntity(entity);
         }
     }
 });
 
-test('mock-data derived idea submissions pass validator',
+Deno.test('mock-data derived idea submissions pass validator',
 async () => {
     const db = await seededDb();
     const seeds = buildIdeas().map((idea, index) => ({
@@ -216,22 +211,17 @@ async () => {
         );
         total += subs.length;
         for (const sub of subs) {
-            assert.doesNotThrow(
-                () => validateIdeaSubmissionEntity(
-                    withoutId(sub),
-                ),
-                'submission ' + sub.id,
-            );
+            validateIdeaSubmissionEntity(withoutId(sub));
         }
         // Per-idea deriveIdea also validates single-get path.
         await deriveIdea(db, organization, id);
     }
-    assert.ok(total > 0, 'no derived idea submissions');
+    assert(total > 0, 'no derived idea submissions');
 });
 
 // Phase Final Task 2: projects(+project_flows+scores) seed
 // row halves stripped — validate the derived plane.
-test('mock-data seeds non-empty derived projects per org',
+Deno.test('mock-data seeds non-empty derived projects per org',
 async () => {
     const db = await seededDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
@@ -239,7 +229,7 @@ async () => {
         const projects = await deriveProjects(
             db, organization,
         );
-        assert.ok(
+        assert(
             projects.length > 0,
             'projects empty in org ' + organization,
         );
@@ -255,20 +245,17 @@ async () => {
                     state: string;
                 };
             void _s;
-            assert.ok(
+            assert(
                 typeof project.state === 'string'
                 && project.state.length > 0,
                 'project ' + project.id + ' missing state',
             );
-            assert.doesNotThrow(
-                () => validateProjectEntity(entity),
-                'project ' + project.id,
-            );
+            validateProjectEntity(entity);
         }
     }
 });
 
-test('mock-data derived project_flows pass validator',
+Deno.test('mock-data derived project_flows pass validator',
 async () => {
     const db = await seededDb();
     let total = 0;
@@ -283,19 +270,14 @@ async () => {
             );
             total += joins.length;
             for (const join of joins) {
-                assert.doesNotThrow(
-                    () => validateProjectFlowEntity(
-                        withoutId(join),
-                    ),
-                    'project_flow ' + join.id,
-                );
+                validateProjectFlowEntity(withoutId(join));
             }
         }
     }
-    assert.ok(total > 0, 'no derived project_flows');
+    assert(total > 0, 'no derived project_flows');
 });
 
-test('mock-data derived baseline/actual scores pass'
+Deno.test('mock-data derived baseline/actual scores pass'
 + ' validators', async () => {
     const db = await seededDb();
     let baselineTotal = 0;
@@ -311,29 +293,19 @@ test('mock-data derived baseline/actual scores pass'
             );
             baselineTotal += baselines.length;
             for (const row of baselines) {
-                assert.doesNotThrow(
-                    () => validateBaselineScoreEntity(
-                        withoutId(row),
-                    ),
-                    'baseline ' + row.id,
-                );
+                validateBaselineScoreEntity(withoutId(row));
             }
             const actuals = await deriveActualScores(
                 db, organization, project.id,
             );
             actualTotal += actuals.length;
             for (const row of actuals) {
-                assert.doesNotThrow(
-                    () => validateActualScoreEntity(
-                        withoutId(row),
-                    ),
-                    'actual ' + row.id,
-                );
+                validateActualScoreEntity(withoutId(row));
             }
         }
     }
-    assert.equal(baselineTotal, 49);
-    assert.equal(actualTotal, 92);
+    assertStrictEquals(baselineTotal, 49);
+    assertStrictEquals(actualTotal, 92);
 });
 
 // The Office of Time: every persisted `at` is 6-digit
@@ -347,22 +319,22 @@ const ZULU_6 =
 
 // Phase Final Task 2 / C3: pin derived-plane .at via
 // surviving lifecycle derives (message plane is truth).
-test('mock-data derived lifecycle .at is 6-digit zulu',
+Deno.test('mock-data derived lifecycle .at is 6-digit zulu',
 async () => {
     const db = await seededDb();
     const rows = [
         ...await deriveWorkOrderLifecycle(db),
     ];
-    assert.ok(rows.length > 0, 'derived lifecycle empty');
+    assert(rows.length > 0, 'derived lifecycle empty');
     for (const row of rows) {
-        assert.match(
+        assertMatch(
             row.at, ZULU_6,
             'row ' + row.id + ' in derived lifecycle',
         );
     }
 });
 
-test('mock-data derived score .at is 6-digit zulu',
+Deno.test('mock-data derived score .at is 6-digit zulu',
 async () => {
     const db = await seededDb();
     let checked = 0;
@@ -380,7 +352,7 @@ async () => {
                     db, organization, project.id,
                 ),
             ]) {
-                assert.match(
+                assertMatch(
                     row.at, ZULU_6,
                     'score ' + row.id,
                 );
@@ -388,43 +360,39 @@ async () => {
             }
         }
     }
-    assert.ok(checked > 0, 'no derived scores');
+    assert(checked > 0, 'no derived scores');
 });
 
 // Phase Final Task 2: organizations ROW half stripped —
 // validate the derived plane (message-plane truth).
 
-test('mock-data seeds non-empty derived organizations',
+Deno.test('mock-data seeds non-empty derived organizations',
 async () => {
     const db = await seededDb();
     const organizations = await deriveOrganizations(db);
-    assert.ok(organizations.length >= 2);
+    assert(organizations.length >= 2);
     // Phase Final Stage B: organizations table retired.
 });
 
-test('mock-data derived organization passes the validator',
+Deno.test('mock-data derived organization passes the validator',
 async () => {
     const db = await seededDb();
     const organization = await deriveOrganization(db
         , 'AjdvjuECVZEgZoFajaIEkg');
-    assert.doesNotThrow(
-        () => validateOrganizationEntity(
-            withoutId(organization),
-        ),
-    );
+    validateOrganizationEntity(withoutId(organization));
 });
 
 // Phase Final Task 2: flows seed row half stripped — validate
 // the derived plane (message-plane truth). Graph shape is
 // pinned by mock-data-flow-relations (pair graph equals
 // authored).
-test('mock-data seeds non-empty derived flows per org',
+Deno.test('mock-data seeds non-empty derived flows per org',
 async () => {
     const db = await seededDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
         const flows = await deriveFlows(db, organization);
-        assert.ok(
+        assert(
             flows.length > 0,
             'flows empty in org ' + organization,
         );
@@ -434,11 +402,8 @@ async () => {
             const {
                 graph: _g, hasUndoHistory: _h, ...entity
             } = flow;
-            assert.doesNotThrow(
-                () => validateFlowEntity(withoutId(entity)),
-                'flow ' + flow.id,
-            );
-            assert.ok(
+            validateFlowEntity(withoutId(entity));
+            assert(
                 typeof flow.graph === 'object'
                 && flow.graph !== null
                 && !Array.isArray(flow.graph),
@@ -450,23 +415,20 @@ async () => {
 
 // Phase Final Task 2: work-orders + joins + SFV from the
 // message plane (row halves stripped).
-test('mock-data seeds non-empty derived work orders',
+Deno.test('mock-data seeds non-empty derived work orders',
 async () => {
     const db = await seededDb();
     const derived = await documentCollectionGetHandler(
         WORK_ORDERS_WIRING,
     )(db, [], 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION, []) as
         WorkOrderEntity[];
-    assert.ok(derived.length > 0, 'work orders empty');
+    assert(derived.length > 0, 'work orders empty');
     for (const wo of derived) {
-        assert.doesNotThrow(
-            () => validateWorkOrderEntity(withoutId(wo)),
-            'work order ' + wo.id,
-        );
+        validateWorkOrderEntity(withoutId(wo));
     }
 });
 
-test('mock-data derived flow-work-order joins pass validator',
+Deno.test('mock-data derived flow-work-order joins pass validator',
 async () => {
     const db = await seededDb();
     const flowIds = [
@@ -481,18 +443,13 @@ async () => {
         );
         total += joins.length;
         for (const join of joins) {
-            assert.doesNotThrow(
-                () => validateFlowWorkOrderEntity(
-                    withoutId(join),
-                ),
-                'join ' + join.id,
-            );
+            validateFlowWorkOrderEntity(withoutId(join));
         }
     }
-    assert.ok(total > 0, 'no flow-work-order joins');
+    assert(total > 0, 'no flow-work-order joins');
 });
 
-test('mock-data derived seed SFV pairs pass validator',
+Deno.test('mock-data derived seed SFV pairs pass validator',
 async () => {
     const db = await seededDb();
     // Seed field values ride transition folds; product reads
@@ -517,18 +474,15 @@ async () => {
         for (const ev of history) {
             total += ev.field_values.length;
             for (const fv of ev.field_values) {
-                assert.doesNotThrow(
-                    () => validateStateFieldValueEntity({
-                        state_event_id: ev.id,
-                        attribute_id: fv.attribute_id,
-                        value: fv.value,
-                    }),
-                    'sfv ' + fv.id,
-                );
+                validateStateFieldValueEntity({
+                    state_event_id: ev.id,
+                    attribute_id: fv.attribute_id,
+                    value: fv.value,
+                });
             }
         }
     }
-    assert.ok(total >= 7, 'expected >=7 SFV, got ' + total);
+    assert(total >= 7, 'expected >=7 SFV, got ' + total);
     // Phase Final Stage B: state_field_values table retired.
 });
 
@@ -540,7 +494,7 @@ async () => {
 // a cross-org author in the seed (e.g. a Wayne member on a
 // Stark flow node) fails the suite instead of production.
 
-test(
+Deno.test(
     'every work-order transition author belongs to'
     + ' the work order\'s org',
     async () => {
@@ -605,7 +559,7 @@ test(
                 );
             }
         }
-        assert.deepEqual(
+        assertEquals(
             [...violations],
             [],
             'cross-org work-order transition authors: '

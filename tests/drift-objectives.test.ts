@@ -1,9 +1,14 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { seedIdentifier } from
     '../api/mock-data/seed-kit.ts';
-import assert from 'node:assert/strict';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -212,7 +217,7 @@ function objectiveCreateBody(
 
 // -- 1. seeded collection wire equals derive -------------------
 
-test('seeded GET /objectives wire equals derive, both orgs'
+Deno.test('seeded GET /objectives wire equals derive, both orgs'
 + ' (the 4/AjdvjuECVZEgZoFajaIEkg split), plus the empty-collection leg',
 async () => {
     const db = await seededDb();
@@ -224,18 +229,18 @@ async () => {
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             , tokenStark),
     );
-    assert.equal(resStark.status, 200);
+    assertStrictEquals(resStark.status, 200);
     const starkPrefix = '/organizations/'
         + STARK_ORGANIZATION + '/objectives/';
     const stark = await derivedObjectives(
         db, STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         await resStark.text(),
         await storedCollectionText(db, starkPrefix),
     );
-    assert.equal(stark.length, 4);
-    assert.deepEqual(
+    assertStrictEquals(stark.length, 4);
+    assertEquals(
         stark.map((o) => o.id).sort(),
         [...OBJECTIVE_SEEDS.map((s) => s.id)].sort(),
     );
@@ -251,9 +256,9 @@ async () => {
             tokenTwo,
         ),
     );
-    assert.equal(resTwo.status, 200);
+    assertStrictEquals(resTwo.status, 200);
     const org2 = await derivedObjectives(db, ORGANIZATION_TWO);
-    assert.equal(
+    assertStrictEquals(
         await resTwo.text(),
         await storedCollectionText(
             db,
@@ -261,21 +266,21 @@ async () => {
                 + '/objectives/',
         ),
     );
-    assert.equal(org2.length, 1);
-    assert.equal(org2[0]!.id, ORGANIZATION_TWO_OBJECTIVE.id);
+    assertStrictEquals(org2.length, 1);
+    assertStrictEquals(org2[0]!.id, ORGANIZATION_TWO_OBJECTIVE.id);
 
     // Empty-collection leg: third organization, zero seeds.
     const THIRD_ORGANIZATION = '3';
     const empty = await derivedObjectives(
         db, THIRD_ORGANIZATION,
     );
-    assert.deepEqual(empty, []);
+    assertEquals(empty, []);
     // Phase Final Stage B: objectives tables retired.
 });
 
 // -- 2. per-objective GET wire equals derive; foreign 404 ----
 
-test('per-objective GET wire equals derive (all 5); a'
+Deno.test('per-objective GET wire equals derive (all 5); a'
 + ' foreign-org GET 404s on wire and on derive',
 async () => {
     const db = await seededDb();
@@ -291,7 +296,7 @@ async () => {
             position: ORGANIZATION_TWO_OBJECTIVE.position,
         },
     ];
-    assert.equal(targets.length, 5);
+    assertStrictEquals(targets.length, 5);
     for (const t of targets) {
         const token = await organizationToken(
             'XXZruirZyAOoRpNxaDnpSA', t.organization,
@@ -304,18 +309,18 @@ async () => {
                 token,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const derived = await derivedObjective(
             db, t.organization, t.id,
         );
         const prefix = '/organizations/'
             + t.organization + '/objectives/';
-        assert.equal(
+        assertStrictEquals(
             await res.text(),
             await storedPutBodyText(db, prefix, t.id),
         );
-        assert.equal(derived.position, t.position);
-        assert.equal(derived.state, 'active');
+        assertStrictEquals(derived.position, t.position);
+        assertStrictEquals(derived.state, 'active');
     }
 
     const foreignId = OBJECTIVE_SEEDS[0]!.id;
@@ -332,20 +337,19 @@ async () => {
             tokenTwo,
         ),
     );
-    assert.equal(foreignRes.status, 404);
+    assertStrictEquals(foreignRes.status, 404);
     const body = await foreignRes.json() as { error: string };
-    assert.equal(body.error, expectedMessage);
-    await assert.rejects(
+    assertStrictEquals(body.error, expectedMessage);
+    const err = await assertRejects(
         () => derivedObjective(db, ORGANIZATION_TWO, foreignId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedMessage,
-    );
+    ) as Error;
+    assertInstanceOf(err, EntityNotFoundError);
+    assertStrictEquals(err.message, expectedMessage);
 });
 
 // -- 3. revisions wire equals derive ---------------------------
 
-test('revisions GET wire equals derive per objective (all 5,'
+Deno.test('revisions GET wire equals derive per objective (all 5,'
 + ' one seeded revision each); foreign-parent nested-'
 + ' collection is 200 [] on wire and derive',
 async () => {
@@ -368,13 +372,13 @@ async () => {
         const res = await handleRequest(
             db, req('GET', path, token),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const wireText = await res.text();
         const derived = await deriveObjectiveRevisions(
             db, organization, id,
         );
-        assert.equal(wireText, JSON.stringify(derived));
-        assert.equal(derived.length, 1);
+        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertStrictEquals(derived.length, 1);
     }
 
     const foreignId = OBJECTIVE_SEEDS[0]!.id;
@@ -387,9 +391,9 @@ async () => {
             + '/objectives/' + foreignId + '/revisions/',
         tokenTwo,
     ));
-    assert.equal(foreignRes.status, 200);
-    assert.equal(await foreignRes.text(), '[]');
-    assert.deepEqual(
+    assertStrictEquals(foreignRes.status, 200);
+    assertStrictEquals(await foreignRes.text(), '[]');
+    assertEquals(
         await deriveObjectiveRevisions(
             db, ORGANIZATION_TWO, foreignId,
         ),
@@ -401,7 +405,7 @@ async () => {
 
 // Phase Final Task 2: score row halves stripped earlier with
 // the projects group — re-home stays wire GET byte identity.
-test('score collection wire equals derive per project: an'
+Deno.test('score collection wire equals derive per project: an'
 + ' approved project (full 4-baseline coverage + actuals), a'
 + ' partial-coverage live-state project, a submitted project'
 + ' (EMPTY), the org-2 project (empty); whole-org totals (49'
@@ -426,28 +430,28 @@ test('score collection wire equals derive per project: an'
     const fullBaseRes = await handleRequest(
         db, req('GET', fullBasePath, tokenStark),
     );
-    assert.equal(fullBaseRes.status, 200);
+    assertStrictEquals(fullBaseRes.status, 200);
     const fullBaseText = await fullBaseRes.text();
     const derivedFullBaselines = await deriveBaselineScores(
         db, STARK_ORGANIZATION, fullCoverageProjectId,
     );
-    assert.equal(
+    assertStrictEquals(
         fullBaseText, JSON.stringify(derivedFullBaselines),
     );
-    assert.equal(derivedFullBaselines.length, 4);
+    assertStrictEquals(derivedFullBaselines.length, 4);
 
     const fullActRes = await handleRequest(
         db, req('GET', fullActPath, tokenStark),
     );
-    assert.equal(fullActRes.status, 200);
+    assertStrictEquals(fullActRes.status, 200);
     const derivedFullActuals = await deriveActualScores(
         db, STARK_ORGANIZATION, fullCoverageProjectId,
     );
-    assert.equal(
+    assertStrictEquals(
         await fullActRes.text(),
         JSON.stringify(derivedFullActuals),
     );
-    assert.equal(derivedFullActuals.length, 5);
+    assertStrictEquals(derivedFullActuals.length, 5);
 
     const partialProjectId = 'ORXAfsQvNowpmJfBwQAtWg';
     const partialBaseRes = await handleRequest(db, req(
@@ -456,16 +460,16 @@ test('score collection wire equals derive per project: an'
         + '/objective-baseline-scores/',
         tokenStark,
     ));
-    assert.equal(partialBaseRes.status, 200);
+    assertStrictEquals(partialBaseRes.status, 200);
     const derivedPartialBaselines = await deriveBaselineScores(
         db, STARK_ORGANIZATION, partialProjectId,
     );
-    assert.equal(
+    assertStrictEquals(
         await partialBaseRes.text(),
         JSON.stringify(derivedPartialBaselines),
     );
-    assert.equal(derivedPartialBaselines.length, 2);
-    assert.deepEqual(
+    assertStrictEquals(derivedPartialBaselines.length, 2);
+    assertEquals(
         await deriveActualScores(
             db, STARK_ORGANIZATION, partialProjectId,
         ),
@@ -473,13 +477,13 @@ test('score collection wire equals derive per project: an'
     );
 
     const submittedProjectId = 'PIfhHMLQQxTxKFDdabXbOw';
-    assert.deepEqual(
+    assertEquals(
         await deriveBaselineScores(
             db, STARK_ORGANIZATION, submittedProjectId,
         ),
         [],
     );
-    assert.deepEqual(
+    assertEquals(
         await deriveActualScores(
             db, STARK_ORGANIZATION, submittedProjectId,
         ),
@@ -489,13 +493,13 @@ test('score collection wire equals derive per project: an'
     const org2ProjectId = seedIdentifier(
         'seed-project-org2',
     );
-    assert.deepEqual(
+    assertEquals(
         await deriveBaselineScores(
             db, ORGANIZATION_TWO, org2ProjectId,
         ),
         [],
     );
-    assert.deepEqual(
+    assertEquals(
         await deriveActualScores(
             db, ORGANIZATION_TWO, org2ProjectId,
         ),
@@ -503,7 +507,7 @@ test('score collection wire equals derive per project: an'
     );
 
     const starkProjectIds = buildProjects().map((p) => p.id);
-    assert.equal(starkProjectIds.length, 16);
+    assertStrictEquals(starkProjectIds.length, 16);
     const derivedBaselineTotal: { id: string }[] = [];
     const derivedActualTotal: { id: string }[] = [];
     for (const projectId of starkProjectIds) {
@@ -518,8 +522,8 @@ test('score collection wire equals derive per project: an'
             )),
         );
     }
-    assert.equal(derivedBaselineTotal.length, 49);
-    assert.equal(derivedActualTotal.length, 92);
+    assertStrictEquals(derivedBaselineTotal.length, 49);
+    assertStrictEquals(derivedActualTotal.length, 92);
 
     const foreignRes = await handleRequest(db, req(
         'GET',
@@ -528,9 +532,9 @@ test('score collection wire equals derive per project: an'
             + '/objective-baseline-scores/',
         tokenTwo,
     ));
-    assert.equal(foreignRes.status, 200);
-    assert.equal(await foreignRes.text(), '[]');
-    assert.deepEqual(
+    assertStrictEquals(foreignRes.status, 200);
+    assertStrictEquals(await foreignRes.text(), '[]');
+    assertEquals(
         await deriveBaselineScores(
             db, ORGANIZATION_TWO, fullCoverageProjectId,
         ),
@@ -540,7 +544,7 @@ test('score collection wire equals derive per project: an'
 
 // -- 5. live-write chain on the message plane ------------------
 
-test('live-write chain: create, reposition, revision edit,'
+Deno.test('live-write chain: create, reposition, revision edit,'
 + ' archive, reactivate, a conversion with 2 baselines, a'
 + ' standalone re-score + actual PUT, and a duplicate create —'
 + ' wire equals derive at every step', async () => {
@@ -556,8 +560,8 @@ test('live-write chain: create, reposition, revision edit,'
             'Chain Objective', '2026-06-01T00:00:00.000000Z',
         ),
     ));
-    assert.equal(created.status, 201);
-    assert.equal(
+    assertStrictEquals(created.status, 201);
+    assertStrictEquals(
         (await db.messagePairs.getAll()).length, beforeCreate + 3,
     );
     {
@@ -566,11 +570,11 @@ test('live-write chain: create, reposition, revision edit,'
                 + '' +
                 objectiveId, token),
         );
-        assert.equal(getRes.status, 200);
+        assertStrictEquals(getRes.status, 200);
         const derived = await derivedObjective(
             db, STARK_ORGANIZATION, objectiveId,
         );
-        assert.equal(
+        assertStrictEquals(
             await getRes.text(),
             await storedPutBodyText(
                 db,
@@ -579,8 +583,8 @@ test('live-write chain: create, reposition, revision edit,'
                 objectiveId,
             ),
         );
-        assert.equal(derived.position, 50);
-        assert.equal(derived.state, 'active');
+        assertStrictEquals(derived.position, 50);
+        assertStrictEquals(derived.state, 'active');
         const revRes = await handleRequest(db, req(
             'GET',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
@@ -590,10 +594,10 @@ test('live-write chain: create, reposition, revision edit,'
         const revs = await deriveObjectiveRevisions(
             db, STARK_ORGANIZATION, objectiveId,
         );
-        assert.equal(
+        assertStrictEquals(
             await revRes.text(), JSON.stringify(revs),
         );
-        assert.equal(revs.length, 1);
+        assertStrictEquals(revs.length, 1);
     }
 
     // Position PUT echoes the genesis trio (putObjectivePosition
@@ -606,11 +610,11 @@ test('live-write chain: create, reposition, revision edit,'
             state: 'active',
         },
     ));
-    assert.equal(reposition.status, 201);
+    assertStrictEquals(reposition.status, 201);
     const repositionResponseId =
         reposition.headers.get('Response-ID');
-    assert.ok(repositionResponseId);
-    assert.equal(reposition.headers.get('Supersedes'), null);
+    assert(repositionResponseId);
+    assertStrictEquals(reposition.headers.get('Supersedes'), null);
     {
         const getRes = await handleRequest(
             db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
@@ -620,7 +624,7 @@ test('live-write chain: create, reposition, revision edit,'
         const derived = await derivedObjective(
             db, STARK_ORGANIZATION, objectiveId,
         );
-        assert.equal(
+        assertStrictEquals(
             await getRes.text(),
             await storedPutBodyText(
                 db,
@@ -629,9 +633,9 @@ test('live-write chain: create, reposition, revision edit,'
                 objectiveId,
             ),
         );
-        assert.equal(derived.position, 77);
-        assert.equal(derived.state, 'active');
-        assert.deepEqual(
+        assertStrictEquals(derived.position, 77);
+        assertStrictEquals(derived.state, 'active');
+        assertEquals(
             await reposition.json(),
             wireObjectiveGet(
                 objectiveId, 77, 'active',
@@ -655,15 +659,15 @@ test('live-write chain: create, reposition, revision edit,'
             at: '2026-06-02T00:00:00.000000Z',
         },
     ));
-    assert.equal(revEdit.status, 201);
+    assertStrictEquals(revEdit.status, 201);
     {
         const revs = await deriveObjectiveRevisions(
             db, STARK_ORGANIZATION, objectiveId,
         );
-        assert.equal(revs.length, 2);
+        assertStrictEquals(revs.length, 2);
         const latestByAt = [...revs].sort((a, b) =>
             a.at < b.at ? -1 : a.at > b.at ? 1 : 0).at(-1)!;
-        assert.equal(latestByAt.id, revisionId2);
+        assertStrictEquals(latestByAt.id, revisionId2);
     }
 
     // ARCHIVE via PUT /organizations/:id/objectives/:id with the archived
@@ -678,20 +682,20 @@ test('live-write chain: create, reposition, revision edit,'
             state: 'archived',
         },
     ));
-    assert.equal(archived.status, 201);
+    assertStrictEquals(archived.status, 201);
     {
         const listRes = await handleRequest(
             db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
                 + '', token),
         );
         const list = await listRes.json() as { id: string }[];
-        assert.equal(
+        assertStrictEquals(
             list.some((o) => o.id === objectiveId), true,
         );
         const derived = await derivedObjectives(
             db, STARK_ORGANIZATION,
         );
-        assert.equal(
+        assertStrictEquals(
             derived.some((o) => o.id === objectiveId), true,
         );
     }
@@ -704,17 +708,17 @@ test('live-write chain: create, reposition, revision edit,'
             state: 'active',
         },
     ));
-    assert.equal(reactivated.status, 201);
+    assertStrictEquals(reactivated.status, 201);
     const reactivatedResponseId =
         reactivated.headers.get('Response-ID');
-    assert.ok(reactivatedResponseId);
+    assert(reactivatedResponseId);
     {
         const getRes = await handleRequest(
             db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
                 + '' +
                 objectiveId, token),
         );
-        assert.equal(getRes.status, 200);
+        assertStrictEquals(getRes.status, 200);
     }
 
     // Conversion with 2 baselines — idea seeded via document
@@ -779,8 +783,8 @@ test('live-write chain: create, reposition, revision edit,'
             ],
         },
     ));
-    assert.equal(conversion.status, 201);
-    assert.equal(
+    assertStrictEquals(conversion.status, 201);
+    assertStrictEquals(
         (await db.messagePairs.getAll()).length,
         beforeConversion + 5,
     );
@@ -790,16 +794,16 @@ test('live-write chain: create, reposition, revision edit,'
     const baseRes = await handleRequest(
         db, req('GET', basePath, token),
     );
-    assert.equal(baseRes.status, 200);
+    assertStrictEquals(baseRes.status, 200);
     const derivedBaselinesAfterConversion =
         await deriveBaselineScores(
             db, STARK_ORGANIZATION, projectId,
         );
-    assert.equal(
+    assertStrictEquals(
         await baseRes.text(),
         JSON.stringify(derivedBaselinesAfterConversion),
     );
-    assert.equal(derivedBaselinesAfterConversion.length, 2);
+    assertStrictEquals(derivedBaselinesAfterConversion.length, 2);
 
     const baselineIdC = generateIdentifier();
     const standaloneBaseline = await handleRequest(db, req(
@@ -812,7 +816,7 @@ test('live-write chain: create, reposition, revision edit,'
             at: '2026-06-06T00:00:00.000000Z',
         },
     ));
-    assert.equal(standaloneBaseline.status, 201);
+    assertStrictEquals(standaloneBaseline.status, 201);
     const actualIdA = generateIdentifier();
     const standaloneActual = await handleRequest(db, req(
         'PUT',
@@ -824,7 +828,7 @@ test('live-write chain: create, reposition, revision edit,'
             at: '2026-06-06T00:00:01.000000Z',
         },
     ));
-    assert.equal(standaloneActual.status, 201);
+    assertStrictEquals(standaloneActual.status, 201);
 
     const baseFinalRes = await handleRequest(
         db, req('GET', basePath, token),
@@ -832,11 +836,11 @@ test('live-write chain: create, reposition, revision edit,'
     const derivedBaselinesFinal = await deriveBaselineScores(
         db, STARK_ORGANIZATION, projectId,
     );
-    assert.equal(
+    assertStrictEquals(
         await baseFinalRes.text(),
         JSON.stringify(derivedBaselinesFinal),
     );
-    assert.equal(derivedBaselinesFinal.length, 3);
+    assertStrictEquals(derivedBaselinesFinal.length, 3);
 
     const actPath =
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
@@ -847,11 +851,11 @@ test('live-write chain: create, reposition, revision edit,'
     const derivedActualsFinal = await deriveActualScores(
         db, STARK_ORGANIZATION, projectId,
     );
-    assert.equal(
+    assertStrictEquals(
         await actFinalRes.text(),
         JSON.stringify(derivedActualsFinal),
     );
-    assert.equal(derivedActualsFinal.length, 1);
+    assertStrictEquals(derivedActualsFinal.length, 1);
 
     // Duplicate create — same id, fresh revisionId.
     // Entity-address pairs before: create op + create doc +
@@ -871,7 +875,7 @@ test('live-write chain: create, reposition, revision edit,'
         ).filter((r) => r.uri_id === objectiveId)
             .map((r) => r.id),
     );
-    assert.equal(beforeDuplicateIds.size, 5);
+    assertStrictEquals(beforeDuplicateIds.size, 5);
 
     const duplicate = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/', token,
@@ -880,10 +884,10 @@ test('live-write chain: create, reposition, revision edit,'
             'Chain Objective v3', '2026-06-07T00:00:00.000000Z',
         ),
     ));
-    assert.equal(duplicate.status, 201);
+    assertStrictEquals(duplicate.status, 201);
     // Supersedes the latest prior entity-address response
     // (reactivate), not the earlier reposition.
-    assert.equal(
+    assertStrictEquals(
         duplicate.headers.get('Supersedes'),
         null,
     );
@@ -895,26 +899,26 @@ test('live-write chain: create, reposition, revision edit,'
     const afterAtAddress = afterResponses.filter(
         (r) => r.uri_id === objectiveId,
     );
-    assert.equal(afterAtAddress.length, 7);
+    assertStrictEquals(afterAtAddress.length, 7);
     const newRows = afterAtAddress.filter(
         (r) => !beforeDuplicateIds.has(r.id),
     );
-    assert.equal(newRows.length, 2);
+    assertStrictEquals(newRows.length, 2);
     for (const row of newRows) {
-        assert.equal('supersedes' in row, false);
+        assertStrictEquals('supersedes' in row, false);
     }
     const documentMessagePairsAfter = documentMessagePairsAt(
         afterRequests, objectivesPrefix,
     ).filter((messagePair) => messagePair.uriId === objectiveId);
     // create doc + reposition + archive + reactivate +
     // duplicate create's document = 5
-    assert.equal(documentMessagePairsAfter.length, 5);
+    assertStrictEquals(documentMessagePairsAfter.length, 5);
     const newestDocumentMessagePair =
         documentMessagePairsAfter.at(-1)!;
     const newestDocumentResponseRow = afterAtAddress.find(
         (r) => r.id === newestDocumentMessagePair.id,
     )!;
-    assert.equal(
+    assertStrictEquals(
         'supersedes' in newestDocumentResponseRow,
         false,
     );
@@ -926,7 +930,7 @@ test('live-write chain: create, reposition, revision edit,'
     const finalObjective = await derivedObjective(
         db, STARK_ORGANIZATION, objectiveId,
     );
-    assert.equal(
+    assertStrictEquals(
         await finalGet.text(),
         await storedPutBodyText(
             db,
@@ -935,12 +939,12 @@ test('live-write chain: create, reposition, revision edit,'
             objectiveId,
         ),
     );
-    assert.equal(finalObjective.position, 88);
+    assertStrictEquals(finalObjective.position, 88);
 });
 
 // -- 6. method-filter: create POST is never the document head -
 
-test('the create-op POST pair is not read as a document message pair —'
+Deno.test('the create-op POST pair is not read as a document message pair —'
 + ' the create body and the document body share zero top-level'
 + ' keys; exactly one PUT pair lands at the objective address'
 + ' after create', async () => {
@@ -955,7 +959,7 @@ test('the create-op POST pair is not read as a document message pair —'
             '2026-06-10T00:00:00.000000Z',
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const prefix = canonicalUriCollection(
         STARK_ORGANIZATION
@@ -969,13 +973,13 @@ test('the create-op POST pair is not read as a document message pair —'
         (r) => r.uri_collection === prefix
             && r.uri_id === objectiveId,
     );
-    assert.equal(atAddress.length, 2);
+    assertStrictEquals(atAddress.length, 2);
 
     const documentMessagePairs = documentMessagePairsAt(
         requests, prefix,
     ).filter((messagePair) => messagePair.uriId === objectiveId);
-    assert.equal(documentMessagePairs.length, 1);
-    assert.equal(documentMessagePairs[0]!.method, 'PUT');
+    assertStrictEquals(documentMessagePairs.length, 1);
+    assertStrictEquals(documentMessagePairs[0]!.method, 'PUT');
 
     const postRow = atAddress.find(
         (r) => decodeRequestMessage(r.request).method === 'POST',
@@ -989,12 +993,12 @@ test('the create-op POST pair is not read as a document message pair —'
     const overlap = [...createBodyKeys].filter(
         (key) => documentBodyKeys.has(key),
     );
-    assert.deepEqual(overlap, []);
+    assertEquals(overlap, []);
 });
 
 // -- 7. resend idempotency -------------------------------------
 
-test('resend idempotency: a byte-identical position-PUT resend'
+Deno.test('resend idempotency: a byte-identical position-PUT resend'
 + ' replays the stored response and appends NO second pair',
 async () => {
     const db = await seededDb();
@@ -1021,19 +1025,19 @@ async () => {
             + objectiveId, token,
         positionBody,
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const afterFirst = (await db.messagePairs.getAll()).length;
-    assert.equal(afterFirst, beforeReposition + 1);
+    assertStrictEquals(afterFirst, beforeReposition + 1);
 
     const second = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + objectiveId, token,
         positionBody,
     ));
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
     const afterSecond = (await db.messagePairs.getAll()).length;
-    assert.equal(afterSecond, afterFirst);
-    assert.equal(
+    assertStrictEquals(afterSecond, afterFirst);
+    assertStrictEquals(
         first.headers.get('Response-ID'),
         second.headers.get('Response-ID'),
     );
@@ -1045,7 +1049,7 @@ async () => {
     const derived = await derivedObjective(
         db, STARK_ORGANIZATION, objectiveId,
     );
-    assert.equal(
+    assertStrictEquals(
         await getRes.text(),
         await storedPutBodyText(
             db,
@@ -1054,12 +1058,12 @@ async () => {
             objectiveId,
         ),
     );
-    assert.equal(derived.position, 99);
+    assertStrictEquals(derived.position, 99);
 });
 
 // -- 8. THE ARCHIVED-INCLUSION PIN -----------------------------
 
-test('THE ARCHIVED-INCLUSION PIN: an objective with a live'
+Deno.test('THE ARCHIVED-INCLUSION PIN: an objective with a live'
 + " 'archived' document-plane event appears in GET /objectives"
 + ' AND GET organizations/:id/objectives/:id 200 — archived is NOT deleted;'
 + " trio families exclude only state='deleted'",
@@ -1083,18 +1087,18 @@ async () => {
             state: 'archived',
         },
     ));
-    assert.equal(archived.status, 201);
+    assertStrictEquals(archived.status, 201);
 
     const listRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             , token),
     );
-    assert.equal(listRes.status, 200);
+    assertStrictEquals(listRes.status, 200);
     const listText = await listRes.text();
     const derivedCollection = await derivedObjectives(
         db, STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         listText,
         await storedCollectionText(
             db,
@@ -1102,7 +1106,7 @@ async () => {
                 + '/objectives/',
         ),
     );
-    assert.equal(
+    assertStrictEquals(
         derivedCollection.some((o) => o.id === objectiveId),
         true,
     );
@@ -1111,12 +1115,12 @@ async () => {
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + objectiveId, token),
     );
-    assert.equal(getRes.status, 200);
+    assertStrictEquals(getRes.status, 200);
     const derivedById = await derivedObjective(
         db, STARK_ORGANIZATION, objectiveId,
     );
-    assert.equal(derivedById.state, 'archived');
-    assert.equal(
+    assertStrictEquals(derivedById.state, 'archived');
+    assertStrictEquals(
         await getRes.text(),
         await storedPutBodyText(
             db,
@@ -1129,7 +1133,7 @@ async () => {
 
 // -- 9. non-lexical live fixtures (byIdAscending craft) --------
 
-test('live PUTs in non-lexical id order: collection is'
+Deno.test('live PUTs in non-lexical id order: collection is'
 + ' oldest live head (at, id) first',
 async () => {
     const db = await seededDb();
@@ -1149,8 +1153,8 @@ async () => {
                 state: 'active',
             },
         ));
-        assert.equal(put.status, 201);
-        assert.deepEqual(
+        assertStrictEquals(put.status, 201);
+        assertEquals(
             await put.json(),
             wireObjectiveGet(
                 f.id, f.position, 'active',
@@ -1163,13 +1167,13 @@ async () => {
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             , token),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const list = await res.json() as { id: string }[];
     const added = list.filter((row) =>
         [
             OBJ_DRIFT_Z, OBJ_DRIFT_A, OBJ_DRIFT_M,
         ].includes(row.id));
-    assert.deepEqual(
+    assertEquals(
         added.map((row) => row.id),
         [OBJ_DRIFT_Z, OBJ_DRIFT_A, OBJ_DRIFT_M],
     );
@@ -1180,8 +1184,8 @@ async () => {
             db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
                 + '' + row.id, token),
         );
-        assert.equal(single.status, 200);
-        assert.equal(
+        assertStrictEquals(single.status, 200);
+        assertStrictEquals(
             await single.text(),
             await storedPutBodyText(db, prefix, row.id),
         );
@@ -1195,7 +1199,7 @@ async () => {
 // stay genesis (state ← event.state, state_at ← event.at,
 // state_event_id ← event.id).
 
-test('GET objective trio is lifecycle-current under clock skew'
+Deno.test('GET objective trio is lifecycle-current under clock skew'
 + ' (genesis-wins-under-skew, case 7d)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -1210,7 +1214,7 @@ test('GET objective trio is lifecycle-current under clock skew'
             state: 'active',
         },
     ));
-    assert.equal(genesis.status, 201);
+    assertStrictEquals(genesis.status, 201);
 
     // Later arrival, earlier state_at, different state +
     // position. 'archived' is a live objective state — if
@@ -1223,7 +1227,7 @@ test('GET objective trio is lifecycle-current under clock skew'
             state: 'archived',
         },
     ));
-    assert.equal(skewed.status, 201);
+    assertStrictEquals(skewed.status, 201);
 
     const expected = wireObjectiveGet(
         objectiveId, 99, 'archived',
@@ -1234,9 +1238,9 @@ test('GET objective trio is lifecycle-current under clock skew'
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + objectiveId, token),
     );
-    assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), expected);
-    assert.deepEqual(
+    assertStrictEquals(res.status, 200);
+    assertEquals(await res.json(), expected);
+    assertEquals(
         JSON.parse(await storedPutBodyText(
             db,
             '/organizations/' + STARK_ORGANIZATION
@@ -1249,22 +1253,22 @@ test('GET objective trio is lifecycle-current under clock skew'
     const derived = await derivedObjective(
         db, STARK_ORGANIZATION, objectiveId,
     );
-    assert.equal(
+    assertStrictEquals(
         JSON.stringify(derived), JSON.stringify(expected),
     );
-    assert.equal(derived.position, 99);
-    assert.equal(derived.state, 'archived');
+    assertStrictEquals(derived.position, 99);
+    assertStrictEquals(derived.state, 'archived');
 
     const objectives = await derivedObjectives(
         db, STARK_ORGANIZATION,
     );
     const row = objectives.find((o) => o.id === objectiveId);
-    assert.deepEqual(row, expected);
+    assertEquals(row, expected);
 });
 
 // -- 10. revision PUT wire equals GET collection entry ---------
 
-test('revision PUT wire body matches collection derive entry',
+Deno.test('revision PUT wire body matches collection derive entry',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -1291,16 +1295,16 @@ async () => {
             + revisionId,
         token, body,
     ));
-    assert.equal(putRes.status, 201);
+    assertStrictEquals(putRes.status, 201);
     const expected: ObjectiveRevisionEntity = {
         id: revisionId,
         ...body,
     };
-    assert.deepEqual(await putRes.json(), expected);
+    assertEquals(await putRes.json(), expected);
     const revs = await deriveObjectiveRevisions(
         db, STARK_ORGANIZATION, objectiveId,
     );
-    assert.ok(revs.some((r) => r.id === revisionId));
+    assert(revs.some((r) => r.id === revisionId));
     const found = revs.find((r) => r.id === revisionId)!;
-    assert.deepEqual(found, expected);
+    assertEquals(found, expected);
 });

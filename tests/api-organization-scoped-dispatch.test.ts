@@ -1,6 +1,5 @@
+import { assertEquals } from '@std/assert';
 import './hmac-test-key.ts';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -49,16 +48,16 @@ async function twoOrganizationIdeas(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('an org-scoped token fences GET to its tenant',
+Deno.test('an org-scoped token fences GET to its tenant',
 async () => {
     const db = await twoOrganizationIdeas();
     const rows = await GET<{ id: string }[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             , await organizationToken('AjdvjuECVZEgZoFajaIEkg'));
-    assert.deepEqual(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
+    assertEquals(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
 });
 
-test('a flat token bridges to the default org',
+Deno.test('a flat token bridges to the default org',
 async () => {
     const db = await twoOrganizationIdeas();
     const rows = await GET<{ id: string }[]>(
@@ -67,5 +66,5 @@ async () => {
     // No honest unscoped default since SP-6: the token
     // resolves to org 'AjdvjuECVZEgZoFajaIEkg', so the org '7' idea stays
     // hidden.
-    assert.deepEqual(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
+    assertEquals(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
 });

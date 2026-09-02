@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from
     '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -10,7 +9,7 @@ import { organizationToken } from
 
 const BASE = 'http://localhost';
 
-test('GET /identities/ is the collection',
+Deno.test('GET /identities/ is the collection',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -22,11 +21,11 @@ async () => {
             },
         }),
     );
-    assert.equal(res.status, 200);
-    assert.ok(Array.isArray(await res.json()));
+    assertStrictEquals(res.status, 200);
+    assert(Array.isArray(await res.json()));
 });
 
-test('GET /identities is 404 when authenticated',
+Deno.test('GET /identities is 404 when authenticated',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -38,10 +37,10 @@ async () => {
             },
         }),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
-test('GET /identities/:id/ trailing slash is 404',
+Deno.test('GET /identities/:id/ trailing slash is 404',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -54,5 +53,5 @@ async () => {
             },
         }),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import {
     currentDefaultOrganizationFor,
 } from '../api/authorization.ts';
@@ -24,45 +23,45 @@ function ev(
     };
 }
 
-test(
+Deno.test(
     'currentDefaultOrganizationFor is null with no event for the identity',
     () => {
         const rows = [ev('d1', 'other', 'AjdvjuECVZEgZoFajaIEkg', AT1)];
-        assert.equal(currentDefaultOrganizationFor(rows, 'me'), null);
+        assertStrictEquals(currentDefaultOrganizationFor(rows, 'me'), null);
     },
 );
 
-test(
+Deno.test(
     'currentDefaultOrganizationFor returns the latest event org',
     () => {
         const rows = [
             ev('d1', 'me', 'AjdvjuECVZEgZoFajaIEkg', AT1),
             ev('d2', 'me', 'BBjWJsjYIDkTRKIIPrzWRw', AT2),
         ];
-        assert.equal(currentDefaultOrganizationFor(rows, 'me')
+        assertStrictEquals(currentDefaultOrganizationFor(rows, 'me')
             , 'BBjWJsjYIDkTRKIIPrzWRw');
     },
 );
 
-test(
+Deno.test(
     'currentDefaultOrganizationFor breaks an at-tie toward later row',
     () => {
         const rows = [
             ev('d1', 'me', 'AjdvjuECVZEgZoFajaIEkg', AT1),
             ev('d2', 'me', '3', AT1),
         ];
-        assert.equal(currentDefaultOrganizationFor(rows, 'me'), '3');
+        assertStrictEquals(currentDefaultOrganizationFor(rows, 'me'), '3');
     },
 );
 
-test(
+Deno.test(
     'currentDefaultOrganizationFor ignores other identities',
     () => {
         const rows = [
             ev('d1', 'me', 'AjdvjuECVZEgZoFajaIEkg', AT1),
             ev('d2', 'other', 'BBjWJsjYIDkTRKIIPrzWRw', AT2),
         ];
-        assert.equal(currentDefaultOrganizationFor(rows, 'me')
+        assertStrictEquals(currentDefaultOrganizationFor(rows, 'me')
             , 'AjdvjuECVZEgZoFajaIEkg');
     },
 );

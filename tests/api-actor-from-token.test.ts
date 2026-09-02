@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import { GET, PUT } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
@@ -8,7 +7,7 @@ import { seedHumanMember } from './member-fixtures.ts';
 import { seedOrganizationMember } from
     './root-admin-fixture.ts';
 
-test(
+Deno.test(
     'a person identity write is authored by the token',
     async () => {
         const db = memoryDbAdapter();
@@ -27,11 +26,11 @@ test(
             && r.uri_id === 'XXZruirZyAOoRpNxaDnpSA'
             && r.requester_identity_id === 'XXZruirZyAOoRpNxaDnpSA',
         );
-        assert.ok(row, 'identity PUT pair missing');
+        assert(row, 'identity PUT pair missing');
     },
 );
 
-test(
+Deno.test(
     'the token sub is the caller identity',
     async () => {
         const db = memoryDbAdapter();
@@ -42,12 +41,12 @@ test(
         const { principalFromToken } = await import(
             '../shared/access-token-decode.ts'
         );
-        assert.equal(
+        assertStrictEquals(
             principalFromToken(token).id, 'alice',
         );
         const seats = await GET<{ id: string }[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', token,
         );
-        assert.ok(seats.some(s => s.id === 'alice'));
+        assert(seats.some(s => s.id === 'alice'));
     },
 );

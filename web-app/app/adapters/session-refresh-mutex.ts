@@ -19,10 +19,7 @@ function refreshChannel(): BroadcastChannel | undefined {
     if (typeof BroadcastChannel !== 'function') {
         return undefined;
     }
-    // Node has BroadcastChannel for workers; unref so
-    // ./validate is not held open. Browser has no unref.
     channel = new BroadcastChannel(REFRESH_CHANNEL);
-    (channel as { unref?: () => void }).unref?.();
     channel.addEventListener('message', (event: MessageEvent) => {
         if (inFlight === null) {
             return;
@@ -37,6 +34,14 @@ function refreshChannel(): BroadcastChannel | undefined {
         }
     });
     return channel;
+}
+
+// A tab releases its channel at unload; a test process has
+// no unload, so the divorce point offers the release
+// explicitly. refreshChannel reopens it on the next refresh.
+export function deleteRefreshChannel(): void {
+    channel?.close();
+    channel = undefined;
 }
 
 export function runSingleFlightRefresh(

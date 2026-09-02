@@ -1,14 +1,7 @@
-import { test } from 'node:test';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
-import {
-    readdirSync,
-    readFileSync,
-    statSync,
-} from 'node:fs';
-import { join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fromFileUrl, join, relative } from '@std/path';
 import { handleRequest, PUT } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -58,7 +51,7 @@ const RETIRED_MESSAGE =
     + ' is retired: send set/clear against'
     + ' the bound instance';
 
-const repoRoot = fileURLToPath(
+const repoRoot = fromFileUrl(
     new URL('..', import.meta.url),
 );
 
@@ -130,34 +123,34 @@ function legacyBody(
 
 function walkTs(dir: string): string[] {
     const out: string[] = [];
-    for (const name of readdirSync(dir)) {
-        const full = join(dir, name);
-        if (statSync(full).isDirectory()) {
+    for (const entry of Deno.readDirSync(dir)) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory) {
             out.push(...walkTs(full));
-        } else if (name.endsWith('.ts')) {
+        } else if (entry.name.endsWith('.ts')) {
             out.push(full);
         }
     }
     return out;
 }
 
-test('gate POST with fieldValues: [] → 400 retired',
+Deno.test('gate POST with fieldValues: [] → 400 retired',
 async () => {
     const db = await seededDb();
     const res = await handleRequest(
         db,
         req('POST', TRANSITION, DEV_TOKEN, legacyBody()),
     );
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.equal(err.error, RETIRED_MESSAGE);
+    assertStrictEquals(err.error, RETIRED_MESSAGE);
     const events = await workOrderLifecycleStatesFor(
         db, ORGANIZATION, WO_ID,
     );
-    assert.equal(events.length, 0);
+    assertStrictEquals(events.length, 0);
 });
 
-test('gate POST with fieldValues bag AND set → 400',
+Deno.test('gate POST with fieldValues bag AND set → 400',
 async () => {
     const db = await seededDb();
     const res = await handleRequest(
@@ -184,12 +177,12 @@ async () => {
             }),
         ),
     );
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.equal(err.error, RETIRED_MESSAGE);
+    assertStrictEquals(err.error, RETIRED_MESSAGE);
 });
 
-test('below-facade postWorkOrderTransitionOp still'
+Deno.test('below-facade postWorkOrderTransitionOp still'
 + ' appends a legacy body',
 async () => {
     const db = await seededDb();
@@ -228,13 +221,13 @@ async () => {
     // the stored body (seed tier dual-tolerant).
     const requests = await db.messagePairs.getAll();
     const hit = requests.some((r) => r.id === messagePair.id);
-    assert.equal(hit, true);
+    assertStrictEquals(hit, true);
 });
 
 // G7 source sweep (pair-write-coverage sourceText idiom):
 // /fieldValues/ hits under api/ + web-app/app/ equal the
 // named exception list — no silent dual-SoT producer.
-test('G7: fieldValues hits equal named exceptions',
+Deno.test('G7: fieldValues hits equal named exceptions',
 () => {
     const hits = new Set<string>();
     for (const root of [
@@ -242,13 +235,13 @@ test('G7: fieldValues hits equal named exceptions',
         join(repoRoot, 'web-app', 'app'),
     ]) {
         for (const full of walkTs(root)) {
-            const text = readFileSync(full, 'utf8');
+            const text = Deno.readTextFileSync(full);
             if (/fieldValues/.test(text)) {
                 hits.add(relative(repoRoot, full));
             }
         }
     }
-    assert.deepEqual(
+    assertEquals(
         [...hits].sort(),
         [...NAMED_EXCEPTIONS].sort(),
         'unexpected fieldValues hit files: '

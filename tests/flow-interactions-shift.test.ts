@@ -1,40 +1,39 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import { pointerIsShift } from
     '../web-app/app/flow-interactions.ts';
 
-test(
+Deno.test(
     'pointerIsShift is true when the window'
     + ' tracks Shift even if the pointer event'
     + ' reports false',
     () => {
-        assert.equal(
+        assertStrictEquals(
             pointerIsShift(true, false),
             true,
         );
     },
 );
 
-test(
+Deno.test(
     'pointerIsShift is true when the pointer'
     + ' event reports Shift',
     () => {
-        assert.equal(
+        assertStrictEquals(
             pointerIsShift(false, true),
             true,
         );
-        assert.equal(
+        assertStrictEquals(
             pointerIsShift(true, true),
             true,
         );
     },
 );
 
-test(
+Deno.test(
     'pointerIsShift is false when neither'
     + ' source is Shift',
     () => {
-        assert.equal(
+        assertStrictEquals(
             pointerIsShift(false, false),
             false,
         );

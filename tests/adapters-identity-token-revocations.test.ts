@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import {
     validateIdentityTokenRevocationEntity,
 } from '../api/validators.ts';
@@ -18,8 +22,8 @@ import { deriveTokenRevocationsFor } from
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-test('validates a revocation body', () => {
-    assert.deepEqual(
+Deno.test('validates a revocation body', () => {
+    assertEquals(
         validateIdentityTokenRevocationEntity({
             identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             at: '2026-06-03T00:00:00.000000Z',
@@ -31,16 +35,16 @@ test('validates a revocation body', () => {
     );
 });
 
-test('rejects an extra key', () => {
-    assert.throws(() =>
+Deno.test('rejects an extra key', () => {
+    assertThrows(() =>
         validateIdentityTokenRevocationEntity({
             identity_id: generateIdentifier(),
             at: 'x', extra: 1,
         }));
 });
 
-test('rejects an unparseable timestamp', () => {
-    assert.throws(() =>
+Deno.test('rejects an unparseable timestamp', () => {
+    assertThrows(() =>
         validateIdentityTokenRevocationEntity({
             identity_id: generateIdentifier(),
             at: 'not-a-date',
@@ -56,7 +60,7 @@ async function setup() {
 // Phase Final Task 2: identity_token_revocations ROW half
 // stripped — append count lives on the message plane.
 
-test('logout-everywhere appends, never splices',
+Deno.test('logout-everywhere appends, never splices',
 async () => {
     // Revoke a subject OTHER than the writer's ('XXZruirZyAOoRpNxaDnpSA',
     // via devToken) so the second append's own Bearer is not
@@ -71,8 +75,8 @@ async () => {
     const rows = await deriveTokenRevocationsFor(
         db, target,
     );
-    assert.equal(rows.length, 2);            // retained
-    assert.ok(rows.every(
+    assertStrictEquals(rows.length, 2);            // retained
+    assert(rows.every(
         r => r.identity_id === target));
     // Phase Final Stage B: identity spine tables retired.
 });

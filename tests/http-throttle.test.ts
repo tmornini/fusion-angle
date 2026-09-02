@@ -1,9 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { request } from 'node:http';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { HTTP_TOO_MANY_REQUESTS } from
     '../api/http-errors.ts';
@@ -13,15 +8,17 @@ import {
     type RequestHandler,
 } from '../server/http-server.ts';
 import { createAuthThrottle } from '../server/throttle.ts';
+import { fetchDiscardingBody } from
+    './fixtures/fetch-discarding-body.ts';
 
 async function withServer(
     handle: RequestHandler,
     run: (base: string) => Promise<void>,
     trustedProxyHops?: string,
 ): Promise<void> {
-    const root = await mkdtemp(
-        join(tmpdir(), 'fusion-throttle-'),
-    );
+    const root = await Deno.makeTempDir({
+        prefix: 'fusion-throttle-',
+    });
     let listener: HttpListener | undefined;
     try {
         listener = await listenHttp({
@@ -40,33 +37,30 @@ async function withServer(
         );
     } finally {
         if (listener !== undefined) await listener.close();
-        await rm(root, { recursive: true, force: true });
+        await Deno.remove(root, { recursive: true });
     }
 }
 
+// fetch's own URL parsing normalizes a dot-segment out of
+// `path` client-side, so the literal string never reaches
+// the wire — but that no longer matters either way:
+// server/http-server.ts:466-467 unconditionally re-parses
+// `request.url` through `new URL(...)`, which normalizes
+// it again server-side regardless of transport. Measured
+// directly (raw socket vs. fetch, same listener): the
+// server-observed path was identical both ways. So the
+// throttle-keying this test proves is unchanged by
+// dropping the raw socket.
 function postRaw(
     base: string,
     path: string,
 ): Promise<number> {
-    const url = new URL(base);
-    return new Promise((resolve, reject) => {
-        const req = request({
-            hostname: url.hostname,
-            port: url.port,
-            method: 'POST',
-            path,
-        }, (res) => {
-            res.resume();
-            res.on('end', () => {
-                resolve(res.statusCode ?? 0);
-            });
-        });
-        req.on('error', reject);
-        req.end();
-    });
+    return fetchDiscardingBody(base + path, {
+        method: 'POST',
+    }).then((res) => res.status);
 }
 
-test('sixth authorize in a minute is 429', async () => {
+Deno.test('sixth authorize in a minute is 429', async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
         handled += 1;
@@ -75,16 +69,16 @@ test('sixth authorize in a minute is 429', async () => {
     await withServer(handle, async (base) => {
         const url = base + '/api/authentication/authorize';
         for (let i = 0; i < 5; i++) {
-            const res = await fetch(url, { method: 'POST' });
-            assert.equal(res.status, 200);
+            const res = await fetchDiscardingBody(url, { method: 'POST' });
+            assertStrictEquals(res.status, 200);
         }
-        const sixth = await fetch(url, { method: 'POST' });
-        assert.equal(sixth.status, HTTP_TOO_MANY_REQUESTS);
-        assert.equal(handled, 5);
+        const sixth = await fetchDiscardingBody(url, { method: 'POST' });
+        assertStrictEquals(sixth.status, HTTP_TOO_MANY_REQUESTS);
+        assertStrictEquals(handled, 5);
     });
 });
 
-test('six refresh token grants reach the handler',
+Deno.test('six refresh token grants reach the handler',
 async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
@@ -97,20 +91,20 @@ async () => {
             grant_type: 'refresh',
         });
         for (let i = 0; i < 6; i++) {
-            const res = await fetch(url, {
+            const res = await fetchDiscardingBody(url, {
                 method: 'POST',
                 headers: {
                     'content-type': 'application/json',
                 },
                 body,
             });
-            assert.equal(res.status, 200);
+            assertStrictEquals(res.status, 200);
         }
-        assert.equal(handled, 6);
+        assertStrictEquals(handled, 6);
     });
 });
 
-test('six token-exchange grants reach the handler',
+Deno.test('six token-exchange grants reach the handler',
 async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
@@ -123,20 +117,20 @@ async () => {
             grant_type: 'token-exchange',
         });
         for (let i = 0; i < 6; i++) {
-            const res = await fetch(url, {
+            const res = await fetchDiscardingBody(url, {
                 method: 'POST',
                 headers: {
                     'content-type': 'application/json',
                 },
                 body,
             });
-            assert.equal(res.status, 200);
+            assertStrictEquals(res.status, 200);
         }
-        assert.equal(handled, 6);
+        assertStrictEquals(handled, 6);
     });
 });
 
-test('sixth non-refresh token grant in a minute is 429',
+Deno.test('sixth non-refresh token grant in a minute is 429',
 async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
@@ -149,28 +143,28 @@ async () => {
             grant_type: 'client_credentials',
         });
         for (let i = 0; i < 5; i++) {
-            const res = await fetch(url, {
+            const res = await fetchDiscardingBody(url, {
                 method: 'POST',
                 headers: {
                     'content-type': 'application/json',
                 },
                 body,
             });
-            assert.equal(res.status, 200);
+            assertStrictEquals(res.status, 200);
         }
-        const sixth = await fetch(url, {
+        const sixth = await fetchDiscardingBody(url, {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
             },
             body,
         });
-        assert.equal(sixth.status, HTTP_TOO_MANY_REQUESTS);
-        assert.equal(handled, 5);
+        assertStrictEquals(sixth.status, HTTP_TOO_MANY_REQUESTS);
+        assertStrictEquals(handled, 5);
     });
 });
 
-test('sixth authorize with a trailing slash is 429',
+Deno.test('sixth authorize with a trailing slash is 429',
 async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
@@ -180,16 +174,16 @@ async () => {
     await withServer(handle, async (base) => {
         const url = base + '/api/authentication/authorize/';
         for (let i = 0; i < 5; i++) {
-            const res = await fetch(url, { method: 'POST' });
-            assert.equal(res.status, 200);
+            const res = await fetchDiscardingBody(url, { method: 'POST' });
+            assertStrictEquals(res.status, 200);
         }
-        const sixth = await fetch(url, { method: 'POST' });
-        assert.equal(sixth.status, HTTP_TOO_MANY_REQUESTS);
-        assert.equal(handled, 5);
+        const sixth = await fetchDiscardingBody(url, { method: 'POST' });
+        assertStrictEquals(sixth.status, HTTP_TOO_MANY_REQUESTS);
+        assertStrictEquals(handled, 5);
     });
 });
 
-test('spoofed X-Forwarded-For from a non-trusted hop is ignored',
+Deno.test('spoofed X-Forwarded-For from a non-trusted hop is ignored',
 async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
@@ -199,26 +193,26 @@ async () => {
     await withServer(handle, async (base) => {
         const url = base + '/api/authentication/authorize';
         for (let i = 0; i < 5; i++) {
-            const res = await fetch(url, {
+            const res = await fetchDiscardingBody(url, {
                 method: 'POST',
                 headers: {
                     'x-forwarded-for': '203.0.113.10',
                 },
             });
-            assert.equal(res.status, 200);
+            assertStrictEquals(res.status, 200);
         }
-        const sixth = await fetch(url, {
+        const sixth = await fetchDiscardingBody(url, {
             method: 'POST',
             headers: {
                 'x-forwarded-for': '203.0.113.20',
             },
         });
-        assert.equal(sixth.status, HTTP_TOO_MANY_REQUESTS);
-        assert.equal(handled, 5);
+        assertStrictEquals(sixth.status, HTTP_TOO_MANY_REQUESTS);
+        assertStrictEquals(handled, 5);
     });
 });
 
-test('trusted hop keys distinct XFF and Forwarded clients',
+Deno.test('trusted hop keys distinct XFF and Forwarded clients',
 async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
@@ -228,33 +222,33 @@ async () => {
     await withServer(handle, async (base) => {
         const url = base + '/api/authentication/authorize';
         for (let i = 0; i < 5; i++) {
-            const res = await fetch(url, {
+            const res = await fetchDiscardingBody(url, {
                 method: 'POST',
                 headers: {
                     'x-forwarded-for': '203.0.113.10',
                 },
             });
-            assert.equal(res.status, 200);
+            assertStrictEquals(res.status, 200);
         }
-        const other = await fetch(url, {
+        const other = await fetchDiscardingBody(url, {
             method: 'POST',
             headers: {
                 'forwarded': 'for=203.0.113.20',
             },
         });
-        assert.equal(other.status, 200);
-        const sixth = await fetch(url, {
+        assertStrictEquals(other.status, 200);
+        const sixth = await fetchDiscardingBody(url, {
             method: 'POST',
             headers: {
                 'x-forwarded-for': '203.0.113.10',
             },
         });
-        assert.equal(sixth.status, HTTP_TOO_MANY_REQUESTS);
-        assert.equal(handled, 6);
+        assertStrictEquals(sixth.status, HTTP_TOO_MANY_REQUESTS);
+        assertStrictEquals(handled, 6);
     }, '127.0.0.1');
 });
 
-test('sixth dot-segment authorize is 429', async () => {
+Deno.test('sixth dot-segment authorize is 429', async () => {
     let handled = 0;
     const handle: RequestHandler = async () => {
         handled += 1;
@@ -264,33 +258,33 @@ test('sixth dot-segment authorize is 429', async () => {
         const path = '/api/authentication/./authorize';
         for (let i = 0; i < 5; i++) {
             const status = await postRaw(base, path);
-            assert.equal(status, 200);
+            assertStrictEquals(status, 200);
         }
         const sixth = await postRaw(base, path);
-        assert.equal(sixth, HTTP_TOO_MANY_REQUESTS);
-        assert.equal(handled, 5);
+        assertStrictEquals(sixth, HTTP_TOO_MANY_REQUESTS);
+        assertStrictEquals(handled, 5);
     });
 });
 
-test('IPv4-mapped remote matches a trusted IPv4 hop',
+Deno.test('IPv4-mapped remote matches a trusted IPv4 hop',
 () => {
     const throttle = createAuthThrottle('10.0.0.1');
     const remote = '::ffff:10.0.0.1';
     for (let i = 0; i < 5; i++) {
-        assert.equal(
+        assertStrictEquals(
             throttle.limited(
                 remote, undefined, '203.0.113.10',
             ),
             false,
         );
     }
-    assert.equal(
+    assertStrictEquals(
         throttle.limited(
             remote, undefined, '203.0.113.20',
         ),
         false,
     );
-    assert.equal(
+    assertStrictEquals(
         throttle.limited(
             remote, undefined, '203.0.113.10',
         ),
@@ -298,7 +292,7 @@ test('IPv4-mapped remote matches a trusted IPv4 hop',
     );
 });
 
-test('injected clock expires the 60s throttle window',
+Deno.test('injected clock expires the 60s throttle window',
 () => {
     let now = 1_000_000;
     const throttle = createAuthThrottle(
@@ -307,30 +301,30 @@ test('injected clock expires the 60s throttle window',
     );
     const remote = '127.0.0.1';
     for (let i = 0; i < 5; i++) {
-        assert.equal(
+        assertStrictEquals(
             throttle.limited(
                 remote, undefined, undefined,
             ),
             false,
         );
     }
-    assert.equal(
+    assertStrictEquals(
         throttle.limited(remote, undefined, undefined),
         true,
     );
     now += 60_000;
-    assert.equal(
+    assertStrictEquals(
         throttle.limited(remote, undefined, undefined),
         false,
     );
 });
 
-test('trusted hop keys the rightmost X-Forwarded-For',
+Deno.test('trusted hop keys the rightmost X-Forwarded-For',
 () => {
     const throttle = createAuthThrottle('10.0.0.1');
     const remote = '10.0.0.1';
     for (let i = 0; i < 5; i++) {
-        assert.equal(
+        assertStrictEquals(
             throttle.limited(
                 remote,
                 undefined,
@@ -339,7 +333,7 @@ test('trusted hop keys the rightmost X-Forwarded-For',
             false,
         );
     }
-    assert.equal(
+    assertStrictEquals(
         throttle.limited(
             remote,
             undefined,

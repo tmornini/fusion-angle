@@ -1,6 +1,7 @@
+import {
+    assertEquals, assertStrictEquals, assertThrows,
+} from '@std/assert';
 import './hmac-test-key.ts';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
 import {
     mintAccessToken,
     TOKEN_AUDIENCE,
@@ -33,53 +34,53 @@ async function token(over: Partial<{
     });
 }
 
-test('verifies a well-formed unexpired token', async () => {
+Deno.test('verifies a well-formed unexpired token', async () => {
     const r = await verifyAccessToken(
         await token(), 1_700_000_100);
-    assert.equal(r.valid, true);
-    assert.equal(r.valid && r.claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(r.valid, true);
+    assertStrictEquals(r.valid && r.claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
-test('rejects an expired token', async () => {
+Deno.test('rejects an expired token', async () => {
     const t = await token({ iat: 1_600_000_000, ttlSeconds: 1 });
     const r = await verifyAccessToken(t, 1_700_000_000);
-    assert.equal(r.valid, false);
+    assertStrictEquals(r.valid, false);
 });
 
-test('rejects a not-yet-valid token', async () => {
+Deno.test('rejects a not-yet-valid token', async () => {
     const t = await token({ iat: 4_000_000_000 });
     const r = await verifyAccessToken(t, 1_700_000_000);
-    assert.equal(r.valid, false);
+    assertStrictEquals(r.valid, false);
 });
 
-test('rejects a malformed token', async () => {
-    assert.equal(
+Deno.test('rejects a malformed token', async () => {
+    assertStrictEquals(
         (await verifyAccessToken('a.b', 1_700_000_000)).valid,
         false);
 });
 
-test('rejects a tampered signature', async () => {
+Deno.test('rejects a tampered signature', async () => {
     const t = await token();
     const bad = t.slice(0, t.lastIndexOf('.') + 1) + 'XXXX';
-    assert.equal(
+    assertStrictEquals(
         (await verifyAccessToken(bad, 1_700_000_100)).valid,
         false);
 });
 
-test('decodeAccessToken does not verify the signature',
+Deno.test('decodeAccessToken does not verify the signature',
 async () => {
     const t = await token();
     const cut = t.lastIndexOf('.') + 1;
     const unsigned = t.slice(0, cut) + 'XXXX';
     const claims = decodeAccessToken(unsigned);
-    assert.equal(claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
     const r = await verifyAccessToken(
         unsigned, 1_700_000_100);
-    assert.equal(r.valid, false);
-    assert.equal(!r.valid && r.reason, 'bad signature');
+    assertStrictEquals(r.valid, false);
+    assertStrictEquals(!r.valid && r.reason, 'bad signature');
 });
 
-test('rejects a tampered body — the real MAC binds it',
+Deno.test('rejects a tampered body — the real MAC binds it',
 async () => {
     const t = await token();
     const [head, , sig] = t.split('.');
@@ -94,11 +95,11 @@ async () => {
     }));
     const forged = head + '.' + forgedBody + '.' + sig;
     const r = await verifyAccessToken(forged, 1_700_000_100);
-    assert.equal(r.valid, false);
-    assert.equal(!r.valid && r.reason, 'bad signature');
+    assertStrictEquals(r.valid, false);
+    assertStrictEquals(!r.valid && r.reason, 'bad signature');
 });
 
-test('rejects a token minted for a different audience', async () => {
+Deno.test('rejects a token minted for a different audience', async () => {
     const header = base64UrlEncode(JSON.stringify(
         { alg: 'HS256', typ: 'JWT', kid: 'dev-co-located' }));
     const claims = base64UrlEncode(JSON.stringify({
@@ -109,12 +110,12 @@ test('rejects a token minted for a different audience', async () => {
     }));
     const sig = base64UrlEncode('dev-co-located');
     const token = header + '.' + claims + '.' + sig;
-    assert.equal(
+    assertStrictEquals(
         (await verifyAccessToken(token, 1_700_000_100)).valid,
         false);
 });
 
-test('a real-signed token for a foreign audience is rejected'
+Deno.test('a real-signed token for a foreign audience is rejected'
     + ' at the audience gate', async () => {
     const t = await mintAccessToken({
         sub: 'XXZruirZyAOoRpNxaDnpSA', roles: [], name: 'Demo',
@@ -122,73 +123,73 @@ test('a real-signed token for a foreign audience is rejected'
         jti: 'jti-test', aud: 'evil-site',
     });
     const r = await verifyAccessToken(t, 1_700_000_100);
-    assert.equal(r.valid, false);
-    assert.equal(!r.valid && r.reason, 'wrong audience');
+    assertStrictEquals(r.valid, false);
+    assertStrictEquals(!r.valid && r.reason, 'wrong audience');
 });
 
-test('principalFromToken reads sub/roles/name', async () => {
+Deno.test('principalFromToken reads sub/roles/name', async () => {
     const p = principalFromToken(await token());
-    assert.equal(p.id, 'XXZruirZyAOoRpNxaDnpSA');
-    assert.deepEqual(p.roles, []);
+    assertStrictEquals(p.id, 'XXZruirZyAOoRpNxaDnpSA');
+    assertEquals(p.roles, []);
 });
 
-test('mints and verifies an org-scoped token', async () => {
+Deno.test('mints and verifies an org-scoped token', async () => {
     const r = await verifyAccessToken(
         await token({ organization: '7' }), 1_700_000_100);
-    assert.equal(r.valid, true);
-    assert.equal(r.valid && r.claims.organization, '7');
+    assertStrictEquals(r.valid, true);
+    assertStrictEquals(r.valid && r.claims.organization, '7');
 });
 
-test('a flat token carries no org claim', async () => {
+Deno.test('a flat token carries no org claim', async () => {
     const r = await verifyAccessToken(
         await token(), 1_700_000_100);
-    assert.equal(r.valid && r.claims.organization, undefined);
+    assertStrictEquals(r.valid && r.claims.organization, undefined);
 });
 
-test('principalFromToken reads the org claim', async () => {
+Deno.test('principalFromToken reads the org claim', async () => {
     const p = principalFromToken(await token({ organization: '7' }));
-    assert.equal(p.organization, '7');
+    assertStrictEquals(p.organization, '7');
 });
 
-test('principalFromToken leaves org undefined when absent',
+Deno.test('principalFromToken leaves org undefined when absent',
 async () => {
     const p = principalFromToken(await token());
-    assert.equal(p.organization, undefined);
+    assertStrictEquals(p.organization, undefined);
 });
 
-test('decodeAccessToken rejects a non-string org claim', () => {
+Deno.test('decodeAccessToken rejects a non-string org claim', () => {
     const body = base64UrlEncode(JSON.stringify({
         sub: 'XXZruirZyAOoRpNxaDnpSA', roles: [], name: 'Demo',
         aud: 'fusion-angle', organization: 7, iat: 1_700_000_000,
         nbf: 1_700_000_000, exp: 9_999_999_999, jti: 'x',
     }));
-    assert.throws(
+    assertThrows(
         () => decodeAccessToken('h.' + body + '.s'),
-        /bad claim shape/,
+        Error, 'bad claim shape',
     );
 });
 
-test('mints and verifies an orgs-list token', async () => {
+Deno.test('mints and verifies an orgs-list token', async () => {
     const r = await verifyAccessToken(
         await token({ organizations: ['AjdvjuECVZEgZoFajaIEkg', '7'] })
             , 1_700_000_100);
-    assert.equal(r.valid, true);
-    assert.deepEqual(r.valid && r.claims.organizations
+    assertStrictEquals(r.valid, true);
+    assertEquals(r.valid && r.claims.organizations
         , ['AjdvjuECVZEgZoFajaIEkg', '7']);
 });
 
-test('principalFromToken reads the orgs list', async () => {
+Deno.test('principalFromToken reads the orgs list', async () => {
     const p = principalFromToken(
         await token({ organizations: ['AjdvjuECVZEgZoFajaIEkg', '7'] }));
-    assert.deepEqual(p.organizations, ['AjdvjuECVZEgZoFajaIEkg', '7']);
+    assertEquals(p.organizations, ['AjdvjuECVZEgZoFajaIEkg', '7']);
 });
 
-test('a flat token carries no orgs list', async () => {
+Deno.test('a flat token carries no orgs list', async () => {
     const p = principalFromToken(await token());
-    assert.equal(p.organizations, undefined);
+    assertStrictEquals(p.organizations, undefined);
 });
 
-test('principalFromClaims matches principalFromToken on the'
+Deno.test('principalFromClaims matches principalFromToken on the'
     + ' same token', async () => {
     const variants = [
         await token(),
@@ -199,15 +200,15 @@ test('principalFromClaims matches principalFromToken on the'
     ];
     for (const t of variants) {
         const r = await verifyAccessToken(t, 1_700_000_100);
-        assert.equal(r.valid, true);
-        assert.deepEqual(
+        assertStrictEquals(r.valid, true);
+        assertEquals(
             r.valid && principalFromClaims(r.claims),
             principalFromToken(t),
         );
     }
 });
 
-test('decodeAccessToken rejects a non-array orgs claim',
+Deno.test('decodeAccessToken rejects a non-array orgs claim',
 () => {
     const body = base64UrlEncode(JSON.stringify({
         sub: 'XXZruirZyAOoRpNxaDnpSA', roles: [], name: 'Demo',
@@ -215,13 +216,13 @@ test('decodeAccessToken rejects a non-array orgs claim',
         iat: 1_700_000_000, nbf: 1_700_000_000,
         exp: 9_999_999_999, jti: 'x',
     }));
-    assert.throws(
+    assertThrows(
         () => decodeAccessToken('h.' + body + '.s'),
-        /bad claim shape/,
+        Error, 'bad claim shape',
     );
 });
 
-test('decodeAccessToken rejects non-string orgs elements',
+Deno.test('decodeAccessToken rejects non-string orgs elements',
 () => {
     const body = base64UrlEncode(JSON.stringify({
         sub: 'XXZruirZyAOoRpNxaDnpSA', roles: [], name: 'Demo',
@@ -229,26 +230,26 @@ test('decodeAccessToken rejects non-string orgs elements',
         iat: 1_700_000_000, nbf: 1_700_000_000,
         exp: 9_999_999_999, jti: 'x',
     }));
-    assert.throws(
+    assertThrows(
         () => decodeAccessToken('h.' + body + '.s'),
-        /bad claim shape/,
+        Error, 'bad claim shape',
     );
 });
 
-test('decodeAccessToken rejects non-string roles elements',
+Deno.test('decodeAccessToken rejects non-string roles elements',
 () => {
     const body = base64UrlEncode(JSON.stringify({
         sub: 'XXZruirZyAOoRpNxaDnpSA', roles: ['admin', 7], name: 'Demo',
         aud: 'fusion-angle', iat: 1_700_000_000,
         nbf: 1_700_000_000, exp: 9_999_999_999, jti: 'x',
     }));
-    assert.throws(
+    assertThrows(
         () => decodeAccessToken('h.' + body + '.s'),
-        /bad claim shape/,
+        Error, 'bad claim shape',
     );
 });
 
-test('latestRevocationAt returns the most recent stamp', () => {
+Deno.test('latestRevocationAt returns the most recent stamp', () => {
     const rows = [
         { id: generateIdentifier(), identity_id: 'a',
           at: '2021-01-01T00:00:00.000000Z' },
@@ -257,28 +258,28 @@ test('latestRevocationAt returns the most recent stamp', () => {
         { id: generateIdentifier(), identity_id: 'a',
           at: '2022-01-01T00:00:00.000000Z' },
     ];
-    assert.equal(
+    assertStrictEquals(
         latestRevocationAt(rows, 'a'),
         '2023-06-01T00:00:00.000000Z',
     );
 });
 
-test('latestRevocationAt isolates identities; null when none', () => {
+Deno.test('latestRevocationAt isolates identities; null when none', () => {
     const rows = [
         { id: generateIdentifier(), identity_id: 'a',
           at: '2023-06-01T00:00:00.000000Z' },
     ];
-    assert.equal(latestRevocationAt(rows, 'b'), null);
+    assertStrictEquals(latestRevocationAt(rows, 'b'), null);
 });
 
-test('revokedThroughSeconds converts the latest stamp', () => {
+Deno.test('revokedThroughSeconds converts the latest stamp', () => {
     const rows = [
         { id: generateIdentifier(), identity_id: 'a',
           at: '2021-01-01T00:00:00.000000Z' },
         { id: generateIdentifier(), identity_id: 'a',
           at: '2023-06-01T00:00:00.000000Z' },
     ];
-    assert.equal(
+    assertStrictEquals(
         revokedThroughSeconds(rows, 'a'),
         Math.floor(
             Date.parse('2023-06-01T00:00:00.000000Z') / 1000),

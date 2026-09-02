@@ -1,26 +1,23 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { assertMatch, assertStrictEquals } from '@std/assert';
+import { fromFileUrl } from '@std/path';
 
-const src = readFileSync(
-    fileURLToPath(
+const src = Deno.readTextFileSync(
+    fromFileUrl(
         new URL(
             '../web-app/landing/index.ts',
             import.meta.url,
         ),
     ),
-    'utf8',
 );
 
-test('landing does not shove to dashboard', () => {
-    assert.equal(
+Deno.test('landing does not shove to dashboard', () => {
+    assertStrictEquals(
         src.includes('AUTO_REDIRECT_MS'),
         false,
     );
-    assert.equal(
+    assertStrictEquals(
         src.includes('dashboard/index.html'),
         false,
     );
-    assert.match(src, /auth\/index\.html/);
+    assertMatch(src, /auth\/index\.html/);
 });

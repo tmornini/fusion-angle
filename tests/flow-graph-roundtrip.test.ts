@@ -1,6 +1,5 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
 
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     storedGraph,
     storedWorkOrderFlowGraph,
@@ -79,27 +78,27 @@ const STORED_WO_GRAPH = {
     ...STORED_FLOW_GRAPH,
 };
 
-test(
+Deno.test(
     'stored flow graph survives parse then serialize',
     () => {
         const parsed = asStoredGraph(
             STORED_FLOW_GRAPH, 'graph',
         );
         const out = storedGraph(parsed);
-        assert.deepEqual(
+        assertEquals(
             out, STORED_FLOW_GRAPH,
         );
     },
 );
 
-test(
+Deno.test(
     'serialized node attributes keep storage keys',
     () => {
         const parsed = asStoredGraph(
             STORED_FLOW_GRAPH, 'graph',
         );
         const out = storedGraph(parsed);
-        assert.deepEqual(
+        assertEquals(
             Object.keys(
                 (out.nodes as { attributes: object[] }[])[1]!
                     .attributes[0]!,
@@ -109,19 +108,19 @@ test(
     },
 );
 
-test(
+Deno.test(
     'parsed node attributes speak the domain tongue',
     () => {
         const parsed = asStoredGraph(
             STORED_FLOW_GRAPH, 'graph',
         );
         const ref = parsed.nodes[1]!.attributes[0]!;
-        assert.equal(ref.attributeId, 'UQBiHFcwJeCDSnmkPBoYRA');
-        assert.equal('attribute_id' in ref, false);
+        assertStrictEquals(ref.attributeId, 'UQBiHFcwJeCDSnmkPBoYRA');
+        assertStrictEquals('attribute_id' in ref, false);
     },
 );
 
-test(
+Deno.test(
     'stored work-order graph survives parse then'
     + ' serialize',
     () => {
@@ -130,6 +129,6 @@ test(
                 STORED_WO_GRAPH, 'flow_graph',
             );
         const out = storedWorkOrderFlowGraph(parsed);
-        assert.deepEqual(out, STORED_WO_GRAPH);
+        assertEquals(out, STORED_WO_GRAPH);
     },
 );

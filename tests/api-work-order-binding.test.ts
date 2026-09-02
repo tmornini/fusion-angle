@@ -1,7 +1,11 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -155,7 +159,7 @@ async function seedFlow(
             },
         },
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 }
 
 async function seedWorkOrder(
@@ -172,7 +176,7 @@ async function seedWorkOrder(
             position: 1,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
@@ -184,7 +188,7 @@ async function seedWorkOrder(
             at: AT,
         },
     ));
-    assert.equal(join.status, 201);
+    assertStrictEquals(join.status, 201);
 }
 
 async function seedLiveType(
@@ -203,7 +207,7 @@ async function seedLiveType(
             state: 'active',
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedAttribute(
@@ -221,7 +225,7 @@ async function seedAttribute(
             write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedInstance(
@@ -240,7 +244,7 @@ async function seedInstance(
             ],
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seedFlowTypeJoin(
@@ -261,7 +265,7 @@ async function seedFlowTypeJoin(
             at: AT,
         },
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
 }
 
 async function seededDb(): Promise<{
@@ -292,7 +296,7 @@ async function seededDb(): Promise<{
 }
 
 // 1. foreign-WO bind + malformed body → 404 (miss first)
-test('foreign-WO bind with malformed body → 404'
+Deno.test('foreign-WO bind with malformed body → 404'
 + ' (miss before body)',
 async () => {
     const { db, tokenB } = await seededDb();
@@ -303,15 +307,15 @@ async () => {
         tokenB,
         { not_a_key: true },
     ));
-    assert.equal(res.status, 404);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 404);
+    assertEquals(await res.json(), {
         error:
             'Not found: work_orders/' + WO_ID,
     });
 });
 
 // 2. absent WO → 404
-test('absent WO bind → 404',
+Deno.test('absent WO bind → 404',
 async () => {
     const { db, token } = await seededDb();
     const res = await handleRequest(db, req(
@@ -319,11 +323,11 @@ async () => {
             + 'xuMWXmMtPdenikPwsAUujg/binding',
         token, bindBody(),
     ));
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
 });
 
 // 3. bad body → 400
-test('bad body (missing key / unknown key / empty'
+Deno.test('bad body (missing key / unknown key / empty'
 + ' id) → 400',
 async () => {
     const { db, token } = await seededDb();
@@ -331,7 +335,7 @@ async () => {
         'PUT', BINDING, token,
         { instance_id: INSTANCE_ID },
     ));
-    assert.equal(missing.status, 400);
+    assertStrictEquals(missing.status, 400);
 
     const unknown = await handleRequest(db, req(
         'PUT', BINDING, token, {
@@ -340,7 +344,7 @@ async () => {
             extra: true,
         },
     ));
-    assert.equal(unknown.status, 400);
+    assertStrictEquals(unknown.status, 400);
 
     const empty = await handleRequest(db, req(
         'PUT', BINDING, token, {
@@ -348,11 +352,11 @@ async () => {
             record_type_id: TYPE_ID,
         },
     ));
-    assert.equal(empty.status, 400);
+    assertStrictEquals(empty.status, 400);
 });
 
 // 4. instance miss postures → 404 (no oracle)
-test('absent / tombstoned / foreign-org instance'
+Deno.test('absent / tombstoned / foreign-org instance'
 + ' → 404 (indistinguishable)',
 async () => {
     const { db, token, tokenB } = await seededDb();
@@ -361,8 +365,8 @@ async () => {
         'PUT', BINDING, token,
         bindBody(INSTANCE_MISSING, TYPE_ID),
     ));
-    assert.equal(absent.status, 404);
-    assert.deepEqual(await absent.json(), {
+    assertStrictEquals(absent.status, 404);
+    assertEquals(await absent.json(), {
         error: 'Not found: record_instances/'
             + INSTANCE_MISSING,
     });
@@ -373,13 +377,13 @@ async () => {
         INSTANCES + INSTANCE_TOMB,
         token,
     ));
-    assert.equal(del.status, 204);
+    assertStrictEquals(del.status, 204);
     const tomb = await handleRequest(db, req(
         'PUT', BINDING, token,
         bindBody(INSTANCE_TOMB, TYPE_ID),
     ));
-    assert.equal(tomb.status, 404);
-    assert.deepEqual(await tomb.json(), {
+    assertStrictEquals(tomb.status, 404);
+    assertEquals(await tomb.json(), {
         error: 'Not found: record_instances/'
             + INSTANCE_TOMB,
     });
@@ -398,7 +402,7 @@ async () => {
             state: 'active',
         },
     ));
-    assert.equal(putTypeB.status, 201);
+    assertStrictEquals(putTypeB.status, 201);
     const putAttrB = await handleRequest(db, req(
         'PUT',
         typeB + '/attributes/' + ATTR_ID,
@@ -417,7 +421,7 @@ async () => {
             ],
         },
     ));
-    assert.equal(putAttrB.status, 201);
+    assertStrictEquals(putAttrB.status, 201);
     const foreignInst = INSTANCE_FOREIGN;
     const putInstB = await handleRequest(db, req(
         'PATCH',
@@ -432,7 +436,7 @@ async () => {
             ],
         },
     ));
-    assert.equal(putInstB.status, 201);
+    assertStrictEquals(putInstB.status, 201);
     // Bind under org A with the foreign instance id + the
     // org-A joined type — head resolves under fenced org
     // only, so foreign is absent 404 (no oracle).
@@ -440,8 +444,8 @@ async () => {
         'PUT', BINDING, token,
         bindBody(foreignInst, TYPE_ID),
     ));
-    assert.equal(foreign.status, 404);
-    assert.deepEqual(await foreign.json(), {
+    assertStrictEquals(foreign.status, 404);
+    assertEquals(await foreign.json(), {
         error: 'Not found: record_instances/'
             + foreignInst,
     });
@@ -450,7 +454,7 @@ async () => {
 // 5. record_type_id not among flow joins → 400
 // Instance must be LIVE under the asserted type so the
 // ladder reaches the join check (instance before join).
-test('record_type_id not among WO flow joins → 400',
+Deno.test('record_type_id not among WO flow joins → 400',
 async () => {
     const { db, token } = await seededDb();
     await seedLiveType(db, token, TYPE_OTHER);
@@ -473,7 +477,7 @@ async () => {
             ],
         },
     ));
-    assert.equal(attr.status, 201);
+    assertStrictEquals(attr.status, 201);
     const otherInst = INSTANCE_OTHER;
     const inst = await handleRequest(db, req(
         'PATCH',
@@ -490,46 +494,46 @@ async () => {
             ],
         },
     ));
-    assert.equal(inst.status, 201);
+    assertStrictEquals(inst.status, 201);
     const before = await messagePairCount(db);
     const res = await handleRequest(db, req(
         'PUT', BINDING, token,
         bindBody(otherInst, TYPE_OTHER),
     ));
-    assert.equal(res.status, 400);
+    assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
-    assert.match(
+    assertMatch(
         err.error,
         /not joined to the work order's flow/,
     );
-    assert.equal(await messagePairCount(db), before);
+    assertStrictEquals(await messagePairCount(db), before);
 });
 
 // 6. fresh bind → 201 + GET embed; unbound omits keys
-test('fresh bind → 201; detail + list embed; unbound'
+Deno.test('fresh bind → 201; detail + list embed; unbound'
 + ' omits keys',
 async () => {
     const { db, token } = await seededDb();
     const res = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
     ));
-    assert.equal(res.status, 201);
+    assertStrictEquals(res.status, 201);
 
     const detail = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
             , token,
     ));
-    assert.equal(detail.status, 200);
+    assertStrictEquals(detail.status, 200);
     const d = await detail.json() as Record<
         string, unknown
     >;
-    assert.equal(d['instance_id'], INSTANCE_ID);
-    assert.equal(d['record_type_id'], TYPE_ID);
+    assertStrictEquals(d['instance_id'], INSTANCE_ID);
+    assertStrictEquals(d['record_type_id'], TYPE_ID);
 
     const list = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
     ));
-    assert.equal(list.status, 200);
+    assertStrictEquals(list.status, 200);
     const rows = await list.json() as Record<
         string, unknown
     >[];
@@ -537,52 +541,52 @@ async () => {
     const unbound = rows.find(
         (r) => r['id'] === WO_UNBOUND,
     );
-    assert.ok(bound !== undefined);
-    assert.ok(unbound !== undefined);
-    assert.equal(bound['instance_id'], INSTANCE_ID);
-    assert.equal(bound['record_type_id'], TYPE_ID);
-    assert.equal(
+    assert(bound !== undefined);
+    assert(unbound !== undefined);
+    assertStrictEquals(bound['instance_id'], INSTANCE_ID);
+    assertStrictEquals(bound['record_type_id'], TYPE_ID);
+    assertStrictEquals(
         Object.hasOwn(unbound, 'instance_id'),
         false,
     );
-    assert.equal(
+    assertStrictEquals(
         Object.hasOwn(unbound, 'record_type_id'),
         false,
     );
 });
 
 // 7. re-bind same pair → 201 replay (pair count stable)
-test('re-bind same pair byte-identically → 201'
+Deno.test('re-bind same pair byte-identically → 201'
 + ' replay (pair count unchanged)',
 async () => {
     const { db, token } = await seededDb();
     const first = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const before = await messagePairCount(db);
     const second = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
     ));
-    assert.equal(second.status, 201);
-    assert.equal(await messagePairCount(db), before);
+    assertStrictEquals(second.status, 201);
+    assertStrictEquals(await messagePairCount(db), before);
 });
 
 // 8. bind different instance → 409
-test('bind different instance → 409',
+Deno.test('bind different instance → 409',
 async () => {
     const { db, token } = await seededDb();
     await seedInstance(db, token, INSTANCE_2);
     const first = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
     const res = await handleRequest(db, req(
         'PUT', BINDING, token,
         bindBody(INSTANCE_2, TYPE_ID),
     ));
-    assert.equal(res.status, 409);
-    assert.deepEqual(await res.json(), {
+    assertStrictEquals(res.status, 409);
+    assertEquals(await res.json(), {
         error:
             'work order is already bound to a'
             + ' different instance',

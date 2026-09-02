@@ -1,7 +1,11 @@
-import { test } from 'node:test';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -215,7 +219,7 @@ async function seedFieldValueReferrer(
     );
 }
 
-test('POST .../record-types kind create (admin) → 204; '
+Deno.test('POST .../record-types kind create (admin) → 204; '
 + 'document + attribute pairs at nested addresses; GETs '
 + 'see them',
 async () => {
@@ -224,38 +228,38 @@ async () => {
         'POST', COLLECTION, adminToken,
         createBody(TYPE_ID, ATTR_ID, 'Composed'),
     ));
-    assert.equal(post.status, 201);
+    assertStrictEquals(post.status, 201);
 
     const typeGet = await handleRequest(db, req(
         'GET', DETAIL, adminToken,
     ));
-    assert.equal(typeGet.status, 200);
+    assertStrictEquals(typeGet.status, 200);
     const typeRow = await typeGet.json() as {
         id: string;
         organization_id: string;
         name: string;
         state: string;
     };
-    assert.equal(typeRow.id, TYPE_ID);
-    assert.equal(typeRow.organization_id, ORGANIZATION);
-    assert.equal(typeRow.name, 'Composed');
-    assert.equal(typeRow.state, 'active');
-    assert.equal('state_event_id' in typeRow, false);
+    assertStrictEquals(typeRow.id, TYPE_ID);
+    assertStrictEquals(typeRow.organization_id, ORGANIZATION);
+    assertStrictEquals(typeRow.name, 'Composed');
+    assertStrictEquals(typeRow.state, 'active');
+    assertStrictEquals('state_event_id' in typeRow, false);
 
     const attrGet = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(attrGet.status, 200);
+    assertStrictEquals(attrGet.status, 200);
     const attrRow = await attrGet.json() as {
         id: string;
         organization_id: string;
         record_type_id: string;
         name: string;
     };
-    assert.equal(attrRow.id, ATTR_ID);
-    assert.equal(attrRow.organization_id, ORGANIZATION);
-    assert.equal(attrRow.record_type_id, TYPE_ID);
-    assert.equal(attrRow.name, 'Priority');
+    assertStrictEquals(attrRow.id, ATTR_ID);
+    assertStrictEquals(attrRow.organization_id, ORGANIZATION);
+    assertStrictEquals(attrRow.record_type_id, TYPE_ID);
+    assertStrictEquals(attrRow.name, 'Priority');
 
     const requests = await db.messagePairs.getAll();
     const typePrefix =
@@ -269,24 +273,24 @@ async () => {
             && r.uri_collection === typePrefix
             && r.method === 'POST',
     );
-    assert.ok(opPair, 'operation message pair missing');
+    assert(opPair, 'operation message pair missing');
 
     const documentPair = requests.find(
         r => r.uri_id === TYPE_ID
             && r.uri_collection === typePrefix
             && r.method === 'PUT',
     );
-    assert.ok(documentPair, 'document message pair missing');
+    assert(documentPair, 'document message pair missing');
 
     const attrPair = requests.find(
         r => r.uri_id === ATTR_ID
             && r.uri_collection === attrPrefix
             && r.method === 'PUT',
     );
-    assert.ok(attrPair, 'attribute pair missing');
+    assert(attrPair, 'attribute pair missing');
 });
 
-test('POST kind edit with removedAttributeIds referencing '
+Deno.test('POST kind edit with removedAttributeIds referencing '
 + 'a bound attribute → 409; NOTHING appended',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -294,7 +298,7 @@ async () => {
         'POST', COLLECTION, adminToken,
         createBody(TYPE_ID, ATTR_ID, 'Asset'),
     ));
-    assert.equal(create.status, 201);
+    assertStrictEquals(create.status, 201);
     await seedFieldValueReferrer(
         db, adminToken, ATTR_ID,
     );
@@ -305,45 +309,45 @@ async () => {
         'POST', COLLECTION, adminToken,
         editBody(TYPE_ID, 'Renamed', [ATTR_ID]),
     ));
-    assert.equal(edit.status, 409);
+    assertStrictEquals(edit.status, 409);
     const err = await edit.json() as { error: string };
-    assert.match(err.error, /1 state field value/);
+    assertMatch(err.error, /1 state field value/);
 
     const typeGet = await handleRequest(db, req(
         'GET', DETAIL, adminToken,
     ));
-    assert.equal(typeGet.status, 200);
+    assertStrictEquals(typeGet.status, 200);
     const typeRow = await typeGet.json() as {
         name: string;
     };
-    assert.equal(typeRow.name, 'Asset');
+    assertStrictEquals(typeRow.name, 'Asset');
 
     const attrGet = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(attrGet.status, 200);
+    assertStrictEquals(attrGet.status, 200);
 
-    assert.equal(
+    assertStrictEquals(
         (await db.messagePairs.getAll()).length,
         requestsBefore.length,
     );
-    assert.equal(
+    assertStrictEquals(
         (await db.messagePairs.getAll()).length,
         responsesBefore.length,
     );
 });
 
-test('POST .../record-types member → 403',
+Deno.test('POST .../record-types member → 403',
 async () => {
     const { db, memberToken } = await adminDb();
     const post = await handleRequest(db, req(
         'POST', COLLECTION, memberToken,
         createBody(TYPE_ID, ATTR_ID, 'Denied'),
     ));
-    assert.equal(post.status, 403);
+    assertStrictEquals(post.status, 403);
 });
 
-test('POST body organization_id forged ≠ path org → '
+Deno.test('POST body organization_id forged ≠ path org → '
 + 'bound org wins',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -355,26 +359,26 @@ async () => {
     const post = await handleRequest(db, req(
         'POST', COLLECTION, adminToken, body,
     ));
-    assert.equal(post.status, 201);
+    assertStrictEquals(post.status, 201);
     const typeGet = await handleRequest(db, req(
         'GET', DETAIL, adminToken,
     ));
-    assert.equal(typeGet.status, 200);
+    assertStrictEquals(typeGet.status, 200);
     const typeRow = await typeGet.json() as {
         organization_id: string;
     };
-    assert.equal(typeRow.organization_id, ORGANIZATION);
+    assertStrictEquals(typeRow.organization_id, ORGANIZATION);
     const attrGet = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(attrGet.status, 200);
+    assertStrictEquals(attrGet.status, 200);
     const attrRow = await attrGet.json() as {
         organization_id: string;
     };
-    assert.equal(attrRow.organization_id, ORGANIZATION);
+    assertStrictEquals(attrRow.organization_id, ORGANIZATION);
 });
 
-test('POST kind unknown → 400 (validator message)',
+Deno.test('POST kind unknown → 400 (validator message)',
 async () => {
     const { db, adminToken } = await adminDb();
     const post = await handleRequest(db, req(
@@ -383,16 +387,16 @@ async () => {
             id: TYPE_ID,
         },
     ));
-    assert.equal(post.status, 400);
+    assertStrictEquals(post.status, 400);
     const err = await post.json() as { error: string };
-    assert.equal(
+    assertStrictEquals(
         err.error,
         "expected RecordWriteBody kind"
         + " 'create' or 'edit', got explode",
     );
 });
 
-test('composed edit carries each stored ACL forward '
+Deno.test('composed edit carries each stored ACL forward '
 + '— a rename never resets a restriction',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -414,7 +418,7 @@ async () => {
     const create = await handleRequest(db, req(
         'POST', COLLECTION, adminToken, body,
     ));
-    assert.equal(create.status, 201);
+    assertStrictEquals(create.status, 201);
 
     const restrict = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, {
@@ -427,7 +431,7 @@ async () => {
             write_roles: ['admin'],
         },
     ));
-    assert.equal(restrict.status, 201);
+    assertStrictEquals(restrict.status, 201);
 
     // A fresh operationId (not req()'s shared
     // TEST_OPERATION_ID): ATTR_ID's own fields are unchanged
@@ -486,21 +490,21 @@ async () => {
             removedAttributeIds: [],
         },
     }));
-    assert.equal(edit.status, 201);
+    assertStrictEquals(edit.status, 201);
 
     const restricted = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assert.equal(restricted.status, 200);
+    assertStrictEquals(restricted.status, 200);
     const restrictedRow =
         await restricted.json() as {
             read_roles: string[];
             write_roles: string[];
         };
-    assert.deepEqual(
+    assertEquals(
         restrictedRow.read_roles, ['admin'],
     );
-    assert.deepEqual(
+    assertEquals(
         restrictedRow.write_roles, ['admin'],
     );
 
@@ -509,18 +513,18 @@ async () => {
         DETAIL + '/attributes/' + attr2Id,
         adminToken,
     ));
-    assert.equal(renamed.status, 200);
+    assertStrictEquals(renamed.status, 200);
     const renamedRow = await renamed.json() as {
         name: string;
         read_roles: string[];
         write_roles: string[];
     };
-    assert.equal(renamedRow.name, 'Notes v2');
-    assert.deepEqual(
+    assertStrictEquals(renamedRow.name, 'Notes v2');
+    assertEquals(
         renamedRow.read_roles,
         ['member', 'admin'],
     );
-    assert.deepEqual(
+    assertEquals(
         renamedRow.write_roles,
         ['member', 'admin'],
     );
@@ -530,18 +534,18 @@ async () => {
         DETAIL + '/attributes/' + attr3Id,
         adminToken,
     ));
-    assert.equal(born.status, 200);
+    assertStrictEquals(born.status, 200);
     const bornRow = await born.json() as {
         name: string;
         read_roles: string[];
         write_roles: string[];
     };
-    assert.equal(bornRow.name, 'Serial');
-    assert.deepEqual(
+    assertStrictEquals(bornRow.name, 'Serial');
+    assertEquals(
         bornRow.read_roles,
         ['member', 'admin'],
     );
-    assert.deepEqual(
+    assertEquals(
         bornRow.write_roles,
         ['member', 'admin'],
     );

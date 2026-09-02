@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertMatch } from '@std/assert';
 import { nowUtc } from '../api/types.ts';
 
 // The Office of Time: persist RFC-3339 zulu at the fullest
@@ -10,23 +9,23 @@ import { nowUtc } from '../api/types.ts';
 const ZULU_6 =
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 
-test('nowUtc mints 6-digit microsecond zulu', () => {
-    assert.match(nowUtc(), ZULU_6);
+Deno.test('nowUtc mints 6-digit microsecond zulu', () => {
+    assertMatch(nowUtc(), ZULU_6);
 });
 
-test('nowUtc is parseable to a real instant', () => {
-    assert.ok(!Number.isNaN(Date.parse(nowUtc())));
+Deno.test('nowUtc is parseable to a real instant', () => {
+    assert(!Number.isNaN(Date.parse(nowUtc())));
 });
 
-test('nowUtc is strictly increasing across 10k mints', () => {
+Deno.test('nowUtc is strictly increasing across 10k mints', () => {
     let prev = nowUtc();
     for (let i = 0; i < 10_000; i++) {
         const next = nowUtc();
-        assert.ok(
+        assert(
             next > prev,
             next + ' not after ' + prev,
         );
-        assert.match(next, ZULU_6);
+        assertMatch(next, ZULU_6);
         prev = next;
     }
 });

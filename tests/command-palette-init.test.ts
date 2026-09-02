@@ -1,7 +1,8 @@
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import './hmac-test-key.ts';
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
+import { withLocalStorageAsync } from
+    './fixtures/local-storage.ts';
 
 // Integration: initCommandPalette() performs no
 // data reads at init — the index builds lazily on
@@ -15,12 +16,12 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 // the
 // call completes without throwing — guarding
 // against a regression to eager loading.
-test(
+Deno.test(
     'initCommandPalette does not throw'
     + ' when schema is absent',
-    async () => {
-        const fakeStorage = createFakeStorage();
-        installGlobals(fakeStorage);
+    () => withLocalStorageAsync(
+        createFakeStorage(), async () => {
+        installGlobals();
         try {
             await import('./in-page-facade.ts');
             const { initAdapter } = await import(
@@ -34,18 +35,19 @@ test(
                 await initAdapter(
                     () => memoryDbAdapter(),
                 );
-            assert.equal(
+            assertStrictEquals(
                 hasSchema, false,
                 'precondition: no schema',
             );
             const unhandled: unknown[] = [];
             const onRejection = (
-                reason: unknown,
+                event: PromiseRejectionEvent,
             ) => {
-                unhandled.push(reason);
+                event.preventDefault();
+                unhandled.push(event.reason);
             };
-            process.on(
-                'unhandledRejection',
+            globalThis.addEventListener(
+                'unhandledrejection',
                 onRejection,
             );
             try {
@@ -53,7 +55,7 @@ test(
                 // Drain microtask boundaries inside
                 // getSearchIndex (await hasSchema,
                 // await getIdeas, etc.) so the
-                // unhandledRejection handler can fire.
+                // unhandledrejection handler can fire.
                 // Two setImmediates flush today's
                 // pipeline; the loop guards against
                 // future microtask growth.
@@ -63,19 +65,19 @@ test(
                     );
                 }
             } finally {
-                process.off(
-                    'unhandledRejection',
+                globalThis.removeEventListener(
+                    'unhandledrejection',
                     onRejection,
                 );
             }
-            assert.deepEqual(
+            assertEquals(
                 unhandled, [],
                 'no MissingTableError leaked',
             );
         } finally {
             uninstallGlobals();
         }
-    },
+    }),
 );
 
 interface FakeStorage {
@@ -107,9 +109,7 @@ interface SavedGlobals {
 
 let saved: SavedGlobals | null = null;
 
-function installGlobals(
-    storage: FakeStorage,
-): void {
+function installGlobals(): void {
     const g = globalThis as Record<
         string, unknown
     >;
@@ -125,12 +125,12 @@ function installGlobals(
     // A future init-time touch of those would fail
     // with "undefined is not a function" — signal
     // worth keeping, but unrelated to the lazy-init
-    // behavior under test.
+    // behavior under test. localStorage is handled by
+    // withLocalStorageAsync, not here.
     g.document = {
         addEventListener: () => {},
         querySelector: () => null,
     };
-    g.localStorage = storage;
 }
 
 function uninstallGlobals(): void {
@@ -143,6 +143,5 @@ function uninstallGlobals(): void {
     } else {
         delete g.document;
     }
-    delete g.localStorage;
     saved = null;
 }

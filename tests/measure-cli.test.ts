@@ -1,6 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import {
+    assertEquals,
+    assertMatch,
+    assertNotMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     DEFAULT_RUNS,
     MEASURE_DEMO_EMAIL,
@@ -36,90 +39,90 @@ function baseFlags(
     };
 }
 
-test('DEFAULT_RUNS is 25', () => {
-    assert.equal(DEFAULT_RUNS, 25);
+Deno.test('DEFAULT_RUNS is 25', () => {
+    assertStrictEquals(DEFAULT_RUNS, 25);
 });
 
-test('bare argv applies full ceremony', () => {
+Deno.test('bare argv applies full ceremony', () => {
     const result = finalizeMeasureCli(baseFlags());
-    assert.equal(result.kind, 'ok');
+    assertStrictEquals(result.kind, 'ok');
     if (result.kind !== 'ok') return;
-    assert.equal(result.cli.record, true);
-    assert.equal(result.cli.writeBudgets, true);
-    assert.equal(result.cli.visualize, true);
-    assert.equal(result.cli.runs, 25);
-    assert.equal(result.cli.check, false);
-    assert.equal(result.cli.profile, false);
-    assert.equal(result.cli.pages, null);
-    assert.equal(result.cli.runsExplicit, false);
+    assertStrictEquals(result.cli.record, true);
+    assertStrictEquals(result.cli.writeBudgets, true);
+    assertStrictEquals(result.cli.visualize, true);
+    assertStrictEquals(result.cli.runs, 25);
+    assertStrictEquals(result.cli.check, false);
+    assertStrictEquals(result.cli.profile, false);
+    assertStrictEquals(result.cli.pages, null);
+    assertStrictEquals(result.cli.runsExplicit, false);
 });
 
-test('record with --pages is illegal', () => {
+Deno.test('record with --pages is illegal', () => {
     const result = finalizeMeasureCli(
         baseFlags({
             record: true,
             pages: ['workbox'],
         }),
     );
-    assert.equal(result.kind, 'error');
+    assertStrictEquals(result.kind, 'error');
     if (result.kind !== 'error') return;
-    assert.match(result.message, /--record/);
-    assert.match(result.message, /omit --pages/);
+    assertMatch(result.message, /--record/);
+    assertMatch(result.message, /omit --pages/);
 });
 
-test('write-budgets with --pages is illegal', () => {
+Deno.test('write-budgets with --pages is illegal', () => {
     const result = finalizeMeasureCli(
         baseFlags({
             writeBudgets: true,
             pages: ['workbox'],
         }),
     );
-    assert.equal(result.kind, 'error');
+    assertStrictEquals(result.kind, 'error');
     if (result.kind !== 'error') return;
-    assert.match(result.message, /--write-budgets/);
-    assert.match(result.message, /omit --pages/);
+    assertMatch(result.message, /--write-budgets/);
+    assertMatch(result.message, /omit --pages/);
 });
 
-test('explicit --runs alone is not bare', () => {
+Deno.test('explicit --runs alone is not bare', () => {
     const result = finalizeMeasureCli(
         baseFlags({
             runs: 5,
             runsExplicit: true,
         }),
     );
-    assert.equal(result.kind, 'ok');
+    assertStrictEquals(result.kind, 'ok');
     if (result.kind !== 'ok') return;
-    assert.equal(result.cli.record, false);
-    assert.equal(result.cli.writeBudgets, false);
-    assert.equal(result.cli.visualize, false);
-    assert.equal(result.cli.runs, 5);
-    assert.equal(result.cli.runsExplicit, true);
+    assertStrictEquals(result.cli.record, false);
+    assertStrictEquals(result.cli.writeBudgets, false);
+    assertStrictEquals(result.cli.visualize, false);
+    assertStrictEquals(result.cli.runs, 5);
+    assertStrictEquals(result.cli.runsExplicit, true);
 });
 
-test('visualize alone is not bare', () => {
+Deno.test('visualize alone is not bare', () => {
     const result = finalizeMeasureCli(
         baseFlags({ visualize: true }),
     );
-    assert.equal(result.kind, 'ok');
+    assertStrictEquals(result.kind, 'ok');
     if (result.kind !== 'ok') return;
-    assert.equal(result.cli.visualize, true);
-    assert.equal(result.cli.record, false);
-    assert.equal(result.cli.writeBudgets, false);
+    assertStrictEquals(result.cli.visualize, true);
+    assertStrictEquals(result.cli.record, false);
+    assertStrictEquals(result.cli.writeBudgets, false);
 });
 
-test('profile is not bare', () => {
+Deno.test('profile is not bare', () => {
     const result = finalizeMeasureCli(
         baseFlags({ profile: true }),
     );
-    assert.equal(result.kind, 'ok');
+    assertStrictEquals(result.kind, 'ok');
     if (result.kind !== 'ok') return;
-    assert.equal(result.cli.profile, true);
-    assert.equal(result.cli.record, false);
-    assert.equal(result.cli.writeBudgets, false);
-    assert.equal(result.cli.visualize, false);
+    assertStrictEquals(result.cli.profile, true);
+    assertStrictEquals(result.cli.record, false);
+    assertStrictEquals(result.cli.writeBudgets, false);
+    assertStrictEquals(result.cli.visualize, false);
 });
 
-test('record full registry leaves flags', () => {
+Deno.test('record full registry leaves flags', () => {
     const input = baseFlags({
         record: true,
         pages: null,
@@ -127,99 +130,99 @@ test('record full registry leaves flags', () => {
         runsExplicit: true,
     });
     const result = finalizeMeasureCli(input);
-    assert.equal(result.kind, 'ok');
+    assertStrictEquals(result.kind, 'ok');
     if (result.kind !== 'ok') return;
-    assert.deepEqual(result.cli, input);
+    assertEquals(result.cli, input);
 });
 
-test('parse accepts --base-url and --password', () => {
+Deno.test('parse accepts --base-url and --password', () => {
     const result = parseMeasureArgv([
         '--base-url',
         'http://127.0.0.1:8080/',
         '--password',
         'secret',
     ]);
-    assert.equal(result.kind, 'ok');
+    assertStrictEquals(result.kind, 'ok');
     if (result.kind !== 'ok') return;
-    assert.equal(
+    assertStrictEquals(
         result.cli.baseUrl,
         'http://127.0.0.1:8080',
     );
-    assert.equal(result.cli.password, 'secret');
-    assert.equal(result.cli.record, false);
-    assert.equal(result.cli.writeBudgets, false);
+    assertStrictEquals(result.cli.password, 'secret');
+    assertStrictEquals(result.cli.record, false);
+    assertStrictEquals(result.cli.writeBudgets, false);
 });
 
-test('unknown flags still error', () => {
+Deno.test('unknown flags still error', () => {
     const result = parseMeasureArgv(['--not-a-flag']);
-    assert.equal(result.kind, 'error');
+    assertStrictEquals(result.kind, 'error');
     if (result.kind !== 'error') return;
-    assert.equal(
+    assertStrictEquals(
         result.message,
         'Unknown flag: --not-a-flag',
     );
 });
 
-test('--base-url requires a password', () => {
+Deno.test('--base-url requires a password', () => {
     const result = parseMeasureArgv(
         ['--base-url', 'http://127.0.0.1:8080'],
         {},
     );
-    assert.equal(result.kind, 'error');
+    assertStrictEquals(result.kind, 'error');
     if (result.kind !== 'error') return;
-    assert.match(result.message, /--password/);
-    assert.match(result.message, /MEASURE_PASSWORD/);
+    assertMatch(result.message, /--password/);
+    assertMatch(result.message, /MEASURE_PASSWORD/);
 });
 
-test('MEASURE_PASSWORD satisfies --base-url', () => {
+Deno.test('MEASURE_PASSWORD satisfies --base-url', () => {
     const result = parseMeasureArgv(
         ['--base-url', 'http://127.0.0.1:8080'],
         { MEASURE_PASSWORD: 'from-env' },
     );
-    assert.equal(result.kind, 'ok');
+    assertStrictEquals(result.kind, 'ok');
     if (result.kind !== 'ok') return;
-    assert.equal(result.cli.password, 'from-env');
+    assertStrictEquals(result.cli.password, 'from-env');
 });
 
-test('visualize-only is disk-only, no local server', () => {
+Deno.test('visualize-only is disk-only, no local server', () => {
     const cli = baseFlags({ visualize: true });
-    assert.equal(isVisualizeOnly(cli), true);
-    assert.equal(needsLocalMeasureServer(cli), false);
+    assertStrictEquals(isVisualizeOnly(cli), true);
+    assertStrictEquals(needsLocalMeasureServer(cli), false);
 });
 
-test('bare ceremony needs a local Node server', () => {
+Deno.test('bare ceremony needs a local Node server', () => {
     const result = finalizeMeasureCli(baseFlags());
-    assert.equal(result.kind, 'ok');
+    assertStrictEquals(result.kind, 'ok');
     if (result.kind !== 'ok') return;
-    assert.equal(isVisualizeOnly(result.cli), false);
-    assert.equal(
+    assertStrictEquals(isVisualizeOnly(result.cli), false);
+    assertStrictEquals(
         needsLocalMeasureServer(result.cli),
         true,
     );
 });
 
-test('--base-url skips the local Node spawn', () => {
+Deno.test('--base-url skips the local Node spawn', () => {
     const cli = baseFlags({
         baseUrl: 'http://127.0.0.1:8080',
         password: 'secret',
     });
-    assert.equal(needsLocalMeasureServer(cli), false);
+    assertStrictEquals(needsLocalMeasureServer(cli), false);
 });
 
-test('local serve requires Postgres and HMAC env', () => {
+Deno.test('local serve requires Postgres and HMAC env', () => {
     const missingUrl = readMeasureServeEnv({
         JWT_HMAC_SIGNING_KEY: 'k',
     });
-    assert.equal(missingUrl.kind, 'error');
+    assertStrictEquals(missingUrl.kind, 'error');
     if (missingUrl.kind !== 'error') return;
-    assert.match(missingUrl.message, /POSTGRES_URL/);
+    assertMatch(missingUrl.message, /POSTGRES_URL/);
 
     const missingKey = readMeasureServeEnv({
         POSTGRES_URL: 'postgres://x',
     });
-    assert.equal(missingKey.kind, 'error');
+    assertStrictEquals(missingKey.kind, 'error');
     if (missingKey.kind !== 'error') return;
-    assert.match(
+    assertMatch(
         missingKey.message,
         /JWT_HMAC_SIGNING_KEY/,
     );
@@ -228,26 +231,26 @@ test('local serve requires Postgres and HMAC env', () => {
         POSTGRES_URL: '',
         JWT_HMAC_SIGNING_KEY: 'k',
     });
-    assert.equal(empty.kind, 'error');
+    assertStrictEquals(empty.kind, 'error');
 
     const ok = readMeasureServeEnv({
         POSTGRES_URL: 'postgres://x',
         JWT_HMAC_SIGNING_KEY: 'k',
     });
-    assert.equal(ok.kind, 'ok');
+    assertStrictEquals(ok.kind, 'ok');
     if (ok.kind !== 'ok') return;
-    assert.equal(ok.env.postgresUrl, 'postgres://x');
-    assert.equal(ok.env.jwtHmacSigningKey, 'k');
+    assertStrictEquals(ok.env.postgresUrl, 'postgres://x');
+    assertStrictEquals(ok.env.jwtHmacSigningKey, 'k');
 });
 
-test('passwordFromSeedReveal reads tab lines', () => {
+Deno.test('passwordFromSeedReveal reads tab lines', () => {
     const text = [
         'Save your demo sign-ins — shown once;',
         '',
         'sarah.chen@company.com\talice-secret',
         'demo@example.com\tdemo-secret',
     ].join('\n');
-    assert.equal(
+    assertStrictEquals(
         passwordFromSeedReveal(
             text,
             MEASURE_DEMO_EMAIL,
@@ -256,15 +259,15 @@ test('passwordFromSeedReveal reads tab lines', () => {
     );
 });
 
-test('passwordFromSeedReveal misses empty secret', () => {
-    assert.equal(
+Deno.test('passwordFromSeedReveal misses empty secret', () => {
+    assertStrictEquals(
         passwordFromSeedReveal(
             'demo@example.com\t',
             MEASURE_DEMO_EMAIL,
         ),
         null,
     );
-    assert.equal(
+    assertStrictEquals(
         passwordFromSeedReveal(
             'other@example.com\tx',
             MEASURE_DEMO_EMAIL,
@@ -273,34 +276,34 @@ test('passwordFromSeedReveal misses empty secret', () => {
     );
 });
 
-test('lastJsonLogMessage takes the last message', () => {
+Deno.test('lastJsonLogMessage takes the last message', () => {
     const text = [
         'not json',
         '{"level":"info","message":"listening"}',
         '{"level":"error","message":'
             + '"database is not empty; refuse to seed"}',
     ].join('\n');
-    assert.equal(
+    assertStrictEquals(
         lastJsonLogMessage(text),
         'database is not empty; refuse to seed',
     );
-    assert.equal(lastJsonLogMessage('plain'), null);
+    assertStrictEquals(lastJsonLogMessage('plain'), null);
 });
 
-test('local spawn is seed then ./fusion-angle serve', () => {
-    assert.equal(MEASURE_SEED_COMMAND, './postgres-seed');
-    assert.deepEqual(measureSeedArgs(), [
+Deno.test('local spawn is seed then ./fusion-angle serve', () => {
+    assertStrictEquals(MEASURE_SEED_COMMAND, './postgres-seed');
+    assertEquals(measureSeedArgs(), [
         '--postgres', 'local', '--mock-data',
     ]);
-    assert.equal(MEASURE_SERVER_ENTRY, './fusion-angle');
-    assert.deepEqual(measureServerArgs(), ['serve']);
+    assertStrictEquals(MEASURE_SERVER_ENTRY, './fusion-angle');
+    assertEquals(measureServerArgs(), ['serve']);
 });
 
-test('measure discovery has no identity sentinel', () => {
-    const src = readFileSync(
-        'web-app/app/measure.ts', 'utf8',
+Deno.test('measure discovery has no identity sentinel', () => {
+    const src = Deno.readTextFileSync(
+        'web-app/app/measure.ts',
     );
-    assert.doesNotMatch(src, /identityId=current/);
-    assert.doesNotMatch(src, /Tony Stark/);
-    assert.match(src, /Detail URL discovery failed/);
+    assertNotMatch(src, /identityId=current/);
+    assertNotMatch(src, /Tony Stark/);
+    assertMatch(src, /Detail URL discovery failed/);
 });

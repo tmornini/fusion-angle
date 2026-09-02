@@ -17,10 +17,7 @@ export async function dispatch(
 ): Promise<number> {
     const verb = args[0];
     const rest = args.slice(1);
-    if (verb === 'serve') {
-        await serve(siteRoot, rest);
-        return 0;
-    }
+    if (verb === 'serve') return serve(siteRoot, rest);
     if (verb === 'seed') return seedMain(rest);
     if (verb === 'wipe') return wipeMain(rest);
     Deno.stderr.writeSync(enc.encode(USAGE));

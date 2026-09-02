@@ -1,8 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { assert, assertStrictEquals } from '@std/assert';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import {
@@ -11,6 +7,8 @@ import {
     passwordOf,
     startOrigin,
 } from './browser/fixtures.ts';
+import { fetchDiscardingBody } from
+    './fixtures/fetch-discarding-body.ts';
 
 // The list route the API actually exposes: there is no
 // /api/organizations/ collection, so the origin proves
@@ -19,23 +17,22 @@ import {
 const MEMBERS_PATH = '/api/organizations/'
     + STARK_ORGANIZATION + '/members/';
 
-test('the in-process origin serves the seeded API',
+Deno.test('the in-process origin serves the seeded API',
 async () => {
-    const staticRoot = mkdtempSync(join(
-        process.env['TMPDIR'] ?? tmpdir(),
-        'fusion-origin-',
-    ));
-    process.env['FUSION_ANGLE_STATIC_ROOT'] = staticRoot;
+    const staticRoot = Deno.makeTempDirSync({
+        prefix: 'fusion-origin-',
+    });
+    Deno.env.set('FUSION_ANGLE_STATIC_ROOT', staticRoot);
     const origin = await startOrigin();
     try {
-        assert.ok(
+        assert(
             passwordOf(origin.credentials, ADMIN_EMAIL)
                 .length > 0,
         );
-        const anonymous = await fetch(
+        const anonymous = await fetchDiscardingBody(
             origin.baseUrl + MEMBERS_PATH,
         );
-        assert.equal(anonymous.status, 401);
+        assertStrictEquals(anonymous.status, 401);
         const bearer = await fetch(
             origin.baseUrl + MEMBERS_PATH,
             { headers: {
@@ -43,13 +40,13 @@ async () => {
                     + await adminToken(),
             } },
         );
-        assert.equal(bearer.status, 200);
+        assertStrictEquals(bearer.status, 200);
         const rows = await bearer.json() as Array<{
             identity_id: string;
         }>;
-        assert.ok(rows.length > 0);
+        assert(rows.length > 0);
     } finally {
         await origin.close();
-        rmSync(staticRoot, { recursive: true, force: true });
+        Deno.removeSync(staticRoot, { recursive: true });
     }
 });

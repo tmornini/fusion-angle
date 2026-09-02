@@ -1,5 +1,8 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -84,47 +87,47 @@ async function passwordUserCtx() {
     return { db, ctx };
 }
 
-test('postPasswordLogin returns a gate-valid credential pair',
+Deno.test('postPasswordLogin returns a gate-valid credential pair',
 async () => {
     const { db, ctx } = await passwordUserCtx();
     const creds = await postPasswordLogin(
         ctx, 'demo@example.com', 's3cret');
-    assert.ok(creds);
-    assert.ok(Array.isArray(
+    assert(creds);
+    assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , creds.accessToken)));
 });
 
-test('postPasswordLogin issues a 30-day refresh token',
+Deno.test('postPasswordLogin issues a 30-day refresh token',
 async () => {
     const { ctx } = await passwordUserCtx();
     const creds = await postPasswordLogin(
         ctx, 'demo@example.com', 's3cret');
-    assert.ok(creds);
+    assert(creds);
     const claims = decodeAccessToken(creds.refreshToken);
-    assert.equal(
+    assertStrictEquals(
         claims.exp - claims.iat, REFRESH_TTL_SECONDS);
 });
 
-test('postPasswordLogin returns null on a wrong password',
+Deno.test('postPasswordLogin returns null on a wrong password',
 async () => {
     const { ctx } = await passwordUserCtx();
-    assert.equal(
+    assertStrictEquals(
         await postPasswordLogin(
             ctx, 'demo@example.com', 'WRONG'),
         null);
 });
 
-test('postPasswordLogin returns null for an unknown user',
+Deno.test('postPasswordLogin returns null for an unknown user',
 async () => {
     const { ctx } = await passwordUserCtx();
-    assert.equal(
+    assertStrictEquals(
         await postPasswordLogin(
             ctx, 'ghost@example.com', 's3cret'),
         null);
 });
 
-test('postPasswordLogin rethrows a non-401 fault, never masks',
+Deno.test('postPasswordLogin rethrows a non-401 fault, never masks',
 async () => {
     // An upstream 500 / network fault is a BUG, not a wrong
     // password — it must surface, not collapse to null.
@@ -133,12 +136,14 @@ async () => {
             throw new Error('upstream 500');
         },
     } as unknown as RequestContext;
-    await assert.rejects(
+    await assertRejects(
         () => postPasswordLogin(ctx, 'a@b.c', 'pw'),
-        /upstream 500/);
+        Error,
+        'upstream 500',
+    );
 });
 
-test('postPasswordLogin sends S256 challenge and verifier',
+Deno.test('postPasswordLogin sends S256 challenge and verifier',
 async () => {
     const posted: Record<string, unknown>[] = [];
     const ctx = {
@@ -156,10 +161,10 @@ async () => {
     await postPasswordLogin(ctx, 'a@b.c', 'pw');
     const authorizeBody = posted[0]!;
     const tokenBody = posted[1]!;
-    assert.equal(
+    assertStrictEquals(
         authorizeBody.code_challenge_method, 'S256');
-    assert.equal(typeof tokenBody.code_verifier, 'string');
-    assert.equal(
+    assertStrictEquals(typeof tokenBody.code_verifier, 'string');
+    assertStrictEquals(
         authorizeBody.code_challenge,
         bytesToBase64Url(
             await sha256Bytes(

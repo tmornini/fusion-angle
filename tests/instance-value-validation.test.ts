@@ -1,5 +1,6 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assertInstanceOf, assertMatch, assertThrows,
+} from '@std/assert';
 import type {
     AttributeType,
     Constraint,
@@ -39,7 +40,7 @@ function byId(
     return new Map(rows.map(r => [r.id, r]));
 }
 
-function assertRejects(
+function assertValidationThrows(
     set: readonly {
         attribute_id: string;
         value: string;
@@ -49,33 +50,28 @@ function assertRejects(
     >,
     messagePattern: RegExp,
 ): void {
-    assert.throws(
+    const err = assertThrows(
         () => validateInstanceValues(
             set, attributesById,
         ),
-        (err: unknown) => {
-            assert.ok(
-                err instanceof ValidationError,
-            );
-            assert.match(err.message, messagePattern);
-            return true;
-        },
-    );
+    ) as Error;
+    assertInstanceOf(err, ValidationError);
+    assertMatch(err.message, messagePattern);
 }
 
-test(
+Deno.test(
     'number non-numeric → ValidationError names'
     + ' attribute and type',
     () => {
         const row = makeRow('number', {
             name: 'Amount',
         });
-        assertRejects(
+        assertValidationThrows(
             [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: 'abc' }],
             byId(row),
             /value for attribute "Amount"/,
         );
-        assertRejects(
+        assertValidationThrows(
             [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: 'abc' }],
             byId(row),
             /number/i,
@@ -83,17 +79,15 @@ test(
     },
 );
 
-test('number finite string passes', () => {
+Deno.test('number finite string passes', () => {
     const row = makeRow('number');
-    assert.doesNotThrow(() => {
-        validateInstanceValues(
-            [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: '42' }],
-            byId(row),
-        );
-    });
+    validateInstanceValues(
+        [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: '42' }],
+        byId(row),
+    );
 });
 
-test(
+Deno.test(
     'number below range_min → ValidationError via'
     + ' constraint engine',
     () => {
@@ -102,12 +96,12 @@ test(
             { name: 'Count' },
             [{ kind: 'range_min', min: '50' }],
         );
-        assertRejects(
+        assertValidationThrows(
             [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: '42' }],
             byId(row),
             /value for attribute "Count"/,
         );
-        assertRejects(
+        assertValidationThrows(
             [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: '42' }],
             byId(row),
             /at least 50/,
@@ -115,14 +109,14 @@ test(
     },
 );
 
-test(
+Deno.test(
     'date non-ISO calendar day fails; valid ISO'
     + ' date passes',
     () => {
         const row = makeRow('date', {
             name: 'Due',
         });
-        assertRejects(
+        assertValidationThrows(
             [{
                 attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
                 value: '2026-13-99',
@@ -130,19 +124,17 @@ test(
             byId(row),
             /value for attribute "Due"/,
         );
-        assert.doesNotThrow(() => {
-            validateInstanceValues(
-                [{
-                    attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
-                    value: '2026-08-05',
-                }],
-                byId(row),
-            );
-        });
+        validateInstanceValues(
+            [{
+                attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
+                value: '2026-08-05',
+            }],
+            byId(row),
+        );
     },
 );
 
-test(
+Deno.test(
     'select value outside options fails; inside'
     + ' passes',
     () => {
@@ -150,7 +142,7 @@ test(
             name: 'Priority',
             options: ['low', 'high'],
         });
-        assertRejects(
+        assertValidationThrows(
             [{
                 attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
                 value: 'medium',
@@ -158,76 +150,70 @@ test(
             byId(row),
             /value for attribute "Priority"/,
         );
-        assert.doesNotThrow(() => {
-            validateInstanceValues(
-                [{
-                    attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
-                    value: 'high',
-                }],
-                byId(row),
-            );
-        });
+        validateInstanceValues(
+            [{
+                attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
+                value: 'high',
+            }],
+            byId(row),
+        );
     },
 );
 
-test(
+Deno.test(
     'checkbox rejects non-boolean strings;'
     + ' true and false pass',
     () => {
         const row = makeRow('checkbox', {
             name: 'Done',
         });
-        assertRejects(
+        assertValidationThrows(
             [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: 'yes' }],
             byId(row),
             /value for attribute "Done"/,
         );
-        assert.doesNotThrow(() => {
-            validateInstanceValues(
-                [{
-                    attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
-                    value: 'true',
-                }],
-                byId(row),
-            );
-            validateInstanceValues(
-                [{
-                    attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
-                    value: 'false',
-                }],
-                byId(row),
-            );
-        });
+        validateInstanceValues(
+            [{
+                attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
+                value: 'true',
+            }],
+            byId(row),
+        );
+        validateInstanceValues(
+            [{
+                attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
+                value: 'false',
+            }],
+            byId(row),
+        );
     },
 );
 
-test('text any non-empty string passes', () => {
+Deno.test('text any non-empty string passes', () => {
     const row = makeRow('text');
-    assert.doesNotThrow(() => {
-        validateInstanceValues(
-            [{
-                attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
-                value: 'hello world',
-            }],
-            byId(row),
-        );
-        validateInstanceValues(
-            [{
-                attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
-                value: '42',
-            }],
-            byId(row),
-        );
-    });
+    validateInstanceValues(
+        [{
+            attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
+            value: 'hello world',
+        }],
+        byId(row),
+    );
+    validateInstanceValues(
+        [{
+            attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
+            value: '42',
+        }],
+        byId(row),
+    );
 });
 
-test(
+Deno.test(
     'empty-string value → ValidationError always',
     () => {
         const row = makeRow('text', {
             name: 'Title',
         });
-        assertRejects(
+        assertValidationThrows(
             [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: '' }],
             byId(row),
             /value for attribute "Title"/,
@@ -235,7 +221,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'radio value outside options fails; inside'
     + ' passes',
     () => {
@@ -243,19 +229,17 @@ test(
             name: 'Choice',
             options: ['a', 'b'],
         });
-        assertRejects(
+        assertValidationThrows(
             [{ attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA', value: 'c' }],
             byId(row),
             /value for attribute "Choice"/,
         );
-        assert.doesNotThrow(() => {
-            validateInstanceValues(
-                [{
-                    attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
-                    value: 'a',
-                }],
-                byId(row),
-            );
-        });
+        validateInstanceValues(
+            [{
+                attribute_id: 'UQBiHFcwJeCDSnmkPBoYRA',
+                value: 'a',
+            }],
+            byId(row),
+        );
     },
 );

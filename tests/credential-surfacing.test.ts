@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertMatch,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -25,37 +29,37 @@ async function adminCredential(db: MemoryDbAdapter) {
     return rows.find(r => r.kind === 'password');
 }
 
-test('bootstrap surfaces an admin password that verifies',
+Deno.test('bootstrap surfaces an admin password that verifies',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const reveal = currentReveal(
         await postBootstrap(db));
-    assert.ok(reveal, 'current credential surfaced');
-    assert.equal(reveal.username, 'demo@example.com');
-    assert.ok(reveal.password.length >= 16);
+    assert(reveal, 'current credential surfaced');
+    assertStrictEquals(reveal.username, 'demo@example.com');
+    assert(reveal.password.length >= 16);
     const cred = await adminCredential(db);
-    assert.ok(cred, 'admin password credential seeded');
+    assert(cred, 'admin password credential seeded');
     // the column holds a hash, never the surfaced plaintext
-    assert.match(cred.secret, /^\$pbkdf2-sha256\$/);
-    assert.notEqual(cred.secret, reveal.password);
+    assertMatch(cred.secret, /^\$pbkdf2-sha256\$/);
+    assertNotStrictEquals(cred.secret, reveal.password);
     // and the surfaced plaintext verifies against that hash
-    assert.equal(
+    assertStrictEquals(
         await verifyPassword(reveal.password, cred.secret),
         true);
     // Phase Final Stage B: identity spine tables retired.
 });
 
-test('mock data surfaces a verifying admin password',
+Deno.test('mock data surfaces a verifying admin password',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const reveal = currentReveal(
         await postMockDataLoad(db));
-    assert.ok(reveal, 'current credential surfaced');
+    assert(reveal, 'current credential surfaced');
     const cred = await adminCredential(db);
-    assert.ok(cred, 'admin password credential seeded');
-    assert.equal(
+    assert(cred, 'admin password credential seeded');
+    assertStrictEquals(
         await verifyPassword(reveal.password, cred.secret),
         true);
 });
@@ -65,27 +69,30 @@ async () => {
 // buildUnaffiliatedIdentity) for mock-data; 1 for
 // bootstrap. System client_secret is not surfaced in
 // the reveal list.
-test('mock-data surfaces exactly twelve human credentials',
+Deno.test('mock-data surfaces exactly twelve human credentials',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const creds = await postMockDataLoad(db);
-    assert.equal(creds.identities.length, 12);
-    assert.ok(
+    assertStrictEquals(creds.identities.length, 12);
+    assert(
         creds.identities.every((c) => c.password.length >= 16),
     );
 });
 
-test('bootstrap surfaces exactly one human credential',
+Deno.test('bootstrap surfaces exactly one human credential',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const creds = await postBootstrap(db);
-    assert.equal(creds.identities.length, 1);
-    assert.equal(creds.identities[0]!.identityId, 'XXZruirZyAOoRpNxaDnpSA');
+    assertStrictEquals(creds.identities.length, 1);
+    assertStrictEquals(
+        creds.identities[0]!.identityId,
+        'XXZruirZyAOoRpNxaDnpSA',
+    );
 });
 
-test('each seed run yields a distinct admin password',
+Deno.test('each seed run yields a distinct admin password',
 async () => {
     const db1 = memoryDbAdapter();
     await db1.postSchemaCreation();
@@ -95,6 +102,6 @@ async () => {
         await postBootstrap(db1));
     const b = currentReveal(
         await postBootstrap(db2));
-    assert.ok(a && b, 'both surfaced');
-    assert.notEqual(a.password, b.password);
+    assert(a && b, 'both surfaced');
+    assertNotStrictEquals(a.password, b.password);
 });

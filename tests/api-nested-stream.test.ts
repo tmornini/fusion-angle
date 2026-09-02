@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -127,7 +126,7 @@ async function createFlow(
             graphDelta: emptyDelta(),
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 }
 
 function storedDoc(
@@ -142,7 +141,7 @@ function storedDoc(
     };
 }
 
-test('stored PUT body equals ideaSubmissionEntityOf',
+Deno.test('stored PUT body equals ideaSubmissionEntityOf',
 async () => {
     const { db, token } = await freshDb();
     const ideaId = generateIdentifier();
@@ -151,7 +150,7 @@ async () => {
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
         ideaDocument('G6 Idea', 'ev-g6'),
     ));
-    assert.equal(putIdea.status, 201);
+    assertStrictEquals(putIdea.status, 201);
     const fields = {
         idea_id: ideaId,
         member_id: 'XXZruirZyAOoRpNxaDnpSA',
@@ -163,7 +162,7 @@ async () => {
             + '/submissions/' + sid,
         token, fields,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const prefix = '/organizations/' + ORGANIZATION
         + '/ideas/' + ideaId + '/submissions/';
     const stored = JSON.parse(
@@ -172,22 +171,22 @@ async () => {
     const expected = ideaSubmissionEntityOf(
         storedDoc(sid, fields),
     );
-    assert.equal(Object.keys(expected)[0], 'id');
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(stored, await put.json());
+    assertStrictEquals(Object.keys(expected)[0], 'id');
+    assertEquals(stored, expected);
+    assertEquals(stored, await put.json());
     const derived = await deriveIdeaSubmissions(
         db, ORGANIZATION, ideaId,
     );
-    assert.deepEqual(derived, [expected]);
+    assertEquals(derived, [expected]);
     const got = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
             + '/submissions/', token,
     ));
-    assert.equal(got.status, 200);
-    assert.deepEqual(await got.json(), [stored]);
+    assertStrictEquals(got.status, 200);
+    assertEquals(await got.json(), [stored]);
 });
 
-test('stored PUT body equals projectFlowEntityOf',
+Deno.test('stored PUT body equals projectFlowEntityOf',
 async () => {
     const { db, token } = await freshDb();
     const projectId = generateIdentifier();
@@ -203,7 +202,7 @@ async () => {
             + '/flows/' + pfid,
         token, fields,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const prefix = '/organizations/' + ORGANIZATION
         + '/projects/' + projectId + '/flows/';
     const stored = JSON.parse(
@@ -212,22 +211,22 @@ async () => {
     const expected = projectFlowEntityOf(
         storedDoc(pfid, fields),
     );
-    assert.equal(Object.keys(expected)[0], 'id');
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(stored, await put.json());
+    assertStrictEquals(Object.keys(expected)[0], 'id');
+    assertEquals(stored, expected);
+    assertEquals(stored, await put.json());
     const derived = await deriveProjectFlows(
         db, ORGANIZATION, projectId,
     );
-    assert.deepEqual(derived, [expected]);
+    assertEquals(derived, [expected]);
     const got = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + projectId + '/flows/', token,
     ));
-    assert.equal(got.status, 200);
-    assert.deepEqual(await got.json(), [stored]);
+    assertStrictEquals(got.status, 200);
+    assertEquals(await got.json(), [stored]);
 });
 
-test('stored PUT body equals flowWorkOrderEntityOf',
+Deno.test('stored PUT body equals flowWorkOrderEntityOf',
 async () => {
     const { db, token } = await freshDb();
     const flowId = generateIdentifier();
@@ -244,7 +243,7 @@ async () => {
             + '/work-orders/' + woid,
         token, fields,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const prefix = '/organizations/' + ORGANIZATION
         + '/flows/' + flowId + '/work-orders/';
     const stored = JSON.parse(
@@ -253,22 +252,22 @@ async () => {
     const expected = flowWorkOrderEntityOf(
         storedDoc(woid, fields),
     );
-    assert.equal(Object.keys(expected)[0], 'id');
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(stored, await put.json());
+    assertStrictEquals(Object.keys(expected)[0], 'id');
+    assertEquals(stored, expected);
+    assertEquals(stored, await put.json());
     const derived = await deriveFlowWorkOrders(
         db, ORGANIZATION, flowId,
     );
-    assert.deepEqual(derived, [expected]);
+    assertEquals(derived, [expected]);
     const got = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
             + '/work-orders/', token,
     ));
-    assert.equal(got.status, 200);
-    assert.deepEqual(await got.json(), [stored]);
+    assertStrictEquals(got.status, 200);
+    assertEquals(await got.json(), [stored]);
 });
 
-test('stored PUT body equals flowRecordEntityOf',
+Deno.test('stored PUT body equals flowRecordEntityOf',
 async () => {
     const { db, token } = await freshDb();
     const flowId = generateIdentifier();
@@ -285,7 +284,7 @@ async () => {
             + '' + frid,
         token, fields,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const prefix = '/organizations/' + ORGANIZATION
         + '/flows/' + flowId + '/records/';
     const stored = JSON.parse(
@@ -294,14 +293,14 @@ async () => {
     const expected = flowRecordEntityOf(
         storedDoc(frid, fields),
     );
-    assert.equal(Object.keys(expected)[0], 'id');
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(stored, await put.json());
+    assertStrictEquals(Object.keys(expected)[0], 'id');
+    assertEquals(stored, expected);
+    assertEquals(stored, await put.json());
     const derived = await deriveFlowRecords(
         db, ORGANIZATION, flowId,
     );
-    assert.deepEqual(derived, [expected]);
-    assert.deepEqual(
+    assertEquals(derived, [expected]);
+    assertEquals(
         stored,
         await deriveFlowRecord(
             db, ORGANIZATION, flowId, frid,
@@ -311,19 +310,19 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
             + '/records/', token,
     ));
-    assert.equal(list.status, 200);
-    assert.deepEqual(await list.json(), [stored]);
+    assertStrictEquals(list.status, 200);
+    assertEquals(await list.json(), [stored]);
     const got = await handleRequest(db, req(
         'GET',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId + '/records/'
             + '' + frid,
         token,
     ));
-    assert.equal(got.status, 200);
-    assert.deepEqual(await got.json(), stored);
+    assertStrictEquals(got.status, 200);
+    assertEquals(await got.json(), stored);
 });
 
-test('stored PUT body equals flowTagEntityOf',
+Deno.test('stored PUT body equals flowTagEntityOf',
 async () => {
     const { db, token } = await freshDb();
     const flowId = generateIdentifier();
@@ -332,7 +331,7 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
     const responseId = head.headers.get('Response-ID');
-    assert.ok(responseId);
+    assert(responseId);
     const name = 'xDyDkxEPwtcNmJVknUHDsg';
     const fields = { flow_response_id: responseId };
     const put = await handleRequest(db, req(
@@ -341,7 +340,7 @@ async () => {
             + name,
         token, fields,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const prefix = '/organizations/' + ORGANIZATION
         + '/flows/' + flowId + '/tags/';
     const stored = JSON.parse(
@@ -350,10 +349,10 @@ async () => {
     const expected = flowTagEntityOf(
         flowId, storedDoc(name, fields),
     );
-    assert.equal(Object.keys(expected)[0], 'id');
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(stored, await put.json());
-    assert.deepEqual(
+    assertStrictEquals(Object.keys(expected)[0], 'id');
+    assertEquals(stored, expected);
+    assertEquals(stored, await put.json());
+    assertEquals(
         stored,
         await deriveFlowTag(
             db, ORGANIZATION, flowId, name,
@@ -363,11 +362,11 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
             + '/tags/' + name, token,
     ));
-    assert.equal(got.status, 200);
-    assert.deepEqual(await got.json(), stored);
+    assertStrictEquals(got.status, 200);
+    assertEquals(await got.json(), stored);
 });
 
-test('stored PUT body equals nestedAttributeWireOf',
+Deno.test('stored PUT body equals nestedAttributeWireOf',
 async () => {
     const { db, token } = await freshDb();
     const typeId = generateIdentifier();
@@ -384,7 +383,7 @@ async () => {
             state: 'active',
         },
     ));
-    assert.equal(typePut.status, 201);
+    assertStrictEquals(typePut.status, 201);
     const fields = {
         name: 'Priority',
         attribute_type: 'text',
@@ -398,7 +397,7 @@ async () => {
     const put = await handleRequest(db, req(
         'PUT', path, token, fields,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const prefix = '/organizations/' + ORGANIZATION
         + '/record-types/' + typeId + '/attributes/';
     const stored = JSON.parse(
@@ -407,25 +406,25 @@ async () => {
     const expected = nestedAttributeWireOf(
         ORGANIZATION, typeId, attrId, fields,
     );
-    assert.equal(Object.keys(expected)[0], 'id');
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(stored, await put.json());
+    assertStrictEquals(Object.keys(expected)[0], 'id');
+    assertEquals(stored, expected);
+    assertEquals(stored, await put.json());
     const got = await handleRequest(db, req(
         'GET', path, token,
     ));
-    assert.equal(got.status, 200);
-    assert.deepEqual(await got.json(), stored);
+    assertStrictEquals(got.status, 200);
+    assertEquals(await got.json(), stored);
     const list = await handleRequest(db, req(
         'GET',
         '/organizations/' + ORGANIZATION
         + '/record-types/' + typeId + '/attributes/',
         token,
     ));
-    assert.equal(list.status, 200);
-    assert.deepEqual(await list.json(), [stored]);
+    assertStrictEquals(list.status, 200);
+    assertEquals(await list.json(), [stored]);
 });
 
-test('stored PUT body equals objectiveRevisionEntityOf',
+Deno.test('stored PUT body equals objectiveRevisionEntityOf',
 async () => {
     const { db, token } = await freshDb();
     const objectiveId = generateIdentifier();
@@ -448,7 +447,7 @@ async () => {
             initialStateAt: AT,
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
     const fields = {
         objective_id: objectiveId,
         name: 'Revenue',
@@ -464,23 +463,23 @@ async () => {
     const expected = objectiveRevisionEntityOf(
         storedDoc(rid, fields),
     );
-    assert.equal(Object.keys(expected)[0], 'id');
-    assert.deepEqual(stored, expected);
+    assertStrictEquals(Object.keys(expected)[0], 'id');
+    assertEquals(stored, expected);
     const derived = await deriveObjectiveRevisions(
         db, ORGANIZATION, objectiveId,
     );
-    assert.deepEqual(derived, [expected]);
+    assertEquals(derived, [expected]);
     const got = await handleRequest(db, req(
         'GET',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + objectiveId
             + '/revisions/',
         token,
     ));
-    assert.equal(got.status, 200);
-    assert.deepEqual(await got.json(), [stored]);
+    assertStrictEquals(got.status, 200);
+    assertEquals(await got.json(), [stored]);
 });
 
-test('stored PUT body equals scoreEntityOf (baseline)',
+Deno.test('stored PUT body equals scoreEntityOf (baseline)',
 async () => {
     const { db, token } = await freshDb();
     const projectId = generateIdentifier();
@@ -498,7 +497,7 @@ async () => {
         + '/objective-baseline-scores/' + sid,
         token, fields,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const prefix = '/organizations/' + ORGANIZATION
         + '/projects/' + projectId
         + '/objective-baseline-scores/';
@@ -506,24 +505,24 @@ async () => {
         await storedPutBodyText(db, prefix, sid),
     );
     const expected = scoreEntityOf(storedDoc(sid, fields));
-    assert.equal(Object.keys(expected)[0], 'id');
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(stored, await put.json());
+    assertStrictEquals(Object.keys(expected)[0], 'id');
+    assertEquals(stored, expected);
+    assertEquals(stored, await put.json());
     const derived = await deriveBaselineScores(
         db, ORGANIZATION, projectId,
     );
-    assert.deepEqual(derived, [expected]);
+    assertEquals(derived, [expected]);
     const got = await handleRequest(db, req(
         'GET',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
         + '/objective-baseline-scores/',
         token,
     ));
-    assert.equal(got.status, 200);
-    assert.deepEqual(await got.json(), [stored]);
+    assertStrictEquals(got.status, 200);
+    assertEquals(await got.json(), [stored]);
 });
 
-test('stored PUT body equals scoreEntityOf (actual)',
+Deno.test('stored PUT body equals scoreEntityOf (actual)',
 async () => {
     const { db, token } = await freshDb();
     const projectId = generateIdentifier();
@@ -541,7 +540,7 @@ async () => {
         + '/objective-actual-scores/' + sid,
         token, fields,
     ));
-    assert.equal(put.status, 201);
+    assertStrictEquals(put.status, 201);
     const prefix = '/organizations/' + ORGANIZATION
         + '/projects/' + projectId
         + '/objective-actual-scores/';
@@ -549,19 +548,19 @@ async () => {
         await storedPutBodyText(db, prefix, sid),
     );
     const expected = scoreEntityOf(storedDoc(sid, fields));
-    assert.equal(Object.keys(expected)[0], 'id');
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(stored, await put.json());
+    assertStrictEquals(Object.keys(expected)[0], 'id');
+    assertEquals(stored, expected);
+    assertEquals(stored, await put.json());
     const derived = await deriveActualScores(
         db, ORGANIZATION, projectId,
     );
-    assert.deepEqual(derived, [expected]);
+    assertEquals(derived, [expected]);
     const got = await handleRequest(db, req(
         'GET',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
         + '/objective-actual-scores/',
         token,
     ));
-    assert.equal(got.status, 200);
-    assert.deepEqual(await got.json(), [stored]);
+    assertStrictEquals(got.status, 200);
+    assertEquals(await got.json(), [stored]);
 });

@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -90,7 +89,7 @@ async function seedDefaultOrganizationEvent(
     );
 }
 
-test(
+Deno.test(
     'identityDefaultOrganization returns the set default when present',
     async () => {
         const db = await freshDb();
@@ -105,7 +104,7 @@ test(
         await seedDefaultOrganizationEvent(
             db, IDENTITY_ID, ORGANIZATION_TWO, T2,
         );
-        assert.equal(
+        assertStrictEquals(
             await identityDefaultOrganization(
                 db, IDENTITY_ID,
             ),
@@ -114,7 +113,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'identityDefaultOrganization falls back to earliest membership',
     async () => {
         const db = await freshDb();
@@ -127,7 +126,7 @@ test(
             db, generateIdentifier(),
             earliestOrganization, IDENTITY_ID, T1,
         );
-        assert.equal(
+        assertStrictEquals(
             await identityDefaultOrganization(
                 db, IDENTITY_ID,
             ),
@@ -136,7 +135,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'identityDefaultOrganization tie-breaks equal-at by lowest org id',
     async () => {
         const db = await freshDb();
@@ -148,7 +147,7 @@ test(
             db, generateIdentifier(),
             ORGANIZATION_TWO, IDENTITY_ID, T1,
         );
-        assert.equal(
+        assertStrictEquals(
             await identityDefaultOrganization(
                 db, IDENTITY_ID,
             ),
@@ -157,11 +156,11 @@ test(
     },
 );
 
-test(
+Deno.test(
     'identityDefaultOrganization is null with no default and no member',
     async () => {
         const db = await freshDb();
-        assert.equal(
+        assertStrictEquals(
             await identityDefaultOrganization(
                 db, IDENTITY_ID,
             ),
@@ -170,7 +169,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'identityDefaultOrganization skips a SET that is not a'
     + ' live seat',
     async () => {
@@ -217,7 +216,7 @@ test(
                 await appendMessagePair(view, tombstone);
             },
         );
-        assert.equal(
+        assertStrictEquals(
             await identityDefaultOrganization(
                 db, IDENTITY_ID,
             ),

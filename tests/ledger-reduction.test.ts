@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     latestByKey,
     findFirstByKey,
@@ -14,7 +13,7 @@ const row = (key: string, at: string, id: string) => ({
 const T1 = '2026-01-01T00:00:00.000000Z';
 const T2 = '2026-02-01T00:00:00.000000Z';
 
-test('latestByKey keeps the latest row per key', () => {
+Deno.test('latestByKey keeps the latest row per key', () => {
     const xBytes = new Uint8Array(16);
     const yBytes = new Uint8Array(16);
     yBytes[0] = 1;
@@ -29,12 +28,12 @@ test('latestByKey keeps the latest row per key', () => {
         row('b', T1, z),
     ];
     const latest = latestByKey(rows, r => r.key);
-    assert.equal(latest.size, 2);
-    assert.equal(latest.get('a')?.id, y);
-    assert.equal(latest.get('b')?.id, z);
+    assertStrictEquals(latest.size, 2);
+    assertStrictEquals(latest.get('a')?.id, y);
+    assertStrictEquals(latest.get('b')?.id, z);
 });
 
-test('latestByKey compares by `at`, not array order', () => {
+Deno.test('latestByKey compares by `at`, not array order', () => {
     const lateBytes = new Uint8Array(16);
     lateBytes[0] = 1;
     const earlyBytes = new Uint8Array(16);
@@ -45,11 +44,11 @@ test('latestByKey compares by `at`, not array order', () => {
         row('a', T2, late),
         row('a', T1, early),
     ];
-    assert.equal(
+    assertStrictEquals(
         latestByKey(rows, r => r.key).get('a')?.id, late);
 });
 
-test('an equal-`at` tie elects the digit-value larger id',
+Deno.test('an equal-`at` tie elects the digit-value larger id',
 () => {
     const asciiLargerBytes = new Uint8Array(16);
     asciiLargerBytes[0] = 0 << 2;
@@ -57,14 +56,14 @@ test('an equal-`at` tie elects the digit-value larger id',
     digitLargerBytes[0] = 62 << 2;
     const asciiLarger = encodeIdentifier(asciiLargerBytes);
     const digitLarger = encodeIdentifier(digitLargerBytes);
-    assert.ok(asciiLarger > digitLarger);
+    assert(asciiLarger > digitLarger);
     const first = row('a', T1, asciiLarger);
     const second = row('a', T1, digitLarger);
-    assert.equal(
+    assertStrictEquals(
         latestByKey([first, second], r => r.key)
             .get('a')?.id,
         digitLarger);
-    assert.equal(
+    assertStrictEquals(
         latestByKey([second, first], r => r.key)
             .get('a')?.id,
         digitLarger);
@@ -88,7 +87,7 @@ function permutations<T>(items: readonly T[]): T[][] {
     return out;
 }
 
-test('every row permutation elects the same winner', () => {
+Deno.test('every row permutation elects the same winner', () => {
     const id3Bytes = new Uint8Array(16);
     id3Bytes[0] = 3;
     const id1Bytes = new Uint8Array(16);
@@ -109,12 +108,12 @@ test('every row permutation elects the same winner', () => {
     ];
     for (const perm of permutations(rows)) {
         const latest = latestByKey(perm, r => r.key);
-        assert.equal(latest.get('a')?.id, id1);
-        assert.equal(latest.get('b')?.id, id9);
+        assertStrictEquals(latest.get('a')?.id, id1);
+        assertStrictEquals(latest.get('b')?.id, id9);
     }
 });
 
-test('an explicit comparator overrides the default', () => {
+Deno.test('an explicit comparator overrides the default', () => {
     const id1Bytes = new Uint8Array(16);
     id1Bytes[0] = 1;
     const id2Bytes = new Uint8Array(16);
@@ -127,37 +126,37 @@ test('an explicit comparator overrides the default', () => {
     ];
     const latest = latestByKey(
         rows, r => r.key, (a, b) => a.at > b.at);
-    assert.equal(latest.get('a')?.id, id1);
+    assertStrictEquals(latest.get('a')?.id, id1);
 });
 
-test('latestByKey returns an empty map for no rows', () => {
+Deno.test('latestByKey returns an empty map for no rows', () => {
     const rows: { key: string; at: string; id: string }[] = [];
-    assert.equal(latestByKey(rows, r => r.key).size, 0);
+    assertStrictEquals(latestByKey(rows, r => r.key).size, 0);
 });
 
-test('findFirstByKey extracts a field from the first match', () => {
+Deno.test('findFirstByKey extracts a field from the first match', () => {
     const rows = [
         { id: 'a', name: 'Ann' },
         { id: 'b', name: 'Bob' },
     ];
-    assert.equal(
+    assertStrictEquals(
         findFirstByKey(rows, r => r.id === 'b', r => r.name),
         'Bob');
 });
 
-test('findFirstByKey returns null when nothing matches', () => {
+Deno.test('findFirstByKey returns null when nothing matches', () => {
     const rows = [{ id: 'a', name: 'Ann' }];
-    assert.equal(
+    assertStrictEquals(
         findFirstByKey(rows, r => r.id === 'z', r => r.name),
         null);
 });
 
-test('findFirstByKey returns the first of several matches', () => {
+Deno.test('findFirstByKey returns the first of several matches', () => {
     const rows = [
         { id: 'a', name: 'first' },
         { id: 'a', name: 'second' },
     ];
-    assert.equal(
+    assertStrictEquals(
         findFirstByKey(rows, r => r.id === 'a', r => r.name),
         'first');
 });

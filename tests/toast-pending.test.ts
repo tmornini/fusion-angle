@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertMatch, assertStrictEquals } from '@std/assert';
 import {
     STORAGE_KEY_PENDING_TOAST,
 } from '../web-app/app/storage-keys.ts';
@@ -78,7 +77,7 @@ function installDom(): {
     return { store, messages };
 }
 
-test(
+Deno.test(
     'showToast writes a pending session payload',
     () => {
         const g =
@@ -91,18 +90,18 @@ test(
             const raw = store.get(
                 STORAGE_KEY_PENDING_TOAST,
             );
-            assert.ok(raw);
+            assert(raw);
             const parsed = JSON.parse(raw!) as {
                 message: string;
                 variant: string;
                 at: string;
             };
-            assert.equal(
+            assertStrictEquals(
                 parsed.message,
                 'Submitted for review',
             );
-            assert.equal(parsed.variant, 'success');
-            assert.match(
+            assertStrictEquals(parsed.variant, 'success');
+            assertMatch(
                 parsed.at,
                 /^\d{4}-\d{2}-\d{2}T.*Z$/,
             );
@@ -114,7 +113,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'replayPendingToast restores the toast once',
     () => {
         const g =
@@ -132,18 +131,18 @@ test(
                 }),
             );
             replayPendingToast();
-            assert.equal(
+            assertStrictEquals(
                 store.has(STORAGE_KEY_PENDING_TOAST),
                 false,
             );
-            assert.ok(
+            assert(
                 messages.includes(
                     'Idea approved successfully',
                 ),
             );
             const again = messages.length;
             replayPendingToast();
-            assert.equal(messages.length, again);
+            assertStrictEquals(messages.length, again);
         } finally {
             g.setTimeout = previousTimeout;
             delete g.sessionStorage;

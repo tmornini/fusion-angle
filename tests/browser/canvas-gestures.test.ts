@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertNotEquals, assertStrictEquals } from '@std/assert';
 import { SHIFT, useBrowser, withAdminPage } from
     './fixtures.ts';
 import {
@@ -10,7 +9,7 @@ import {
 
 const browser = useBrowser();
 
-test('a port drag onto empty canvas adds a node and its edge',
+Deno.test('a port drag onto empty canvas adds a node and its edge',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         await openFlow(page, origin, ONBOARDING);
@@ -28,11 +27,11 @@ async () => {
             + ` === ${nodes + 1}`,
             'one more node',
         );
-        assert.equal(await edgeCount(page), edges + 1);
+        assertStrictEquals(await edgeCount(page), edges + 1);
     });
 });
 
-test('a shift drag from a port onto a node commits an edge',
+Deno.test('a shift drag from a port onto a node commits an edge',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         await openFlow(page, origin, ONBOARDING);
@@ -57,18 +56,18 @@ async () => {
             + ` === ${edges + 1}`,
             'one more edge',
         );
-        assert.equal(await nodeCount(page), nodes);
+        assertStrictEquals(await nodeCount(page), nodes);
     });
 });
 
-test('a body drag moves the node and persists its position',
+Deno.test('a body drag moves the node and persists its position',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         const flowId = await openFlow(page, origin, ONBOARDING);
         const review = await nodeIdNamed(page, 'Review');
         const before = (await flowGraph(origin, flowId))
             .graph.nodes.find((n) => n.id === review);
-        assert.ok(before);
+        assert(before);
         const from = await page.center(nodeSelector(review));
         await page.drag(from, { x: from.x + 60, y: from.y + 40 });
         let after = before;
@@ -80,14 +79,14 @@ async () => {
                 || after.positionY !== before.positionY) break;
             await new Promise((r) => setTimeout(r, 100));
         }
-        assert.notDeepEqual(
+        assertNotEquals(
             [after.positionX, after.positionY],
             [before.positionX, before.positionY],
         );
     });
 });
 
-test('a marquee on empty canvas selects the nodes it encloses',
+Deno.test('a marquee on empty canvas selects the nodes it encloses',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
         await openFlow(page, origin, ONBOARDING);
@@ -105,6 +104,6 @@ async () => {
             })()`,
             `${total} nodes selected`,
         );
-        assert.equal(selected, total);
+        assertStrictEquals(selected, total);
     });
 });

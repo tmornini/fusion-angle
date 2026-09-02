@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertMatch, assertNotMatch } from '@std/assert';
 import {
     RecordDetailPresenter,
 } from '../web-app/app/presenters/record-detail.ts';
@@ -31,32 +30,32 @@ function pageFor(state: RecordState): string {
     }).buildPage().toString();
 }
 
-test(
+Deno.test(
     'an active record offers Archive through the'
     + ' house dialog',
     () => {
         const html = pageFor('active');
-        assert.match(
+        assertMatch(
             html,
             /data-dialog-open="confirm-archive"/,
         );
-        assert.match(
+        assertMatch(
             html, /id="record-archive-btn"/,
         );
-        assert.match(html, /Active/);
+        assertMatch(html, /Active/);
     },
 );
 
-test(
+Deno.test(
     'an archived record hides Archive and reads'
     + ' Archived',
     () => {
         const html = pageFor('archived');
-        assert.doesNotMatch(
+        assertNotMatch(
             html,
             /data-dialog-open="confirm-archive"/,
         );
-        assert.doesNotMatch(html, /Active/);
-        assert.match(html, /Archived/);
+        assertNotMatch(html, /Active/);
+        assertMatch(html, /Archived/);
     },
 );

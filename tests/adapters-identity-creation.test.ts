@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -30,7 +34,7 @@ async function setup() {
 // identity_credentials ROW halves stripped — oracles are the
 // message plane (GET + derive).
 
-test('postIdentityCreation mints a person identity'
+Deno.test('postIdentityCreation mints a person identity'
     + ' with PII', async () => {
     const { db, ctx } = await setup();
     await postIdentityCreation(ctx, 'fndCYAsXazdzMUlEGMNIZw', {
@@ -43,14 +47,14 @@ test('postIdentityCreation mints a person identity'
     const identity = await GET<{ kind: string }>(
         db, 'identities/fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
     );
-    assert.equal(identity.kind, 'person');
+    assertStrictEquals(identity.kind, 'person');
     const pii = await deriveIdentityPii(db, 'fndCYAsXazdzMUlEGMNIZw');
-    assert.equal(pii.email, 'pat@example.com');
+    assertStrictEquals(pii.email, 'pat@example.com');
     // Phase Final Stage B: identity spine tables retired.
     // Phase Final Stage B: identity spine tables retired.
 });
 
-test('postIdentityCreation mints a service identity'
+Deno.test('postIdentityCreation mints a service identity'
     + ' with a hashed client_secret', async () => {
     const { db, ctx } = await setup();
     await postIdentityCreation(ctx, 'syWUUcdBSbBgMwBiCrgbDw', {
@@ -59,21 +63,21 @@ test('postIdentityCreation mints a service identity'
     const identity = await GET<{ kind: string }>(
         db, 'identities/syWUUcdBSbBgMwBiCrgbDw', DEV_TOKEN,
     );
-    assert.equal(identity.kind, 'service');
+    assertStrictEquals(identity.kind, 'service');
     const creds = await deriveCredentialsFor(db, 'syWUUcdBSbBgMwBiCrgbDw');
     const cred = creds.find(r => r.kind === 'client_secret');
-    assert.ok(cred, 'credential exists on message plane');
-    assert.equal(cred.status, 'set');
-    assert.notEqual(cred.secret, 'top-secret');
-    assert.equal(
+    assert(cred, 'credential exists on message plane');
+    assertStrictEquals(cred.status, 'set');
+    assertNotStrictEquals(cred.secret, 'top-secret');
+    assertStrictEquals(
         await verifyPassword('top-secret', cred.secret),
         true);
-    await assert.rejects(
+    await assertRejects(
         () => deriveIdentityPii(db, 'syWUUcdBSbBgMwBiCrgbDw'),
     );
 });
 
-test('postIdentityCreation is idempotent on re-put',
+Deno.test('postIdentityCreation is idempotent on re-put',
 async () => {
     const { db, ctx } = await setup();
     const spec = {
@@ -89,12 +93,12 @@ async () => {
     const identity = await GET<{ kind: string }>(
         db, 'identities/fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
     );
-    assert.equal(identity.kind, 'person');
+    assertStrictEquals(identity.kind, 'person');
     const pii = await deriveIdentityPii(db, 'fndCYAsXazdzMUlEGMNIZw');
-    assert.equal(pii.email, 'a@example.com');
+    assertStrictEquals(pii.email, 'a@example.com');
 });
 
-test('two service creations for the same id leave'
+Deno.test('two service creations for the same id leave'
     + ' exactly one client_secret head', async () => {
     const { db, ctx } = await setup();
     const spec = {
@@ -104,5 +108,5 @@ test('two service creations for the same id leave'
     await postIdentityCreation(ctx, 'syWUUcdBSbBgMwBiCrgbDw', spec);
     const creds = (await deriveCredentialsFor(db, 'syWUUcdBSbBgMwBiCrgbDw'))
         .filter(r => r.kind === 'client_secret');
-    assert.equal(creds.length, 1);
+    assertStrictEquals(creds.length, 1);
 });

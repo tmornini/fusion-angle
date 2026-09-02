@@ -1,25 +1,18 @@
-// state.ts reads localStorage / window / document at
-// module-eval time; stub before importing presenters.
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-};
+import { assertMatch } from '@std/assert';
+import {
+    IdentityProvidersPresenter,
+} from '../web-app/app/presenters/identity-providers.ts';
+
+// identity-providers.ts never reads localStorage (checked
+// against the full product tree); window/document are
+// stubbed because IdentityProvidersPresenter.render walks
+// a real DOM element.
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
-
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-
-const {
-    IdentityProvidersPresenter,
-} = await import(
-    '../web-app/app/presenters/identity-providers.ts'
-);
 
 function record(): {
     container: HTMLElement;
@@ -40,7 +33,7 @@ function record(): {
     };
 }
 
-test('renders a row per provider event', () => {
+Deno.test('renders a row per provider event', () => {
     const rec = record();
     new IdentityProvidersPresenter([
         {
@@ -55,15 +48,15 @@ test('renders a row per provider event', () => {
         },
     ]).render(rec.container);
     const out = rec.html();
-    assert.match(out, /google/);
-    assert.match(out, /g-1/);
-    assert.match(out, /linked/);
-    assert.match(out, /unlinked/);
+    assertMatch(out, /google/);
+    assertMatch(out, /g-1/);
+    assertMatch(out, /linked/);
+    assertMatch(out, /unlinked/);
 });
 
-test('renders an empty state when no events', () => {
+Deno.test('renders an empty state when no events', () => {
     const rec = record();
     new IdentityProvidersPresenter([])
         .render(rec.container);
-    assert.match(rec.html(), /No linked providers/);
+    assertMatch(rec.html(), /No linked providers/);
 });

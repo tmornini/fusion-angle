@@ -1,4 +1,3 @@
-import { after, before, test } from 'node:test';
 import { connectPostgres } from
     '../api/postgres-client.ts';
 import { PostgresBackend } from
@@ -14,16 +13,16 @@ import { defineStoreAcceptance } from
 // tables before seedAdminSchema. Do not share schemas
 // across files.
 
-const POSTGRES_URL = process.env['POSTGRES_URL'];
+const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function schemaName(): string {
-    const base = process.env['SCHEMA_NAME']
+    const base = Deno.env.get('SCHEMA_NAME')
         ?? (
             'fusion_test_'
             + String(Date.now())
             + '_'
-            + String(process.pid)
+            + String(Deno.pid)
         );
     const name = base + '_acceptance';
     if (!IDENT.test(name)) {
@@ -46,9 +45,9 @@ function urlWithSearchPath(
 }
 
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
-    test(
+    Deno.test(
         'postgres acceptance skipped without POSTGRES_URL',
-        { skip: 'POSTGRES_URL is unset' },
+        { ignore: true }, // POSTGRES_URL is unset
         () => {},
     );
 } else {
@@ -58,13 +57,13 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     );
     const backend = new PostgresBackend(sql);
 
-    before(async () => {
+    Deno.test.beforeAll(async () => {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
     });
 
-    after(async () => {
+    Deno.test.afterAll(async () => {
         try {
             await sql.unsafe(
                 'DROP SCHEMA IF EXISTS '

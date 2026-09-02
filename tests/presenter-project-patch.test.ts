@@ -1,34 +1,24 @@
-// state.ts (transitively imported via core.ts ->
-// presenters) reads localStorage and window /
-// document at module-eval time, which Node lacks.
-// Stub before any import, then load presenter
-// modules with dynamic import() so the stubs are
-// in place. Same pattern as logger.test.ts.
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-};
+import { assertStrictEquals, assertThrows } from '@std/assert';
+import { Project, COST_DIVISOR } from '../api/types.ts';
+import { ProjectView } from
+    '../web-app/app/adapters/projects.ts';
+import {
+    projectDraftFromView,
+    projectPatchFromDraft,
+} from '../web-app/app/presenters/project-detail.ts';
+
+// None of api/types.ts, adapters/projects.ts, or
+// presenters/project-detail.ts reads localStorage (checked
+// against the full product tree); window/document are
+// stubbed only because a real DOM tree is out of scope for
+// these pure-function tests but the presenter module graph
+// still expects the globals to exist.
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
-
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-
-const { Project, COST_DIVISOR } =
-    await import('../api/types.ts');
-const { ProjectView } =
-    await import('../web-app/app/adapters/projects.ts');
-const {
-    projectDraftFromView,
-    projectPatchFromDraft,
-} = await import(
-    '../web-app/app/presenters/project-detail.ts'
-);
 
 function buildView() {
     const project = new Project({
@@ -49,7 +39,7 @@ function buildView() {
     return new ProjectView(project, [], [], []);
 }
 
-test(
+Deno.test(
     'projectPatchFromDraft rejects an empty cost',
     () => {
         const view = buildView();
@@ -59,14 +49,15 @@ test(
         };
         // Number('') is 0 — accepting it would store a
         // fabricated $0k baseline
-        assert.throws(
+        assertThrows(
             () => projectPatchFromDraft(view, draft),
-            /estimated cost must be a number/,
+            Error,
+            'estimated cost must be a number',
         );
     },
 );
 
-test(
+Deno.test(
     'projectPatchFromDraft rejects a non-numeric cost',
     () => {
         const view = buildView();
@@ -74,14 +65,15 @@ test(
             ...projectDraftFromView(view),
             costBaseline: 'lots',
         };
-        assert.throws(
+        assertThrows(
             () => projectPatchFromDraft(view, draft),
-            /estimated cost must be a number/,
+            Error,
+            'estimated cost must be a number',
         );
     },
 );
 
-test(
+Deno.test(
     'projectPatchFromDraft scales a numeric cost',
     () => {
         const view = buildView();
@@ -91,7 +83,7 @@ test(
         };
         const patch =
             projectPatchFromDraft(view, draft);
-        assert.equal(
+        assertStrictEquals(
             patch.fields.estimatedCost,
             7 * COST_DIVISOR,
         );

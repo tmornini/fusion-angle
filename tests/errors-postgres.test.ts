@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     isUndefinedTable,
     mapPostgresError,
@@ -20,12 +19,12 @@ function assertWire(
     status: number,
     message: string,
 ): void {
-    assert.ok(error instanceof ApiError);
-    assert.equal(error.status, status);
-    assert.equal(error.message, message);
+    assert(error instanceof ApiError);
+    assertStrictEquals(error.status, status);
+    assertStrictEquals(error.message, message);
 }
 
-test('duplicate PK is loud 500', () => {
+Deno.test('duplicate PK is loud 500', () => {
     assertWire(
         mapPostgresError({
             code: '23505',
@@ -44,7 +43,7 @@ test('duplicate PK is loud 500', () => {
     );
 });
 
-test('constraint_name maps like constraint', () => {
+Deno.test('constraint_name maps like constraint', () => {
     assertWire(
         mapPostgresError({
             code: '23505',
@@ -55,7 +54,7 @@ test('constraint_name maps like constraint', () => {
     );
 });
 
-test('other unique is loud 500', () => {
+Deno.test('other unique is loud 500', () => {
     assertWire(
         mapPostgresError({
             code: '23505',
@@ -66,7 +65,7 @@ test('other unique is loud 500', () => {
     );
 });
 
-test('invalid text representation is loud 500', () => {
+Deno.test('invalid text representation is loud 500', () => {
     assertWire(
         mapPostgresError({ code: '22P02' }),
         HTTP_INTERNAL_ERROR,
@@ -74,7 +73,7 @@ test('invalid text representation is loud 500', () => {
     );
 });
 
-test('CHECK failed is loud 500', () => {
+Deno.test('CHECK failed is loud 500', () => {
     assertWire(
         mapPostgresError({
             constraint: 'pairs_request_at_chk',
@@ -84,7 +83,7 @@ test('CHECK failed is loud 500', () => {
     );
 });
 
-test('deadlock 40P01 is loud 500', () => {
+Deno.test('deadlock 40P01 is loud 500', () => {
     assertWire(
         mapPostgresError({ code: '40P01' }),
         HTTP_INTERNAL_ERROR,
@@ -92,7 +91,7 @@ test('deadlock 40P01 is loud 500', () => {
     );
 });
 
-test('timeout and connection loss are 504', () => {
+Deno.test('timeout and connection loss are 504', () => {
     for (const code of [
         'CONNECT_TIMEOUT',
         'CONNECTION_CLOSED',
@@ -109,54 +108,54 @@ test('timeout and connection loss are 504', () => {
     }
 });
 
-test('isUndefinedTable is SQLSTATE 42P01', () => {
-    assert.equal(
+Deno.test('isUndefinedTable is SQLSTATE 42P01', () => {
+    assertStrictEquals(
         isUndefinedTable({ code: '42P01' }),
         true,
     );
-    assert.equal(
+    assertStrictEquals(
         isUndefinedTable({ code: '42P02' }),
         false,
     );
-    assert.equal(
+    assertStrictEquals(
         isUndefinedTable(new Error('nope')),
         false,
     );
 });
 
-test('missing table is loud 500, not recovery', () => {
+Deno.test('missing table is loud 500, not recovery', () => {
     const mapped = mapPostgresError({ code: '42P01' });
     assertWire(
         mapped,
         HTTP_INTERNAL_ERROR,
         'missing table',
     );
-    assert.equal(
+    assertStrictEquals(
         mapped instanceof MissingTableError,
         false,
     );
 });
 
-test('plain errors pass through', () => {
+Deno.test('plain errors pass through', () => {
     const err = new Error('getWhere does not accept uri_id');
-    assert.equal(mapPostgresError(err), err);
+    assertStrictEquals(mapPostgresError(err), err);
 });
 
-test('ApiError passes through', () => {
+Deno.test('ApiError passes through', () => {
     const err = new ApiError('already', 409);
-    assert.equal(mapPostgresError(err), err);
+    assertStrictEquals(mapPostgresError(err), err);
 });
 
-test('EntityNotFoundError passes through', () => {
+Deno.test('EntityNotFoundError passes through', () => {
     const err = new EntityNotFoundError(
         'identity_pii', 'x',
     );
-    assert.equal(mapPostgresError(err), err);
+    assertStrictEquals(mapPostgresError(err), err);
 });
 
-test('ForeignOrganizationError passes through', () => {
+Deno.test('ForeignOrganizationError passes through', () => {
     const err = new ForeignOrganizationError(
         'identity_pii', 'x',
     );
-    assert.equal(mapPostgresError(err), err);
+    assertStrictEquals(mapPostgresError(err), err);
 });

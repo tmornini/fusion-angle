@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { ORGANIZATION_TWO } from
     '../api/mock-data/seed-constants.ts';
@@ -62,7 +61,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 // row-plane oracle is retired. pendingInvitationFor is the
 // sole pending discovery path (message plane).
 
-test('deriveIdentityPiiRows resolves grantInvitation email'
+Deno.test('deriveIdentityPiiRows resolves grantInvitation email'
 + ' (Phase Final Task 2: identity_pii ROW half stripped —'
 + ' message plane is sole oracle)',
 async () => {
@@ -70,20 +69,20 @@ async () => {
     const email = 'sarah.chen@company.com';
     const fromPairs = (await deriveIdentityPiiRows(db))
         .find(p => p.email === email);
-    assert.ok(fromPairs !== undefined);
-    assert.equal(fromPairs!.email, email);
+    assert(fromPairs !== undefined);
+    assertStrictEquals(fromPairs!.email, email);
     // Phase Final Stage B: identity spine tables retired.
 
     // Unknown email: message plane misses.
     const missing = 'nobody@example.invalid';
-    assert.equal(
+    assertStrictEquals(
         (await deriveIdentityPiiRows(db))
             .find(p => p.email === missing),
         undefined,
     );
 });
 
-test('pendingInvitationFor lifecycle on the message plane'
+Deno.test('pendingInvitationFor lifecycle on the message plane'
 + ' (grant/decline/reinvite)', async () => {
     const db = await seededDb();
     const admin = await organizationToken(
@@ -102,15 +101,15 @@ test('pendingInvitationFor lifecycle on the message plane'
         if (fromFn !== null) {
             const derived = (await deriveInvitations(db))
                 .find(r => r.id === fromFn.id);
-            assert.equal(derived?.state, 'pending');
-            assert.equal(
+            assertStrictEquals(derived?.state, 'pending');
+            assertStrictEquals(
                 derived?.organization_id, ORGANIZATION_TWO);
-            assert.equal(derived?.identity_id, inviteeId);
+            assertStrictEquals(derived?.identity_id, inviteeId);
         }
         return fromFn;
     }
 
-    assert.equal(await assertPending(), null);
+    assertStrictEquals(await assertPending(), null);
 
     const grant = await handleRequest(db, req(
         'POST', '/organizations/' + ORGANIZATION_TWO
@@ -121,8 +120,8 @@ test('pendingInvitationFor lifecycle on the message plane'
             grantAt: '2026-06-02T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 200);
-    assert.equal(
+    assertStrictEquals(grant.status, 200);
+    assertStrictEquals(
         (await assertPending())?.id,
         'iqtxKmWMdfYjxphbQhAJnw',
     );
@@ -137,8 +136,8 @@ test('pendingInvitationFor lifecycle on the message plane'
             at: '2026-06-02T00:00:01.000000Z',
         },
     ));
-    assert.equal(decline.status, 204);
-    assert.equal(await assertPending(), null);
+    assertStrictEquals(decline.status, 204);
+    assertStrictEquals(await assertPending(), null);
 
     // Declined-reinvite: multi-candidate on the same
     // (organization, identity) pair.
@@ -151,15 +150,15 @@ test('pendingInvitationFor lifecycle on the message plane'
             grantAt: '2026-06-02T00:00:02.000000Z',
         },
     ));
-    assert.equal(regrant.status, 200);
-    assert.equal(
+    assertStrictEquals(regrant.status, 200);
+    assertStrictEquals(
         (await assertPending())?.id,
         INV_REHOME_PARITY_2,
     );
     // Phase Final Stage B: roster tables retired.
 });
 
-test('loadInvitation shape: deriveInvitations find-by-id'
+Deno.test('loadInvitation shape: deriveInvitations find-by-id'
 + ' for a live grant, absent for missing', async () => {
     const db = await seededDb();
     const admin = await organizationToken(
@@ -173,18 +172,18 @@ test('loadInvitation shape: deriveInvitations find-by-id'
             grantAt: '2026-06-02T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 200);
+    assertStrictEquals(grant.status, 200);
 
     // Phase Final Task 2: invitations ROW half stripped.
     const derived = (await deriveInvitations(db))
         .find(r => r.id === INV_REHOME_LOAD_1);
-    assert.ok(derived !== undefined);
-    assert.equal(derived.id, INV_REHOME_LOAD_1);
-    assert.equal(derived.organization_id, ORGANIZATION_TWO);
-    assert.equal(derived.state, 'pending');
+    assert(derived !== undefined);
+    assertStrictEquals(derived.id, INV_REHOME_LOAD_1);
+    assertStrictEquals(derived.organization_id, ORGANIZATION_TWO);
+    assertStrictEquals(derived.state, 'pending');
 
     // Missing id: message plane absent.
-    assert.equal(
+    assertStrictEquals(
         (await deriveInvitations(db))
             .find(r => r.id === INV_GHOST),
         undefined,

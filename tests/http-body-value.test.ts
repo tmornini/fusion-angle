@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { HttpMessageError } from '../shared/http-message/types.ts';
 
@@ -16,140 +15,140 @@ const textBody = HttpMessage.fromWire(
     'HTTP/1.1 200 OK\r\ncontent-type: text/plain\r\n\r\nhello',
 );
 
-test('body().exists() is true when a body is present', () => {
-    assert.equal(json.body().exists(), true);
+Deno.test('body().exists() is true when a body is present', () => {
+    assertStrictEquals(json.body().exists(), true);
 });
 
-test('body().exists() is false when there is no body', () => {
-    assert.equal(noBody.body().exists(), false);
+Deno.test('body().exists() is false when there is no body', () => {
+    assertStrictEquals(noBody.body().exists(), false);
 });
 
-test('body().toText() decodes the octets as UTF-8', () => {
-    assert.equal(textBody.body().toText(), 'hello');
+Deno.test('body().toText() decodes the octets as UTF-8', () => {
+    assertStrictEquals(textBody.body().toText(), 'hello');
 });
 
-test('body().toBytes() returns the raw octets', () => {
-    assert.deepEqual(
+Deno.test('body().toBytes() returns the raw octets', () => {
+    assertEquals(
         textBody.body().toBytes(),
         new TextEncoder().encode('hello'),
     );
 });
 
-test('body().toBytes() returns a copy', () => {
+Deno.test('body().toBytes() returns a copy', () => {
     const bytes = textBody.body().toBytes();
     bytes[0] = 0;
-    assert.deepEqual(
+    assertEquals(
         textBody.body().toBytes(),
         new TextEncoder().encode('hello'),
     );
 });
 
-test('body().toBase64() is the base64 of the octets', () => {
-    assert.equal(textBody.body().toBase64(), 'aGVsbG8=');
+Deno.test('body().toBase64() is the base64 of the octets', () => {
+    assertStrictEquals(textBody.body().toBase64(), 'aGVsbG8=');
 });
 
-test('body().decoded() navigates JSON members', () => {
-    assert.equal(
+Deno.test('body().decoded() navigates JSON members', () => {
+    assertStrictEquals(
         json.body().decoded().query('user.name').toText(),
         'bob',
     );
-    assert.equal(
+    assertStrictEquals(
         json.body().decoded().query('items.1').toNumber(),
         20,
     );
 });
 
-test('body().decoded() matches message.query(body.*)', () => {
-    assert.equal(
+Deno.test('body().decoded() matches message.query(body.*)', () => {
+    assertStrictEquals(
         json.body().decoded().query('user.name').toText(),
         json.query('body.user.name').toText(),
     );
 });
 
-test('decoded() of a scalar body converts directly', () => {
+Deno.test('decoded() of a scalar body converts directly', () => {
     const scalar = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'content-type: application/json\r\n\r\n42',
     );
-    assert.equal(scalar.body().decoded().toNumber(), 42);
+    assertStrictEquals(scalar.body().decoded().toNumber(), 42);
 });
 
-test('conversions on an absent body throw', () => {
-    assert.throws(() => noBody.body().toText(), HttpMessageError);
-    assert.throws(() => noBody.body().toBytes(), HttpMessageError);
-    assert.throws(() => noBody.body().decoded(), HttpMessageError);
+Deno.test('conversions on an absent body throw', () => {
+    assertThrows(() => noBody.body().toText(), HttpMessageError);
+    assertThrows(() => noBody.body().toBytes(), HttpMessageError);
+    assertThrows(() => noBody.body().decoded(), HttpMessageError);
 });
 
-test('decoded() throws when no codec handles the type', () => {
+Deno.test('decoded() throws when no codec handles the type', () => {
     const noCodec = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'content-type: application/xml\r\n\r\nhello',
     );
-    assert.throws(
+    assertThrows(
         () => noCodec.body().decoded(),
         HttpMessageError,
     );
 });
 
-test('decoded() throws on a malformed JSON body', () => {
+Deno.test('decoded() throws on a malformed JSON body', () => {
     const bad = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'content-type: application/json\r\n\r\nnot json',
     );
-    assert.throws(() => bad.body().decoded(), HttpMessageError);
-    assert.equal(bad.query('body.x').exists(), false);
+    assertThrows(() => bad.body().decoded(), HttpMessageError);
+    assertStrictEquals(bad.query('body.x').exists(), false);
 });
 
-test('contentDecoded() is identity without content-encoding', () => {
-    assert.deepEqual(
+Deno.test('contentDecoded() is identity without content-encoding', () => {
+    assertEquals(
         json.body().contentDecoded().toBytes(),
         json.body().toBytes(),
     );
 });
 
-test('contentDecoded() throws on an unsupported encoding', () => {
+Deno.test('contentDecoded() throws on an unsupported encoding', () => {
     const gz = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'content-encoding: gzip\r\n' +
         'content-type: text/plain\r\n\r\nx',
     );
-    assert.throws(
+    assertThrows(
         () => gz.body().contentDecoded(),
         HttpMessageError,
     );
 });
 
-test('base64Decoded() decodes a base64-armored body', () => {
+Deno.test('base64Decoded() decodes a base64-armored body', () => {
     const armored = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'content-type: text/plain\r\n\r\naGVsbG8=',
     );
-    assert.equal(armored.body().base64Decoded().toText(), 'hello');
+    assertStrictEquals(armored.body().base64Decoded().toText(), 'hello');
 });
 
-test('base64Decoded() throws HttpMessageError on bad input', () => {
+Deno.test('base64Decoded() throws HttpMessageError on bad input', () => {
     const armored = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'content-type: text/plain\r\n\r\n!!!not base64!!!',
     );
-    assert.throws(
+    assertThrows(
         () => armored.body().base64Decoded().toText(),
         HttpMessageError,
     );
 });
 
-test('contentDecoded() on an absent body throws', () => {
-    assert.throws(
+Deno.test('contentDecoded() on an absent body throws', () => {
+    assertThrows(
         () => noBody.body().contentDecoded(),
         HttpMessageError,
     );
 });
 
-test('decoded() throws on a content-encoded body', () => {
+Deno.test('decoded() throws on a content-encoded body', () => {
     const gz = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'content-encoding: gzip\r\n' +
         'content-type: application/json\r\n\r\n{"a":1}',
     );
-    assert.throws(() => gz.body().decoded(), HttpMessageError);
+    assertThrows(() => gz.body().decoded(), HttpMessageError);
 });

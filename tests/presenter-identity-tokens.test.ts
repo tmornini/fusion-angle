@@ -1,25 +1,18 @@
-// state.ts reads localStorage / window / document at
-// module-eval time; stub before importing presenters.
-// @ts-expect-error — Node global stub
-globalThis.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-};
+import { assertMatch } from '@std/assert';
+import {
+    IdentityTokensPresenter,
+} from '../web-app/app/presenters/identity-tokens.ts';
+
+// identity-tokens.ts never reads localStorage (checked
+// against the full product tree); window/document are
+// stubbed because IdentityTokensPresenter.render walks a
+// real DOM element.
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
-
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-
-const {
-    IdentityTokensPresenter,
-} = await import(
-    '../web-app/app/presenters/identity-tokens.ts'
-);
 
 function record(): {
     container: HTMLElement;
@@ -40,7 +33,7 @@ function record(): {
     };
 }
 
-test('renders a card per chain with each jti event', () => {
+Deno.test('renders a card per chain with each jti event', () => {
     const rec = record();
     new IdentityTokensPresenter([
         {
@@ -60,16 +53,16 @@ test('renders a card per chain with each jti event', () => {
         },
     ]).render(rec.container);
     const out = rec.html();
-    assert.match(out, /WeXjAaAxGSpLpamfEuvcww/);
-    assert.match(out, /jmvogLnzTmiQlAkVvDHrvQ/);
-    assert.match(out, /j2/);
-    assert.match(out, /issued/);
-    assert.match(out, /rotated/);
+    assertMatch(out, /WeXjAaAxGSpLpamfEuvcww/);
+    assertMatch(out, /jmvogLnzTmiQlAkVvDHrvQ/);
+    assertMatch(out, /j2/);
+    assertMatch(out, /issued/);
+    assertMatch(out, /rotated/);
 });
 
-test('renders an empty state when no chains', () => {
+Deno.test('renders an empty state when no chains', () => {
     const rec = record();
     new IdentityTokensPresenter([])
         .render(rec.container);
-    assert.match(rec.html(), /No tokens/);
+    assertMatch(rec.html(), /No tokens/);
 });

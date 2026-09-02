@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     canonicalizeResource,
     summarizeRequestHits,
@@ -13,8 +17,8 @@ import {
 import { encodeIdentifier } from
     '../shared/identifier.ts';
 
-test('DEFAULT_PROFILE_PAGES is the four heavy pages', () => {
-    assert.deepEqual(
+Deno.test('DEFAULT_PROFILE_PAGES is the four heavy pages', () => {
+    assertEquals(
         [...DEFAULT_PROFILE_PAGES],
         [
             'organization',
@@ -25,32 +29,32 @@ test('DEFAULT_PROFILE_PAGES is the four heavy pages', () => {
     );
 });
 
-test('canonicalizeResource collapses long id segments', () => {
+Deno.test('canonicalizeResource collapses long id segments', () => {
     const dashBytes = new Uint8Array(16);
     dashBytes[0] = 62 << 2;
     const id = encodeIdentifier(dashBytes);
-    assert.ok(id.includes('-') || id.includes('_'));
-    assert.equal(
+    assert(id.includes('-') || id.includes('_'));
+    assertStrictEquals(
         canonicalizeResource(
             `work-orders/${id}`,
         ),
         'work-orders/:id',
     );
-    assert.equal(
+    assertStrictEquals(
         canonicalizeResource(
             `work-orders/${id}/history`,
         ),
         'work-orders/:id/history',
     );
-    assert.equal(
+    assertStrictEquals(
         canonicalizeResource('states'),
         'states',
     );
-    assert.equal(
+    assertStrictEquals(
         canonicalizeResource('ideas'),
         'ideas',
     );
-    assert.equal(
+    assertStrictEquals(
         canonicalizeResource(
             'work-orders/' + 'a'.repeat(21),
         ),
@@ -58,7 +62,7 @@ test('canonicalizeResource collapses long id segments', () => {
     );
 });
 
-test('summarizeRequestHits counts and sorts', () => {
+Deno.test('summarizeRequestHits counts and sorts', () => {
     const dashBytes = new Uint8Array(16);
     dashBytes[0] = 62 << 2;
     const id = encodeIdentifier(dashBytes);
@@ -76,8 +80,8 @@ test('summarizeRequestHits counts and sorts', () => {
             resource: `work-orders/${id}/claim`,
         },
     ]);
-    assert.equal(summary.total, 6);
-    assert.deepEqual(summary.byRoute, [
+    assertStrictEquals(summary.total, 6);
+    assertEquals(summary.byRoute, [
         {
             method: 'GET',
             resource: 'states',
@@ -101,7 +105,7 @@ test('summarizeRequestHits counts and sorts', () => {
     ]);
 });
 
-test('pageInitAttribution nested and residual', () => {
+Deno.test('pageInitAttribution nested and residual', () => {
     const attr = pageInitAttribution({
         [MEASURE_BOOT_PAGE_INIT]: 2000,
         'fetch:a': 900,
@@ -109,13 +113,13 @@ test('pageInitAttribution nested and residual', () => {
         'render:a': 100,
         'boot:sidebar-chrome': 500,
     });
-    assert.equal(attr.pageInitMs, 2000);
-    assert.equal(attr.nestedFetchMs, 1700);
-    assert.equal(attr.nestedRenderMs, 100);
-    assert.equal(attr.residualMs, 200);
+    assertStrictEquals(attr.pageInitMs, 2000);
+    assertStrictEquals(attr.nestedFetchMs, 1700);
+    assertStrictEquals(attr.nestedRenderMs, 100);
+    assertStrictEquals(attr.residualMs, 200);
 });
 
-test('formatRequestProfileReport includes residual', () => {
+Deno.test('formatRequestProfileReport includes residual', () => {
     const text = formatRequestProfileReport(
         'workbox',
         3200,
@@ -133,21 +137,21 @@ test('formatRequestProfileReport includes residual', () => {
             },
         ],
     );
-    assert.match(text, /Request profile: workbox/);
-    assert.match(text, /readyMs\s+3200/);
-    assert.match(text, /residual 100/);
-    assert.match(text, /nested-fetch 2000/);
-    assert.match(text, /API requests\s+3 total/);
-    assert.match(text, /GET\s+states/);
-    assert.match(text, /work-orders/);
+    assertMatch(text, /Request profile: workbox/);
+    assertMatch(text, /readyMs\s+3200/);
+    assertMatch(text, /residual 100/);
+    assertMatch(text, /nested-fetch 2000/);
+    assertMatch(text, /API requests\s+3 total/);
+    assertMatch(text, /GET\s+states/);
+    assertMatch(text, /work-orders/);
 });
 
-test('formatRequestProfileReport empty hits', () => {
+Deno.test('formatRequestProfileReport empty hits', () => {
     const text = formatRequestProfileReport(
         'auth',
         200,
         { [MEASURE_BOOT_PAGE_INIT]: 1 },
         [],
     );
-    assert.match(text, /\(none recorded\)/);
+    assertMatch(text, /\(none recorded\)/);
 });

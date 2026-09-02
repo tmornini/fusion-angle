@@ -1,7 +1,6 @@
-import { test } from 'node:test';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import assert from 'node:assert/strict';
 import { handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -160,7 +159,7 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
         req('POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             , DEV_TOKEN, createBody()),
     );
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     // Task 8 CUT: legacy fieldValues fold is below-gate
     // stored-data seed (live wire rejects the key).
@@ -215,12 +214,12 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
             DEV_TOKEN,
         ),
     );
-    assert.equal(release.status, 204);
+    assertStrictEquals(release.status, 204);
 
     return db;
 }
 
-test(
+Deno.test(
     'GET organizations/:id/work-orders/:id/history returns 200 DESC rows;'
     + ' row[0] is current; transition carries field_values;'
     + ' claim rows carry []',
@@ -235,27 +234,27 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const rows = await res.json() as HistoryEvent[];
 
         // birth(3) + transition(1) + release(1) = 5.
-        assert.equal(rows.length, 5);
+        assertStrictEquals(rows.length, 5);
 
         // DESC: index 0 is the latest event (release).
-        assert.equal(rows[0]!.state, 'claim_released');
-        assert.deepEqual(rows[0]!.field_values, []);
+        assertStrictEquals(rows[0]!.state, 'claim_released');
+        assertEquals(rows[0]!.field_values, []);
 
         // Earliest birth is last.
-        assert.equal(rows[4]!.id, EV_1);
-        assert.equal(rows[4]!.state, NODE_START);
+        assertStrictEquals(rows[4]!.id, EV_1);
+        assertStrictEquals(rows[4]!.state, NODE_START);
 
         // Transition row carries folded field values.
         const transition = rows.find(
             (row) => row.id === TRANSITION_EVENT_ID,
         );
-        assert.ok(transition !== undefined);
-        assert.equal(transition!.state, NODE_MIDDLE);
-        assert.deepEqual(transition!.field_values, [
+        assert(transition !== undefined);
+        assertStrictEquals(transition!.state, NODE_MIDDLE);
+        assertEquals(transition!.field_values, [
             {
                 id: FIELD_VALUE_ID,
                 attribute_id: ATTR_SEVERITY,
@@ -267,15 +266,15 @@ test(
         const claimed = rows.find(
             (row) => row.id === EV_3,
         );
-        assert.ok(claimed !== undefined);
-        assert.equal(claimed!.state, 'claimed');
-        assert.deepEqual(claimed!.field_values, []);
+        assert(claimed !== undefined);
+        assertStrictEquals(claimed!.state, 'claimed');
+        assertEquals(claimed!.field_values, []);
 
         // Every row names this work order.
         for (const row of rows) {
-            assert.equal(row.entity_id, WORK_ORDER_ID);
-            assert.equal(row.member_id, 'XXZruirZyAOoRpNxaDnpSA');
-            assert.ok(Array.isArray(row.field_values));
+            assertStrictEquals(row.entity_id, WORK_ORDER_ID);
+            assertStrictEquals(row.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+            assert(Array.isArray(row.field_values));
         }
 
         // Strict DESC on (at, id).
@@ -285,7 +284,7 @@ test(
             const ordered =
                 prev.at > cur.at
                 || (prev.at === cur.at && prev.id > cur.id);
-            assert.ok(
+            assert(
                 ordered,
                 'history must be (at, id) DESC',
             );
@@ -293,7 +292,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'foreign work order history → 404 at this address',
     async () => {
         const db = await seededMockDb();
@@ -310,16 +309,16 @@ test(
                 tokenTwo,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             body.error,
             'Not found: work_orders/' + foreignId,
         );
     },
 );
 
-test(
+Deno.test(
     'absent work order history → 404',
     async () => {
         const db = memoryDbAdapter();
@@ -334,16 +333,16 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 404);
+        assertStrictEquals(res.status, 404);
         const body = await res.json() as { error: string };
-        assert.equal(
+        assertStrictEquals(
             body.error,
             'Not found: work_orders/' + missingId,
         );
     },
 );
 
-test(
+Deno.test(
     'unauthenticated work order history → 401',
     async () => {
         const db = memoryDbAdapter();
@@ -356,16 +355,16 @@ test(
                     + WORK_ORDER_ID + '/history',
             ),
         );
-        assert.equal(res.status, 401);
+        assertStrictEquals(res.status, 401);
         const body = await res.json() as { error: string };
-        assert.equal(body.error, 'invalid_token');
+        assertStrictEquals(body.error, 'invalid_token');
     },
 );
 
 // Bulk GET work-orders/history is deleted. Callers fan-in
 // per-item GET work-orders/:id/history.
 
-test(
+Deno.test(
     'GET organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/history is 404',
     async () => {
         const db = await seededChainDb();
@@ -378,7 +377,7 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(collection.status, 404);
+        assertStrictEquals(collection.status, 404);
 
         const emptyDb = memoryDbAdapter();
         await seedAdminSchema(emptyDb);
@@ -391,6 +390,6 @@ test(
                 DEV_TOKEN,
             ),
         );
-        assert.equal(empty.status, 404);
+        assertStrictEquals(empty.status, 404);
     },
 );

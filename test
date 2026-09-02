@@ -20,6 +20,7 @@ set -euo pipefail
 export JWT_HMAC_SIGNING_KEY="${JWT_HMAC_SIGNING_KEY:-test-hmac-signing-key}"
 DENO_TEST=(
     deno test --frozen --parallel --no-check
+    --sanitize-ops --sanitize-resources
     --allow-env --allow-read --allow-write
     --allow-net --allow-run=deno,./serve,./crank,sh,./validate
     --preload ./tests/hmac-test-key.ts

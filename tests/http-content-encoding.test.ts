@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertRejects, assertStrictEquals } from '@std/assert';
 import { Octets } from '../shared/http-message/octets.ts';
 import {
     ContentCodingRegistry,
@@ -26,39 +25,39 @@ async function deflate(
     return Octets.fromBytes(new Uint8Array(buffer));
 }
 
-test('gzip codec round-trips compressed octets', async () => {
+Deno.test('gzip codec round-trips compressed octets', async () => {
     const decoded = await gzipContentCodec.decode(
         await deflate('gzip', 'hello, world'),
     );
-    assert.equal(
+    assertStrictEquals(
         new TextDecoder().decode(decoded.asBytes()),
         'hello, world',
     );
 });
 
-test('deflate codec round-trips compressed octets', async () => {
+Deno.test('deflate codec round-trips compressed octets', async () => {
     const decoded = await deflateContentCodec.decode(
         await deflate('deflate', 'hello, world'),
     );
-    assert.equal(
+    assertStrictEquals(
         new TextDecoder().decode(decoded.asBytes()),
         'hello, world',
     );
 });
 
-test('the default registry has no br codec', () => {
-    assert.equal(
+Deno.test('the default registry has no br codec', () => {
+    assertStrictEquals(
         defaultContentCodingRegistry().codecFor('br'),
         undefined,
     );
 });
 
-test('an injected br codec is found', () => {
+Deno.test('an injected br codec is found', () => {
     const br: ContentCodec = {
         handles: (coding) => coding === 'br',
         decode: (body) => Promise.resolve(body),
     };
-    assert.equal(
+    assertStrictEquals(
         new ContentCodingRegistry([br]).codecFor('br'), br,
     );
 });
@@ -68,7 +67,7 @@ const RESPONSE_LINE = {
     version: 'HTTP/1.1', status: 200, reason: 'OK',
 };
 
-test('decodedAsync strips gzip then decodes JSON', async () => {
+Deno.test('decodedAsync strips gzip then decodes JSON', async () => {
     const body = Body.fromModel(
         {
             startLine: RESPONSE_LINE,
@@ -86,10 +85,10 @@ test('decodedAsync strips gzip then decodes JSON', async () => {
         defaultContentCodingRegistry(),
     );
     const decoded = await body.decodedAsync();
-    assert.equal(decoded.query('ok').toBoolean(), true);
+    assertStrictEquals(decoded.query('ok').toBoolean(), true);
 });
 
-test('contentDecodedAsync rejects br by default', async () => {
+Deno.test('contentDecodedAsync rejects br by default', async () => {
     const body = Body.fromModel(
         {
             startLine: RESPONSE_LINE,
@@ -100,7 +99,7 @@ test('contentDecodedAsync rejects br by default', async () => {
         defaultBodyRegistry(),
         defaultContentCodingRegistry(),
     );
-    await assert.rejects(
-        body.contentDecodedAsync(), HttpMessageError,
+    await assertRejects(
+        () => body.contentDecodedAsync(), HttpMessageError,
     );
 });

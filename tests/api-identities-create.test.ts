@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { GET, POST, PUT, handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
@@ -66,7 +70,7 @@ function req(
     });
 }
 
-test(
+Deno.test(
     'POST identities (person) writes the bare identity; its'
     + ' PII enters via a separate PUT identities/:id/pii'
     + ' (Phase 10 Task 2 intake decomposition)',
@@ -78,25 +82,25 @@ test(
         }, DEV_TOKEN);
         const identity = await GET<{ kind: string }>(
             db, 'identities/pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN);
-        assert.equal(identity.kind, 'person');
+        assertStrictEquals(identity.kind, 'person');
         // No PII yet — create body no longer carries pii.
         // Phase Final Task 2: identity spine ROW halves stripped.
-        await assert.rejects(
+        await assertRejects(
             () => deriveIdentityPii(db, 'pnXmXrxOWayANgDLdCjuBw'));
         await PUT(
             db, 'identities/pnXmXrxOWayANgDLdCjuBw/pii', pii('Alice')
                 , DEV_TOKEN);
         const piiRow = await deriveIdentityPii(db, 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(piiRow.name, 'Alice');
+        assertStrictEquals(piiRow.name, 'Alice');
         // A person carries no credential.
         const creds = await deriveCredentialsFor(db
             , 'pnXmXrxOWayANgDLdCjuBw');
-        assert.equal(creds.length, 0);
+        assertStrictEquals(creds.length, 0);
         // Phase Final Stage B: identity spine tables retired.
     },
 );
 
-test(
+Deno.test(
     'POST identities (service) writes the identity and its'
     + ' client_secret credential in one operation',
     async () => {
@@ -108,20 +112,20 @@ test(
         }, DEV_TOKEN);
         const identity = await GET<{ kind: string }>(
             db, 'identities/syWUUcdBSbBgMwBiCrgbDw', DEV_TOKEN);
-        assert.equal(identity.kind, 'service');
+        assertStrictEquals(identity.kind, 'service');
         const creds = await deriveCredentialsFor(db
             , 'syWUUcdBSbBgMwBiCrgbDw');
         const cred = creds.find(c => c.kind === 'client_secret');
-        assert.ok(cred, 'credential exists on message plane');
-        assert.equal(cred.status, 'set');
+        assert(cred, 'credential exists on message plane');
+        assertStrictEquals(cred.status, 'set');
         // A service carries no PII.
-        await assert.rejects(
+        await assertRejects(
             () => deriveIdentityPii(db, 'syWUUcdBSbBgMwBiCrgbDw'));
         // Phase Final Stage B: identity spine tables retired.
     },
 );
 
-test(
+Deno.test(
     'POST identities (person) rejects a legacy pii-bearing'
     + ' body: PII now enters ONLY via PUT identities/:id/pii'
     + ' (Phase 10 Task 2 retires the create-time PII facet, and'
@@ -130,7 +134,7 @@ test(
     async () => {
         const db = await freshDb();
         const doomed = generateIdentifier();
-        await assert.rejects(
+        await assertRejects(
             () => POST(db, 'identities/', {
                 id: doomed,
                 kind: 'person',
@@ -142,14 +146,14 @@ test(
             }, DEV_TOKEN),
         );
         // The unexpected `pii` key 400s before any facet lands.
-        await assert.rejects(
+        await assertRejects(
             () => GET(db, 'identities/' + doomed, DEV_TOKEN));
-        await assert.rejects(
+        await assertRejects(
             () => deriveIdentityPii(db, doomed));
     },
 );
 
-test(
+Deno.test(
     'a bad PUT identities/:id/pii after a good create leaves'
     + ' the identity standing PII-less — the torn-state'
     + ' acceptance the intake decomposition names',
@@ -159,7 +163,7 @@ test(
         await POST(db, 'identities/', {
             id: torn, kind: 'person',
         }, DEV_TOKEN);
-        await assert.rejects(
+        await assertRejects(
             // PII missing the required `bio` key.
             () => PUT(db, 'identities/' + torn + '/pii', {
                 name: 'Torn',
@@ -170,19 +174,19 @@ test(
         // The identity survives; it simply carries no PII yet.
         const identity = await GET<{ kind: string }>(
             db, 'identities/' + torn, DEV_TOKEN);
-        assert.equal(identity.kind, 'person');
-        await assert.rejects(
+        assertStrictEquals(identity.kind, 'person');
+        await assertRejects(
             () => deriveIdentityPii(db, torn));
     },
 );
 
-test(
+Deno.test(
     'POST identities (service) rolls back the identity when'
     + ' its credential sub-object is invalid',
     async () => {
         const db = await freshDb();
         const doomed = generateIdentifier();
-        await assert.rejects(
+        await assertRejects(
             // Credential with a malformed `at` — the
             // identity_credentials store rejects it mid-tx,
             // AFTER the identities put has landed, so both must
@@ -196,14 +200,14 @@ test(
                 },
             }, DEV_TOKEN),
         );
-        await assert.rejects(
+        await assertRejects(
             () => GET(db, 'identities/' + doomed, DEV_TOKEN));
         const creds = await deriveCredentialsFor(db, doomed);
-        assert.equal(creds.length, 0);
+        assertStrictEquals(creds.length, 0);
     },
 );
 
-test(
+Deno.test(
     'an admin may POST identities but a plain member is'
     + ' denied',
     async () => {
@@ -213,7 +217,7 @@ test(
                 id: 'pnXmXrxOWayANgDLdCjuBw',
                 kind: 'person',
             }));
-        assert.equal(create.status, 201);
+        assertStrictEquals(create.status, 201);
 
         const memberDb = memoryDbAdapter();
         await memberDb.postSchemaCreation();
@@ -224,16 +228,16 @@ test(
                 id: 'prBESZPjJDiuXCeZLmbiVw',
                 kind: 'person',
             }));
-        assert.equal(denied.status, 403);
+        assertStrictEquals(denied.status, 403);
         // The denied member wrote nothing on the message plane
         // — no identities/prBESZPjJDiuXCeZLmbiVw document.
-        await assert.rejects(
+        await assertRejects(
             () => GET(memberDb, 'identities/prBESZPjJDiuXCeZLmbiVw', token),
         );
     },
 );
 
-test('identity creation stores identityDocumentEntityOf',
+Deno.test('identity creation stores identityDocumentEntityOf',
 async () => {
     const db = await freshDb();
     const id = generateIdentifier();
@@ -244,7 +248,7 @@ async () => {
     const stored = JSON.parse(
         await storedPutBodyText(db, '/identities/', id),
     );
-    assert.deepEqual(
+    assertEquals(
         stored,
         identityDocumentEntityOf(
             {

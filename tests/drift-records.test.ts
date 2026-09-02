@@ -1,5 +1,10 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert,
+    assertEquals,
+    assertInstanceOf,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -386,7 +391,7 @@ function decodeRequestMessage(message: string): {
 
 // -- 1. records collection wire equals derive --------------------
 
-test('seeded GET nested record-types wire equals derived'
+Deno.test('seeded GET nested record-types wire equals derived'
 + ' collection'
     + ', both orgs (the AjdvjuECVZEgZoFajaIEkg/'
     + 'AjdvjuECVZEgZoFajaIEkg split)', async () => {
@@ -405,23 +410,23 @@ test('seeded GET nested record-types wire equals derived'
                 token,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const wireText = await res.text();
         const derived = await derivedRecords(db, organization);
-        assert.equal(wireText, JSON.stringify(derived));
+        assertStrictEquals(wireText, JSON.stringify(derived));
     }
     const org1 = await derivedRecords(db, STARK_ORGANIZATION);
     const org2 = await derivedRecords(db, ORGANIZATION_TWO);
-    assert.equal(org1.length, 1);
-    assert.equal(org2.length, 1);
-    assert.equal(org1[0]!.id, customerProfileRecordId);
-    assert.equal(org2[0]!.id, projectBriefRecordId);
+    assertStrictEquals(org1.length, 1);
+    assertStrictEquals(org2.length, 1);
+    assertStrictEquals(org1[0]!.id, customerProfileRecordId);
+    assertStrictEquals(org2[0]!.id, projectBriefRecordId);
     // Phase Final Stage B: records table retired.
 });
 
 // -- 2. foreign-org GET 404 on wire + derive ---------------------
 
-test('a foreign-org GET 404s on wire and on derive, for'
+Deno.test('a foreign-org GET 404s on wire and on derive, for'
 + ' records, record-attributes, and flow_records',
 async () => {
     const db = await seededDb();
@@ -444,17 +449,16 @@ async () => {
             tokenTwo,
         ),
     );
-    assert.equal(recRes.status, 404);
+    assertStrictEquals(recRes.status, 404);
     const recBody = await recRes.json() as { error: string };
-    assert.equal(recBody.error, expectedRecordMessage);
-    await assert.rejects(
+    assertStrictEquals(recBody.error, expectedRecordMessage);
+    const err = await assertRejects(
         () => derivedRecord(
             db, ORGANIZATION_TWO, customerProfileRecordId,
         ),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedRecordMessage,
-    );
+    ) as Error;
+    assertInstanceOf(err, EntityNotFoundError);
+    assertStrictEquals(err.message, expectedRecordMessage);
 
     const attributeId = 'CPJmMPXRaBIiNdGBofUPVg';
     // Nested GET probes the parent type first — miss at
@@ -473,18 +477,19 @@ async () => {
             tokenTwo,
         ),
     );
-    assert.equal(attrRes.status, 404);
+    assertStrictEquals(attrRes.status, 404);
     const attrBody = await attrRes.json() as { error: string };
-    assert.equal(attrBody.error, expectedTypeMessage);
+    assertStrictEquals(attrBody.error, expectedTypeMessage);
     const expectedAttributeMessage =
         'Not found: record_attributes/' + attributeId;
-    await assert.rejects(
+    const attrErr = await assertRejects(
         () => derivedRecordAttribute(
             db, ORGANIZATION_TWO, attributeId,
         ),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedAttributeMessage,
+    ) as Error;
+    assertInstanceOf(attrErr, EntityNotFoundError);
+    assertStrictEquals(
+        attrErr.message, expectedAttributeMessage,
     );
 
     const joinId = 'dDmnfQddFbigpThjftUlWg';
@@ -500,22 +505,21 @@ async () => {
             tokenTwo,
         ),
     );
-    assert.equal(joinRes.status, 404);
+    assertStrictEquals(joinRes.status, 404);
     const joinBody = await joinRes.json() as { error: string };
-    assert.equal(joinBody.error, expectedJoinMessage);
-    await assert.rejects(
+    assertStrictEquals(joinBody.error, expectedJoinMessage);
+    const joinErr = await assertRejects(
         () => deriveFlowRecord(
             db, ORGANIZATION_TWO, flowId, joinId,
         ),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedJoinMessage,
-    );
+    ) as Error;
+    assertInstanceOf(joinErr, EntityNotFoundError);
+    assertStrictEquals(joinErr.message, expectedJoinMessage);
 });
 
 // -- 3. per-record + per-attribute GET wire equals derive --------
 
-test('per-record GET wire equals derive; per-attribute GET'
+Deno.test('per-record GET wire equals derive; per-attribute GET'
 + ' wire equals derive; attribute collection 10/4 split',
 async () => {
     const db = await seededDb();
@@ -541,12 +545,12 @@ async () => {
                 token,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const wireText = await res.text();
         const derived = await derivedRecord(
             db, organization, id,
         );
-        assert.equal(wireText, JSON.stringify(derived));
+        assertStrictEquals(wireText, JSON.stringify(derived));
     }
 
     const attributeOrganizationByRecordId:
@@ -555,7 +559,7 @@ async () => {
             [projectBriefRecordId]: ORGANIZATION_TWO,
         };
     const attributes = buildRecordAttributes();
-    assert.equal(attributes.length, 14);
+    assertStrictEquals(attributes.length, 14);
     for (const attribute of attributes) {
         const organization =
             attributeOrganizationByRecordId[
@@ -575,13 +579,13 @@ async () => {
                 token,
             ),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const wireText = await res.text();
         const derived = await derivedRecordAttribute(
             db, organization, attribute.id,
         );
-        assert.equal(wireText, JSON.stringify(derived));
-        assert.equal(derived.name, attribute.name);
+        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertStrictEquals(derived.name, attribute.name);
     }
 
     const org1Attributes = await derivedRecordAttributes(
@@ -590,8 +594,8 @@ async () => {
     const org2Attributes = await derivedRecordAttributes(
         db, ORGANIZATION_TWO,
     );
-    assert.equal(org1Attributes.length, 10);
-    assert.equal(org2Attributes.length, 4);
+    assertStrictEquals(org1Attributes.length, 10);
+    assertStrictEquals(org2Attributes.length, 4);
     // Phase Final Stage B: record_attributes table retired.
 });
 
@@ -617,7 +621,7 @@ const SEEDED_JOIN_FLOWS = [
     },
 ];
 
-test('flow_records join wire equals derive across every'
+Deno.test('flow_records join wire equals derive across every'
 + ' seeded flow (the AjdvjuECVZEgZoFajaIEkg/AjdvjuECVZEgZoFajaIEkg/'
     + 'AjdvjuECVZEgZoFajaIEkg split) + empty + :frid',
 async () => {
@@ -637,13 +641,13 @@ async () => {
                 token,
             ),
         );
-        assert.equal(listRes.status, 200);
+        assertStrictEquals(listRes.status, 200);
         const wireList = await listRes.text();
         const derived = await deriveFlowRecords(
             db, organization, flowId,
         );
-        assert.equal(wireList, JSON.stringify(derived));
-        assert.equal(derived.length, 1);
+        assertStrictEquals(wireList, JSON.stringify(derived));
+        assertStrictEquals(derived.length, 1);
 
         const byIdRes = await handleRequest(
             db,
@@ -654,12 +658,12 @@ async () => {
                 token,
             ),
         );
-        assert.equal(byIdRes.status, 200);
+        assertStrictEquals(byIdRes.status, 200);
         const wireById = await byIdRes.text();
         const derivedById = await deriveFlowRecord(
             db, organization, flowId, joinId,
         );
-        assert.equal(wireById, JSON.stringify(derivedById));
+        assertStrictEquals(wireById, JSON.stringify(derivedById));
     }
 
     const token = await organizationToken();
@@ -672,9 +676,9 @@ async () => {
             token,
         ),
     );
-    assert.equal(emptyRes.status, 200);
-    assert.equal(await emptyRes.text(), '[]');
-    assert.deepEqual(
+    assertStrictEquals(emptyRes.status, 200);
+    assertStrictEquals(await emptyRes.text(), '[]');
+    assertEquals(
         await deriveFlowRecords(
             db, STARK_ORGANIZATION, EMPTY_FLOW_ID,
         ),
@@ -685,7 +689,7 @@ async () => {
 
 // -- 5. live-write chain on wire + derive ------------------------
 
-test('live-write chain: create, edit, RESTRICT 409, echoed'
+Deno.test('live-write chain: create, edit, RESTRICT 409, echoed'
 + ' trio, archive, delete, physical DELETE — wire + derive',
 async () => {
     const db = await seededDb();
@@ -700,12 +704,12 @@ async () => {
             db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const wireText = await res.text();
         const derived = await derivedRecord(
             db, STARK_ORGANIZATION, recordId,
         );
-        assert.equal(wireText, JSON.stringify(derived));
+        assertStrictEquals(wireText, JSON.stringify(derived));
     }
 
     async function assertAttributeWire(id: string): Promise<void> {
@@ -714,12 +718,12 @@ async () => {
                 + '/record-types/' + recordId
                 + '/attributes/' + id, token),
         );
-        assert.equal(res.status, 200);
+        assertStrictEquals(res.status, 200);
         const wireText = await res.text();
         const derived = await derivedRecordAttribute(
             db, STARK_ORGANIZATION, id,
         );
-        assert.equal(wireText, JSON.stringify(derived));
+        assertStrictEquals(wireText, JSON.stringify(derived));
     }
 
     async function assertAttributeAbsent(id: string): Promise<void> {
@@ -728,8 +732,8 @@ async () => {
                 + '/record-types/' + recordId
                 + '/attributes/' + id, token),
         );
-        assert.equal(res.status, 404);
-        await assert.rejects(
+        assertStrictEquals(res.status, 404);
+        await assertRejects(
             () => derivedRecordAttribute(
                 db, STARK_ORGANIZATION, id,
             ),
@@ -754,7 +758,7 @@ async () => {
             REC_DRIFT_CHAIN_1_GENESIS, nowUtc(),
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
     await assertRecordWire();
     await assertAttributeWire(attrA);
     await assertAttributeWire(attrB);
@@ -777,7 +781,7 @@ async () => {
             'active', editStateAt, editStateEventId,
         ),
     ));
-    assert.equal(edited.status, 201);
+    assertStrictEquals(edited.status, 201);
     await assertRecordWire();
     await assertAttributeAbsent(attrA);
     await assertAttributeWire(attrB);
@@ -798,11 +802,11 @@ async () => {
             'active', nowUtc(), REC_DRIFT_CHAIN_1_REJECTED,
         ),
     ));
-    assert.equal(rejected.status, 409);
-    assert.equal(
+    assertStrictEquals(rejected.status, 409);
+    assertStrictEquals(
         (await db.messagePairs.getAll()).length, beforeRequestCount,
     );
-    assert.equal(
+    assertStrictEquals(
         (await derivedRecordAttributes(db, STARK_ORGANIZATION))
             .length,
         beforeAttrCount,
@@ -821,8 +825,8 @@ async () => {
             state: 'active',
         },
     ));
-    assert.equal(echoed.status, 201);
-    assert.equal(
+    assertStrictEquals(echoed.status, 201);
+    assertStrictEquals(
         0 /* states table retired */,
         beforeStatesCount,
     );
@@ -830,7 +834,7 @@ async () => {
     const afterEcho = await derivedRecord(
         db, STARK_ORGANIZATION, recordId,
     );
-    assert.equal(afterEcho.description, 'echoed-trio description');
+    assertStrictEquals(afterEcho.description, 'echoed-trio description');
 
     // Step 5: archived — still visible.
     const archived = await handleRequest(db, req(
@@ -842,12 +846,12 @@ async () => {
             state: 'archived',
         },
     ));
-    assert.equal(archived.status, 201);
+    assertStrictEquals(archived.status, 201);
     await assertRecordWire();
     const afterArchive = await derivedRecords(
         db, STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         afterArchive.some((r) => r.id === recordId), true,
     );
 
@@ -861,20 +865,20 @@ async () => {
             state: 'deleted',
         },
     ));
-    assert.equal(deletedTransition.status, 201);
+    assertStrictEquals(deletedTransition.status, 201);
     const deletedGet = await handleRequest(
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token),
     );
-    assert.equal(deletedGet.status, 404);
-    await assert.rejects(
+    assertStrictEquals(deletedGet.status, 404);
+    await assertRejects(
         () => derivedRecord(db, STARK_ORGANIZATION, recordId),
         EntityNotFoundError,
     );
     const derivedListAfterDelete = await derivedRecords(
         db, STARK_ORGANIZATION,
     );
-    assert.equal(
+    assertStrictEquals(
         derivedListAfterDelete.some((r) => r.id === recordId),
         false,
     );
@@ -884,7 +888,7 @@ async () => {
     const derivedHistory = await deriveRecordStateHistory(
         db, STARK_ORGANIZATION, recordId,
     );
-    assert.equal(derivedHistory.length, 3);
+    assertStrictEquals(derivedHistory.length, 3);
 
     // Step 7: physical DELETE on a second record.
     const secondRecordId = generateIdentifier();
@@ -896,18 +900,18 @@ async () => {
             [], REC_DRIFT_CHAIN_2_GENESIS, nowUtc(),
         ),
     ));
-    assert.equal(secondCreated.status, 201);
+    assertStrictEquals(secondCreated.status, 201);
     const secondDeleted = await handleRequest(db, req(
         'DELETE', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + secondRecordId, token,
     ));
-    assert.equal(secondDeleted.status, 204);
+    assertStrictEquals(secondDeleted.status, 204);
     const secondGet = await handleRequest(
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + secondRecordId, token),
     );
-    assert.equal(secondGet.status, 404);
-    await assert.rejects(
+    assertStrictEquals(secondGet.status, 404);
+    await assertRejects(
         () => derivedRecord(
             db, STARK_ORGANIZATION, secondRecordId,
         ),
@@ -917,7 +921,7 @@ async () => {
 
 // -- 6. duplicate-create supersession ----------------------------
 
-test('duplicate-create supersession: second document message pair'
+Deno.test('duplicate-create supersession: second document message pair'
 + ' Supersedes the first document message pair; wire equals derive',
 async () => {
     const db = await seededDb();
@@ -942,7 +946,7 @@ async () => {
             '2026-05-02T00:00:00.000000Z',
         ),
     ));
-    assert.equal(first.status, 201);
+    assertStrictEquals(first.status, 201);
 
     const firstDocumentMessagePairs = documentMessagePairsAt(
         await db.messagePairs.getAllWhere(
@@ -950,7 +954,7 @@ async () => {
         ),
         prefix,
     ).filter((messagePair) => messagePair.uriId === recordId);
-    assert.equal(firstDocumentMessagePairs.length, 1);
+    assertStrictEquals(firstDocumentMessagePairs.length, 1);
 
     const second = await handleRequest(db, req(
         'POST', '/organizations/' + STARK_ORGANIZATION
@@ -967,7 +971,7 @@ async () => {
             '2026-05-02T00:00:01.000000Z',
         ),
     ));
-    assert.equal(second.status, 201);
+    assertStrictEquals(second.status, 201);
 
     const allRequests =
         await db.messagePairs.getAllWhere('uri_collection', prefix);
@@ -976,13 +980,13 @@ async () => {
     const secondDocumentMessagePairs = documentMessagePairsAt(
         allRequests, prefix,
     ).filter((messagePair) => messagePair.uriId === recordId);
-    assert.equal(secondDocumentMessagePairs.length, 2);
+    assertStrictEquals(secondDocumentMessagePairs.length, 2);
     const secondDocumentMessagePairId =
         secondDocumentMessagePairs[1]!.id;
     const secondDocumentResponseRow = allResponses.find(
         (r) => r.id === secondDocumentMessagePairId,
     )!;
-    assert.equal(
+    assertStrictEquals(
         'supersedes' in secondDocumentResponseRow, false,
     );
 
@@ -990,19 +994,19 @@ async () => {
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const wireText = await res.text();
     const derived = await derivedRecord(
         db, STARK_ORGANIZATION, recordId,
     );
-    assert.equal(wireText, JSON.stringify(derived));
-    assert.equal(derived.name, 'Dup Second');
+    assertStrictEquals(wireText, JSON.stringify(derived));
+    assertStrictEquals(derived.name, 'Dup Second');
     // Phase Final Stage B: records table retired.
 });
 
 // -- 7. method-filter --------------------------------------------
 
-test('the create-op POST pair is not read as a document message pair —'
+Deno.test('the create-op POST pair is not read as a document message pair —'
 + ' create and document bodies share zero top-level keys',
 async () => {
     const db = await seededDb();
@@ -1025,7 +1029,7 @@ async () => {
             '2026-05-03T00:00:00.000000Z',
         ),
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const recordsPrefix = canonicalUriCollection(
         STARK_ORGANIZATION, '/record-types/',
@@ -1038,13 +1042,13 @@ async () => {
         (r) => r.uri_collection === recordsPrefix
             && r.uri_id === recordId,
     );
-    assert.equal(atRecordAddress.length, 2);
+    assertStrictEquals(atRecordAddress.length, 2);
 
     const recordDocumentMessagePairs = documentMessagePairsAt(
         recordRequests, recordsPrefix,
     ).filter((messagePair) => messagePair.uriId === recordId);
-    assert.equal(recordDocumentMessagePairs.length, 1);
-    assert.equal(recordDocumentMessagePairs[0]!.method, 'PUT');
+    assertStrictEquals(recordDocumentMessagePairs.length, 1);
+    assertStrictEquals(recordDocumentMessagePairs[0]!.method, 'PUT');
 
     const postRow = atRecordAddress.find(
         (r) => decodeRequestMessage(r.request).method === 'POST',
@@ -1058,7 +1062,7 @@ async () => {
     const overlap = [...createBodyKeys].filter(
         (key) => documentBodyKeys.has(key),
     );
-    assert.deepEqual(overlap, []);
+    assertEquals(overlap, []);
 
     // Task 8: attribute pairs store under the type's
     // nested attributes prefix.
@@ -1078,8 +1082,8 @@ async () => {
         attributeRequests, attributesPrefix,
     ).filter((messagePair) =>
         messagePair.uriId === attributeId);
-    assert.equal(attributeDocumentMessagePairs.length, 1);
-    assert.equal(attributeDocumentMessagePairs[0]!.method, 'PUT');
+    assertStrictEquals(attributeDocumentMessagePairs.length, 1);
+    assertStrictEquals(attributeDocumentMessagePairs[0]!.method, 'PUT');
 });
 
 // -- 8. genesis-wins-under-skew ----------------------------------
@@ -1090,7 +1094,7 @@ async () => {
 // stay genesis (state ← event.state, state_at ← event.at,
 // state_event_id ← event.id).
 
-test('GET record trio is lifecycle-current under clock skew'
+Deno.test('GET record trio is lifecycle-current under clock skew'
 + ' (genesis-wins-under-skew, case 7d)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -1103,7 +1107,7 @@ test('GET record trio is lifecycle-current under clock skew'
             state: 'active',
         },
     ));
-    assert.equal(genesis.status, 201);
+    assertStrictEquals(genesis.status, 201);
 
     // Later arrival, earlier state_at, different state + name.
     // 'deleted' would hide the row if it won as current —
@@ -1115,17 +1119,17 @@ test('GET record trio is lifecycle-current under clock skew'
             state: 'deleted',
         },
     ));
-    assert.equal(skewed.status, 201);
+    assertStrictEquals(skewed.status, 201);
 
     const res = await handleRequest(
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token),
     );
-    assert.equal(res.status, 404);
+    assertStrictEquals(res.status, 404);
     const history = await deriveRecordStateHistory(
         db, STARK_ORGANIZATION, recordId,
     );
-    assert.deepEqual(
+    assertEquals(
         history.map((entry) => entry.state),
         ['active', 'deleted'],
     );
@@ -1133,7 +1137,7 @@ test('GET record trio is lifecycle-current under clock skew'
 
 // -- 9. non-lex collection order (craftsmanship) -----------------
 
-test('GET /records collection is wire byte-identical to a'
+Deno.test('GET /records collection is wire byte-identical to a'
 + ' literal id-lex reconstruction after non-lex PUTs',
 async () => {
     const db = await seededDb();
@@ -1168,7 +1172,7 @@ async () => {
                 state: 'active',
             },
         ));
-        assert.equal(put.status, 201);
+        assertStrictEquals(put.status, 201);
     }
     // Oldest live head (at, id): z, a, m — insertion.
     const expectedIds = [
@@ -1178,24 +1182,24 @@ async () => {
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/', token),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const list = await res.json() as { id: string }[];
     const added = list.filter((row) =>
         [
             REC_DRIFT_Z, REC_DRIFT_A, REC_DRIFT_M,
         ].includes(row.id));
-    assert.deepEqual(
+    assertEquals(
         added.map((r) => r.id), expectedIds,
     );
     const derived = await derivedRecords(db, STARK_ORGANIZATION);
-    assert.equal(
+    assertStrictEquals(
         JSON.stringify(list), JSON.stringify(derived),
     );
 });
 
 // -- 10. delete-then-recreate ------------------------------------
 
-test('delete-then-recreate: DELETE via the wire, re-PUT the'
+Deno.test('delete-then-recreate: DELETE via the wire, re-PUT the'
 + ' SAME id, GET by-id + collection succeed on wire + derive',
 async () => {
     const db = await seededDb();
@@ -1209,22 +1213,22 @@ async () => {
             state: 'active',
         },
     ));
-    assert.equal(genesis.status, 201);
+    assertStrictEquals(genesis.status, 201);
 
     const deleted = await handleRequest(db, req(
         'DELETE', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token,
     ));
-    assert.equal(deleted.status, 204);
+    assertStrictEquals(deleted.status, 204);
     const deleteResponseId = deleted.headers.get('Response-ID');
-    assert.ok(deleteResponseId);
+    assert(deleteResponseId);
 
     const miss = await handleRequest(
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token),
     );
-    assert.equal(miss.status, 404);
-    await assert.rejects(
+    assertStrictEquals(miss.status, 404);
+    await assertRejects(
         () => derivedRecord(db, STARK_ORGANIZATION, recordId),
         EntityNotFoundError,
     );
@@ -1236,8 +1240,8 @@ async () => {
             state: 'active',
         },
     ));
-    assert.equal(recreated.status, 201);
-    assert.equal(
+    assertStrictEquals(recreated.status, 201);
+    assertStrictEquals(
         recreated.headers.get('Supersedes'), null,
     );
 
@@ -1245,21 +1249,21 @@ async () => {
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token),
     );
-    assert.equal(res.status, 200);
+    assertStrictEquals(res.status, 200);
     const wireText = await res.text();
     const derived = await derivedRecord(
         db, STARK_ORGANIZATION, recordId,
     );
-    assert.equal(wireText, JSON.stringify(derived));
-    assert.equal(derived.name, 'Second Life');
+    assertStrictEquals(wireText, JSON.stringify(derived));
+    assertStrictEquals(derived.name, 'Second Life');
 
     const listRes = await handleRequest(
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/', token),
     );
-    assert.equal(listRes.status, 200);
+    assertStrictEquals(listRes.status, 200);
     const list = await listRes.json() as { id: string }[];
-    assert.equal(
+    assertStrictEquals(
         list.some((r) => r.id === recordId), true,
     );
 });
@@ -1335,7 +1339,7 @@ function workOrderFlowGraph(
     };
 }
 
-test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
+Deno.test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
 + " fieldValues tally over a work order's OWN transition"
 + " pairs equals collectAttributeReferrers' valueCount for a"
 + ' live, ledger-backed transition', async () => {
@@ -1354,12 +1358,12 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
         'DfkwfBiyfyCyRHvsHnDiqQ', // Number of Employees
         'ElVKgkCreTEHQXJZPBJDKw', // Reviewer Notes
     ];
-    assert.equal(flagshipAttributeIds.length, 7);
+    assertStrictEquals(flagshipAttributeIds.length, 7);
 
     const flagshipScan = await transitionFieldValueCounts(
         db, STARK_ORGANIZATION, flagshipWorkOrderId,
     );
-    assert.equal(flagshipScan.size, 0);
+    assertStrictEquals(flagshipScan.size, 0);
 
     const allMessagePairs = await db.messagePairs.getAll();
     const sfvRows = stateFieldValuesFrom(allMessagePairs);
@@ -1377,7 +1381,7 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
         );
     }
     for (const attributeId of flagshipAttributeIds) {
-        assert.equal(
+        assertStrictEquals(
             flagshipSfvTally.get(attributeId) ?? 0, 0,
         );
     }
@@ -1386,10 +1390,10 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
         db, STARK_ORGANIZATION, customerProfileRecordId,
         SEED_INSTANCE_ID,
     );
-    assert.ok(head !== undefined);
-    assert.equal(head!.values.length, 7);
+    assert(head !== undefined);
+    assertStrictEquals(head!.values.length, 7);
     for (const attributeId of flagshipAttributeIds) {
-        assert.ok(
+        assert(
             head!.values.some(
                 (v) => v.attribute_id === attributeId,
             ),
@@ -1403,8 +1407,8 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
     );
     for (const attributeId of flagshipAttributeIds) {
         const referrers = flagshipReferrers.get(attributeId)!;
-        assert.equal(referrers.valueCount, 0);
-        assert.ok(
+        assertStrictEquals(referrers.valueCount, 0);
+        assert(
             referrers.instanceIds.includes(
                 SEED_INSTANCE_ID,
             ),
@@ -1442,7 +1446,7 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
             states: [N_START, N_MIDDLE, 'claimed'],
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     // Task 8 CUT: legacy fieldValues below the gate
     // (live leg still seeds STORED SFV fold shape).
@@ -1483,13 +1487,13 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
         [liveAttributeX, liveAttributeY],
         'seed-type',
     );
-    assert.equal(liveScan.get(liveAttributeX), 1);
-    assert.equal(liveScan.get(liveAttributeY), 1);
-    assert.equal(
+    assertStrictEquals(liveScan.get(liveAttributeX), 1);
+    assertStrictEquals(liveScan.get(liveAttributeY), 1);
+    assertStrictEquals(
         liveScan.get(liveAttributeX),
         liveReferrers.get(liveAttributeX)!.valueCount,
     );
-    assert.equal(
+    assertStrictEquals(
         liveScan.get(liveAttributeY),
         liveReferrers.get(liveAttributeY)!.valueCount,
     );

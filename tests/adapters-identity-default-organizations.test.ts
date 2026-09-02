@@ -1,13 +1,12 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from '@std/assert';
 import { TABLE_NAMES } from '../api/db.ts';
 
 // Phase Final Stage B: identity_default_organizations
 // table retired — message-plane pins live elsewhere.
-test(
+Deno.test(
     'TABLE_NAMES drops identity_default_organizations',
     () => {
-        assert.ok(
+        assert(
             !TABLE_NAMES.includes(
                 'identity_default_organizations',
             ),

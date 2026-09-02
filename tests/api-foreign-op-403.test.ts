@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -78,7 +77,7 @@ function graphJson(): Record<string, unknown> {
     };
 }
 
-test('foreign-org work-order claim is 404', async () => {
+Deno.test('foreign-org work-order claim is 404', async () => {
     const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
@@ -94,7 +93,7 @@ test('foreign-org work-order claim is 404', async () => {
             position: 1,
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const claimAt = nowUtc();
     const foreign = await handleRequest(db, req(
@@ -108,14 +107,14 @@ test('foreign-org work-order claim is 404', async () => {
             expireAt: claimAt,
         },
     ));
-    assert.equal(foreign.status, 404);
-    assert.deepEqual(await foreign.json(), {
+    assertStrictEquals(foreign.status, 404);
+    assertEquals(await foreign.json(), {
         error:
             'Not found: work_orders/yCFjxREVDLjycQDxFIsqIg',
     });
 });
 
-test('foreign-org work-order release is 404', async () => {
+Deno.test('foreign-org work-order release is 404', async () => {
     const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
@@ -131,7 +130,7 @@ test('foreign-org work-order release is 404', async () => {
             position: 2,
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const foreign = await handleRequest(db, req(
         'DELETE',
@@ -139,10 +138,10 @@ test('foreign-org work-order release is 404', async () => {
             + '/work-orders/yDEYnDEKhTTMRnyKdusvCw/claim',
         tokenB,
     ));
-    assert.equal(foreign.status, 404);
+    assertStrictEquals(foreign.status, 404);
 });
 
-test('foreign-org work-order transition is 404', async () => {
+Deno.test('foreign-org work-order transition is 404', async () => {
     const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
@@ -158,7 +157,7 @@ test('foreign-org work-order transition is 404', async () => {
             position: 3,
         },
     ));
-    assert.equal(created.status, 201);
+    assertStrictEquals(created.status, 201);
 
     const foreign = await handleRequest(db, req(
         'POST',
@@ -172,14 +171,14 @@ test('foreign-org work-order transition is 404', async () => {
             transitionAt: nowUtc(),
         },
     ));
-    assert.equal(foreign.status, 404);
-    assert.deepEqual(await foreign.json(), {
+    assertStrictEquals(foreign.status, 404);
+    assertEquals(await foreign.json(), {
         error:
             'Not found: work_orders/yHJmosJCPJCTxoRaPwKdQA',
     });
 });
 
-test('foreign-org flow undo is 404', async () => {
+Deno.test('foreign-org flow undo is 404', async () => {
     const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
@@ -212,7 +211,7 @@ test('foreign-org flow undo is 404', async () => {
             },
         },
     ));
-    assert.ok(
+    assert(
         created.status === 201 || created.status === 201,
         'flow create status ' + created.status,
     );
@@ -226,8 +225,8 @@ test('foreign-org flow undo is 404', async () => {
             at: AT,
         },
     ));
-    assert.equal(foreign.status, 404);
-    assert.deepEqual(await foreign.json(), {
+    assertStrictEquals(foreign.status, 404);
+    assertEquals(await foreign.json(), {
         error: 'Not found: flows/aRKhwTupsfXtczSCmaJMGQ',
     });
 });

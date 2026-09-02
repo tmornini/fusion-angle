@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { assertStrictEquals } from '@std/assert';
 import {
     extractErrorMessage as apiExtract,
 } from '../shared/error-helpers.ts';
@@ -13,22 +12,22 @@ const layers = [
 ];
 
 for (const [layer, extract] of layers) {
-    test(layer + ' extractErrorMessage uses an Error message',
+    Deno.test(layer + ' extractErrorMessage uses an Error message',
         () => {
-            assert.equal(extract(new Error('boom')), 'boom');
+            assertStrictEquals(extract(new Error('boom')), 'boom');
         });
 
-    test(layer + ' extractErrorMessage stringifies a non-Error',
+    Deno.test(layer + ' extractErrorMessage stringifies a non-Error',
         () => {
-            assert.equal(extract('plain'), 'plain');
-            assert.equal(extract(42), '42');
+            assertStrictEquals(extract('plain'), 'plain');
+            assertStrictEquals(extract(42), '42');
         });
 
-    test(layer + ' extractErrorMessage prefers a fallback for'
+    Deno.test(layer + ' extractErrorMessage prefers a fallback for'
         + ' a non-Error', () => {
-            assert.equal(extract('x', 'Import failed'),
+            assertStrictEquals(extract('x', 'Import failed'),
                 'Import failed');
-            assert.equal(extract(new Error('boom'), 'fb'),
+            assertStrictEquals(extract(new Error('boom'), 'fb'),
                 'boom');
         });
 }

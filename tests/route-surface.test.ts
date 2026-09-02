@@ -1,5 +1,6 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import {
+    assert, assertEquals, assertStrictEquals, assertThrows,
+} from '@std/assert';
 import { routes, route } from '../api/routes.ts';
 import { offeredVerbs, uriOf } from
     '../api/route-surface.ts';
@@ -9,35 +10,35 @@ function routeNamed(pattern: string) {
         row.segments.join('/') === pattern);
 }
 
-test('identities collection offers GET and POST',
+Deno.test('identities collection offers GET and POST',
 () => {
     const row = routeNamed('identities/');
-    assert.ok(row);
+    assert(row);
     const verbs = offeredVerbs(row);
-    assert.ok(verbs.includes('get'));
-    assert.ok(verbs.includes('post'));
+    assert(verbs.includes('get'));
+    assert(verbs.includes('post'));
 });
 
-test('empty handlers offer nothing', () => {
-    assert.deepEqual(
+Deno.test('empty handlers offer nothing', () => {
+    assertEquals(
         offeredVerbs(route('identities/', {})),
         [],
     );
 });
 
-test('a fake sixth function key throws', () => {
+Deno.test('a fake sixth function key throws', () => {
     const row = {
         ...route('identities/', {}),
         head: async () => ({}),
     };
-    assert.throws(
+    assertThrows(
         () => offeredVerbs(row),
-        /sixth verb without a sixth column: head/,
+        Error, 'sixth verb without a sixth column: head',
     );
 });
 
-test('uriOf keeps the collection slash', () => {
-    assert.equal(
+Deno.test('uriOf keeps the collection slash', () => {
+    assertStrictEquals(
         uriOf(route('identities/', {
             get: async () => ({}),
         })),
@@ -45,8 +46,8 @@ test('uriOf keeps the collection slash', () => {
     );
 });
 
-test('uriOf names an item with its param', () => {
-    assert.equal(
+Deno.test('uriOf names an item with its param', () => {
+    assertStrictEquals(
         uriOf(route('identities/:id', {
             get: async () => ({}),
         })),

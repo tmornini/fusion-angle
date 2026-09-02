@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertEquals,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     FlowDesignerPresenter,
     buildInitialFlowSnapshot,
@@ -36,7 +40,7 @@ function buildPresenter(): FlowDesignerPresenter {
     );
 }
 
-test(
+Deno.test(
     'withInteractionState returns snapshot with'
     + ' the given interaction state',
     () => {
@@ -63,8 +67,8 @@ test(
         };
         const next = presenter
             .withInteractionState(state);
-        assert.equal(next.interaction, state);
-        assert.equal(
+        assertStrictEquals(next.interaction, state);
+        assertStrictEquals(
             next.interaction.selection.kind,
             'nodes',
         );
@@ -72,18 +76,18 @@ test(
             next.interaction.selection.kind
                 === 'nodes'
         ) {
-            assert.ok(
+            assert(
                 next.interaction.selection
                     .nodeIds.has('n1'),
             );
         }
-        assert.equal(
+        assertStrictEquals(
             next.interaction.zoom, 1.5,
         );
     },
 );
 
-test(
+Deno.test(
     'withInteractionState preserves all other'
     + ' snapshot fields',
     () => {
@@ -104,15 +108,15 @@ test(
         };
         const next = presenter
             .withInteractionState(state);
-        assert.equal(next.flowId, original.flowId);
-        assert.equal(
+        assertStrictEquals(next.flowId, original.flowId);
+        assertStrictEquals(
             next.flowName, original.flowName,
         );
-        assert.equal(
+        assertStrictEquals(
             next.isPanelOpen, original.isPanelOpen,
         );
-        assert.equal(next.nodes, original.nodes);
-        assert.equal(next.edges, original.edges);
+        assertStrictEquals(next.nodes, original.nodes);
+        assertStrictEquals(next.edges, original.edges);
     },
 );
 
@@ -150,14 +154,14 @@ function buildPresenterWithNodes(
     );
 }
 
-test(
+Deno.test(
     'buildGestureContext carries the committed'
     + ' interaction (the FSM reduces from it)',
     () => {
         const presenter =
             buildPresenterWithNodes(false);
         const zoomed = presenter.withZoomedIn();
-        assert.notEqual(
+        assertNotStrictEquals(
             zoomed.interaction.zoom,
             presenter.snapshot().interaction.zoom,
         );
@@ -165,14 +169,14 @@ test(
             zoomed, 1200, 800,
             buildFlowHistorySnapshot(false),
         );
-        assert.equal(
+        assertStrictEquals(
             next.buildGestureContext().interaction,
             zoomed.interaction,
         );
     },
 );
 
-test(
+Deno.test(
     'withZoomedIn steps +0.1 scaling the viewBox about'
     + ' its center; withZoomedOut reverses it',
     () => {
@@ -188,33 +192,33 @@ test(
         const vb = zoomed.interaction.viewBox;
         const ratio =
             before.zoom / zoomed.interaction.zoom;
-        assert.ok(
+        assert(
             Math.abs(zoomed.interaction.zoom - 1.1)
                 < 1e-9,
         );
-        assert.ok(
+        assert(
             Math.abs(vb.w - before.viewBox.w * ratio)
                 < 1e-9,
         );
-        assert.ok(
+        assert(
             Math.abs(vb.h - before.viewBox.h * ratio)
                 < 1e-9,
         );
-        assert.ok(
+        assert(
             Math.abs(vb.x + vb.w / 2 - cx) < 1e-9,
         );
-        assert.ok(
+        assert(
             Math.abs(vb.y + vb.h / 2 - cy) < 1e-9,
         );
         const back = new FlowDesignerPresenter(
             zoomed, 1200, 800,
             buildFlowHistorySnapshot(false),
         ).withZoomedOut();
-        assert.ok(
+        assert(
             Math.abs(back.interaction.zoom - 1.0)
                 < 1e-9,
         );
-        assert.ok(
+        assert(
             Math.abs(
                 back.interaction.viewBox.w
                     - before.viewBox.w,
@@ -223,7 +227,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'withFitToBox updates the viewBox to frame'
     + ' the given content box',
     () => {
@@ -243,7 +247,7 @@ test(
             Math.abs(after.x - beforeX) > 0.001;
         const wChanged =
             Math.abs(after.w - beforeW) > 0.001;
-        assert.ok(
+        assert(
             xChanged || wChanged,
             'viewBox should change to frame the'
             + ' given box',
@@ -251,7 +255,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'withFitToBox frames a box that extends far'
     + ' below the nodes (edge/waypoint geometry)',
     () => {
@@ -263,18 +267,18 @@ test(
         };
         const next = presenter.withFitToBox(box);
         const vb = next.interaction.viewBox;
-        assert.ok(
+        assert(
             vb.y + vb.h >= box.maxY - 0.001,
             'viewBox bottom covers the low dip',
         );
-        assert.ok(
+        assert(
             vb.y <= box.minY + 0.001,
             'viewBox top covers the box top',
         );
     },
 );
 
-test(
+Deno.test(
     'withFitToBox re-fits the viewBox but does'
     + ' NOT move nodes (viewport op contract)',
     () => {
@@ -313,16 +317,16 @@ test(
         const afterN2 = next.nodes.find(
             n => n.id === 'n2',
         )!;
-        assert.equal(
+        assertStrictEquals(
             afterN1.positionX, beforeN1.positionX,
         );
-        assert.equal(
+        assertStrictEquals(
             afterN1.positionY, beforeN1.positionY,
         );
-        assert.equal(
+        assertStrictEquals(
             afterN2.positionX, beforeN2.positionX,
         );
-        assert.equal(
+        assertStrictEquals(
             afterN2.positionY, beforeN2.positionY,
         );
         const after = next.interaction.viewBox;
@@ -330,7 +334,7 @@ test(
             Math.abs(after.x - beforeVb.x) > 0.001;
         const wChanged =
             Math.abs(after.w - beforeVb.w) > 0.001;
-        assert.ok(
+        assert(
             xChanged || wChanged,
             'viewBox should change (fit ran)',
         );
@@ -344,7 +348,7 @@ test(
 // tests/flow-designer-open.test.ts:
 // putClientFacade(wrapInPageAdapter(db)) plus
 // putSessionToken(DEV_TOKEN) makes
-// sessionContext() live under node:test. Same
+// sessionContext() live under Deno.test. Same
 // reason no other withNode* mutation test exists
 // in this file.
 //
@@ -352,9 +356,9 @@ test(
 // manual (TEST-PLAN F51). The presenter's
 // #guardLocked() invokes showToast(), which
 // depends on document — no DOM under
-// node:test.
+// Deno.test.
 
-test(
+Deno.test(
     'withNodeMemberIds is a no-op when no node'
     + ' is selected',
     () => {
@@ -376,7 +380,7 @@ test(
         const n = next.nodes.find(
             x => x.id === 'n1',
         )!;
-        assert.deepEqual(n.memberIds, []);
+        assertEquals(n.memberIds, []);
     },
 );
 
@@ -386,7 +390,7 @@ test(
 // Immutability is what the captured-reference
 // pattern weaponized into staleness in the
 // original "+ Add Field" bug.
-test(
+Deno.test(
     'a presenter built from withInteractionState'
     + ' reports the selected node, and the'
     + ' source presenter remains unchanged',
@@ -403,7 +407,7 @@ test(
                 initial, 800, 600,
                 buildFlowHistorySnapshot(false),
             );
-        assert.equal(
+        assertStrictEquals(
             initialPresenter.selectedNodeId(),
             null,
         );
@@ -420,11 +424,11 @@ test(
                 selectedSnap, 800, 600,
                 buildFlowHistorySnapshot(false),
             );
-        assert.equal(
+        assertStrictEquals(
             selectedPresenter.selectedNodeId(),
             'n1',
         );
-        assert.equal(
+        assertStrictEquals(
             initialPresenter.selectedNodeId(),
             null,
         );
@@ -449,7 +453,7 @@ test(
 // the plain constructor byte-for-byte. Only the 5-arg,
 // migrateToCenter=true form (onFlowLoaded's own one call
 // site) may recenter.
-test(
+Deno.test(
     'the plain (commit()-style) constructor leaves an'
     + ' off-center snapshot untouched — no silent'
     + ' migrate-to-center save on every re-render',
@@ -470,12 +474,12 @@ test(
         );
         const n1 = presenter.snapshot().nodes
             .find(n => n.id === 'n1')!;
-        assert.equal(n1.positionX, 500);
-        assert.equal(n1.positionY, 500);
+        assertStrictEquals(n1.positionX, 500);
+        assertStrictEquals(n1.positionY, 500);
     },
 );
 
-test(
+Deno.test(
     'buildFlowSaveShape keeps stored agentIds'
     + ' and person memberIds',
     () => {
@@ -496,16 +500,16 @@ test(
         );
         const saved = buildFlowSaveShape(snap)
             .nodes[0]!;
-        assert.deepEqual(
+        assertEquals(
             saved.memberIds, [humanId],
         );
-        assert.deepEqual(
+        assertEquals(
             saved.agentIds, [agentId],
         );
     },
 );
 
-test(
+Deno.test(
     'buildFlowSaveShape lifts leftover mixed'
     + ' agent ids out of memberIds',
     () => {
@@ -526,16 +530,16 @@ test(
         );
         const saved = buildFlowSaveShape(snap)
             .nodes[0]!;
-        assert.deepEqual(
+        assertEquals(
             saved.memberIds, [humanId],
         );
-        assert.deepEqual(
+        assertEquals(
             saved.agentIds, [agentId],
         );
     },
 );
 
-test(
+Deno.test(
     'withCanvasSize keeps a non-auto-fit presenter\'s'
     + ' zoom — a resize never re-fits the camera',
     () => {
@@ -547,12 +551,12 @@ test(
             buildFlowHistorySnapshot(false),
         );
         const resized = next.withCanvasSize(1000, 700);
-        assert.ok(
+        assert(
             Math.abs(resized.interaction.zoom - 1.1)
                 < 1e-9,
             'zoom survives the resize',
         );
-        assert.ok(
+        assert(
             Math.abs(
                 resized.interaction.viewBox.w
                     - 1000 / 1.1,
@@ -562,7 +566,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'withNodeNamed(id, name) renames that node even'
     + ' when the selection has moved to another',
     () => {
@@ -589,18 +593,18 @@ test(
         );
         const next = presenter
             .withNodeNamed('a', 'typed');
-        assert.equal(
+        assertStrictEquals(
             next.nodes.find(n => n.id === 'a')!.name,
             'typed',
         );
-        assert.equal(
+        assertStrictEquals(
             next.nodes.find(n => n.id === 'b')!.name,
             'B',
         );
     },
 );
 
-test(
+Deno.test(
     'withNodeNamed(id, name) applies with no selection'
     + ' at all — the flush is bound to its target',
     () => {
@@ -617,14 +621,14 @@ test(
         );
         const next = presenter
             .withNodeNamed('a', 'typed');
-        assert.equal(
+        assertStrictEquals(
             next.nodes.find(n => n.id === 'a')!.name,
             'typed',
         );
     },
 );
 
-test(
+Deno.test(
     'withEdgeNamed(id, name) applies with no selection',
     () => {
         const graph = {
@@ -646,7 +650,7 @@ test(
         );
         const next = presenter
             .withEdgeNamed('e1', 'renamed');
-        assert.equal(
+        assertStrictEquals(
             next.edges.find(e => e.id === 'e1')!.name,
             'renamed',
         );

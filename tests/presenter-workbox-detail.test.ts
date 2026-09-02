@@ -1,5 +1,9 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import {
+    assert,
+    assertMatch,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import {
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
@@ -258,7 +262,7 @@ function makePresenter(
 
 // buildAttributeInputHtml (the exported helper)
 
-test(
+Deno.test(
     'buildAttributeInputHtml renders a text input'
     + ' carrying the attribute id',
     () => {
@@ -271,16 +275,16 @@ test(
         const out = buildAttributeInputHtml(
             ref, attribute,
         ).toString();
-        assert.match(out, /<input/);
-        assert.match(out, /type="text"/);
-        assert.match(
+        assertMatch(out, /<input/);
+        assertMatch(out, /type="text"/);
+        assertMatch(
             out, /data-attribute-id="a-x"/,
         );
-        assert.ok(!out.includes('required'));
+        assert(!out.includes('required'));
     },
 );
 
-test(
+Deno.test(
     'buildAttributeInputHtml pre-fills value from'
     + ' the instance head',
     () => {
@@ -293,11 +297,11 @@ test(
         const out = buildAttributeInputHtml(
             ref, attribute, 'hello',
         ).toString();
-        assert.match(out, /value="hello"/);
+        assertMatch(out, /value="hello"/);
     },
 );
 
-test(
+Deno.test(
     'buildAttributeInputHtml force-disables with'
     + ' bind prompt title when unbound',
     () => {
@@ -306,8 +310,8 @@ test(
         const out = buildAttributeInputHtml(
             ref, attribute, null, true,
         ).toString();
-        assert.match(out, /disabled/);
-        assert.ok(
+        assertMatch(out, /disabled/);
+        assert(
             out.includes(
                 'title="Bind an instance before'
                 + ' editing values"',
@@ -316,7 +320,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'buildPage pre-fills inputs from instance'
     + ' values and shows a bound badge',
     () => {
@@ -351,14 +355,14 @@ test(
         });
         const out = presenter.buildPage()
             .toString();
-        assert.match(out, /value="from-head"/);
-        assert.match(out, /data-binding="bound"/);
-        assert.match(out, /Instance inst-xyz/);
-        assert.match(out, /title="type rt-cust"/);
+        assertMatch(out, /value="from-head"/);
+        assertMatch(out, /data-binding="bound"/);
+        assertMatch(out, /Instance inst-xyz/);
+        assertMatch(out, /title="type rt-cust"/);
     },
 );
 
-test(
+Deno.test(
     'buildPage unbound disables fields, shows'
     + ' bind prompt and picker button',
     () => {
@@ -397,31 +401,31 @@ test(
         });
         const out = presenter.buildPage()
             .toString();
-        assert.match(
+        assertMatch(
             out, /data-binding="unbound"/,
         );
-        assert.match(
+        assertMatch(
             out, /data-dialog-open="bind-instance"/,
         );
-        assert.match(
+        assertMatch(
             out, /id="bind-instance-dialog"/,
         );
-        assert.match(
+        assertMatch(
             out, /data-instance-pick="inst-a"/,
         );
-        assert.ok(
+        assert(
             !out.includes('data-attribute-id="inst'),
         );
         // Fields disabled with bind title.
-        assert.match(out, /disabled/);
-        assert.match(
+        assertMatch(out, /disabled/);
+        assertMatch(
             out,
             /Bind an instance before editing/,
         );
     },
 );
 
-test(
+Deno.test(
     'buildAttributeInputHtml adds the required'
     + ' attribute for required refs',
     () => {
@@ -432,11 +436,11 @@ test(
         const out = buildAttributeInputHtml(
             ref, attribute,
         ).toString();
-        assert.match(out, /required/);
+        assertMatch(out, /required/);
     },
 );
 
-test(
+Deno.test(
     'buildAttributeInputHtml renders a number'
     + ' input for the number attribute type',
     () => {
@@ -447,12 +451,12 @@ test(
         const out = buildAttributeInputHtml(
             ref, attribute,
         ).toString();
-        assert.match(out, /<input/);
-        assert.match(out, /type="number"/);
+        assertMatch(out, /<input/);
+        assertMatch(out, /type="number"/);
     },
 );
 
-test(
+Deno.test(
     'buildAttributeInputHtml renders a date input'
     + ' for the date attribute type',
     () => {
@@ -463,12 +467,12 @@ test(
         const out = buildAttributeInputHtml(
             ref, attribute,
         ).toString();
-        assert.match(out, /<input/);
-        assert.match(out, /type="date"/);
+        assertMatch(out, /<input/);
+        assertMatch(out, /type="date"/);
     },
 );
 
-test(
+Deno.test(
     'buildAttributeInputHtml renders a select with'
     + ' one option per choice plus a placeholder',
     () => {
@@ -480,14 +484,14 @@ test(
         const out = buildAttributeInputHtml(
             ref, attribute,
         ).toString();
-        assert.match(out, /<select/);
-        assert.match(out, /Select\.\.\./);
-        assert.match(out, /value="Low"/);
-        assert.match(out, /value="High"/);
+        assertMatch(out, /<select/);
+        assertMatch(out, /Select\.\.\./);
+        assertMatch(out, /value="Low"/);
+        assertMatch(out, /value="High"/);
     },
 );
 
-test(
+Deno.test(
     'buildAttributeInputHtml renders a radio group'
     + ' with one collectable input per option',
     () => {
@@ -499,15 +503,15 @@ test(
         const out = buildAttributeInputHtml(
             ref, attribute,
         ).toString();
-        assert.match(out, /type="radio"/);
-        assert.match(out, /name="UQBiHFcwJeCDSnmkPBoYRA"/);
-        assert.match(out, /data-attribute-id="UQBiHFcwJeCDSnmkPBoYRA"/);
-        assert.match(out, /value="Low"/);
-        assert.match(out, /value="High"/);
+        assertMatch(out, /type="radio"/);
+        assertMatch(out, /name="UQBiHFcwJeCDSnmkPBoYRA"/);
+        assertMatch(out, /data-attribute-id="UQBiHFcwJeCDSnmkPBoYRA"/);
+        assertMatch(out, /value="Low"/);
+        assertMatch(out, /value="High"/);
     },
 );
 
-test(
+Deno.test(
     'buildAttributeInputHtml renders a bare'
     + ' checkbox input for the checkbox type',
     () => {
@@ -518,12 +522,12 @@ test(
         const out = buildAttributeInputHtml(
             ref, attribute,
         ).toString();
-        assert.match(out, /type="checkbox"/);
-        assert.ok(!out.includes('class="input"'));
+        assertMatch(out, /type="checkbox"/);
+        assert(!out.includes('class="input"'));
     },
 );
 
-test(
+Deno.test(
     'buildAttributeInputHtml renders readonly and'
     + ' disabled attributes for a readonly ref',
     () => {
@@ -534,11 +538,11 @@ test(
         const out = buildAttributeInputHtml(
             ref, attribute,
         ).toString();
-        assert.match(out, /readonly/);
+        assertMatch(out, /readonly/);
     },
 );
 
-test(
+Deno.test(
     'buildAttributeInputHtml on a readonly select'
     + ' emits the disabled attribute',
     () => {
@@ -552,29 +556,29 @@ test(
         const out = buildAttributeInputHtml(
             ref, attribute,
         ).toString();
-        assert.match(out, /disabled/);
+        assertMatch(out, /disabled/);
     },
 );
 
 // WorkboxDetailPresenter: getters + buildPage
 
-test(
+Deno.test(
     'WorkboxDetailPresenter exposes id, display'
     + ' id, and flow name from the work order',
     () => {
         const presenter = makePresenter();
-        assert.equal(presenter.idValue(), 'wo-1');
-        assert.equal(
+        assertStrictEquals(presenter.idValue(), 'wo-1');
+        assertStrictEquals(
             presenter.displayIdText(), 'WO-42',
         );
-        assert.equal(
+        assertStrictEquals(
             presenter.flowNameText(),
             'Expense approval',
         );
     },
 );
 
-test(
+Deno.test(
     'the current node is the destination of the'
     + ' latest transition',
     () => {
@@ -596,14 +600,14 @@ test(
                 }),
             ],
         });
-        assert.equal(
+        assertStrictEquals(
             presenter.currentNodeId(), 'n-2',
         );
-        assert.equal(presenter.isArchive(), true);
+        assertStrictEquals(presenter.isArchive(), true);
     },
 );
 
-test(
+Deno.test(
     'renderableAttributes are the current node'
     + ' refs and buildPage renders a labeled input'
     + ' per required attribute with a marker',
@@ -645,7 +649,7 @@ test(
             graph,
             attributes: [amountAttr, noteAttr],
         });
-        assert.equal(
+        assertStrictEquals(
             presenter
                 .renderableAttributes()
                 .length,
@@ -653,18 +657,18 @@ test(
         );
         const out = presenter
             .buildPage().toString();
-        assert.match(out, /Attributes/);
-        assert.match(out, /Amount \*/);
-        assert.match(out, /Note/);
-        assert.match(
+        assertMatch(out, /Attributes/);
+        assertMatch(out, /Amount \*/);
+        assertMatch(out, /Note/);
+        assertMatch(
             out, /data-attribute-id="a-amt"/,
         );
-        assert.match(out, /type="number"/);
-        assert.ok(!out.includes('undefined'));
+        assertMatch(out, /type="number"/);
+        assert(!out.includes('undefined'));
     },
 );
 
-test(
+Deno.test(
     'buildPage renders one transition button per'
     + ' outgoing edge and a release button when'
     + ' the work order is not complete',
@@ -696,17 +700,17 @@ test(
         });
         const presenter = makePresenter({ graph });
         const out = presenter.buildPage().toString();
-        assert.match(out, /data-edge-id="e-ok"/);
-        assert.match(out, /data-edge-id="e-no"/);
-        assert.match(out, /Approve/);
-        assert.match(out, /Reject/);
-        assert.match(out, /id="unclaim-btn"/);
-        assert.match(out, /Release Work Order/);
-        assert.match(out, /work-order-transitions/);
+        assertMatch(out, /data-edge-id="e-ok"/);
+        assertMatch(out, /data-edge-id="e-no"/);
+        assertMatch(out, /Approve/);
+        assertMatch(out, /Reject/);
+        assertMatch(out, /id="unclaim-btn"/);
+        assertMatch(out, /Release Work Order/);
+        assertMatch(out, /work-order-transitions/);
     },
 );
 
-test(
+Deno.test(
     'buildPage on a complete work order hides the'
     + ' attributes card, transition buttons, and'
     + ' release button',
@@ -720,31 +724,31 @@ test(
             ],
         });
         const out = presenter.buildPage().toString();
-        assert.ok(!out.includes('work-order-fields'));
-        assert.ok(!out.includes(
+        assert(!out.includes('work-order-fields'));
+        assert(!out.includes(
             'work-order-transitions',
         ));
-        assert.ok(!out.includes('unclaim-btn'));
-        assert.match(out, /WO-42/);
-        assert.match(out, /Done/);
+        assert(!out.includes('unclaim-btn'));
+        assertMatch(out, /WO-42/);
+        assertMatch(out, /Done/);
     },
 );
 
-test(
+Deno.test(
     'buildPage shows a single Created -> Triage'
     + ' history row for a freshly created work order',
     () => {
         const presenter = makePresenter();
         const out = presenter.buildPage().toString();
-        assert.match(out, /History/);
-        assert.match(out, /Created/);
-        assert.match(out, /Triage/);
-        assert.match(out, /Ada Park/);
-        assert.ok(!out.includes('Unknown'));
+        assertMatch(out, /History/);
+        assertMatch(out, /Created/);
+        assertMatch(out, /Triage/);
+        assertMatch(out, /Ada Park/);
+        assert(!out.includes('Unknown'));
     },
 );
 
-test(
+Deno.test(
     'buildPage history lists transitions newest'
     + ' first with their attribute values',
     () => {
@@ -800,18 +804,18 @@ test(
         const out = presenter.buildPage().toString();
         // newest (Triage -> Approved) appears before
         // the creation entry (Created -> Triage).
-        assert.ok(
+        assert(
             out.indexOf('Approved')
             < out.indexOf('Created'),
         );
-        assert.match(out, /Amount/);
-        assert.match(out, /1200/);
-        assert.match(out, /Bo Park/);
-        assert.match(out, /Ada Park/);
+        assertMatch(out, /Amount/);
+        assertMatch(out, /1200/);
+        assertMatch(out, /Bo Park/);
+        assertMatch(out, /Ada Park/);
     },
 );
 
-test(
+Deno.test(
     'an active claim by the current member is'
     + ' reported as claimed with byCurrentMember',
     () => {
@@ -823,16 +827,16 @@ test(
             currentMemberId: 'pjQzgITAPDQVyvCVpzpIfQ',
         });
         const status = presenter.claimStatus();
-        assert.equal(status.kind, 'claimed');
+        assertStrictEquals(status.kind, 'claimed');
         if (status.kind === 'claimed') {
-            assert.equal(
+            assertStrictEquals(
                 status.byCurrentMember, true,
             );
         }
     },
 );
 
-test(
+Deno.test(
     'an active claim by another member is claimed'
     + ' but not by the current member',
     () => {
@@ -844,23 +848,23 @@ test(
             currentMemberId: 'pjQzgITAPDQVyvCVpzpIfQ',
         });
         const status = presenter.claimStatus();
-        assert.equal(status.kind, 'claimed');
+        assertStrictEquals(status.kind, 'claimed');
         if (status.kind === 'claimed') {
-            assert.equal(
+            assertStrictEquals(
                 status.byCurrentMember, false,
             );
         }
     },
 );
 
-test(
+Deno.test(
     'a null active claim leaves the work order'
     + ' unclaimed',
     () => {
         const presenter = makePresenter({
             activeClaim: null,
         });
-        assert.equal(
+        assertStrictEquals(
             presenter.claimStatus().kind, 'unclaimed',
         );
     },
@@ -868,7 +872,7 @@ test(
 
 // buildViolations: the rejected-transition banner
 
-test(
+Deno.test(
     'buildViolations names each failed attribute,'
     + ' phrasing range bounds by attribute type',
     () => {
@@ -899,30 +903,30 @@ test(
         const out = presenter
             .buildViolations(violations)
             .toString();
-        assert.match(out, /violations-banner/);
-        assert.match(out, /role="alert"/);
-        assert.match(out, /Amount is required/);
+        assertMatch(out, /violations-banner/);
+        assertMatch(out, /role="alert"/);
+        assertMatch(out, /Amount is required/);
         // Date-aware phrasing proves the presenter
         // resolved the attribute by id for its type.
-        assert.match(
+        assertMatch(
             out,
             /Due date must be on or after 2026-01-01/,
         );
-        assert.equal(
+        assertStrictEquals(
             out.match(/<li>/g)?.length, 2,
         );
-        assert.ok(!out.includes('undefined'));
+        assert(!out.includes('undefined'));
     },
 );
 
-test(
+Deno.test(
     'buildViolations throws when a violation names'
     + ' an attribute absent from the Record',
     () => {
         const presenter = makePresenter({
             attributes: [],
         });
-        assert.throws(
+        assertThrows(
             () => presenter.buildViolations([
                 {
                     kind: 'required',
@@ -930,7 +934,8 @@ test(
                     attributeName: 'Ghost',
                 },
             ]),
-            /unknown attributeId: ghost/,
+            Error,
+            'unknown attributeId: ghost',
         );
     },
 );

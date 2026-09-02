@@ -1,131 +1,160 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
 import {
-    existsSync,
-    mkdtempSync,
-    readFileSync,
-    writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import {
-    spawnSync,
-    type SpawnSyncReturns,
-} from 'node:child_process';
+    assert,
+    assertMatch,
+    assertNotMatch,
+    assertStrictEquals,
+} from '@std/assert';
+import { existsSync } from '@std/fs';
+import { join } from '@std/path';
+
+type CrankResult = {
+    readonly status: number;
+    readonly stdout: string;
+    readonly stderr: string;
+    readonly stamp: string;
+};
 
 function pathWithDockerStub(stamp: string): string {
-    const dir = mkdtempSync(
-        join(tmpdir(), 'fusion-docker-stub-'),
-    );
-    writeFileSync(
+    const dir = Deno.makeTempDirSync({
+        prefix: 'fusion-docker-stub-',
+    });
+    Deno.writeTextFileSync(
         join(dir, 'docker'),
         '#!/bin/bash\n'
         + `printf x >> "${stamp}"\n`
         + 'exit 99\n',
         { mode: 0o755 },
     );
-    return `${dir}:${process.env['PATH'] ?? ''}`;
+    // Deno.Command's env MERGES onto the ambient
+    // environment (it does not replace it), so only the
+    // PATH override needs to be named here.
+    return `${dir}:${Deno.env.get('PATH') ?? ''}`;
 }
 
-function runCrank(
+async function runCrank(
     args: string[],
-): SpawnSyncReturns<string> & { stamp: string } {
+): Promise<CrankResult> {
     const stamp = join(
-        mkdtempSync(join(tmpdir(), 'fusion-stamp-')),
+        Deno.makeTempDirSync({ prefix: 'fusion-stamp-' }),
         'called',
     );
-    const result = spawnSync('./crank', args, {
-        encoding: 'utf8',
-        timeout: 4000,
+    // signal only bounds the async output() — the sync
+    // outputSync() ignores it and blocks regardless.
+    // POSTGRES_URL and JWT_HMAC_SIGNING_KEY are blanked
+    // deliberately: Node's spawnSync REPLACED the child env
+    // with exactly {PATH, HOME, TMPDIR}, so ./crank never
+    // saw either var regardless of the ambient shell.
+    // Deno.Command MERGES, and ./test exports
+    // JWT_HMAC_SIGNING_KEY ambiently, so omitting this would
+    // leak it into a child the original deliberately
+    // starved. No case below reaches ./crank past its
+    // argument parsing (each exits on a usage error or
+    // --help, before line 85 of ./crank mints these), so no
+    // current assertion depends on the blank — kept anyway
+    // for parity with the original isolation.
+    const output = await new Deno.Command('./crank', {
+        args,
+        signal: AbortSignal.timeout(4000),
         env: {
             PATH: pathWithDockerStub(stamp),
-            HOME: process.env['HOME'] ?? '',
-            TMPDIR: process.env['TMPDIR'] ?? '/tmp',
+            POSTGRES_URL: '',
+            JWT_HMAC_SIGNING_KEY: '',
         },
-    });
-    return Object.assign(result, { stamp });
+    }).output();
+    const decoder = new TextDecoder();
+    return {
+        status: output.code,
+        stdout: decoder.decode(output.stdout),
+        stderr: decoder.decode(output.stderr),
+        stamp,
+    };
 }
 
 function dockerCalled(stamp: string): boolean {
     return existsSync(stamp)
-        && readFileSync(stamp, 'utf8').length > 0;
+        && Deno.readTextFileSync(stamp).length > 0;
 }
 
-test('crank with no args exits 1 with usage', () => {
-    const result = runCrank([]);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /Usage: \.\/crank/);
-    assert.equal(dockerCalled(result.stamp), false);
+Deno.test('crank with no args exits 1 with usage',
+async () => {
+    const result = await runCrank([]);
+    assertStrictEquals(result.status, 1);
+    assertMatch(result.stderr, /Usage: \.\/crank/);
+    assertStrictEquals(dockerCalled(result.stamp), false);
 });
 
-test('crank missing port exits 1 with usage', () => {
-    const result = runCrank(['--mock-data']);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /Usage: \.\/crank/);
-    assert.equal(dockerCalled(result.stamp), false);
+Deno.test('crank missing port exits 1 with usage',
+async () => {
+    const result = await runCrank(['--mock-data']);
+    assertStrictEquals(result.status, 1);
+    assertMatch(result.stderr, /Usage: \.\/crank/);
+    assertStrictEquals(dockerCalled(result.stamp), false);
 });
 
-test('crank missing mode exits 1 with usage', () => {
-    const result = runCrank(['8080']);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /Usage: \.\/crank/);
-    assert.equal(dockerCalled(result.stamp), false);
+Deno.test('crank missing mode exits 1 with usage',
+async () => {
+    const result = await runCrank(['8080']);
+    assertStrictEquals(result.status, 1);
+    assertMatch(result.stderr, /Usage: \.\/crank/);
+    assertStrictEquals(dockerCalled(result.stamp), false);
 });
 
-test('crank two modes exits 1 with usage', () => {
-    const result = runCrank([
+Deno.test('crank two modes exits 1 with usage',
+async () => {
+    const result = await runCrank([
         '--mock-data',
         '--bootstrap',
         '8080',
     ]);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /Usage: \.\/crank/);
-    assert.match(result.stderr, /exclusive/);
-    assert.equal(dockerCalled(result.stamp), false);
+    assertStrictEquals(result.status, 1);
+    assertMatch(result.stderr, /Usage: \.\/crank/);
+    assertMatch(result.stderr, /exclusive/);
+    assertStrictEquals(dockerCalled(result.stamp), false);
 });
 
-test('crank unknown flag exits 1 with usage', () => {
-    const result = runCrank(['--bogus', '8080']);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /Usage: \.\/crank/);
-    assert.equal(dockerCalled(result.stamp), false);
+Deno.test('crank unknown flag exits 1 with usage',
+async () => {
+    const result = await runCrank(['--bogus', '8080']);
+    assertStrictEquals(result.status, 1);
+    assertMatch(result.stderr, /Usage: \.\/crank/);
+    assertStrictEquals(dockerCalled(result.stamp), false);
 });
 
-test('crank --help exits 0', () => {
-    const result = runCrank(['--help']);
-    assert.equal(result.status, 0);
-    assert.match(result.stdout, /Usage: \.\/crank/);
-    assert.equal(dockerCalled(result.stamp), false);
+Deno.test('crank --help exits 0', async () => {
+    const result = await runCrank(['--help']);
+    assertStrictEquals(result.status, 0);
+    assertMatch(result.stdout, /Usage: \.\/crank/);
+    assertStrictEquals(dockerCalled(result.stamp), false);
 });
 
-test('crank source owns the local stack', () => {
-    const src = readFileSync('crank', 'utf8');
-    assert.match(src, /\.\/validate/);
-    assert.match(
+Deno.test('crank source owns the local stack', () => {
+    const src = Deno.readTextFileSync('crank');
+    assertMatch(src, /\.\/validate/);
+    assertMatch(
         src,
         /docker compose up -d --wait postgres/,
     );
-    assert.match(src, /\.\/test-postgres/);
-    assert.match(src, /\.\/build --no-zip/);
-    assert.match(
+    assertMatch(src, /\.\/test-postgres/);
+    assertMatch(src, /\.\/build --no-zip/);
+    assertMatch(
         src,
         /\.\/postgres-wipe --postgres local/,
     );
-    assert.match(
+    assertMatch(
         src,
         /\.\/postgres-seed --postgres local/,
     );
-    assert.match(src, /\.\/serve /);
-    assert.doesNotMatch(
+    assertMatch(src, /\.\/serve /);
+    assertNotMatch(
         src,
         /docker compose up -d --wait["\n]*$/,
     );
-    assert.doesNotMatch(src, /echo \$POSTGRES_URL/);
-    assert.doesNotMatch(
+    assertNotMatch(src, /echo \$POSTGRES_URL/);
+    assertNotMatch(
         src,
         /echo \$POSTGRES_PASSWORD/,
     );
-    assert.doesNotMatch(
+    assertNotMatch(
         src,
         /echo \$JWT_HMAC_SIGNING_KEY/,
     );
@@ -133,7 +162,7 @@ test('crank source owns the local stack', () => {
     const upAt = src.indexOf(
         'docker compose up -d --wait postgres',
     );
-    assert.ok(trapAt >= 0, 'trap missing');
-    assert.ok(upAt >= 0, 'compose up missing');
-    assert.ok(trapAt < upAt, 'trap after Docker');
+    assert(trapAt >= 0, 'trap missing');
+    assert(upAt >= 0, 'compose up missing');
+    assert(trapAt < upAt, 'trap after Docker');
 });

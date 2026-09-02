@@ -1,40 +1,39 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertMatch, assertStrictEquals } from '@std/assert';
 import {
     getModelsByProvider,
     findProviderModel,
     isProviderModelId,
 } from '../api/provider-models.ts';
 
-test(
+Deno.test(
     'every model id is 22-char base62 and unique',
     () => {
         const models = [...getModelsByProvider()
             .values()].flat();
         const ids = new Set<string>();
         for (const m of models) {
-            assert.match(
+            assertMatch(
                 m.id, /^[0-9A-Za-z]{22}$/,
             );
             ids.add(m.id);
         }
-        assert.equal(ids.size, models.length);
+        assertStrictEquals(ids.size, models.length);
     },
 );
 
-test(
+Deno.test(
     'isProviderModelId is true for a catalog id'
     + ' and false otherwise',
     () => {
         const first = [...getModelsByProvider()
             .values()][0]![0]!;
-        assert.ok(isProviderModelId(first.id));
-        assert.ok(!isProviderModelId('nope'));
-        assert.ok(!isProviderModelId(''));
+        assert(isProviderModelId(first.id));
+        assert(!isProviderModelId('nope'));
+        assert(!isProviderModelId(''));
     },
 );
 
-test(
+Deno.test(
     'getModelsByProvider groups every model under'
     + ' its own provider',
     () => {
@@ -42,25 +41,25 @@ test(
         let total = 0;
         for (const [provider, list] of byProvider) {
             for (const m of list) {
-                assert.equal(m.provider, provider);
+                assertStrictEquals(m.provider, provider);
             }
             total += list.length;
         }
-        assert.ok(total > 0);
+        assert(total > 0);
     },
 );
 
-test(
+Deno.test(
     'findProviderModel returns the model by id'
     + ' or undefined when unknown',
     () => {
         const first = [...getModelsByProvider()
             .values()][0]![0]!;
-        assert.equal(
+        assertStrictEquals(
             findProviderModel(first.id)?.id,
             first.id,
         );
-        assert.equal(
+        assertStrictEquals(
             findProviderModel('missing'), undefined,
         );
     },

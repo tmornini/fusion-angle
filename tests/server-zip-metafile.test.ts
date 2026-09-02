@@ -1,12 +1,13 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
-import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {
+    assertEquals,
+    assertMatch,
+    assertNotMatch,
+    assertStrictEquals,
+} from '@std/assert';
+import { fromFileUrl, relative } from '@std/path';
 
-const BUILD_SCRIPT = readFileSync('build', 'utf8');
-const BUILD_LIB_SCRIPT = readFileSync('build-lib', 'utf8');
+const BUILD_SCRIPT = Deno.readTextFileSync('build');
+const BUILD_LIB_SCRIPT = Deno.readTextFileSync('build-lib');
 
 // Deleted names no longer appear in live source. Hunt
 // the live mint symbols too, or a server-core import of
@@ -39,34 +40,34 @@ function clientGraphHits(
     return hits;
 }
 
-test('build emits one ZIP from the server-core entry', () => {
-    assert.match(
+Deno.test('build emits one ZIP from the server-core entry', () => {
+    assertMatch(
         BUILD_SCRIPT,
         /fusion-angle-\$\{SHA\}\.zip/,
     );
-    assert.doesNotMatch(
+    assertNotMatch(
         BUILD_SCRIPT,
         /fusion-ai-browser/,
     );
-    assert.doesNotMatch(
+    assertNotMatch(
         BUILD_SCRIPT,
         /fusion-angle-browser/,
     );
-    assert.match(
+    assertMatch(
         BUILD_LIB_SCRIPT,
         /web-app\/app\/server-core\.ts/,
     );
-    assert.doesNotMatch(
+    assertNotMatch(
         BUILD_LIB_SCRIPT,
         /web-app\/app\/core\.ts/,
     );
 });
 
-test('client-graph pin matches mint and deleted names',
+Deno.test('client-graph pin matches mint and deleted names',
 () => {
     const input = 'api/access-token.ts';
-    const src = readFileSync(input, 'utf8');
-    assert.deepEqual(
+    const src = Deno.readTextFileSync(input);
+    assertEquals(
         clientGraphHits(input, src),
         [
             'api/access-token.ts:api/access-token.ts',
@@ -74,7 +75,7 @@ test('client-graph pin matches mint and deleted names',
             'api/access-token.ts:mintAccessToken',
         ],
     );
-    assert.deepEqual(
+    assertEquals(
         clientGraphHits(
             'sample/path.ts',
             'SIGNING_KEY_MATERIAL',
@@ -85,18 +86,25 @@ test('client-graph pin matches mint and deleted names',
     );
 });
 
-test(
+Deno.test(
     'client graph omits token mint and signing key',
     () => {
-        const info = spawnSync('deno', [
-            'info', '--frozen', '--json',
-            'web-app/app/server-core.ts',
-        ], {
-            encoding: 'utf8',
-            env: process.env,
-        });
-        assert.equal(info.status, 0, info.stderr);
-        const graph = JSON.parse(info.stdout) as {
+        // No env override: Deno.Command already inherits
+        // the full ambient environment when env is omitted,
+        // same as Node's own spawnSync default.
+        const info = new Deno.Command('deno', {
+            args: [
+                'info', '--frozen', '--json',
+                'web-app/app/server-core.ts',
+            ],
+        }).outputSync();
+        const decoder = new TextDecoder();
+        assertStrictEquals(
+            info.code, 0, decoder.decode(info.stderr),
+        );
+        const graph = JSON.parse(
+            decoder.decode(info.stdout),
+        ) as {
             roots: string[];
             modules: {
                 specifier: string;
@@ -125,23 +133,23 @@ test(
         for (const specifier of seen) {
             if (!specifier.startsWith('file://')) continue;
             const path = relative(
-                process.cwd(),
-                fileURLToPath(specifier),
+                Deno.cwd(),
+                fromFileUrl(specifier),
             );
             hits.push(...clientGraphHits(
-                path, readFileSync(path, 'utf8'),
+                path, Deno.readTextFileSync(path),
             ));
         }
-        assert.deepEqual(hits, []);
+        assertEquals(hits, []);
     },
 );
 
-test('build --no-zip help names crank', () => {
-    assert.match(
+Deno.test('build --no-zip help names crank', () => {
+    assertMatch(
         BUILD_SCRIPT,
         /the fusion-angle executable — for \.\/crank/,
     );
-    assert.doesNotMatch(
+    assertNotMatch(
         BUILD_SCRIPT,
         /for \.\/serve/,
     );

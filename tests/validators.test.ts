@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
 import {
     validateHumanMemberEntity,
     validateAIMemberEntity,
@@ -52,58 +51,58 @@ const validHumanMember = {
     team_dimensions: { driver: 0.5 },
 };
 
-test(
+Deno.test(
     'validateHumanMemberEntity accepts valid payload',
     () => {
         const result = validateHumanMemberEntity(
             validHumanMember,
         );
-        assert.equal(result.title, 'Engineer');
+        assertStrictEquals(result.title, 'Engineer');
     },
 );
 
-test(
+Deno.test(
     'validateHumanMemberEntity rejects status key '
     + '(retired by Stage 10b+c)',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateHumanMemberEntity({
                 ...validHumanMember,
                 status: 'active',
             }),
-            /unexpected key "status"/,
+            Error, 'unexpected key "status"',
         );
     },
 );
 
-test(
+Deno.test(
     'validateHumanMemberEntity rejects contact PII'
     + ' (now in identity_pii)',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateHumanMemberEntity({
                 ...validHumanMember,
                 email: 'ada@example.com',
             }),
-            /unexpected key "email"/,
+            Error, 'unexpected key "email"',
         );
     },
 );
 
-test(
+Deno.test(
     'validateHumanMemberEntity rejects unexpected key',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateHumanMemberEntity({
                 ...validHumanMember,
                 admin: true,
             }),
-            /unexpected key "admin"/,
+            Error, 'unexpected key "admin"',
         );
     },
 );
 
-test(
+Deno.test(
     'validateHumanMemberEntity rejects missing'
     + ' required key',
     () => {
@@ -111,42 +110,42 @@ test(
         delete (
             body as Record<string, unknown>
         )['department'];
-        assert.throws(
+        assertThrows(
             () => validateHumanMemberEntity(body),
-            /missing required key "department"/,
+            Error, 'missing required key "department"',
         );
     },
 );
 
-test(
+Deno.test(
     'validateHumanMemberEntity rejects non-string'
     + ' strengths elements',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateHumanMemberEntity({
                 ...validHumanMember,
                 strengths: [1, 2],
             }),
-            /expected string for strengths\[0\]/,
+            Error, 'expected string for strengths[0]',
         );
     },
 );
 
-test(
+Deno.test(
     'validateHumanMemberEntity rejects non-number'
     + ' team dimension values',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateHumanMemberEntity({
                 ...validHumanMember,
                 team_dimensions: { driver: 'high' },
             }),
-            /expected finite number for team_dimensions\.driver/,
+            Error, 'expected finite number for team_dimensions.driver',
         );
     },
 );
 
-test(
+Deno.test(
     'validateHumanMemberEntity accepts native'
     + ' strengths and team_dimensions',
     () => {
@@ -156,45 +155,45 @@ test(
             strengths: ['systems', 'mentoring'],
             team_dimensions: { driver: 60, amiable: 40 },
         });
-        assert.deepEqual(
+        assertEquals(
             entity.strengths,
             ['systems', 'mentoring'],
         );
-        assert.deepEqual(
+        assertEquals(
             entity.team_dimensions,
             { driver: 60, amiable: 40 },
         );
     },
 );
 
-test(
+Deno.test(
     'validateHumanMemberEntity rejects a'
     + ' JSON-encoded strengths string',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateHumanMemberEntity({
                 title: 'Engineer',
                 department: 'R&D',
                 strengths: '["systems"]',
                 team_dimensions: { driver: 60 },
             }),
-            /expected array for strengths/,
+            Error, 'expected array for strengths',
         );
     },
 );
 
-test(
+Deno.test(
     'validateHumanMemberEntity rejects a'
     + ' JSON-encoded team_dimensions string',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateHumanMemberEntity({
                 title: 'Engineer',
                 department: 'R&D',
                 strengths: [],
                 team_dimensions: '{"driver":60}',
             }),
-            /expected object for team_dimensions/,
+            Error, 'expected object for team_dimensions',
         );
     },
 );
@@ -208,28 +207,28 @@ const validAIMember = {
     model: firstProviderModel().id,
 };
 
-test(
+Deno.test(
     'validateAIMemberEntity accepts valid payload',
     () => {
         const result = validateAIMemberEntity(
             validAIMember,
         );
-        assert.equal(
+        assertStrictEquals(
             result.description,
             'Long context, deep reasoning.',
         );
-        assert.equal(
+        assertStrictEquals(
             result.skill_focus,
             'Deep reasoning over long docs.',
         );
-        assert.equal(
+        assertStrictEquals(
             result.model,
             firstProviderModel().id,
         );
     },
 );
 
-test(
+Deno.test(
     'validateAIMemberEntity accepts empty'
     + ' skill_focus',
     () => {
@@ -237,58 +236,58 @@ test(
             ...validAIMember,
             skill_focus: '',
         });
-        assert.equal(result.skill_focus, '');
+        assertStrictEquals(result.skill_focus, '');
     },
 );
 
-test(
+Deno.test(
     'validateAIMemberEntity rejects unknown'
     + ' model id',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateAIMemberEntity({
                 ...validAIMember,
                 model: UNKNOWN_MODEL,
             }),
-            /model must be a known provider/,
+            Error, 'model must be a known provider',
         );
     },
 );
 
-test(
+Deno.test(
     'validateAIMemberEntity rejects unexpected key',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateAIMemberEntity({
                 ...validAIMember,
                 surprise: 'oops',
             }),
-            /unexpected key "surprise"/,
+            Error, 'unexpected key "surprise"',
         );
     },
 );
 
-test(
+Deno.test(
     'validateAIMemberEntity rejects missing model',
     () => {
         const { model: _omit, ...rest } =
             validAIMember;
-        assert.throws(
+        assertThrows(
             () => validateAIMemberEntity(rest),
-            /missing required key "model"/,
+            Error, 'missing required key "model"',
         );
     },
 );
 
-test(
+Deno.test(
     'validateAIMemberEntity rejects missing'
     + ' skill_focus',
     () => {
         const { skill_focus: _omit, ...rest } =
             validAIMember;
-        assert.throws(
+        assertThrows(
             () => validateAIMemberEntity(rest),
-            /missing required key "skill_focus"/,
+            Error, 'missing required key "skill_focus"',
         );
     },
 );
@@ -306,58 +305,58 @@ const validIdea = {
     success_metrics: 'Metrics',
 };
 
-test('validateIdeaEntity accepts valid payload', () => {
+Deno.test('validateIdeaEntity accepts valid payload', () => {
     const result = validateIdeaEntity(validIdea);
-    assert.equal(result.title, 'Idea One');
-    assert.equal(result.position, 1);
+    assertStrictEquals(result.title, 'Idea One');
+    assertStrictEquals(result.position, 1);
 });
 
-test(
+Deno.test(
     'validateIdeaEntity rejects unexpected key',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateIdeaEntity({
             ...validIdea,
             secret: 'pwned',
         }),
-        /unexpected key "secret"/,
+        Error, 'unexpected key "secret"',
     );
 });
 
-test(
+Deno.test(
     'validateIdeaEntity rejects status key (retired)',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateIdeaEntity({
             ...validIdea,
             status: 'active',
         }),
-        /unexpected key "status"/,
+        Error, 'unexpected key "status"',
     );
 });
 
-test(
+Deno.test(
     'validateIdeaEntity rejects readiness key (retired)',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateIdeaEntity({
             ...validIdea,
             readiness: 'ready',
         }),
-        /unexpected key "readiness"/,
+        Error, 'unexpected key "readiness"',
     );
 });
 
-test(
+Deno.test(
     'validateIdeaEntity rejects missing required key',
     () => {
     const body = { ...validIdea };
     delete (
         body as Record<string, unknown>
     )['expected_outcome'];
-    assert.throws(
+    assertThrows(
         () => validateIdeaEntity(body),
-        /missing required key "expected_outcome"/,
+        Error, 'missing required key "expected_outcome"',
     );
 });
 
@@ -375,44 +374,44 @@ const validProject = {
     position: 1,
 };
 
-test('validateProjectEntity accepts valid payload', () => {
+Deno.test('validateProjectEntity accepts valid payload', () => {
     const result =
         validateProjectEntity(validProject);
-    assert.equal(result.title, 'Proj');
+    assertStrictEquals(result.title, 'Proj');
 });
 
-test('validateProjectEntity rejects unknown key', () => {
-    assert.throws(
+Deno.test('validateProjectEntity rejects unknown key', () => {
+    assertThrows(
         () => validateProjectEntity({
             ...validProject,
             status: 'submitted',
         }),
-        /unexpected key "status"/,
+        Error, 'unexpected key "status"',
     );
 });
 
-test(
+Deno.test(
     'validateProjectEntity rejects a timestamp where a'
     + ' calendar date belongs',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateProjectEntity({
             ...validProject,
             start_date: '2024-01-01T00:00:00.000000Z',
         }),
-        /calendar date YYYY-MM-DD for ProjectEntity/,
+        Error, 'calendar date YYYY-MM-DD for ProjectEntity',
     );
 });
 
-test(
+Deno.test(
     'validateProjectEntity rejects an impossible day',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateProjectEntity({
             ...validProject,
             target_end_date: '2024-02-30',
         }),
-        /calendar date YYYY-MM-DD for ProjectEntity/,
+        Error, 'calendar date YYYY-MM-DD for ProjectEntity',
     );
 });
 
@@ -430,46 +429,46 @@ const validFlow = {
     lock_timeout: DEFAULT_LOCK_TIMEOUT,
 };
 
-test('validateFlowEntity accepts valid payload', () => {
+Deno.test('validateFlowEntity accepts valid payload', () => {
     const result = validateFlowEntity(validFlow);
-    assert.equal(result.name, 'Flow A');
-    assert.equal(result.is_locked, false);
+    assertStrictEquals(result.name, 'Flow A');
+    assertStrictEquals(result.is_locked, false);
 });
 
-test(
+Deno.test(
     'validateFlowEntity rejects non-boolean is_locked',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateFlowEntity({
             ...validFlow,
             is_locked: 0,
         }),
-        /expected boolean for is_locked/,
+        Error, 'expected boolean for is_locked',
     );
 });
 
-test(
+Deno.test(
     'validateFlowEntity rejects unexpected key',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateFlowEntity({
             ...validFlow,
             admin: true,
         }),
-        /unexpected key "admin"/,
+        Error, 'unexpected key "admin"',
     );
 });
 
-test(
+Deno.test(
     'validateFlowEntity rejects missing required key',
     () => {
     const body = { ...validFlow };
     delete (
         body as Record<string, unknown>
     )['lock_timeout'];
-    assert.throws(
+    assertThrows(
         () => validateFlowEntity(body),
-        /missing required key "lock_timeout"/,
+        Error, 'missing required key "lock_timeout"',
     );
 });
 
@@ -490,28 +489,28 @@ const validWorkOrder = {
     position: 1,
 };
 
-test(
+Deno.test(
     'validateWorkOrderEntity accepts valid payload',
     () => {
     const result =
         validateWorkOrderEntity(validWorkOrder);
-    assert.equal(result.display_id, 'WO-001');
+    assertStrictEquals(result.display_id, 'WO-001');
 });
 
-test(
+Deno.test(
     'validateWorkOrderEntity rejects non-number'
     + ' position',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateWorkOrderEntity({
             ...validWorkOrder,
             position: 'first',
         }),
-        /expected finite number for position/,
+        Error, 'expected finite number for position',
     );
 });
 
-test(
+Deno.test(
     'validateWorkOrderEntity tolerates legacy'
     + ' graphs still carrying flowId',
     () => {
@@ -524,7 +523,7 @@ test(
             nodes: [], edges: [],
         },
     });
-    assert.equal(result.display_id, 'WO-001');
+    assertStrictEquals(result.display_id, 'WO-001');
 });
 
 // --- FlowWorkOrderEntity ---
@@ -535,26 +534,26 @@ const validFlowWorkOrder = {
     at: '2024-01-01T00:00:00.000000Z',
 };
 
-test(
+Deno.test(
     'validateFlowWorkOrderEntity accepts valid payload',
     () => {
     const result =
         validateFlowWorkOrderEntity(
             validFlowWorkOrder,
         );
-    assert.equal(result.flow_id, F_1);
+    assertStrictEquals(result.flow_id, F_1);
 });
 
-test(
+Deno.test(
     'validateFlowWorkOrderEntity rejects missing'
     + ' work_order_id',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateFlowWorkOrderEntity({
             flow_id: F_1,
             at: '2024-01-01T00:00:00.000000Z',
         }),
-        /missing required key "work_order_id"/,
+        Error, 'missing required key "work_order_id"',
     );
 });
 
@@ -566,7 +565,7 @@ const validStateFieldValue = {
     value: 'Acme Corp',
 };
 
-test(
+Deno.test(
     'validateStateFieldValueEntity accepts valid'
     + ' payload',
     () => {
@@ -574,19 +573,19 @@ test(
         validateStateFieldValueEntity(
             validStateFieldValue,
         );
-    assert.equal(result.state_event_id, EVT_1);
+    assertStrictEquals(result.state_event_id, EVT_1);
 });
 
-test(
+Deno.test(
     'validateStateFieldValueEntity rejects missing'
     + ' state_event_id',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateStateFieldValueEntity({
             attribute_id: F_1,
             value: 'x',
         }),
-        /missing required key "state_event_id"/,
+        Error, 'missing required key "state_event_id"',
     );
 });
 
@@ -601,42 +600,42 @@ const validOrganization = {
     ideas_limit: 200,
 };
 
-test(
+Deno.test(
     'validateOrganizationEntity accepts valid payload',
     () => {
     const result =
         validateOrganizationEntity(validOrganization);
-    assert.equal(result.name, 'Acme Corp');
-    assert.equal(result.seats, 10);
+    assertStrictEquals(result.name, 'Acme Corp');
+    assertStrictEquals(result.seats, 10);
 });
 
-test(
+Deno.test(
     'validateOrganizationEntity rejects non-number'
     + ' seats',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateOrganizationEntity({
             ...validOrganization,
             seats: 'ten',
         }),
-        /expected finite number for seats/,
+        Error, 'expected finite number for seats',
     );
 });
 
-test(
+Deno.test(
     'validateOrganizationEntity rejects unexpected'
     + ' key',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateOrganizationEntity({
             ...validOrganization,
             admin: true,
         }),
-        /unexpected key "admin"/,
+        Error, 'unexpected key "admin"',
     );
 });
 
-test(
+Deno.test(
     'validateOrganizationEntity rejects missing'
     + ' required key',
     () => {
@@ -644,38 +643,38 @@ test(
     delete (
         body as Record<string, unknown>
     )['seats'];
-    assert.throws(
+    assertThrows(
         () => validateOrganizationEntity(body),
-        /missing required key "seats"/,
+        Error, 'missing required key "seats"',
     );
 });
 
-test(
+Deno.test(
     'validateOrganizationEntity rejects the retired'
     + ' stored aggregates',
     () => {
     // used_seats / last_activity are DERIVED from the
     // memberships ledger and the states log — a stored
     // copy is a second truth kept in sync by nothing
-    assert.throws(
+    assertThrows(
         () => validateOrganizationEntity({
             ...validOrganization,
             used_seats: 5,
         }),
-        /unexpected key "used_seats"/,
+        Error, 'unexpected key "used_seats"',
     );
 });
 
-test(
+Deno.test(
     'validateOrganizationEntity rejects a bare'
     + ' calendar date for next_billing',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateOrganizationEntity({
             ...validOrganization,
             next_billing: '2025-01-01',
         }),
-        /invalid timestamp/,
+        Error, 'invalid timestamp',
     );
 });
 
@@ -687,7 +686,7 @@ const validIdeaSubmission = {
     at: '2024-01-01T00:00:00.000000Z',
 };
 
-test(
+Deno.test(
     'validateIdeaSubmissionEntity accepts valid'
     + ' payload',
     () => {
@@ -695,19 +694,19 @@ test(
         validateIdeaSubmissionEntity(
             validIdeaSubmission,
         );
-    assert.equal(result.idea_id, I_1);
+    assertStrictEquals(result.idea_id, I_1);
 });
 
-test(
+Deno.test(
     'validateIdeaSubmissionEntity rejects missing'
     + ' idea_id',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateIdeaSubmissionEntity({
             member_id: U_1,
             at: '2024-01-01T00:00:00.000000Z',
         }),
-        /missing required key "idea_id"/,
+        Error, 'missing required key "idea_id"',
     );
 });
 
@@ -719,26 +718,26 @@ const validProjectFlow = {
     at: '2024-01-01T00:00:00.000000Z',
 };
 
-test(
+Deno.test(
     'validateProjectFlowEntity accepts valid payload',
     () => {
     const result =
         validateProjectFlowEntity(
             validProjectFlow,
         );
-    assert.equal(result.project_id, 'pjQzgITAPDQVyvCVpzpIfQ');
+    assertStrictEquals(result.project_id, 'pjQzgITAPDQVyvCVpzpIfQ');
 });
 
-test(
+Deno.test(
     'validateProjectFlowEntity rejects missing'
     + ' flow_id',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateProjectFlowEntity({
             project_id: 'pjQzgITAPDQVyvCVpzpIfQ',
             at: '2024-01-01T00:00:00.000000Z',
         }),
-        /missing required key "flow_id"/,
+        Error, 'missing required key "flow_id"',
     );
 });
 
@@ -755,10 +754,10 @@ const baseNode = {
     taskInstructions: '',
 };
 
-test(
+Deno.test(
     'asStoredGraph throws on missing memberIds',
     () => {
-        assert.throws(
+        assertThrows(
             () => asStoredGraph(
                 { nodes: [baseNode], edges: [] },
                 'graph',
@@ -767,7 +766,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'asStoredGraph round-trips an empty memberIds',
     () => {
         const result = asStoredGraph(
@@ -783,11 +782,11 @@ test(
             'graph',
         );
         const n = result.nodes[0]!;
-        assert.deepEqual(n.memberIds, []);
+        assertEquals(n.memberIds, []);
     },
 );
 
-test(
+Deno.test(
     'asStoredGraph round-trips a populated'
     + ' memberIds list',
     () => {
@@ -807,14 +806,14 @@ test(
             'graph',
         );
         const n = result.nodes[0]!;
-        assert.deepEqual(
+        assertEquals(
             n.memberIds,
             [MEMBER_SARAH, MEMBER_CLAUDE],
         );
     },
 );
 
-test(
+Deno.test(
     'asStoredGraph leaves missing agentIds absent',
     () => {
         const result = asStoredGraph(
@@ -830,11 +829,11 @@ test(
             'graph',
         );
         const n = result.nodes[0]!;
-        assert.equal(n.agentIds, undefined);
+        assertStrictEquals(n.agentIds, undefined);
     },
 );
 
-test(
+Deno.test(
     'asStoredGraph round-trips a populated'
     + ' agentIds list',
     () => {
@@ -852,11 +851,11 @@ test(
             'graph',
         );
         const n = result.nodes[0]!;
-        assert.deepEqual(n.agentIds, ['UuvoBhQJUSEsiJwscXPkUg']);
+        assertEquals(n.agentIds, ['UuvoBhQJUSEsiJwscXPkUg']);
     },
 );
 
-test(
+Deno.test(
     'assertFlowGraphWriteLaw rejects an AI agent'
     + ' id in memberIds',
     () => {
@@ -872,16 +871,16 @@ test(
             },
             'graph',
         );
-        assert.throws(
+        assertThrows(
             () => assertFlowGraphWriteLaw(
                 graph, new Set([AI_1]),
             ),
-            /not AI agents/,
+            Error, 'not AI agents',
         );
     },
 );
 
-test(
+Deno.test(
     'assertFlowGraphWriteLaw accepts a live agent'
     + ' in agentIds',
     () => {
@@ -898,19 +897,17 @@ test(
             },
             'graph',
         );
-        assert.doesNotThrow(() =>
-            assertFlowGraphWriteLaw(
-                graph, new Set(['UuvoBhQJUSEsiJwscXPkUg']),
-            ),
+        assertFlowGraphWriteLaw(
+            graph, new Set(['UuvoBhQJUSEsiJwscXPkUg']),
         );
     },
 );
 
-test(
+Deno.test(
     'asStoredGraph rejects non-string entries in'
     + ' memberIds',
     () => {
-        assert.throws(
+        assertThrows(
             () => asStoredGraph(
                 {
                     nodes: [
@@ -929,11 +926,11 @@ test(
 
 // --- asStoredGraph (taskInstructions) ---
 
-test(
+Deno.test(
     'asStoredGraph throws on missing'
     + ' taskInstructions',
     () => {
-        assert.throws(
+        assertThrows(
             () => asStoredGraph(
                 {
                     nodes: [
@@ -956,7 +953,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'asStoredGraph round-trips an empty'
     + ' taskInstructions',
     () => {
@@ -974,11 +971,11 @@ test(
             'graph',
         );
         const n = result.nodes[0]!;
-        assert.equal(n.taskInstructions, '');
+        assertStrictEquals(n.taskInstructions, '');
     },
 );
 
-test(
+Deno.test(
     'asStoredGraph round-trips multi-line'
     + ' markdown taskInstructions byte-for-byte',
     () => {
@@ -997,15 +994,15 @@ test(
             'graph',
         );
         const n = result.nodes[0]!;
-        assert.equal(n.taskInstructions, md);
+        assertStrictEquals(n.taskInstructions, md);
     },
 );
 
-test(
+Deno.test(
     'asStoredGraph rejects non-string'
     + ' taskInstructions',
     () => {
-        assert.throws(
+        assertThrows(
             () => asStoredGraph(
                 {
                     nodes: [
@@ -1035,20 +1032,20 @@ const validSelectAttribute = {
     constraints: [] as const,
 };
 
-test(
+Deno.test(
     'validateRecordAttributeEntity rejects a'
     + ' select with zero options',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateRecordAttributeEntity({
             ...validSelectAttribute,
             options: [],
         }),
-        /at least one option/,
+        Error, 'at least one option',
     );
 });
 
-test(
+Deno.test(
     'validateRecordAttributeEntity accepts a'
     + ' radio with options',
     () => {
@@ -1056,42 +1053,42 @@ test(
         ...validSelectAttribute,
         attribute_type: 'radio',
     });
-    assert.equal(result.attribute_type, 'radio');
+    assertStrictEquals(result.attribute_type, 'radio');
 });
 
-test(
+Deno.test(
     'validateRecordAttributeEntity rejects a'
     + ' radio with zero options',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateRecordAttributeEntity({
             ...validSelectAttribute,
             attribute_type: 'radio',
             options: [],
         }),
-        /at least one option/,
+        Error, 'at least one option',
     );
 });
 
-test(
+Deno.test(
     'validateRecordAttributeEntity rejects non-string'
     + ' option elements on any type',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateRecordAttributeEntity({
             ...validSelectAttribute,
             attribute_type: 'text',
             options: [3],
         }),
-        /expected string for options\[0\]/,
+        Error, 'expected string for options[0]',
     );
 });
 
-test(
+Deno.test(
     'validateRecordAttributeEntity rejects a regex'
     + ' constraint on a number attribute_type',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateRecordAttributeEntity({
             ...validSelectAttribute,
             attribute_type: 'number',
@@ -1100,15 +1097,15 @@ test(
                 { kind: 'regex', pattern: '^\\d+$' },
             ],
         }),
-        /regex/,
+        Error, 'regex',
     );
 });
 
-test(
+Deno.test(
     'validateRecordAttributeEntity rejects range_min'
     + ' on a text attribute_type',
     () => {
-    assert.throws(
+    assertThrows(
         () => validateRecordAttributeEntity({
             ...validSelectAttribute,
             attribute_type: 'text',
@@ -1120,7 +1117,7 @@ test(
     );
 });
 
-test(
+Deno.test(
     'validateRecordAttributeEntity accepts range_min'
     + ' on a date attribute_type',
     () => {
@@ -1135,10 +1132,10 @@ test(
             },
         ],
     });
-    assert.equal(result.attribute_type, 'date');
+    assertStrictEquals(result.attribute_type, 'date');
 });
 
-test(
+Deno.test(
     'validateRecordAttributeEntity accepts a regex'
     + ' constraint on a text attribute_type',
     () => {
@@ -1153,30 +1150,30 @@ test(
             },
         ],
     });
-    assert.equal(result.name, 'Priority');
+    assertStrictEquals(result.name, 'Priority');
 });
 
-test('asConstraint rejects nested-quantifier regex', () => {
-    assert.throws(
+Deno.test('asConstraint rejects nested-quantifier regex', () => {
+    assertThrows(
         () => asConstraint(
             { kind: 'regex', pattern: '(a+)+$' }, 'c',
         ),
-        /nested unbounded quantifiers/,
+        Error, 'nested unbounded quantifiers',
     );
 });
 
-test('asConstraint rejects an over-long pattern', () => {
-    assert.throws(
+Deno.test('asConstraint rejects an over-long pattern', () => {
+    assertThrows(
         () => asConstraint(
             { kind: 'regex', pattern: 'a'.repeat(201) },
             'c',
         ),
-        /exceeds 200 chars/,
+        Error, 'exceeds 200 chars',
     );
 });
 
-test('asConstraint accepts a safe pattern', () => {
-    assert.equal(
+Deno.test('asConstraint accepts a safe pattern', () => {
+    assertStrictEquals(
         asConstraint(
             { kind: 'regex', pattern: '^[a-z]{3,10}$' },
             'c',
@@ -1185,7 +1182,7 @@ test('asConstraint accepts a safe pattern', () => {
     );
 });
 
-test(
+Deno.test(
     'validateFlowDocumentBody accepts a native'
     + ' graph object',
     () => {
@@ -1207,17 +1204,17 @@ test(
             },
             revivals: [],
         });
-        assert.deepEqual(
+        assertEquals(
             body.graph, { nodes: [], edges: [] },
         );
     },
 );
 
-test(
+Deno.test(
     'validateFlowDocumentBody rejects a'
     + ' JSON-encoded graph string',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateFlowDocumentBody({
                 name: 'Onboarding',
                 is_locked: false,
@@ -1237,12 +1234,12 @@ test(
                 },
                 revivals: [],
             }),
-            /expected object for FlowDocumentBody\.graph/,
+            Error, 'expected object for FlowDocumentBody.graph',
         );
     },
 );
 
-test(
+Deno.test(
     'validateWorkOrderEntity accepts a native'
     + ' flow_graph object',
     () => {
@@ -1257,7 +1254,7 @@ test(
             },
             position: 1,
         });
-        assert.deepEqual(
+        assertEquals(
             entity.flow_graph,
             {
                 name: 'Onboarding',
@@ -1269,11 +1266,11 @@ test(
     },
 );
 
-test(
+Deno.test(
     'validateWorkOrderEntity rejects a'
     + ' JSON-encoded flow_graph string',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateWorkOrderEntity({
                 organization_id: ORGANIZATION_1,
                 display_id: 'a7c3e1f9',
@@ -1282,7 +1279,7 @@ test(
                     + '"nodes":[],"edges":[]}',
                 position: 1,
             }),
-            /expected object for flow_graph/,
+            Error, 'expected object for flow_graph',
         );
     },
 );
@@ -1302,64 +1299,64 @@ const validMessagePair = {
     operation_id: '0123456789ABCDEFGHIJKw',
 };
 
-test(
+Deno.test(
     'validateMessagePairEntity accepts a full pair',
     () => {
         const got = validateMessagePairEntity(validMessagePair);
-        assert.equal(got.method, 'PUT');
-        assert.equal(got.request_at, validMessagePair.request_at);
-        assert.equal(
+        assertStrictEquals(got.method, 'PUT');
+        assertStrictEquals(got.request_at, validMessagePair.request_at);
+        assertStrictEquals(
             got.response_at, validMessagePair.response_at,
         );
     },
 );
 
-test(
+Deno.test(
     'validateMessagePairEntity rejects status key',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateMessagePairEntity({
                 ...validMessagePair, status: 200,
             }),
-            /unexpected key "status"/,
+            Error, 'unexpected key "status"',
         );
     },
 );
 
-test(
+Deno.test(
     'validateMessagePairEntity rejects message_hash key',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateMessagePairEntity({
                 ...validMessagePair,
                 message_hash: 'a'.repeat(64),
             }),
-            /unexpected key "message_hash"/,
+            Error, 'unexpected key "message_hash"',
         );
     },
 );
 
-test(
+Deno.test(
     'validateMessagePairEntity rejects a short hash',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateMessagePairEntity({
                 ...validMessagePair,
                 request_hash: 'aa',
             }),
-            /request_hash must be a 64-/,
+            Error, 'request_hash must be a 64-',
         );
     },
 );
 
-test(
+Deno.test(
     'validateMessagePairEntity rejects a lowercase method',
     () => {
-        assert.throws(
+        assertThrows(
             () => validateMessagePairEntity({
                 ...validMessagePair, method: 'put',
             }),
-            /method must match \^\[A-Z\]\+\$/,
+            Error, 'method must match ^[A-Z]+$',
         );
     },
 );

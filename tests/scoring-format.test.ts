@@ -1,5 +1,4 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assertStrictEquals, assertThrows } from '@std/assert';
 import {
     latestPerPair,
     weightedMeanByPosition,
@@ -9,7 +8,7 @@ import {
 import type { ObjectiveId } from '../api/types.ts';
 import { generateIdentifier } from '../shared/identifier.ts';
 
-test('latestPerPair keeps the latest by at',
+Deno.test('latestPerPair keeps the latest by at',
     () => {
         const rows = [
             { id: generateIdentifier(),
@@ -33,37 +32,37 @@ test('latestPerPair keeps the latest by at',
               at: '2026-05-14T00:00:00.000000Z' },
         ];
         const latest = latestPerPair(rows);
-        assert.equal(latest.length, 3);
+        assertStrictEquals(latest.length, 3);
         const byKey = new Map(
             latest.map(r =>
                 [r.projectId + ':'
                     + r.objectiveId, r.score]),
         );
-        assert.equal(byKey.get(
+        assertStrictEquals(byKey.get(
             'pnXmXrxOWayANgDLdCjuBw:ohqxgUBEaFQwYbXsonRPmg',
         ), 60);
-        assert.equal(byKey.get('pnXmXrxOWayANgDLdCjuBw:o2'), -20);
-        assert.equal(byKey.get(
+        assertStrictEquals(byKey.get('pnXmXrxOWayANgDLdCjuBw:o2'), -20);
+        assertStrictEquals(byKey.get(
             'prBESZPjJDiuXCeZLmbiVw:ohqxgUBEaFQwYbXsonRPmg',
         ), 10);
     });
 
-test('formatSigned emits + for positive', () => {
-    assert.equal(formatSigned(42), '+42');
+Deno.test('formatSigned emits + for positive', () => {
+    assertStrictEquals(formatSigned(42), '+42');
 });
 
-test('formatSigned emits − for negative (U+2212)', () => {
-    assert.equal(formatSigned(-10), '−10');
+Deno.test('formatSigned emits − for negative (U+2212)', () => {
+    assertStrictEquals(formatSigned(-10), '−10');
 });
 
-test('formatSigned emits 0 for zero', () => {
-    assert.equal(formatSigned(0), '0');
+Deno.test('formatSigned emits 0 for zero', () => {
+    assertStrictEquals(formatSigned(0), '0');
 });
 
-test('toneForScore maps to canonical tone vocabulary', () => {
-    assert.equal(toneForScore(1), 'success');
-    assert.equal(toneForScore(-1), 'error');
-    assert.equal(toneForScore(0), 'muted');
+Deno.test('toneForScore maps to canonical tone vocabulary', () => {
+    assertStrictEquals(toneForScore(1), 'success');
+    assertStrictEquals(toneForScore(-1), 'error');
+    assertStrictEquals(toneForScore(0), 'muted');
 });
 
 const positions = new Map<ObjectiveId, number>([
@@ -72,20 +71,20 @@ const positions = new Map<ObjectiveId, number>([
     ['o3' as ObjectiveId, 2],
 ]);
 
-test(
+Deno.test(
     'weightedMeanByPosition returns null for empty input',
     () => {
-        assert.equal(
+        assertStrictEquals(
             weightedMeanByPosition([], positions),
             null,
         );
     },
 );
 
-test(
+Deno.test(
     'weightedMeanByPosition returns the score for one item',
     () => {
-        assert.equal(
+        assertStrictEquals(
             weightedMeanByPosition(
                 [{ objectiveId: 'ohqxgUBEaFQwYbXsonRPmg' as ObjectiveId,
                    score: 42 }],
@@ -96,7 +95,7 @@ test(
     },
 );
 
-test(
+Deno.test(
     'weightedMeanByPosition applies 0.95 decay by position',
     () => {
         // ohqxgUBEaFQwYbXsonRPmg (pos 0, w=1.0) + o2 (pos 1, w=0.95)
@@ -112,11 +111,11 @@ test(
             ],
             positions,
         );
-        assert.equal(result, 50);
+        assertStrictEquals(result, 50);
     },
 );
 
-test(
+Deno.test(
     'weightedMeanByPosition sorts unordered input by position',
     () => {
         // Input reverse order; helper sorts by position
@@ -130,21 +129,21 @@ test(
             ],
             positions,
         );
-        assert.equal(result, 50);
+        assertStrictEquals(result, 50);
     },
 );
 
-test(
+Deno.test(
     'weightedMeanByPosition throws on unknown objectiveId',
     () => {
-        assert.throws(
+        assertThrows(
             () => weightedMeanByPosition(
                 [{ objectiveId:
                     'unknown' as ObjectiveId,
                    score: 5 }],
                 positions,
             ),
-            /missing position for objective/,
+            Error, 'missing position for objective',
         );
     },
 );

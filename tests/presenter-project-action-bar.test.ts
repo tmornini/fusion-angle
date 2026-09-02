@@ -1,11 +1,10 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import { ProjectActionBarPresenter } from
     '../web-app/app/presenters/project-action-bar.ts';
 
 const PROJECT_ID = 'pnXmXrxOWayANgDLdCjuBw';
 
-test('under_review with no scores: Approve disabled',
+Deno.test('under_review with no scores: Approve disabled',
     () => {
         const p = new ProjectActionBarPresenter(
             PROJECT_ID, 'under_review',
@@ -20,14 +19,14 @@ test('under_review with no scores: Approve disabled',
             new Map(),
         );
         const html = p.buildReviewActions().toString();
-        assert.ok(
+        assert(
             html.includes(
                 'data-action="approve" disabled',
             ),
         );
     });
 
-test('under_review with full scoring: Approve enabled',
+Deno.test('under_review with full scoring: Approve enabled',
     () => {
         const p = new ProjectActionBarPresenter(
             PROJECT_ID, 'under_review',
@@ -39,10 +38,10 @@ test('under_review with full scoring: Approve enabled',
         const approveDisabled = html.includes(
             'data-action="approve" disabled',
         );
-        assert.equal(approveDisabled, false);
+        assertStrictEquals(approveDisabled, false);
     });
 
-test('approved project: Archive shown',
+Deno.test('approved project: Archive shown',
     () => {
         const p = new ProjectActionBarPresenter(
             PROJECT_ID, 'approved',
@@ -58,12 +57,12 @@ test('approved project: Archive shown',
         );
         const html =
             p.buildLifecycleActions().toString();
-        assert.ok(html.includes(
+        assert(html.includes(
             'data-action="archive"',
         ));
     });
 
-test('approved with full actuals: Archive enabled',
+Deno.test('approved with full actuals: Archive enabled',
     () => {
         const p = new ProjectActionBarPresenter(
             PROJECT_ID, 'approved',
@@ -76,58 +75,58 @@ test('approved with full actuals: Archive enabled',
         const archiveDisabled = html.includes(
             'data-action="archive" disabled',
         );
-        assert.equal(archiveDisabled, false);
+        assertStrictEquals(archiveDisabled, false);
     });
 
-test('submitted project: Score button hidden, other review actions shown',
-    () => {
-        const p = new ProjectActionBarPresenter(
-            PROJECT_ID, 'submitted',
-            { ready: true, problems: [] },
-            { ready: true, problems: [] },
-            new Map(),
-        );
-        const html = p.buildReviewActions().toString();
-        assert.equal(
-            html.includes('data-action="score"'),
-            false,
-            'Score button must NOT render on submitted',
-        );
-        assert.ok(
-            html.includes('data-action="approve"'),
-            'Approve button must render on submitted',
-        );
-        assert.ok(
-            html.includes('data-action="decline"'),
-            'Decline button must render on submitted',
-        );
-        assert.ok(
-            html.includes('data-action="send-back"'),
-            'Send-back button must render on submitted',
-        );
-    });
+Deno.test('submitted project: Score button hidden, other review'
++ ' actions shown', () => {
+    const p = new ProjectActionBarPresenter(
+        PROJECT_ID, 'submitted',
+        { ready: true, problems: [] },
+        { ready: true, problems: [] },
+        new Map(),
+    );
+    const html = p.buildReviewActions().toString();
+    assertStrictEquals(
+        html.includes('data-action="score"'),
+        false,
+        'Score button must NOT render on submitted',
+    );
+    assert(
+        html.includes('data-action="approve"'),
+        'Approve button must render on submitted',
+    );
+    assert(
+        html.includes('data-action="decline"'),
+        'Decline button must render on submitted',
+    );
+    assert(
+        html.includes('data-action="send-back"'),
+        'Send-back button must render on submitted',
+    );
+});
 
-test('sent_back project: Score button hidden, other review actions shown',
-    () => {
-        const p = new ProjectActionBarPresenter(
-            PROJECT_ID, 'sent_back',
-            { ready: true, problems: [] },
-            { ready: true, problems: [] },
-            new Map(),
-        );
-        const html = p.buildReviewActions().toString();
-        assert.equal(
-            html.includes('data-action="score"'),
-            false,
-            'Score button must NOT render on sent_back',
-        );
-        assert.ok(
-            html.includes('data-action="approve"'),
-            'Approve button must render on sent_back',
-        );
-    });
+Deno.test('sent_back project: Score button hidden, other review'
++ ' actions shown', () => {
+    const p = new ProjectActionBarPresenter(
+        PROJECT_ID, 'sent_back',
+        { ready: true, problems: [] },
+        { ready: true, problems: [] },
+        new Map(),
+    );
+    const html = p.buildReviewActions().toString();
+    assertStrictEquals(
+        html.includes('data-action="score"'),
+        false,
+        'Score button must NOT render on sent_back',
+    );
+    assert(
+        html.includes('data-action="approve"'),
+        'Approve button must render on sent_back',
+    );
+});
 
-test('Approve tooltip enumerates unscored objective names',
+Deno.test('Approve tooltip enumerates unscored objective names',
     () => {
         const names = new Map([
             ['ohqxgUBEaFQwYbXsonRPmg', 'Increase incomes'],
@@ -148,7 +147,7 @@ test('Approve tooltip enumerates unscored objective names',
             names,
         );
         const html = p.buildReviewActions().toString();
-        assert.ok(
+        assert(
             html.includes(
                 'title="Set a baseline score before '
                 + 'approving: Increase incomes, '
@@ -159,7 +158,7 @@ test('Approve tooltip enumerates unscored objective names',
         );
     });
 
-test('Archive tooltip enumerates objectives lacking actuals',
+Deno.test('Archive tooltip enumerates objectives lacking actuals',
     () => {
         const names = new Map([
             ['ohqxgUBEaFQwYbXsonRPmg', 'Improve employee morale'],
@@ -178,7 +177,7 @@ test('Archive tooltip enumerates objectives lacking actuals',
         );
         const html =
             p.buildLifecycleActions().toString();
-        assert.ok(
+        assert(
             html.includes(
                 'title="Add an actual measurement '
                 + 'before archiving: '
@@ -187,14 +186,14 @@ test('Archive tooltip enumerates objectives lacking actuals',
             'Archive tooltip should enumerate'
             + ' objectives lacking actuals',
         );
-        assert.equal(
+        assertStrictEquals(
             html.includes('action-bar-caption'),
             false,
             'reason lives in the tooltip, not a caption',
         );
     });
 
-test('review actions empty on approved (lifecycle in header)',
+Deno.test('review actions empty on approved (lifecycle in header)',
     () => {
         const p = new ProjectActionBarPresenter(
             PROJECT_ID, 'approved',
@@ -203,10 +202,10 @@ test('review actions empty on approved (lifecycle in header)',
             new Map(),
         );
         const html = p.buildReviewActions().toString();
-        assert.equal(html.trim(), '');
+        assertStrictEquals(html.trim(), '');
     });
 
-test('lifecycle actions empty on under_review',
+Deno.test('lifecycle actions empty on under_review',
     () => {
         const p = new ProjectActionBarPresenter(
             PROJECT_ID, 'under_review',
@@ -216,5 +215,5 @@ test('lifecycle actions empty on under_review',
         );
         const html =
             p.buildLifecycleActions().toString();
-        assert.equal(html.trim(), '');
+        assertStrictEquals(html.trim(), '');
     });
