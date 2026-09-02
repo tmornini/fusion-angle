@@ -51,7 +51,9 @@ function getChannel(): BroadcastChannel | undefined {
 // A tab releases its channel at unload; a test process has
 // no unload, so the divorce point offers the release
 // explicitly. getChannel reopens lazily and re-registers
-// dispatch on the new handle, so the subscribers survive.
+// dispatch on the new handle, so the handler Set survives
+// — but a subscriber already registered hears nothing
+// until the next post or subscribe reopens the channel.
 export function deleteNotificationChannel(): void {
     channel?.close();
     channel = undefined;

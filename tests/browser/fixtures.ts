@@ -407,9 +407,20 @@ export class Browser {
                 created.browserContextId,
             );
         } catch (error) {
-            await this.disposeContext(
-                created.browserContextId,
-            );
+            // disposeContext can reject too, and a failed
+            // cleanup must not replace the failure that
+            // caused it: report it, then throw the real one.
+            try {
+                await this.disposeContext(
+                    created.browserContextId,
+                );
+            } catch (disposeError) {
+                console.error(
+                    'disposeContext failed after'
+                    + ' newPageIn rejected',
+                    disposeError,
+                );
+            }
             throw error;
         }
     }
