@@ -26,6 +26,7 @@ import {
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import {
     advisoryKey,
+    POOL_MAX,
 } from '../api/advisory-lock.ts';
 import {
     ApiError,
@@ -230,6 +231,15 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
         await backend.ensureTables(TABLE_NAMES);
         await seedAdminSchema(db);
+        // Open the pool to its full width here: a
+        // pooled connection starts a max_lifetime
+        // timer when its socket connects, and the ops
+        // sanitizer blames whichever test first widens
+        // the pool. Every timer must predate test one.
+        await Promise.all(Array.from(
+            { length: POOL_MAX },
+            () => sql.query`SELECT 1`,
+        ));
     });
 
     Deno.test.afterAll(async () => {
