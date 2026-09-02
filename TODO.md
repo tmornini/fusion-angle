@@ -1303,6 +1303,31 @@ Off the critical path; each with its oracle.
   'npm:' deno.json deno.lock` prints nothing;
   `./test-postgres` 52 passed; `./measure --check` green
   against the committed budgets.
+- Render still runs the retired Node runtime. Its build
+  command is `npm ci --include=dev && git checkout -- . &&
+  ./build --no-zip ./render-out/` and its start command
+  `node server.mjs`; on master since `352cd9e2` the first
+  fails at `npm ci` (no `package.json`) and the second
+  names a file that no longer exists, so a push of master
+  produces a red build and no deploy. Spec 2 item 13 ruled
+  the move to Render's Docker runtime — build from the
+  Dockerfile, start from its `CMD` — and consciously
+  retired "no Render config change". Render fixes a
+  service's runtime at creation, so: create a Web Service
+  with Runtime Docker on this repository and `master`,
+  build and start commands empty, `POSTGRES_URL` and
+  `JWT_HMAC_SIGNING_KEY` copied from the Node service
+  (`PORT` is Render's; the `CMD` maps it to
+  `HTTP_SERVER_PORT`), health-check path and custom domain
+  carried over; pause auto-deploy on the Node service
+  first; retire it once the Docker service is healthy on
+  the same database. `./postgres-seed --postgres render`
+  and `./postgres-wipe --postgres render` post jobs that
+  run the compiled binary's verbs and assume the Docker
+  service. Oracle: `docker compose build` green locally at
+  HEAD; the Docker service's first deploy green with the
+  landing page served over the custom domain; the old
+  service deleted.
 
 ## Sequencing
 

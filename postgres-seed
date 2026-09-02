@@ -32,7 +32,7 @@ one web service. HTTP only (curl).
 local: assert loopback, then
 deno run --frozen server/postgres-seed.ts.
 compose: docker compose run --rm seed MODE — the
-Render job command inside the builder image.
+Render job command inside the runtime image.
 Development gun.
 USAGE
 }
