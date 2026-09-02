@@ -4475,7 +4475,7 @@ FSM, unlike `flows/detail`).
        tests/presenter-projects-organization.test.ts
        'OrganizationPresenter.buildPage renders overview
        stats and usage bars with
-       XXZruirZyAOoRpNxaDnpSA/limit values' (decides the
+       current/limit values' (decides the
        Active People stat cell and a "current / limit"
        Usage Overview bar; "Projects" and "Ideas" each
        render twice — a stat cell AND a usage-bar label —

@@ -181,6 +181,14 @@ Deno.test(
     + ' binding',
     async () => {
         const db = await freshDb();
+        await PUT(db, TYPE, {
+            id: 'rbfHGatkwQzGZJVXKJEeyw',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            name: 'Customer',
+            description: '',
+            position: 1,
+            state: 'active',
+        }, DEV_TOKEN);
         await PUT(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aEsGMmBEFaVdWihhHXwCbw/records/dCnpryxCNwuTnCrBBDIMOw', {
@@ -205,6 +213,14 @@ Deno.test(
     'DELETE organizations/:id/flows/:id/records/:frid removes the binding',
     async () => {
         const db = await freshDb();
+        await PUT(db, TYPE, {
+            id: 'rbfHGatkwQzGZJVXKJEeyw',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            name: 'Customer',
+            description: '',
+            position: 1,
+            state: 'active',
+        }, DEV_TOKEN);
         await PUT(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aEsGMmBEFaVdWihhHXwCbw/records/dCnpryxCNwuTnCrBBDIMOw', {

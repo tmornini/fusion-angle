@@ -9,6 +9,7 @@ import {
 import {
     sessionContext,
     getFlowStats,
+    subscribeFlowChanges,
 } from '../app/adapters/index.ts';
 import {
     FlowStatsPresenter,
@@ -90,19 +91,41 @@ function anchorCardTo(
     card.style.setProperty('--card-y', String(cy));
 }
 
+// The page's identity, set once by init and read by every
+// load — a bell re-runs load(host) for the same flow.
+let flowId = '';
+let projectId: string | undefined;
+
+// The hover/click listeners of the CURRENT render; each load
+// aborts the last so a re-render never doubles them.
+let cardListeners: AbortController | null = null;
+
 export async function init(
     params?: Record<string, string>,
 ): Promise<void> {
-    const flowId = params?.flowId;
-    const projectId = params?.projectId;
-    if (!flowId) {
+    const id = params?.flowId;
+    if (!id) {
         navigateTo('flows');
         return;
     }
+    flowId = id;
+    projectId = params?.projectId;
     const host = $required(
         '#flow-stats', document,
     );
 
+    await load(host);
+    // Cross-tab flow edits ring the same flowChanges bell
+    // the designer trusts. This page has no edit mode to
+    // protect, so a re-load from the server is the whole
+    // response — the selected path and pinned node reset
+    // with it.
+    subscribeFlowChanges(() => {
+        void load(host);
+    });
+}
+
+async function load(host: HTMLElement): Promise<void> {
     await loadInto({
         container: host,
         skeleton: buildSkeleton('detail', 1),
@@ -137,8 +160,9 @@ export async function init(
             };
             presenter.renderUpdate(host, ui);
 
-            const ctrl = new AbortController();
-            const { signal } = ctrl;
+            cardListeners?.abort();
+            cardListeners = new AbortController();
+            const { signal } = cardListeners;
 
             host.addEventListener(
                 'mouseover',

@@ -4,7 +4,7 @@ import {
     assertStrictEquals,
     assertThrows,
 } from '@std/assert';
-import { deriveRecordStateHistory } from
+import { deriveRecordTypeStateHistory } from
     '../api/derive-record-types.ts';
 import {
     memoryDbAdapter,
@@ -140,7 +140,7 @@ Deno.test('postRecordDocumentOp genesis (head-absent) returns the'
 async () => {
     const db = await freshDb();
     // Phase Final Task 2: states ROW half stripped — pair
-    // required for deriveRecordStateHistory to see genesis.
+    // required for deriveRecordTypeStateHistory to see genesis.
     const body = {
         ...recordDocument('Fresh', 'active', AT, 'ev-1'),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
@@ -166,7 +166,7 @@ async () => {
     assertStrictEquals(written.name, 'Fresh');
     assertStrictEquals(written.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
     // Phase Final Stage B: records table retired.
-    const events = await deriveRecordStateHistory(db
+    const events = await deriveRecordTypeStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'rbfHGatkwQzGZJVXKJEeyw');
     assertStrictEquals(events.length, 1);
     assertStrictEquals(events[0]!.state, 'active');
@@ -223,7 +223,7 @@ async () => {
         },
         'member-b',
     );
-    const events = await deriveRecordStateHistory(db
+    const events = await deriveRecordTypeStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'rcaSzEaORBkezCxyhLhecA');
     assertStrictEquals(events.length, 1);
     assertStrictEquals(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
@@ -286,7 +286,7 @@ Deno.test('postRecordDocumentOp with a fresh trio posts a'
         db, 'rlBnfIvzDVVZeVSjBECxGg', secondBody, 'XXZruirZyAOoRpNxaDnpSA'
             , secondMessagePair,
     );
-    const events = await deriveRecordStateHistory(db
+    const events = await deriveRecordTypeStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'rlBnfIvzDVVZeVSjBECxGg');
     assertEquals(
         events.map(e => e.state).toSorted(),
@@ -326,7 +326,7 @@ Deno.test('a byte-identical resend replays the stored response:'
             token, body,
         ),
     );
-    const events = await deriveRecordStateHistory(db
+    const events = await deriveRecordTypeStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'sBdXBQtlujsRkbzspdvfFg');
     assertStrictEquals(events.length, 1);
     assertStrictEquals((await db.messagePairs.getAll()).length, 3);

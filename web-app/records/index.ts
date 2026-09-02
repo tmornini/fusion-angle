@@ -64,7 +64,7 @@ export async function init(): Promise<void> {
                 $(
                     '#create-record-btn',
                     document,
-                )?.remove();
+                )?.classList.add('hidden');
                 subscribeOnce(
                     subscribeRecordChanges, init,
                 );
@@ -91,6 +91,11 @@ function onRecordsLoaded(
     records: RecordWithCounts[],
     recordsListEl: HTMLElement,
 ): void {
+    // The button is static markup: the empty render hides it
+    // (onEmpty) and a populated one shows it again, so the
+    // empty→populated re-init keeps its CTA.
+    $('#create-record-btn', document)
+        ?.classList.remove('hidden');
     recordState =
         buildInitialRecordListState(records);
     listEl = recordsListEl;

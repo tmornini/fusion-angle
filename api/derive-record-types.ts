@@ -181,18 +181,3 @@ export async function requireRecordTypeExists(
 ): Promise<void> {
     await deriveRecordTypeEntity(db, organization, id);
 }
-
-// Flat-window history helper kept as a thin alias of the
-// nested type history walk (same prefix, same reduction).
-// Call sites that still name deriveRecordStateHistory
-// (adapters, drift pins) keep compiling; wire history is
-// RECORD_TYPE_VERSIONS_PATTERN only after Task 23.
-export async function deriveRecordStateHistory(
-    db: DbAdapter,
-    organization: Id,
-    recordId: Id,
-): Promise<StateEntity[]> {
-    return deriveRecordTypeStateHistory(
-        db, organization, recordId,
-    );
-}

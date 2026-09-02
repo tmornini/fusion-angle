@@ -375,7 +375,7 @@ Deno.test(
 Deno.test(
     'OrganizationPresenter.buildPage renders'
     + ' overview stats and usage bars with'
-    + ' XXZruirZyAOoRpNxaDnpSA/limit values',
+    + ' current/limit values',
     () => {
         const out = new OrganizationPresenter(
             makeOrganization(), makeStats(),

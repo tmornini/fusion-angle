@@ -356,10 +356,10 @@ async () => {
     };
     const tok = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , 'BBjWJsjYIDkTRKIIPrzWRw');
-    const rOEPOcVMQdJiiiMuiiEhlg = await handleRequest(
+    const r1 = await handleRequest(
         db, req('POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
             tok, body));
-    assertStrictEquals(rOEPOcVMQdJiiiMuiiEhlg.status, 200);
+    assertStrictEquals(r1.status, 200);
     const r2 = await handleRequest(
         db, req('POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
             tok, body));
@@ -501,11 +501,11 @@ async () => {
         eventId: EV_R_IDEM,
         at: REVOKE_AT,
     };
-    const rOEPOcVMQdJiiiMuiiEhlg = await handleRequest(db, req(
+    const r1 = await handleRequest(db, req(
         'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
             + 'itekPiJIBiPQhcZveiqTKw',
         tok, revBody));
-    assertStrictEquals(rOEPOcVMQdJiiiMuiiEhlg.status, 204);
+    assertStrictEquals(r1.status, 204);
     const r2 = await handleRequest(db, req(
         'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
             + 'itekPiJIBiPQhcZveiqTKw',

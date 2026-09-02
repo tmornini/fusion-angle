@@ -92,8 +92,6 @@ export class FlowStatsPresenter {
             'page-title'
             + ' flow-stats-flow-name'
         }"></h1>
-        <p class="flow-stats-flow-desc"
-        ></p>
     </div>
     <div class="flow-stats-window-badge"
     >Trailing 90 days</div>
@@ -212,7 +210,7 @@ ${this.buildLegend()}${footnote}</div>`;
         setHtml(container, this.buildShell());
         // The aggregate is deliberately
         // flow-name-agnostic; the page module
-        // sets these from the FlowGraph it
+        // sets it from the FlowGraph it
         // already holds (Task 18).
         const nameEl = $(
             '.flow-stats-flow-name', container,
@@ -220,13 +218,6 @@ ${this.buildLegend()}${footnote}</div>`;
         if (nameEl) {
             nameEl.textContent =
                 this.#flowName();
-        }
-        const descEl = $(
-            '.flow-stats-flow-desc', container,
-        );
-        if (descEl) {
-            descEl.textContent =
-                this.#flowDesc();
         }
     }
 
@@ -411,8 +402,7 @@ ${this.buildLegend()}${footnote}</div>`;
         return null;
     }
 
-    // Stubs — page module fills these from
+    // Stub — the page module fills the name from
     // the FlowGraph it already holds (Task 18).
     #flowName(): string { return ''; }
-    #flowDesc(): string { return ''; }
 }

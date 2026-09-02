@@ -26,7 +26,7 @@ import { deriveIdeaStateHistory } from
     '../api/derive-ideas.ts';
 import { deriveProjectStateHistory } from
     '../api/derive-projects.ts';
-import { deriveRecordStateHistory } from
+import { deriveRecordTypeStateHistory } from
     '../api/derive-record-types.ts';
 import { deriveFlowStateHistory } from
     '../api/derive-flows.ts';
@@ -169,7 +169,7 @@ async function entityHistory(
     ] = await Promise.all([
         deriveIdeaStateHistory(db, organization, entityId),
         deriveProjectStateHistory(db, organization, entityId),
-        deriveRecordStateHistory(db, organization, entityId),
+        deriveRecordTypeStateHistory(db, organization, entityId),
         deriveFlowStateHistory(db, organization, entityId),
         deriveObjectiveStateHistory(
             db, organization, entityId,

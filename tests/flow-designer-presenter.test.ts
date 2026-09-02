@@ -353,7 +353,7 @@ Deno.test(
 // in this file.
 //
 // Locked-state coverage of withNodeMemberIds is
-// manual (TEST-PLAN F51). The presenter's
+// manual (TEST-PLAN F62). The presenter's
 // #guardLocked() invokes showToast(), which
 // depends on document — no DOM under
 // Deno.test.

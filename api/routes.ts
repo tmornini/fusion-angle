@@ -2557,12 +2557,14 @@ export async function postFlowWorkOrderDocumentOp(
 // successBody forms the wire bytes; the reconstructed return
 // is for below-facade callers and type parity. `messagePair` is
 // optional. The actor parameter is spelled `_actor`: no state
-// event here to author.
+// event here to author. `organization` is the verified token
+// claim the record probe reads in.
 export async function postFlowRecordDocumentOp(
     db: DbAdapter,
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
+    organization: Id,
     messagePair?: MessagePair,
 ): Promise<FlowRecordEntity> {
     const entity = flowRecordEntityOf({
@@ -2571,10 +2573,26 @@ export async function postFlowRecordDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
+    const recordsPrefix = recordTypesUriPrefix(organization);
     return db.transaction(
         // Phase Final Task 2: flow_records ROW half stripped.
         MESSAGE_TABLES,
         async (view) => {
+            // Record miss is EntityNotFoundError (404) —
+            // never missedReadError (would 403 foreign and
+            // create an existence oracle; W1 / W7), the
+            // work-order binding's instance-probe posture.
+            const recordHead = deriveDocumentsAt(
+                await view.messagePairs.getAllAtAddress(
+                    recordsPrefix, entity.record_id,
+                ),
+                recordsPrefix,
+            ).get(entity.record_id);
+            if (recordHead === undefined) {
+                throw new EntityNotFoundError(
+                    'records', entity.record_id,
+                );
+            }
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
             }
@@ -5535,9 +5553,10 @@ export const routes: Route[] = [
                 db, requireOrganization(organization),
                 param(p, 1), param(p, 2),
             ),
-        put: (db, p, body, actor, messagePair) =>
+        put: (db, p, body, actor, messagePair, organization) =>
             postFlowRecordDocumentOp(
-                db, param(p, 2), body, actor, messagePair,
+                db, param(p, 2), body, actor,
+                requireOrganization(organization), messagePair,
             ),
         // Phase Final Task 2: flow_records ROW half stripped —
         // DELETE is a pure message-plane tombstone append.

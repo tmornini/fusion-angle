@@ -439,14 +439,14 @@ export async function versionSnapshotsAt(
     prefix: string,
     id: Id,
     toEntity: (document: DerivedDocument) => object,
-): Promise<unknown[]> {
+): Promise<Record<string, unknown>[]> {
     const stored = await messageStore(db).getMessagePairs(
         prefix, id,
     );
     const messagePairs = documentMessagePairsAt(
         stored, prefix,
     ).filter((messagePair) => messagePair.uriId === id);
-    const snapshots: unknown[] = [];
+    const snapshots: Record<string, unknown>[] = [];
     for (const messagePair of messagePairs.toReversed()) {
         if (messagePair.method !== PUT_METHOD) continue;
         snapshots.push({

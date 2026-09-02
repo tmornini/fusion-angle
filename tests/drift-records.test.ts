@@ -41,7 +41,8 @@ import {
     deriveFlowRecords,
     deriveFlowRecord,
 } from '../api/derive-flow-records.ts';
-import { deriveRecordStateHistory } from '../api/derive-record-types.ts';
+import { deriveRecordTypeStateHistory } from
+    '../api/derive-record-types.ts';
 import { resolveGlobalOwner } from '../api/derive-states.ts';
 import {
     customerProfileRecordId,
@@ -885,7 +886,7 @@ async () => {
 
     // Phase Final Task 2: states ROW half stripped — history
     // is message-plane only.
-    const derivedHistory = await deriveRecordStateHistory(
+    const derivedHistory = await deriveRecordTypeStateHistory(
         db, STARK_ORGANIZATION, recordId,
     );
     assertStrictEquals(derivedHistory.length, 3);
@@ -1126,7 +1127,7 @@ Deno.test('GET record trio is lifecycle-current under clock skew'
                 + '/record-types/' + recordId, token),
     );
     assertStrictEquals(res.status, 404);
-    const history = await deriveRecordStateHistory(
+    const history = await deriveRecordTypeStateHistory(
         db, STARK_ORGANIZATION, recordId,
     );
     assertEquals(

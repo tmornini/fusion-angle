@@ -154,9 +154,23 @@ function bindAddIdentityDialog(): void {
     $required('#add-identity-btn', document)
         .addEventListener(
             'click',
-            () => { pendingIdentityId = null; },
+            () => {
+                pendingIdentityId = null;
+                clearAddIdentityFields();
+            },
             { signal },
         );
+}
+
+// The dialog's inputs are static markup, so a cancelled,
+// escaped, or submitted session would greet the next one with
+// last time's text. Open is the one path all three share.
+function clearAddIdentityFields(): void {
+    $input('#id-name', document)!.value = '';
+    $input('#id-email', document)!.value = '';
+    $input('#id-phone', document)!.value = '';
+    $textarea('#id-bio', document)!.value = '';
+    $input('#svc-secret', document)!.value = '';
 }
 
 function onKindRadioChange(e: Event): void {

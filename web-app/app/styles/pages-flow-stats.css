@@ -67,11 +67,6 @@ html[data-page="flow-stats"] #flow-stats {
     margin: 0;
     font-size: var(--text-2xl);
 }
-.flow-stats-flow-desc {
-    margin: 0;
-    font-size: var(--text-sm);
-    color: hsl(var(--muted-foreground));
-}
 .flow-stats-window-badge {
     flex-shrink: 0;
     font-size: var(--text-xs);

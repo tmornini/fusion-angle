@@ -18,6 +18,7 @@ import {
 import {
     putWorkOrder,
 } from '../web-app/app/adapters/work-orders-mutations.ts';
+import { putRecord } from '../web-app/app/adapters/records.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     type WorkOrderFlowGraph,
@@ -91,11 +92,27 @@ async function seedWorkOrder(
     );
 }
 
+// The binding PUT probes the bound record's own existence,
+// so every record_id a test binds must be seeded first —
+// the SAME record-types PUT the live route serves, same
+// precedent as seedFlow/seedWorkOrder above.
+async function seedRecord(
+    db: MemoryDbAdapter,
+    id: string,
+): Promise<void> {
+    const ctx = createRequestContext(db, await organizationToken());
+    await putRecord(ctx, id, {
+        name: 'Record', description: '', position: 1,
+        state: 'active',
+    });
+}
+
 Deno.test(
     'putFlowRecord then getRecordForFlow round-trips'
     + ' the binding',
     async () => {
-        const { ctx } = await adminContext();
+        const { db, ctx } = await adminContext();
+        await seedRecord(db, 'rbfHGatkwQzGZJVXKJEeyw');
         await putFlowRecord(ctx, 'dCnpryxCNwuTnCrBBDIMOw', {
             flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -112,7 +129,8 @@ Deno.test(
     'getRecordForFlow returns the bound'
     + ' record id, or null if unbound',
     async () => {
-        const { ctx } = await adminContext();
+        const { db, ctx } = await adminContext();
+        await seedRecord(db, 'rbfHGatkwQzGZJVXKJEeyw');
         await putFlowRecord(ctx, 'dCnpryxCNwuTnCrBBDIMOw', {
             flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -140,6 +158,7 @@ Deno.test(
         await seedWorkOrder(
             db, workOrderId, 'A001', 'aEsGMmBEFaVdWihhHXwCbw', 1,
         );
+        await seedRecord(db, 'rbfHGatkwQzGZJVXKJEeyw');
         await putFlowRecord(ctx, 'dCnpryxCNwuTnCrBBDIMOw', {
             flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -158,7 +177,8 @@ Deno.test(
     'getRecordForWorkOrder returns null for a'
     + ' work order with no flow link',
     async () => {
-        const { ctx } = await adminContext();
+        const { db, ctx } = await adminContext();
+        await seedRecord(db, 'rbfHGatkwQzGZJVXKJEeyw');
         await putFlowRecord(ctx, 'dCnpryxCNwuTnCrBBDIMOw', {
             flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -202,6 +222,9 @@ Deno.test(
         await seedFlow(db, flowA, 'Alpha');
         await seedFlow(db, flowB, 'Beta');
         await seedFlow(db, flowC, 'Gamma');
+        const otherRecord = generateIdentifier();
+        await seedRecord(db, 'rbfHGatkwQzGZJVXKJEeyw');
+        await seedRecord(db, otherRecord);
         await putFlowRecord(ctx, generateIdentifier(), {
             flow_id: flowA,
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -214,7 +237,7 @@ Deno.test(
         });
         await putFlowRecord(ctx, generateIdentifier(), {
             flow_id: flowC,
-            record_id: generateIdentifier(),
+            record_id: otherRecord,
             at: AT,
         });
         const flows =
@@ -249,6 +272,7 @@ Deno.test(
         const flowB = generateIdentifier();
         const woA = generateIdentifier();
         const woB = generateIdentifier();
+        await seedRecord(db, 'rbfHGatkwQzGZJVXKJEeyw');
         await putFlowRecord(ctx, generateIdentifier(), {
             flow_id: flowA,
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -299,7 +323,8 @@ Deno.test(
 Deno.test(
     'deleteFlowRecord removes the binding row',
     async () => {
-        const { ctx } = await adminContext();
+        const { db, ctx } = await adminContext();
+        await seedRecord(db, 'rbfHGatkwQzGZJVXKJEeyw');
         await putFlowRecord(ctx, 'dCnpryxCNwuTnCrBBDIMOw', {
             flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',

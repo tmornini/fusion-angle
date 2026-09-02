@@ -24,6 +24,15 @@
     .detail-grid { grid-template-columns: 1fr !important; }
     .gauge-grid { grid-template-columns: 1fr; }
     .objective-aggregates-card { width: auto; }
+    /* The aggregates row's two fixed columns outgrow a
+        narrow phone; put label and gauge on one line and
+        the sparkline full-width beneath. */
+    .objective-aggregates-card .score-row {
+        grid-template-columns: minmax(0, 1fr) 110px;
+    }
+    .objective-aggregates-card .score-row-sparkline {
+        grid-column: 1 / -1;
+    }
 }
 
 /* Reduced motion */

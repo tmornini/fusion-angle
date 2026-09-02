@@ -1028,7 +1028,7 @@ Deno.test(
         assertNotStrictEquals(
             rows[0]!.etag, rows[1]!.etag,
         );
-        assert(rows[0]!.at >= rows[1]!.at);
+        assert(rows[0]!.at > rows[1]!.at);
         assertStrictEquals(typeof rows[0]!.member_id, 'string');
         assertNotStrictEquals(rows[0]!.member_id, '');
         assertStrictEquals(

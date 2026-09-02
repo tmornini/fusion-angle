@@ -879,7 +879,7 @@ function invitationDocumentEntity(
 async function invitationVersionSnapshots(
     db: DbAdapter,
     id: Id,
-): Promise<unknown[]> {
+): Promise<Record<string, unknown>[]> {
     return versionSnapshotsAt(
         db, INVITATIONS_STORAGE_PREFIX, id,
         invitationDocumentEntity,

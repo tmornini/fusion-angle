@@ -58,6 +58,7 @@ import {
 } from '../app/flow-gesture-render.ts';
 import {
     FlowDesignerPresenter,
+    bindableRecords,
     buildInitialFlowSnapshot,
     type FlowSnapshot,
 } from '../app/presenters/index.ts';
@@ -1429,7 +1430,9 @@ function renderBindingSlot(
         '.flow-binding-slot', container,
     );
     if (!slot) return;
-    const sorted = [...records].toSorted(
+    const sorted = bindableRecords(
+        records, boundRecordId,
+    ).toSorted(
         (a, b) => a.name.localeCompare(b.name),
     );
     setHtml(

@@ -1094,8 +1094,8 @@ async () => {
         },
     );
     const password = UNSEATED_PASSWORD;
-    const gOrganization = STARK;
-    const gAdmin = STARK_ADMIN;
+    const starkOrganization = STARK;
+    const starkAdmin = STARK_ADMIN;
     const verifier = 'pkce-verifier-unseated';
     const challenge = await s256Challenge(verifier);
     const authorized = await handleRequest(
@@ -1181,20 +1181,20 @@ async () => {
     assertStrictEquals(
         refreshedClaims.organizations, undefined,
     );
-    const gAdminToken = await claimToken({
-        sub: gAdmin,
-        organization: gOrganization,
-        organizations: [gOrganization],
-        roles: ['admin:' + gOrganization],
+    const starkAdminToken = await claimToken({
+        sub: starkAdmin,
+        organization: starkOrganization,
+        organizations: [starkOrganization],
+        roles: ['admin:' + starkOrganization],
     });
     const granted = await handleRequest(db, new Request(
-        `${BASE}/organizations/` + gOrganization
+        `${BASE}/organizations/` + starkOrganization
             + '/invitations/',
         {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: 'Bearer ' + gAdminToken,
+                Authorization: 'Bearer ' + starkAdminToken,
                 'operation-id': generateIdentifier(),
             },
             body: JSON.stringify({

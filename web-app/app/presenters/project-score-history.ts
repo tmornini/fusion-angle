@@ -137,16 +137,9 @@ export class ProjectScoreHistoryPresenter {
         }</td>`;
         switch (e.kind) {
             case 'baseline': {
-                const def = this.#resolver(
+                const def = this.#definitionAt(
                     e.objectiveId, e.at,
                 );
-                if (!def) {
-                    throw new Error(
-                        `objective definition missing `
-                        + `for ${e.objectiveId} at `
-                        + `${e.at}`,
-                    );
-                }
                 return html`<tr>
                     ${dateCell}
                     ${whoCell}
@@ -158,16 +151,9 @@ export class ProjectScoreHistoryPresenter {
                 </tr>`;
             }
             case 'actual': {
-                const def = this.#resolver(
+                const def = this.#definitionAt(
                     e.objectiveId, e.at,
                 );
-                if (!def) {
-                    throw new Error(
-                        `objective definition missing `
-                        + `for ${e.objectiveId} at `
-                        + `${e.at}`,
-                    );
-                }
                 return html`<tr>
                     ${dateCell}
                     ${whoCell}
@@ -187,16 +173,9 @@ export class ProjectScoreHistoryPresenter {
                     <td>renamed/edited</td>
                 </tr>`;
             case 'archival': {
-                const def = this.#resolver(
+                const def = this.#definitionAt(
                     e.objectiveId, e.at,
                 );
-                if (!def) {
-                    throw new Error(
-                        `objective definition missing `
-                        + `for ${e.objectiveId} at `
-                        + `${e.at}`,
-                    );
-                }
                 return html`<tr>
                     ${dateCell}
                     ${whoCell}
@@ -206,16 +185,9 @@ export class ProjectScoreHistoryPresenter {
                 </tr>`;
             }
             case 'reactivation': {
-                const def = this.#resolver(
+                const def = this.#definitionAt(
                     e.objectiveId, e.at,
                 );
-                if (!def) {
-                    throw new Error(
-                        `objective definition missing `
-                        + `for ${e.objectiveId} at `
-                        + `${e.at}`,
-                    );
-                }
                 return html`<tr>
                     ${dateCell}
                     ${whoCell}
@@ -225,5 +197,19 @@ export class ProjectScoreHistoryPresenter {
                 </tr>`;
             }
         }
+    }
+
+    #definitionAt(
+        objectiveId: ObjectiveId,
+        at: string,
+    ): { name: string; description: string } {
+        const def = this.#resolver(objectiveId, at);
+        if (!def) {
+            throw new Error(
+                `objective definition missing `
+                + `for ${objectiveId} at ${at}`,
+            );
+        }
+        return def;
     }
 }

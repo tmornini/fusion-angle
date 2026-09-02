@@ -20,6 +20,7 @@ import type { FlowSummary } from
 import { WorkingStylesPresenter } from
     '../web-app/app/presenters/working-styles.ts';
 import {
+    bindableRecords,
     buildFlowNameHeader,
     buildNodePanel,
     buildEdgePanel,
@@ -34,7 +35,7 @@ import {
     HumanMember, AIMember,
 } from '../api/types.ts';
 import type {
-    GraphNode, GraphEdge,
+    GraphNode, GraphEdge, RecordEntity,
 } from '../api/types.ts';
 import {
     makeHumanMember as buildHumanMember,
@@ -975,6 +976,44 @@ Deno.test(
                 ['a', 'b', 'c'],
             ),
             ['b'],
+        );
+    },
+);
+
+Deno.test(
+    'bindableRecords drops archived records but keeps'
+    + ' the one currently bound',
+    () => {
+        const record = (
+            id: string, state: string,
+        ): RecordEntity => ({
+            id,
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            name: 'Record ' + id,
+            description: '',
+            position: 0,
+            state,
+        });
+        const active = record(
+            'rbfHGatkwQzGZJVXKJEeyw', 'active',
+        );
+        const archived = record(
+            'dCnpryxCNwuTnCrBBDIMOw', 'archived',
+        );
+        const boundArchived = record(
+            'aEsGMmBEFaVdWihhHXwCbw', 'archived',
+        );
+        assertEquals(
+            bindableRecords(
+                [active, archived, boundArchived],
+                boundArchived.id,
+            ).map(r => r.id),
+            [active.id, boundArchived.id],
+        );
+        assertEquals(
+            bindableRecords([active, archived], null)
+                .map(r => r.id),
+            [active.id],
         );
     },
 );

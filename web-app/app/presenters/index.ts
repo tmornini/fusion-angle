@@ -100,6 +100,9 @@ export {
     type FlowSnapshot,
 } from './flow-designer.ts';
 export {
+    bindableRecords,
+} from './flow-designer-view.ts';
+export {
     WorkingStylesPresenter,
 } from './working-styles.ts';
 export {

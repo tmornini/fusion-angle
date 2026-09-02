@@ -90,7 +90,12 @@ spec → plan → ship cycle, implemented sequentially. A
    in-place `viewBox` mutation at four method sites
    (`web-app/app/presenters/flow-designer.ts:537, 556, 1012, 1042`),
    `hasUndoHistory` as `pairs > 1`
-   (`api/derive-flows.ts:108`), rotation only on the
+   (`api/derive-flows.ts:108` — the client's
+   approximation, read by no route; the undo route
+   walks the stack itself and its bottom-of-stack 201
+   is the documented no-op, `api/types.ts:1043-1051`,
+   which TEST-PLAN F36/F45 call PASS — the brainstorm
+   decides whether that stays), rotation only on the
    toggle path (`web-app/app/flow-layout.ts:1032-1037`),
    and the mirror trigger.
 7. Headless AI worker — a server-side process that
@@ -130,20 +135,8 @@ spec → plan → ship cycle, implemented sequentially. A
    guarded by no test); the second instance the
    remediation added (`canvasFocusOf`'s walk); the undo
    path's duplicated pure helpers
-   (`api/flow-graph-diff.ts:16-26`); the dead
-   `FK_SPECIAL` map
-   (`web-app/app/schema-svg.ts:100-110` — remove the
-   comment at `schema-svg.ts:100-110` when done);
-   `callerOrganizationIds`, zero callers
-   (`api/request-auth.ts:189-197` — remove the comment
-   at `request-auth.ts:189-191` when done); the
-   test-only `deriveRecordStateHistory` alias
-   (`api/derive-record-types.ts:185-189` — remove the
-   comment at `derive-record-types.ts:185-189` when
-   done); the `#flowDesc` stub
-   (`web-app/app/presenters/flow-stats.ts:414-417` —
-   remove the comment at `flow-stats.ts:414-415` when
-   done); `toRecordAttribute`'s `??` ACL default
+   (`api/flow-graph-diff.ts:16-26`); `toRecordAttribute`'s
+   `??` ACL default
    (`web-app/app/adapters/record-attributes.ts:76-79`)
    and the two readings of an absent role array
    (`api/routes.ts:843-856, 1000-1005` —
@@ -228,20 +221,15 @@ Off the critical path; each with its oracle.
   still sets `btn.disabled` — two forms, one
   directory, opposite validation voices
   (`web-app/ideas/create.ts:124`,
-  `web-app/ideas/convert.ts:356`;
-  `docs/superpowers/test-plan-mitigations/`
-  `2026-08-26-d-d6.md`)
-- The run-four remediation's remaining seams — the
-  Objectives sparkline track collapses at 304px
-  (`web-app/app/styles/components-metrics.css:80-82`);
-  archived records in the flow-header dropdown
-  (`web-app/flows/detail.ts:1391-1402`,
-  `renderBindingSlot`); Edit rendered for members on
-  record detail
-  (`web-app/app/presenters/record-detail.ts:495-500`);
-  the binding PUT not probing record existence
-  (`api/routes.ts:5583-5586`); R12 without a positive
-  subject; stale G9 / R6 / R7 notes
+  `web-app/ideas/convert.ts:356`). A design call, not
+  a defect: TEST-PLAN D6/D7 pin the toast, and the
+  2026-08-26 D6 stub files the voice question as its
+  separate finding
+- The run-four remediation's remaining seams — R6 and
+  R7, whose "toy" clauses need a Layer 3 observation
+  before any rewrite. G9's staleness was the corrupted
+  test name, restored by the small-items sweep; R12's
+  note is accurate and its gap is the Unpinned entry
 - A replay is indistinguishable from a creation. The
   gate's replay branch renders a previously-stored
   pair but passes `appended: true`
@@ -301,23 +289,20 @@ Off the critical path; each with its oracle.
   remediation design spec, second-commit paragraph
 - Stale-history comment cleanup as one pass — about 35
   code and 32 test comments describe a past state as
-  present; the enumeration is the run-four
-  remediation's Evidence
+  present. The run-four remediation's Evidence
+  (`docs/superpowers/specs/`
+  `2026-08-23-test-plan-run-four-remediation-design.md:911-932`)
+  lists provenance, not comments, and the reproductions
+  that might have were scratchpad, never committed —
+  the pass re-derives its enumeration by reading. The
+  two remaining "remove the comment at … when done"
+  pointers under `## Critical path` are that path's
+  property, not stale
 - Cryptographically verifiable ledger — brainstorm
   hash-and-verify (or sign) of stored pairs. The dropped
   `version` column hashed on write and was never checked
   on read. `request_hash` is replay identity, not
   response integrity — `SCHEMA.md` item 4
-- The add-identity dialog never clears its fields —
-  AA-Obj's stale-state sibling —
-  `web-app/identities/index.ts:213-281`
-- `flows/stats.ts` wires no change subscription; the
-  stats page stays stale until navigation
-- The empty-state `onEmpty` removes the header create
-  button irreversibly; a live empty→populated re-init
-  (run-six Task 9) leaves the list without its header
-  CTA — hide, don't remove —
-  `web-app/ideas/index.ts`, `web-app/records/index.ts`
 - Claim-on-load with no release-on-leave plus the
   8-hour `DEFAULT_LOCK_TIMEOUT` turns a drive-by
   work-order view into an 8-hour claim
@@ -351,18 +336,6 @@ Off the critical path; each with its oracle.
   rendering —
   `web-app/app/adapters/objectives.ts:311`,
   `web-app/projects/detail.ts:318`
-- The resolve-and-throw block in
-  `web-app/app/presenters/project-score-history.ts` is four
-  identical 11-line copies (:139, :161, :182, :201) — a
-  `#definitionAt(objectiveId, at)` helper collapses each
-- `tests/ideas-empty-subscribe.test.ts` enforces its
-  load-bearing property by comment, not assertion: assert
-  the two raw PUTs alone do not wake the page before
-  posting the bell
-- `tests/presenter-project-score-history.test.ts:224,:259`
-  assert substrings the row-selection predicate already
-  implies, leaving the detail cell unpinned — assert
-  `<td>archived</td>`
 - Untested by design after run-six: the records/projects/
   flows `onEmpty` arms (only ideas is pinned), `loadInto`'s
   retry branch, a work order both claimed and completed,
@@ -373,12 +346,6 @@ Off the critical path; each with its oracle.
   its callback synchronously; all thirteen
   `subscribe<Entity>Changes` delegate to `createChannel`,
   so it is inert — guard only if that changes
-- Run-six cosmetics, none load-bearing: `unknown[]`
-  returns now provably narrower
-  (`api/document-family.ts:438,:445`), a non-strict DESC
-  pin (`tests/api-entity-history-routes.test.ts:1033`),
-  and a dead `disconnect()` stub in
-  `tests/ideas-empty-subscribe.test.ts`
 - Node-only modules by directory — once whole-tree type
   checking ships, the browser tsconfig's `exclude` is
   the last hand-kept registry (seven, growing with the
@@ -437,9 +404,9 @@ Off the critical path; each with its oracle.
     --no-zip` into a temp dir; today
     `tests/server-zip-metafile.test.ts` only regex-checks
     the build script's source text
-  - The mock-data reveal's 11 printed lines carry
+  - The mock-data reveal's 12 printed lines carry
     `demo@example.com` and `sarah.chen@company.com` by
-    name, not merely a count of 11 (A3) — Layer 1,
+    name, not merely a count of 12 (A3) — Layer 1,
     `tests/pg-seed.test.ts` `'mock-data seed prints every
     human sign-in'`; every `demo@example.com` assertion
     there sits on a `'bootstrap'` call or the synthetic
@@ -841,9 +808,10 @@ Off the critical path; each with its oracle.
   - The Organization edit form's prefill — the two inputs
     carrying the current Name and Domain as `value`
     attributes (G10) — Layer 1,
-    `tests/presenter-projects-organization.test.ts`;
-    nothing anywhere exercises `toGeneralInfoDraft`
-    (`web-app/app/adapters/admin.ts:58`)
+    `tests/presenter-projects-organization.test.ts`,
+    whose edit-form test already calls
+    `toGeneralInfoDraft` (`web-app/app/adapters/admin.ts:58`)
+    and makes no `value=` assertion
   - The sidebar member chip's click-to-profile navigation
     (G12) — Layer 2; `web-app/app/sidebar-member.ts`
     carries no test, and the browser tests read the
@@ -1116,40 +1084,6 @@ Off the critical path; each with its oracle.
   TEST-PLAN case claims the feedback survives. Oracle: a
   Layer 1 test asserting the typed feedback reaches the
   transition
-- Two corrupted upstream identifiers, from an old
-  id-scrubber. One is a test NAME —
-  `tests/presenter-projects-organization.test.ts:398`
-  says `XXZruirZyAOoRpNxaDnpSA` where it means
-  `current/limit` — and a TEST-PLAN pin quotes it
-  faithfully (`TEST-PLAN.md:4391`), so the name is fixed
-  first and the pin follows in the same commit. The other
-  is a local variable standing for `r1` at four sites in
-  `tests/api-invitations-fence.test.ts` (:360, :363,
-  :505, :509) — `rOEPOcVMQdJiiiMuiiEhlg`, quoted by no
-  pin, so it renames alone
-- Two locals named for a retired section slice —
-  `gOrganization` and `gAdmin`
-  (`tests/api-authentication-token.test.ts:1092-1093`)
-  carry the old Section-G prefix; Commandment III says
-  they read `starkOrganization` and `starkAdmin`. Quoted
-  by no pin, so they rename alone
-- A stale manual-coverage pointer —
-  `tests/flow-designer-presenter.test.ts:352` points its
-  comment at "TEST-PLAN F51"; the locked-members case is
-  F62
-- Two dormant seed map entries still carry the deleted
-  slice seeder's identity `dtmZgnDBlVcoyjxKzlaKgA`
-  ('g-unseated') — `api/mock-data.ts:204`
-  (`SEED_PASSWORD_CREDENTIAL_BY_IDENTITY`) and
-  `api/mock-data/seed-hash-preimage.ts:175`. Pruning
-  them was out of the three-layers spec's scope
-- Undo at the stack bottom returns 201 — `api/derive-flows.ts`
-  computes `hasUndoHistory` as `pairs > 1`, so the first undo
-  past the bottom is accepted instead of refused. Named by
-  the 2026-08-29 three-layers audit; observed in the F
-  undo/redo cases. Oracle: a Layer 1 test in
-  `tests/flow-operations.test.ts` asserting the bottom-of-stack
-  undo is refused.
 - The first click after a page reload only focuses the window
   — the focusing click is the viewport center, never the
   top-left brand (that is the Apple menu when Chrome is

@@ -382,7 +382,7 @@ Deno.test(
             },
             '2026-01-01T00:00:00.000000Z',
         );
-        const rOEPOcVMQdJiiiMuiiEhlg = await appendInstancePair(
+        const r1 = await appendInstancePair(
             db, INST_A, 'PUT',
             {
                 values: [
@@ -409,7 +409,7 @@ Deno.test(
             val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
         assertStrictEquals(
-            revisions[1]!.messagePairId, rOEPOcVMQdJiiiMuiiEhlg,
+            revisions[1]!.messagePairId, r1,
         );
         assertEquals(revisions[1]!.values, [
             val('a', '3'),

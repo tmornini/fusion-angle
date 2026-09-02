@@ -185,13 +185,13 @@ Deno.test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'cGVtCERtMGxhyNGAsQBBuQ');
-    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, token
+    const r1 = await headResponseId(db, token
         , 'cGVtCERtMGxhyNGAsQBBuQ');
 
     const first = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'cGVtCERtMGxhyNGAsQBBuQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
-        { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
+        { flow_response_id: r1 },
     ));
     assertStrictEquals(first.status, 201);
     const firstId = first.headers.get('Response-ID');
@@ -215,7 +215,7 @@ Deno.test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
     ));
     assertStrictEquals(saved.status, 201);
     const r2 = await headResponseId(db, token, 'cGVtCERtMGxhyNGAsQBBuQ');
-    assertNotStrictEquals(r2, rOEPOcVMQdJiiiMuiiEhlg);
+    assertNotStrictEquals(r2, r1);
 
     const second = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
@@ -240,13 +240,13 @@ Deno.test('e2e: DELETE marks the tag — GET 404s after, and the'
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'cKweIyGvtrOHqQULtGJUZQ');
-    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, token
+    const r1 = await headResponseId(db, token
         , 'cKweIyGvtrOHqQULtGJUZQ');
 
     const put = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'cKweIyGvtrOHqQULtGJUZQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
-        { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
+        { flow_response_id: r1 },
     ));
     assertStrictEquals(put.status, 201);
 
@@ -282,14 +282,14 @@ Deno.test('e2e: a malformed tag body (extra key) 400s and stores'
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'cOOLmJXlyeYuFYrSofTRmw');
-    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, token
+    const r1 = await headResponseId(db, token
         , 'cOOLmJXlyeYuFYrSofTRmw');
     const before = await db.messagePairs.getAll();
 
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'cOOLmJXlyeYuFYrSofTRmw/tags/xDyDkxEPwtcNmJVknUHDsg', token,
-        { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg, extra: 'nope' },
+        { flow_response_id: r1, extra: 'nope' },
     ));
     assertStrictEquals(res.status, 400);
     const after = await db.messagePairs.getAll();
@@ -302,7 +302,7 @@ Deno.test('e2e: a malformed tag name (disallowed characters) 400s'
     const token = await organizationToken();
     const flowId = generateIdentifier();
     await createFlow(db, token, flowId);
-    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(
+    const r1 = await headResponseId(
         db, token, flowId,
     );
     const before = await db.messagePairs.getAll();
@@ -311,7 +311,7 @@ Deno.test('e2e: a malformed tag name (disallowed characters) 400s'
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + flowId + '/tags/'
             + 'not%20ok', token,
-        { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
+        { flow_response_id: r1 },
     ));
     assertStrictEquals(res.status, 400);
     const after = await db.messagePairs.getAll();
@@ -327,14 +327,14 @@ Deno.test('e2e: a member-role identity (not just admin) can'
     const memberToken = await organizationToken('toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
     await createFlow(db, adminToken, 'cYEjfPMQAquxhDuXSIHlAQ');
-    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, adminToken
+    const r1 = await headResponseId(db, adminToken
         , 'cYEjfPMQAquxhDuXSIHlAQ');
 
     const put = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'cYEjfPMQAquxhDuXSIHlAQ/tags/xDyDkxEPwtcNmJVknUHDsg'
             , memberToken,
-        { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
+        { flow_response_id: r1 },
     ));
     assertStrictEquals(put.status, 201);
 
@@ -361,19 +361,19 @@ Deno.test('e2e: two different tag names PUT concurrently on one flow'
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'cZEsJjunHJduajRIcdmmuw');
-    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, token
+    const r1 = await headResponseId(db, token
         , 'cZEsJjunHJduajRIcdmmuw');
 
     const [a, b] = await Promise.all([
         handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'cZEsJjunHJduajRIcdmmuw/tags/alpha', token,
-            { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
+            { flow_response_id: r1 },
         )),
         handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'cZEsJjunHJduajRIcdmmuw/tags/beta', token,
-            { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
+            { flow_response_id: r1 },
         )),
     ]);
     assertStrictEquals(a.status, 201);
@@ -405,13 +405,13 @@ Deno.test('e2e: a tag written once still resolves to the EXACT'
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'cadVHBQlvTvWsTriyDUeTQ');
-    const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, token
+    const r1 = await headResponseId(db, token
         , 'cadVHBQlvTvWsTriyDUeTQ');
 
     const tagged = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'cadVHBQlvTvWsTriyDUeTQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
-        { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
+        { flow_response_id: r1 },
     ));
     assertStrictEquals(tagged.status, 201);
 
@@ -429,7 +429,7 @@ Deno.test('e2e: a tag written once still resolves to the EXACT'
     ));
     assertStrictEquals(save2.status, 201);
     const r2 = await headResponseId(db, token, 'cadVHBQlvTvWsTriyDUeTQ');
-    assertNotStrictEquals(r2, rOEPOcVMQdJiiiMuiiEhlg);
+    assertNotStrictEquals(r2, r1);
 
     const save3 = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
@@ -454,7 +454,7 @@ Deno.test('e2e: a tag written once still resolves to the EXACT'
     assertStrictEquals(get.status, 200);
     const body = await get.json() as { flow_response_id: string };
     assertStrictEquals(
-        body.flow_response_id, rOEPOcVMQdJiiiMuiiEhlg,
+        body.flow_response_id, r1,
         'the tag must still name the ORIGINAL pinned response,'
         + ' never the flow\'s current head',
     );

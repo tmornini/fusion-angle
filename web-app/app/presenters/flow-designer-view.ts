@@ -26,6 +26,10 @@ import {
     AIMember,
     MEMBER_WITHOUT_PII_NAME,
 } from '../adapters/index.ts';
+import type {
+    RecordEntity,
+    RecordId,
+} from '../../../api/types.ts';
 
 export function buildAttributeRefRow(
     ref: NodeAttribute,
@@ -437,4 +441,18 @@ class="flow-toolbar">
     }>${iconTrash(ICON_SIZE.lg, '')}</button>
 </div>
 </div>`;
+}
+
+// The records a flow's binding <select> offers: every live
+// record, plus the record currently bound whatever its
+// state, so the control keeps showing the truth and a change
+// event cannot silently unbind an archived record.
+export function bindableRecords(
+    records: readonly RecordEntity[],
+    boundRecordId: RecordId | null,
+): RecordEntity[] {
+    return records.filter(
+        r => r.state !== 'archived'
+            || r.id === boundRecordId,
+    );
 }

@@ -262,9 +262,26 @@ function bindAddMemberDialog(): void {
     $required('#add-member-btn', document)
         .addEventListener(
             'click',
-            () => { pendingMemberId = null; },
+            () => {
+                pendingMemberId = null;
+                clearAddMemberFields();
+            },
             { signal },
         );
+}
+
+// The dialog's inputs are static markup, so a cancelled,
+// escaped, or submitted session would greet the next one with
+// last time's text. Open is the one path all three share.
+function clearAddMemberFields(): void {
+    $input('#hw-name', document)!.value = '';
+    $input('#hw-email', document)!.value = '';
+    $input('#hw-title', document)!.value = '';
+    $input('#hw-phone', document)!.value = '';
+    $textarea('#hw-bio', document)!.value = '';
+    $input('#ai-name', document)!.value = '';
+    $textarea('#ai-description', document)!.value = '';
+    $textarea('#ai-skill-focus', document)!.value = '';
 }
 
 function bindInviteMemberDialog(): void {

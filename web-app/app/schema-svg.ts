@@ -96,18 +96,6 @@ function splitTopLevel(
     return out;
 }
 
-// _id columns whose target table the name convention cannot
-// reach: attribute_id points at record_attributes (the column name
-// predates Records); state_event_id points at states;
-// from_node_id / to_node_id point at flow_nodes (the from_/to_
-// prefix hides the noun the convention would pluralize).
-const FK_SPECIAL: Record<string, string> = {
-    attribute_id: 'record_attributes',
-    state_event_id: 'states',
-    from_node_id: 'flow_nodes',
-    to_node_id: 'flow_nodes',
-};
-
 // Branded id types that name their home table. A detail row whose
 // own `id` carries one of these is a shared-primary-key reference
 // to that parent (human_members.id: MemberId -> members).
@@ -209,8 +197,6 @@ function fkTarget(
         return t && t !== table ? t : null;
     }
     if (!col.endsWith('_id')) return null;
-    const special = FK_SPECIAL[col];
-    if (special) return special;
     const target = col.slice(0, -3) + 's';
     return tables.has(target) ? target : null;
 }

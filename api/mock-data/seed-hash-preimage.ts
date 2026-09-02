@@ -172,7 +172,6 @@ export const SEED_HASH_PREIMAGE: Readonly<
     'dqyTeecJBQmttvQWXErnRg': 'r-attr-2',
     'dRQPLUPyeWHegZWFDAIEAQ': 'fwVQwEUQ8xG4McvCnNVFIV',
     'dSbcrUIZTpJuBJzPxrfrRA': 'aa-attr-2',
-    'dtmZgnDBlVcoyjxKzlaKgA': 'g-unseated',
     'dTTlFfPlPlCDQWBsshUFsA': 'fwo-',
     'DuDIopZiMzfiZcqbMPnBqg': '8woeY7cfbuSKMFI4wMrQZH',
     'DWazojgdJiAZiXrpYnftEQ': 'g-edge-submit',

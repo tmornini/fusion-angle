@@ -272,10 +272,24 @@ async () => {
     const { db, token } = await freshDb();
     const flowId = generateIdentifier();
     const frid = generateIdentifier();
+    const recordId = generateIdentifier();
     await createFlow(db, token, flowId, generateIdentifier());
+    // The binding PUT probes the bound record's own
+    // existence, so it must be seeded first.
+    const seededRecord = await handleRequest(db, req(
+        'PUT',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + recordId,
+        token,
+        {
+            name: 'G6 Record', description: '', position: 1,
+            state: 'active',
+        },
+    ));
+    assertStrictEquals(seededRecord.status, 201);
     const fields = {
         flow_id: flowId,
-        record_id: generateIdentifier(),
+        record_id: recordId,
         at: AT,
     };
     const put = await handleRequest(db, req(

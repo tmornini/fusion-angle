@@ -9,6 +9,7 @@ import {
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
+    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
@@ -128,6 +129,35 @@ async function seedWorkOrder(
     });
 }
 
+// The binding PUT and the attribute PUT (below) both need
+// their record to exist first. Guarded ensure-exists —
+// GET, and on miss the composed create op with its
+// initialState 'active' state event — is the ONE creation
+// path both share, so neither shadows the other with a
+// second, bare-PUT creation route.
+async function ensureRecord(
+    ctx: RequestContext,
+    recordId: string,
+): Promise<void> {
+    try {
+        await ctx.GET(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + recordId,
+        );
+    } catch {
+        await postRecordChange(ctx, recordId, {
+            kind: 'create',
+            record: {
+                name: recordId,
+                description: '',
+                position: 1,
+            },
+            attributes: [],
+            initialState: 'active',
+        });
+    }
+}
+
 // NAMED re-pin (Task 7): the flipped GET
 // organizations/:id/flows/:id/records derives from the
 // message ledger too, the SAME reason as seedFlowLink's
@@ -141,6 +171,9 @@ async function seedBinding(
     recordId: string,
 ): Promise<void> {
     const ctx = createRequestContext(db, await organizationToken());
+    // The binding PUT probes the bound record's own
+    // existence, so it must be seeded first.
+    await ensureRecord(ctx, recordId);
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
             + '/records/' + generateIdentifier(),
@@ -209,23 +242,7 @@ async function seedAttribute(
     const ctx = createRequestContext(
         db, await organizationToken(),
     );
-    try {
-        await ctx.GET(
-            'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + recordId,
-        );
-    } catch {
-        await postRecordChange(ctx, recordId, {
-            kind: 'create',
-            record: {
-                name: recordId,
-                description: '',
-                position: 1,
-            },
-            attributes: [],
-            initialState: 'active',
-        });
-    }
+    await ensureRecord(ctx, recordId);
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
         + recordId

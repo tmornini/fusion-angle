@@ -215,7 +215,7 @@ Deno.test(
         ));
         assert(row.includes('Sarah Lee'));
         assert(row.includes('Drive Growth'));
-        assert(row.includes('archived'));
+        assert(row.includes('<td>archived</td>'));
         assert(
             !row.includes('—'),
             'no em-dash resignation',
@@ -250,7 +250,7 @@ Deno.test(
         ));
         assert(row.includes('Sarah Lee'));
         assert(row.includes('Drive Growth'));
-        assert(row.includes('reactivated'));
+        assert(row.includes('<td>reactivated</td>'));
     },
 );
 

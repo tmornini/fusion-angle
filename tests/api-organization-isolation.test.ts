@@ -508,7 +508,7 @@ async function seedChain(
     // derives from the message ledger too, the SAME reason as
     // the flow-work-order join above — a raw db.flowRecords.put
     // leaves no pair at this address.
-    await handleRequest(db, req(
+    const bindingWrite = await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
             + '/flows/' + ids.flow
@@ -519,6 +519,7 @@ async function seedChain(
             at: T8_AT,
         },
     ));
+    assertStrictEquals(bindingWrite.status, 201);
     // Phase Final Stage B: idea_submissions table retired —
     // seed through the live nested PUT so the message plane owns
     // the leaf (same shape as objective_revisions below).

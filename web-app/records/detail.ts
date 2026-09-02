@@ -211,6 +211,7 @@ async function load(
                 attributes: loaded.attributes,
                 boundFlows: loaded.flows,
                 workOrders: loaded.workOrders,
+                roles: heldRoles(),
             });
             render(root);
             bindActions(root);
@@ -236,6 +237,7 @@ function render(root: HTMLElement): void {
         attributes: currentView.attributes,
         boundFlows: currentView.boundFlows,
         workOrders: currentView.workOrders,
+        roles: currentView.roles,
     });
     const presenter =
         new RecordDetailPresenter(currentView);

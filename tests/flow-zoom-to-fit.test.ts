@@ -171,19 +171,19 @@ Deno.test(
         const r0 = fitBoxToCanvas(
             box, CANVAS_W, CANVAS_H, 0,
         );
-        const rOEPOcVMQdJiiiMuiiEhlg = fitBoxToCanvas(
+        const r1 = fitBoxToCanvas(
             box, CANVAS_W, CANVAS_H, PANEL,
         );
         assert(r0);
-        assert(rOEPOcVMQdJiiiMuiiEhlg);
+        assert(r1);
         const cx =
             ((-100) + (100 + NODE_WIDTH)) / 2;
         const pixelX0 =
             (cx - r0.viewBox.x)
                 * CANVAS_W / r0.viewBox.w;
         const pixelX1 =
-            (cx - rOEPOcVMQdJiiiMuiiEhlg.viewBox.x)
-                * CANVAS_W / rOEPOcVMQdJiiiMuiiEhlg.viewBox.w;
+            (cx - r1.viewBox.x)
+                * CANVAS_W / r1.viewBox.w;
         assert(
             Math.abs(pixelX0 - CANVAS_W / 2)
                 < 0.5,

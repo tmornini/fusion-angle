@@ -64,7 +64,7 @@ export async function init(): Promise<void> {
             onEmpty: () => {
                 $(
                     '#create-idea-btn', document,
-                )?.remove();
+                )?.classList.add('hidden');
                 subscribeOnce(
                     subscribeIdeaChanges, init,
                 );
@@ -91,6 +91,11 @@ function onIdeasLoaded(
     ideas: IdeaWithSubmitter[],
     teamListEl: HTMLElement,
 ): void {
+    // The button is static markup: the empty render hides it
+    // (onEmpty) and a populated one shows it again, so the
+    // empty→populated re-init keeps its CTA.
+    $('#create-idea-btn', document)
+        ?.classList.remove('hidden');
     ideaState = buildInitialIdeaListState(ideas);
     listEl = teamListEl;
     badgesEl = $(

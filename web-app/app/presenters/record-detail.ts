@@ -444,6 +444,10 @@ export interface RecordDetailView {
     readonly workOrders:
         readonly WorkOrder[];
     readonly instances: InstancesSectionView;
+    // The caller's project roles. Record-type mutation
+    // is admin-only by absence at the API, so Edit and
+    // Archive render for an admin alone.
+    readonly roles: readonly string[];
 }
 
 export class RecordDetailPresenter {
@@ -491,13 +495,7 @@ export class RecordDetailPresenter {
                     </div>
                 </div>
                 <div class="flex gap-2">
-                    ${this.#buildArchiveButton()}
-                    <button
-                        id="record-edit-btn"
-                        class="btn btn-primary">
-                        ${iconEdit(ICON_SIZE.base, '')}
-                        Edit
-                    </button>
+                    ${this.#buildAdminActions()}
                 </div>
             </div>
             <p class="text-muted mb-6"
@@ -512,6 +510,22 @@ export class RecordDetailPresenter {
             ${this.#buildBoundFlowsCard()}
             ${this.#buildWorkOrdersCard()}
         </div>`;
+    }
+
+    // A member's Edit or Archive would end in 403 at Save —
+    // the API keeps record-type mutation admin-only by
+    // absence — so neither renders for anyone else.
+    #buildAdminActions(): SafeHtml {
+        if (!this.#view.roles.includes('admin')) {
+            return trusted('');
+        }
+        return html`${this.#buildArchiveButton()}
+                    <button
+                        id="record-edit-btn"
+                        class="btn btn-primary">
+                        ${iconEdit(ICON_SIZE.base, '')}
+                        Edit
+                    </button>`;
     }
 
     #buildArchiveButton(): SafeHtml {

@@ -4,7 +4,7 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { deriveRecordStateHistory } from
+import { deriveRecordTypeStateHistory } from
     '../api/derive-record-types.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
@@ -261,7 +261,7 @@ Deno.test(
             ctx, 'rbfHGatkwQzGZJVXKJEeyw',
         );
         assertStrictEquals(model.stateValue(), 'archived');
-        const events = await deriveRecordStateHistory(
+        const events = await deriveRecordTypeStateHistory(
             db, 'AjdvjuECVZEgZoFajaIEkg', 'rbfHGatkwQzGZJVXKJEeyw',
         );
         assertStrictEquals(events.at(-1)?.state, 'archived');
@@ -354,7 +354,7 @@ Deno.test(
         await postRecordStateChange(
             ctx, sRqRSyldQDFbqkDYSObDqw, 'archived',
         );
-        const events = await deriveRecordStateHistory(db
+        const events = await deriveRecordTypeStateHistory(db
             , 'AjdvjuECVZEgZoFajaIEkg',
             'rbfHGatkwQzGZJVXKJEeyw',
         );

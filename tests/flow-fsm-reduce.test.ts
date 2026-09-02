@@ -675,11 +675,11 @@ Deno.test(
                 ['n1', { x: 0, y: 0 }],
             ]),
         });
-        const rOEPOcVMQdJiiiMuiiEhlg = reduceFsm(
+        const r1 = reduceFsm(
             state0, downInput(1000),
         );
         const r2 = reduceFsm(
-            rOEPOcVMQdJiiiMuiiEhlg.state, downInput(1200),
+            r1.state, downInput(1200),
         );
         const open = findAction(
             r2.actions, 'open-panel',

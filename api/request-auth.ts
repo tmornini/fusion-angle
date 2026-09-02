@@ -1,4 +1,3 @@
-import type { DbAdapter } from './db.ts';
 import {
     nowEpochSeconds,
     type Id,
@@ -184,16 +183,6 @@ export function callerOrganizationIdsFromClaims(
     principal: Principal,
 ): Set<Id> {
     return new Set(principal.organizations ?? []);
-}
-
-// Adapter-shaped alias retained for callers that still pass
-// a DbAdapter — the claim set is authoritative; the adapter
-// is unused. Prefer callerOrganizationIdsFromClaims.
-export async function callerOrganizationIds(
-    _adapter: DbAdapter,
-    principal: Principal,
-): Promise<Set<Id>> {
-    return callerOrganizationIdsFromClaims(principal);
 }
 
 // Parse a request body that must be a JSON OBJECT. Valid JSON
