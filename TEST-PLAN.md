@@ -1273,15 +1273,19 @@ the second organization.
   Pin: tests/browser/two-jars.test.ts 'two tabs share
        the cookie; sign-out in one bounces the other'
        — the same pin as SV9, which this case
-       duplicates almost exactly; exploratory — the
-       live in-memory-access-token nuance before
-       navigation (same as SV9); also unclaimed: that
-       the 401 comes from the shared revocation
-       ledger specifically, rather than simply a
-       cleared cookie — both tabs share one jar, so
-       tab B's cookie is already gone too, and no
-       test isolates the ledger check from the
-       cookie-absence case
+       duplicates almost exactly;
+       tests/api-token-exchange-revocation.test.ts
+       'refresh on a logged-out but live jti is the
+       revocation, not reuse' (decides the shared
+       ledger itself rejects a presented credential
+       nowhere near expiry — a live jti under a logout
+       stamp, no cookie in play; the ledger bites at
+       refresh, and tests/api-token-gate.test.ts 'a
+       logout-everywhere does not kill a live access
+       token' pins that a live ACCESS token is not the
+       ledger's to refuse before exp); exploratory —
+       the live in-memory-access-token nuance before
+       navigation (same as SV9)
 
 ### Zero-membership landing (org gate)
 
@@ -1931,11 +1935,11 @@ covering the D20–D24 run between them.
        dimmed when isActive is false' (decides
        `data-dimmed="true"` on the non-selected
        badge — half of D26's dimming clause);
-       exploratory — the live `aria-pressed`
-       highlight on the selected badge (the same test
-       builds the selected/`isActive: true` case and
-       checks only `data-dimmed="false"` on it, never
-       `aria-pressed`)
+       tests/state-badge.test.ts 'stateBadge presses
+       only the active filter chip' (decides
+       `aria-pressed="true"` on the selected badge and
+       `"false"` on every other — the highlight half);
+       exploratory — the live click and repaint
 - [ ] **D27** Click the same badge again. PASS: filter clears, all ideas shown, all badges at full opacity.
   Pin: tests/presenter-idea.test.ts
        'applyIdeaFilterToggle sets, replaces, and

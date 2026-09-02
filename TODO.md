@@ -127,9 +127,8 @@ spec → plan → ship cycle, implemented sequentially. A
    (`web-app/app/presenters/flow-designer.ts:221-227`);
    the shell's hand-kept copy of the reveal header
    (`postgres-lib:8` against `server/seed.ts:26-27`,
-   guarded by no test); the second
-   instances the remediation added (`formRExtras`'
-   record create, `canvasFocusOf`'s walk); the undo
+   guarded by no test); the second instance the
+   remediation added (`canvasFocusOf`'s walk); the undo
    path's duplicated pure helpers
    (`api/flow-graph-diff.ts:16-26`); the dead
    `FK_SPECIAL` map
@@ -194,9 +193,6 @@ Off the critical path; each with its oracle.
 
 - A full TEST-PLAN.md walk using serial subagents, so
   session context stays short — TEST-PLAN.md `## The walk`
-- One client 401-recovery voice through
-  `redirectToLogin()` with `?return=` —
-  `tests/adapters-http-facade.test.ts`
 - Toast pause on hover and focus
 - Mock seed's fixed 2026-06-15 anchor — after
   2026-09-13 serial-mode FS3 carries in-flight heat
@@ -328,10 +324,6 @@ Off the critical path; each with its oracle.
   (run-six Task 3 renders it; the UX remains) —
   `web-app/workbox/detail.ts:583-593`,
   `api/types.ts:1007`
-- G/V5 needs a cross-slice identity to verify Decline,
-  or the case text should sanction any invited
-  identity — plan defect vs explorer slip, unresolved —
-  TEST-PLAN.md G/V5
 - Intermittent "flow-marquee" console exceptions on
   non-canvas pages (Billing) — a flow-canvas gesture
   listener may be bound globally — TEST-PLAN.md G42
@@ -387,9 +379,6 @@ Off the critical path; each with its oracle.
   pin (`tests/api-entity-history-routes.test.ts:1033`),
   and a dead `disconnect()` stub in
   `tests/ideas-empty-subscribe.test.ts`
-- Investigate `docker compose up -d --wait` postgres
-  only. Not the compose `server` — that would be a
-  second origin (`compose.yaml`)
 - Node-only modules by directory — once whole-tree type
   checking ships, the browser tsconfig's `exclude` is
   the last hand-kept registry (seven, growing with the
@@ -528,13 +517,6 @@ Off the critical path; each with its oracle.
   - The Sign Up mode toggle's title, field, and button
     changes, and the "Sign-up is coming soon" toast with
     no navigation (B10, B11) — Layer 1, the same export
-  - A 401 after sign-out being the revocation ledger
-    rejecting a presented credential, not merely a
-    request with no cookie (B24) — Layer 1, an API test
-    that revokes through the ledger while a live access
-    token is still in play; the two-jars pin shares one
-    cookie jar, so a cleared cookie alone explains its
-    bounce
   - `resolveOrganizationGate(nonEmpty, <a gated page
     other than invitations>)` returning the list (B28) —
     Layer 1, one more assertion in
@@ -604,13 +586,6 @@ Off the critical path; each with its oracle.
     `IDEA_STATE_CONFIG`
     (`web-app/app/presenters/state-display.ts:35`) is
     untested
-  - `promoted` and `archived` ideas never getting a
-    filter badge even when present (D25) — Layer 1, a
-    `renderBadges` fixture including one; only their
-    absence from the candidate list is source-confirmed
-  - The `aria-pressed="true"` highlight on the selected
-    filter badge (D26) — Layer 1, one more assertion on
-    the lit case the dimmed test already builds
   - The convert page's error state (D35) — Layer 1;
     `web-app/ideas/convert.ts:96-115` hand-rolls its own
     `buildErrorState` call outside the shared `loadInto`
@@ -1084,13 +1059,6 @@ Off the critical path; each with its oracle.
     importing `INSTANCE_CONFLICT_NOTICE` in
     `tests/presenter-record-instances.test.ts` instead of
     asserting a hand-typed literal
-  - The mock seed's actual absence of any custom
-    attribute ACL (R21) — Layer 1, a
-    `read_roles`/`write_roles` default assertion in
-    `tests/mock-data-records.test.ts`; without it a
-    future seed adding `read_roles: ['admin']` makes
-    R21's live default-ACL check read FAIL on healthy
-    product with nothing red first
   - `crank`'s termination trap — a signal stopping the
     live `crank` and its child `./serve`, and the temp
     bundle removed afterward (J1, J2) — Layer 1,
