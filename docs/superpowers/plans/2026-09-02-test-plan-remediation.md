@@ -108,7 +108,7 @@ TZ=UTC deno test --frozen --no-check \
 **Files:**
 - Create: `docs/superpowers/plans/2026-09-02-test-plan-remediation.md`
 
-- [ ] **Step 1: Commit the plan as written**
+- [x] **Step 1: Commit the plan as written**
 
 ```bash
 git add docs/superpowers/plans/2026-09-02-test-plan-remediation.md
@@ -127,7 +127,7 @@ No `./validate` needed: markdown only.
 
 Doc only. No tests.
 
-- [ ] **Step 1: Extend the Shift-drag note and add F37b / AA33**
+- [x] **Step 1: Extend the Shift-drag note and add F37b / AA33**
 
 Replace the existing Shift-drag bullet (~152–155):
 
@@ -164,7 +164,7 @@ Shift is missing on pointer-up. AA33/AA34 score
 DEFERRED on AA32 when stray nodes block targeting.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add TEST-PLAN.md
@@ -185,7 +185,7 @@ gains class `.hidden` (`display: none` in
 `web-app/app/styles/utilities.css:108`), not the HTML
 `hidden` attribute (`web-app/projects/detail.ts:238-246`).
 
-- [ ] **Step 1: Correct E10a observable**
+- [x] **Step 1: Correct E10a observable**
 
 Replace:
 
@@ -209,7 +209,7 @@ with:
   flows sidebar stay visible in edit mode.
 ```
 
-- [ ] **Step 2: Correct A3 pin count**
+- [x] **Step 2: Correct A3 pin count**
 
 Replace:
 
@@ -228,7 +228,7 @@ with:
        names)
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add TEST-PLAN.md
@@ -252,12 +252,12 @@ only seeded Customer Profile instance
 Do not seed a second instance (that would move
 message-pair counts). Restore after WB19a instead.
 
-- [ ] **Step 1: Rewrite R13 to bind-first reality**
+- [x] **Step 1: Rewrite R13 to bind-first reality**
 
 Replace the R13 PASS paragraph with:
 
 ```
-- [ ] **R13** From workbox, open the gate-violation work
+- [x] **R13** From workbox, open the gate-violation work
   order (`#gate0001`, `eOlNZpGQfmCdpSFWXGkzFQ`) at Data
   Capture, unbound. PASS: current node is Data Capture;
   every attribute input is disabled/readonly behind the
@@ -273,12 +273,12 @@ Replace the R13 PASS paragraph with:
 
 Keep the existing Pin block.
 
-- [ ] **Step 2: Rewrite R14 to bind then submit**
+- [x] **Step 2: Rewrite R14 to bind then submit**
 
 Replace the R14 PASS paragraph with:
 
 ```
-- [ ] **R14** Bind `#gate0001` to the seeded Customer
+- [x] **R14** Bind `#gate0001` to the seeded Customer
   Profile instance (Company Name "Acme Corp") via the
   bind picker — an existing instance, never a minted
   one — then fill Company Name + Contact Email and
@@ -292,7 +292,7 @@ Replace the R14 PASS paragraph with:
 
 Keep the existing Pin block.
 
-- [ ] **Step 3: Instruct WB19a to restore Acme Corp**
+- [x] **Step 3: Instruct WB19a to restore Acme Corp**
 
 After WB19a's PASS paragraph (before its Pin), add:
 
@@ -305,7 +305,7 @@ After WB19a's PASS paragraph (before its Pin), add:
   read that value.
 ```
 
-- [ ] **Step 4: Point R16 at the restored seed**
+- [x] **Step 4: Point R16 at the restored seed**
 
 In R16's PASS paragraph, after "Company Name
 \"Acme Corp\"", add:
@@ -316,7 +316,7 @@ In R16's PASS paragraph, after "Company Name
   a missing seed.
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add TEST-PLAN.md
@@ -339,7 +339,7 @@ currently emits `move-nodes` with unchanged positions.
 `withNodesMoved` then PUTs and advances undo. A click
 is not an edit.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/flow-fsm-scenarios.test.ts`:
 
@@ -391,7 +391,7 @@ Deno.test(
 );
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 TZ=UTC JWT_HMAC_SIGNING_KEY=test-hmac-signing-key \
@@ -413,7 +413,7 @@ x:100, y:100}`, not `undefined`.
 If it passes, the bug is already gone — stop and
 re-read `onPointerUp`. Do not "fix" a green test.
 
-- [ ] **Step 3: Minimal fix**
+- [x] **Step 3: Minimal fix**
 
 In `web-app/app/flow-fsm-reduce.ts` `onPointerUp`,
 inside the `state.drag.kind === 'dragging'` branch,
@@ -474,9 +474,9 @@ Do not guard `withNodesMoved`. The FSM is the
 covenant site. Leave the existing nonzero drag tests
 untouched.
 
-- [ ] **Step 4: Re-run the filter — PASS. Then `./validate`.**
+- [x] **Step 4: Re-run the filter — PASS. Then `./validate`.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/flow-fsm-scenarios.test.ts \
@@ -501,7 +501,7 @@ node/edge in it has focus; Enter opens the panel.
 Nodes carry `role="button"`; overriding ARIA
 Space-as-activate is deliberate.
 
-- [ ] **Step 1: Write the failing Layer 2 test**
+- [x] **Step 1: Write the failing Layer 2 test**
 
 Add imports in `canvas-pan.test.ts`: `stays` from
 `./fixtures.ts`; `nodeIdNamed`, `nodeSelector` from
@@ -557,7 +557,7 @@ Deno.test(
 
 Keep existing tests. Wrap at 78 chars.
 
-- [ ] **Step 2: Run `./test-browser` and watch F12 fail**
+- [x] **Step 2: Run `./test-browser` and watch F12 fail**
 
 Expected: pan stays on and/or `.flow-props-panel`
 appears, so `until('pan cursor off')` times out or
@@ -568,7 +568,7 @@ appears, so `until('pan cursor off')` times out or
 If it PASSES, re-read the listener — do not "fix"
 a green test.
 
-- [ ] **Step 3: Minimal fix**
+- [x] **Step 3: Minimal fix**
 
 In `web-app/app/flow-interactions.ts`, gate the
 document listener on Enter only:
@@ -637,11 +637,11 @@ On F12's Pin line in `TEST-PLAN.md`, add:
 Do not change `isFormFocused`. Do not remove
 `role="button"` from nodes.
 
-- [ ] **Step 4: `./test-browser` PASS, then `./validate`.**
+- [x] **Step 4: `./test-browser` PASS, then `./validate`.**
 
 Existing `canvas-keyboard` Enter-opens must stay green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/browser/canvas-pan.test.ts \
@@ -663,7 +663,7 @@ This is a characterization pin. Green ⇒ R12 was a
 driver artifact (panel never opened). Red ⇒ presenter
 bug, fix red → green in this task.
 
-- [ ] **Step 1: Add the pin tests**
+- [x] **Step 1: Add the pin tests**
 
 Import `buildAttributeRefRow` next to the existing
 `buildNodePanel` import. Import type `RecordAttribute`
@@ -807,7 +807,7 @@ If `deno check` rejects, import the type and use a
 
 Wrap any assertion regex that would exceed 78 chars.
 
-- [ ] **Step 2: Run the filter**
+- [x] **Step 2: Run the filter**
 
 ```bash
 # same deno test invocation as Task 5
@@ -822,9 +822,9 @@ three tests. Skip product code. Go to Step 4.
 `buildAttributeRefRow` / `buildNodePanel` minimally
 until green. Do not weaken the assertions.
 
-- [ ] **Step 3: `./validate`.**
+- [x] **Step 3: `./validate`.**
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/presenter-misc.test.ts TEST-PLAN.md
@@ -845,7 +845,7 @@ Customer Onboarding's bbox-center misses a bezier.
 Target the edge **label rect** (`.flow-edge rect`).
 Layout Test: `'Layout Test: Proposal Review Cycle'`.
 
-- [ ] **Step 1: Add helpers to `tests/browser/canvas.ts`**
+- [x] **Step 1: Add helpers to `tests/browser/canvas.ts`**
 
 Import type `Point` from `./fixtures.ts` (Page is
 already imported).
@@ -877,7 +877,7 @@ export function edgeLabelSelector(): string {
 
 No product file changes in this step.
 
-- [ ] **Step 2: Write F26 and F28 tests**
+- [x] **Step 2: Write F26 and F28 tests**
 
 Append to `tests/browser/canvas-gestures.test.ts`.
 Import `doubleClick`, `doubleClickAt`, `LAYOUT_TEST`,
@@ -967,7 +967,7 @@ Deno.test(
 );
 ```
 
-- [ ] **Step 3: `./test-browser`**
+- [x] **Step 3: `./test-browser`**
 
 **If both PASS:** walk F26/F28 were mis-hits. Commit
 the tests. Update TEST-PLAN F26/F28 Pin lines to name
@@ -978,7 +978,7 @@ the failure, write nothing extra, fix red → green
 (likely hit-target or `#canDelete`). Do not weaken
 the test.
 
-- [ ] **Step 4: `./validate`. Commit.**
+- [x] **Step 4: `./validate`. Commit.**
 
 ```bash
 git add tests/browser/canvas.ts \
@@ -1000,7 +1000,7 @@ Review→Data Capture. The absent pair is Data Capture
 uses). This test starts **without** Shift and holds
 it mid-gesture.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```typescript
 Deno.test(
@@ -1056,7 +1056,7 @@ Deno.test(
 
 `SHIFT` is already imported in this file.
 
-- [ ] **Step 2: `./test-browser`**
+- [x] **Step 2: `./test-browser`**
 
 **PASS:** product honors mid-drag Shift when the
 compositor actually holds it. Walk F23 stays BLOCKED
@@ -1067,7 +1067,7 @@ Commit the test.
 honor mid-drag Shift. That is a real bug — fix
 `shift-key` / `finishConnect` red → green.
 
-- [ ] **Step 3: Update F23 Pin, `./validate`, commit**
+- [x] **Step 3: Update F23 Pin, `./validate`, commit**
 
 ```bash
 git commit -m "Hold Shift mid port-drag to commit an edge"
@@ -1083,7 +1083,7 @@ git commit -m "Hold Shift mid port-drag to commit an edge"
 
 Uses `doubleClick` from Task 8.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Import `doubleClick`, `nodeIdNamed`, `nodeSelector`
 (F12 already added `nodeIdNamed` / `nodeSelector`).
@@ -1145,7 +1145,7 @@ Deno.test(
 );
 ```
 
-- [ ] **Step 2: `./test-browser`**
+- [x] **Step 2: `./test-browser`**
 
 **PASS:** camera code is clean; walk F14 was a missed
 Zoom-in click. Commit the test.
@@ -1157,7 +1157,7 @@ click missed in CDP too — fix the selector
 that is a camera bug — fix `applyPanelTransition`
 red → green.
 
-- [ ] **Step 3: Pin line, `./validate`, commit**
+- [x] **Step 3: Pin line, `./validate`, commit**
 
 ```bash
 git commit -m "Restore viewBox after zoom then panel close"
@@ -1175,7 +1175,7 @@ Customer Onboarding seeds `is_auto_layout: true`.
 Fixtures always drive the attached visible page, so
 this removes the hidden-tab hypothesis.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```typescript
 Deno.test(
@@ -1223,7 +1223,7 @@ Deno.test(
 );
 ```
 
-- [ ] **Step 2: `./test-browser`**
+- [x] **Step 2: `./test-browser`**
 
 **PASS:** walk F37b was the hidden second tab. Commit.
 
@@ -1231,7 +1231,7 @@ Deno.test(
 Fix red → green. `add-node` has no Auto-Layout branch
 today; a failure here is new evidence.
 
-- [ ] **Step 3: Pin line, `./validate`, commit**
+- [x] **Step 3: Pin line, `./validate`, commit**
 
 ```bash
 git commit -m "Undo a port-drag node on an auto-layout flow"
@@ -1253,7 +1253,7 @@ mechanism). Data Capture has one free attribute; Review
 has seven. Add two refs on **Review** (F25's reason)
 with distinct mode/required.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```typescript
 Deno.test(
@@ -1389,7 +1389,7 @@ Fix template-string quoting so the evaluate strings
 are valid JS and every source line stays ≤78 chars.
 If a quoted selector cannot wrap, split with `+`.
 
-- [ ] **Step 2: `./test-browser`**
+- [x] **Step 2: `./test-browser`**
 
 **PASS:** attribute-ref writes land on Review; Shift
 edge write lands. Walk AA33/AA34 stay DEFERRED on
@@ -1398,7 +1398,7 @@ AA32 targeting; this pin decides the writes. Commit.
 **FAIL:** product bug on add-edge or add-attribute-ref
 under compositor input. Fix red → green.
 
-- [ ] **Step 3: Pin lines, `./validate`, commit**
+- [x] **Step 3: Pin lines, `./validate`, commit**
 
 ```bash
 git commit -m "Shift-drag an edge and add attribute refs"
@@ -1414,7 +1414,7 @@ git commit -m "Shift-drag an edge and add attribute refs"
 Do not edit dated 2026-09-02 stubs. Implementation
 tracking lives here.
 
-- [ ] **Step 1: Append later-work bullets**
+- [x] **Step 1: Append later-work bullets**
 
 Add, each with an oracle:
 
@@ -1441,7 +1441,7 @@ Add, each with an oracle:
 Adjust the R12 bullet to match Task 7's actual
 outcome (green pin vs product fix).
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add TODO.md
@@ -1455,22 +1455,22 @@ git commit -m "Triage the 2026-09-02 walk leftovers"
 **Files:**
 - Modify: this plan (check every `- [ ]` that shipped)
 
-- [ ] **Step 1: Tick completed steps in this plan.**
+- [x] **Step 1: Tick completed steps in this plan.**
 
-- [ ] **Step 2: `./validate` then `./test-all`.**
+- [x] **Step 2: `./validate` then `./test-all`.**
 
 `./test-all` is `./validate` + `./test-browser`.
 Chrome required. Dirty tree is fine for validate;
 `./test-all` before a walk/build.
 
-- [ ] **Step 3: Commit the ticked plan**
+- [x] **Step 3: Commit the ticked plan**
 
 ```bash
 git add docs/superpowers/plans/2026-09-02-test-plan-remediation.md
 git commit -m "Tick the 2026-09-02 remediation plan"
 ```
 
-- [ ] **Step 4: Land when master has not moved**
+- [x] **Step 4: Land when master has not moved**
 
 ```bash
 cd /Users/tmornini/code/fusion-angle

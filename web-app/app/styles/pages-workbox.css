@@ -1,5 +1,24 @@
 /* Workbox: work-order inbox, detail. */
 
+/* Cross-document snapshots cover compositor clicks
+    on Bind after inbox → detail. Inbox and detail
+    are the only pages that load this bundle. */
+@view-transition {
+    navigation: none;
+}
+
+.work-order-attr-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+}
+
+@media (max-width: 767px) {
+    .work-order-attr-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .work-order-history-fields {
     display: grid;
     grid-template-columns: auto 1fr;

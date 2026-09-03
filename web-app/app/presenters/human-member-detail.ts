@@ -625,6 +625,9 @@ export class HumanMemberDetailEditPresenter {
             '.member-actions-slot',
             buildEditableActionButtons(),
         );
+        // Strengths are editable; Working Styles are
+        // not. Keep the chips with the other edit
+        // fields so they stay in the viewport.
         mutateSlot(
             container,
             '.member-cards-slot',
@@ -635,13 +638,13 @@ export class HumanMemberDetailEditPresenter {
                         this.#draft,
                     ),
                 )}
-                ${buildTeamDimensionsCard(
-                    this.#member,
-                )}
                 ${buildStrengthsCard(
                     buildEditableStrengthChips(
                         this.#draft.strengths,
                     ),
+                )}
+                ${buildTeamDimensionsCard(
+                    this.#member,
                 )}`,
         );
     }

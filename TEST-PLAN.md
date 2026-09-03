@@ -117,6 +117,14 @@ the product working, not a FAIL.
 
 Do not patch. Do not re-seed. Do not retry the plan.
 
+Score from ### Scoring. FAIL only when you drove the
+step and the product disagreed, and the disagree is
+not already decided by a green Pin. A missed
+compositor gesture, a hidden tab, a missing
+prerequisite, or a green pin for the unobserved half
+is BLOCKED or DEFERRED — never FAIL. DRIFT when the
+product matches a pin and the document is wrong.
+
 Return one line per case:
 ID PASS|FAIL|BLOCKED|DEFERRED|DRIFT — one-line note.
 ```
@@ -177,20 +185,100 @@ not repeat the note in every case.
 - F29 empty-canvas click: close the properties panel
   first. An open panel's close restores the F14 saved
   viewBox — that is not this case.
+- Compositor gestures (double-click as two
+  pointerdowns on one element id inside
+  `DBLCLICK_MS`, body-drag, port-drag, `.drag-handle`
+  pointer capture, `input[type=range]` drag): if the
+  driver does not deliver the gesture, record BLOCKED
+  naming that. Do not FAIL. Layer 1 and Layer 2 pins
+  decide the covenant. E11 (projects list-drag)
+  PASSed on the second 09-02 walk — the driver *can*
+  drag lists; a miss on D36 or K6 is still BLOCKED
+  this walk, not a missing product.
+- F12: after the pan-mode node drag, Space toggles
+  pan off (Layer 2 pin). The double-click half
+  retargets the same node id; landing on Archive or
+  missing `#prop-node-name` is BLOCKED targeting, not
+  FAIL. Create/Archive panels have no
+  `#prop-node-name`.
+- F17: F12/F14 leave Auto Fit off and the camera
+  elsewhere. Create is min-x. If Create's
+  `transform` is outside the viewBox, Auto Fit on or
+  pan until it is inside, then drag. Dragging an
+  off-canvas node is BLOCKED, not FAIL.
+- F57a: Enter opens the focused node's panel; Space
+  toggles pan. Do not score F57a FAIL for Space
+  toggling pan — that is F12's covenant.
+- D32a: assert `.idea-actions-slot` only. Buttons
+  inside a closed `dialog` (including
+  `data-idea-action="send-back-confirm"`) are not the
+  header.
+- K13: drag `.baseline-slider` *inside* the
+  `.project-objective-row` whose name cell is the
+  objective. Do not query a bare
+  `input[type=range]` — at 1280×800 the rows are a
+  140/110/1fr grid; identical y means the same
+  element was hit twice.
+- F70: if the Industry row is not in the open
+  panel, DEFERRED on F69.
+- R14: bind `#gate0001` to any existing Customer
+  Profile instance in the picker (never mint). The
+  label may read `Walk Co B` after WB19a. R13's
+  open claimed the WO; bind while claimed by the
+  current member is expected.
+- R16: PASS if the Instances section lists at least
+  one instance with id + readable values. `Acme Corp`
+  and `Walk Co B` are both this walk's instance.
+- R21: four identity/org halves. Auth is 5 per 60 s.
+  If Wayne halves are not driven, BLOCKED, not FAIL.
+- AA9: click `.strength-chip` buttons with
+  `data-strength`. Layer 2 pin
+  tests/browser/member-strengths.test.ts
+  'chip toggles persist on save and reload (AA9)'
+  decides the save. If the chips do not toggle,
+  record BLOCKED naming that. Do not FAIL.
+- WB11: create or open an unbound Data Capture WO,
+  bind, fill, submit. Layer 2 pin
+  tests/browser/workbox-transition.test.ts
+  'bind, fill, and submit navigates to the inbox
+  (WB11)' decides the inbox navigation. If bind
+  cannot be driven, record BLOCKED. Do not FAIL.
 
 ### Scoring
 
 | Outcome | Meaning |
 |---|---|
 | PASS | the PASS line was observed |
-| FAIL | the PASS line could not be observed as driven — a finding, not a verdict |
-| BLOCKED | a step could not be performed for a named reason outside the product (driver or environment); the reason is the note |
+| FAIL | the step was driven and the product disagreed with the PASS line, and no green Layer 1/2 pin already decides that observation — a finding, not a verdict |
+| BLOCKED | a step could not be performed (driver or environment), or the compositor did not deliver the gesture a green pin already decides; the reason is the note |
 | DEFERRED | a prerequisite case did not produce what this case needs |
 | DRIFT | passes in substance; the document or the UI text disagrees — the document changes |
+
+A case whose `Pin:` names a Layer 1 or Layer 2 test
+for the unobserved half scores BLOCKED or DEFERRED,
+never FAIL. FAIL is only for an *exploratory* half
+the explorer actually drove, or for a pin that is
+itself red. The walk still gates nothing; this rule
+exists so FAIL can reach zero without lying.
 
 Walk-specific: F23 scores BLOCKED like AA32 when
 Shift is missing on pointer-up. AA33/AA34 score
 DEFERRED on AA32 when stray nodes block targeting.
+F12's double-click miss after a pan-drag, F17
+off-canvas body-drag, F37b port-drag (hidden tab
+or otherwise), D36/D37/K6 list-drag, K13–K15
+slider-drag: BLOCKED when the gesture was not
+delivered. Layer 1/2 pins decide the math.
+F70 without an Industry row: DEFERRED on F69.
+K14/K15 when K13 did not dirty a slider: DEFERRED
+on K13.
+R21 Wayne halves not driven: BLOCKED naming
+throttle or time, not FAIL. The Stark default-ACL
+half may still PASS.
+R16 leftover `Walk Co B`: PASS (the instance is
+present). Missing Instances section: FAIL of the
+exploratory half (no Layer 1 pin renders the live
+Customer Profile list).
 
 Nothing blocks on any outcome. BLOCKED is allowed for a
 driver limit: with no gate riding on the walk, an honest
@@ -479,10 +567,15 @@ the second organization.
        (decides that toggling Data Analysis off and
        Agile Methods on in one save leaves exactly
        [Strategic Planning, Stakeholder Management,
-       Agile Methods] on the next GET); exploratory —
-       the live toast, read-mode return, the Phone/Bio
-       edit (a separate `PUT identities/:id/pii` this
-       test never calls), and reload persistence
+       Agile Methods] on the next GET);
+       tests/browser/member-strengths.test.ts
+       'chip toggles persist on save and reload (AA9)'
+       (decides Edit → toggle Data Analysis off and
+       Agile Methods on → Save → reload leaves
+       Strategic Planning, Stakeholder Management,
+       Agile Methods);
+       exploratory — the Phone/Bio edit (a separate
+       `PUT identities/:id/pii` this test never calls)
 - [ ] **AA9a** From "Ops Assistant" (AA7a)'s member
   detail, click Edit, change Description and Skill
   Focus, and pick a different Model from the pulldown
@@ -2043,12 +2136,20 @@ covering the D20–D24 run between them.
        false by construction); exploratory — the
        live absence of the buttons for a state other
        than the one tested
-- [ ] **D32a** On an in_review idea, click "Edit". PASS: the header shows only Cancel / Save — no Send Back, Approve, Submit, or Convert. Click Cancel: the read header (Send Back / Approve / Edit) returns.
-  Pin: exploratory — `IdeaEditPresenter`'s action
-       buttons are unconditionally Cancel/Save (no
-       CLI test renders them), and no test composes
-       the read-header's button set for `in_review`
-       specifically
+- [ ] **D32a** On an in_review idea, click "Edit".
+  PASS: `.idea-actions-slot` contains only Cancel /
+  Save — no Send Back, Approve, Submit, or Convert
+  *in that slot*. Buttons inside a closed
+  `<dialog>` in `.idea-dialogs-slot` (including
+  `data-idea-action="send-back-confirm"`) are the
+  confirm dialog, not the header. Click Cancel: the
+  read header (Send Back / Approve / Edit in
+  `.idea-actions-slot`) returns.
+  Pin: exploratory — no CLI test renders
+       `.idea-actions-slot`; `IdeaEditPresenter`'s
+       action buttons are unconditionally Cancel/Save,
+       and no test composes the read-header's button
+       set for `in_review` specifically
 
 ### Ideas Workflow Integration
 
@@ -2589,7 +2690,10 @@ opens and renders.)
        position' (decides a real compositor body drag
        changes the node's stored positionX/positionY);
        exploratory — the per-frame rAF paint
-- [ ] **F17** Drag the start node by its body. PASS: it
+- [ ] **F17** Drag the start node by its body. If
+  Create is off-canvas, Auto Fit on or pan until its
+  `transform` is inside the viewBox, then drag.
+  Off-canvas drag is BLOCKED. PASS: it
   moves freely like any standard node — start and complete
   nodes are both draggable. With Auto Layout on the drop
   re-lays out: Create returns to the head of the first
@@ -3506,16 +3610,23 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        a text input is the editable target that suppresses
        the canvas chord); exploratory — the space character
        landing in the input
-- [ ] **F57a** Tab to a node, tap Space. PASS: the
-  node's panel opens (Space activates the
-  focused item); pan mode stays off.
-  Pin: tests/flow-fsm-reduce.test.ts 'canvas-key-activate
-       on a node single-selects it, opens the panel, and
-       requests an update' (decides the activation path
-       Space shares with Enter selects the node and emits
-       open-panel:true); exploratory — pan mode staying
-       off, which rests on the interaction layer's
-       `defaultPrevented` guard and carries no test
+- [ ] **F57a** Tab to a regular node (not Create or
+  Archive — those panels have no `#prop-node-name`).
+  Tap Enter. PASS: the node's panel opens
+  (`#prop-node-name` exists); pan mode stays off.
+  Space on a focused node toggles pan and does not
+  open the panel — that is F12, not this case.
+  Pin: tests/browser/canvas-keyboard.test.ts
+       'Tab from the canvas enters the ring and
+       marks the node' (drives Tab then Enter and
+       waits for `#prop-node-name`);
+       tests/flow-fsm-reduce.test.ts
+       'canvas-key-activate on a node single-selects
+       it, opens the panel, and requests an update'
+       (decides Enter's activation path);
+       tests/browser/canvas-pan.test.ts
+       'Space on a focused node toggles pan off
+       and does not open the panel (F12)'
 
 ### Members Selector (Node Panel)
 
@@ -3693,7 +3804,8 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        exploratory — the row's mode and Required controls
        and the dropdown staying available
 - [ ] **F70** Continuing from F69, click the remove ("×")
-  control on the "Industry" attribute row. PASS: the row
+  control on the "Industry" attribute row. If the
+  Industry row is absent, DEFERRED on F69. PASS: the row
   disappears from the attributes list, leaving Review as
   the seed had it.
   Pin: tests/flow-operations.test.ts
@@ -4070,8 +4182,14 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   Pin: tests/api-work-order-transition-instance.test.ts
        'value-bearing fresh If-Match → 204; head advances'
        (its own assertion checks `res.status === 201`,
-       despite the test's stale name); exploratory — the
-       live form fill and the navigation back to the inbox
+       despite the test's stale name);
+       tests/browser/workbox-transition.test.ts
+       'bind, fill, and submit navigates to the inbox
+       (WB11)' (decides bind → fill Company Name and
+       Contact Email → submit lands on
+       `/workbox/index.html` with the Transition
+       complete toast);
+       exploratory — the live keystroke fill
 - [ ] **WB16** Read the network log across WB11's bind
   and transition (never `js()` fetch — the bearer is
   memory-only, per the explorer prompt). Snapshot
@@ -4183,12 +4301,6 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   notice and a warning toast ("This instance changed
   underneath you — values refreshed; re-apply your
   edit"), and does **not** auto-retry the transition.
-  After PASS, restore the mutated instance's
-  Company Name to "Acme Corp" (and any other
-  field this case changed). WB19a overwrites
-  the only seeded Customer Profile instance;
-  R14's bind picker and R16's instance list
-  read that value.
   Pin: tests/api-work-order-transition-instance.test.ts
        'value-bearing stale If-Match → 412' (decides the
        server 412 when a transition's held etag is
@@ -6059,7 +6171,11 @@ NPS", and "Improve employee morale" are not.
        count (four or five, depending on K5)
 - [ ] **K13** Drag the "Increase incomes" and "Raise
   customer NPS" sliders to non-zero values — send "Raise
-  customer NPS" to the far left (−100); Save. PASS if the
+  customer NPS" to the far left (−100); Save. Drive
+  each slider as `.project-objective-row` (name cell
+  matches) → `.baseline-slider`. A bare
+  `input[type=range]` selector is the first row twice.
+  PASS if the
   shared `Save` button enables (dirty-tracked), the rows
   show the saved baselines including the signed −100, and
   Approve is **still** disabled because at least "Improve
@@ -6507,16 +6623,18 @@ K30 only describes.
        with at least one required attribute with a
        null stored value'; exploratory — the action
        screen's disabled inputs and the bind prompt
-- [ ] **R14** Bind `#gate0001` to the seeded Customer
-  Profile instance (Company Name "Acme Corp") via the
-  bind picker — an existing instance, never a minted
-  one — then fill Company Name + Contact Email and
+- [ ] **R14** Bind `#gate0001` to an existing Customer
+  Profile instance in the picker (label may be Acme Corp
+  or Walk Co B after WB19a) — never mint a new one —
+  then fill Company Name + Contact Email and
   click submit. PASS: transition succeeds; work order
   advances to Review (does NOT demand Reviewer Notes —
   that is current-node only when leaving Review). A
   value-bearing transition while still unbound is
   refused with 400 (`ValidationError` →
-  `HTTP_BAD_REQUEST`), not 409; 409 is rebind.
+  `HTTP_BAD_REQUEST`), not 409; 409 is rebind. R13's
+  open claimed the WO; bind while claimed by the
+  current member is expected.
   Pin: tests/adapters-record-transitions.test.ts
        'validateRecordTransition does not require
        TARGET-node attributes when the current node is
@@ -6555,12 +6673,12 @@ K30 only describes.
        records/ card and chip rendering, and the
        chip's live toggle
 - [ ] **R16** Open Customer Profile detail. PASS: an
-  Instances section lists the seeded instances (id +
-  readable values) — at least one seeded instance
-  (Company Name "Acme Corp") — with a "New instance"
-  control. WB19a must have restored that name; a leftover
-  "Walk Co B" is this walk's hygiene failure, not
-  a missing seed. The empty "No instances yet" state is a
+  Instances section lists at least one
+  instance (id + readable values) and a "New instance"
+  control. The genesis Company Name is "Acme Corp";
+  WB19a may have renamed it to "Walk Co B". Either
+  name is this walk's instance, not a missing seed.
+  The empty "No instances yet" state is a
   real UI branch the CLI pin below decides; Customer
   Profile is never empty on this seed, so the
   explorer will not see it live.
@@ -6644,6 +6762,9 @@ K30 only describes.
   open New instance on Project Brief — Approved renders
   `data-access="readonly"`, Priority is ABSENT from the
   form, and Project Name / Description stay writable.
+  If the Wayne halves are not driven, BLOCKED
+  naming throttle or time. Do not FAIL a half
+  that was not opened.
   Setting an ACL remains `PUT …/attributes/:id` only — no
   UI reaches it; the seed, not the walk, produced the
   restricted state (TODO.md names the ACL-editing UI).

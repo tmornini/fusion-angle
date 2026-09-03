@@ -346,6 +346,10 @@ export class WorkboxDetailPresenter {
                 >${this.#conflictNotice}</p>`
             : html``;
 
+        // Bind rides the header so the compositor
+        // click lands in the 1280×800 viewport
+        // (WB11). Attributes are two columns so
+        // submit stays below them and still in view.
         return html`<div
             class="entity">
             <div id="work-order-header"
@@ -358,7 +362,7 @@ export class WorkboxDetailPresenter {
                     aria-label="Back">
                     ${iconArrowLeft(ICON_SIZE.xl, '')}
                 </button>
-                <div>
+                <div class="flex-1">
                     <h1 class="text-2xl
                         font-bold mb-1">
                         ${this.flowNameText()}
@@ -382,6 +386,7 @@ export class WorkboxDetailPresenter {
                         ${this.#bindingBadge()}
                     </div>
                 </div>
+                ${this.#bindButton()}
             </div>
 
             ${conflict}
@@ -392,7 +397,6 @@ export class WorkboxDetailPresenter {
             <div class="flex gap-3 mb-6
                 flex-wrap">
                 ${unclaimBtn}
-                ${this.#bindButton()}
             </div>
 
             <details
@@ -568,11 +572,13 @@ export class WorkboxDetailPresenter {
                 font-semibold mb-4">
                 Attributes
             </h3>
-            ${resolved.map(
-                r => this.#buildAttributeRow(
-                    r.ref, r.attribute,
-                ),
-            )}
+            <div class="work-order-attr-grid">
+                ${resolved.map(
+                    r => this.#buildAttributeRow(
+                        r.ref, r.attribute,
+                    ),
+                )}
+            </div>
         </div>`;
     }
 
@@ -678,7 +684,7 @@ export class WorkboxDetailPresenter {
             attribute.attributeType === 'radio'
         ) {
             return html`<fieldset class="${
-                'attribute-group-fieldset mb-4'
+                'attribute-group-fieldset'
             }">
                 <legend
                     class="label"
@@ -691,7 +697,7 @@ export class WorkboxDetailPresenter {
                 )}
             </fieldset>`;
         }
-        return html`<div class="mb-4">
+        return html`<div>
             <label
                 class="label"
                 for="wo-attr-${attribute.id}"
