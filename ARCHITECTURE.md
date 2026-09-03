@@ -52,7 +52,18 @@ stream now, so it measures to response construction and
 excludes the transfer the awaited Node pipeline included.
 
 Render builds from the Dockerfile. The compose-stack
-spec's "no Render config change" is retired.
+spec's "no Render config change" is retired. The one
+web service switched runtime in place — Render's
+runtime is editable after creation, by
+`PATCH /v1/services/{id}` with `serviceDetails.runtime`
+— so no service was created and no domain moved. The
+first Docker deploy measured 24.717982 s from the
+deploy's `createdAt` to its `finishedAt`, the
+build-artifact spec's "measured at the first deploy"
+risk, closed. The Docker build runs no tests and sees
+no env vars (the Dockerfile declares no `ARG`), unlike
+the retired native build, whose `./validate` step saw
+the build-time `POSTGRES_URL`.
 
 ## Layers
 
