@@ -243,6 +243,12 @@ not repeat the note in every case.
   'bind, fill, and submit navigates to the inbox
   (WB11)' decides the inbox navigation. If bind
   cannot be driven, record BLOCKED. Do not FAIL.
+- WB19a/WB19b: drive while the bound WO is still
+  Active, before WB14. If WB14 already archived it,
+  DEFERRED on WB14, not FAIL. Layer 1 pins decide
+  the 412. The live re-GET, conflict notice, and
+  no-auto-retry half is exploratory. WB19 history
+  remains readable after archive.
 
 ### Scoring
 
@@ -279,6 +285,8 @@ R16 leftover `Walk Co B`: PASS (the instance is
 present). Missing Instances section: FAIL of the
 exploratory half (no Layer 1 pin renders the live
 Customer Profile list).
+WB19a/WB19b when the bound WO is already archived:
+DEFERRED on WB14. Layer 1 pins decide the 412.
 
 Nothing blocks on any outcome. BLOCKED is allowed for a
 driver limit: with no gate riding on the walk, an honest
@@ -4267,14 +4275,14 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        claim→release→reclaim sequence and its event
        ordering); exploratory — the live three-click UI
        sequence
-- [ ] **WB19** Subject: the bound Active WO from
-  WB11–WB13 (still Active; WB14 archives it). Skipping
-  because "WO already archived" is FAIL. After
-  transitioning a work order through at least two states,
-  read the derived history (`GET work-orders/:id/history`
-  or the matching pairs in `message_pairs`) for this work
-  order's id. PASS: rows are `(at, id)` DESC (index 0 =
-  current); each non-claim event has the immutable shape
+- [ ] **WB19** Subject: the bound WO from WB11–WB13
+  (WB14 archives it later; history is still readable
+  after archive). After transitioning a work order
+  through at least two states, read the derived history
+  (`GET work-orders/:id/history` or the matching pairs
+  in `message_pairs`) for this work order's id. PASS:
+  rows are `(at, id)` DESC (index 0 = current); each
+  non-claim event has the immutable shape
   `{id, entity_id, state, member_id, at, field_values}`,
   with `state` carrying the target node's identifier.
   Live values live on the instance head; history
@@ -4290,10 +4298,11 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        ever mutates an existing pair (an architectural
        invariant, not a single assertion)
 - [ ] **WB19a — Two-tab 412 on the action screen.**
-  Subject: the same bound Active WO from WB11–WB13;
-  skipping because "WO already archived" is FAIL. Bind a
-  work order to an instance. Open the action screen in
-  two tabs. In tab 2, change an instance value via the
+  Subject: the same bound Active WO from WB11–WB13.
+  Drive before WB14. If the WO is already archived,
+  DEFERRED on WB14 — not FAIL. Bind a work order to
+  an instance. Open the action screen in two tabs.
+  In tab 2, change an instance value via the
   records detail instance editor (or a second transition)
   so the head etag advances. In tab 1, edit a value and
   transition. PASS: tab 1 receives 412, re-GETs the
@@ -4311,10 +4320,11 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        `conflictNotice` rendering carries no test either)
 - [ ] **WB19b — Direct instance PATCH vs transition 412
   convergence.** Subject: the same bound Active WO from
-  WB11–WB13; skipping because "WO already archived" is
-  FAIL. With a bound WO open on the action screen, PATCH
-  the same instance from the record detail UI (save) so
-  the head advances; then attempt a value-bearing
+  WB11–WB13. Drive before WB14. If the WO is already
+  archived, DEFERRED on WB14 — not FAIL. With a bound
+  WO open on the action screen, PATCH the same
+  instance from the record detail UI (save) so the
+  head advances; then attempt a value-bearing
   transition on the stale action screen. PASS: same 412
   recovery shape as WB19a. Conversely, after a successful
   **value-bearing** transition (set/clear + If-Match —

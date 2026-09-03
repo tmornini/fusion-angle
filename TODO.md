@@ -210,6 +210,16 @@ Off the critical path; each with its oracle.
   missed Zoom-in. Layer 2 pins in
   `tests/browser/canvas-gestures.test.ts` and
   `tests/browser/canvas-pan.test.ts`
+- 2026-09-02 second walk AA9/WB11: Layer 2
+  characterization pins close the only maybe-product
+  FAILs. Green pins (or a product fix behind a red
+  one) decide them; compositor leftovers stay
+  BLOCKED — TEST-PLAN.md Driving notes;
+  tests/browser/member-strengths.test.ts
+  'chip toggles persist on save and reload (AA9)';
+  tests/browser/workbox-transition.test.ts
+  'bind, fill, and submit navigates to the inbox
+  (WB11)'
 - Toast pause on hover and focus
 - Mock seed's fixed 2026-06-15 anchor — after
   2026-09-13 serial-mode FS3 carries in-flight heat
