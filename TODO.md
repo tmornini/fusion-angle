@@ -387,13 +387,6 @@ Off the critical path; each with its oracle.
   its callback synchronously; all thirteen
   `subscribe<Entity>Changes` delegate to `createChannel`,
   so it is inert — guard only if that changes
-- Nothing asserts that the operator wrappers exec `deno`
-  rather than `node`; coverage today is a grep run by
-  hand. `tests/fusion-angle-live-name.test.ts` already
-  walks the same root-file list for forbidden strings, so
-  the shape exists. Oracle: a test asserting no `node`
-  invocation in `postgres-lib`, `postgres-seed`,
-  `postgres-wipe`.
 - Absence and emptiness are conflated in attribute ACL
   derivation. `attributeSchemaOf` synthesizes
   `readRoles: []` both for a head that deliberately
