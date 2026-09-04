@@ -365,8 +365,15 @@ stack).
 
 SHA skip applies only to the `validate`
 combination, not to a primitive run alone.
-The stamp is `most-recently-validated-sha`
-in the shared git dir.
+The stamp file is
+`most-recently-validated-sha` in the shared
+git dir; its contents are that SHA. Tests
+that must not touch the real stamp overlay
+`MOST_RECENTLY_VALIDATED_SHA_PATH` (path to
+the stamp file) and
+`WORKING_TREE_PORCELAIN` (stand-in for
+`git status --porcelain`). There is no
+`validate-ok` and no `VALIDATE_OK`.
 
 **`./test postgres`.** Always a Docker
 Postgres. Mint a password, `compose up`
