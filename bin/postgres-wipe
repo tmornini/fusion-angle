@@ -11,9 +11,8 @@ usage() {
 Usage: ./bin/postgres-wipe --postgres render TOKEN
        ./bin/postgres-wipe --postgres local
 
-Drop the message plane (message_pairs), leftover
-pairs, retired leftovers (responses, requests),
-schema_marker, and message_body. Does not seed.
+Public-schema reset: DROP SCHEMA public CASCADE,
+then recreate and grant. Does not seed.
 --postgres is required and has no default.
 --postgres render needs TOKEN (the confirmation).
 --postgres local is compose run of the wipe

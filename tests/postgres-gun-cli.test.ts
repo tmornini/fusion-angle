@@ -177,6 +177,17 @@ Deno.test('wipe --help exits 0', async () => {
     );
 });
 
+Deno.test('wipe help describes the schema reset',
+() => {
+    const src = Deno.readTextFileSync(
+        'bin/postgres-wipe',
+    );
+    assertMatch(src, /DROP SCHEMA/);
+    assertMatch(src, /public/);
+    assertMatch(src, /Does not seed\./);
+    assertNotMatch(src, /message_pairs/);
+});
+
 Deno.test('seed --help exits 0', async () => {
     const result = await runGun(
         './bin/postgres-seed',
