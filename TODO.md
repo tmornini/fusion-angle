@@ -6,123 +6,306 @@ file by shipping; `## Close protocol` is the exit.
 ## Critical product path
 
 Twelve items, in this order — each its own brainstorm →
-spec → plan → ship cycle, implemented sequentially. A
-"Merged:" clause names bullets absorbed from
-`## Later work`; they keep their oracles.
+spec → plan → ship cycle, implemented sequentially,
+ordered by benefit over cost: what a pilot tenant needs
+first, the process engine and its AI worker on that, two
+processes last. A "Merged:" clause names bullets absorbed
+from `## Later work`; they keep their oracles. Four
+former items left for `## Later work` (genericity, JSON
+parse/stringify, simulated latency, cachability) and the
+skew tests folded into item 7.
 
-1. Restore the genesis-wins-under-skew covenant — five
-   drift/derive tests name a clock-skew case they never
-   construct, so they pass for the wrong reason.
-   `tests/drift-ideas.test.ts:600` ('GET idea trio is
-   lifecycle-current under clock skew') seeds a genesis PUT
-   at `2026-05-01`, then a later-arriving PUT at
-   `2020-01-01`, and asserts the trio keeps the genesis
-   `state_at` / `state_event_id`. But its fixture
-   `ideaDocument(title, state, stateAt, stateEventId,
-   position)` never writes `stateAt` or `stateEventId` into
-   the body — the whole-tree type check flagged both unused
-   (TS6133), and they now carry the `_` prefix that records
-   the omission. No skew is ever built, so nothing the name
-   claims is exercised. Same shape in
-   `tests/drift-objectives.test.ts:1199`,
-   `tests/drift-projects.test.ts:558`,
-   `tests/drift-records.test.ts:1093`,
-   `tests/drift-states.test.ts:1436`, and
-   `tests/derive-projects.test.ts`. Two exits per the Office
-   of Verification: make the PUT path accept caller-supplied
-   trio values so the skew is real, or rename the tests to
-   the arrival-order covenant they actually keep. The first
-   is a validator change; neither is confined to one test's
-   subject. Found by the whole-tree type check.
-2. Remove the lifecycle trio — fold `state` /
-   `state_at` / `state_event_id` out of every document
-   body (Decision 7): the reduction
-   (`api/derive-documents.ts:148-157`), the stamp
-   (`api/document-family.ts:118`), every derive
-   (`api/derive-ideas.ts:54, 83`,
+1. The one table, examined — a report, not a change:
+   the structure and behavior of `message_pairs`
+   (`api/schema-postgres.ts`) under the SQL the code
+   actually issues (`api/backend-postgres.ts`: by id, by
+   collection, by address, by `request_hash`, body
+   containment, `latestPutDelete`, `lockHead` `FOR
+   UPDATE`, the advisory locks, `pg_notify`, the upsert).
+   `EXPLAIN ANALYZE` each against a ledger the size of a
+   year of tenant writes, not the 1453-pair mock seed,
+   and extend `tests/pg-explain.test.ts` (six plan pins
+   today) until every statement has one. Name what each
+   index buys and costs on the write path; whether
+   head-of-address (`livePutsOf` in
+   `api/message-store.ts` folding `SELECT *` of a whole
+   collection, 69 callers) belongs in SQL (`DISTINCT
+   ON`) or stays in the process; the five whole-ledger
+   `getAll()` folds (`api/derive-invitations.ts:70`
+   names the class; `api/derive-identity-tokens.ts:193`
+   runs on every chained token refresh;
+   `api/derive-identity-spine.ts:119`;
+   `api/derive-state-field-values.ts:187`;
+   `api/derive-states.ts:1441, 1970`) and the ledger
+   size at which each crosses the perception threshold;
+   integrity — `upsertRow`'s `ON CONFLICT (id) DO
+   UPDATE` lets the store rewrite a pair the doctrine
+   calls append-only (TEST-PLAN WB16/WB19, unpinned),
+   text-with-regex timestamps against
+   `timestamptz`, the 52-bit advisory key space, the
+   IMMUTABLE `message_body()` beneath the GIN index;
+   schema evolution — `CREATE … IF NOT EXISTS` plus a
+   boolean `schema_marker` is the whole migration story,
+   so name how a DDL change reaches a tenant database
+   that cannot be wiped; tenancy riding
+   `uri_collection`; growth (two wire messages per
+   write, backup size, VACUUM on an insert-only table).
+   Output: a dated report under `docs/superpowers/specs/`
+   whose findings are the oracles items 2, 5, 8, 10, and
+   12 design against.
+2. The authentication header out of the message; roles
+   and views — `HOISTED_HEADER_NAMES`
+   (`api/message-pair.ts:519-521`) stores
+   `Authorization:` verbatim in every write pair's
+   `request`, so the ledger holds every bearer token
+   ever spent on a write; the
+   `/authentication/authorize/` pair stores the login
+   body, password included, and the
+   `/authentication/token/` pair stores the refresh
+   token it was sent and the access token it issued
+   (`tests/api-shadow-ledger-auth.test.ts` 'live secrets
+   land in the auth-flow ledger rows' and 'a refresh
+   grant stores its own pair with live secrets' pin the
+   exposure). Every dump and backup carries all of it;
+   retire that before item 5 backs anything up. The
+   header leaves the `request` bytes for a column of its
+   own — whether `request_hash` still covers it is the
+   brainstorm's question, since replay identity across
+   two tokens changes either way — and the grant bodies
+   follow the same rule or are hashed in place; a view
+   the application reads that omits the column; a
+   schema-owner role that owns DDL, and application
+   roles (read-only, write-only, read-write) that cannot
+   read it, in place of `POSTGRES_DROP_SCHEMA`'s
+   `GRANT ALL … TO public`; what Render's Postgres lets
+   a role be, measured first. Merged: token-at-rest
+   hashing (closes KNOWN
+   seam "A raw dump still has verbatim auth messages");
+   two-role views (`tests/backend-postgres.test.ts`, the
+   re-grant); physical PII erasure (closes KNOWN seam
+   "Erased PII persists as superseded pairs" —
+   `tests/api-pii-tombstone.test.ts`; physical delete or
+   crypto-shredding is the one place append-only yields,
+   and the brainstorm names which); the in-band
+   plaintext comment at `api/mock-data.ts:145-156`,
+   which still says PBKDF2 and names a column that is
+   not there (owner call).
+3. `/status` — `{ up: boolean, components: { postgres:
+   boolean } }`, 200 when every component is up and 503
+   when any is not, built for more components. Decide:
+   bearer-exempt or not (Render and compose probe it
+   unauthenticated; `AUTHENTICATION_ROUTES` is the whole
+   exempt set today); what `postgres: true` proves (a
+   `SELECT 1` on a pooled connection under its own short
+   timeout, not the 30 s statement timeout); that a read
+   stores no pair; whether the throttle counts it and
+   whether it logs. Replaces the compose healthcheck's
+   `fetch('/')`, which proves static serving only. Item
+   5's health probe; item 12 answers it per process.
+4. A person's first sign-in — no page mints a human
+   credential: the seed does
+   (`api/mock-data/seed-message-pairs.ts:2609`), only
+   services get a secret from the UI
+   (`web-app/app/adapters/identities.ts:293`), and
+   `postHumanMemberCreation`
+   (`web-app/app/adapters/members.ts:222`) creates a
+   member who cannot sign in. One primitive, two flows:
+   a single-use, expiring, emailed link whose holder
+   sets a password — sent on invitation grant (whether
+   grant or the link creates the identity is the
+   brainstorm's first question) and on "forgot
+   password". `identities/:id/credentials/:cid` already
+   accepts `kind: 'password'`; the link is the missing
+   authorization to reach it. Email is an external
+   service behind an adapter, its key supplied at deploy
+   and never logged; the link token is a secret at rest
+   under item 2's discipline. Not sign-up: a stranger
+   creating an organization stays in `## Later work`
+   (SP-6). Merged: invitation email delivery.
+5. Operable — what a pilot tenant's data needs before it
+   exists. A backup the operator has restored once:
+   Render's schedule, a written restore drill, its
+   measured duration, and a `schema_marker` that reads
+   present afterward. Cross-environment blocking, so
+   `./deploy --render TOKEN --postgres mock-data` can
+   never wipe the tenant database from a laptop and the
+   Render `ipAllowList` loses `0.0.0.0/0`. Request and
+   error logs as one JSON object per line — `api/api.ts:
+   347` and `:2081` print a label, an object, and an
+   error as three values (the Office of Structured
+   Observability wants one document with level, message,
+   and request identity). An alert when `/status` is not
+   200 or the error rate rises. `TRUSTED_PROXY_HOPS` set
+   to Render's real hop count. Consumes item 3. Merged:
+   the throttle seam — a global cap if the hops are
+   wrong, refresh and exchange unlimited
+   (`tests/http-throttle.test.ts`); the `ipAllowList`
+   bullet.
+6. The membership profile — an organization-side profile
+   per SEAT, so the identity "Tony Stark, CEO" holding a
+   contractor seat elsewhere appears there as
+   "contractor": the document shape (keys on the seat
+   body, or a nested facet under the seat mirroring
+   `identities/:id/pii` — the brainstorm decides), its
+   validator, derive, seed, the roster and detail reads,
+   and the Members page's edit. Replaces the
+   one-profile-per-identity covenant at
+   `api/types.ts:1301-1303`; the seed already carries
+   the contradiction (the admin holds two seats with one
+   title). Lands before items 10 and 11, whose designer
+   roster and AI seats read it; the roster-profile and
+   `DEFAULT_DIM` bullets take their honest absent shapes
+   on the critical functionality path and this item
+   replaces absence with the read. Authored on the
+   `2026-09-04-critical-functionality-path` branch; this
+   is its master copy.
+7. Lifecycle out of the document body — fold `state` /
+   `state_at` / `state_event_id` (Decision 7's trio) out
+   of every document PUT so ideas, projects, flows, and
+   objectives (`lifecycle: 'trio'` at `api/routes.ts:
+   369, 381, 402, 495`) take the shape work-orders,
+   identities, and ai-agents already have: lifecycle is
+   its own event pairs at an operation address, and the
+   absence of a row IS the absence of the event. Sites:
+   the reduction (`api/derive-documents.ts:148-157`),
+   the stamp (`api/document-family.ts:118`), every
+   derive (`api/derive-ideas.ts:54, 83`,
    `api/derive-projects.ts:39, 70`,
    `api/derive-flows.ts:75`), the seeds
-   (`api/mock-data/seed-message-pairs.ts:733, 913`),
-   and the validators' trio-key gates; lifecycle
-   becomes its own event rows. Merged: no lifecycle
-   transition table at any gate.
-3. Credentials out of the message; views for the app —
-   hoist `Authenticate:` (ideally the only plaintext
-   credential path) into its own column; a view that
-   omits it and omits deleted rows; a schema-owner
-   role and view-only application roles (read-only,
-   write-only, read-write), none able to read the
-   column. Merged: token-at-rest hashing (closes KNOWN
-   seam "A raw dump still has verbatim auth
-   messages" — `tests/api-shadow-ledger-auth.test.ts`);
-   two-role views
-   (`tests/backend-postgres.test.ts:391`); physical
-   PII erasure (closes KNOWN seam "Erased PII persists
-   as superseded pairs" —
-   `tests/api-pii-tombstone.test.ts`); the in-band
-   plaintext comment at `api/mock-data.ts:151-152`
-   (owner call).
-5. `/status` — `{ up: boolean, components: {
-   postgres: boolean } }`; `up` is true when every
-   component is; built for more components. Item 10's
-   health probe.
-6. Re-implement workbox, work orders, and flows —
-   nodes become processes; process kinds: record
-   modification (current), external process
-   synchronization (new), directed cyclic graph (flow
-   and sub-flow), directed cyclic graph (sub-graph); a
-   chat on every record and work order (consumes item
-   8). Merged: READY gate on dangling refs
-   (`tests/adapters-flow-publish.test.ts`); locked
-   verbs not executed
-   (`tests/family-registry.test.ts`); the flow-tag
-   designer UI (`TEST-PLAN.md:1510-1511`); F6's ZIP
-   import not rebinding `flow_records`
-   (`TEST-PLAN.md:1114`); the canvas seams the
-   remediation leaves — page selection writes behind
-   the FSM, its four selection-writing sites
-   (`web-app/flows/detail.ts:369, 403, 559, 1854`),
-   in-place `viewBox` mutation at four method sites
-   (`web-app/app/presenters/flow-designer.ts:537, 556, 1012, 1042`),
-   `hasUndoHistory` as `pairs > 1`
-   (`api/derive-flows.ts:108` — the client's
-   approximation, read by no route; the undo route
-   walks the stack itself and its bottom-of-stack 201
-   is the documented no-op, `api/types.ts:1043-1051`,
-   which TEST-PLAN F36/F45 call PASS — the brainstorm
-   decides whether that stays), rotation only on the
-   toggle path (`web-app/app/flow-layout.ts:1032-1037`),
-   and the mirror trigger.
-7. Headless AI worker — a server-side process that
-   watches each AI process-worker's workbox, claims,
-   assembles the record definition, the attribute
-   values (which — decided in the brainstorm), the
-   node instructions, and whatever else serves, asks
-   the model to follow them precisely, and applies the
-   reply: attribute updates in record-PATCH form and
-   the outgoing edge. API-only. Merged: roster seat
-   naming an AI agent
-   (`tests/family-registry.test.ts:112-113`);
-   FLOW-CANVAS.md's display-only AI checkboxes
-   (`FLOW-CANVAS.md:130-132`);
-   `withNodeTaskInstructions` already stores the
-   instructions.
-8. Chats at `/api/chats` — attachable to any document
-   at `/…/:collection/:id/chat` with as little
-   ceremony as the plane allows.
-10. Production readiness, repository and Render —
-    block cross-environment connections,
-    high-availability app and Postgres, and the rest.
-    Merged: the single-mint-process KNOWN seam's
-    precondition — record the claim-expiry decision as
-    its own event before any multi-process deployment
-    (`api/derive-states.ts:811-823` — remove the
-    comment at `derive-states.ts:811-823` when done);
-    the `TRUSTED_PROXY_HOPS` throttle seam
-    (`tests/http-throttle.test.ts`);
-    stale-until-navigation once there are processes to
-    notify (`tests/advisory-lock.test.ts`). Consumes
-    item 5.
+   (`api/mock-data/seed-message-pairs.ts:733, 913`; the
+   1453 pin moves), the validators' trio-key gates, and
+   the wire — decide whether GET still presents `state`,
+   derived, so the pages do not change. Eighty files
+   name the trio, fifty-eight of them tests. Precedes
+   item 10, so the flow rewrite lands on the stateless
+   shape once. Merged: no lifecycle transition table at
+   any gate; the genesis-wins-under-skew tests — five
+   suites name a clock-skew case their fixtures never
+   build (`tests/drift-ideas.test.ts` 'GET idea trio is
+   lifecycle-current under clock skew' and its siblings
+   in drift-objectives, drift-projects, drift-records,
+   and derive-projects; `_stateAt` / `_stateEventId`
+   carry the unused-argument prefix), so they pass for
+   the wrong reason. With the trio gone the server
+   stamps every `at`, skew cannot exist, and the tests
+   go with the trio or rename to the arrival-order
+   covenant they keep — never the other exit, teaching
+   the PUT path to trust a caller's clock.
+8. The bell reaches the browser — every write already
+   `pg_notify`s `fusion_events` with a scoped
+   `NotificationEvent` (`api/notifications.ts`;
+   `notifyPayload` in `api/advisory-lock.ts`, 8000-byte
+   cap with a `full` fallback) and nothing LISTENs, so a
+   second browser is stale until navigation. Ship the
+   other half: one LISTEN connection per process,
+   outside the pool, reconnecting; a per-session stream
+   to the page (SSE is the platform primitive — the
+   brainstorm weighs it against WebSocket and names the
+   drain and the resource-sanitizer cost in `./test
+   browser`), fenced to the session's organization and
+   identity, delivered into the existing
+   `fusion-angle:data` refresh so pages change nothing.
+   Precedes item 9 (a chat that does not update is not a
+   chat) and item 11 (the worker trusts the bell, never
+   polls). Merged: stale-until-navigation (closes KNOWN
+   seam "Stale-until-navigation (no LISTEN)" —
+   `tests/advisory-lock.test.ts`).
+9. Chats — a conversation on any document at
+   `/…/:collection/:id/chat/` with as little ceremony as
+   the plane allows: a message is a POST pair at that
+   address, the chat is that address's history, and
+   derive is `getMessagePairs` filtered to POST — no new
+   family shape unless the brainstorm finds one (edits,
+   deletions, and attachments are its questions).
+   Authorship is `requester_identity_id`, so an AI
+   seat's messages need no extra field. Reads ride the
+   fenced org; updates ride item 8. Consumed by item 10
+   (a chat on every record and work order) and item 11
+   (the channel a person uses to instruct and correct a
+   worker).
+10. Processes — re-implement flows, work orders, and the
+    workbox with a node as a process. Four kinds, each
+    defined by what it waits on and what it emits:
+    record modification (today's node — a member or
+    agent edits the bound instance and transitions);
+    external synchronization (new — the node waits on a
+    system outside the origin: webhook in, request out,
+    or both); sub-flow (the node runs another flow
+    document as a child work order and resumes on its
+    completion); sub-graph (the node holds an inline
+    graph inside the same work order). Both graphs are
+    directed and cyclic. Kept: the pair plane, the graph
+    frozen into the work order at creation, the claim
+    alphabet, all-see-all. Each record and work order
+    carries a chat (consumes item 9). The brainstorm's
+    first questions: what the two nested kinds share,
+    and how a cycle across a sub-flow boundary
+    terminates. Merged, the canvas debts the rewrite
+    retires or keeps by decision: READY gate on dangling
+    refs (`tests/adapters-flow-publish.test.ts`); locked
+    verbs not executed (`tests/family-registry.test.ts`);
+    the flow-tag designer UI (TEST-PLAN "Flow Designer —
+    Flow Tags", API-only today); F6's ZIP import not
+    rebinding `flow_records` (TEST-PLAN F6); page
+    selection writes behind the FSM at four sites in
+    `web-app/flows/detail.ts` (`canvasFocusOf`'s walk is
+    the second instance the remediation added); in-place
+    `viewBox` mutation at four method sites
+    (`web-app/app/presenters/flow-designer.ts:537, 556,
+    1012, 1042`); `hasUndoHistory` as `pairs > 1`
+    (`api/derive-flows.ts:108` — the client's
+    approximation, read by no route; the undo route
+    walks the stack itself and its bottom-of-stack 201
+    is the documented no-op, `api/types.ts:1043-1051`,
+    which TEST-PLAN F36/F45 call PASS — the brainstorm
+    decides whether that stays); rotation only on the
+    toggle path (`web-app/app/flow-layout.ts:1032-1037`);
+    the mirror trigger; and the canvas entries of the
+    genericity bullet in `## Later work` (two zoom
+    implementations, `#noteMutation`, `handleSpace`,
+    Delete's `preventDefault`).
+11. Headless AI worker — a process that hears item 8's
+    bell for each AI seat's workbox, claims the work
+    order as that seat (the `client_credentials` grant
+    already mints a service identity's token, so every
+    pair it lands names the agent as
+    `requester_identity_id`), assembles the record
+    definition, the attribute values (which — the
+    brainstorm decides), the node instructions
+    (`withNodeTaskInstructions` already stores them),
+    and the chat (item 9), asks the model to follow them
+    precisely, validates the reply at the gate like any
+    other uninstructed voice, and applies it: attribute
+    updates in record-PATCH form and the outgoing edge.
+    API-only; no page. Decide in the brainstorm: an
+    in-process loop or a second verb of the binary (a
+    second process is item 12's precondition, the
+    claim-expiry event, arriving early); the model
+    behind an adapter with its key supplied at deploy
+    and never logged; bounded retries with backoff; a
+    loop guard and a spend ceiling for a cycle whose
+    every node is an AI seat; record content treated as
+    data, never as instruction. Consumes items 8, 9, and
+    10. Merged: roster seat naming an AI agent
+    (`tests/family-registry.test.ts:112-113`);
+    FLOW-CANVAS.md's display-only AI checkboxes
+    (`## Members and attributes`).
+12. Two processes — high availability for the app and
+    for Postgres on Render. The app's precondition is in
+    the tree: `api/derive-states.ts:811-823` — the live
+    claim route decides expiry against `Date.now()` and
+    replay reproduces it only inside one process; record
+    the expiry decision as its own event first (remove
+    the comment there when done). Then two replicas
+    behind Render's balancer, each answering item 3's
+    probe; LISTEN in each (item 8 is per process by
+    construction); advisory locks already cluster-wide;
+    the throttle's per-process counters named as a known
+    cost or moved to the store; a Postgres plan with a
+    standby and a rehearsed failover. Closes KNOWN seam
+    "Single mint process" and retires ARCHITECTURE.md's
+    "do not run two replicas". Consumes items 3, 5, 8,
+    and item 1's lock and growth findings.
 
 ## Critical functionality path
 
@@ -263,12 +446,6 @@ Off the critical path; each with its oracle.
   truth for the dashboard service. Oracle: a
   committed `render.yaml` that matches the live
   service without a dashboard PATCH.
-- Render Postgres `ipAllowList` still contains
-  `0.0.0.0/0`. This repo's laptop reseed path to
-  the external URL is gone; tightening the list
-  is item-10 policy (item 10 never names
-  `ipAllowList`). Oracle: Render connection info
-  `ipAllowList` does not contain `0.0.0.0/0`.
 - Dependency-warm Docker layer. `COPY . .` busts
   later layers; `deno compile` fetches `denort`.
   Cold-build reliability is not the problem.
@@ -331,7 +508,6 @@ Off the critical path; each with its oracle.
 - `./measure` harvests error-page timings;
   `page:ready` carries no status —
   `web-app/app/measure.ts`
-- Invitation email delivery
 - Claim-on-load with no release-on-leave plus the
   8-hour `DEFAULT_LOCK_TIMEOUT` turns a drive-by
   work-order view into an 8-hour claim
@@ -1272,18 +1448,28 @@ Off the critical path; each with its oracle.
 
 ## Sequencing
 
-- 8 → 6 (the chat clause consumes chats)
-- 5 → 10 (the health probe consumes `/status`)
-- Item 3's token-at-rest hashing and physical PII
-  erasure close their KNOWN seams — the closer removes
-  the ARCHITECTURE.md bullet and this file's line in
-  one commit
-- The profile document precedes the roster-profile and
-  `DEFAULT_DIM` bullets
+- 1 → 2, 5, 8, 10, 12 (the report's findings are their
+  oracles)
+- 2 → 4, 5 (no credential is written or backed up in
+  the clear)
+- 3 → 5 → 12 (the health probe, then per process)
+- 6 → 10, 11 (the designer roster and AI seats read the
+  profile)
+- 7 → 10 (the flow rewrite lands on the stateless shape
+  once)
+- 8 → 9 → 10 → 11 (the bell, then chats, then
+  processes, then the worker)
+- Items 2, 8, and 12 close KNOWN seams — the closer
+  removes the ARCHITECTURE.md bullet and this file's
+  line in one commit
+- Item 6 precedes the roster-profile and `DEFAULT_DIM`
+  bullets
 - The mock-seed anchor bullet activates after
   2026-09-13
 - `api/derive-states.ts:811-823` (claim-expiry as its
   own event) lands before any multi-process deployment
+  — item 12's first commit, or item 11's if the worker
+  is a second process
 
 ## Close protocol
 
