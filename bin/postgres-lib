@@ -1,82 +1,47 @@
 # Shared Render/local helpers for postgres-seed
 # and postgres-wipe. Source me; do not exec.
 
-API='https://api.render.com/v1'
 WIPE_TIMEOUT_SEC=120
 REVEAL_TIMEOUT_SEC=180
 POLL_SEC=5
 REVEAL_HEADER='Save your demo sign-ins — shown once; copy them now.'
 DASHBOARD_KEYS='https://dashboard.render.com/u/settings?add-api-key'
 
-fail_http() {
-    local code="$1"
-    local file="$2"
-    local msg
-    msg=$(printf '%s' '
-        const enc = new TextEncoder();
-        const path = Deno.args[0];
-        let msg = "";
-        try {
-            const raw = Deno.readTextFileSync(path);
-            const json = JSON.parse(raw);
-            if (
-                json
-                && typeof json.message === "string"
-            ) {
-                msg = json.message;
-            }
-        } catch {
-            msg = "";
-        }
-        Deno.stdout.writeSync(enc.encode(msg));
-    ' | deno run --frozen --allow-read="$file" - "$file")
-    if [ -n "$msg" ]; then
-        echo "Error: Render HTTP ${code}: ${msg}" >&2
-    else
-        echo "Error: Render HTTP ${code}" >&2
+assert_render_cli() {
+    if ! command -v render >/dev/null; then
+        echo "Error: render is required" >&2
+        exit 1
     fi
-    exit 1
-}
-
-# $1 method  $2 path  $3 outfile  $4 optional JSON body
-http_json() {
-    local method="$1"
-    local path="$2"
-    local out="$3"
-    local body="${4:-}"
-    local code
-    local -a curl_args=(
-        -sS
-        -o "$out"
-        -w '%{http_code}'
-        -X "$method"
-        -H "Authorization: Bearer ${RENDER_API_KEY}"
-        -H "Accept: application/json"
-    )
-    if [ -n "$body" ]; then
-        curl_args+=(
-            -H "Content-Type: application/json"
-            --data-binary @"$body"
-        )
+    local yaml="$HOME/.render/cli.yaml"
+    if [ ! -f "$yaml" ]; then
+        echo "Error: ~/.render/cli.yaml is" \
+            "required" >&2
+        exit 1
     fi
-    code=$(curl "${curl_args[@]}" "${API}${path}")
-    case "$code" in
-        2??) return 0 ;;
-        *) fail_http "$code" "$out" ;;
-    esac
-}
-
-write_job_body() {
-    local dest="$1"
-    local cmd="$2"
     printf '%s' '
-        Deno.writeTextFileSync(
+        const enc = new TextEncoder();
+        const text = Deno.readTextFileSync(
             Deno.args[0],
-            JSON.stringify({
-                startCommand: Deno.args[1],
-            }),
         );
-    ' | deno run --frozen --allow-write="$dest" - "$dest" "$cmd"
+        const match = text.match(
+            /expires_at:\s*"?([0-9T:.\-]+Z)/,
+        );
+        if (!match) {
+            Deno.stderr.writeSync(enc.encode(
+                "Error: ~/.render/cli.yaml is expired\n",
+            ));
+            Deno.exit(1);
+        }
+        const exp = Date.parse(match[1]);
+        if (!Number.isFinite(exp)
+            || Date.now() >= exp) {
+            Deno.stderr.writeSync(enc.encode(
+                "Error: ~/.render/cli.yaml is expired\n",
+            ));
+            Deno.exit(1);
+        }
+    ' | deno run --frozen --allow-read="$yaml" \
+        - "$yaml"
 }
 
 start_rfc3339() {
@@ -89,47 +54,71 @@ start_rfc3339() {
         +'%Y-%m-%dT%H:%M:%SZ'
 }
 
-fetch_logs() {
-    local owner="$1"
-    local resource="$2"
-    local start="$3"
-    local out="$4"
-    local code
-    code=$(curl -sS -o "$out" -w '%{http_code}' \
-        --get \
-        --data-urlencode "ownerId=${owner}" \
-        --data-urlencode "resource=${resource}" \
-        --data-urlencode "startTime=${start}" \
-        --data-urlencode "limit=100" \
-        --data-urlencode "direction=forward" \
-        -H "Authorization: Bearer ${RENDER_API_KEY}" \
-        -H "Accept: application/json" \
-        "${API}/logs")
-    case "$code" in
-        2??) return 0 ;;
-        *) fail_http "$code" "$out" ;;
-    esac
-}
-
-# Flatten Render logs JSON to one text line per
-# logs[].message, splitting each message on \n.
+# Flatten CLI log JSON to one text line per
+# message, splitting each message on \n.
+# STOP if no message field can be found.
 flatten_render_logs() {
     local src="$1"
     local dest="$2"
     printf '%s' '
-        const data = JSON.parse(
-            Deno.readTextFileSync(Deno.args[0]),
+        const enc = new TextEncoder();
+        const text = Deno.readTextFileSync(
+            Deno.args[0],
         );
-        const logs = Array.isArray(data.logs)
-            ? data.logs
-            : [];
+        function parseAll(raw) {
+            try {
+                return JSON.parse(raw);
+            } catch {
+                const wrapped = "["
+                    + raw.replace(/}\s*{/g, "},{")
+                    + "]";
+                try {
+                    return JSON.parse(wrapped);
+                } catch {
+                    return null;
+                }
+            }
+        }
+        const data = parseAll(text);
+        if (data === null) {
+            Deno.stderr.writeSync(enc.encode(
+                "Error: log messages missing\n",
+            ));
+            Deno.exit(1);
+        }
+        const messages = [];
+        function walk(value) {
+            if (typeof value === "string") {
+                return;
+            }
+            if (Array.isArray(value)) {
+                for (const item of value) {
+                    walk(item);
+                }
+                return;
+            }
+            if (value && typeof value === "object") {
+                if (typeof value.message === "string") {
+                    messages.push(value.message);
+                    return;
+                }
+                for (const nested of Object.values(
+                    value,
+                )) {
+                    walk(nested);
+                }
+            }
+        }
+        walk(data);
+        if (messages.length === 0) {
+            Deno.stderr.writeSync(enc.encode(
+                "Error: log messages missing\n",
+            ));
+            Deno.exit(1);
+        }
         const lines = [];
-        for (const entry of logs) {
-            const message = entry && entry.message;
-            const text = typeof message === "string"
-                ? message
-                : "";
-            for (const line of text.split("\n")) {
+        for (const message of messages) {
+            for (const line of message.split("\n")) {
                 lines.push(line);
             }
         }
@@ -138,7 +127,8 @@ flatten_render_logs() {
             lines.join("\n"),
         );
     ' | deno run --frozen \
-        --allow-read="$src" --allow-write="$dest" - "$src" "$dest"
+        --allow-read="$src" --allow-write="$dest" \
+        - "$src" "$dest"
 }
 
 # Print the reveal from the header through the last
@@ -171,41 +161,6 @@ print_reveal_lines() {
         - "$file" "$REVEAL_HEADER"
 }
 
-assert_loopback_postgres_url() {
-    if [ -z "${POSTGRES_URL:-}" ]; then
-        echo "Error: missing required env" \
-            "POSTGRES_URL" >&2
-        exit 1
-    fi
-    local host
-    host=$(printf '%s' '
-        const enc = new TextEncoder();
-        const url = Deno.env.get("POSTGRES_URL")
-            ?? "";
-        if (url === "") Deno.exit(2);
-        try {
-            Deno.stdout.writeSync(enc.encode(
-                new URL(url).hostname,
-            ));
-        } catch {
-            Deno.exit(3);
-        }
-    ' | deno run --frozen --allow-env=POSTGRES_URL -) || {
-        echo "Error: POSTGRES_URL host is not" \
-            "loopback" >&2
-        exit 1
-    }
-    case "$host" in
-        localhost|127.0.0.1|'[::1]')
-            ;;
-        *)
-            echo "Error: POSTGRES_URL host is" \
-            "not loopback" >&2
-            exit 1
-            ;;
-    esac
-}
-
 job_id_from() {
     local file="$1"
     local label="$2"
@@ -214,8 +169,19 @@ job_id_from() {
         const job = JSON.parse(
             Deno.readTextFileSync(Deno.args[0]),
         );
-        if (typeof job.id !== "string"
-            || job.id === "") {
+        function idOf(value) {
+            if (value && typeof value.id === "string"
+                && value.id !== "") {
+                return value.id;
+            }
+            if (value && value.job
+                && typeof value.job === "object") {
+                return idOf(value.job);
+            }
+            return "";
+        }
+        const id = idOf(job);
+        if (id === "") {
             Deno.stderr.writeSync(enc.encode(
                 "Error: "
                 + Deno.args[1]
@@ -223,23 +189,69 @@ job_id_from() {
             ));
             Deno.exit(1);
         }
-        Deno.stdout.writeSync(enc.encode(job.id));
-    ' | deno run --frozen --allow-read="$file" - "$file" "$label"
+        Deno.stdout.writeSync(enc.encode(id));
+    ' | deno run --frozen --allow-read="$file" \
+        - "$file" "$label"
 }
 
-job_status_from() {
+job_status_from_list() {
     local file="$1"
+    local job_id="$2"
     printf '%s' '
         const enc = new TextEncoder();
-        const job = JSON.parse(
-            Deno.readTextFileSync(Deno.args[0]),
-        );
-        Deno.stdout.writeSync(enc.encode(
-            typeof job.status === "string"
-                ? job.status
-                : "",
-        ));
-    ' | deno run --frozen --allow-read="$file" - "$file"
+        const cannotPoll =
+            "Error: render jobs get is not a CLI "
+            + "verb; list cannot poll\n";
+        function failPoll() {
+            Deno.stderr.writeSync(
+                enc.encode(cannotPoll),
+            );
+            Deno.exit(1);
+        }
+        let json;
+        try {
+            json = JSON.parse(
+                Deno.readTextFileSync(Deno.args[0]),
+            );
+        } catch {
+            failPoll();
+        }
+        function asList(value) {
+            if (Array.isArray(value)) return value;
+            if (value && typeof value === "object") {
+                if (Array.isArray(value.data)) {
+                    return value.data;
+                }
+                if (Array.isArray(value.jobs)) {
+                    return value.jobs;
+                }
+            }
+            return null;
+        }
+        function asJob(row) {
+            if (row && row.job
+                && typeof row.job === "object") {
+                return row.job;
+            }
+            return row;
+        }
+        const rows = asList(json);
+        if (rows === null) failPoll();
+        const want = Deno.args[1];
+        for (const row of rows) {
+            const job = asJob(row);
+            if (!job || job.id !== want) continue;
+            if (typeof job.status !== "string") {
+                failPoll();
+            }
+            Deno.stdout.writeSync(
+                enc.encode(job.status),
+            );
+            Deno.exit(0);
+        }
+        Deno.exit(0);
+    ' | deno run --frozen --allow-read="$file" \
+        - "$file" "$job_id"
 }
 
 wait_for_job() {
@@ -250,11 +262,11 @@ wait_for_job() {
     local status=''
     while [ $((SECONDS - started)) -lt \
         "$timeout_sec" ]; do
-        http_json GET \
-            "/services/${SERVICE_ID}/jobs/${job_id}" \
-            "$TMP/${label}-status.json"
-        status=$(job_status_from \
-            "$TMP/${label}-status.json")
+        render jobs list "$SERVICE_ID" -o json \
+            > "$TMP/${label}-status.json"
+        status=$(job_status_from_list \
+            "$TMP/${label}-status.json" \
+            "$job_id") || exit 1
         case "$status" in
             succeeded)
                 return 0
@@ -273,26 +285,60 @@ wait_for_job() {
 }
 
 discover_render_ids() {
-    http_json GET '/postgres?limit=100' \
-        "$TMP/postgres.json"
-    http_json GET \
-        '/services?type=web_service&limit=100' \
-        "$TMP/services.json"
+    render postgres list -o json \
+        > "$TMP/postgres.json"
+    render services -o json \
+        > "$TMP/services.json"
 
     printf '%s' '
         const enc = new TextEncoder();
 
+        function fail(msg) {
+            Deno.stderr.writeSync(enc.encode(
+                "Error: " + msg + "\n",
+            ));
+            Deno.exit(1);
+        }
+
         function load(path) {
-            const json = JSON.parse(
-                Deno.readTextFileSync(path),
-            );
-            if (!Array.isArray(json)) {
-                Deno.stderr.writeSync(enc.encode(
-                    "Error: Render list is not an array\n",
-                ));
-                Deno.exit(1);
+            try {
+                return JSON.parse(
+                    Deno.readTextFileSync(path),
+                );
+            } catch {
+                fail("Render list is not JSON");
             }
-            return json;
+        }
+
+        function asList(json) {
+            if (Array.isArray(json)) return json;
+            if (json && typeof json === "object") {
+                const arrays = Object.values(json)
+                    .filter(Array.isArray);
+                if (arrays.length === 1) {
+                    return arrays[0];
+                }
+                if (typeof json.id === "string") {
+                    return [json];
+                }
+            }
+            fail("Render list is not an array");
+        }
+
+        function unwrap(row, key) {
+            if (row && row[key]
+                && typeof row[key] === "object") {
+                return row[key];
+            }
+            return row && typeof row === "object"
+                ? row
+                : {};
+        }
+
+        function str(value) {
+            return typeof value === "string"
+                ? value
+                : "";
         }
 
         function refuse(kind, lines) {
@@ -311,49 +357,81 @@ discover_render_ids() {
             Deno.exit(1);
         }
 
-        const postgres = load(Deno.args[0]);
-        const services = load(Deno.args[1]);
-        const pgLines = postgres.map((row) => {
-            const item = row && row.postgres;
-            const name = item && item.name;
-            const id = item && item.id;
-            return String(name ?? "?")
+        function lineOf(item) {
+            return (str(item.name) || "?")
                 + " ("
-                + String(id ?? "?")
+                + (str(item.id) || "?")
                 + ")";
-        });
-        const svcLines = services.map((row) => {
-            const item = row && row.service;
-            const name = item && item.name;
-            const id = item && item.id;
-            return String(name ?? "?")
-                + " ("
-                + String(id ?? "?")
-                + ")";
-        });
+        }
+
+        function ownerOf(item) {
+            if (str(item.ownerId)) {
+                return item.ownerId;
+            }
+            if (item.owner
+                && typeof item.owner === "object") {
+                return str(item.owner.id);
+            }
+            return str(item.owner);
+        }
+
+        function runtimeOf(item) {
+            if (typeof item.runtime === "string") {
+                return item.runtime;
+            }
+            const details = item.serviceDetails;
+            if (details
+                && typeof details.runtime === "string") {
+                return details.runtime;
+            }
+            return null;
+        }
+
+        function isWeb(item) {
+            const t = str(item.type);
+            return t === "web_service" || t === "web";
+        }
+
+        const postgres = asList(load(Deno.args[0]))
+            .map((row) => unwrap(row, "postgres"));
+        const services = asList(load(Deno.args[1]))
+            .map((row) => unwrap(row, "service"));
+        const web = services.filter(isWeb);
+        const pgLines = postgres.map(lineOf);
+        const webLines = web.map(lineOf);
         if (postgres.length !== 1) {
             refuse("Postgres instance", pgLines);
         }
-        if (services.length !== 1) {
-            refuse("web service", svcLines);
+        if (web.length === 0
+            && services.length > 0
+            && services.every((item) =>
+                str(item.type) === ""
+            )) {
+            fail("service type missing");
         }
-        const owner = postgres[0].postgres
-            && postgres[0].postgres.owner
-            && postgres[0].postgres.owner.id;
-        const serviceId = services[0].service
-            && services[0].service.id;
-        if (typeof owner !== "string" || owner === "") {
-            Deno.stderr.writeSync(enc.encode(
-                "Error: Postgres owner id missing\n",
-            ));
-            Deno.exit(1);
+        if (web.length !== 1) {
+            refuse("web service", webLines);
         }
-        if (typeof serviceId !== "string"
-            || serviceId === "") {
-            Deno.stderr.writeSync(enc.encode(
-                "Error: web service id missing\n",
-            ));
-            Deno.exit(1);
+        const pg = postgres[0];
+        const svc = web[0];
+        const owner = ownerOf(pg);
+        const serviceId = str(svc.id);
+        if (owner === "") {
+            fail("Postgres owner id missing");
+        }
+        if (serviceId === "") {
+            fail("web service id missing");
+        }
+        const runtime = runtimeOf(svc);
+        if (runtime === null) {
+            fail("service runtime missing");
+        }
+        if (runtime !== "docker") {
+            fail(
+                "service runtime is "
+                + runtime
+                + ", not docker",
+            );
         }
         Deno.stdout.writeSync(
             enc.encode(owner + "\n" + serviceId + "\n"),

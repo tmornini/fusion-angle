@@ -8,33 +8,26 @@ ROOT="$(cd "$BIN/.." && pwd)"
 
 usage() {
     cat <<'USAGE'
-Usage: ./postgres-seed --postgres local
+Usage: ./bin/postgres-seed --postgres local
        --bootstrap|--mock-data
-       ./postgres-seed --postgres render TOKEN
-       --bootstrap|--mock-data
-       ./postgres-seed --postgres compose
+       ./bin/postgres-seed --postgres render TOKEN
        --bootstrap|--mock-data
 
 Seed an empty Postgres. --postgres is
 required and has no default. --postgres render
 needs TOKEN (the confirmation). --postgres local
-uses POSTGRES_URL (loopback only); it takes no
-TOKEN. --postgres compose seeds the compose
-stack; it takes no TOKEN and reads
-POSTGRES_PASSWORD through compose.yaml.
+is compose run of the seed service. It takes no
+TOKEN.
 
 Options:
-  --postgres render|local|compose   Target (required)
+  --postgres render|local   Target (required)
   --bootstrap   Seed bootstrap identities
   --mock-data   Seed mock data
   --help       Show this help message
 
 render: TOKEN must see exactly one Postgres and
-one web service. HTTP only (curl).
-local: assert loopback, then
-deno run --frozen server/postgres-seed.ts.
-compose: docker compose run --rm seed MODE — the
-Render job command inside the runtime image.
+one web service. render CLI, not curl.
+local: docker compose run --rm seed MODE.
 Development gun.
 USAGE
 }
@@ -114,11 +107,11 @@ case "$POSTGRES_TARGET" in
         usage >&2
         exit 1
         ;;
-    render|local|compose)
+    render|local)
         ;;
     *)
-        echo "Error: --postgres must be render," \
-            "local, or compose" >&2
+        echo "Error: --postgres must be render" \
+            "or local" >&2
         usage >&2
         exit 1
         ;;
@@ -131,8 +124,7 @@ if [ "$POSTGRES_TARGET" = "render" ] \
     exit 1
 fi
 
-if [ "$POSTGRES_TARGET" = "local" \
-    -o "$POSTGRES_TARGET" = "compose" ] \
+if [ "$POSTGRES_TARGET" = "local" ] \
     && [ -n "$TOKEN" ]; then
     echo "Error: unexpected argument" >&2
     usage >&2
@@ -145,7 +137,7 @@ else
     MODE='--mock-data'
 fi
 
-if [ "$POSTGRES_TARGET" = "compose" ]; then
+if [ "$POSTGRES_TARGET" = "local" ]; then
     if ! command -v docker >/dev/null; then
         echo "Error: docker is required" >&2
         exit 1
@@ -159,22 +151,9 @@ if ! command -v deno >/dev/null; then
     exit 1
 fi
 
-if [ "$POSTGRES_TARGET" = "local" ]; then
-    assert_loopback_postgres_url
-    exec deno run --frozen --allow-net \
-        --allow-env=POSTGRES_URL,PGPORT,PGSSL,PGSSLNEGOTIATION,\
-PGIDLE_TIMEOUT,PGCONNECT_TIMEOUT,PGMAX_LIFETIME,PGMAX_PIPELINE,PGBACKOFF,\
-PGKEEP_ALIVE,PGPREPARE,PGDEBUG,PGFETCH_TYPES,PGPUBLICATIONS,\
-PGTARGET_SESSION_ATTRS,PGAPPNAME,PGTARGETSESSIONATTRS,JWT_HMAC_SIGNING_KEY \
-        "$ROOT/server/postgres-seed.ts" "$MODE"
-fi
-
-if ! command -v curl >/dev/null; then
-    echo "Error: curl is required" >&2
-    exit 1
-fi
 export RENDER_API_KEY="$TOKEN"
 unset TOKEN
+assert_render_cli
 
 cleanup() {
     rm -rf "$TMP"
@@ -186,27 +165,26 @@ trap cleanup EXIT
 
 discover_render_ids
 
-write_job_body "$TMP/seed-job.json" \
-    "./render-out/fusion-angle seed ${MODE}"
-http_json POST \
-    "/services/${SERVICE_ID}/jobs" \
-    "$TMP/seed-created.json" \
-    "$TMP/seed-job.json"
+render jobs create "$SERVICE_ID" \
+    --start-command \
+    "./render-out/fusion-angle seed ${MODE}" \
+    --confirm -o json > "$TMP/seed-created.json"
 
 JOB_ID=$(job_id_from \
     "$TMP/seed-created.json" seed)
 SEED_START=$(start_rfc3339)
 wait_for_job "$JOB_ID" "$REVEAL_TIMEOUT_SEC" seed
 
-fetch_logs "$OWNER_ID" "$JOB_ID" "$SEED_START" \
-    "$TMP/logs.json"
+render logs --resources "$JOB_ID" \
+    --start "$SEED_START" \
+    --direction forward --limit 100 \
+    -o json > "$TMP/logs.json"
 flatten_render_logs "$TMP/logs.json" \
     "$TMP/logs.txt"
 print_reveal_lines "$TMP/logs.txt"
 
-http_json POST \
-    "/services/${SERVICE_ID}/restart" \
-    "$TMP/restart.json"
+render restart "$SERVICE_ID" --confirm \
+    -o json > "$TMP/restart.json"
 
 echo "Revoke the API key at ${DASHBOARD_KEYS}" >&2
 exit 0

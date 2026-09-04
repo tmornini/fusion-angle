@@ -33,17 +33,21 @@ cd "$ROOT"
 # skips), read (fixtures, scripts, source walkers),
 # write (temp dirs for the HTTP tests), net (127.0.0.1
 # listeners), run (the metafile test now spawns deno;
-# serve, crank, and test CLI pins spawn those
-# scripts; test-cli's git SHA skip uses sh).
+# serve, crank, test, and postgres-gun CLI pins
+# spawn those scripts; test-cli's git SHA skip
+# uses sh).
 run_memory() {
     JWT_HMAC_SIGNING_KEY="${JWT_HMAC_SIGNING_KEY:-test-hmac-signing-key}"
     export JWT_HMAC_SIGNING_KEY
+    ALLOW_RUN=deno,./bin/serve,./crank,sh,./test
+    ALLOW_RUN="$ALLOW_RUN,./bin/postgres-wipe"
+    ALLOW_RUN="$ALLOW_RUN,./bin/postgres-seed"
     DENO_TEST=(
         deno test --frozen --parallel --no-check
         --sanitize-ops --sanitize-resources
         --allow-env --allow-read --allow-write
         --allow-net
-        --allow-run=deno,./bin/serve,./crank,sh,./test
+        --allow-run="$ALLOW_RUN"
         --preload ./tests/hmac-test-key.ts
         --preload ./tests/local-storage-stub.ts
         --preload ./tests/session-storage-stub.ts

@@ -8,24 +8,25 @@ ROOT="$(cd "$BIN/.." && pwd)"
 
 usage() {
     cat <<'USAGE'
-Usage: ./postgres-wipe --postgres render TOKEN
-       ./postgres-wipe --postgres local
+Usage: ./bin/postgres-wipe --postgres render TOKEN
+       ./bin/postgres-wipe --postgres local
 
 Drop the message plane (message_pairs), leftover
 pairs, retired leftovers (responses, requests),
 schema_marker, and message_body. Does not seed.
 --postgres is required and has no default.
 --postgres render needs TOKEN (the confirmation).
---postgres local uses POSTGRES_URL (loopback
-only); it takes no TOKEN.
+--postgres local is compose run of the wipe
+service. It takes no TOKEN.
 
 Options:
   --postgres render|local   Target (required)
   --help       Show this help message
 
 render: TOKEN must see exactly one Postgres and
-one web service. HTTP only (curl).
-local: drop. No seed. Development gun.
+one web service. render CLI, not curl.
+local: docker compose run --rm wipe. No seed.
+Development gun.
 USAGE
 }
 
@@ -96,27 +97,23 @@ if [ "$POSTGRES_TARGET" = "local" ] \
     exit 1
 fi
 
+if [ "$POSTGRES_TARGET" = "local" ]; then
+    if ! command -v docker >/dev/null; then
+        echo "Error: docker is required" >&2
+        exit 1
+    fi
+    exec docker compose -f "$ROOT/compose.yaml" \
+        run --rm wipe
+fi
+
 if ! command -v deno >/dev/null; then
     echo "Error: deno is required" >&2
     exit 1
 fi
 
-if [ "$POSTGRES_TARGET" = "local" ]; then
-    assert_loopback_postgres_url
-    exec deno run --frozen --allow-net \
-        --allow-env=POSTGRES_URL,PGPORT,PGSSL,PGSSLNEGOTIATION,\
-PGIDLE_TIMEOUT,PGCONNECT_TIMEOUT,PGMAX_LIFETIME,PGMAX_PIPELINE,PGBACKOFF,\
-PGKEEP_ALIVE,PGPREPARE,PGDEBUG,PGFETCH_TYPES,PGPUBLICATIONS,\
-PGTARGET_SESSION_ATTRS,PGAPPNAME,PGTARGETSESSIONATTRS,JWT_HMAC_SIGNING_KEY \
-        "$ROOT/server/postgres-wipe.ts"
-fi
-
-if ! command -v curl >/dev/null; then
-    echo "Error: curl is required" >&2
-    exit 1
-fi
 export RENDER_API_KEY="$TOKEN"
 unset TOKEN
+assert_render_cli
 
 cleanup() {
     rm -rf "$TMP"
@@ -128,20 +125,16 @@ trap cleanup EXIT
 
 discover_render_ids
 
-WIPE_START=$(deno run --frozen \
-    "$ROOT/server/postgres-wipe.ts" \
-    --print-start-command)
-write_job_body "$TMP/wipe-job.json" "$WIPE_START"
-http_json POST \
-    "/services/${SERVICE_ID}/jobs" \
-    "$TMP/wipe-created.json" \
-    "$TMP/wipe-job.json"
+render jobs create "$SERVICE_ID" \
+    --start-command \
+    "./render-out/fusion-angle wipe" \
+    --confirm -o json > "$TMP/wipe-created.json"
 
 WIPE_JOB_ID=$(job_id_from \
     "$TMP/wipe-created.json" wipe)
 wait_for_job "$WIPE_JOB_ID" "$WIPE_TIMEOUT_SEC" wipe
 
-echo "seed with ./postgres-seed --postgres" \
+echo "seed with ./bin/postgres-seed --postgres" \
     "render TOKEN --<mode>" >&2
 echo "Revoke the API key at ${DASHBOARD_KEYS}" >&2
 exit 0
