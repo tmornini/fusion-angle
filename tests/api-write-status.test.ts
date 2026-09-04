@@ -1,4 +1,4 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import { assert, assertMatch, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -360,4 +360,20 @@ async () => {
         IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
     );
     assert(live !== undefined, 'empty PUT must live');
+});
+
+// Memory serializes all ops, so the TOCTOU is
+// unreachable here; the pin is the comparison.
+Deno.test('the post-tx PUT answers 200 when the stored pair '
++ 'is not ours',
+() => {
+    const src = Deno.readTextFileSync('api/api.ts');
+    assertMatch(
+        src,
+        new RegExp(
+            'const response = sendWriteResponse\\('
+            + '\\s*stored, \'PUT\','
+            + '\\s*stored\\.id === messagePair\\.id,?\\s*\\)',
+        ),
+    );
 });

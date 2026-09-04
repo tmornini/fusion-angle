@@ -317,12 +317,10 @@ Off the critical path; each with its oracle.
   `web-app/app/adapters/members.ts:48`
 - `DEFAULT_DIM` stands in for an assessment that never
   happened — `web-app/members/index.ts:52`
-- Below the gate, a replay is indistinguishable from a
-  creation: `appendMessagePair` skips a duplicate
-  `request_hash` silently by its own comment
-  (`api/message-pair.ts:686-701`), and the composed
-  operation wrapping it still answers 201 however many
-  inner pairs actually landed
+- An inner pair of a composed operation skipped while
+  the top-level pair landed still answers 201:
+  `appendMessagePair` returns void and the gate never
+  holds inner hashes (`api/message-pair.ts:686-701`)
 - A panel rename whose target is deleted during the
   800 ms debounce still saves and still clears redo.
   `withNodeNamed`, `withNodeTaskInstructions`, and
