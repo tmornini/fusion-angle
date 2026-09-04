@@ -3,7 +3,7 @@
 The single home for later work. An item leaves this
 file by shipping; `## Close protocol` is the exit.
 
-## Critical path
+## Critical product path
 
 Twelve items, in this order — each its own brainstorm →
 spec → plan → ship cycle, implemented sequentially. A
@@ -180,7 +180,7 @@ spec → plan → ship cycle, implemented sequentially. A
     `api/db-backed.ts:31-32`, `api/api.ts:2133-2134` —
     revise the three comments when done).
 
-## Later work
+## Critical functionality path
 
 Off the critical path; each with its oracle.
 
@@ -312,6 +312,9 @@ Off the critical path; each with its oracle.
   R7, whose "toy" clauses need a Layer 3 observation
   before any rewrite. G9's staleness was the corrupted
   test name, restored by the small-items sweep
+
+## Later work
+
 - The `exists()` helper is duplicated five times, byte
   for byte, all under `web-app/app/` — `compose.ts`,
   `generate-api-documentation.ts`, `measure-viz.ts`,
