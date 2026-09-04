@@ -18,6 +18,7 @@ const ROOT_FILES = [
     'bin/build',
     'bin/serve',
     'test',
+    'deploy',
     'bin/measure',
     'deno.json',
     'bin/postgres-wipe',

@@ -33,13 +33,13 @@ cd "$ROOT"
 # skips), read (fixtures, scripts, source walkers),
 # write (temp dirs for the HTTP tests), net (127.0.0.1
 # listeners), run (the metafile test now spawns deno;
-# serve, crank, test, and postgres-gun CLI pins
+# serve, deploy, test, and postgres-gun CLI pins
 # spawn those scripts; test-cli's git SHA skip
 # uses sh).
 run_memory() {
     JWT_HMAC_SIGNING_KEY="${JWT_HMAC_SIGNING_KEY:-test-hmac-signing-key}"
     export JWT_HMAC_SIGNING_KEY
-    ALLOW_RUN=deno,./bin/serve,./crank,sh,./test
+    ALLOW_RUN=deno,./bin/serve,./deploy,sh,./test
     ALLOW_RUN="$ALLOW_RUN,./bin/postgres-wipe"
     ALLOW_RUN="$ALLOW_RUN,./bin/postgres-seed"
     DENO_TEST=(
@@ -72,7 +72,7 @@ run_lint() {
                -o -name '*.css' \) \
             ! -path 'web-app/app/compose.ts' \
             -exec awk "$AWK_LINT" {} +
-        awk "$AWK_LINT" test crank \
+        awk "$AWK_LINT" test deploy \
             bin/build bin/build-lib bin/serve \
             bin/test-postgres bin/test-browser \
             bin/generate-schema-svg \

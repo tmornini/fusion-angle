@@ -19,9 +19,9 @@ Deno.test('test does not lint root markdown', () => {
     );
 });
 
-Deno.test('test lints crank', () => {
+Deno.test('test lints deploy', () => {
     assertMatch(
         longLineBlock(TEST_SRC),
-        /\bcrank\b/,
+        /\bdeploy\b/,
     );
 });
