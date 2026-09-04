@@ -365,9 +365,8 @@ stack).
 
 SHA skip applies only to the `validate`
 combination, not to a primitive run alone.
-The stamp stays `validate-ok` in the shared
-git dir (the combination is still named
-`validate`).
+The stamp is `most-recently-validated-sha`
+in the shared git dir.
 
 **`./test postgres`.** Always a Docker
 Postgres. Mint a password, `compose up`
