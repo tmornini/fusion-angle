@@ -277,3 +277,19 @@ Deno.test('deploy source render path is the CLI',
     assertMatch(combined, /command -v render/);
     assertNotMatch(combined, /http_json/);
 });
+
+Deno.test('deploy oracle curls bound their wait',
+() => {
+    const src = Deno.readTextFileSync('deploy');
+    assertMatch(src, /ORACLE_TIMEOUT_SEC=/);
+    assertMatch(
+        src,
+        /--max-time "\$ORACLE_TIMEOUT_SEC"/,
+    );
+    const curls = [...src.matchAll(/\$\(curl /g)];
+    const bounds = [...src.matchAll(
+        /--max-time "\$ORACLE_TIMEOUT_SEC"/g,
+    )];
+    assert(curls.length > 0, 'curl missing');
+    assertStrictEquals(curls.length, bounds.length);
+});

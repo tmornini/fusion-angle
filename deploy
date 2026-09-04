@@ -208,6 +208,8 @@ fi
 
 discover_render_ids
 
+ORACLE_TIMEOUT_SEC=20
+
 if [ -n "$COMMIT_SHA" ]; then
     render deploys create "$SERVICE_ID" \
         --commit "$COMMIT_SHA" \
@@ -220,6 +222,7 @@ if [ -n "$COMMIT_SHA" ]; then
                 want=401
             fi
             code=$(curl -sS -o /dev/null \
+                --max-time "$ORACLE_TIMEOUT_SEC" \
                 -w '%{http_code}' \
                 "https://${host}${path}")
             echo "${host} ${path} ${code}"
@@ -235,6 +238,7 @@ if [ -n "$COMMIT_SHA" ]; then
         www.fusionangle.ai; do
         apex="${host#www.}"
         out=$(curl -sS -o /dev/null \
+            --max-time "$ORACLE_TIMEOUT_SEC" \
             -w '%{http_code} %{redirect_url}' \
             "https://${host}/")
         echo "${host} / ${out}"
