@@ -899,7 +899,7 @@ async () => {
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assertStrictEquals(replay.status, 201);
+    assertStrictEquals(replay.status, 200);
     assertStrictEquals(
         replay.headers.get('ETag'),
         originalEtag,

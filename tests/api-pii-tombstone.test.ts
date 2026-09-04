@@ -227,7 +227,7 @@ Deno.test('a byte-identical resend against the LIVE slot replays'
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Dana'),
     ));
-    assertStrictEquals(resend.status, 201);
+    assertStrictEquals(resend.status, 200);
     assertStrictEquals(resend.headers.get('Response-ID'), firstId);
     assertStrictEquals(
         (await db.messagePairs.getAll()).length,
@@ -257,7 +257,7 @@ Deno.test('a byte-identical resend AFTER supersession replays'
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Erin'),
     ));
-    assertStrictEquals(resend.status, 201);
+    assertStrictEquals(resend.status, 200);
     assertStrictEquals(resend.headers.get('Response-ID'), firstId);
     assertStrictEquals(
         (await db.messagePairs.getAll()).length,

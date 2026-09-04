@@ -800,7 +800,7 @@ Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
     const second = await handleRequest(db, req(
         'PUT', '/ai-agents/' + aiId, token, body,
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     const afterSecond = (await db.messagePairs.getAll()).length;
     assertStrictEquals(afterSecond, afterFirst);
     assertStrictEquals(

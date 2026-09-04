@@ -1065,7 +1065,7 @@ async () => {
 
 // --- 9. byte-identical resend ---
 
-Deno.test('byte-identical resend → 204 replay, no second '
+Deno.test('byte-identical resend → 200 replay, no second '
 + 'revision',
 async () => {
     const { db, adminToken, etag } = await seededBound();
@@ -1092,7 +1092,7 @@ async () => {
         'POST', TRANSITION, adminToken, body,
         { [IF_MATCH_HEADER]: etag },
     ));
-    assertStrictEquals(replay.status, 201);
+    assertStrictEquals(replay.status, 200);
     assertStrictEquals(
         await instancePairCount(db),
         afterFirst,

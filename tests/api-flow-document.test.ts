@@ -520,7 +520,7 @@ Deno.test('e2e: a byte-identical resend converges (one event, one'
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'bZXXOWeDHCowVkWMhrZGgg', token, body, headers,
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     assertStrictEquals(second.headers.get('Response-ID'), firstId);
     const stored = await db.messagePairs.getById(firstId!);
     assert(stored !== undefined);

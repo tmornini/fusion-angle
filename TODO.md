@@ -317,20 +317,9 @@ Off the critical path; each with its oracle.
   `web-app/app/adapters/members.ts:48`
 - `DEFAULT_DIM` stands in for an assessment that never
   happened — `web-app/members/index.ts:52`
-- A replay is indistinguishable from a creation. The
-  gate's replay branch renders a previously-stored
-  pair but passes `appended: true`
-  (`api/api.ts:1013-1015`), so `sendWriteResponse`
-  (`api/message-pair.ts:610-624`) answers 201 exactly
-  as the genuine create did. THE FIX IS WIRING, NOT
-  DELETION: pass `false` there. The 200 branch is not
-  dead — the unchanged-live-PUT site already passes
-  `false` (`api/api.ts:1412-1413`), which is both the
-  proof the distinction was designed and the precedent
-  for the repair; an item reading "remove the 200
-  branch" would be exactly backwards. Below the gate,
-  the same blindness: `appendMessagePair` skips a
-  duplicate `request_hash` silently by its own comment
+- Below the gate, a replay is indistinguishable from a
+  creation: `appendMessagePair` skips a duplicate
+  `request_hash` silently by its own comment
   (`api/message-pair.ts:686-701`), and the composed
   operation wrapping it still answers 201 however many
   inner pairs actually landed

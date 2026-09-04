@@ -223,7 +223,7 @@ export function defineStoreAcceptance(
         );
     });
 
-    Deno.test(name + ': exact retry keeps status', async () => {
+    Deno.test(name + ': exact retry replays as 200', async () => {
         const { db, token } = await ready();
         const body = ideaDocument('Retry', 'ev-sa-retry');
         const first = await handleRequest(
@@ -240,7 +240,7 @@ export function defineStoreAcceptance(
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'tjrZLujBtBVqFwOsBDWdQQ', token, body),
         );
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
         assertStrictEquals(
             second.headers.get('Operation-ID'), firstOp,
         );

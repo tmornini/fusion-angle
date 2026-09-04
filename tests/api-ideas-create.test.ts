@@ -165,7 +165,7 @@ Deno.test(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'hJeymLqQwgpIHWgKlcHWNA', DEV_TOKEN, body,
         ));
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
         assertStrictEquals(
             second.headers.get('Response-ID'),
             first.headers.get('Response-ID'),

@@ -556,7 +556,7 @@ async () => {
 });
 
 // 7. re-bind same pair → 201 replay (pair count stable)
-Deno.test('re-bind same pair byte-identically → 201'
+Deno.test('re-bind same pair byte-identically → 200'
 + ' replay (pair count unchanged)',
 async () => {
     const { db, token } = await seededDb();
@@ -568,7 +568,7 @@ async () => {
     const second = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     assertStrictEquals(await messagePairCount(db), before);
 });
 

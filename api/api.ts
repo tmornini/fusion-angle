@@ -985,7 +985,7 @@ export async function handleRequest(
                 );
                 if (replay !== undefined) {
                     const response = sendWriteResponse(
-                        replay, method, true,
+                        replay, method, false,
                     );
                     if (
                         routePattern

@@ -545,7 +545,7 @@ async () => {
     });
 });
 
-Deno.test('byte-identical PATCH create resend → 201 replay',
+Deno.test('byte-identical PATCH create resend → 200 replay',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -564,7 +564,7 @@ async () => {
     const second = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     assertStrictEquals(
         second.headers.get('Response-ID'),
         originalId,

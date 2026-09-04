@@ -196,7 +196,7 @@ async () => {
     );
 });
 
-Deno.test('exact retry returns the original 201',
+Deno.test('exact retry returns the original as 200',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -215,7 +215,7 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'yggAqfvrChBmrMfrOilSUg', token, body),
     );
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     assertStrictEquals(
         second.headers.get('Operation-ID'), firstOp,
     );

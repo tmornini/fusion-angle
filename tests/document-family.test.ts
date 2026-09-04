@@ -633,7 +633,7 @@ async () => {
         // yet it must replay — never 412 — because the fast path
         // runs BEFORE the four-outcome table.
         const resend = await handleRequest(db, editRequest.clone());
-        assertStrictEquals(resend.status, 201);
+        assertStrictEquals(resend.status, 200);
         assertStrictEquals(resend.headers.get('Date'), editDate);
         assertStrictEquals(
             resend.headers.get('Response-ID'),
