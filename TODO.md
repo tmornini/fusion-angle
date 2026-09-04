@@ -1393,7 +1393,10 @@ Off the critical path; each with its oracle.
   requests, and the rest; the brainstorm presents its
   questions from most to least desirable. Start:
   `server/http-server.ts` `NO_STORE` and
-  `CONTENT_SECURITY_POLICY`.
+  `CONTENT_SECURITY_POLICY`. Oracle: a measured
+  `./bin/measure` repeat-load delta naming the header
+  that earned it; hashed assets already carry
+  `HASHED_CACHE_CONTROL`.
 - Genericity — DRY, even once (the indulgence); spec
   away every nit. Merged: `putRecordInstance` PATCHes
   (name lie —
@@ -1425,7 +1428,10 @@ Off the critical path; each with its oracle.
   remove the comment at `validators.ts:705-713` when
   done); `handleSpace` dispatching
   `isFormFocused: false` unconditionally; Delete's
-  `preventDefault` with nothing selected.
+  `preventDefault` with nothing selected. Oracle: each
+  named site collapsed to one definition, `./test
+  validate` green; the canvas entries retire with
+  product-path item 10.
 - Fewer JSON parse/stringify — byte-stream header
   setting, mechanical sympathy and simplicity for
   the processor; measured first
@@ -1433,7 +1439,10 @@ Off the critical path; each with its oracle.
   content-coding seams
   (`shared/http-message/body.ts:76-79` and
   `shared/http-message/content-coding.ts:5-7` —
-  revise both comments when done).
+  revise both comments when done). Oracle: a
+  `./bin/measure --profile` run placing parse/stringify
+  above the budgets' noise — the item activates on that
+  number, not before.
 - Simulated latency by environment — when
   `FUSION_ANGLE_ENVIRONMENT` is exactly `local` and
   `FUSION_ANGLE_LATENCY` is a millisecond count,
@@ -1444,7 +1453,10 @@ Off the critical path; each with its oracle.
   no-op. Merged: the shim's "both presets pass a
   no-op today" (`api/latency.ts:1-5`,
   `api/db-backed.ts:31-32`, `api/api.ts:2133-2134` —
-  revise the three comments when done).
+  revise the three comments when done). Oracle:
+  `FUSION_ANGLE_LATENCY=200` under `local` lifts every
+  `./bin/measure` median by about 200 ms; unset leaves
+  the no-op.
 
 ## Sequencing
 
