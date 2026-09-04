@@ -86,6 +86,8 @@ const DUMMY_BODIES: Readonly<
     [ATTRIBUTE_DETAIL_PATTERN]: {
         name: 'A', attribute_type: 'text',
         sort_order: 1, options: [], constraints: [],
+        read_roles: ['member', 'admin'],
+        write_roles: ['member', 'admin'],
     },
     [INSTANCE_DETAIL_PATTERN]: {
         set: [{ attribute_id: ID, value: 'v' }],

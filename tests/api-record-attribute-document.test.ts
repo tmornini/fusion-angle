@@ -189,6 +189,8 @@ async () => {
         sort_order: 1,
         options: [],
         constraints: [],
+        read_roles: ['member', 'admin'],
+        write_roles: ['member', 'admin'],
     };
     const opHeaders: readonly (readonly [string, string])[] =
         [['operation-id', TEST_OPERATION_ID]];

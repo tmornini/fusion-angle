@@ -404,6 +404,8 @@ async () => {
         sort_order: 0,
         options: [],
         constraints: [],
+        read_roles: ['member', 'admin'],
+        write_roles: ['member', 'admin'],
     };
     const path = '/organizations/' + ORGANIZATION
         + '/record-types/' + typeId

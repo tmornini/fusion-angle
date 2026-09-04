@@ -72,8 +72,7 @@ import {
     validateProjectFlowEntity,
     validateFlowTagName,
     validateRecordAttributeDocumentBody,
-    validateAttributeDocumentCreate,
-    validateAttributeDocumentReplace,
+    validateAttributeDocument,
     validateInstancePutBody,
     validateInstancePatchBody,
     validateRecordDocumentBody,
@@ -85,6 +84,7 @@ import {
     validateWorkOrderTransitionBody,
     asWorkOrderFlowGraph,
     pickString,
+    pickStringArray,
     pickBoolean,
     pickNumber,
     asStoredGraph,
@@ -974,15 +974,15 @@ function attributesUriPrefix(
 
 // Live attribute heads → AttributeSchemaRow map for
 // instance ACL + value gates (Tasks 15/17). Roles and
-// type fields ride the stored nested document body.
+// type fields ride the stored nested document body; a
+// head without its role arrays is a breach proclaimed
+// here, never a case handled.
 function attributeSchemaOf(
     id: string,
     body: Record<string, unknown>,
 ): AttributeSchemaRow {
     const optionsRaw = body['options'];
     const constraintsRaw = body['constraints'];
-    const readRolesRaw = body['read_roles'];
-    const writeRolesRaw = body['write_roles'];
     return {
         id,
         name: pickString(body, 'name'),
@@ -995,12 +995,8 @@ function attributeSchemaOf(
         constraints: Array.isArray(constraintsRaw)
             ? constraintsRaw as Constraint[]
             : [],
-        readRoles: Array.isArray(readRolesRaw)
-            ? readRolesRaw as string[]
-            : [],
-        writeRoles: Array.isArray(writeRolesRaw)
-            ? writeRolesRaw as string[]
-            : [],
+        readRoles: pickStringArray(body, 'read_roles'),
+        writeRoles: pickStringArray(body, 'write_roles'),
     };
 }
 
@@ -1029,18 +1025,16 @@ export async function loadAttributeSchemaById(
 }
 
 // G6: GET derive is the stored PUT. Address echoes plus
-// create-time ACL defaults (validate stamps when omitted).
+// the stored nested document body (both ACL keys required).
 export function nestedAttributeWireOf(
     organization: Id,
     recordTypeId: Id,
     attributeId: Id,
     requestBody: Record<string, unknown>,
 ): Record<string, unknown> {
-    const raw = withoutId(requestBody);
-    const entity =
-        'read_roles' in raw && 'write_roles' in raw
-            ? validateAttributeDocumentReplace(raw)
-            : validateAttributeDocumentCreate(raw);
+    const entity = validateAttributeDocument(
+        withoutId(requestBody),
+    );
     return {
         id: attributeId,
         organization_id: organization,
@@ -5300,21 +5294,8 @@ export const routes: Route[] = [
         put: async (db, p, body, _actor, messagePair) => {
             const org = param(p, 0);
             const typeId = param(p, 1);
-            const attrId = param(p, 2);
             await requireRecordTypeExists(db, org, typeId);
-            const prefix = attributesUriPrefix(org, typeId);
-            const messagePairs = await db.messagePairs.getAllWhere(
-                'uri_collection', prefix,
-            );
-            const hasHead = deriveDocumentsAt(
-                messagePairs, prefix,
-            ).has(attrId);
-            const raw = withoutId(body);
-            if (hasHead) {
-                validateAttributeDocumentReplace(raw);
-            } else {
-                validateAttributeDocumentCreate(raw);
-            }
+            validateAttributeDocument(withoutId(body));
             return db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {

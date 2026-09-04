@@ -665,3 +665,41 @@ async () => {
         'winner writes wire PATCH + inner PUT',
     );
 });
+
+// The measured 403: an admin's keyless nested create stored
+// no role keys, attributeSchemaOf read [] for both, and a
+// member's value write was forbidden. The gate now refuses
+// the keyless create; a keyed one lets the member write.
+Deno.test('an admin keyless nested attribute create is 400',
+async () => {
+    const { db, adminToken } = await adminDb();
+    await putLiveType(db, adminToken);
+    const put = await handleRequest(db, req(
+        'PUT', ATTRS + ATTR_ID, adminToken, {
+            name: 'Title',
+            attribute_type: 'text',
+            sort_order: 0,
+            options: [],
+            constraints: [],
+        },
+    ));
+    assertStrictEquals(put.status, 400);
+    assertEquals(await put.json(), {
+        error: 'missing required key "read_roles"'
+            + ' for AttributeDocumentBody',
+    });
+});
+
+Deno.test('a keyed nested create lets a member write its'
++ ' value',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
+    const res = await handleRequest(db, req(
+        'PATCH', INSTANCE_DETAIL, memberToken,
+        setBody([{ attribute_id: ATTR_ID, value: 'Hello' }]),
+    ));
+    assertStrictEquals(res.status, 201);
+});

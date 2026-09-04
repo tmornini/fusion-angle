@@ -106,6 +106,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
         + '/attributes/VPckAwjJsTGCEkKaOOGRGw', {
             name: 'Severity', attribute_type: 'text',
             sort_order: 0, options: [], constraints: [],
+            read_roles: ['member', 'admin'],
+            write_roles: ['member', 'admin'],
         },
         DEV_TOKEN,
     );

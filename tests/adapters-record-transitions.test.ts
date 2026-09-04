@@ -29,6 +29,7 @@ import {
     postRecordChange,
 } from '../web-app/app/adapters/records.ts';
 import {
+    DEFAULT_ATTRIBUTE_ACL_ROLES,
     DEFAULT_LOCK_TIMEOUT,
     type GraphNode,
     type GraphEdge,
@@ -255,6 +256,8 @@ async function seedAttribute(
             sort_order: 1,
             options: [],
             constraints: options.constraints ?? [],
+            read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+            write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
         },
     );
 }

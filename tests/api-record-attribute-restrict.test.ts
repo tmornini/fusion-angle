@@ -91,6 +91,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
         sort_order: 0,
         options: [],
         constraints: [],
+        read_roles: ['member', 'admin'],
+        write_roles: ['member', 'admin'],
     }, DEV_TOKEN);
     return db;
 }
@@ -290,6 +292,8 @@ Deno.test(
             sort_order: 1,
             options: [],
             constraints: [],
+            read_roles: ['member', 'admin'],
+            write_roles: ['member', 'admin'],
         }, DEV_TOKEN);
         const before = await GET<{
             organization_id: string;

@@ -371,15 +371,6 @@ Off the critical path; each with its oracle.
   its callback synchronously; all thirteen
   `subscribe<Entity>Changes` delegate to `createChannel`,
   so it is inert — guard only if that changes
-- Absence and emptiness are conflated in attribute ACL
-  derivation. `attributeSchemaOf` synthesizes
-  `readRoles: []` both for a head that deliberately
-  stores an empty array and for one carrying no role
-  keys at all (`api/routes.ts:1000-1005`), because the
-  nested attribute PUT appends the raw wire body
-  rather than the validator's normalized document
-  (`api/routes.ts:5307-5333`; the default-stamping it
-  discards is `api/validators.ts:3042-3054`)
 - Member-removal affordance under members/identities —
   zero-membership is seed-produced today (Riley Okafor);
   no page deletes a membership row. Oracle: removing a
