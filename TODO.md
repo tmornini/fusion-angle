@@ -153,12 +153,10 @@ skew tests folded into item 7.
    `api/types.ts:1301-1303`; the seed already carries
    the contradiction (the admin holds two seats with one
    title). Lands before items 10 and 11, whose designer
-   roster and AI seats read it; the roster-profile and
-   `DEFAULT_DIM` bullets take their honest absent shapes
-   on the critical functionality path and this item
-   replaces absence with the read. Authored on the
-   `2026-09-04-critical-functionality-path` branch; this
-   is its master copy.
+   roster and AI seats read it, and replaces the
+   roster's absent profile with the read. Authored on
+   the `2026-09-04-critical-functionality-path` branch;
+   this is its master copy.
 7. Lifecycle out of the document body — fold `state` /
    `state_at` / `state_event_id` (Decision 7's trio) out
    of every document PUT so ideas, projects, flows, and
@@ -1419,11 +1417,9 @@ Off the critical path; each with its oracle.
   path's duplicated pure helpers
   (`api/flow-graph-diff.ts:16-26`); `toRecordAttribute`'s
   `??` ACL default
-  (`web-app/app/adapters/record-attributes.ts:76-79`)
-  and the two readings of an absent role array
-  (`api/routes.ts:843-856, 1000-1005` —
-  `recordAttributeDocumentBodyOf` vs
-  `attributeSchemaOf`); the nested
+  (`web-app/app/adapters/record-attributes.ts:76-79`;
+  its server half is the ACL bullet on the critical
+  functionality path); the nested
   key-set follow-on (`api/validators.ts:705-713` —
   remove the comment at `validators.ts:705-713` when
   done); `handleSpace` dispatching
@@ -1474,8 +1470,8 @@ Off the critical path; each with its oracle.
 - Items 2, 8, and 12 close KNOWN seams — the closer
   removes the ARCHITECTURE.md bullet and this file's
   line in one commit
-- Item 6 precedes the roster-profile and `DEFAULT_DIM`
-  bullets
+- Item 6 precedes routing the roster through the
+  profile
 - The mock-seed anchor bullet activates after
   2026-09-13
 - `api/derive-states.ts:811-823` (claim-expiry as its
