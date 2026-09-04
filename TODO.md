@@ -62,11 +62,6 @@ spec → plan → ship cycle, implemented sequentially. A
    `tests/api-pii-tombstone.test.ts`); the in-band
    plaintext comment at `api/mock-data.ts:151-152`
    (owner call).
-4. Cachability — headers, `HEAD`, conditional
-   requests, and the rest; the brainstorm presents its
-   questions from most to least desirable. Start:
-   `server/http-server.ts` `NO_STORE` and
-   `CONTENT_SECURITY_POLICY`.
 5. `/status` — `{ up: boolean, components: {
    postgres: boolean } }`; `up` is true when every
    component is; built for more components. Item 10's
@@ -115,38 +110,6 @@ spec → plan → ship cycle, implemented sequentially. A
 8. Chats at `/api/chats` — attachable to any document
    at `/…/:collection/:id/chat` with as little
    ceremony as the plane allows.
-9. Genericity — DRY, even once (the indulgence); spec
-   away every nit. Merged: `putRecordInstance` PATCHes
-   (name lie —
-   `tests/adapters-record-instances.test.ts`,
-   `tests/api-instances-create.test.ts`); same-body
-   PATCH appends 201
-   (`tests/api-instances-create.test.ts:585-586`);
-   member detail's redundant GET trio
-   (`web-app/members/detail.ts`); two zoom
-   implementations and two constant sets
-   (`web-app/app/flow-fsm-reduce.ts:12-14, 632-656`,
-   `web-app/app/flow-interactions.ts:16-18, 816-850`);
-   `#noteMutation` / `history()` beside
-   `advanceHistory`
-   (`web-app/app/presenters/flow-designer.ts:221-227`);
-   the shell's hand-kept copy of the reveal header
-   (`postgres-lib:8` against `server/seed.ts:26-27`,
-   guarded by no test); the second instance the
-   remediation added (`canvasFocusOf`'s walk); the undo
-   path's duplicated pure helpers
-   (`api/flow-graph-diff.ts:16-26`); `toRecordAttribute`'s
-   `??` ACL default
-   (`web-app/app/adapters/record-attributes.ts:76-79`)
-   and the two readings of an absent role array
-   (`api/routes.ts:843-856, 1000-1005` —
-   `recordAttributeDocumentBodyOf` vs
-   `attributeSchemaOf`); the nested
-   key-set follow-on (`api/validators.ts:705-713` —
-   remove the comment at `validators.ts:705-713` when
-   done); `handleSpace` dispatching
-   `isFormFocused: false` unconditionally; Delete's
-   `preventDefault` with nothing selected.
 10. Production readiness, repository and Render —
     block cross-environment connections,
     high-availability app and Postgres, and the rest.
@@ -160,25 +123,6 @@ spec → plan → ship cycle, implemented sequentially. A
     stale-until-navigation once there are processes to
     notify (`tests/advisory-lock.test.ts`). Consumes
     item 5.
-11. Fewer JSON parse/stringify — byte-stream header
-    setting, mechanical sympathy and simplicity for
-    the processor; measured first
-    (`./measure --profile`). Merged: the deferred
-    content-coding seams
-    (`shared/http-message/body.ts:76-79` and
-    `shared/http-message/content-coding.ts:5-7` —
-    revise both comments when done).
-12. Simulated latency by environment — when
-    `FUSION_ANGLE_ENVIRONMENT` is exactly `local` and
-    `FUSION_ANGLE_LATENCY` is a millisecond count,
-    both present and non-empty, every API request
-    takes the existing log-normal sampler
-    (`api/latency.ts:18-40`) with
-    `mu = ln(FUSION_ANGLE_LATENCY)`; otherwise the
-    no-op. Merged: the shim's "both presets pass a
-    no-op today" (`api/latency.ts:1-5`,
-    `api/db-backed.ts:31-32`, `api/api.ts:2133-2134` —
-    revise the three comments when done).
 
 ## Critical functionality path
 
@@ -1269,6 +1213,62 @@ Off the critical path; each with its oracle.
   'npm:' deno.json deno.lock` prints nothing;
   `./test-postgres` 52 passed; `./measure --check` green
   against the committed budgets.
+- Cachability — headers, `HEAD`, conditional
+  requests, and the rest; the brainstorm presents its
+  questions from most to least desirable. Start:
+  `server/http-server.ts` `NO_STORE` and
+  `CONTENT_SECURITY_POLICY`.
+- Genericity — DRY, even once (the indulgence); spec
+  away every nit. Merged: `putRecordInstance` PATCHes
+  (name lie —
+  `tests/adapters-record-instances.test.ts`,
+  `tests/api-instances-create.test.ts`); same-body
+  PATCH appends 201
+  (`tests/api-instances-create.test.ts:585-586`);
+  member detail's redundant GET trio
+  (`web-app/members/detail.ts`); two zoom
+  implementations and two constant sets
+  (`web-app/app/flow-fsm-reduce.ts:12-14, 632-656`,
+  `web-app/app/flow-interactions.ts:16-18, 816-850`);
+  `#noteMutation` / `history()` beside
+  `advanceHistory`
+  (`web-app/app/presenters/flow-designer.ts:221-227`);
+  the shell's hand-kept copy of the reveal header
+  (`postgres-lib:8` against `server/seed.ts:26-27`,
+  guarded by no test); the second instance the
+  remediation added (`canvasFocusOf`'s walk); the undo
+  path's duplicated pure helpers
+  (`api/flow-graph-diff.ts:16-26`); `toRecordAttribute`'s
+  `??` ACL default
+  (`web-app/app/adapters/record-attributes.ts:76-79`)
+  and the two readings of an absent role array
+  (`api/routes.ts:843-856, 1000-1005` —
+  `recordAttributeDocumentBodyOf` vs
+  `attributeSchemaOf`); the nested
+  key-set follow-on (`api/validators.ts:705-713` —
+  remove the comment at `validators.ts:705-713` when
+  done); `handleSpace` dispatching
+  `isFormFocused: false` unconditionally; Delete's
+  `preventDefault` with nothing selected.
+- Fewer JSON parse/stringify — byte-stream header
+  setting, mechanical sympathy and simplicity for
+  the processor; measured first
+  (`./measure --profile`). Merged: the deferred
+  content-coding seams
+  (`shared/http-message/body.ts:76-79` and
+  `shared/http-message/content-coding.ts:5-7` —
+  revise both comments when done).
+- Simulated latency by environment — when
+  `FUSION_ANGLE_ENVIRONMENT` is exactly `local` and
+  `FUSION_ANGLE_LATENCY` is a millisecond count,
+  both present and non-empty, every API request
+  takes the existing log-normal sampler
+  (`api/latency.ts:18-40`) with
+  `mu = ln(FUSION_ANGLE_LATENCY)`; otherwise the
+  no-op. Merged: the shim's "both presets pass a
+  no-op today" (`api/latency.ts:1-5`,
+  `api/db-backed.ts:31-32`, `api/api.ts:2133-2134` —
+  revise the three comments when done).
 
 ## Sequencing
 
