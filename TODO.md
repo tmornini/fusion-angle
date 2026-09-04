@@ -387,15 +387,6 @@ Off the critical path; each with its oracle.
   its callback synchronously; all thirteen
   `subscribe<Entity>Changes` delegate to `createChannel`,
   so it is inert — guard only if that changes
-- GPU flag in the Layer 2 launcher — `launchChrome`
-  no longer passes `--disable-gpu` (cargo cult under
-  `--headless=new`; it was required only by old
-  headless on Windows). Its one real effect was
-  forcing software compositing, which made runs more
-  alike across machines. Dropped UNVERIFIED —
-  `./test-browser` has run green on one machine
-  (2026-08-28). Restore it if two machines disagree.
-  Oracle: `./test-browser` green on two machines
 - Nothing asserts that the operator wrappers exec `deno`
   rather than `node`; coverage today is a grep run by
   hand. `tests/fusion-angle-live-name.test.ts` already
@@ -1453,6 +1444,15 @@ Off the critical path; each with its oracle.
   `FUSION_ANGLE_LATENCY=200` under `local` lifts every
   `./bin/measure` median by about 200 ms; unset leaves
   the no-op.
+- GPU flag in the Layer 2 launcher — `launchChrome`
+  no longer passes `--disable-gpu` (cargo cult under
+  `--headless=new`; it was required only by old
+  headless on Windows). Its one real effect was
+  forcing software compositing, which made runs more
+  alike across machines. Dropped UNVERIFIED —
+  `./test-browser` has run green on one machine
+  (2026-08-28). Restore it if two machines disagree.
+  Oracle: `./test-browser` green on two machines
 
 ## Sequencing
 
