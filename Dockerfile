@@ -11,4 +11,4 @@ WORKDIR /srv
 COPY --from=builder /srv/render-out ./render-out
 USER deno
 CMD ["sh", "-c", \
-    "cd render-out && HTTP_SERVER_PORT=$PORT exec ./fusion-angle serve"]
+    "cd render-out && exec ./fusion-angle serve"]

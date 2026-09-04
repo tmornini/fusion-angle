@@ -106,14 +106,14 @@ Deno.test('readListenEnv requires the three secrets', () => {
     assertThrows(
         () => readListenEnv((name) => ({
             JWT_HMAC_SIGNING_KEY: 'k',
-            HTTP_SERVER_PORT: '8080',
+            PORT: '8080',
         }[name])),
         Error, 'missing required env POSTGRES_URL',
     );
     assertThrows(
         () => readListenEnv((name) => ({
             POSTGRES_URL: 'postgres://x',
-            HTTP_SERVER_PORT: '8080',
+            PORT: '8080',
         }[name])),
         Error, 'missing required env JWT_HMAC_SIGNING_KEY',
     );
@@ -122,20 +122,20 @@ Deno.test('readListenEnv requires the three secrets', () => {
             POSTGRES_URL: 'postgres://x',
             JWT_HMAC_SIGNING_KEY: 'k',
         }[name])),
-        Error, 'missing required env HTTP_SERVER_PORT',
+        Error, 'missing required env PORT',
     );
     assertThrows(
         () => readListenEnv((name) => ({
             POSTGRES_URL: 'postgres://x',
             JWT_HMAC_SIGNING_KEY: 'k',
-            HTTP_SERVER_PORT: 'nope',
+            PORT: 'nope',
         }[name])),
-        Error, 'HTTP_SERVER_PORT must be an integer',
+        Error, 'PORT must be an integer',
     );
     const env = readListenEnv((name) => ({
         POSTGRES_URL: 'postgres://x',
         JWT_HMAC_SIGNING_KEY: 'k',
-        HTTP_SERVER_PORT: '8080',
+        PORT: '8080',
         TRUSTED_PROXY_HOPS: '10.0.0.1',
     }[name]));
     assertStrictEquals(env.port, 8080);
@@ -149,15 +149,15 @@ Deno.test('readListenEnv reads by name, never the bag', () => {
         return {
             POSTGRES_URL: 'postgres://u@h/d',
             JWT_HMAC_SIGNING_KEY: 'k',
-            HTTP_SERVER_PORT: '8080',
+            PORT: '8080',
         }[name];
     };
     const env = readListenEnv(read);
     assertStrictEquals(env.port, 8080);
     assertStrictEquals(env.trustedProxyHops, undefined);
     assertEquals(seen.sort(), [
-        'HTTP_SERVER_PORT',
         'JWT_HMAC_SIGNING_KEY',
+        'PORT',
         'POSTGRES_URL',
         'TRUSTED_PROXY_HOPS',
     ]);
@@ -264,7 +264,7 @@ Deno.test('boot refuses argv before connecting', async () => {
             (name) => ({
                 POSTGRES_URL: 'postgres://user:pw@h/db',
                 JWT_HMAC_SIGNING_KEY: 'k',
-                HTTP_SERVER_PORT: '8080',
+                PORT: '8080',
             }[name]),
             ['--seed-mock-data'],
             '/unused',

@@ -34,11 +34,11 @@ services:
             postgres:
                 condition: service_healthy
         environment:
-            PORT: "8080"
+            PORT: ${PORT:?required}
             POSTGRES_URL: *postgres-url
             JWT_HMAC_SIGNING_KEY: ${JWT_HMAC_SIGNING_KEY:?required}
         ports:
-            - 127.0.0.1:8080:8080
+            - 127.0.0.1:${PORT:?required}:${PORT:?required}
         stop_grace_period: 15s
         healthcheck:
             test:

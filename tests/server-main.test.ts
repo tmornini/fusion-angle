@@ -83,7 +83,7 @@ async () => {
         env: {
             POSTGRES_URL: LEAKY_URL,
             JWT_HMAC_SIGNING_KEY: 'k',
-            HTTP_SERVER_PORT: '8099',
+            PORT: '8099',
         },
     }).output();
     const stderr = new TextDecoder().decode(result.stderr);

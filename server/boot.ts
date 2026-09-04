@@ -60,13 +60,13 @@ export function readListenEnv(
     const jwtHmacSigningKey = requiredEnvBy(
         'JWT_HMAC_SIGNING_KEY', read,
     );
-    const portRaw = requiredEnvBy('HTTP_SERVER_PORT', read);
+    const portRaw = requiredEnvBy('PORT', read);
     const port = Number(portRaw);
     if (!Number.isInteger(port)
         || port < 1
         || port > 65535) {
         throw new Error(
-            'HTTP_SERVER_PORT must be an integer 1-65535',
+            'PORT must be an integer 1-65535',
         );
     }
     const hops = read('TRUSTED_PROXY_HOPS');
