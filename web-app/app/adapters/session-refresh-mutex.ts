@@ -59,6 +59,23 @@ export function runSingleFlightRefresh(
     return pending;
 }
 
+// A refresh that FOLLOWS any in-flight refresh instead of
+// joining it. The remint after an invitation accept bakes
+// roles from a seat the joined flight may predate, and two
+// callers presenting one refresh jti brand the loser a
+// replay and revoke the chain. Wait for the flight to
+// settle either way — its outcome is the joiners' to
+// handle — then latch a flight of our own, so a 401 that
+// lands meanwhile joins THIS one.
+export async function runRefreshAfterInFlight(
+    refresh: () => Promise<string | null>,
+): Promise<string | null> {
+    if (inFlight !== null) {
+        await Promise.allSettled([inFlight]);
+    }
+    return runSingleFlightRefresh(refresh);
+}
+
 async function runLocked(
     refresh: () => Promise<string | null>,
 ): Promise<string | null> {

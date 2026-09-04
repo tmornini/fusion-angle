@@ -309,9 +309,6 @@ skew tests folded into item 7.
 
 Off the critical path; each with its oracle.
 
-- The re-mint refresh is not single-flighted with the
-  facade's cookie refresh —
-  `web-app/app/adapters/shared.ts:463-464`
 - Mock seed's fixed 2026-06-15 anchor — after
   2026-09-13 serial-mode FS3 carries in-flight heat
   only

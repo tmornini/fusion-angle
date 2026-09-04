@@ -31,7 +31,10 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { organizationToken } from './token-fixtures.ts';
+import {
+    organizationToken,
+    reachableToken,
+} from './token-fixtures.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
@@ -61,6 +64,10 @@ import { deriveDocumentsAt } from
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import {
+    runSingleFlightRefresh,
+    deleteRefreshChannel,
+} from '../web-app/app/adapters/session-refresh-mutex.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -443,7 +450,10 @@ Deno.test('accept writes a membership in the invitation org',
     const inv = (await deriveInvitations(db))[0]!;
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
-    await postInvitationAcceptance(toccYYkLEABmlbpHJalgtQ, inv.id);
+    await postInvitationAcceptance(
+        toccYYkLEABmlbpHJalgtQ, inv.id,
+        'BBjWJsjYIDkTRKIIPrzWRw',
+    );
     const memberships = (await deriveMembershipsAll(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ');
     const organizations = memberships.map(m => m.organization_id).sort();
@@ -465,7 +475,9 @@ Deno.test('accept by a non-invitee is rejected',
     // Dave tries to accept Sarah's invitation.
     const dave = await ctxOn(db, daveId, 'AjdvjuECVZEgZoFajaIEkg');
     await assertRejects(
-        () => postInvitationAcceptance(dave, inv.id));
+        () => postInvitationAcceptance(
+            dave, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
+        ));
 }));
 
 Deno.test('decline records declined and writes no membership',
@@ -534,6 +546,7 @@ Deno.test('accept after revoke is rejected, no membership',
     await assertRejects(
         () => postInvitationAcceptance(
             toccYYkLEABmlbpHJalgtQ, inv.id,
+            'BBjWJsjYIDkTRKIIPrzWRw',
         ));
     const wayne = (await deriveMembershipsAll(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ'
@@ -555,6 +568,7 @@ Deno.test('accept after decline is rejected',
     await assertRejects(
         () => postInvitationAcceptance(
             toccYYkLEABmlbpHJalgtQ, inv.id,
+            'BBjWJsjYIDkTRKIIPrzWRw',
         ));
 }));
 
@@ -568,7 +582,10 @@ Deno.test('decline after accept is rejected',
     const inv = (await deriveInvitations(db))[0]!;
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
-    await postInvitationAcceptance(toccYYkLEABmlbpHJalgtQ, inv.id);
+    await postInvitationAcceptance(
+        toccYYkLEABmlbpHJalgtQ, inv.id,
+        'BBjWJsjYIDkTRKIIPrzWRw',
+    );
     await assertRejects(
         () => postInvitationDecline(
             toccYYkLEABmlbpHJalgtQ, inv.id,
@@ -690,7 +707,10 @@ Deno.test('accept: event author is server-derived, membership lands',
     const inv = (await deriveInvitations(db))[0]!;
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
-    await postInvitationAcceptance(toccYYkLEABmlbpHJalgtQ, inv.id);
+    await postInvitationAcceptance(
+        toccYYkLEABmlbpHJalgtQ, inv.id,
+        'BBjWJsjYIDkTRKIIPrzWRw',
+    );
     // State event landed with a non-empty id + at.
     const life = await invitationLifecycleStatesFor(
         db, inv.id,
@@ -784,9 +804,15 @@ Deno.test('a repeated accept posts no notification',
     const inv = (await deriveInvitations(db))[0]!;
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
-    await postInvitationAcceptance(toccYYkLEABmlbpHJalgtQ, inv.id);
+    await postInvitationAcceptance(
+        toccYYkLEABmlbpHJalgtQ, inv.id,
+        'BBjWJsjYIDkTRKIIPrzWRw',
+    );
     assertStrictEquals(posted.length, 2);   // grant, accept
-    await postInvitationAcceptance(toccYYkLEABmlbpHJalgtQ, inv.id);
+    await postInvitationAcceptance(
+        toccYYkLEABmlbpHJalgtQ, inv.id,
+        'BBjWJsjYIDkTRKIIPrzWRw',
+    );
     assertStrictEquals(posted.length, 2);
 }));
 
@@ -835,6 +861,10 @@ Deno.test('cookie-session accept remints via refresh POST',
         const inv = (await deriveInvitations(db))[0]!;
         const toccYYkLEABmlbpHJalgtQ = await ctxOn(db
             , 'toccYYkLEABmlbpHJalgtQ', 'AjdvjuECVZEgZoFajaIEkg');
+        const minted = await reachableToken(
+            'toccYYkLEABmlbpHJalgtQ',
+            ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw'],
+        );
         const refreshBodies: unknown[] = [];
         const recording: RequestContext = {
             ...toccYYkLEABmlbpHJalgtQ,
@@ -845,7 +875,7 @@ Deno.test('cookie-session accept remints via refresh POST',
                 if (resource === 'authentication/token') {
                     refreshBodies.push(body);
                     return {
-                        access_token: 'reminted-access',
+                        access_token: minted,
                         token_type: 'Bearer',
                         expires_in: 900,
                     } as T;
@@ -855,15 +885,18 @@ Deno.test('cookie-session accept remints via refresh POST',
                 );
             },
         };
-        await postInvitationAcceptance(recording, inv.id);
+        await postInvitationAcceptance(
+            recording, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
+        );
         assertStrictEquals(refreshBodies.length, 1);
         assertEquals(refreshBodies[0], {
             grant_type: 'refresh',
         });
-        assertStrictEquals(getSessionToken(), 'reminted-access');
+        assertStrictEquals(getSessionToken(), minted);
     } finally {
         setCookieSession(false);
         deleteSessionToken();
+        deleteRefreshChannel();
     }
 }));
 
@@ -896,7 +929,9 @@ Deno.test('a failed re-mint after accept surfaces, seat kept',
             },
         };
         const err = await assertRejects(
-            () => postInvitationAcceptance(recording, inv.id),
+            () => postInvitationAcceptance(
+                recording, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
+            ),
         ) as Error;
         assertInstanceOf(err, SessionRemintFailedError);
         assertStrictEquals(err.cause, refused);
@@ -914,5 +949,175 @@ Deno.test('a failed re-mint after accept surfaces, seat kept',
     } finally {
         setCookieSession(false);
         deleteSessionToken();
+        deleteRefreshChannel();
+    }
+}));
+
+// The remint FOLLOWS an in-flight facade refresh. Latch the
+// mutex with a grant only the test can settle, start the
+// accept, and prove the remint has not presented a jti
+// while the flight is open; settle, and it runs once.
+Deno.test('the remint waits for an in-flight facade refresh',
+() => withLocalStorageAsync(freshStorage(), async () => {
+    setCookieSession(true);
+    try {
+        const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
+            , 'BBjWJsjYIDkTRKIIPrzWRw');
+        const tony = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
+            , 'BBjWJsjYIDkTRKIIPrzWRw');
+        await postInvitationGrant(tony, 'sarah@x.com');
+        const inv = (await deriveInvitations(db))[0]!;
+        const sarah = await ctxOn(db
+            , 'toccYYkLEABmlbpHJalgtQ', 'AjdvjuECVZEgZoFajaIEkg');
+        const minted = await reachableToken(
+            'toccYYkLEABmlbpHJalgtQ',
+            ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw'],
+        );
+        let settleFacade!: () => void;
+        const facadeFlight = runSingleFlightRefresh(
+            () => new Promise<string | null>((resolve) => {
+                settleFacade = () => resolve(minted);
+            }),
+        );
+        const refreshBodies: unknown[] = [];
+        const recording: RequestContext = {
+            ...sarah,
+            POST: async <T>(
+                resource: string,
+                body: Record<string, unknown>,
+            ): Promise<T> => {
+                if (resource === 'authentication/token') {
+                    refreshBodies.push(body);
+                    return {
+                        access_token: minted,
+                        token_type: 'Bearer',
+                        expires_in: 900,
+                    } as T;
+                }
+                return sarah.POST(resource, body);
+            },
+        };
+        const accepting = postInvitationAcceptance(
+            recording, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
+        );
+        for (let i = 0; i < 10; i++) {
+            await new Promise(r => setImmediate(r));
+        }
+        assertStrictEquals(
+            refreshBodies.length, 0,
+            'the remint must not present a jti while a'
+            + ' refresh is in flight',
+        );
+        settleFacade();
+        await facadeFlight;
+        await accepting;
+        assertStrictEquals(refreshBodies.length, 1);
+        assertStrictEquals(getSessionToken(), minted);
+    } finally {
+        setCookieSession(false);
+        deleteSessionToken();
+        deleteRefreshChannel();
+    }
+}));
+
+// A peer tab's broadcast can hand the mutex a token minted
+// before the seat: the remint runs once more, then stops.
+Deno.test('a re-minted token without the seat earns one more'
++ ' attempt',
+() => withLocalStorageAsync(freshStorage(), async () => {
+    setCookieSession(true);
+    try {
+        const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
+            , 'BBjWJsjYIDkTRKIIPrzWRw');
+        const tony = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
+            , 'BBjWJsjYIDkTRKIIPrzWRw');
+        await postInvitationGrant(tony, 'sarah@x.com');
+        const inv = (await deriveInvitations(db))[0]!;
+        const sarah = await ctxOn(db
+            , 'toccYYkLEABmlbpHJalgtQ', 'AjdvjuECVZEgZoFajaIEkg');
+        const stale = await reachableToken(
+            'toccYYkLEABmlbpHJalgtQ', ['AjdvjuECVZEgZoFajaIEkg'],
+        );
+        const fresh = await reachableToken(
+            'toccYYkLEABmlbpHJalgtQ',
+            ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw'],
+        );
+        const tokens = [stale, fresh];
+        const refreshBodies: unknown[] = [];
+        const recording: RequestContext = {
+            ...sarah,
+            POST: async <T>(
+                resource: string,
+                body: Record<string, unknown>,
+            ): Promise<T> => {
+                if (resource === 'authentication/token') {
+                    refreshBodies.push(body);
+                    return {
+                        access_token:
+                            tokens[refreshBodies.length - 1],
+                        token_type: 'Bearer',
+                        expires_in: 900,
+                    } as T;
+                }
+                return sarah.POST(resource, body);
+            },
+        };
+        await postInvitationAcceptance(
+            recording, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
+        );
+        assertStrictEquals(refreshBodies.length, 2);
+        assertStrictEquals(getSessionToken(), fresh);
+    } finally {
+        setCookieSession(false);
+        deleteSessionToken();
+        deleteRefreshChannel();
+    }
+}));
+
+Deno.test('two re-minted tokens without the seat surface a'
++ ' named failure',
+() => withLocalStorageAsync(freshStorage(), async () => {
+    setCookieSession(true);
+    try {
+        const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
+            , 'BBjWJsjYIDkTRKIIPrzWRw');
+        const tony = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
+            , 'BBjWJsjYIDkTRKIIPrzWRw');
+        await postInvitationGrant(tony, 'sarah@x.com');
+        const inv = (await deriveInvitations(db))[0]!;
+        const sarah = await ctxOn(db
+            , 'toccYYkLEABmlbpHJalgtQ', 'AjdvjuECVZEgZoFajaIEkg');
+        const stale = await reachableToken(
+            'toccYYkLEABmlbpHJalgtQ', ['AjdvjuECVZEgZoFajaIEkg'],
+        );
+        const refreshBodies: unknown[] = [];
+        const recording: RequestContext = {
+            ...sarah,
+            POST: async <T>(
+                resource: string,
+                body: Record<string, unknown>,
+            ): Promise<T> => {
+                if (resource === 'authentication/token') {
+                    refreshBodies.push(body);
+                    return {
+                        access_token: stale,
+                        token_type: 'Bearer',
+                        expires_in: 900,
+                    } as T;
+                }
+                return sarah.POST(resource, body);
+            },
+        };
+        const err = await assertRejects(
+            () => postInvitationAcceptance(
+                recording, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
+            ),
+        ) as Error;
+        assertInstanceOf(err, SessionRemintFailedError);
+        assertStrictEquals(refreshBodies.length, 2);
+    } finally {
+        setCookieSession(false);
+        deleteSessionToken();
+        deleteRefreshChannel();
     }
 }));
