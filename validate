@@ -114,10 +114,10 @@ if [ "$(grep -c '^## KNOWN seams' ARCHITECTURE.md)" \
 ARCHITECTURE.md: '## KNOWN seams' count must be 1
 "
 fi
-if [ "$(grep -c '^## Critical path' TODO.md)" \
+if [ "$(grep -c '^## Critical product path' TODO.md)" \
     != "1" ]; then
     LATER_HOME_FAIL="${LATER_HOME_FAIL}\
-TODO.md: '## Critical path' count must be 1
+TODO.md: '## Critical product path' count must be 1
 "
 fi
 LATER_PATTERN='later work|\(later\)|not built'
