@@ -28,6 +28,8 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Task 2 (Decision 7's trio fold, the fifth family): PUT
 // records/:id becomes a document PUT — the entity's own fields
@@ -48,13 +50,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
@@ -310,12 +313,13 @@ Deno.test('a byte-identical resend replays the stored response:'
     const body = recordDocument(
         'Idempotent', 'active', AT, 'ev-resend',
     );
+    const operationId = generateIdentifier();
     await handleRequest(
         db, req(
             'PUT',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'sBdXBQtlujsRkbzspdvfFg',
-            token, body,
+            token, body, operationId,
         ),
     );
     await handleRequest(
@@ -323,7 +327,7 @@ Deno.test('a byte-identical resend replays the stored response:'
             'PUT',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'sBdXBQtlujsRkbzspdvfFg',
-            token, body,
+            token, body, operationId,
         ),
     );
     const events = await deriveRecordTypeStateHistory(db

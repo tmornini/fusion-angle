@@ -114,13 +114,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
@@ -356,13 +357,14 @@ async () => {
     };
     const tok = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , 'BBjWJsjYIDkTRKIIPrzWRw');
+    const operationId = generateIdentifier();
     const r1 = await handleRequest(
         db, req('POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
-            tok, body));
+            tok, body, operationId));
     assertStrictEquals(r1.status, 200);
     const r2 = await handleRequest(
         db, req('POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
-            tok, body));
+            tok, body, operationId));
     assertStrictEquals(r2.status, 200);
     assertStrictEquals((await deriveInvitations(db)).length, 1);
     assertStrictEquals(
@@ -404,15 +406,16 @@ async () => {
     };
     const sTok = await organizationToken('toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
+    const operationId = generateIdentifier();
     const UQTJZvCoKlFjEoDlDUwekw = await handleRequest(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hasVDnGjEylAnJDTPjnZuQ',
-        sTok, accBody));
+        sTok, accBody, operationId));
     assertStrictEquals(UQTJZvCoKlFjEoDlDUwekw.status, 204);
     const UZgNCkZlSJcSaAmAJuSkcw = await handleRequest(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hasVDnGjEylAnJDTPjnZuQ',
-        sTok, accBody));
+        sTok, accBody, operationId));
     assertStrictEquals(UZgNCkZlSJcSaAmAJuSkcw.status, 204);
     assertStrictEquals(
         (await invitationLifecycleStatesFor(db
@@ -454,15 +457,16 @@ async () => {
     };
     const sTok = await organizationToken('toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
+    const operationId = generateIdentifier();
     const d1 = await handleRequest(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hlmIVMfGBbdTSoChNYsQkQ',
-        sTok, decBody));
+        sTok, decBody, operationId));
     assertStrictEquals(d1.status, 204);
     const d2 = await handleRequest(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hlmIVMfGBbdTSoChNYsQkQ',
-        sTok, decBody));
+        sTok, decBody, operationId));
     assertStrictEquals(d2.status, 204);
     assertStrictEquals(
         (await invitationLifecycleStatesFor(db
@@ -501,15 +505,16 @@ async () => {
         eventId: EV_R_IDEM,
         at: REVOKE_AT,
     };
+    const operationId = generateIdentifier();
     const r1 = await handleRequest(db, req(
         'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
             + 'itekPiJIBiPQhcZveiqTKw',
-        tok, revBody));
+        tok, revBody, operationId));
     assertStrictEquals(r1.status, 204);
     const r2 = await handleRequest(db, req(
         'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
             + 'itekPiJIBiPQhcZveiqTKw',
-        tok, revBody));
+        tok, revBody, operationId));
     assertStrictEquals(r2.status, 204);
     assertStrictEquals(
         (await invitationLifecycleStatesFor(db

@@ -68,6 +68,7 @@ function req(
     token: string,
     body?: unknown,
     extraHeaders?: Record<string, string>,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
@@ -76,7 +77,7 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: TEST_OPERATION_ID,
+        operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
@@ -560,13 +561,16 @@ Deno.test('re-bind same pair byte-identically → 200'
 + ' replay (pair count unchanged)',
 async () => {
     const { db, token } = await seededDb();
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
+        undefined, operationId,
     ));
     assertStrictEquals(first.status, 201);
     const before = await messagePairCount(db);
     const second = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
+        undefined, operationId,
     ));
     assertStrictEquals(second.status, 200);
     assertStrictEquals(await messagePairCount(db), before);

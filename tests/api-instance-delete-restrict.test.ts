@@ -64,13 +64,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
@@ -376,12 +377,15 @@ async () => {
     await transitionTo(
         db, token, WO_A, N_TERM, TE_A_TERM,
     );
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, token,
+        undefined, operationId,
     ));
     assertStrictEquals(first.status, 204);
     const second = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, token,
+        undefined, operationId,
     ));
     assertStrictEquals(second.status, 204);
 });

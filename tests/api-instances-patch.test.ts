@@ -90,6 +90,7 @@ function req(
     token: string,
     body?: unknown,
     extraHeaders?: Record<string, string>,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
@@ -98,7 +99,7 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: TEST_OPERATION_ID,
+        operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
@@ -866,9 +867,11 @@ async () => {
             { attribute_id: ATTR_ID, value: 'B' },
         ],
     };
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: e0 },
+        operationId,
     ));
     assertStrictEquals(first.status, 201);
     const originalEtag = first.headers.get('ETag')!;
@@ -898,6 +901,7 @@ async () => {
     const replay = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: e0 },
+        operationId,
     ));
     assertStrictEquals(replay.status, 200);
     assertStrictEquals(

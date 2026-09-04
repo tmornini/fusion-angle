@@ -192,8 +192,9 @@ async () => {
         read_roles: ['member', 'admin'],
         write_roles: ['member', 'admin'],
     };
+    const operationId = generateIdentifier();
     const opHeaders: readonly (readonly [string, string])[] =
-        [['operation-id', TEST_OPERATION_ID]];
+        [['operation-id', operationId]];
     const first = await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + RECORD_ID + '/attributes/rTiMgnMtYSIDYKegGxixMA',

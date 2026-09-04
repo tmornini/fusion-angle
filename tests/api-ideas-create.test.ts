@@ -8,6 +8,8 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Phase 2 Task 3 (R1, Decision 7): create dissolved into the
 // SAME genesis-capable document PUT organizations/:id/ideas/:id Task 2 built
@@ -21,13 +23,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
@@ -156,14 +159,17 @@ Deno.test(
             'hJeymLqQwgpIHWgKlcHWNA', 'Retried',
             '2026-01-01T00:00:00.000000Z',
         );
+        const operationId = generateIdentifier();
         const first = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'hJeymLqQwgpIHWgKlcHWNA', DEV_TOKEN, body,
+            operationId,
         ));
         assertStrictEquals(first.status, 201);
         const second = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'hJeymLqQwgpIHWgKlcHWNA', DEV_TOKEN, body,
+            operationId,
         ));
         assertStrictEquals(second.status, 200);
         assertStrictEquals(

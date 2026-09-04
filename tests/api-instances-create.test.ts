@@ -68,6 +68,7 @@ function req(
     token: string,
     body?: unknown,
     extraHeaders?: Record<string, string>,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
@@ -76,7 +77,7 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: TEST_OPERATION_ID,
+        operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
@@ -554,8 +555,10 @@ async () => {
     const body = setBody([
         { attribute_id: ATTR_ID, value: 'same' },
     ]);
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
+        undefined, operationId,
     ));
     assertStrictEquals(first.status, 201);
     const originalId = first.headers.get('Response-ID')!;
@@ -563,6 +566,7 @@ async () => {
     const originalBody = await first.json();
     const second = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
+        undefined, operationId,
     ));
     assertStrictEquals(second.status, 200);
     assertStrictEquals(

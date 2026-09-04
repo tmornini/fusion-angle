@@ -51,13 +51,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
@@ -147,15 +148,18 @@ Deno.test('a byte-identical resend converges: one event,'
     const db = await freshDb();
     const token = await organizationToken();
     const body = ideaDocument('Idempotent', 'active');
+    const operationId = generateIdentifier();
     await handleRequest(
         db, req('PUT'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'YIuEjXvCwXAgrpyvcvLJjg', token, body),
+            + 'YIuEjXvCwXAgrpyvcvLJjg', token, body,
+            operationId),
     );
     await handleRequest(
         db, req('PUT'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'YIuEjXvCwXAgrpyvcvLJjg', token, body),
+            + 'YIuEjXvCwXAgrpyvcvLJjg', token, body,
+            operationId),
     );
     const events = await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
         , 'YIuEjXvCwXAgrpyvcvLJjg');

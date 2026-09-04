@@ -13,7 +13,10 @@ import { parseWire } from
     '../shared/http-message/wire-codec.ts';
 import { messageStore } from '../api/message-store.ts';
 import { strongEtagOf } from '../api/message-pair.ts';
-import { isIdentifier } from '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
 
 const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const MEMBERSHIP_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/';
@@ -49,6 +52,7 @@ function req(
     token: string,
     body?: unknown,
     headers?: Readonly<Record<string, string>>,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
@@ -57,7 +61,7 @@ function req(
         body,
         ...(headers !== undefined
             ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
+        operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
@@ -201,10 +205,12 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const body = ideaDocument('Retry', 'ev-ws-retry');
+    const operationId = generateIdentifier();
     const first = await handleRequest(
         db, req('PUT'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'yggAqfvrChBmrMfrOilSUg', token, body),
+            + 'yggAqfvrChBmrMfrOilSUg', token, body,
+            undefined, operationId),
     );
     assertStrictEquals(first.status, 201);
     const firstId = first.headers.get('Response-ID');
@@ -213,7 +219,8 @@ async () => {
     const second = await handleRequest(
         db, req('PUT'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'yggAqfvrChBmrMfrOilSUg', token, body),
+            + 'yggAqfvrChBmrMfrOilSUg', token, body,
+            undefined, operationId),
     );
     assertStrictEquals(second.status, 200);
     assertStrictEquals(

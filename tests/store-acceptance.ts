@@ -226,10 +226,12 @@ export function defineStoreAcceptance(
     Deno.test(name + ': exact retry replays as 200', async () => {
         const { db, token } = await ready();
         const body = ideaDocument('Retry', 'ev-sa-retry');
+        const operationId = generateIdentifier();
         const first = await handleRequest(
             db, req('PUT'
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                + 'tjrZLujBtBVqFwOsBDWdQQ', token, body),
+                + 'tjrZLujBtBVqFwOsBDWdQQ', token, body,
+                undefined, operationId),
         );
         assertStrictEquals(first.status, 201);
         const firstId = first.headers.get('Response-ID');
@@ -238,7 +240,8 @@ export function defineStoreAcceptance(
         const second = await handleRequest(
             db, req('PUT'
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                + 'tjrZLujBtBVqFwOsBDWdQQ', token, body),
+                + 'tjrZLujBtBVqFwOsBDWdQQ', token, body,
+                undefined, operationId),
         );
         assertStrictEquals(second.status, 200);
         assertStrictEquals(

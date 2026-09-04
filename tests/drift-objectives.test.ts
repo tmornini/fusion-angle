@@ -88,13 +88,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
@@ -1020,10 +1021,11 @@ async () => {
         state: 'active' as const,
     };
     const beforeReposition = (await db.messagePairs.getAll()).length;
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + objectiveId, token,
-        positionBody,
+        positionBody, operationId,
     ));
     assertStrictEquals(first.status, 201);
     const afterFirst = (await db.messagePairs.getAll()).length;
@@ -1032,7 +1034,7 @@ async () => {
     const second = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + objectiveId, token,
-        positionBody,
+        positionBody, operationId,
     ));
     assertStrictEquals(second.status, 200);
     const afterSecond = (await db.messagePairs.getAll()).length;

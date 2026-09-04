@@ -79,6 +79,7 @@ function req(
     token: string,
     body?: unknown,
     extraHeaders?: Record<string, string>,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
@@ -87,7 +88,7 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: TEST_OPERATION_ID,
+        operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
@@ -1081,9 +1082,11 @@ async () => {
     // Fix transitionAt so resend is byte-identical.
     body['transitionAt'] =
         '2026-06-01T00:00:00.000000Z';
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'POST', TRANSITION, adminToken, body,
         { [IF_MATCH_HEADER]: etag },
+        operationId,
     ));
     assertStrictEquals(first.status, 201);
     const afterFirst = await instancePairCount(db);
@@ -1091,6 +1094,7 @@ async () => {
     const replay = await handleRequest(db, req(
         'POST', TRANSITION, adminToken, body,
         { [IF_MATCH_HEADER]: etag },
+        operationId,
     ));
     assertStrictEquals(replay.status, 200);
     assertStrictEquals(

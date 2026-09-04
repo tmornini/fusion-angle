@@ -61,13 +61,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        operationId: operationId ?? TEST_OPERATION_ID,
     });
 }
 
@@ -362,12 +363,15 @@ async () => {
             'Rental', 1, 'active', AT, 'rt-1-genesis',
         ),
     ));
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'DELETE', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
+        undefined, operationId,
     ));
     assertStrictEquals(first.status, 204);
     const second = await handleRequest(db, req(
         'DELETE', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
+        undefined, operationId,
     ));
     assertStrictEquals(second.status, 204);
 });
