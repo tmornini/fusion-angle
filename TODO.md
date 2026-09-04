@@ -312,19 +312,6 @@ Off the critical path; each with its oracle.
 - The re-mint refresh is not single-flighted with the
   facade's cookie refresh —
   `web-app/app/adapters/shared.ts:463-464`
-- `JWT_HMAC_SIGNING_KEY` may not belong in the local
-  seed `--allow-env` (`postgres-seed:168`).
-  `api/access-token.ts` IS in the
-  seed's 105-module transitive graph — `postgres-seed.ts`
-  → `seed.ts` → `api/mock-data.ts` → `api/routes.ts` →
-  `api/authentication.ts`, a route that never touches
-  `api/api.ts` — but it reads the key lazily inside
-  `hmacSigningKeyMaterial()` (:29-44), so whether the seed
-  ever reaches that read is undecided — the seed hits
-  ECONNREFUSED first. Kept rather than narrowed on
-  evidence that needs a database to gather. Oracle: a
-  successful `./postgres-seed --postgres local
-  --bootstrap` that never reads it.
 - Mock seed's fixed 2026-06-15 anchor — after
   2026-09-13 serial-mode FS3 carries in-flight heat
   only

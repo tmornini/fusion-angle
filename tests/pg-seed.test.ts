@@ -400,3 +400,38 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assertStrictEquals(error.message, SEED_NONEMPTY);
     });
 }
+
+// The seed's oracle: neither mode reads the environment.
+// A Deno.test permission set denies what it omits, so
+// `env: false` is the whole environment gone; the memory
+// path does no I/O, and access-token.ts's signingKey()
+// memoizes only when something mints — nothing here does,
+// so a key read cannot be masked by an earlier test.
+Deno.test({
+    name: 'seedPostgres needs no environment in either mode',
+    permissions: { env: false },
+    fn: async () => {
+        for (const mode of [
+            'bootstrap', 'mock-data',
+        ] as const) {
+            const db = memoryDbAdapter();
+            const empty = fakeClient([{
+                message_pairs: false,
+                marker: false,
+            }]);
+            await seedPostgres(
+                empty.sql, db, mode, {
+                    hashPassword: testHashPassword,
+                    write: () => {},
+                },
+            );
+            assertStrictEquals(await db.hasSchema(), true);
+        }
+    },
+});
+
+Deno.test('the seed wrapper runs without the signing key',
+() => {
+    const src = Deno.readTextFileSync('bin/postgres-seed');
+    assertNotMatch(src, /JWT_HMAC_SIGNING_KEY/);
+});
