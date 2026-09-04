@@ -3,7 +3,7 @@
 This file is the capability map of the one table. Columns,
 keys, and indexes live in `SCHEMA.svg` (generated from
 `api/db.ts`, `api/types.ts`, and `api/schema-postgres.ts`;
-`./validate` fails on drift). Families, routes, and
+`./test validate` fails on drift). Families, routes, and
 alphabets live in code; this file does not restate them.
 
 ## The one table
@@ -39,7 +39,7 @@ same rows in an in-process Map keyed by table name.
    `api/schema-postgres.ts`).
 7. **`schema_marker` stamped last** —
    `POSTGRES_SCHEMA_MARKER_TABLE`; seed stamps it last so a
-   failed seed reads as empty (`./postgres-seed`).
+   failed seed reads as empty (`./bin/postgres-seed`).
 8. **Tenancy rides `uri_collection`** — the store is
    global; the fence and the write authorizer
    (`api/write-authorizer.ts`) enforce organization.
@@ -90,11 +90,11 @@ tombstone.
 
 ## Operator tools
 
-`./postgres-seed` (`--bootstrap`, `--mock-data`) runs
-in-process on an empty database
-and stamps `schema_marker` last. Seed refuses a non-empty
-database. `./postgres-wipe` drops the pair plane
-(`POSTGRES_DROP_SCHEMA`) and does not seed.
+`./bin/postgres-seed` (`--bootstrap`, `--mock-data`)
+runs in-process on an empty database and stamps
+`schema_marker` last. Seed refuses a non-empty
+database. `./bin/postgres-wipe` is the public-schema
+reset (`POSTGRES_DROP_SCHEMA`) and does not seed.
 
 ## How we got here
 

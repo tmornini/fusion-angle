@@ -7,11 +7,11 @@
 Three layers verify this product. Two are gates. The third
 is exploration, and nothing rides on its result.
 
-| Layer | Command | Runs | Standing |
-|---|---|---|---|
-| 1 | `./validate` | AT1–AT3: the one `deno check`, `./test` in two TZ passes, the lints, the two drift gates. Chrome-free, Postgres-free | Gate: every commit |
-| 2 | `./test-all` | Layer 1, then `./test-browser` (AT5) | Gate: the operator's, before `./build`, a deploy, or a walk; `./crank` enforces it for the walk |
-| 3 | "run the test plan" | `./crank --mock-data 8080` — Layer 1, AT4 `./test-postgres`, AT5 — then one explorer walks A4 through SV | Exploration; nothing rides on its result |
+| Layer | Command | Standing |
+|---|---|---|
+| 1 | `./test validate` | Gate: every commit |
+| 2 | `./test validate browser` | Gate: before a build, a deploy, or a walk; `./deploy --local` enforces it |
+| 3 | `./deploy --local 8080 --postgres mock-data` then the walk | Exploration |
 
 **A browser observation changes product only through a red
 test at Layer 1 or Layer 2.** The walk finds; the test
@@ -23,11 +23,10 @@ ruling is not evidence; the red test is.
 
 Use a fresh local Postgres via Docker. Do not set
 `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, or
-`HTTP_SERVER_PORT` by hand — `./crank` mints them for its
-children and never prints them.
+`PORT` by hand — `./deploy --local` mints them.
 
 The walk runs in the checkout under test. If another
-checkout holds 8080, crank on a free port; every
+checkout holds 8080, deploy on a free port; every
 `localhost:8080` below reads as that port.
 
 The browser layer is the **browser-use** plugin (MCP
@@ -45,12 +44,13 @@ not mid-walk.
 
 ### The master's steps
 
-1. **A1** `./build` from a clean tree, then **A2** inventory
-   the artifact.
-2. **A3** `./crank --mock-data 8080`. Crank runs Layer 1,
-   `./test-postgres` (AT4), and `./test-browser` (AT5)
-   before it serves. Red anywhere aborts the walk — no
-   explorer is dispatched. Read the seed reveal from stdout;
+1. **A1** `./bin/build` from a clean tree, then **A2**
+   inventory the artifact.
+2. **A3** `./deploy --local 8080 --postgres mock-data`.
+   Deploy runs Layer 1, `./test postgres` (AT4), and
+   `./test browser` (AT5) before it serves. Red
+   anywhere aborts the walk — no explorer is
+   dispatched. Read the seed reveal from stdout;
    it is shown once. A3 **is** SV1.
 3. Dispatch one explorer with the prompt below. A1–A3
    are the master's — they run before the origin exists;
@@ -342,30 +342,30 @@ outcome: it is the default `- [ ]`, not yet executed.
 
 ## AT. Automated Test Suite
 
-AT1–AT3 are Layer 1, the one `./validate` crank runs
-first. AT5 is Layer 2's browser suite. AT4 is crank's
-`./test-postgres`, run after postgres is up. Layer 3
-runs all five through `./crank`; the walk never invokes
-them separately. Abort on any AT red.
+AT1–AT3 are Layer 1, the one `./test validate`
+deploy runs first. AT5 is Layer 2's browser
+suite. AT4 is `./test postgres`, which owns
+its own Docker Postgres, not the walk DB.
+Layer 3 runs all five through `./deploy --local`;
+the walk never invokes them separately. Abort on
+any AT red.
 
 - [ ] **AT1** Run `deno check --frozen api shared server
   tests web-app`. PASS: exits 0; no diagnostics emitted.
   Pin: exploratory — the command is its own witness
 - [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/*.test.ts` for the main `Deno.test` suite, written against `@std/assert`, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; both suites report `ok | N passed | 0 failed`, today `ok | 3490 passed | 0 failed | 7 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite.
   Pin: exploratory — the command is its own witness
-- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1's `deno check --frozen api shared server tests web-app` and AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `build`, `serve`, `crank`, `test`, `test-postgres`, `validate`, `generate-schema-svg`, `generate-api-documentation`, `measure`, `postgres-wipe`, `postgres-lib`, and `postgres-seed`, plus `deno.json`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
+- [ ] **AT3** Run `./test validate`. PASS: exits 0 (composes AT1's `deno check --frozen api shared server tests web-app` and AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `test`, `deploy`, plus `bin/build`, `bin/build-lib`, `bin/serve`, `bin/test-postgres`, `bin/test-browser`, `bin/generate-schema-svg`, `bin/generate-api-documentation`, `bin/measure`, `bin/postgres-wipe`, `bin/postgres-lib`, and `bin/postgres-seed`, plus `deno.json`, `Dockerfile`, `compose.yaml`, `.dockerignore`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
   Pin: exploratory — the command is its own witness
-- [ ] **AT4** Crank sets `POSTGRES_URL` and
-  runs `./test-postgres` after postgres is
-  up and before `./build --no-zip`. The
-  suite creates and drops its own
-  `fusion_test_*` schema. PASS: exits 0,
-  `ok | 52 passed | 0 failed` across the
-  seven files. `./validate` stays
-  Postgres-free.
+- [ ] **AT4** Run `./test postgres`. It
+  owns its own Docker Postgres, not the
+  walk DB. The suite creates and drops
+  its own `fusion_test_*` schema. PASS:
+  exits 0, `ok | 52 passed | 0 failed`
+  across the seven files. `./test validate`
+  stays Postgres-free.
   Pin: exploratory — the command is its own witness
-- [ ] **AT5** Crank runs `./test-browser` after AT4 and
-  before `./build --no-zip`. It bundles the client with
+- [ ] **AT5** Run `./test browser`. It bundles the client with
   `deno bundle` into `$TMPDIR` and runs `TZ=UTC deno
   test --frozen --no-check --sanitize-resources
   --allow-env --allow-read --allow-write --allow-net
@@ -378,35 +378,36 @@ them separately. Abort on any AT red.
   one CDP WebSocket per file in `Deno.test.beforeAll`,
   so its pending receive always crosses a test boundary.
   Needs Chrome (`CHROME` or `CHROME_DEBUG_URL`). PASS:
-  exits 0, `fail 0`. `./test-all` runs AT1–AT3 then AT5.
+  exits 0, `fail 0`. `./test validate browser` runs
+  AT1–AT3 then AT5.
   Pin: exploratory — the command is its own witness
 
 ---
 
 ## A. Build & Setup
 
-- [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-angle-${SHA}.zip`.
+- [ ] **A1** Run `./bin/build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-angle-${SHA}.zip`.
   Pin: exploratory — the exit code and the ZIP
        file appearing on disk
-- [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains the `fusion-angle` executable and `site/` with `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
+- [ ] **A2** Unzip the A1 ZIP (or run `./bin/build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains the `fusion-angle` executable and `site/` with `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
   The 29 are the `PAGE_REGISTRY` HTML files; do
   **not** count root `index.html` inside the 29
   (it stays the separate "plus root `index.html`");
   do **not** count verb/status rooms.
   Pin: tests/page-registry.test.ts 'PAGE_REGISTRY is 29
        HTML page files including the api-documentation
-       index'; exploratory — that a real `./build` run
+       index'; exploratory — that a real `./bin/build` run
        actually emits those 29 files (the eight named
        above included) into `site/`, the 18
        directories, the `fusion-angle` executable,
        `site/assets/app.js`, `site/assets/styles.css`,
        the fonts, and the generated verb/status rooms
-- [ ] **A3** `./crank --mock-data 8080`. Crank
-  validates, mints secrets, starts postgres
-  only, runs `./test-postgres`, `./build
-  --no-zip` into a temp dir, wipes, seeds, and
-  listens. Empty is the wipe step, not a human
-  prerequisite. Secrets never print (seed's
+- [ ] **A3** `./deploy --local 8080 --postgres
+  mock-data`. Deploy validates, mints secrets,
+  starts compose postgres and server, wipes,
+  seeds, and listens. Empty is the wipe step,
+  not a human prerequisite. There is no host
+  `--no-zip` dir. Secrets never print (seed's
   one-shot stdout is the only reveal). PASS:
   process listens; seed stdout prints `Save
   your demo sign-ins — shown once; copy them
@@ -6798,20 +6799,22 @@ K30 only describes.
 J1–J3 are the master's: `## The walk` step 5 runs
 them after K8, once the explorer has returned.
 
-- [ ] **J1** Stop the `./crank` process started
+- [ ] **J1** Stop the `./deploy` process started
   in A3 via the harness-native task stop (not
   `kill`). PASS: process terminates; the trap
-  stopped `./serve`. Sandbox EPERM on `kill`
-  is FAIL if the harness stop itself fails;
-  do not score BLOCKED.
+  ran `compose down --remove-orphans`. Sandbox
+  EPERM on `kill` is FAIL if the harness stop
+  itself fails; do not score BLOCKED.
   Pin: exploratory — the live process actually
        terminating under the harness stop
-- [ ] **J2** After J1 PASS, verify crank's temp
-  bundle is gone (trap `rm -rf`). PASS:
-  directory removed. DEFERRED only if crank
+- [ ] **J2** After J1 PASS, verify there is no
+  leftover compose project and no `.env`.
+  There is no temp bundle — there is no host
+  `--no-zip` dir. PASS: no leftover compose
+  project, no `.env`. DEFERRED only if deploy
   is still up.
-  Pin: exploratory — the temp directory's
-       absence on disk after teardown
+  Pin: exploratory — no leftover compose
+       project and no `.env` after teardown
 - [ ] **J3** Verify the ZIP file remains on
   `~/Desktop` for archival. PASS:
   `fusion-angle-${SHA}.zip` exists.

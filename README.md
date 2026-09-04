@@ -24,9 +24,9 @@ The demo is multi-organization: loading mock data seeds two
 orgs (Stark Industries and Wayne Enterprises) with a sidebar
 org-switcher for the multi-org user. Operator seed prints
 sign-in credentials once on stdout from
-`./postgres-seed --mock-data`.
+`./bin/postgres-seed --postgres local --mock-data`.
 
-**Demo-grade security.** `./build` emits one artifact:
+**Demo-grade security.** `./bin/build` emits one artifact:
 `fusion-angle-${SHA}.zip` (the `fusion-angle` executable,
 Deno + Postgres, pages and API on one origin,
 `JWT_HMAC_SIGNING_KEY` from the environment). See
@@ -41,13 +41,13 @@ git clone <repo-url>
 cd fusion-angle
 ```
 
-[Deno](https://deno.com) 2.9.6 runs `./validate`,
-`./test`, `./test-postgres`, `./build`,
-`./test-browser`, `./measure`, and both generators,
-resolving its own dependencies from `deno.json` and
-`deno.lock`. `./crank` composes those scripts, and
-`./serve` execs the `deno compile` binary; neither
-calls `deno` itself.
+[Deno](https://deno.com) 2.9.6 runs `./test`,
+`./test validate`, `./bin/build`, `./test browser`,
+`./bin/measure`, and both generators, resolving its
+own dependencies from `deno.json` and `deno.lock`.
+`./deploy` composes the walk origin, and
+`./bin/serve` execs the `deno compile` binary;
+neither calls `deno` itself.
 
 ## Docs
 

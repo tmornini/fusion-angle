@@ -5,48 +5,31 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 `@AGENTS.md` import stub.
 
 ```bash
-./test                 # Run automated tests (memory backend)
-./test-browser         # Layer 2's browser half; needs Chrome
-./test-all             # Layer 2: ./validate + ./test-browser
-./validate             # deno check + tests + lint (dirty ok; SHA skips)
-./build                # executable ZIP to ~/Desktop/
-./build --no-zip dir/  # fusion-angle + site/ to dir/
-./build dir/           # executable ZIP to dir/ instead of ~/Desktop/
-./build --help         # Show usage
-./crank --mock-data|--bootstrap port
-./serve dir/ port      # ./fusion-angle serve from dir/
-./postgres-seed --postgres local --bootstrap|--mock-data
-./postgres-seed --postgres render TOKEN \
-    --bootstrap|--mock-data
-./postgres-wipe --postgres render TOKEN
-./postgres-wipe --postgres local
-./postgres-seed --postgres compose \
-    --bootstrap|--mock-data
-docker compose build       # image of the committed tree
-docker compose up --wait   # postgres:18 + server, 127.0.0.1:8080
-docker compose down        # stop; the database dies with it
-./measure              # Full ceremony (record+budgets+25+viz)
-./measure --help       # Show usage
-./measure --check      # Fail if medians exceed budgets
-./measure --record     # Append history (full registry only)
-./measure --write-budgets  # mean+1.5σ budgets (full sweep)
-./measure --budget-sigmas N  # σ multiplier (default 1.5)
-./measure --pages a,b  # Subset of PAGE_REGISTRY keys
-./measure --runs N     # Runs per page (default 25)
-./measure --visualize  # History HTML from disk (no Chrome)
-./measure --profile    # API counts + residual (default 4 pages, 1 run)
-./measure --base-url URL  # Hit a running origin (needs --password)
+./test                 # memory suite
+./test validate        # Layer 1 (SHA skip on clean HEAD)
+./test validate browser  # Layer 2
+./test postgres        # AT4; own Docker Postgres
+./test browser         # AT5; Chrome, in-process memory
+./test check|lint|schema|api-docs
+./deploy --local PORT --postgres mock-data|bootstrap
+./deploy --render TOKEN --commit SHA
+./deploy --render TOKEN --postgres mock-data|bootstrap
+./bin/build            # executable ZIP to ~/Desktop/
+./bin/build --no-zip dir/
+./bin/serve dir/ port  # ZIP hatch; PORT from argv
+./bin/postgres-seed --postgres local --mock-data|--bootstrap
+./bin/postgres-wipe --postgres local
+./bin/measure
 ```
 
-Deno 2.9.6 runs `./validate`, `./test`, `./test-postgres`,
-`./build`, `./test-browser`, `./measure`, and both
-generators, each invoking the `deno` CLI directly. The
-local `./postgres-seed` and `./postgres-wipe` paths
-`exec deno run` under named permissions, and
-`postgres-lib`'s eight inline programs pipe into
-`deno run --frozen` on stdin. `./crank` composes those
-scripts, and `./serve` execs the `deno compile` binary,
-which embeds the runtime — neither calls `deno` itself.
+Deno 2.9.6 runs `./test`, `./test validate`,
+`./bin/build`, `./test browser`, `./bin/measure`,
+and both generators, each invoking the `deno` CLI
+directly. `postgres-lib`'s eight inline programs
+pipe into `deno run --frozen` on stdin. `./deploy`
+composes the walk origin, and `./bin/serve` execs
+the `deno compile` binary, which embeds the
+runtime — neither calls `deno` itself.
 
 Deno is the only server-side runtime this repository uses;
 the browser is the other, and runs the pages. No script
@@ -59,40 +42,38 @@ therefore not a `node` process: `npm:postgres@3.4.9`
 needs no npm CLI, and a `node:path` import resolves with
 no `node` binary on `PATH` at all.
 
-**Commit before building.** `./build` and `./crank`
+**Commit before building.** `./bin/build` and `./deploy`
 require a clean working directory.
-Run `./validate` to catch type errors and lint issues;
-commit; then build or crank.
+Run `./test validate` to catch type errors and lint issues;
+commit; then build or deploy.
 
-`./serve` and a local `./measure` sweep need
+`./bin/serve` and a local `./bin/measure` sweep need
 `POSTGRES_URL` and `JWT_HMAC_SIGNING_KEY` already
-set. `./serve dir/ port` sets `HTTP_SERVER_PORT`
-from `port`. `./crank` mints those for its children.
+set. `./bin/serve dir/ port` sets `PORT`
+from `port`. `./deploy --local` mints those for its
+children.
 
-When running under the Claude Code sandbox, the default
-fails because `/tmp/` is not writable. Use this invocation
-instead:
+When running under the Claude Code sandbox:
 
 ```bash
-TMPDIR=/tmp/claude ./crank --mock-data 8080
+./deploy --local 8080 --postgres mock-data
 # open http://localhost:8080/landing/index.html
 ```
 
-`TMPDIR=/tmp/claude` redirects `./crank`'s temp
-bundle into the sandbox-allowed path.
+There is no temp bundle — compose down is the trap.
 `localhost` is reachable from the sandbox, so the
 Chrome MCP tools can drive the page normally.
 
 The sandbox cannot write `~/Library/Caches/deno`
 either, so `export DENO_DIR="$TMPDIR/deno-dir"` before
-any `deno` command and before `./validate`. Both are
-agent-environment accommodations, never baked into a
-repo script: the operator's machine writes both
+any `deno` command and before `./test` or `./deploy`.
+Both are agent-environment accommodations, never baked
+into a repo script: the operator's machine writes both
 defaults.
 
 ## Gates
 
-`./validate` composes `deno check --frozen api shared
+`./test validate` composes `deno check --frozen api shared
 server tests web-app`, then `./test` — `Deno.test`
 suites written against `@std/assert`, run as `deno
 test --frozen --parallel --no-check
@@ -104,44 +85,46 @@ and scripts (not `.md`), the `org` identifier ban
 under `api/`, `web-app/`, `tests/`, and `shared/`,
 then `generate-schema-svg --check` and
 `generate-api-documentation --check`, both `deno run`.
-Clean tree for `./build`, `./crank`, and `./measure`.
+Clean tree for `./bin/build`, `./deploy`, and
+`./bin/measure`.
 
 `./test` takes 9.5 s with the sanitizers on, against
 9.6 s for Deno before Part 5 turned them on and 16.2 s
 for the old Node `node --test` baseline. `--no-check`
 costs nothing: `deno check` has already covered
-`tests/`. `./test-postgres` carries the same two
-sanitizer flags; `./test-browser` carries
+`tests/`. `./test postgres` carries the same two
+sanitizer flags; `./test browser` carries
 `--sanitize-resources` only, because `useBrowser()`
 opens one CDP WebSocket per file in
 `Deno.test.beforeAll`, whose pending receive always
 crosses a test boundary — the reason lives in that
 script's own comment block.
 
-`./test-browser` needs Chrome (`CHROME` or
+`./test browser` needs Chrome (`CHROME` or
 `CHROME_DEBUG_URL`); it bundles with `deno bundle`
 into `$TMPDIR` on any tree and runs
 `tests/browser/*.test.ts` under `deno test` serially.
-It is not part of `./validate`; `./crank` runs it
-after `./test-postgres`.
+It is not part of `./test validate`; `./deploy --local`
+runs it after `./test postgres`.
 
-Three layers verify this product. Layer 1 is `./validate`,
-the gate on every commit. Layer 2 is `./test-all` —
-Layer 1 then `./test-browser` — the operator's gate before
-`./build`, a deploy, or a walk. Layer 3 is the serial walk
-(`./crank --mock-data 8080`, then one explorer through
-TEST-PLAN.md); it is exploration and gates nothing. A
-browser observation changes product only through a red
-test at Layer 1 or Layer 2: a product commit may cite a
-TEST-PLAN mitigation stub only when its `Reproduced by`
-names a red test.
+Three layers verify this product. Layer 1 is
+`./test validate`, the gate on every commit. Layer 2 is
+`./test validate browser` — Layer 1 then `./test browser`
+— the operator's gate before `./bin/build`, a deploy, or
+a walk. Layer 3 is the serial walk
+(`./deploy --local 8080 --postgres mock-data`, then one
+explorer through TEST-PLAN.md); it is exploration and
+gates nothing. A browser observation changes product
+only through a red test at Layer 1 or Layer 2: a
+product commit may cite a TEST-PLAN mitigation stub
+only when its `Reproduced by` names a red test.
 
-`./measure` is not part of `./validate`; it needs
-Chrome. Full ceremony: `--record` + `--write-budgets`
+`./bin/measure` is not part of `./test validate`; it
+needs Chrome. Full ceremony: `--record` + `--write-budgets`
 + `--runs 25` + `--visualize`. `--check` gates
 median readyMs against `measurements/budgets.json`.
 `--base-url` hits a running origin (needs `--password`).
-See `./measure --help` for flags.
+See `./bin/measure --help` for flags.
 
 ## Commit
 
@@ -167,7 +150,7 @@ plan (`<slug>.md`), and spec (`<slug>-design.md`).
 git worktree add .worktrees/<slug> -b <slug>
 cd .worktrees/<slug>
 git rebase master     # amend until every commit is green
-./validate            # ./test-all before a build or walk
+./test validate        # ./test validate browser before a build or walk
 cd -                  # the main checkout
 git merge --ff-only <slug>
 git worktree remove .worktrees/<slug> && git branch -d <slug>
@@ -207,7 +190,7 @@ down the codebase-specific patterns the scripture itself
 cannot know:
 
 - **Voice rules.** 78-char max line in files
-  `./validate` still lints, 4-space indent, no
+  `./test lint` still lints, 4-space indent, no
   inline styles (use CSS custom properties + classes per
   DESIGN-SYSTEM.md), present-tense imperative
   commit messages, Co-Authored-By trailer.
@@ -225,6 +208,7 @@ skill, the patterns load via the prompt.
 
 Subagents work in the dispatching agent's worktree and never
 create their own — never pass the Agent tool `isolation`.
+Subagents never run `./deploy --render`.
 
 ## Where things live
 
@@ -310,10 +294,10 @@ its files still import `node:test`.
 ### Operator seed and wipe
 
 The `fusion-angle` executable has three verbs: `serve`,
-`seed`, and `wipe`. `./postgres-seed` runs in-process
-on an empty database and refuses a non-empty one.
-`./postgres-wipe` drops the message plane; it does
-not seed.
+`seed`, and `wipe`. `./bin/postgres-seed` runs
+in-process on an empty database and refuses a
+non-empty one. `./bin/postgres-wipe` is the
+public-schema reset; it does not seed.
 
 ### Same-tab refresh; other browsers stale
 
@@ -364,7 +348,7 @@ is — a green run is not evidence of a fence.
 
 The browser is what catches a stray `process` or `Deno.*`
 in client code now — a runtime `ReferenceError` that
-`./test-browser` (Layer 2) and the walk (Layer 3) see
+`./test browser` (Layer 2) and the walk (Layer 3) see
 only on a path they exercise. TODO.md carries the oracle
 for a gate that would restore the fence.
 
@@ -372,7 +356,7 @@ for a gate that would restore the fence.
 adopted because `node --strip-types` required them at
 runtime. Deno requires neither: with no config at all it
 both runs and checks an enum and a namespace. They stay a
-deliberate repo choice, and `deno check` and `./build`'s
+deliberate repo choice, and `deno check` and `./bin/build`'s
 `deno compile` bind them now — `deno compile` type-checks
 unless told not to, and `build` passes no `--no-check`, so
 an enum or namespace is TS1294 at either gate under this
@@ -392,7 +376,7 @@ as a `--preload`, not an import.
 ### Required env is never logged
 
 `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and
-`HTTP_SERVER_PORT` are required. Never log them.
+`PORT` are required. Never log them.
 
 ### Transaction bodies await only row ops
 
