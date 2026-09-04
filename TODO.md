@@ -313,8 +313,8 @@ Off the critical path; each with its oracle.
   facade's cookie refresh —
   `web-app/app/adapters/shared.ts:463-464`
 - `JWT_HMAC_SIGNING_KEY` may not belong in the local
-  seed/wipe `--allow-env` (`postgres-seed:168`,
-  `postgres-wipe:109`). `api/access-token.ts` IS in the
+  seed `--allow-env` (`postgres-seed:168`).
+  `api/access-token.ts` IS in the
   seed's 105-module transitive graph — `postgres-seed.ts`
   → `seed.ts` → `api/mock-data.ts` → `api/routes.ts` →
   `api/authentication.ts`, a route that never touches
