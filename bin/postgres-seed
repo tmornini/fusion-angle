@@ -1,8 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+BIN="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$BIN/.." && pwd)"
 # shellcheck disable=SC1091
-. "$(dirname "$0")/postgres-lib"
+. "$BIN/postgres-lib"
 
 usage() {
     cat <<'USAGE'
@@ -148,7 +150,6 @@ if [ "$POSTGRES_TARGET" = "compose" ]; then
         echo "Error: docker is required" >&2
         exit 1
     fi
-    ROOT="$(cd "$(dirname "$0")" && pwd)"
     exec docker compose -f "$ROOT/compose.yaml" \
         run --rm seed "$MODE"
 fi
@@ -160,7 +161,6 @@ fi
 
 if [ "$POSTGRES_TARGET" = "local" ]; then
     assert_loopback_postgres_url
-    ROOT="$(cd "$(dirname "$0")" && pwd)"
     exec deno run --frozen --allow-net \
         --allow-env=POSTGRES_URL,PGPORT,PGSSL,PGSSLNEGOTIATION,\
 PGIDLE_TIMEOUT,PGCONNECT_TIMEOUT,PGMAX_LIFETIME,PGMAX_PIPELINE,PGBACKOFF,\

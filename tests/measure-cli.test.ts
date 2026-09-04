@@ -291,7 +291,7 @@ Deno.test('lastJsonLogMessage takes the last message', () => {
 });
 
 Deno.test('local spawn is seed then ./fusion-angle serve', () => {
-    assertStrictEquals(MEASURE_SEED_COMMAND, './postgres-seed');
+    assertStrictEquals(MEASURE_SEED_COMMAND, './bin/postgres-seed');
     assertEquals(measureSeedArgs(), [
         '--postgres', 'local', '--mock-data',
     ]);

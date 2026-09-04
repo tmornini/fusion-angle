@@ -4,7 +4,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
 COPY . .
-RUN ./build --no-zip render-out/
+RUN ./bin/build --no-zip render-out/
 
 FROM denoland/deno:2.9.6 AS runtime
 WORKDIR /srv

@@ -507,7 +507,7 @@ async function main(): Promise<void> {
                 `Building to ${buildDir}/ …\n`,
             ));
             const built = await new Deno.Command(
-                './build',
+                './bin/build',
                 {
                     args: ['--no-zip', buildDir + '/'],
                     cwd: repoRoot,

@@ -1,8 +1,8 @@
 #!/bin/bash
-# Sourced by ./build and ./test-browser from the repo
-# root. Not a command. bundle_client composes the pages
-# and bundles the client into DEST; ./build owns the
-# clean-tree gate, the executable, and the ZIP.
+# Sourced from repo root after the caller `cd "$ROOT"`.
+# Not a command. bundle_client composes the pages
+# and bundles the client into DEST; ./bin/build owns
+# the clean-tree gate, the executable, and the ZIP.
 
 # Fail when the artifact is empty or absent; report its
 # size otherwise — one voice for every emitted artifact.

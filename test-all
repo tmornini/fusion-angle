@@ -2,13 +2,13 @@
 set -euo pipefail
 
 # Layer 2: ./validate (Layer 1), then the deterministic
-# browser suite. Chrome absence is ./test-browser's own
-# refusal — this script adds no Chrome discovery of its
-# own. Cannot run inside the Claude Code sandbox: Chrome
-# cannot bind() its ProcessSingleton socket there.
+# browser suite. Chrome absence is ./bin/test-browser's
+# own refusal — this script adds no Chrome discovery of
+# its own. Cannot run inside the Claude Code sandbox:
+# Chrome cannot bind() its ProcessSingleton socket there.
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
 ./validate
-./test-browser
+./bin/test-browser

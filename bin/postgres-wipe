@@ -1,8 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+BIN="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$BIN/.." && pwd)"
 # shellcheck disable=SC1091
-. "$(dirname "$0")/postgres-lib"
+. "$BIN/postgres-lib"
 
 usage() {
     cat <<'USAGE'
@@ -101,7 +103,6 @@ fi
 
 if [ "$POSTGRES_TARGET" = "local" ]; then
     assert_loopback_postgres_url
-    ROOT="$(cd "$(dirname "$0")" && pwd)"
     exec deno run --frozen --allow-net \
         --allow-env=POSTGRES_URL,PGPORT,PGSSL,PGSSLNEGOTIATION,\
 PGIDLE_TIMEOUT,PGCONNECT_TIMEOUT,PGMAX_LIFETIME,PGMAX_PIPELINE,PGBACKOFF,\
@@ -127,7 +128,6 @@ trap cleanup EXIT
 
 discover_render_ids
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
 WIPE_START=$(deno run --frozen \
     "$ROOT/server/postgres-wipe.ts" \
     --print-start-command)

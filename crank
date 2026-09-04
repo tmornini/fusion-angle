@@ -112,13 +112,13 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 docker compose up -d --wait postgres
-./test-postgres
-./test-browser
+./bin/test-postgres
+./bin/test-browser
 BUILD_DIR="$(mktemp -d \
     "${TMPDIR:-/tmp}/fusion-crank.XXXXXX")"
-./build --no-zip "${BUILD_DIR}/"
-./postgres-wipe --postgres local
-./postgres-seed --postgres local "$MODE"
-./serve "${BUILD_DIR}/" "$PORT" &
+./bin/build --no-zip "${BUILD_DIR}/"
+./bin/postgres-wipe --postgres local
+./bin/postgres-seed --postgres local "$MODE"
+./bin/serve "${BUILD_DIR}/" "$PORT" &
 SERVE_PID=$!
 wait "$SERVE_PID"

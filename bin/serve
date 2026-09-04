@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
     cat <<'USAGE'
-Usage: ./serve dir/ port
+Usage: ./bin/serve dir/ port
   dir/   Bundle directory (trailing / required)
   port   HTTP_SERVER_PORT (required; no default)
   Requires POSTGRES_URL and JWT_HMAC_SIGNING_KEY.

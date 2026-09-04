@@ -22,7 +22,7 @@ DENO_TEST=(
     deno test --frozen --parallel --no-check
     --sanitize-ops --sanitize-resources
     --allow-env --allow-read --allow-write
-    --allow-net --allow-run=deno,./serve,./crank,sh,./validate
+    --allow-net --allow-run=deno,./bin/serve,./crank,sh,./validate
     --preload ./tests/hmac-test-key.ts
     --preload ./tests/local-storage-stub.ts
     --preload ./tests/session-storage-stub.ts

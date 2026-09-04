@@ -6,8 +6,10 @@ import {
 } from '@std/assert';
 import { fromFileUrl, relative } from '@std/path';
 
-const BUILD_SCRIPT = Deno.readTextFileSync('build');
-const BUILD_LIB_SCRIPT = Deno.readTextFileSync('build-lib');
+const BUILD_SCRIPT = Deno.readTextFileSync('bin/build');
+const BUILD_LIB_SCRIPT = Deno.readTextFileSync(
+    'bin/build-lib',
+);
 
 // Deleted names no longer appear in live source. Hunt
 // the live mint symbols too, or a server-core import of

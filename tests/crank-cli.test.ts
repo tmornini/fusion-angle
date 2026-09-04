@@ -134,17 +134,17 @@ Deno.test('crank source owns the local stack', () => {
         src,
         /docker compose up -d --wait postgres/,
     );
-    assertMatch(src, /\.\/test-postgres/);
-    assertMatch(src, /\.\/build --no-zip/);
+    assertMatch(src, /\.\/bin\/test-postgres/);
+    assertMatch(src, /\.\/bin\/build --no-zip/);
     assertMatch(
         src,
-        /\.\/postgres-wipe --postgres local/,
+        /\.\/bin\/postgres-wipe --postgres local/,
     );
     assertMatch(
         src,
-        /\.\/postgres-seed --postgres local/,
+        /\.\/bin\/postgres-seed --postgres local/,
     );
-    assertMatch(src, /\.\/serve /);
+    assertMatch(src, /\.\/bin\/serve /);
     assertNotMatch(
         src,
         /docker compose up -d --wait["\n]*$/,

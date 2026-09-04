@@ -36,8 +36,12 @@ for arg in "$@"; do
     esac
 done
 
+BIN="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$BIN/.." && pwd)"
 # shellcheck source=build-lib
-source "$(dirname "$0")/build-lib"
+source "$BIN/build-lib"
+# git status, bundle_client, compile: cwd must be ROOT
+cd "$ROOT"
 
 if [ -n "$(git status --porcelain)" ]; then
     echo "Error: working directory is not clean." \
@@ -65,7 +69,6 @@ else
     TARGET_FLAG="--target x86_64-unknown-linux-gnu"
 fi
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
 ABS_BUILD="$(cd "$BUILD_DIR" && pwd)"
 # deno compile looks up absolute file:// specifiers on
 # disk at runtime, so the generated entry must be
