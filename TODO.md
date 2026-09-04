@@ -184,86 +184,30 @@ spec → plan → ship cycle, implemented sequentially. A
 
 Off the critical path; each with its oracle.
 
-- A full TEST-PLAN.md walk using serial subagents, so
-  session context stays short — TEST-PLAN.md `## The walk`
-- 2026-09-02 walk F23/AA32: compositor cannot hold
-  Shift across a mouse gesture. Layer 1 pins and
-  `tests/browser/canvas-gestures.test.ts` 'Shift held
-  mid port-drag commits an edge and adds no node
-  (F23)' decide the product. Score BLOCKED when
-  Shift is missing on pointer-up — TEST-PLAN.md
-  Driving notes
-- 2026-09-02 walk AA33/AA34: DEFERRED on AA32 stray
-  nodes. Attribute-ref writes:
-  `tests/presenter-misc.test.ts` R12 pins +
-  `tests/browser/canvas-gestures.test.ts`
-  'Shift-drag adds an edge and Review accepts two
-  attribute refs (AA32/AA33/AA34)'
-- 2026-09-02 walk F37b: re-activate tab A after F37a;
-  Layer 2 pin `tests/browser/canvas-gestures.test.ts`
-  'plain port-drag on an auto-layout flow adds a
-  node and Undo restores (F37b)'
-- 2026-09-02 walk R12: driver (panel never opened).
-  `buildAttributeRefRow` Layer 1 pin is green —
-  `tests/presenter-misc.test.ts`
-- 2026-09-02 walk F26/F28/F14: compositor mis-hit /
-  missed Zoom-in. Layer 2 pins in
-  `tests/browser/canvas-gestures.test.ts` and
-  `tests/browser/canvas-pan.test.ts`
-- 2026-09-02 second walk AA9/WB11: Layer 2
-  characterization pins close the only maybe-product
-  FAILs. Green pins (or a product fix behind a red
-  one) decide them; compositor leftovers stay
-  BLOCKED — TEST-PLAN.md Driving notes;
-  tests/browser/member-strengths.test.ts
-  'chip toggles persist on save and reload (AA9)';
-  tests/browser/workbox-transition.test.ts
-  'bind, fill, and submit navigates to the inbox
-  (WB11)'
-- Toast pause on hover and focus
+- The re-mint refresh is not single-flighted with the
+  facade's cookie refresh —
+  `web-app/app/adapters/shared.ts:463-464`
+- `JWT_HMAC_SIGNING_KEY` may not belong in the local
+  seed/wipe `--allow-env` (`postgres-seed:168`,
+  `postgres-wipe:109`). `api/access-token.ts` IS in the
+  seed's 105-module transitive graph — `postgres-seed.ts`
+  → `seed.ts` → `api/mock-data.ts` → `api/routes.ts` →
+  `api/authentication.ts`, a route that never touches
+  `api/api.ts` — but it reads the key lazily inside
+  `hmacSigningKeyMaterial()` (:29-44), so whether the seed
+  ever reaches that read is undecided — the seed hits
+  ECONNREFUSED first. Kept rather than narrowed on
+  evidence that needs a database to gather. Oracle: a
+  successful `./postgres-seed --postgres local
+  --bootstrap` that never reads it.
 - Mock seed's fixed 2026-06-15 anchor — after
   2026-09-13 serial-mode FS3 carries in-flight heat
   only
-- Profile as its own document,
-  `identities/:id/profile`, 404 = no profile — closes
-  whole-or-none — `tests/api-identity-document.test.ts`
 - Roster rows carry a fabricated empty profile
   (`emptyPersonProfile`) —
   `web-app/app/adapters/members.ts:48`
 - `DEFAULT_DIM` stands in for an assessment that never
   happened — `web-app/members/index.ts:52`
-- The re-mint refresh is not single-flighted with the
-  facade's cookie refresh —
-  `web-app/app/adapters/shared.ts:463-464`
-- `./measure` harvests error-page timings;
-  `page:ready` carries no status —
-  `web-app/app/measure.ts`
-- The cross-party delegation ledger
-  (`api/authentication.ts:884-886`;
-  `tests/api-authentication-token.test.ts:678`)
-- Passkey, provider-IdP, and corporate-OIDC ceremonies
-  (`api/authentication.ts:1595-1597`;
-  `tests/api-authentication-authorize.test.ts:225`)
-- Per-client multi-audience, DPoP `cnf`, jti reuse
-  detection (`api/types.ts:508-510`;
-  `shared/access-token-decode.ts:30-31`)
-- SP-6 sign-up (`web-app/auth/index.ts:655-663`)
-- Billing (`web-app/billing/`)
-- Invitation email delivery
-- Attribute drag-reorder (TEST-PLAN R8)
-- Idea-create toasts an incomplete submit; convert
-  still sets `btn.disabled` — two forms, one
-  directory, opposite validation voices
-  (`web-app/ideas/create.ts:124`,
-  `web-app/ideas/convert.ts:356`). A design call, not
-  a defect: TEST-PLAN D6/D7 pin the toast, and the
-  2026-08-26 D6 stub files the voice question as its
-  separate finding
-- The run-four remediation's remaining seams — R6 and
-  R7, whose "toy" clauses need a Layer 3 observation
-  before any rewrite. G9's staleness was the corrupted
-  test name, restored by the small-items sweep; R12's
-  note is accurate and its gap is the Unpinned entry
 - A replay is indistinguishable from a creation. The
   gate's replay branch renders a previously-stored
   pair but passes `appended: true`
@@ -281,25 +225,6 @@ Off the critical path; each with its oracle.
   (`api/message-pair.ts:686-701`), and the composed
   operation wrapping it still answers 201 however many
   inner pairs actually landed
-- A shared test operation id can produce false greens.
-  `tests/http-fixtures.ts:12` exports one hardcoded
-  `TEST_OPERATION_ID`; 135 test files use it, 99
-  through a local `req()` helper that pins it. Because
-  `appendMessagePair` dedupes on `request_hash`, a
-  test issuing two byte-identical requests has the
-  second silently dropped — which made a security test
-  in the run-four remediation pass against unfixed
-  code until it was caught. Oracle:
-  `tests/api-record-types-composed-op.test.ts:434-440`
-- Absence and emptiness are conflated in attribute ACL
-  derivation. `attributeSchemaOf` synthesizes
-  `readRoles: []` both for a head that deliberately
-  stores an empty array and for one carrying no role
-  keys at all (`api/routes.ts:1000-1005`), because the
-  nested attribute PUT appends the raw wire body
-  rather than the validator's normalized document
-  (`api/routes.ts:5307-5333`; the default-stamping it
-  discards is `api/validators.ts:3042-3054`)
 - A panel rename whose target is deleted during the
   800 ms debounce still saves and still clears redo.
   `withNodeNamed`, `withNodeTaskInstructions`, and
@@ -311,42 +236,19 @@ Off the critical path; each with its oracle.
   `web-app/app/presenters/flow-designer.ts:808-885`;
   the debounced schedules are
   `web-app/flows/detail.ts:1349-1391`
-- A flow loaded with Auto Fit OFF no longer fits on
-  first paint. `withCanvasSize`
-  (`web-app/app/presenters/flow-designer.ts:996-1017`)
-  fits only under `isAutoFit`, and the load-time block
-  (`web-app/flows/detail.ts:1685-1697`) is the only
-  load-time fit — its `reconcileFitFromDom()` returns
-  early for the same reason. RECORDED, behavior
-  unchanged. The sentence it falsifies is "onFlowLoaded
-  keeps its explicit first fit" — the run-four
-  remediation design spec, second-commit paragraph
-- Stale-history comment cleanup as one pass — about 35
-  code and 32 test comments describe a past state as
-  present. The run-four remediation's Evidence
-  (`docs/superpowers/specs/`
-  `2026-08-23-test-plan-run-four-remediation-design.md:911-932`)
-  lists provenance, not comments, and the reproductions
-  that might have were scratchpad, never committed —
-  the pass re-derives its enumeration by reading. The
-  two remaining "remove the comment at … when done"
-  pointers under `## Critical path` are that path's
-  property, not stale
-- Cryptographically verifiable ledger — brainstorm
-  hash-and-verify (or sign) of stored pairs. The dropped
-  `version` column hashed on write and was never checked
-  on read. `request_hash` is replay identity, not
-  response integrity — `SCHEMA.md` item 4
-- Claim-on-load with no release-on-leave plus the
-  8-hour `DEFAULT_LOCK_TIMEOUT` turns a drive-by
-  work-order view into an 8-hour claim
-  (run-six Task 3 renders it; the UX remains) —
-  `web-app/workbox/detail.ts:583-593`,
-  `api/types.ts:1007`
-- Intermittent "flow-marquee" console exceptions on
-  non-canvas pages (Billing) — a flow-canvas gesture
-  listener may be bound globally — TEST-PLAN.md G42
-  observation
+- `mustFind` throws `gesture frame target missing:
+  .flow-marquee` when a selecting-gesture rAF paints an
+  SVG rebuilt without the rect. `renderMarqueeFrame`
+  (`web-app/app/flow-gesture-render.ts`) looks up
+  `.flow-marquee`; `buildGraphSvg` emits that rect only
+  while `marqueeRect` is set. Mid-gesture rAF skips
+  commit, so a resize `update()` rebuilds from the idle
+  snapshot and omits the rect while `bindInteractions`
+  still holds selecting state. Not global:
+  `bindInteractions` is called only from
+  `web-app/flows/detail.ts`, and Billing's `init()` is
+  empty. TEST-PLAN.md G42's Billing console observation
+  is not a Billing listener
 - A re-init failure degrades weaker than a first-boot one:
   `subscribeOnce`'s `void fn()` lets the rejection reach the
   global `unhandledrejection` handler, which logs and
@@ -355,6 +257,123 @@ Off the critical path; each with its oracle.
   — `web-app/app/channels.ts:152`,
   `web-app/app/page-loader.ts:41-75`,
   `web-app/app/error-helpers.ts:41-57`
+- `subscribeOnce`'s `const unsubscribe = subscribe(...)`
+  would throw a TDZ ReferenceError if any `subscribe` fired
+  its callback synchronously; all thirteen
+  `subscribe<Entity>Changes` delegate to `createChannel`,
+  so it is inert — guard only if that changes
+- GPU flag in the Layer 2 launcher — `launchChrome`
+  no longer passes `--disable-gpu` (cargo cult under
+  `--headless=new`; it was required only by old
+  headless on Windows). Its one real effect was
+  forcing software compositing, which made runs more
+  alike across machines. Dropped UNVERIFIED —
+  `./test-browser` has run green on one machine
+  (2026-08-28). Restore it if two machines disagree.
+  Oracle: `./test-browser` green on two machines
+- Nothing asserts that the operator wrappers exec `deno`
+  rather than `node`; coverage today is a grep run by
+  hand. `tests/fusion-angle-live-name.test.ts` already
+  walks the same root-file list for forbidden strings, so
+  the shape exists. Oracle: a test asserting no `node`
+  invocation in `postgres-lib`, `postgres-seed`,
+  `postgres-wipe`.
+- Absence and emptiness are conflated in attribute ACL
+  derivation. `attributeSchemaOf` synthesizes
+  `readRoles: []` both for a head that deliberately
+  stores an empty array and for one carrying no role
+  keys at all (`api/routes.ts:1000-1005`), because the
+  nested attribute PUT appends the raw wire body
+  rather than the validator's normalized document
+  (`api/routes.ts:5307-5333`; the default-stamping it
+  discards is `api/validators.ts:3042-3054`)
+- Member-removal affordance under members/identities —
+  zero-membership is seed-produced today (Riley Okafor);
+  no page deletes a membership row. Oracle: removing a
+  member's last seat lands that identity on
+  `invitations/index.html` at next boot (TEST-PLAN
+  B25–B29 driven live); restores B28's original
+  "restore the deleted membership row" branch
+- A shared test operation id can produce false greens.
+  `tests/http-fixtures.ts:12` exports one hardcoded
+  `TEST_OPERATION_ID`; 126 test files use it, 101
+  through a local `req()` helper that pins it.
+  `apiRequest` already mints a fresh identifier when
+  `operationId` is omitted; the helpers still pass the
+  shared id. Because `appendMessagePair` dedupes on
+  `request_hash`, a test issuing two byte-identical
+  requests has the second silently dropped — which
+  made a security test in the run-four remediation
+  pass against unfixed code until it was caught.
+  Oracle:
+  `tests/api-record-types-composed-op.test.ts:436-442`
+- Toast pause on hover and focus
+- The run-four remediation's remaining seams — R6 and
+  R7, whose "toy" clauses need a Layer 3 observation
+  before any rewrite. G9's staleness was the corrupted
+  test name, restored by the small-items sweep
+- The `exists()` helper is duplicated five times, byte
+  for byte, all under `web-app/app/` — `compose.ts`,
+  `generate-api-documentation.ts`, `measure-viz.ts`,
+  `cdp-client.ts`, `measure.ts`. Commandment IX's
+  threshold is three. Each copy was sanctioned
+  deliberately: extracting a shared module from any one
+  Deno porting task would have reached into four other
+  tasks' files. Oracle: one definition, five importers,
+  `./validate` green.
+- The cross-party delegation ledger
+  (`api/authentication.ts:884-886`;
+  `tests/api-authentication-token.test.ts:678`)
+- Passkey, provider-IdP, and corporate-OIDC ceremonies
+  (`api/authentication.ts:1595-1597`;
+  `tests/api-authentication-authorize.test.ts:225`)
+- Per-client multi-audience, DPoP `cnf`, jti reuse
+  detection (`api/types.ts:508-510`;
+  `shared/access-token-decode.ts:30-31`)
+- SP-6 sign-up (`web-app/auth/index.ts:655-663`)
+- Cryptographically verifiable ledger — brainstorm
+  hash-and-verify (or sign) of stored pairs. The dropped
+  `version` column hashed on write and was never checked
+  on read. `request_hash` is replay identity, not
+  response integrity — `SCHEMA.md` item 4
+- ACL-editing UI for record attributes (`read_roles` /
+  `write_roles`) — R21's restricted branches are
+  seed-produced today; setting an ACL is
+  `PUT …/attributes/:id` only, and no page reaches it.
+  Oracle: an admin edits an ACL through the UI and a
+  member-perspective New-instance form flips live;
+  TEST-PLAN R21 gains the write path as a user gesture
+- A pure-TypeScript scrypt would retire the last
+  product-process `node:` import
+  (`server/scrypt-hash.ts`). Measured at
+  this repo's `ln=17,r=8,p=1,dkLen=32`,
+  `jsr:@noble/hashes@2.4.0/scrypt.js` medians 224 ms
+  against `node:crypto` scryptSync's 192 ms — 17% slower,
+  digests byte-identical, so stored `$scrypt$` credentials
+  verify unchanged, and `deno compile` embeds it with no
+  native dependency. Its audit status, maintenance
+  cadence, and supply-chain posture are UNVERIFIED; for a
+  credential path that is the decisive question, and it
+  settles before the benchmark means anything. The cost is
+  a third-party package where the Article prefers a
+  platform primitive. `@denorg/scrypt` and
+  `@wildboar/scrypt-0` also exist on JSR, unexamined.
+  Oracle: byte-identical digests for the stored parameters.
+- Untested by design after run-six: the records/projects/
+  flows `onEmpty` arms (only ideas is pinned), `loadInto`'s
+  retry branch, a work order both claimed and completed,
+  and the archived-genesis walk
+  (`web-app/app/adapters/objectives.ts:190-192`)
+- `./measure` harvests error-page timings;
+  `page:ready` carries no status —
+  `web-app/app/measure.ts`
+- Invitation email delivery
+- Claim-on-load with no release-on-leave plus the
+  8-hour `DEFAULT_LOCK_TIMEOUT` turns a drive-by
+  work-order view into an 8-hour claim
+  (run-six Task 3 renders it; the UX remains) —
+  `web-app/workbox/detail.ts:583-593`,
+  `api/types.ts:1007`
 - `subscribeOnce` guarantees "never two" live subscriptions,
   not "always one": a bell arriving between teardown and
   re-arm is dropped, leaving an empty list page blank — the
@@ -370,55 +389,95 @@ Off the critical path; each with its oracle.
   rendering —
   `web-app/app/adapters/objectives.ts:311`,
   `web-app/projects/detail.ts:318`
-- Untested by design after run-six: the records/projects/
-  flows `onEmpty` arms (only ideas is pinned), `loadInto`'s
-  retry branch, a work order both claimed and completed,
-  and the archived-genesis walk
-  (`web-app/app/adapters/objectives.ts:190-192`)
-- `subscribeOnce`'s `const unsubscribe = subscribe(...)`
-  would throw a TDZ ReferenceError if any `subscribe` fired
-  its callback synchronously; all thirteen
-  `subscribe<Entity>Changes` delegate to `createChannel`,
-  so it is inert — guard only if that changes
-- Node-only modules by directory — once whole-tree type
-  checking ships, the browser tsconfig's `exclude` is
-  the last hand-kept registry (seven, growing with the
-  tiers plan). Move them out of `web-app/app/` into a
-  top-level tools directory so browser membership is by
-  rule and the top level names the tools. After the
-  tiers plan. Oracle: `web-app/app/tsconfig.json` has
-  no `exclude`
-- A DOM-free server universe — `server/` and the `api/`
-  it reaches type-check only under `lib.dom`, so a
-  `document` in server-side code is invisible to `tsc`.
-  Measured at `8cad9e86`: `server/` alone under `ES2024`
-  + `@types/node` reports 8 errors, all WebCrypto/Fetch
-  names that `lib.webworker` carries without `document`
-  (`api/client-assertion.ts:29-167`,
-  `api/message-pair.ts:540`). A third project over
-  `server/` extending the root with
-  `lib: ["ES2024", "WebWorker"]`; verify `@types/node`
-  coexists. Oracle: a `document` reference in `api/`
-  fails `./validate`
-- The browser tsconfig at `web-app/app/` is the nearest
-  project only for `web-app/app/**`; editors and the
-  LSP open `web-app/flows/**` and the other page
-  directories under the root superset, where `process`
-  resolves. Move it to `web-app/tsconfig.json`. Six
-  live references (`validate`, TEST-PLAN.md AT1,
-  AGENTS.md's Gates paragraph, AGENTS.md's one type
-  universe invariant, `tests/tsconfig-covenants.test.ts`,
-  and this file's own Node-only-modules-by-directory
-  Oracle above) plus the tiers plan's path
-- GPU flag in the Layer 2 launcher — `launchChrome`
-  no longer passes `--disable-gpu` (cargo cult under
-  `--headless=new`; it was required only by old
-  headless on Windows). Its one real effect was
-  forcing software compositing, which made runs more
-  alike across machines. Dropped UNVERIFIED —
-  `./test-browser` has run green on one machine
-  (2026-08-28). Restore it if two machines disagree.
-  Oracle: `./test-browser` green on two machines
+- Node-only modules still live under `web-app/app/` —
+  `measure.ts`, `generate-api-documentation.ts`,
+  `compose.ts`, `generate-schema-svg.ts`,
+  `cdp-client.ts`, `measure-viz.ts`. The browser
+  tsconfig `exclude` that listed them is gone with that
+  file. Moving them to a top-level tools directory
+  would make browser membership by rule and is the
+  exclusion the `Deno.*` fence still needs. Oracle:
+  those six files are not under `web-app/app/`
+- A DOM-free server universe — `deno.json` is the only
+  project and its `lib` includes `dom`, so a `document`
+  in `api/` or `server/` type-checks. Re-measured: a
+  temp `document.body` under `api/` passed `deno check
+  --frozen api`. WebCrypto/Fetch names the server needs
+  (`crypto.subtle` in `api/client-assertion.ts`,
+  `HeadersInit` in `api/message-pair.ts`) live on
+  `lib.webworker` without `document`. Oracle: a
+  `document` reference in `api/` fails `./validate`
+- The Send Back feedback textarea is discarded.
+  `web-app/app/presenters/idea.ts:410-425` renders
+  `<textarea id="approval-send-back-feedback">` in the
+  Send Back dialog, and `grep -rn
+  "approval-send-back-feedback" web-app/ api/ shared/
+  tests/ server/` returns zero reads: the confirm path
+  (`web-app/ideas/detail.ts:289-296` → `transitionIdea`
+  → `postIdeaStateChange`) has no feedback parameter, so
+  whatever a reviewer types is thrown away. Found by
+  reading, not driving, during the 2026-08-29 audit; no
+  TEST-PLAN case claims the feedback survives. Oracle: a
+  Layer 1 test asserting the typed feedback reaches the
+  transition
+- The browser type fence is gone, not weakened. Ambient
+  Node globals unlock per `deno check` invocation: one
+  `node:` specifier anywhere in the checked graph gives
+  `process` to every file in it. `web-app` carries none
+  of its own since the Deno port, but the gate checks it
+  in one invocation with `server` and `tests`, and
+  either alone suffices — `server/scrypt-hash.ts`'s
+  `node:crypto` means retiring `node:test` will not
+  restore it. `npm:` does not unlock; `Deno.*` never
+  fenced at all, via `deno.ns`.
+  `tests/browser-fence.test.ts` checks an isolated file,
+  so it passes while the property is false. Restoring
+  the `process` half now costs one line:
+  `deno check --frozen web-app` alone is green on the
+  tree today and rejects a `process` reference under
+  `web-app/` with TS2591. The `Deno.*` half is a much
+  bigger job and must not inherit that estimate: a lib
+  array without `deno.ns` is necessary but far from
+  sufficient — measured over `api shared web-app` it
+  yields 104 TS2304 errors, every one of them in a
+  `web-app/app/` tooling module (`measure.ts` 49,
+  `generate-api-documentation.ts` 14, `compose.ts` 14,
+  `generate-schema-svg.ts` 11, `cdp-client.ts` 10,
+  `measure-viz.ts` 6) and none in browser page code. So
+  that half needs the lib change PLUS the exclusion
+  registry the `process` half escaped. Oracle for the
+  `process` half: that invocation in `./validate`, red
+  on a `process` reference under `web-app/`.
+- `./measure --record` writes the literal `'unknown'` as
+  `cpuModel` (`web-app/app/measure.ts:946`). Deno exposes
+  no CPU-model API — `navigator.hardwareConcurrency` is a
+  count — and the `sysctl` workaround was rejected as
+  unverifiable and macOS-only. All 14 rows in
+  `measurements/history.jsonl` carry a real chip name; no
+  row written from here on will. The truthful shape omits
+  the field rather than storing a sentinel, which needs
+  `measure-core.ts`'s field type and `shapeHistoryLine`
+  (:36, :264) together with `measure-viz.ts:986`, whose
+  `|| ''` is itself the default-value sin. Oracle: a row
+  with no `cpuModel` key renders without the separator.
+- Stale-history comment cleanup as one pass — comments
+  still describe a past state as present. Sampled:
+  `web-app/app/measure-cli.ts` names a Node harness;
+  `web-app/app/page-request-profile.ts` says "No-op in
+  Node"; `tests/drift-states.test.ts` says derive-states
+  is unread in production while `api/routes.ts` imports
+  it; `api/routes.ts` claims revival dual-write after
+  the states row half is stripped; `api/mock-data/seed-kit.ts`
+  cites `tests/mock-data-fingerprint.test.ts`, which is
+  gone. The run-four remediation's Evidence
+  (`docs/superpowers/specs/`
+  `2026-08-23-test-plan-run-four-remediation-design.md:911-932`)
+  lists provenance, not comments, and the reproductions
+  that might have were scratchpad, never committed —
+  the pass re-derives its enumeration by reading. The
+  two remaining "remove the comment at … when done"
+  pointers under `## Critical path` are that path's
+  property, not stale
 - Unpinned but pinnable — TEST-PLAN covenants with no
   test, the 2026-08-29 audit's gap list. Each names the
   lowest layer that could express it. The walk observes
@@ -496,11 +555,6 @@ Off the critical path; each with its oracle.
     and deliberately no `data-edge-id`, which is what
     keeps it non-interactive (AA30) — Layer 1, a render
     test over `web-app/app/flow-graph.ts:869-882`
-  - The attribute list item's rendered mode label
-    (Editable / Read-only) and required-toggle state
-    (AA33, AA34) — Layer 1, a presenter test on the
-    properties panel's attribute-list render; only the
-    `performAddAttributeRef` write is tested
   - The landing CTAs carrying `[data-goto-auth]` and
     navigating to `auth/index.html` on click (B2, B3) —
     Layer 2, a browser test on `web-app/landing/`;
@@ -739,9 +793,6 @@ Off the critical path; each with its oracle.
     `#prop-node-attribute-picker` (F63, F64) — Layer 1,
     `assert.doesNotMatch` in
     `tests/presenter-misc.test.ts`
-  - The picker filtering out already-referenced
-    attributes (F68) — Layer 1, `buildNodePanel` with a
-    node that references one of two
   - The rendered hazard badge — `<g
     class="flow-node-danger">` / `.flow-node-warning` and
     its `<title>` copy (F73) — Layer 1, `buildGraphSvg`;
@@ -1037,10 +1088,6 @@ Off the critical path; each with its oracle.
     `tests/browser/toasts.test.ts`
   - The flow header's painted "Record: Customer Profile"
     dropdown and its selected state (R11) — Layer 2
-  - The node panel's whole attribute ref-row rendering
-    (R12) — Layer 1; `buildAttributeRefRow`
-    (`web-app/app/presenters/flow-designer-view.ts`) is
-    exported and untested
   - The workbox action screen's empty-required pre-check
     and its toast text (R13) — Layer 1;
     `hasEmptyRequiredAttribute`
@@ -1105,19 +1152,65 @@ Off the critical path; each with its oracle.
   — it is retired, PASS vacuously. Once the audit
   workspace is gone, those thirteen `Pin:` clauses in
   TEST-PLAN.md are the only record of them
-- The Send Back feedback textarea is discarded.
-  `web-app/app/presenters/idea.ts:410-425` renders
-  `<textarea id="approval-send-back-feedback">` in the
-  Send Back dialog, and `grep -rn
-  "approval-send-back-feedback" web-app/ api/ shared/
-  tests/ server/` returns zero reads: the confirm path
-  (`web-app/ideas/detail.ts:289-296` → `transitionIdea`
-  → `postIdeaStateChange`) has no feedback parameter, so
-  whatever a reviewer types is thrown away. Found by
-  reading, not driving, during the 2026-08-29 audit; no
-  TEST-PLAN case claims the feedback survives. Oracle: a
-  Layer 1 test asserting the typed feedback reaches the
-  transition
+- Profile as its own document,
+  `identities/:id/profile`, 404 = no profile — closes
+  whole-or-none — `tests/api-identity-document.test.ts`
+- Idea-create toasts an incomplete submit; convert
+  still sets `btn.disabled` — two forms, one
+  directory, opposite validation voices
+  (`web-app/ideas/create.ts:124`,
+  `web-app/ideas/convert.ts:356`). A design call, not
+  a defect: TEST-PLAN D6/D7 pin the toast, and the
+  2026-08-26 D6 stub files the voice question as its
+  separate finding
+- A full TEST-PLAN.md walk using serial subagents, so
+  session context stays short — TEST-PLAN.md `## The walk`
+- 2026-09-02 walk F23/AA32: compositor cannot hold
+  Shift across a mouse gesture. Layer 1 pins and
+  `tests/browser/canvas-gestures.test.ts` 'Shift held
+  mid port-drag commits an edge and adds no node
+  (F23)' decide the product. Score BLOCKED when
+  Shift is missing on pointer-up — TEST-PLAN.md
+  Driving notes
+- 2026-09-02 walk AA33/AA34: DEFERRED on AA32 stray
+  nodes. Attribute-ref writes:
+  `tests/presenter-misc.test.ts` R12 pins +
+  `tests/browser/canvas-gestures.test.ts`
+  'Shift-drag adds an edge and Review accepts two
+  attribute refs (AA32/AA33/AA34)'
+- 2026-09-02 walk F37b: re-activate tab A after F37a;
+  Layer 2 pin `tests/browser/canvas-gestures.test.ts`
+  'plain port-drag on an auto-layout flow adds a
+  node and Undo restores (F37b)'
+- 2026-09-02 walk R12: driver (panel never opened).
+  `buildAttributeRefRow` Layer 1 pin is green —
+  `tests/presenter-misc.test.ts`
+- 2026-09-02 walk F26/F28/F14: compositor mis-hit /
+  missed Zoom-in. Layer 2 pins in
+  `tests/browser/canvas-gestures.test.ts` and
+  `tests/browser/canvas-pan.test.ts`
+- 2026-09-02 second walk AA9/WB11: Layer 2
+  characterization pins close the only maybe-product
+  FAILs. Green pins (or a product fix behind a red
+  one) decide them; compositor leftovers stay
+  BLOCKED — TEST-PLAN.md Driving notes;
+  tests/browser/member-strengths.test.ts
+  'chip toggles persist on save and reload (AA9)';
+  tests/browser/workbox-transition.test.ts
+  'bind, fill, and submit navigates to the inbox
+  (WB11)'
+- Billing (`web-app/billing/`)
+- Attribute drag-reorder (TEST-PLAN R8)
+- A flow loaded with Auto Fit OFF no longer fits on
+  first paint. `withCanvasSize`
+  (`web-app/app/presenters/flow-designer.ts:996-1017`)
+  fits only under `isAutoFit`, and the load-time block
+  (`web-app/flows/detail.ts:1685-1697`) is the only
+  load-time fit — its `reconcileFitFromDom()` returns
+  early for the same reason. RECORDED, behavior
+  unchanged. The sentence it falsifies is "onFlowLoaded
+  keeps its explicit first fit" — the run-four
+  remediation design spec, second-commit paragraph
 - The first click after a page reload only focuses the window
   — the focusing click is the viewport center, never the
   top-left brand (that is the Apple menu when Chrome is
@@ -1127,105 +1220,6 @@ Off the critical path; each with its oracle.
   carried as a driving note in TEST-PLAN.md's `## The
   walk`. Oracle: a Layer 2 test under `tests/browser/`
   asserting one click after reload reaches the element.
-- ACL-editing UI for record attributes (`read_roles` /
-  `write_roles`) — R21's restricted branches are
-  seed-produced today; setting an ACL is
-  `PUT …/attributes/:id` only, and no page reaches it.
-  Oracle: an admin edits an ACL through the UI and a
-  member-perspective New-instance form flips live;
-  TEST-PLAN R21 gains the write path as a user gesture
-- Member-removal affordance under members/identities —
-  zero-membership is seed-produced today (Riley Okafor);
-  no page deletes a membership row. Oracle: removing a
-  member's last seat lands that identity on
-  `invitations/index.html` at next boot (TEST-PLAN
-  B25–B29 driven live); restores B28's original
-  "restore the deleted membership row" branch
-- The browser type fence is gone, not weakened. Ambient
-  Node globals unlock per `deno check` invocation: one
-  `node:` specifier anywhere in the checked graph gives
-  `process` to every file in it. `web-app` carries none
-  of its own since the Deno port, but the gate checks it
-  in one invocation with `server` and `tests`, and
-  either alone suffices — `server/scrypt-hash.ts`'s
-  `node:crypto` means retiring `node:test` will not
-  restore it. `npm:` does not unlock; `Deno.*` never
-  fenced at all, via `deno.ns`.
-  `tests/browser-fence.test.ts` checks an isolated file,
-  so it passes while the property is false. Restoring
-  the `process` half now costs one line:
-  `deno check --frozen web-app` alone is green on the
-  tree today and rejects a `process` reference under
-  `web-app/` with TS2591. The `Deno.*` half is a much
-  bigger job and must not inherit that estimate: a lib
-  array without `deno.ns` is necessary but far from
-  sufficient — measured over `api shared web-app` it
-  yields 104 TS2304 errors, every one of them in a
-  `web-app/app/` tooling module (`measure.ts` 49,
-  `generate-api-documentation.ts` 14, `compose.ts` 14,
-  `generate-schema-svg.ts` 11, `cdp-client.ts` 10,
-  `measure-viz.ts` 6) and none in browser page code. So
-  that half needs the lib change PLUS the exclusion
-  registry the `process` half escaped. Oracle for the
-  `process` half: that invocation in `./validate`, red
-  on a `process` reference under `web-app/`.
-- The `exists()` helper is duplicated five times, byte
-  for byte, all under `web-app/app/` — `compose.ts`,
-  `generate-api-documentation.ts`, `measure-viz.ts`,
-  `cdp-client.ts`, `measure.ts`. Commandment IX's
-  threshold is three. Each copy was sanctioned
-  deliberately: extracting a shared module from any one
-  Deno porting task would have reached into four other
-  tasks' files. Oracle: one definition, five importers,
-  `./validate` green.
-- `./measure --record` writes the literal `'unknown'` as
-  `cpuModel` (`web-app/app/measure.ts:946`). Deno exposes
-  no CPU-model API — `navigator.hardwareConcurrency` is a
-  count — and the `sysctl` workaround was rejected as
-  unverifiable and macOS-only. All 14 rows in
-  `measurements/history.jsonl` carry a real chip name; no
-  row written from here on will. The truthful shape omits
-  the field rather than storing a sentinel, which needs
-  `measure-core.ts`'s field type and `shapeHistoryLine`
-  (:36, :264) together with `measure-viz.ts:986`, whose
-  `|| ''` is itself the default-value sin. Oracle: a row
-  with no `cpuModel` key renders without the separator.
-- `JWT_HMAC_SIGNING_KEY` may not belong in the local
-  seed/wipe `--allow-env` (`postgres-seed:168`,
-  `postgres-wipe:109`). `api/access-token.ts` IS in the
-  seed's 105-module transitive graph — `postgres-seed.ts`
-  → `seed.ts` → `api/mock-data.ts` → `api/routes.ts` →
-  `api/authentication.ts`, a route that never touches
-  `api/api.ts` — but it reads the key lazily inside
-  `hmacSigningKeyMaterial()` (:29-44), so whether the seed
-  ever reaches that read is undecided — the seed hits
-  ECONNREFUSED first. Kept rather than narrowed on
-  evidence that needs a database to gather. Oracle: a
-  successful `./postgres-seed --postgres local
-  --bootstrap` that never reads it.
-- Nothing asserts that the operator wrappers exec `deno`
-  rather than `node`; coverage today is a grep run by
-  hand. `tests/fusion-angle-live-name.test.ts` already
-  walks the same root-file list for forbidden strings, so
-  the shape exists. Oracle: a test asserting no `node`
-  invocation in `postgres-lib`, `postgres-seed`,
-  `postgres-wipe`.
-- A pure-TypeScript scrypt would retire the last
-  product-process `node:` import
-  (`server/scrypt-hash.ts`). Measured at
-  this repo's `ln=17,r=8,p=1,dkLen=32`,
-  `jsr:@noble/hashes@2.4.0/scrypt.js` medians 224 ms
-  against `node:crypto` scryptSync's 192 ms — 17% slower,
-  digests byte-identical, so stored `$scrypt$` credentials
-  verify unchanged, and `deno compile` embeds it with no
-  native dependency. Its audit status, maintenance
-  cadence, and supply-chain posture are UNVERIFIED; for a
-  credential path that is the decisive question, and it
-  settles before the benchmark means anything. The cost is
-  a third-party package where the Article prefers a
-  platform primitive. `@denorg/scrypt` and
-  `@wildboar/scrypt-0` also exist on JSR, unexamined.
-  Oracle: byte-identical digests for the stored parameters.
 - Spec 6 did not run — replacing `npm:postgres@3.4.9`
   with `jsr:@db/postgres` behind `api/postgres-client.ts`.
   Spec:
