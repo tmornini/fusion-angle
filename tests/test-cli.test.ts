@@ -120,3 +120,18 @@ Deno.test(
         'browser exec before run_validate',
     );
 });
+
+Deno.test('test-postgres mints PORT for compose parse',
+() => {
+    const src = Deno.readTextFileSync('bin/test-postgres');
+    assertMatch(src, /export JWT_HMAC_SIGNING_KEY/);
+    assertMatch(src, /export POSTGRES_PASSWORD/);
+    assertNotMatch(src, /\$\{PORT:-/);
+    const inline = /export PORT=/.test(src);
+    const assign = /PORT=/.test(src)
+        && /export PORT\b/.test(src);
+    assert(
+        inline || assign,
+        'bin/test-postgres must export PORT',
+    );
+});

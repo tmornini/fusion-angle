@@ -14,6 +14,9 @@ POSTGRES_PASSWORD="$(openssl rand -hex 16)"
 JWT_HMAC_SIGNING_KEY="$(openssl rand -hex 32)"
 export POSTGRES_PASSWORD
 export JWT_HMAC_SIGNING_KEY
+# Compose parses the whole file, including server PORT.
+# This process never starts server; 8080 unblocks parse.
+export PORT=8080
 # Do not read an ambient POSTGRES_URL. Assign after
 # mint. Compose interpolates JWT at parse time.
 POSTGRES_URL="postgres://fusion:${POSTGRES_PASSWORD}"
