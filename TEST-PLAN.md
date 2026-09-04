@@ -325,7 +325,7 @@ F38b, F57a).
 
 The per-section table above counts 401 distinct
 TEST-PLAN cases (A3 is SV1; not counted twice). The
-CLI count is the most recent `./validate` (AT2)
+CLI count is the most recent `./test` (AT2)
 report — the main `tests/*.test.ts` suite plus the
 `tests/tz/*.test.ts` timezone suite; AT2 without
 `POSTGRES_URL` skips the seven `pg-*.test.ts` /
@@ -6823,13 +6823,13 @@ them after K8, once the explorer has returned.
 ## SV. Server (Deno + Postgres)
 
 This is the default origin, not a second ceremony —
-A3 **is** SV1, on the same crank process every other
+A3 **is** SV1, on the same deploy process every other
 section already walked. B15 / B18 / B19 / B23 pin the
 same cookie-session covenants on this process.
 
 Operator prerequisites:
 
-- A3 is crank; the explorer skips SV1 and does not
+- A3 is deploy; the explorer skips SV1 and does not
   re-seed.
 - Credentials print once on **stdout**, never HTTP.
 
@@ -7016,9 +7016,9 @@ Build SHA: <git rev-parse --short HEAD>  (clean | dirty: N files)
 ## Automated (AT)
 - AT1 tsc: PASS (0 diagnostics)
 - AT2 ./test: PASS (N/N, 0 fail, Xs)
-- AT3 ./validate: PASS (lint clean)
-- AT4 ./test-postgres: PASS (0 fail)
-- AT5 ./test-browser: PASS (0 fail)
+- AT3 ./test validate: PASS (lint clean)
+- AT4 ./test postgres: PASS (0 fail)
+- AT5 ./test browser: PASS (0 fail)
 
 ## Manual Browser Regression
 Total: <N> cases — PASS X · FAIL Y · BLOCKED Z · DEFERRED D · DRIFT R

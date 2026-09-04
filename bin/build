@@ -3,20 +3,20 @@ set -euo pipefail
 
 usage() {
     cat <<'USAGE'
-Usage: ./build [--no-zip] [path/]
+Usage: ./bin/build [--no-zip] [path/]
 
 Options:
   path/      Output directory (trailing / required)
              Default: ~/Desktop/
   --no-zip   Create bundle directory without zipping
-             (the fusion-angle executable — for ./crank)
+             (the fusion-angle executable — for ./deploy)
   --help     Show this help message
 
 Examples:
-  ./build                          # server ZIP to ~/Desktop/
-  ./build dist/                    # server ZIP to dist/
-  ./build --no-zip /tmp/test/      # server bundle to /tmp/test/
-  ./build --no-zip                 # server bundle to ~/Desktop/
+  ./bin/build                      # server ZIP to ~/Desktop/
+  ./bin/build dist/                # server ZIP to dist/
+  ./bin/build --no-zip /tmp/test/  # server bundle to /tmp/test/
+  ./bin/build --no-zip             # server bundle to ~/Desktop/
 USAGE
 }
 
