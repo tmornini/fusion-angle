@@ -132,37 +132,25 @@ Deno.test('schema declares collection indexes', () => {
     );
 });
 
-Deno.test('deleteSchema drops tables, function, marker',
+Deno.test('POSTGRES_DROP_SCHEMA drops schema public',
+() => {
+    assertStrictEquals(
+        POSTGRES_DROP_SCHEMA,
+        'DROP SCHEMA public CASCADE;\n'
+        + 'CREATE SCHEMA public;\n'
+        + 'GRANT ALL ON SCHEMA public TO CURRENT_USER;\n'
+        + 'GRANT ALL ON SCHEMA public TO public;',
+    );
+});
+
+Deno.test('deleteSchema unsafes POSTGRES_DROP_SCHEMA',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     await backend.deleteSchema();
-    const text = fake.calls[0]!.text;
-    assertMatch(
-        text, /DROP TABLE IF EXISTS message_pairs/,
-    );
-    assertMatch(text, /DROP TABLE IF EXISTS pairs/);
-    assertMatch(text, /DROP TABLE IF EXISTS responses/);
-    assertMatch(text, /DROP TABLE IF EXISTS requests/);
-    assertMatch(
-        text, /DROP TABLE IF EXISTS schema_marker/,
-    );
-    assertMatch(
-        text,
-        /DROP FUNCTION IF EXISTS message_body\(bytea\)/,
-    );
-});
-
-Deno.test('POSTGRES_DROP_SCHEMA drops message_pairs first',
-() => {
     assertStrictEquals(
+        fake.calls[0]!.text,
         POSTGRES_DROP_SCHEMA,
-        'DROP TABLE IF EXISTS message_pairs;\n'
-        + 'DROP TABLE IF EXISTS pairs;\n'
-        + 'DROP TABLE IF EXISTS responses;\n'
-        + 'DROP TABLE IF EXISTS requests;\n'
-        + 'DROP TABLE IF EXISTS schema_marker;\n'
-        + 'DROP FUNCTION IF EXISTS message_body(bytea);',
     );
 });
 

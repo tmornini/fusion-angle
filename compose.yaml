@@ -70,3 +70,18 @@ services:
         entrypoint:
             - ./render-out/fusion-angle
             - seed
+
+    wipe:
+        build:
+            context: .
+            target: runtime
+        profiles:
+            - wipe
+        depends_on:
+            postgres:
+                condition: service_healthy
+        environment:
+            POSTGRES_URL: *postgres-url
+        entrypoint:
+            - ./render-out/fusion-angle
+            - wipe
