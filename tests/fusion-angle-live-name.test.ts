@@ -17,7 +17,6 @@ const ROOT_FILES = [
     'AUDIT.md',
     'bin/build',
     'bin/serve',
-    'validate',
     'test',
     'bin/measure',
     'deno.json',

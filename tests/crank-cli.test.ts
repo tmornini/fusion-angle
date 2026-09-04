@@ -129,12 +129,12 @@ Deno.test('crank --help exits 0', async () => {
 
 Deno.test('crank source owns the local stack', () => {
     const src = Deno.readTextFileSync('crank');
-    assertMatch(src, /\.\/validate/);
+    assertMatch(src, /\.\/test validate/);
     assertMatch(
         src,
         /docker compose up -d --wait postgres/,
     );
-    assertMatch(src, /\.\/bin\/test-postgres/);
+    assertMatch(src, /\.\/test postgres/);
     assertMatch(src, /\.\/bin\/build --no-zip/);
     assertMatch(
         src,
@@ -162,7 +162,19 @@ Deno.test('crank source owns the local stack', () => {
     const upAt = src.indexOf(
         'docker compose up -d --wait postgres',
     );
+    const postgresAt = src.indexOf('./test postgres');
+    const browserAt = src.indexOf('./test browser');
     assert(trapAt >= 0, 'trap missing');
     assert(upAt >= 0, 'compose up missing');
     assert(trapAt < upAt, 'trap after Docker');
+    assert(postgresAt >= 0, 'test postgres missing');
+    assert(browserAt >= 0, 'test browser missing');
+    assert(
+        postgresAt < upAt,
+        'test postgres after compose up',
+    );
+    assert(
+        browserAt < upAt,
+        'test browser after compose up',
+    );
 });

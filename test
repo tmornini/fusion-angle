@@ -1,6 +1,24 @@
 #!/bin/bash
 set -euo pipefail
 
+usage() {
+    cat <<'USAGE'
+Usage: ./test [memory]
+       ./test check
+       ./test lint
+       ./test schema
+       ./test api-docs
+       ./test postgres
+       ./test browser
+       ./test validate
+       ./test validate browser
+       ./test validate postgres
+USAGE
+}
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+
 # Instants render in LOCAL time, so date-formatting
 # output shifts with the runner's zone — a false prophet
 # on a non-UTC machine. Pin UTC for the main suite
@@ -9,23 +27,266 @@ set -euo pipefail
 # (Honolulu, UTC-10, no DST). The tests/*.test.ts glob
 # is non-recursive, so it excludes tests/tz/.
 #
-# --no-check: deno check covers tests/ in ./validate;
+# --no-check: deno check covers tests/ in ./test check;
 # checking again at run time buys nothing.
 # Permissions, named: env (signing key, TZ, POSTGRES_URL
 # skips), read (fixtures, scripts, source walkers),
 # write (temp dirs for the HTTP tests), net (127.0.0.1
 # listeners), run (the metafile test now spawns deno;
-# serve, crank, and validate CLI pins spawn those
-# scripts; validate-cli's git SHA skip uses sh).
-export JWT_HMAC_SIGNING_KEY="${JWT_HMAC_SIGNING_KEY:-test-hmac-signing-key}"
-DENO_TEST=(
-    deno test --frozen --parallel --no-check
-    --sanitize-ops --sanitize-resources
-    --allow-env --allow-read --allow-write
-    --allow-net --allow-run=deno,./bin/serve,./crank,sh,./validate
-    --preload ./tests/hmac-test-key.ts
-    --preload ./tests/local-storage-stub.ts
-    --preload ./tests/session-storage-stub.ts
-)
-TZ=UTC "${DENO_TEST[@]}" tests/*.test.ts
-TZ=Pacific/Honolulu "${DENO_TEST[@]}" tests/tz/*.test.ts
+# serve, crank, and test CLI pins spawn those
+# scripts; test-cli's git SHA skip uses sh).
+run_memory() {
+    JWT_HMAC_SIGNING_KEY="${JWT_HMAC_SIGNING_KEY:-test-hmac-signing-key}"
+    export JWT_HMAC_SIGNING_KEY
+    DENO_TEST=(
+        deno test --frozen --parallel --no-check
+        --sanitize-ops --sanitize-resources
+        --allow-env --allow-read --allow-write
+        --allow-net
+        --allow-run=deno,./bin/serve,./crank,sh,./test
+        --preload ./tests/hmac-test-key.ts
+        --preload ./tests/local-storage-stub.ts
+        --preload ./tests/session-storage-stub.ts
+    )
+    TZ=UTC "${DENO_TEST[@]}" tests/*.test.ts
+    TZ=Pacific/Honolulu "${DENO_TEST[@]}" \
+        tests/tz/*.test.ts
+}
+
+run_check() {
+    deno --version
+    deno check --frozen api shared server tests web-app
+}
+
+run_lint() {
+    AWK_LINT='length > 78 {
+        printf "%s:%d: %d chars\n", FILENAME, FNR, length
+    }'
+    LONG_LINES=$( {
+        find api web-app tests shared server -type f \
+            \( -name '*.ts' -o -name '*.html' \
+               -o -name '*.css' \) \
+            ! -path 'web-app/app/compose.ts' \
+            -exec awk "$AWK_LINT" {} +
+        awk "$AWK_LINT" test crank \
+            bin/build bin/build-lib bin/serve \
+            bin/test-postgres bin/test-browser \
+            bin/generate-schema-svg \
+            bin/generate-api-documentation \
+            bin/measure bin/postgres-wipe \
+            bin/postgres-lib bin/postgres-seed \
+            deno.json Dockerfile compose.yaml \
+            .dockerignore
+    } )
+
+    if [ -n "$LONG_LINES" ]; then
+        echo "Error: lines exceed 78 characters:" >&2
+        echo "$LONG_LINES" >&2
+        exit 1
+    fi
+
+    # Reject the `org` abbreviation in identifiers;
+    # use `organization`. Prose, URLs (w3.org), and
+    # CSS class names may keep the short form.
+    ORG_ABBREV=$(
+        find api web-app tests shared server -type f \
+            \( -name '*.ts' -o -name '*.html' \
+               -o -name '*.css' \) \
+            ! -path 'web-app/app/compose.ts' -print0 \
+        | xargs -0 perl -ne '
+            close ARGV if eof;
+            print "$ARGV:$.: $_"
+                if /org[A-Z]|[a-z]Org([A-Z]|\b)|\bOrg[A-Z]/
+                || /[a-z]Orgs([A-Z]|\b)|\bOrgs[A-Z]/
+                || /_ORG(_|[0-9]|\b)|\bORG(_|[0-9])/;
+        '
+    )
+
+    if [ -n "$ORG_ABBREV" ]; then
+        echo "Error: 'org' abbreviation in identifiers:" >&2
+        echo "$ORG_ABBREV" >&2
+        exit 1
+    fi
+
+    # Reject the vocabulary of the retired browser-resident
+    # storage tiers. `localStorage` alone is legal (UI
+    # preferences); its backend/tier compounds are not.
+    # `in-browser ZIP` is the live flow export (zip.ts).
+    PATTERN='indexeddb|IDBTransaction|non-IDB|\bIDB\b'
+    PATTERN="$PATTERN|LocalStorageBackend"
+    PATTERN="$PATTERN|localStorage (backend|tier|simulated|demo)"
+    PATTERN="$PATTERN|simulated (backend|tier)s?"
+    PATTERN="$PATTERN|object stores?|\bPhase B\b|auto-?commit"
+    PATTERN="$PATTERN|in-browser data|browser[ -]ZIP"
+    RETIRED_VOCAB=$(
+        {
+            find api shared server tests web-app/app \
+                -type f \
+                \( -name '*.ts' -o -name '*.html' \
+                   -o -name '*.css' \) -print0 \
+            | xargs -0 grep -nEi "$PATTERN" \
+                || true
+            find . -maxdepth 1 -type f -name '*.md' \
+                -exec grep -nEi "$PATTERN" {} + \
+                || true
+        } | grep -v 'in-browser ZIP' || true
+    )
+
+    if [ -n "$RETIRED_VOCAB" ]; then
+        echo "Error: retired storage-tier vocabulary:" >&2
+        echo "$RETIRED_VOCAB" >&2
+        exit 1
+    fi
+
+    # Later work has one home (run-four remediation §10):
+    # the section lives in TODO.md and nowhere else, and no
+    # other root doc defers work in prose. Rows that POINT
+    # at TODO.md are the sanctioned exception (the
+    # in-browser-ZIP precedent above).
+    LATER_HOME_FAIL=
+    if [ "$(grep -c '^## Later work' ARCHITECTURE.md)" \
+        != "0" ]; then
+        LATER_HOME_FAIL="${LATER_HOME_FAIL}\
+ARCHITECTURE.md: '## Later work' count must be 0
+"
+    fi
+    if [ "$(grep -c '^## KNOWN seams' ARCHITECTURE.md)" \
+        != "1" ]; then
+        LATER_HOME_FAIL="${LATER_HOME_FAIL}\
+ARCHITECTURE.md: '## KNOWN seams' count must be 1
+"
+    fi
+    if [ "$(grep -c '^## Critical product path' TODO.md)" \
+        != "1" ]; then
+        LATER_HOME_FAIL="${LATER_HOME_FAIL}\
+TODO.md: '## Critical product path' count must be 1
+"
+    fi
+    LATER_PATTERN='later work|\(later\)|not built'
+    LATER_PATTERN="$LATER_PATTERN|coming soon"
+    LATER_PATTERN="$LATER_PATTERN|later session"
+    LATER_PATTERN="$LATER_PATTERN|will be added when"
+    DEFERRAL_PROSE=$(
+        find . -maxdepth 1 -type f -name '*.md' \
+            ! -name 'TODO.md' ! -name 'TEST-PLAN.md' \
+            -exec grep -nEi "$LATER_PATTERN" {} + \
+            2>/dev/null \
+        | grep -v 'TODO.md' || true
+    )
+
+    if [ -n "${LATER_HOME_FAIL}${DEFERRAL_PROSE}" ]; then
+        echo "Error: later work must live in TODO.md:" >&2
+        printf '%s' "${LATER_HOME_FAIL}" >&2
+        if [ -n "${DEFERRAL_PROSE}" ]; then
+            echo "${DEFERRAL_PROSE}" >&2
+        fi
+        exit 1
+    fi
+
+    # Every tests/… path TEST-PLAN.md cites must exist.
+    # Paths, not test names: a name is the audit's
+    # judgment, a path is what rots when a file is
+    # renamed or deleted. The trailing `|| true` is
+    # this file's idiom for a grep that may legitimately
+    # match nothing: under `set -euo pipefail` a
+    # no-match grep would otherwise kill the whole
+    # script at this assignment, silently and with no
+    # diagnostic.
+    MISSING_PINS=$(
+        grep -oE 'tests/[A-Za-z0-9._/-]+\.test\.ts' \
+            TEST-PLAN.md \
+        | sort -u \
+        | while read -r PIN_PATH; do
+            [ -f "$PIN_PATH" ] || echo "  ${PIN_PATH}"
+        done || true
+    )
+
+    if [ -n "$MISSING_PINS" ]; then
+        echo "Error: TEST-PLAN.md cites a missing test:" >&2
+        echo "$MISSING_PINS" >&2
+        exit 1
+    fi
+}
+
+run_schema() {
+    ./bin/generate-schema-svg --check
+}
+
+run_api_docs() {
+    ./bin/generate-api-documentation --check
+}
+
+run_validate() {
+    local stamp porcelain head_sha
+    stamp="${MOST_RECENTLY_VALIDATED_SHA_PATH:-$(
+        git rev-parse --git-common-dir
+    )/most-recently-validated-sha}"
+    head_sha=$(git rev-parse HEAD)
+    porcelain="${WORKING_TREE_PORCELAIN-$(git status --porcelain)}"
+    if [ -z "$porcelain" ] \
+        && [ -f "$stamp" ] \
+        && [ "$(tr -d '[:space:]' < "$stamp")" = "$head_sha" ]
+    then
+        echo "already validated $head_sha"
+        return
+    fi
+    run_check
+    run_memory
+    run_lint
+    run_schema
+    run_api_docs
+    if [ -z "$porcelain" ]; then
+        printf '%s\n' "$head_sha" > "$stamp"
+    fi
+}
+
+case "${1:-memory}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    memory)
+        if [ $# -gt 1 ]; then
+            echo "Error: unexpected argument: $2" >&2
+            usage >&2
+            exit 1
+        fi
+        run_memory
+        ;;
+    check|lint|schema|api-docs|postgres|browser)
+        if [ $# -ne 1 ]; then
+            echo "Error: unexpected argument" >&2
+            usage >&2
+            exit 1
+        fi
+        case "$1" in
+            check) run_check ;;
+            lint) run_lint ;;
+            schema) run_schema ;;
+            api-docs) run_api_docs ;;
+            postgres) exec "$ROOT/bin/test-postgres" ;;
+            browser) exec "$ROOT/bin/test-browser" ;;
+        esac
+        ;;
+    validate)
+        shift
+        if [ $# -eq 0 ]; then
+            run_validate
+        elif [ $# -eq 1 ] && [ "$1" = "browser" ]; then
+            run_validate
+            exec "$ROOT/bin/test-browser"
+        elif [ $# -eq 1 ] && [ "$1" = "postgres" ]; then
+            run_validate
+            exec "$ROOT/bin/test-postgres"
+        else
+            echo "Error: unknown suite" >&2
+            usage >&2
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Error: unknown suite: $1" >&2
+        usage >&2
+        exit 1
+        ;;
+esac

@@ -80,7 +80,9 @@ else
     MODE='--mock-data'
 fi
 
-./validate
+./test validate
+./test postgres
+./test browser
 
 POSTGRES_PASSWORD="$(openssl rand -hex 16)"
 JWT_HMAC_SIGNING_KEY="$(openssl rand -hex 32)"
@@ -112,8 +114,6 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 docker compose up -d --wait postgres
-./bin/test-postgres
-./bin/test-browser
 BUILD_DIR="$(mktemp -d \
     "${TMPDIR:-/tmp}/fusion-crank.XXXXXX")"
 ./bin/build --no-zip "${BUILD_DIR}/"

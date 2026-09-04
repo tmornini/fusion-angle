@@ -1,6 +1,6 @@
 import { assert, assertMatch, assertNotMatch } from '@std/assert';
 
-const VALIDATE = Deno.readTextFileSync('validate');
+const TEST_SRC = Deno.readTextFileSync('test');
 
 function longLineBlock(src: string): string {
     const start = src.indexOf('LONG_LINES=');
@@ -10,8 +10,8 @@ function longLineBlock(src: string): string {
     return src.slice(start, end);
 }
 
-Deno.test('validate does not lint root markdown', () => {
-    const block = longLineBlock(VALIDATE);
+Deno.test('test does not lint root markdown', () => {
+    const block = longLineBlock(TEST_SRC);
     assertNotMatch(block, /-name '\*\.md'/);
     assertNotMatch(
         block,
@@ -19,9 +19,9 @@ Deno.test('validate does not lint root markdown', () => {
     );
 });
 
-Deno.test('validate lints crank', () => {
+Deno.test('test lints crank', () => {
     assertMatch(
-        longLineBlock(VALIDATE),
+        longLineBlock(TEST_SRC),
         /\bcrank\b/,
     );
 });
