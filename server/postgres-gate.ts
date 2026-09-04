@@ -113,7 +113,7 @@ export function safeErrorMessage(
         return error.message;
     }
     if (error.message.startsWith(
-        'HTTP_SERVER_PORT ',
+        'PORT ',
     )) {
         return error.message;
     }

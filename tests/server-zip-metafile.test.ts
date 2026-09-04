@@ -6,8 +6,10 @@ import {
 } from '@std/assert';
 import { fromFileUrl, relative } from '@std/path';
 
-const BUILD_SCRIPT = Deno.readTextFileSync('build');
-const BUILD_LIB_SCRIPT = Deno.readTextFileSync('build-lib');
+const BUILD_SCRIPT = Deno.readTextFileSync('bin/build');
+const BUILD_LIB_SCRIPT = Deno.readTextFileSync(
+    'bin/build-lib',
+);
 
 // Deleted names no longer appear in live source. Hunt
 // the live mint symbols too, or a server-core import of
@@ -144,13 +146,21 @@ Deno.test(
     },
 );
 
-Deno.test('build --no-zip help names crank', () => {
+Deno.test('build --no-zip help names deploy', () => {
     assertMatch(
         BUILD_SCRIPT,
-        /the fusion-angle executable — for \.\/crank/,
+        /Usage: \.\/bin\/build/,
+    );
+    assertMatch(
+        BUILD_SCRIPT,
+        /the fusion-angle executable — for \.\/deploy/,
     );
     assertNotMatch(
         BUILD_SCRIPT,
         /for \.\/serve/,
+    );
+    assertNotMatch(
+        BUILD_SCRIPT,
+        /\.\/crank/,
     );
 });

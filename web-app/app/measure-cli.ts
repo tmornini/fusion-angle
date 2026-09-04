@@ -8,7 +8,7 @@ export const DEFAULT_RUNS = 25;
 export const DEFAULT_BUDGET_SIGMAS = 1.5;
 export const MEASURE_DEMO_EMAIL = 'demo@example.com';
 export const MEASURE_SERVER_ENTRY = './fusion-angle';
-export const MEASURE_SEED_COMMAND = './postgres-seed';
+export const MEASURE_SEED_COMMAND = './bin/postgres-seed';
 
 export type MeasureServeEnv = {
     postgresUrl: string;

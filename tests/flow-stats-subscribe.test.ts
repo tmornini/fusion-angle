@@ -15,6 +15,7 @@ import {
 } from '../api/types.ts';
 
 const CHANNEL_NAME = 'fusion-angle:data';
+const BELL_DEADLINE_MS = 5000;
 const MEMBER_ID = 'XXZruirZyAOoRpNxaDnpSA';
 const FLOW_NAME = 'Stats flow';
 const RENAMED = 'Stats flow, renamed in another tab';
@@ -194,8 +195,18 @@ Deno.test(
             poster.postMessage({ kind: 'full' });
             // BroadcastChannel delivery and the re-run
             // load's fetch/render pipeline are
-            // asynchronous; drain generously.
-            for (let i = 0; i < 25; i++) {
+            // asynchronous and not fixed in length, so
+            // a tick count is a guess; wait for the
+            // condition instead, bounded by a deadline.
+            // The assert above narrowed textContent to
+            // FLOW_NAME; a closure reads it as a string.
+            const shownName = (): string =>
+                host.nameEl.textContent;
+            const deadline = Date.now() + BELL_DEADLINE_MS;
+            while (
+                shownName() !== RENAMED
+                && Date.now() < deadline
+            ) {
                 await new Promise(
                     r => setImmediate(r),
                 );

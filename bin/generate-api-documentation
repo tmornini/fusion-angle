@@ -1,5 +1,10 @@
 #!/bin/bash
 set -euo pipefail
+
+BIN="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$BIN/.." && pwd)"
+cd "$ROOT"
+
 deno run --frozen --allow-read \
     --allow-write=web-app/api-documentation \
     web-app/app/generate-api-documentation.ts "$@"

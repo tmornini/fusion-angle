@@ -40,7 +40,7 @@ async function runServe(
     // otherwise leak it through.
     // signal only bounds the async output() — the sync
     // outputSync() ignores it and blocks regardless.
-    const output = await new Deno.Command('./serve', {
+    const output = await new Deno.Command('./bin/serve', {
         args,
         signal: AbortSignal.timeout(4000),
         env: {
@@ -63,7 +63,7 @@ Deno.test('serve with no args exits 1 with usage',
 async () => {
     const result = await runServe([]);
     assertStrictEquals(result.status, 1);
-    assertMatch(result.stderr, /Usage: \.\/serve/);
+    assertMatch(result.stderr, /Usage: \.\/bin\/serve/);
     assertStrictEquals(
         existsSync(result.stamp) &&
             Deno.readTextFileSync(result.stamp)
@@ -76,20 +76,20 @@ Deno.test('serve missing port exits 1 with usage',
 async () => {
     const result = await runServe(['bundle/']);
     assertStrictEquals(result.status, 1);
-    assertMatch(result.stderr, /Usage: \.\/serve/);
+    assertMatch(result.stderr, /Usage: \.\/bin\/serve/);
 });
 
 Deno.test('serve dir without trailing slash exits 1',
 async () => {
     const result = await runServe(['bundle', '8080']);
     assertStrictEquals(result.status, 1);
-    assertMatch(result.stderr, /Usage: \.\/serve/);
+    assertMatch(result.stderr, /Usage: \.\/bin\/serve/);
 });
 
 Deno.test('serve --help exits 0', async () => {
     const result = await runServe(['--help']);
     assertStrictEquals(result.status, 0);
-    assertMatch(result.stdout, /Usage: \.\/serve/);
+    assertMatch(result.stdout, /Usage: \.\/bin\/serve/);
 });
 
 Deno.test('serve missing POSTGRES_URL exits 1',
@@ -111,7 +111,7 @@ Deno.test('serve missing JWT exits 1', async () => {
 });
 
 Deno.test('serve does not invoke ./build', () => {
-    const src = Deno.readTextFileSync('serve');
+    const src = Deno.readTextFileSync('bin/serve');
     assertNotMatch(src, /\.\/build/);
     assertMatch(src, /exec \.\/fusion-angle serve/);
     assertNotMatch(src, /DEFAULT_PORT/);

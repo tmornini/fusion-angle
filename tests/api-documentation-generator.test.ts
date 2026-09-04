@@ -13,9 +13,9 @@ import {
 import { offeredVerbs, uriOf } from
     '../api/route-surface.ts';
 
-Deno.test('validate runs generate-api-documentation'
+Deno.test('test validate runs generate-api-documentation'
     + ' --check', () => {
-    const src = Deno.readTextFileSync('validate');
+    const src = Deno.readTextFileSync('test');
     assertMatch(
         src,
         /generate-api-documentation --check/,

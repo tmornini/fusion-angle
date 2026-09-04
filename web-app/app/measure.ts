@@ -507,7 +507,7 @@ async function main(): Promise<void> {
                 `Building to ${buildDir}/ …\n`,
             ));
             const built = await new Deno.Command(
-                './build',
+                './bin/build',
                 {
                     args: ['--no-zip', buildDir + '/'],
                     cwd: repoRoot,
@@ -616,7 +616,7 @@ async function main(): Promise<void> {
                             localServe.postgresUrl,
                         JWT_HMAC_SIGNING_KEY:
                             localServe.jwtHmacSigningKey,
-                        HTTP_SERVER_PORT: String(port),
+                        PORT: String(port),
                     },
                     stdin: 'null',
                     stdout: 'null',

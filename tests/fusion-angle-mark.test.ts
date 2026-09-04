@@ -60,7 +60,7 @@ Deno.test('favicon.svg embeds the PNG and inverts in light',
 });
 
 Deno.test('build copies mark.png next to the favicons', () => {
-    const src = Deno.readTextFileSync('build-lib');
+    const src = Deno.readTextFileSync('bin/build-lib');
     assertMatch(
         src,
         /cp web-app\/assets\/mark\.png/,

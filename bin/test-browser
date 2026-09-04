@@ -8,11 +8,12 @@ set -euo pipefail
 # Chrome: CHROME (binary) or CHROME_DEBUG_URL (a
 # running Chrome's browser WebSocket URL).
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+BIN="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$BIN/.." && pwd)"
 cd "$ROOT"
 
 # shellcheck source=build-lib
-source ./build-lib
+source "$BIN/build-lib"
 
 if [ -z "${CHROME_DEBUG_URL:-}" ]; then
     CHROME="${CHROME:-/Applications/Google Chrome.app}"

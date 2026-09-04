@@ -9,32 +9,46 @@ canvas lives in `FLOW-CANVAS.md`. The URI catalog lives at
 
 ## One origin, one ZIP
 
-Vanilla TypeScript. `./build` emits one artifact from one
-source tree (clean tree required):
-`fusion-angle-${SHA}.zip`. The `fusion-angle` executable
-serves composed pages and the API on one origin via
-`Deno.serve`. Drain is `shutdown()` + `finished` with
-the `drainMs` abort. Static files stream from
-`Deno.open`, which reads the compiled file system. The
-site and postgres.js 3.4.9 are embedded at compile
-time; the permission covenant (`--allow-net` and a
-scoped `--allow-env`, no `--allow-read`) is baked in
-then too. The process is `server/boot.ts` behind
-`fusion-angle serve`. The client is a fetch facade
-(`web-app/app/server-core.ts`). Postgres is the store.
-The page talks `fetch`.
+Vanilla TypeScript. `./bin/build` emits one
+artifact from one source tree (clean tree
+required): `fusion-angle-${SHA}.zip`. The
+`fusion-angle` executable serves composed
+pages and the API on one origin via
+`Deno.serve`. Drain is `shutdown()` +
+`finished` with the `drainMs` abort. Static
+files stream from `Deno.open`, which reads
+the compiled file system. The site and
+postgres.js 3.4.9 are embedded at compile
+time; the permission covenant (`--allow-net`
+and a scoped `--allow-env`, no
+`--allow-read`) is baked in then too. The
+process is `server/boot.ts` behind
+`fusion-angle serve`. The client is a fetch
+facade (`web-app/app/server-core.ts`).
+Postgres is the store. The page talks
+`fetch`.
 
-Required env, never logged and never defaulted:
-`POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`,
-`HTTP_SERVER_PORT`. Optional `TRUSTED_PROXY_HOPS`. Body
-over 1 MiB is 413 (`server/http-server.ts`
-`REQUEST_BODY_MAX_BYTES`). `serve` neither seeds nor
-applies DDL and takes no further argv; `seed` and
-`wipe` are the other two verbs of the same binary
-(wrappers: `./postgres-seed`, `./postgres-wipe`).
-Missing `schema_marker` refuses with `schema_marker
-absent; seed with ./postgres-seed`. One mint process —
-do not run two replicas.
+Required env, never logged and never
+defaulted: `POSTGRES_URL`,
+`JWT_HMAC_SIGNING_KEY`, `PORT`. Optional
+`TRUSTED_PROXY_HOPS`. Body over 1 MiB is 413
+(`server/http-server.ts`
+`REQUEST_BODY_MAX_BYTES`). `serve` neither
+seeds nor applies DDL and takes no further
+argv; `seed` and `wipe` are the other two
+verbs of the same binary (wrappers:
+`bin/postgres-seed`, `bin/postgres-wipe`).
+Wipe is `DROP SCHEMA public CASCADE`,
+recreate `public`, re-grant. Missing
+`schema_marker` refuses with `schema_marker
+absent; seed with ./bin/postgres-seed`. One
+mint process — do not run two replicas.
+
+`./deploy` is the operator path. Compose
+keeps `:?required`; `./deploy` mints before
+compose. The Dockerfile `CMD` is
+`cd render-out && exec ./fusion-angle serve`
+with no env copy.
 
 postgres.js 3.4.9 is embedded behind
 `api/postgres-client.ts` only (named exception).

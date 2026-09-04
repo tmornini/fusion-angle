@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+BIN="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$BIN/.." && pwd)"
+cd "$ROOT"
+
 # Regenerate SCHEMA.svg from the schema of record
 # (api/db.ts, api/types.ts, api/schema-postgres.ts).
 # Pass --check to fail instead of write when the SVG

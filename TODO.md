@@ -315,6 +315,23 @@ Off the critical path; each with its oracle.
 
 ## Later work
 
+- `render.yaml` Blueprint as a second source of
+  truth for the dashboard service. Oracle: a
+  committed `render.yaml` that matches the live
+  service without a dashboard PATCH.
+- Render Postgres `ipAllowList` still contains
+  `0.0.0.0/0`. This repo's laptop reseed path to
+  the external URL is gone; tightening the list
+  is item-10 policy (item 10 never names
+  `ipAllowList`). Oracle: Render connection info
+  `ipAllowList` does not contain `0.0.0.0/0`.
+- Dependency-warm Docker layer. `COPY . .` busts
+  later layers; `deno compile` fetches `denort`.
+  Cold-build reliability is not the problem.
+  Oracle: a measured cold Render Docker build,
+  then a layer that caches `deno.json` /
+  `deno.lock` / `denort` only if that number is
+  the bottleneck.
 - The `exists()` helper is duplicated five times, byte
   for byte, all under `web-app/app/` — `compose.ts`,
   `generate-api-documentation.ts`, `measure-viz.ts`,

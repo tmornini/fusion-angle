@@ -26,12 +26,10 @@ import {
 } from '../shared/identifier.ts';
 
 export const POSTGRES_DROP_SCHEMA =
-    'DROP TABLE IF EXISTS message_pairs;\n'
-    + 'DROP TABLE IF EXISTS pairs;\n'
-    + 'DROP TABLE IF EXISTS responses;\n'
-    + 'DROP TABLE IF EXISTS requests;\n'
-    + 'DROP TABLE IF EXISTS schema_marker;\n'
-    + 'DROP FUNCTION IF EXISTS message_body(bytea);';
+    'DROP SCHEMA public CASCADE;\n'
+    + 'CREATE SCHEMA public;\n'
+    + 'GRANT ALL ON SCHEMA public TO CURRENT_USER;\n'
+    + 'GRANT ALL ON SCHEMA public TO public;';
 
 export interface PostgresTx extends Tx {
     getAddress<T extends { id: string }>(
