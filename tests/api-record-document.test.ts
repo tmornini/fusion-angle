@@ -26,8 +26,10 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Task 2 (Decision 7's trio fold, the fifth family): PUT
 // records/:id becomes a document PUT — the entity's own fields
@@ -48,13 +50,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -157,7 +160,7 @@ async () => {
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     const written = await postRecordDocumentOp(
         db, 'rbfHGatkwQzGZJVXKJEeyw', body,
@@ -209,7 +212,7 @@ async () => {
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, 'rcaSzEaORBkezCxyhLhecA', firstBody, 'XXZruirZyAOoRpNxaDnpSA'
@@ -254,7 +257,7 @@ Deno.test('postRecordDocumentOp with a fresh trio posts a'
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, 'rlBnfIvzDVVZeVSjBECxGg', firstBody, 'XXZruirZyAOoRpNxaDnpSA'
@@ -280,7 +283,7 @@ Deno.test('postRecordDocumentOp with a fresh trio posts a'
         requestAt: '2026-01-02T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, 'rlBnfIvzDVVZeVSjBECxGg', secondBody, 'XXZruirZyAOoRpNxaDnpSA'
@@ -310,12 +313,13 @@ Deno.test('a byte-identical resend replays the stored response:'
     const body = recordDocument(
         'Idempotent', 'active', AT, 'ev-resend',
     );
+    const operationId = generateIdentifier();
     await handleRequest(
         db, req(
             'PUT',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'sBdXBQtlujsRkbzspdvfFg',
-            token, body,
+            token, body, operationId,
         ),
     );
     await handleRequest(
@@ -323,7 +327,7 @@ Deno.test('a byte-identical resend replays the stored response:'
             'PUT',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'sBdXBQtlujsRkbzspdvfFg',
-            token, body,
+            token, body, operationId,
         ),
     );
     const events = await deriveRecordTypeStateHistory(db
@@ -367,7 +371,7 @@ async function storedMessagePairAt(
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     return {
         id: messagePair.id,

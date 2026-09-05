@@ -29,7 +29,7 @@ import {
     formWriteMessagePair,
 } from '../api/message-pair.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 
 // GET organizations/:id/work-orders/:id/history — Phase A1 of states-URI
@@ -63,7 +63,6 @@ function req(
         path,
         ...(token !== undefined ? { token } : {}),
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -198,7 +197,7 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
         organization: STARK_ORGANIZATION,
         responseStatus: 204,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postWorkOrderTransitionOp(
         db, WORK_ORDER_ID, transitionBody,

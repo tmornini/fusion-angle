@@ -52,7 +52,7 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
     storedPutBodyText,
     storedCollectionText,
 } from './http-fixtures.ts';
@@ -88,13 +88,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -1020,10 +1021,11 @@ async () => {
         state: 'active' as const,
     };
     const beforeReposition = (await db.messagePairs.getAll()).length;
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + objectiveId, token,
-        positionBody,
+        positionBody, operationId,
     ));
     assertStrictEquals(first.status, 201);
     const afterFirst = (await db.messagePairs.getAll()).length;
@@ -1032,9 +1034,9 @@ async () => {
     const second = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + objectiveId, token,
-        positionBody,
+        positionBody, operationId,
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     const afterSecond = (await db.messagePairs.getAll()).length;
     assertStrictEquals(afterSecond, afterFirst);
     assertStrictEquals(

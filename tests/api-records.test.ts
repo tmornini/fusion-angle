@@ -121,6 +121,8 @@ Deno.test(
             sort_order: 1,
             options: [],
             constraints: [],
+            read_roles: ['member', 'admin'],
+            write_roles: ['member', 'admin'],
         }, DEV_TOKEN);
         const stored = await GET<{
             id: string;
@@ -153,6 +155,8 @@ Deno.test(
             sort_order: 1,
             options: [],
             constraints: [],
+            read_roles: ['member', 'admin'],
+            write_roles: ['member', 'admin'],
         }, DEV_TOKEN);
         await DELETE(db, ATTR, DEV_TOKEN);
         await assertRejects(

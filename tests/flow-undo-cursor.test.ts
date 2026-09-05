@@ -61,7 +61,7 @@ import { putSessionToken } from
     '../web-app/app/adapters/session-token.ts';
 import type { GraphNode } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { withLocalStorageAsync } from
     './fixtures/local-storage.ts';
@@ -113,7 +113,6 @@ function req(
         body,
         ...(headers !== undefined
             ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -655,7 +654,7 @@ Deno.test(
             organization,
             responseStatus: 204,
             responseBody: undefined,
-            operationId: TEST_OPERATION_ID,
+            operationId: generateIdentifier(),
         });
         const err = await assertRejects(
             () => postFlowUndoOp(

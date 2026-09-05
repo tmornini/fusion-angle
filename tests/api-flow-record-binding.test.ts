@@ -11,7 +11,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 
 // PUT organizations/:id/flows/:id/records/:frid — bind a flow
@@ -43,7 +43,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 

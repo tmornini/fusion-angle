@@ -985,7 +985,7 @@ export async function handleRequest(
                 );
                 if (replay !== undefined) {
                     const response = sendWriteResponse(
-                        replay, method, true,
+                        replay, method, false,
                     );
                     if (
                         routePattern
@@ -1672,8 +1672,12 @@ export async function handleRequest(
                         adapter, routePattern, params,
                         body, organization, actor,
                     );
+                    // The pair by hash is THIS request's iff
+                    // its id matches; a concurrent twin that
+                    // landed first leaves this one a 200.
                     const response = sendWriteResponse(
-                        stored, 'PUT', true,
+                        stored, 'PUT',
+                        stored.id === messagePair.id,
                     );
                     if (
                         routePattern

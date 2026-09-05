@@ -94,12 +94,14 @@ Deno.test('send with no subscribers is a no-op', () => {
 Deno.test('subscribeOnce delivers exactly once', () => {
     const ch = createChannel<void>();
     let calls = 0;
+    const errors: unknown[] = [];
     subscribeOnce(ch.subscribe, () => {
         calls += 1;
-    });
+    }, err => { errors.push(err); });
     ch.send();
     ch.send();
     assertStrictEquals(calls, 1);
+    assertEquals(errors, []);
 });
 
 Deno.test(
@@ -107,15 +109,40 @@ Deno.test(
     () => {
         const ch = createChannel<void>();
         let calls = 0;
+        const errors: unknown[] = [];
         subscribeOnce(ch.subscribe, () => {
             calls += 1;
             // A send from inside fn must not
             // recurse: the one-shot is already
             // gone.
             ch.send();
-        });
+        }, err => { errors.push(err); });
         ch.send();
         assertStrictEquals(calls, 1);
+        assertEquals(errors, []);
+    },
+);
+
+Deno.test(
+    'subscribeOnce hands a throwing or rejecting fn to onError',
+    async () => {
+        const ch = createChannel<void>();
+        const errors: unknown[] = [];
+        subscribeOnce(ch.subscribe, () => {
+            throw new Error('sync');
+        }, err => { errors.push(err); });
+        ch.send();
+        subscribeOnce(
+            ch.subscribe,
+            () => Promise.reject(new Error('async')),
+            err => { errors.push(err); },
+        );
+        ch.send();
+        await new Promise(r => setImmediate(r));
+        assertEquals(
+            errors.map(e => (e as Error).message),
+            ['sync', 'async'],
+        );
     },
 );
 

@@ -23,7 +23,6 @@ import {
 import {
     deriveDocumentsAt,
 } from '../api/derive-documents.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -145,7 +144,7 @@ Deno.test('postRecordAttributeDocumentOp writes exactly the'
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     // Phase Final Task 2: record_attributes ROW half stripped
     // — message plane + op return are the oracles.
@@ -189,9 +188,12 @@ async () => {
         sort_order: 1,
         options: [],
         constraints: [],
+        read_roles: ['member', 'admin'],
+        write_roles: ['member', 'admin'],
     };
+    const operationId = generateIdentifier();
     const opHeaders: readonly (readonly [string, string])[] =
-        [['operation-id', TEST_OPERATION_ID]];
+        [['operation-id', operationId]];
     const first = await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + RECORD_ID + '/attributes/rTiMgnMtYSIDYKegGxixMA',
@@ -247,7 +249,7 @@ async function putDocumentMessagePair(
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -282,7 +284,7 @@ async function deleteDocumentMessagePair(
         requestAt: '2026-01-02T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,

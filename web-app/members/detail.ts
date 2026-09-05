@@ -14,6 +14,7 @@ import {
     aiMemberPatchFromDraft,
     isAIMemberFieldKey,
     type AIMemberDraftFields,
+    seatRemovalOf, type SeatRemoval,
 } from '../app/presenters/index.ts';
 import { showToast } from '../app/toast.ts';
 import {
@@ -28,6 +29,10 @@ import {
 import { navigateTo } from '../app/navigation.ts';
 import { trimStrings } from '../app/format.ts';
 import {
+    closeDialog,
+    handleDialogClick,
+} from '../app/dialog.ts';
+import {
     RequestError,
     HTTP_NOT_FOUND,
 } from '../../api/http-errors.ts';
@@ -41,6 +46,8 @@ import {
     getAIMemberEntity,
     putAIMember,
     subscribeAIMemberChanges,
+    getAdminSeatIds,
+    deleteHumanMemberSeat,
     HumanMember,
     AIMember,
     type MemberPii,
@@ -79,6 +86,14 @@ type PageState = HumanState | AIState;
 
 let state: PageState | null = null;
 let pageContainer: HTMLElement | null = null;
+let removal: SeatRemoval | null = null;
+
+function removalOf(): SeatRemoval {
+    if (removal === null) {
+        throw new Error('seat removal not resolved');
+    }
+    return removal;
+}
 
 function buildPresenter():
     | HumanMemberDetailPresenter
@@ -94,7 +109,7 @@ function buildPresenter():
     if (state.variant === 'human') {
         return state.kind === 'reading'
             ? new HumanMemberDetailPresenter(
-                state.member,
+                state.member, removalOf(),
             )
             : new HumanMemberDetailEditPresenter(
                 state.member, state.draft,
@@ -164,18 +179,23 @@ export async function init(
     );
     pageContainer = container;
 
+    const ctx = sessionContext();
     await loadInto({
         container,
         skeleton: buildSkeleton('detail', 4),
-        fetch: () => loadMemberByEitherKind(
-            memberId,
-        ),
+        fetch: async () => ({
+            member: await loadMemberByEitherKind(memberId),
+            adminSeatIds: await getAdminSeatIds(ctx),
+        }),
         retry: () => init(params),
-        onData: member => {
+        onData: ({ member, adminSeatIds }) => {
             if (!member) {
                 navigateTo('members');
                 return;
             }
+            removal = seatRemovalOf(
+                adminSeatIds, memberId, ctx.identity.id,
+            );
 
             if (member.kind === 'human') {
                 state = {
@@ -234,8 +254,12 @@ async function refresh(
     memberId: string,
 ): Promise<void> {
     if (!pageContainer || !state) return;
+    const ctx = sessionContext();
     const fresh = await loadMemberByEitherKind(
         memberId,
+    );
+    removal = seatRemovalOf(
+        await getAdminSeatIds(ctx), memberId, ctx.identity.id,
     );
     state = reduceRefresh(state, fresh);
     rerender();
@@ -261,6 +285,11 @@ function onClick(e: MouseEvent): void {
     const target = e.target as Element | null;
     if (!target) return;
 
+    // The Remove dialog lives inside the container, so its
+    // open, cancel, and backdrop clicks arrive here — one
+    // voice with every other dialog surface.
+    if (handleDialogClick(target, e)) return;
+
     const actionEl = target.closest(
         '[data-member-action]',
     );
@@ -281,6 +310,11 @@ function onClick(e: MouseEvent): void {
     }
     if (action === 'save') {
         void handleSave();
+        return;
+    }
+    if (action === 'confirm-remove') {
+        closeDialog('confirm-remove');
+        void performRemove();
         return;
     }
 
@@ -423,6 +457,20 @@ async function handleSave(): Promise<void> {
     } else {
         await saveAIMember(state);
     }
+}
+
+async function performRemove(): Promise<void> {
+    if (!state || state.variant !== 'human') return;
+    const ctx = sessionContext();
+    const memberId = state.member.idForLink();
+    try {
+        await deleteHumanMemberSeat(ctx, memberId);
+    } catch (err) {
+        reportFault(ctx, 'Failed to remove member', err);
+        return;
+    }
+    showToast('Member removed', 'success');
+    navigateTo('members');
 }
 
 // The detail save's dirty check for the PII second hop (Phase

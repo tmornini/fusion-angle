@@ -28,7 +28,7 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
@@ -75,7 +75,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -217,7 +216,7 @@ async function appendInstanceMessagePair(
         organization,
         responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,

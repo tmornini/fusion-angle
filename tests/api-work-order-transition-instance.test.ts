@@ -36,7 +36,7 @@ import {
     deriveInstanceHead,
 } from '../api/derive-record-instances.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
@@ -79,6 +79,7 @@ function req(
     token: string,
     body?: unknown,
     extraHeaders?: Record<string, string>,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
@@ -87,7 +88,7 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -1065,7 +1066,7 @@ async () => {
 
 // --- 9. byte-identical resend ---
 
-Deno.test('byte-identical resend → 204 replay, no second '
+Deno.test('byte-identical resend → 200 replay, no second '
 + 'revision',
 async () => {
     const { db, adminToken, etag } = await seededBound();
@@ -1081,9 +1082,11 @@ async () => {
     // Fix transitionAt so resend is byte-identical.
     body['transitionAt'] =
         '2026-06-01T00:00:00.000000Z';
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'POST', TRANSITION, adminToken, body,
         { [IF_MATCH_HEADER]: etag },
+        operationId,
     ));
     assertStrictEquals(first.status, 201);
     const afterFirst = await instancePairCount(db);
@@ -1091,8 +1094,9 @@ async () => {
     const replay = await handleRequest(db, req(
         'POST', TRANSITION, adminToken, body,
         { [IF_MATCH_HEADER]: etag },
+        operationId,
     ));
-    assertStrictEquals(replay.status, 201);
+    assertStrictEquals(replay.status, 200);
     assertStrictEquals(
         await instancePairCount(db),
         afterFirst,

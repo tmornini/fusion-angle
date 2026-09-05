@@ -1,11 +1,24 @@
-import { assertEquals, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { adminContext } from './context-fixtures.ts';
 import { deriveIdentityPii } from
     '../api/derive-identity-spine.ts';
+import { deriveMembershipsForIdentity } from
+    '../api/derive-memberships.ts';
 import {
-    postHumanMemberCreation,
+    HTTP_NOT_FOUND,
+    RequestError,
+} from '../api/http-errors.ts';
+import {
+    deleteHumanMemberSeat,
     featuredHumanMembers,
+    getAdminSeatIds,
     getHumanMemberProfile,
+    postHumanMemberCreation,
     type HumanMember,
     type HumanMemberDraft,
 } from '../web-app/app/adapters/members.ts';
@@ -133,5 +146,31 @@ Deno.test('a full identity document reads 1:1', async () => {
             strengths: [],
             team_dimensions: {},
         },
+    );
+});
+
+Deno.test('deleteHumanMemberSeat removes the seat', async () => {
+    const { db, ctx } = await adminContext();
+    const id = generateIdentifier();
+    await seedHumanMember(db, id, 'Leaving Member');
+    await deleteHumanMemberSeat(ctx, id);
+    const err = await assertRejects(
+        () => ctx.GET(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/members/' + id,
+        ),
+    ) as Error;
+    assert(err instanceof RequestError);
+    assertStrictEquals(err.status, HTTP_NOT_FOUND);
+    assertEquals(await deriveMembershipsForIdentity(db, id), []);
+});
+
+Deno.test('getAdminSeatIds lists the admin seats only',
+async () => {
+    const { db, ctx } = await adminContext();
+    const member = generateIdentifier();
+    await seedHumanMember(db, member, 'Plain Member');
+    assertEquals(
+        await getAdminSeatIds(ctx),
+        ['XXZruirZyAOoRpNxaDnpSA'],
     );
 });

@@ -7,7 +7,8 @@ import { formWriteMessagePair } from '../api/message-pair.ts';
 import type {
     MessagePairEntity,
 } from '../api/types.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -33,7 +34,7 @@ async function storedMessagePairAt(
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: status,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     return {
         id: messagePair.id,

@@ -133,7 +133,83 @@ function paintToast(
     toast.appendChild(closeBtn);
 
     container.prepend(toast);
-    setTimeout(closeToast, TOAST_DURATION_MS);
+    armAutoDismiss(toast, closeToast);
+}
+
+// The auto-dismiss pauses while the pointer or focus rests
+// on the toast and resumes with the remainder on leave —
+// either presence holds it. A paused toast still counts
+// toward MAX_TOASTS and can still be evicted: the cap stays
+// a bound.
+function armAutoDismiss(
+    toast: HTMLElement,
+    close: () => void,
+): void {
+    let remainingMs = TOAST_DURATION_MS;
+    let armedAt = Date.now();
+    let live = true;
+    let timer: ReturnType<
+        typeof setTimeout
+    > | undefined;
+    // Dismiss disarms resume so a later leave cannot
+    // schedule close again and wipe another toast's
+    // pending. The × click already calls close; this
+    // only drops live so resume cannot re-arm.
+    const disarm = (): void => {
+        live = false;
+        if (timer !== undefined) {
+            clearTimeout(timer);
+            timer = undefined;
+        }
+    };
+    const dismiss = (): void => {
+        if (!live) return;
+        disarm();
+        close();
+    };
+    timer = setTimeout(dismiss, remainingMs);
+    let pointerOver = false;
+    let focusWithin = false;
+    const pause = (): void => {
+        if (!live) return;
+        if (timer === undefined) return;
+        clearTimeout(timer);
+        timer = undefined;
+        remainingMs -= Date.now() - armedAt;
+    };
+    const resume = (): void => {
+        if (!live) return;
+        if (timer !== undefined) return;
+        armedAt = Date.now();
+        timer = setTimeout(dismiss, remainingMs);
+    };
+    const settle = (): void => {
+        if (!live) return;
+        if (pointerOver || focusWithin) {
+            pause();
+        } else {
+            resume();
+        }
+    };
+    toast.addEventListener('mouseenter', () => {
+        pointerOver = true;
+        settle();
+    });
+    toast.addEventListener('mouseleave', () => {
+        pointerOver = false;
+        settle();
+    });
+    toast.addEventListener('focusin', () => {
+        focusWithin = true;
+        settle();
+    });
+    toast.addEventListener('focusout', () => {
+        focusWithin = false;
+        settle();
+    });
+    toast.lastElementChild?.addEventListener(
+        'click', disarm,
+    );
 }
 
 export function showToast(

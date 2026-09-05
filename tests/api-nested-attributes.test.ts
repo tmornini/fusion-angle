@@ -17,7 +17,7 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -73,7 +73,6 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -171,43 +170,22 @@ async () => {
     });
 });
 
-Deno.test('PUT create no ACL keys → 200; GET shows stamped '
-+ 'DEFAULT_ATTRIBUTE_ACL_ROLES',
+Deno.test('PUT create without ACL keys → 400; nothing stored',
 async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
     const put = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, attrCore(),
     ));
-    assertStrictEquals(put.status, 201);
-    const echo = await put.json() as AttributeWireRow;
-    assertEquals(echo, {
-        id: ATTR_ID,
-        organization_id: ORGANIZATION,
-        record_type_id: TYPE_ID,
-        name: 'Priority',
-        attribute_type: 'text',
-        sort_order: 0,
-        options: [],
-        constraints: [],
-        read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-        write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+    assertStrictEquals(put.status, 400);
+    assertEquals(await put.json(), {
+        error: 'missing required key "read_roles"'
+            + ' for AttributeDocumentBody',
     });
     const get = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assertStrictEquals(get.status, 200);
-    const row = await get.json() as AttributeWireRow;
-    assertEquals(
-        row.read_roles,
-        [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    );
-    assertEquals(
-        row.write_roles,
-        [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    );
-    assertStrictEquals(row.record_type_id, TYPE_ID);
-    assertStrictEquals(row.organization_id, ORGANIZATION);
+    assertStrictEquals(get.status, 404);
 });
 
 Deno.test('PUT replace without ACL keys → 400',
@@ -215,7 +193,10 @@ async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
     const first = await handleRequest(db, req(
-        'PUT', ATTR_DETAIL, adminToken, attrCore(),
+        'PUT', ATTR_DETAIL, adminToken, attrCore({
+            read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+            write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+        }),
     ));
     assertStrictEquals(first.status, 201);
     const second = await handleRequest(db, req(
@@ -232,7 +213,10 @@ async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
     const first = await handleRequest(db, req(
-        'PUT', ATTR_DETAIL, adminToken, attrCore(),
+        'PUT', ATTR_DETAIL, adminToken, attrCore({
+            read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+            write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+        }),
     ));
     assertStrictEquals(first.status, 201);
     const second = await handleRequest(db, req(
@@ -298,7 +282,10 @@ async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
     await handleRequest(db, req(
-        'PUT', ATTR_DETAIL, adminToken, attrCore(),
+        'PUT', ATTR_DETAIL, adminToken, attrCore({
+            read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+            write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+        }),
     ));
     const del = await handleRequest(db, req(
         'DELETE', ATTR_DETAIL, adminToken,
@@ -319,7 +306,10 @@ async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
     await handleRequest(db, req(
-        'PUT', ATTR_DETAIL, adminToken, attrCore(),
+        'PUT', ATTR_DETAIL, adminToken, attrCore({
+            read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+            write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+        }),
     ));
     const flowId = generateIdentifier();
     const nodeId = generateIdentifier();

@@ -2922,23 +2922,15 @@ export function validateRecordAttributeDocumentBody(
 }
 
 // Nested attribute document under a record-type address
-// (Task 6). No record_id — parentage is the URI. Create
-// stamps DEFAULT_ATTRIBUTE_ACL_ROLES when ACL keys are
-// omitted; replace requires both keys (no silent drift
-// back to defaults). Role strings are free non-empty
-// strings; [] is legal (admins only via bypass).
+// (Task 6). No record_id — parentage is the URI. Both ACL
+// keys are required on create and replace alike: the nested
+// PUT appends the wire it was given, so a keyless head would
+// store no roles and read as nobody-but-admin. Role strings
+// are free non-empty strings; [] is legal (admins only via
+// bypass).
 export const NESTED_ATTRIBUTE_DOCUMENT_BODY_KEYS = [
     'name', 'attribute_type', 'sort_order',
     'options', 'constraints',
-    'read_roles', 'write_roles',
-] as const;
-
-const NESTED_ATTRIBUTE_CORE_KEYS = [
-    'name', 'attribute_type', 'sort_order',
-    'options', 'constraints',
-] as const;
-
-const NESTED_ATTRIBUTE_ACL_KEYS = [
     'read_roles', 'write_roles',
 ] as const;
 
@@ -2970,25 +2962,15 @@ function pickNonEmptyStringArray(
     });
 }
 
-function validateAttributeDocument(
+export function validateAttributeDocument(
     body: Record<string, unknown>,
-    mode: 'create' | 'replace',
 ): AttributeDocument {
     const label = 'AttributeDocumentBody';
-    if (mode === 'create') {
-        assertOnlyKeys(
-            body,
-            NESTED_ATTRIBUTE_CORE_KEYS,
-            label,
-            NESTED_ATTRIBUTE_ACL_KEYS,
-        );
-    } else {
-        assertOnlyKeys(
-            body,
-            NESTED_ATTRIBUTE_DOCUMENT_BODY_KEYS,
-            label,
-        );
-    }
+    assertOnlyKeys(
+        body,
+        NESTED_ATTRIBUTE_DOCUMENT_BODY_KEYS,
+        label,
+    );
     const name = pickString(body, 'name');
     if (name === '') {
         throw new ValidationError(
@@ -3029,40 +3011,19 @@ function validateAttributeDocument(
             + attributeType + "'",
         );
     }
-    const defaultRoles: string[] = [
-        ...DEFAULT_ATTRIBUTE_ACL_ROLES,
-    ];
-    const readRoles = 'read_roles' in body
-        ? pickNonEmptyStringArray(
-            body, 'read_roles', label,
-        )
-        : [...defaultRoles];
-    const writeRoles = 'write_roles' in body
-        ? pickNonEmptyStringArray(
-            body, 'write_roles', label,
-        )
-        : [...defaultRoles];
     return {
         name,
         attribute_type: attributeType,
         sort_order: pickNumber(body, 'sort_order'),
         options,
         constraints,
-        read_roles: readRoles,
-        write_roles: writeRoles,
+        read_roles: pickNonEmptyStringArray(
+            body, 'read_roles', label,
+        ),
+        write_roles: pickNonEmptyStringArray(
+            body, 'write_roles', label,
+        ),
     };
-}
-
-export function validateAttributeDocumentCreate(
-    body: Record<string, unknown>,
-): AttributeDocument {
-    return validateAttributeDocument(body, 'create');
-}
-
-export function validateAttributeDocumentReplace(
-    body: Record<string, unknown>,
-): AttributeDocument {
-    return validateAttributeDocument(body, 'replace');
 }
 
 const FLOW_RECORD_BODY_KEYS: readonly string[] = [

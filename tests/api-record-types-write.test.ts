@@ -25,7 +25,7 @@ import {
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import {
@@ -61,13 +61,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -133,7 +134,7 @@ async function seedRecordTypeBelowGate(
             position: body['position'],
             state: body['state'],
         },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, messagePair,
@@ -362,12 +363,15 @@ async () => {
             'Rental', 1, 'active', AT, 'rt-1-genesis',
         ),
     ));
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'DELETE', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
+        undefined, operationId,
     ));
     assertStrictEquals(first.status, 204);
     const second = await handleRequest(db, req(
         'DELETE', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
+        undefined, operationId,
     ));
     assertStrictEquals(second.status, 204);
 });

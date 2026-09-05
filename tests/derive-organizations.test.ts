@@ -13,7 +13,7 @@ import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import {
@@ -47,7 +47,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 

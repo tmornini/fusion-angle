@@ -5,8 +5,9 @@ import {
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { seedRootAdmin, seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const BASE = 'http://localhost';
 
@@ -31,7 +32,7 @@ async function deleteMembership(
             headers: {
                 'Authorization': 'Bearer '
                     + await organizationToken(),
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
         }));
     assertStrictEquals(res.status, 204);
@@ -47,7 +48,7 @@ function putDefaultOrganization(
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token,
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
             body: JSON.stringify({
                 organization_id: organization,
@@ -55,10 +56,19 @@ function putDefaultOrganization(
         });
 }
 
+// A second admin seat: the tests below remove the root
+// admin's seat to prove the claim-based fence, and the last
+// admin seat refuses removal (Task 20 of the critical
+// functionality path).
+const SECOND_ADMIN_ID = 'uTGrEpVpODbNhDhDVdWeqQ';
+
 async function adminDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedRootAdmin(db);
+    await seedSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', SECOND_ADMIN_ID, 'admin',
+    );
     return db;
 }
 

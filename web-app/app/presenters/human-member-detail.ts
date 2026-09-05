@@ -18,6 +18,7 @@ import {
     iconBriefcase,
     iconStar,
     iconCheckCircle2,
+    iconTrash,
 } from '../icons.ts';
 import {
     HumanMember,
@@ -111,6 +112,59 @@ export function humanMemberPatchFromDraft(
         department: draft.department,
         bio: draft.bio,
         strengths: [...draft.strengths],
+    };
+}
+
+// The Add Member dialog's fields, as the roster collects
+// them.
+export interface HumanMemberCreationDraft {
+    name: string;
+    email: string;
+    title: string;
+    department: string;
+    phone: string;
+    bio: string;
+}
+
+// The create body from the dialog's draft — the sibling of
+// humanMemberPatchFromDraft for the roster's Add Member.
+export function humanMemberCreationFromDraft(
+    draft: HumanMemberCreationDraft,
+): HumanMemberDraft {
+    return {
+        name: draft.name,
+        email: draft.email,
+        title: draft.title,
+        department: draft.department,
+        strengths: [],
+        // No page collects an assessment, so none is
+        // recorded — an empty map, never a fabricated
+        // score.
+        team_dimensions: {},
+        phone: draft.phone,
+        bio: draft.bio,
+    };
+}
+
+// Whether this seat may be removed from member detail, and
+// whose it is — the dialog's copy differs for the viewer's
+// own seat. The API refuses the last admin seat (409); the
+// page mirrors the guard by not offering the button.
+export interface SeatRemoval {
+    readonly removable: boolean;
+    readonly isSelf: boolean;
+}
+
+export function seatRemovalOf(
+    adminSeatIds: readonly string[],
+    memberId: string,
+    viewerId: string,
+): SeatRemoval {
+    const lastAdmin = adminSeatIds.length === 1
+        && adminSeatIds[0] === memberId;
+    return {
+        removable: !lastAdmin,
+        isSelf: viewerId === memberId,
     };
 }
 
@@ -486,6 +540,7 @@ function buildEditableStrengthChips(
 }
 
 function buildReadonlyActionButtons(
+    removal: SeatRemoval,
 ): SafeHtml {
     return html`
         <button
@@ -495,7 +550,60 @@ function buildReadonlyActionButtons(
             id="member-edit-btn"
             data-member-action="edit">
             ${iconEdit(ICON_SIZE.base, '')} Edit
-        </button>`;
+        </button>
+        ${buildRemoveAffordance(removal)}`;
+}
+
+// Remove and its confirm, the identities page's alertdialog
+// shape (web-app/identities/detail.html). Rendered inside
+// the page container so the page's own click delegate
+// drives open, cancel, and backdrop through
+// handleDialogClick. Absent for the last admin seat.
+function buildRemoveAffordance(
+    removal: SeatRemoval,
+): SafeHtml {
+    if (!removal.removable) {
+        return html``;
+    }
+    const consequence = removal.isSelf
+        ? 'You lose access to this organization at your'
+            + ' next token refresh.'
+        : 'Their access to this organization ends at'
+            + ' their next token refresh.';
+    return html`
+        <button
+            class="${
+                'btn btn-destructive gap-2'
+            }"
+            id="member-remove-btn"
+            data-dialog-open="confirm-remove">
+            ${iconTrash(ICON_SIZE.base, '')} Remove
+        </button>
+        <dialog id="confirm-remove-dialog"
+            class="dialog dialog-narrow"
+            role="alertdialog"
+            aria-labelledby="confirm-remove-title"
+            aria-describedby="confirm-remove-message">
+            <div class="dialog-header">
+                <h3 id="confirm-remove-title"
+                    class="dialog-title">
+                    Remove this member?</h3>
+            </div>
+            <p id="confirm-remove-message"
+                class="text-sm text-muted">
+                ${consequence}
+            </p>
+            <div class="dialog-footer">
+                <button class="btn btn-outline"
+                    data-dialog-cancel="confirm-remove">
+                    Cancel
+                </button>
+                <button class="btn btn-destructive"
+                    data-member-action="confirm-remove">
+                    Remove
+                </button>
+            </div>
+        </dialog>`;
 }
 
 function buildEditableActionButtons(
@@ -530,9 +638,11 @@ function buildTeamDimensionsCard(
 
 export class HumanMemberDetailPresenter {
     readonly #member: HumanMember;
+    readonly #removal: SeatRemoval;
 
-    constructor(member: HumanMember) {
+    constructor(member: HumanMember, removal: SeatRemoval) {
         this.#member = member;
+        this.#removal = removal;
     }
 
     idForLink(): string {
@@ -560,7 +670,7 @@ export class HumanMemberDetailPresenter {
         mutateSlot(
             container,
             '.member-actions-slot',
-            buildReadonlyActionButtons(),
+            buildReadonlyActionButtons(this.#removal),
         );
         mutateSlot(
             container,

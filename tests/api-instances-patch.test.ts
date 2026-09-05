@@ -48,7 +48,7 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
@@ -90,6 +90,7 @@ function req(
     token: string,
     body?: unknown,
     extraHeaders?: Record<string, string>,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
@@ -98,7 +99,7 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -239,7 +240,7 @@ async function appendInstanceMessagePair(
         organization,
         responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -866,9 +867,11 @@ async () => {
             { attribute_id: ATTR_ID, value: 'B' },
         ],
     };
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: e0 },
+        operationId,
     ));
     assertStrictEquals(first.status, 201);
     const originalEtag = first.headers.get('ETag')!;
@@ -898,8 +901,9 @@ async () => {
     const replay = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: e0 },
+        operationId,
     ));
-    assertStrictEquals(replay.status, 201);
+    assertStrictEquals(replay.status, 200);
     assertStrictEquals(
         replay.headers.get('ETag'),
         originalEtag,
@@ -1012,7 +1016,7 @@ async () => {
             set: staleBody.set,
             clear: [],
         },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     // Advance the real head past H0.
     const advance = await handleRequest(db, req(
@@ -1086,7 +1090,7 @@ async () => {
         requestAt: nowUtc(),
         organization: ORGANIZATION,
         response: { status: 200, body: {} },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     assertStrictEquals('follows' in revision, false);
     assertStrictEquals('supersedes' in revision, false);

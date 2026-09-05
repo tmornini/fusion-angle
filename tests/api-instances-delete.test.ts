@@ -44,7 +44,7 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -76,6 +76,7 @@ function req(
     token: string,
     body?: unknown,
     extraHeaders?: Record<string, string>,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
@@ -84,7 +85,7 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -346,13 +347,16 @@ async () => {
         await adminDb();
     await putLiveType(db, adminToken);
     await putInstance(db, memberToken, []);
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
+        undefined, undefined, operationId,
     ));
     assertStrictEquals(first.status, 204);
     const afterFirst = await countInstanceMessagePairs(db);
     const second = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
+        undefined, undefined, operationId,
     ));
     assertStrictEquals(second.status, 204);
     assertStrictEquals(
@@ -462,7 +466,7 @@ async () => {
             set: patchBody.set,
             clear: [],
         },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     // Concurrent DELETE tombstones the address.
     const del = await handleRequest(db, req(

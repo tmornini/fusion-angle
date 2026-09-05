@@ -9,8 +9,9 @@ import {
     reachableToken,
 } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-06-04T00:00:00.000000Z';
@@ -63,7 +64,7 @@ function putDefaultOrganization(
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token,
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
             body: JSON.stringify({
                 organization_id: organization,

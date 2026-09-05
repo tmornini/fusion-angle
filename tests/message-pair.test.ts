@@ -9,7 +9,8 @@ import {
     appendMessagePair,
 } from '../api/message-pair.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const INPUT = {
     method: 'PUT',
@@ -24,7 +25,7 @@ const INPUT = {
     organization: 'AjdvjuECVZEgZoFajaIEkg',
     responseStatus: 204,
     responseBody: undefined,
-    operationId: TEST_OPERATION_ID,
+    operationId: generateIdentifier(),
 } as const;
 
 Deno.test('an org-owned pair stores at the org-nested prefix',
@@ -45,7 +46,7 @@ async () => {
         routeSegments: ['identities', ':id', 'pii'],
         pathSegments: ['identities', 'ada', 'pii'],
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     assertStrictEquals(
         messagePair.uriCollection, '/identities/ada/pii/',
@@ -79,7 +80,7 @@ async () => {
             options: [],
             constraints: [],
         },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     assertStrictEquals(
         messagePair.uriCollection,
@@ -105,7 +106,7 @@ async () => {
             'organizations', 'AjdvjuECVZEgZoFajaIEkg',
             'record-types', 'rOEPOcVMQdJiiiMuiiEhlg',
         ],
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     assertStrictEquals(
         messagePair.uriCollection,
@@ -143,7 +144,7 @@ Deno.test('formed response has no follows or supersedes',
 async () => {
     const messagePair = await formWriteMessagePair({
         ...INPUT,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     assertStrictEquals(
         'follows' in messagePair, false,

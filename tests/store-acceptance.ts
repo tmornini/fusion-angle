@@ -4,7 +4,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -33,7 +33,7 @@ function req(
         body,
         ...(headers !== undefined
             ? { headers } : {}),
-        operationId: operationId ?? TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -223,13 +223,15 @@ export function defineStoreAcceptance(
         );
     });
 
-    Deno.test(name + ': exact retry keeps status', async () => {
+    Deno.test(name + ': exact retry replays as 200', async () => {
         const { db, token } = await ready();
         const body = ideaDocument('Retry', 'ev-sa-retry');
+        const operationId = generateIdentifier();
         const first = await handleRequest(
             db, req('PUT'
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                + 'tjrZLujBtBVqFwOsBDWdQQ', token, body),
+                + 'tjrZLujBtBVqFwOsBDWdQQ', token, body,
+                undefined, operationId),
         );
         assertStrictEquals(first.status, 201);
         const firstId = first.headers.get('Response-ID');
@@ -238,9 +240,10 @@ export function defineStoreAcceptance(
         const second = await handleRequest(
             db, req('PUT'
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                + 'tjrZLujBtBVqFwOsBDWdQQ', token, body),
+                + 'tjrZLujBtBVqFwOsBDWdQQ', token, body,
+                undefined, operationId),
         );
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
         assertStrictEquals(
             second.headers.get('Operation-ID'), firstOp,
         );

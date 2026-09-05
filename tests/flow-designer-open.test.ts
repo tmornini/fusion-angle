@@ -39,7 +39,7 @@ import {
 } from
     '../web-app/app/presenters/flow-designer.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { wrapInPageAdapter } from
     './in-page-facade.ts';
@@ -79,7 +79,6 @@ function req(
         body,
         ...(headers !== undefined
             ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -220,6 +219,32 @@ Deno.test(
         assertNotStrictEquals(
             op.freshSnap.flowName,
             'Alpha Renamed',
+        );
+    }),
+);
+
+Deno.test(
+    'a rename with no target appends no pair',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const db = await freshDb();
+        putClientFacade(wrapInPageAdapter(db));
+        putSessionToken(DEV_TOKEN);
+        const flowId = generateIdentifier();
+        await createFlow(db, DEV_TOKEN, flowId);
+        const ctx = createRequestContext(db, DEV_TOKEN);
+        const graph = await getFlowGraph(ctx, flowId);
+        const snap = buildInitialFlowSnapshot(
+            graph, CANVAS_W, CANVAS_H, [], [], [],
+        );
+        const presenter = new FlowDesignerPresenter(
+            snap, CANVAS_W, CANVAS_H,
+            buildFlowHistorySnapshot(graph.hasUndoHistory),
+        );
+        const n = await flowDocumentPairCount(db, flowId);
+        presenter.withNodeNamed('missing', 'typed');
+        await enqueueFlowSave(flowId, async () => undefined);
+        assertStrictEquals(
+            await flowDocumentPairCount(db, flowId), n,
         );
     }),
 );

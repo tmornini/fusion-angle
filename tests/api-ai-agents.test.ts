@@ -6,7 +6,7 @@ import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import { generateIdentifier } from
@@ -32,7 +32,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 

@@ -17,7 +17,8 @@ import {
     instancesUriPrefix,
     type InstanceValue,
 } from '../api/derive-record-instances.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Instance derive: full-state heads (R5 / Task 14).
 // No fold. revisionValuesOf normalizes genesis {set} and
@@ -78,7 +79,7 @@ async function appendInstancePair(
         organization: ORGANIZATION,
         responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,

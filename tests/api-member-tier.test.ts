@@ -8,7 +8,7 @@ import { devToken } from './token-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { ideaBody, seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -24,7 +24,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 

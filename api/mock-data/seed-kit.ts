@@ -1,8 +1,7 @@
 // Shared seed primitives for the mock-data composition: one
 // clock, one PRNG, one id alphabet. These are pure and draw-order
 // preserving — the per-entity seed modules thread the same rng
-// through them so the seeded world stays byte-for-byte stable
-// (pinned by tests/mock-data-fingerprint.test.ts).
+// through them so two seeds on one day are byte-for-byte alike.
 
 import type { Id } from '../types.ts';
 import { SYSTEM_MEMBER_ID } from '../types.ts';
@@ -17,11 +16,23 @@ import {
 } from './seed-constants.ts';
 import type { SeedHumanMember } from './members.ts';
 
-// A FIXED anchor, never the wall clock: date-derived seed ids
-// (objective scores embed scoredAt) must not drift across UTC
-// days, or the fingerprint becomes a false prophet. Bump
-// deliberately to refresh how current the demo dates look.
-export const now = new Date('2026-06-15T00:00:00.000Z');
+// The seed's clock is the start of the current UTC day —
+// day-quantized, so the Honolulu pass and a same-day re-seed
+// agree — and current, so the ninety-day stats window
+// (web-app/app/adapters/flow-stats.ts) always holds the
+// seeded sojourns: every seeded instant sits at or before
+// this anchor, and a fixed one clips them all to zero ninety
+// days on. Date-derived seed ids follow the day; nothing
+// under tests/ hashes the seed.
+export const now = startOfUtcDay(new Date());
+
+function startOfUtcDay(instant: Date): Date {
+    return new Date(Date.UTC(
+        instant.getUTCFullYear(),
+        instant.getUTCMonth(),
+        instant.getUTCDate(),
+    ));
+}
 
 function pad(n: number): string {
     return String(n).padStart(2, '0');

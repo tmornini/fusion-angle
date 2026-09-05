@@ -18,13 +18,18 @@ import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import {
-    type SessionCredentials,
     getSessionCredentials,
     isCookieSession,
     putSessionCredentials,
 } from './session-credentials.ts';
 import { postSessionRefresh } from './session-refresh.ts';
+import {
+    runRefreshAfterInFlight,
+} from './session-refresh-mutex.ts';
 import { putSessionToken } from './session-token.ts';
+import {
+    principalFromToken,
+} from '../../../shared/access-token-decode.ts';
 export {
     isInvitationState,
 } from '../../../api/types.ts';
@@ -190,14 +195,15 @@ export class SessionRemintFailedError extends Error {
     }
 }
 
-// Accept an invitation — the server writes the membership in the
-// invitation's org (type:"member") and appends 'accepted' in one
-// atomic batch. Then remint via the refresh grant so the access
-// token gains the new member:O claim (roles bake only at mint).
-// The committed seat's bell rings either way.
+// Accept an invitation — the server writes the membership in
+// the invitation's org (type:"member") and appends 'accepted'
+// in one atomic batch. Then remint via the refresh grant so
+// the access token gains the new member:O claim (roles bake
+// only at mint). The committed seat's bell rings either way.
 export async function postInvitationAcceptance(
     ctx: RequestContext,
     id: Id,
+    organizationId: Id,
 ): Promise<void> {
     await ctx.PUT(
         'identities/' + ctx.identity.id
@@ -210,43 +216,89 @@ export async function postInvitationAcceptance(
         },
     );
     try {
-        await remintSessionClaims(ctx);
+        await remintSessionClaims(ctx, organizationId);
     } finally {
         invitationChanges.notify();
     }
 }
 
-// Re-bake access-token roles from live memberships. A refresh
-// that fails after the accept committed is named, never
-// swallowed — the page renders it. A 401 is the recovery
-// layer's to recover.
+// Re-bake access-token roles from live memberships. The grant
+// rides AFTER any in-flight facade refresh — one jti presented
+// twice is replay, and replay revokes the chain — and the token
+// it yields must list the accepted organization: a peer tab's
+// broadcast can serve the mutex a token minted before the seat.
+// One more grant, then a named failure. Two attempts, no loop.
+// A refresh that fails after the accept committed is named,
+// never swallowed — the page renders it. A 401 is the
+// recovery layer's to recover.
 async function remintSessionClaims(
     ctx: RequestContext,
+    organizationId: Id,
 ): Promise<void> {
-    if (isCookieSession()) {
-        const creds = await postRemintRefresh(ctx, '');
-        putSessionToken(creds.accessToken);
+    if (!isCookieSession() && getSessionCredentials() === null) {
         return;
     }
-    const stored = getSessionCredentials();
-    if (stored === null) return;
-    const creds = await postRemintRefresh(
-        ctx, stored.refreshToken,
-    );
-    putSessionCredentials(creds);
-    putSessionToken(creds.accessToken);
+    const first = await postRemintRefresh(ctx);
+    if (listsOrganization(first, organizationId)) {
+        return;
+    }
+    const second = await postRemintRefresh(ctx);
+    if (listsOrganization(second, organizationId)) {
+        return;
+    }
+    throw new SessionRemintFailedError(new Error(
+        'the re-minted token does not list ' + organizationId,
+    ));
 }
 
-// The one try: it wraps only the refresh grant.
+function listsOrganization(
+    accessToken: string,
+    organizationId: Id,
+): boolean {
+    const principal = principalFromToken(accessToken);
+    if (principal.organization === organizationId) {
+        return true;
+    }
+    return principal.organizations !== undefined
+        && principal.organizations.includes(organizationId);
+}
+
+// The one try: it wraps only the refresh grant. The stored
+// refresh token is read INSIDE the flight, after any earlier
+// flight has rotated it.
 async function postRemintRefresh(
     ctx: RequestContext,
-    refreshToken: string,
-): Promise<SessionCredentials> {
+): Promise<string> {
+    let access: string | null;
     try {
-        return await postSessionRefresh(ctx, refreshToken);
+        access = await runRefreshAfterInFlight(async () => {
+            const creds = await postSessionRefresh(
+                ctx, storedRefreshToken(),
+            );
+            putSessionCredentials(creds);
+            return creds.accessToken;
+        });
     } catch (err) {
         throw new SessionRemintFailedError(err);
     }
+    if (access === null) {
+        throw new SessionRemintFailedError(new Error(
+            'the refresh grant yielded no access token',
+        ));
+    }
+    putSessionToken(access);
+    return access;
+}
+
+function storedRefreshToken(): string {
+    if (isCookieSession()) {
+        return '';
+    }
+    const stored = getSessionCredentials();
+    if (stored === null) {
+        throw new Error('no session credentials to re-mint');
+    }
+    return stored.refreshToken;
 }
 
 export async function postInvitationDecline(

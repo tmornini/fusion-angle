@@ -18,7 +18,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { HttpMessage } from
@@ -51,13 +51,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -147,15 +148,18 @@ Deno.test('a byte-identical resend converges: one event,'
     const db = await freshDb();
     const token = await organizationToken();
     const body = ideaDocument('Idempotent', 'active');
+    const operationId = generateIdentifier();
     await handleRequest(
         db, req('PUT'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'YIuEjXvCwXAgrpyvcvLJjg', token, body),
+            + 'YIuEjXvCwXAgrpyvcvLJjg', token, body,
+            operationId),
     );
     await handleRequest(
         db, req('PUT'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'YIuEjXvCwXAgrpyvcvLJjg', token, body),
+            + 'YIuEjXvCwXAgrpyvcvLJjg', token, body,
+            operationId),
     );
     const events = await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
         , 'YIuEjXvCwXAgrpyvcvLJjg');
@@ -194,7 +198,7 @@ async () => {
                 'Content-Type': 'application/json',
                 Authorization: 'Bearer ' + token,
                 'Idempotency-Key': 'k-same-1',
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
             body: JSON.stringify(body),
         }),

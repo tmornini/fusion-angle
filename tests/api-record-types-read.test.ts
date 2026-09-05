@@ -19,7 +19,7 @@ import {
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
@@ -53,7 +53,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -113,7 +112,7 @@ async function seedRecordTypePair(
             organization_id: organization,
             ...body,
         },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, messagePair,

@@ -33,7 +33,7 @@ import { mintAccessToken, TOKEN_AUDIENCE } from
     '../api/access-token.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
@@ -61,7 +61,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 

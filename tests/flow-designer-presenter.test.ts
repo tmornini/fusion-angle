@@ -12,7 +12,10 @@ import {
     '../web-app/app/presenters/flow-designer.ts';
 import { makeAIMember } from './member-fixtures.ts';
 import {
+    appendToRedoStack,
     buildFlowHistorySnapshot,
+    canRedoFlowEdits,
+    type FlowVersion,
 } from '../web-app/app/flow-history.ts';
 import type {
     InteractionState,
@@ -653,6 +656,84 @@ Deno.test(
         assertStrictEquals(
             next.edges.find(e => e.id === 'e1')!.name,
             'renamed',
+        );
+    },
+);
+
+// A target deleted during the 800 ms debounce is a miss:
+// the presenter hands back the snapshot it holds, queues no
+// save, and clears no redo.
+function redoOfOne(): ReturnType<typeof appendToRedoStack> {
+    const version: FlowVersion = {
+        id: 'vErSiOnOnEaAaAaAaAaAaw',
+        flowId: emptyGraph.id,
+        name: 'Test Flow',
+        isLocked: false,
+        isAutoLayout: false,
+        isAutoFit: false,
+        lockTimeout: 0,
+        nodes: [],
+        edges: [],
+        createdAt: '2026-01-01T00:00:00.000000Z',
+    };
+    return appendToRedoStack(
+        buildFlowHistorySnapshot(true), version,
+    );
+}
+
+Deno.test(
+    'withNodeNamed on a missing node returns the held'
+    + ' snapshot and keeps the redo stack',
+    () => {
+        const snap = buildInitialFlowSnapshot(
+            { ...emptyGraph, nodes: [node('a')] },
+            800, 600, [], [], [],
+        );
+        const presenter = new FlowDesignerPresenter(
+            snap, 800, 600, redoOfOne(),
+        );
+        const next = presenter.withNodeNamed('missing', 'typed');
+        assertStrictEquals(next, presenter.snapshot());
+        assertStrictEquals(
+            canRedoFlowEdits(presenter.history()), true,
+        );
+    },
+);
+
+Deno.test(
+    'withNodeTaskInstructions on a missing node keeps the'
+    + ' redo stack',
+    () => {
+        const snap = buildInitialFlowSnapshot(
+            { ...emptyGraph, nodes: [node('a')] },
+            800, 600, [], [], [],
+        );
+        const presenter = new FlowDesignerPresenter(
+            snap, 800, 600, redoOfOne(),
+        );
+        const next = presenter
+            .withNodeTaskInstructions('missing', 'do it');
+        assertStrictEquals(next, presenter.snapshot());
+        assertStrictEquals(
+            canRedoFlowEdits(presenter.history()), true,
+        );
+    },
+);
+
+Deno.test(
+    'withEdgeNamed on a missing edge keeps the redo stack',
+    () => {
+        const snap = buildInitialFlowSnapshot(
+            { ...emptyGraph, nodes: [node('a'), node('b')] },
+            800, 600, [], [], [],
+        );
+        const presenter = new FlowDesignerPresenter(
+            snap, 800, 600, redoOfOne(),
+        );
+        const next = presenter.withEdgeNamed('missing', 'go');
+        assertStrictEquals(next, presenter.snapshot());
+        assertStrictEquals(
+            canRedoFlowEdits(presenter.history()), true,
         );
     },
 );

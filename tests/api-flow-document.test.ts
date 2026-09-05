@@ -36,7 +36,7 @@ import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
-    apiRequest, TEST_OPERATION_ID, storedPutBodyText,
+    apiRequest, storedPutBodyText,
 } from './http-fixtures.ts';
 import { messageStore } from '../api/message-store.ts';
 
@@ -55,6 +55,7 @@ function req(
     token: string,
     body?: unknown,
     headers?: Record<string, string>,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
@@ -62,7 +63,7 @@ function req(
         token,
         body,
         ...(headers !== undefined ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -505,9 +506,11 @@ Deno.test('e2e: a byte-identical resend converges (one event, one'
     const headers = {
         'if-match': await headEtag(db, token, 'bZXXOWeDHCowVkWMhrZGgg'),
     };
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'bZXXOWeDHCowVkWMhrZGgg', token, body, headers,
+        operationId,
     ));
     assertStrictEquals(first.status, 201);
     const firstId = first.headers.get('Response-ID');
@@ -519,8 +522,9 @@ Deno.test('e2e: a byte-identical resend converges (one event, one'
     const second = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'bZXXOWeDHCowVkWMhrZGgg', token, body, headers,
+        operationId,
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     assertStrictEquals(second.headers.get('Response-ID'), firstId);
     const stored = await db.messagePairs.getById(firstId!);
     assert(stored !== undefined);

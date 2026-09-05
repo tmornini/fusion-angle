@@ -309,134 +309,23 @@ skew tests folded into item 7.
 
 Off the critical path; each with its oracle.
 
-- The re-mint refresh is not single-flighted with the
-  facade's cookie refresh —
-  `web-app/app/adapters/shared.ts:463-464`
-- `JWT_HMAC_SIGNING_KEY` may not belong in the local
-  seed/wipe `--allow-env` (`postgres-seed:168`,
-  `postgres-wipe:109`). `api/access-token.ts` IS in the
-  seed's 105-module transitive graph — `postgres-seed.ts`
-  → `seed.ts` → `api/mock-data.ts` → `api/routes.ts` →
-  `api/authentication.ts`, a route that never touches
-  `api/api.ts` — but it reads the key lazily inside
-  `hmacSigningKeyMaterial()` (:29-44), so whether the seed
-  ever reaches that read is undecided — the seed hits
-  ECONNREFUSED first. Kept rather than narrowed on
-  evidence that needs a database to gather. Oracle: a
-  successful `./postgres-seed --postgres local
-  --bootstrap` that never reads it.
-- Mock seed's fixed 2026-06-15 anchor — after
-  2026-09-13 serial-mode FS3 carries in-flight heat
-  only
-- Roster rows carry a fabricated empty profile
-  (`emptyPersonProfile`) —
-  `web-app/app/adapters/members.ts:48`
-- `DEFAULT_DIM` stands in for an assessment that never
-  happened — `web-app/members/index.ts:52`
-- A replay is indistinguishable from a creation. The
-  gate's replay branch renders a previously-stored
-  pair but passes `appended: true`
-  (`api/api.ts:1013-1015`), so `sendWriteResponse`
-  (`api/message-pair.ts:610-624`) answers 201 exactly
-  as the genuine create did. THE FIX IS WIRING, NOT
-  DELETION: pass `false` there. The 200 branch is not
-  dead — the unchanged-live-PUT site already passes
-  `false` (`api/api.ts:1412-1413`), which is both the
-  proof the distinction was designed and the precedent
-  for the repair; an item reading "remove the 200
-  branch" would be exactly backwards. Below the gate,
-  the same blindness: `appendMessagePair` skips a
-  duplicate `request_hash` silently by its own comment
-  (`api/message-pair.ts:686-701`), and the composed
-  operation wrapping it still answers 201 however many
-  inner pairs actually landed
-- A panel rename whose target is deleted during the
-  800 ms debounce still saves and still clears redo.
-  `withNodeNamed`, `withNodeTaskInstructions`, and
-  `withEdgeNamed` fire `#queueSave` and `#noteMutation`
-  unconditionally, so an `applyUpdateNode` that matches
-  nothing still ships a phantom idempotent PUT and a
-  spurious redo clear — a disclosed trade-off, not a
-  regression. Oracle:
-  `web-app/app/presenters/flow-designer.ts:808-885`;
-  the debounced schedules are
-  `web-app/flows/detail.ts:1349-1391`
-- `mustFind` throws `gesture frame target missing:
-  .flow-marquee` when a selecting-gesture rAF paints an
-  SVG rebuilt without the rect. `renderMarqueeFrame`
-  (`web-app/app/flow-gesture-render.ts`) looks up
-  `.flow-marquee`; `buildGraphSvg` emits that rect only
-  while `marqueeRect` is set. Mid-gesture rAF skips
-  commit, so a resize `update()` rebuilds from the idle
-  snapshot and omits the rect while `bindInteractions`
-  still holds selecting state. Not global:
-  `bindInteractions` is called only from
-  `web-app/flows/detail.ts`, and Billing's `init()` is
-  empty. TEST-PLAN.md G42's Billing console observation
-  is not a Billing listener
-- A re-init failure degrades weaker than a first-boot one:
-  `subscribeOnce`'s `void fn()` lets the rejection reach the
-  global `unhandledrejection` handler, which logs and
-  toasts — but first boot gets `handlePageLoadError`'s full
-  error state with a Try Again button. Toast-only, no retry
-  — `web-app/app/channels.ts:152`,
-  `web-app/app/page-loader.ts:41-75`,
-  `web-app/app/error-helpers.ts:41-57`
-- `subscribeOnce`'s `const unsubscribe = subscribe(...)`
-  would throw a TDZ ReferenceError if any `subscribe` fired
-  its callback synchronously; all thirteen
-  `subscribe<Entity>Changes` delegate to `createChannel`,
-  so it is inert — guard only if that changes
-- GPU flag in the Layer 2 launcher — `launchChrome`
-  no longer passes `--disable-gpu` (cargo cult under
-  `--headless=new`; it was required only by old
-  headless on Windows). Its one real effect was
-  forcing software compositing, which made runs more
-  alike across machines. Dropped UNVERIFIED —
-  `./test-browser` has run green on one machine
-  (2026-08-28). Restore it if two machines disagree.
-  Oracle: `./test-browser` green on two machines
-- Nothing asserts that the operator wrappers exec `deno`
-  rather than `node`; coverage today is a grep run by
-  hand. `tests/fusion-angle-live-name.test.ts` already
-  walks the same root-file list for forbidden strings, so
-  the shape exists. Oracle: a test asserting no `node`
-  invocation in `postgres-lib`, `postgres-seed`,
-  `postgres-wipe`.
-- Absence and emptiness are conflated in attribute ACL
-  derivation. `attributeSchemaOf` synthesizes
-  `readRoles: []` both for a head that deliberately
-  stores an empty array and for one carrying no role
-  keys at all (`api/routes.ts:1000-1005`), because the
-  nested attribute PUT appends the raw wire body
-  rather than the validator's normalized document
-  (`api/routes.ts:5307-5333`; the default-stamping it
-  discards is `api/validators.ts:3042-3054`)
-- Member-removal affordance under members/identities —
-  zero-membership is seed-produced today (Riley Okafor);
-  no page deletes a membership row. Oracle: removing a
-  member's last seat lands that identity on
-  `invitations/index.html` at next boot (TEST-PLAN
-  B25–B29 driven live); restores B28's original
-  "restore the deleted membership row" branch
-- A shared test operation id can produce false greens.
-  `tests/http-fixtures.ts:12` exports one hardcoded
-  `TEST_OPERATION_ID`; 126 test files use it, 101
-  through a local `req()` helper that pins it.
-  `apiRequest` already mints a fresh identifier when
-  `operationId` is omitted; the helpers still pass the
-  shared id. Because `appendMessagePair` dedupes on
-  `request_hash`, a test issuing two byte-identical
-  requests has the second silently dropped — which
-  made a security test in the run-four remediation
-  pass against unfixed code until it was caught.
-  Oracle:
-  `tests/api-record-types-composed-op.test.ts:436-442`
-- Toast pause on hover and focus
+- An inner pair of a composed operation skipped while
+  the top-level pair landed answers 201;
+  `appendMessagePair` returns void and the gate never
+  holds inner hashes (`api/message-pair.ts:686-701`).
+  Oracle: a composed create whose inner hash collides
+  with an earlier pair
 - The run-four remediation's remaining seams — R6 and
-  R7, whose "toy" clauses need a Layer 3 observation
-  before any rewrite. G9's staleness was the corrupted
-  test name, restored by the small-items sweep
+  R7. R6 holds in a stronger form: no picker renders for
+  `select`. R7's primary clause is false: `regex` is
+  always offered and a second pick adds a second row
+  (`web-app/app/presenters/record-detail.ts:838-871,
+  901-909`; `api/validators.ts:2759-2775` accepts
+  duplicates). The walk decides whether that is a
+  defect; the pin
+  (`tests/presenter-record-detail.test.ts`) makes any
+  rewrite honest. G9's staleness was the corrupted test
+  name, restored by the small-items sweep
 
 ## Later work
 
@@ -621,9 +510,8 @@ Off the critical path; each with its oracle.
   Node"; `tests/drift-states.test.ts` says derive-states
   is unread in production while `api/routes.ts` imports
   it; `api/routes.ts` claims revival dual-write after
-  the states row half is stripped; `api/mock-data/seed-kit.ts`
-  cites `tests/mock-data-fingerprint.test.ts`, which is
-  gone. The run-four remediation's Evidence
+  the states row half is stripped. The run-four
+  remediation's Evidence
   (`docs/superpowers/specs/`
   `2026-08-23-test-plan-run-four-remediation-design.md:911-932`)
   lists provenance, not comments, and the reproductions
@@ -1453,6 +1341,15 @@ Off the critical path; each with its oracle.
   `FUSION_ANGLE_LATENCY=200` under `local` lifts every
   `./bin/measure` median by about 200 ms; unset leaves
   the no-op.
+- GPU flag in the Layer 2 launcher — `launchChrome`
+  no longer passes `--disable-gpu` (cargo cult under
+  `--headless=new`; it was required only by old
+  headless on Windows). Its one real effect was
+  forcing software compositing, which made runs more
+  alike across machines. Dropped UNVERIFIED —
+  `./test-browser` has run green on one machine
+  (2026-08-28). Restore it if two machines disagree.
+  Oracle: `./test-browser` green on two machines
 
 ## Sequencing
 
@@ -1472,8 +1369,6 @@ Off the critical path; each with its oracle.
   line in one commit
 - Item 6 precedes routing the roster through the
   profile
-- The mock-seed anchor bullet activates after
-  2026-09-13
 - `api/derive-states.ts:811-823` (claim-expiry as its
   own event) lands before any multi-process deployment
   — item 12's first commit, or item 11's if the worker

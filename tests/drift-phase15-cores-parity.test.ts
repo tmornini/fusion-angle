@@ -63,7 +63,7 @@ import {
 } from '../shared/identifier.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 
 const N_START = generateIdentifier();
@@ -115,7 +115,6 @@ function req(
         body,
         ...(headers !== undefined
             ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -989,6 +988,8 @@ Deno.test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
             sort_order: 99,
             options: [],
             constraints: [],
+            read_roles: ['member', 'admin'],
+            write_roles: ['member', 'admin'],
         },
     ));
     assertStrictEquals(attrPut.status, 201);
@@ -1158,6 +1159,8 @@ Deno.test('residual pin: soft-deleted node drops from'
             sort_order: 99,
             options: [],
             constraints: [],
+            read_roles: ['member', 'admin'],
+            write_roles: ['member', 'admin'],
         },
     ));
     assertStrictEquals(attrPut.status, 201);
@@ -1362,6 +1365,8 @@ async function transitionWithFieldValue(
             sort_order: 0,
             options: [],
             constraints: [],
+            read_roles: ['member', 'admin'],
+            write_roles: ['member', 'admin'],
         },
     ));
     assertStrictEquals(attrWrite.status, 201);
@@ -1680,6 +1685,8 @@ async () => {
             sort_order: 99,
             options: [],
             constraints: [],
+            read_roles: ['member', 'admin'],
+            write_roles: ['member', 'admin'],
         },
     ));
     assertStrictEquals(attrPut.status, 201);

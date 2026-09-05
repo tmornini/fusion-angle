@@ -73,8 +73,14 @@ async function onListClick(e: MouseEvent): Promise<void> {
     if (!id) return;
     try {
         if (action === 'accept') {
+            const invitation = pending.find(
+                inv => inv.id === id,
+            );
+            if (invitation === undefined) return;
             await postInvitationAcceptance(
-                sessionContext(), id);
+                sessionContext(), id,
+                invitation.organizationId,
+            );
             showToast('Invitation accepted', 'success');
         } else if (action === 'decline') {
             await postInvitationDecline(

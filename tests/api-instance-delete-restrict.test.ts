@@ -14,7 +14,7 @@ import {
 } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
@@ -64,13 +64,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -376,12 +377,15 @@ async () => {
     await transitionTo(
         db, token, WO_A, N_TERM, TE_A_TERM,
     );
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, token,
+        undefined, operationId,
     ));
     assertStrictEquals(first.status, 204);
     const second = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, token,
+        undefined, operationId,
     ));
     assertStrictEquals(second.status, 204);
 });

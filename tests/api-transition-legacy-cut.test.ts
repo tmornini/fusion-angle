@@ -26,7 +26,7 @@ import { STARK_ORGANIZATION } from
 import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 
 // Task 8 CUT — hard-cut at the gate for the legacy
@@ -80,7 +80,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -206,7 +205,7 @@ async () => {
         organization: ORGANIZATION,
         responseStatus: 204,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postWorkOrderTransitionOp(
         db,

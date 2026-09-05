@@ -34,7 +34,7 @@ import {
     documentGetHandler,
 } from '../api/document-family.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -63,7 +63,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -226,7 +225,7 @@ async () => {
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     // Phase Final Task 2: objectives ROW half stripped —
     // op returns the reconstructed entity; only pairs land.
@@ -293,7 +292,7 @@ async function putDocumentMessagePair(
         requestAt: at,
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -317,7 +316,7 @@ async function deleteDocumentMessagePair(
         requestAt: at,
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,

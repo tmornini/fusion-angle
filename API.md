@@ -61,19 +61,22 @@ headers (`wireHeadersFor` + `attachEtag`): Date,
 Response-ID, Operation-ID, ETag (quoted message-pair
 identifier). A document PUT's ETag equals its
 Response-ID (both the pair id). Instance reads do not
-emit Response-ID. Replay returns the original,
-including Date. If-Match is the sole conflict
+emit Response-ID. A byte-identical replay answers 200
+with the original — Response-ID, ETag, and Date. If-Match
+is the sole conflict
 mechanism: exactly one strong validator (`"<identifier>"`);
 `*`, weak, lists, unquoted, or 64-hex yield 400.
 
 `sendWriteResponse` sets send-time status: 201 if this
 request appended a pair (PUT/PATCH/POST), 200 if it
-stored nothing, DELETE 204. The stored start-line stays
+stored nothing (a same-body PUT, or a replay served from
+the ledger), DELETE 204. The stored start-line stays
 GET-shaped 200 / DELETE 204.
 
 Status ladder:
 
-- **200** — same-body document PUT (no append); stored
+- **200** — same-body document PUT (no append); a
+  byte-identical replay of any PUT/PATCH/POST; stored
   PUT start-line
 - **201** — first append of PUT/PATCH/POST
 - **204** — DELETE success (live or already-gone)
@@ -97,10 +100,11 @@ Status ladder:
 (`api/family-registry.ts`), plus instance PATCH:
 
 - **simple** — same-body as live head → 200, no append;
-  first append 201
+  first append 201; byte-identical replay → 200
 - **locked** — live family is flows only. If-Match
   quoted identifier. live+absent → 428; live+≠ head → 412;
-  genesis with no If-Match → 201
+  genesis with no If-Match → 201; byte-identical replay →
+  200 before the ladder
 - **latched operation** — a sub-resource POST that acts
   ON its parent document (flow undo today,
   `LATCHED_OPERATION_ROUTE_PATTERNS`). If-Match pins the

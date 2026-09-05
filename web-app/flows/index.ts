@@ -11,6 +11,7 @@ import {
     loadInto,
 } from '../app/loading-states.ts';
 import { subscribeOnce } from '../app/channels.ts';
+import { handlePageLoadError } from '../app/page-loader.ts';
 import { extractErrorMessage } from '../app/error-helpers.ts';
 import {
     ICON_SIZE,
@@ -109,6 +110,7 @@ export async function init(
             onEmpty: () => {
                 subscribeOnce(
                     subscribeFlowChanges, init,
+                    err => handlePageLoadError('flows', err),
                 );
             },
         },

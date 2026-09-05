@@ -29,7 +29,7 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -88,13 +88,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -790,8 +791,10 @@ Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
 
     const beforeCount = (await db.messagePairs.getAll()).length;
     const body = aiMemberDocumentBody('Resend AI Facet');
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PUT', '/ai-agents/' + aiId, token, body,
+        operationId,
     ));
     assertStrictEquals(first.status, 201);
     const afterFirst = (await db.messagePairs.getAll()).length;
@@ -799,8 +802,9 @@ Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
 
     const second = await handleRequest(db, req(
         'PUT', '/ai-agents/' + aiId, token, body,
+        operationId,
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     const afterSecond = (await db.messagePairs.getAll()).length;
     assertStrictEquals(afterSecond, afterFirst);
     assertStrictEquals(

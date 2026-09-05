@@ -38,7 +38,7 @@ import {
     seedOrganizationDocument as seedOrganizationDocumentMessagePair,
 } from './test-fixtures.ts';
 import {
-    devToken, expiredToken, organizationToken,
+    claimToken, devToken, expiredToken, organizationToken,
 } from './token-fixtures.ts';
 import {
     ANONYMOUS_ID,
@@ -60,12 +60,21 @@ import { nowUtc } from '../api/types.ts';
 import {
     deriveIdentityTokens,
 } from '../api/derive-identity-tokens.ts';
-import { refreshTokenFromSetCookie } from './http-fixtures.ts';
+import {
+    apiRequest,
+    refreshTokenFromSetCookie,
+} from './http-fixtures.ts';
+import { seedIdentityPii } from './identity-fixtures.ts';
+import {
+    postInvitationAcceptance,
+} from '../web-app/app/adapters/invitations.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { deleteRefreshChannel } from
     '../web-app/app/adapters/session-refresh-mutex.ts';
+import { deleteNotificationChannel } from
+    '../web-app/app/adapters/broadcast-channel.ts';
 
 // The single-flight mutex opens ONE refresh channel per
 // process, lazily, and a test process has no unload to
@@ -74,6 +83,7 @@ import { deleteRefreshChannel } from
 // reopens it.
 Deno.test.afterEach(() => {
     deleteRefreshChannel();
+    deleteNotificationChannel();
 });
 
 const ORGANIZATION_A = generateIdentifier();
@@ -462,4 +472,74 @@ Deno.test('recovery leaves the cross-tab active-org preference'
     assertStrictEquals(
         localStorage.getItem(ACTIVE_ORGANIZATION_ID), ORGANIZATION_B,
     );
+}));
+
+// Two recovering contexts race: a reader whose access token
+// is dead (its 401 opens the facade refresh) and an acceptor
+// whose token is live (its remint follows). Both would once
+// present the same refresh jti; the loser was a replay and
+// the chain was revoked. The remint now follows the flight.
+Deno.test('a concurrent facade refresh and remint present'
++ ' one jti each',
+() => withLocalStorageAsync(freshStorage(), async () => {
+    const db = await freshDb();
+    const wayneAdmin = 'toccYYkLEABmlbpHJalgtQ';
+    await seedOrganizationDocumentMessagePair(
+        db, ORGANIZATION_B, ORGANIZATION_B,
+    );
+    await seedSeat(
+        db, ORGANIZATION_B, wayneAdmin, 'admin',
+        '2026-06-04T00:00:00.000000Z',
+    );
+    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
+        name: 'Tony', email: 'demo@example.com',
+        phone: '', bio: '',
+    });
+    const invitationId = generateIdentifier();
+    const granted = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/' + ORGANIZATION_B
+            + '/invitations/',
+        token: await claimToken({
+            sub: wayneAdmin,
+            organization: ORGANIZATION_B,
+            organizations: [ORGANIZATION_B],
+            roles: ['admin:' + ORGANIZATION_B],
+        }),
+        body: {
+            email: 'demo@example.com',
+            invitationId,
+            grantEventId: generateIdentifier(),
+            grantAt: '2026-06-04T00:00:01.000000Z',
+        },
+    }));
+    assertStrictEquals(granted.status, 200);
+    const pair = await issuePair(db);
+    putSessionCredentials({
+        accessToken: pair.access_token,
+        refreshToken: pair.refresh_token,
+    });
+    const deadA = await expiredOrganizationToken(ORGANIZATION_A);
+    putSessionToken(deadA);
+    const reader = createRecoveringRequestContext(db, deadA);
+    const acceptor = createRecoveringRequestContext(
+        db,
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
+        ),
+    );
+    const [members] = await Promise.all([
+        reader.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'members/'),
+        postInvitationAcceptance(
+            acceptor, invitationId, ORGANIZATION_B,
+        ),
+    ]);
+    assert(Array.isArray(members));
+    // Assert on `revoked`, not `rotated`: the loser was a
+    // replay, so the rotation count was already one.
+    const revoked = (await deriveIdentityTokens(db))
+        .filter(row => row.action === 'revoked');
+    assertStrictEquals(revoked.length, 0);
+    assertNotStrictEquals(getSessionCredentials(), null);
 }));

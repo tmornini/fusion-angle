@@ -38,7 +38,6 @@ import {
 } from '../api/message-pair.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 // Destroying a record attribute is RESTRICT, not cascade:
 // while a state_field_values row names it or a live
@@ -91,6 +90,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
         sort_order: 0,
         options: [],
         constraints: [],
+        read_roles: ['member', 'admin'],
+        write_roles: ['member', 'admin'],
     }, DEV_TOKEN);
     return db;
 }
@@ -290,6 +291,8 @@ Deno.test(
             sort_order: 1,
             options: [],
             constraints: [],
+            read_roles: ['member', 'admin'],
+            write_roles: ['member', 'admin'],
         }, DEV_TOKEN);
         const before = await GET<{
             organization_id: string;
@@ -366,7 +369,7 @@ async function seedFieldValueReferrer(
         organization: STARK_ORGANIZATION,
         responseStatus: 204,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postWorkOrderTransitionOp(
         db, WORK_ORDER_ID, body, SYSTEM_MEMBER_ID,

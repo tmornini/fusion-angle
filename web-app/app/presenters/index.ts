@@ -80,9 +80,13 @@ export {
     HumanMemberDetailEditPresenter,
     humanMemberDraftFromMember,
     humanMemberPatchFromDraft,
+    humanMemberCreationFromDraft,
     isHumanMemberFieldKey,
+    seatRemovalOf,
     type HumanMemberDraftFields,
+    type HumanMemberCreationDraft,
     type HumanMemberFieldKey,
+    type SeatRemoval,
 } from './human-member-detail.ts';
 export {
     AIMemberDetailPresenter,

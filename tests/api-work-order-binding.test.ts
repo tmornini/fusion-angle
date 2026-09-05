@@ -24,7 +24,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
@@ -68,6 +68,7 @@ function req(
     token: string,
     body?: unknown,
     extraHeaders?: Record<string, string>,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
@@ -76,7 +77,7 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -556,19 +557,22 @@ async () => {
 });
 
 // 7. re-bind same pair → 201 replay (pair count stable)
-Deno.test('re-bind same pair byte-identically → 201'
+Deno.test('re-bind same pair byte-identically → 200'
 + ' replay (pair count unchanged)',
 async () => {
     const { db, token } = await seededDb();
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
+        undefined, operationId,
     ));
     assertStrictEquals(first.status, 201);
     const before = await messagePairCount(db);
     const second = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
+        undefined, operationId,
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     assertStrictEquals(await messagePairCount(db), before);
 });
 

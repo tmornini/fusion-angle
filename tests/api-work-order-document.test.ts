@@ -27,7 +27,7 @@ import { formWriteMessagePair } from '../api/message-pair.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -172,7 +172,7 @@ Deno.test('postWorkOrderDocumentOp returns the entity and the'
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     const written = await postWorkOrderDocumentOp(
         db, 'yAhMcJGxllmQkLemOQjCmA', body,
@@ -238,7 +238,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 

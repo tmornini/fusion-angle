@@ -6,12 +6,10 @@ import {
     assertThrows,
 } from '@std/assert';
 import {
-    DEFAULT_ATTRIBUTE_ACL_ROLES,
     ValidationError,
 } from '../api/types.ts';
 import {
-    validateAttributeDocumentCreate,
-    validateAttributeDocumentReplace,
+    validateAttributeDocument,
 } from '../api/validators.ts';
 
 // Nested attribute document body fields — no record_id
@@ -29,67 +27,65 @@ function coreFields(
     };
 }
 
-// -- create: ACL optional → stamp defaults -----------------
+// -- both ACL keys are required -------------------------
 
-Deno.test('create omits both ACL keys → stamps'
-+ ' DEFAULT_ATTRIBUTE_ACL_ROLES on both', () => {
-    const out = validateAttributeDocumentCreate(
-        coreFields(),
+Deno.test('omitting both ACL keys is rejected', () => {
+    const err = assertThrows(
+        () => validateAttributeDocument(coreFields()),
+    ) as Error;
+    assertInstanceOf(err, ValidationError);
+    assertStrictEquals(
+        err.message,
+        'missing required key "read_roles"'
+        + ' for AttributeDocumentBody',
     );
-    assertEquals(
-        out.read_roles,
-        [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    );
-    assertEquals(
-        out.write_roles,
-        [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    );
-    assertStrictEquals(out.name, 'Priority');
-    assertStrictEquals(out.attribute_type, 'text');
-    assertStrictEquals(out.sort_order, 1);
-    assertEquals(out.options, []);
-    assertEquals(out.constraints, []);
 });
 
-Deno.test('create accepts read_roles: [] (admins only)',
-() => {
-    const out = validateAttributeDocumentCreate(
-        coreFields({ read_roles: [] }),
+Deno.test('read_roles: [] with write_roles given is'
++ ' admins-only on read', () => {
+    const out = validateAttributeDocument(
+        coreFields({ read_roles: [], write_roles: ['member'] }),
     );
     assertEquals(out.read_roles, []);
-    assertEquals(
-        out.write_roles,
-        [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    );
+    assertEquals(out.write_roles, ['member']);
 });
 
-Deno.test('create rejects read_roles with empty string',
-() => {
+Deno.test('rejects read_roles with an empty string', () => {
     const err = assertThrows(
-        () => validateAttributeDocumentCreate(
-            coreFields({ read_roles: [''] }),
+        () => validateAttributeDocument(
+            coreFields({
+                read_roles: [''],
+                write_roles: ['member'],
+            }),
         ),
     ) as Error;
     assertInstanceOf(err, ValidationError);
     assertMatch(err.message, /non-empty/);
 });
 
-Deno.test('create accepts write_roles without read_roles'
-+ ' (submit-only field)', () => {
-    const out = validateAttributeDocumentCreate(
-        coreFields({ write_roles: ['member'] }),
+Deno.test('write_roles without read_roles is rejected',
+() => {
+    const err = assertThrows(
+        () => validateAttributeDocument(
+            coreFields({ write_roles: ['member'] }),
+        ),
+    ) as Error;
+    assertInstanceOf(err, ValidationError);
+    assertStrictEquals(
+        err.message,
+        'missing required key "read_roles"'
+        + ' for AttributeDocumentBody',
     );
-    assertEquals(
-        out.read_roles,
-        [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    );
-    assertEquals(out.write_roles, ['member']);
 });
 
 Deno.test('create rejects unknown key record_id', () => {
     const err = assertThrows(
-        () => validateAttributeDocumentCreate(
-            coreFields({ record_id: 'rbfHGatkwQzGZJVXKJEeyw' }),
+        () => validateAttributeDocument(
+            coreFields({
+                record_id: 'rbfHGatkwQzGZJVXKJEeyw',
+                read_roles: ['member'],
+                write_roles: ['member'],
+            }),
         ),
     ) as Error;
     assertInstanceOf(err, ValidationError);
@@ -104,7 +100,7 @@ Deno.test('create rejects unknown key record_id', () => {
 
 Deno.test('replace rejects missing write_roles', () => {
     const err = assertThrows(
-        () => validateAttributeDocumentReplace(
+        () => validateAttributeDocument(
             coreFields({
                 read_roles: ['member'],
             }),
@@ -119,7 +115,7 @@ Deno.test('replace rejects missing write_roles', () => {
 });
 
 Deno.test('replace accepts both ACL keys verbatim', () => {
-    const out = validateAttributeDocumentReplace(
+    const out = validateAttributeDocument(
         coreFields({
             read_roles: ['auditor'],
             write_roles: ['admin'],
@@ -134,10 +130,12 @@ Deno.test('replace accepts both ACL keys verbatim', () => {
 
 Deno.test('create rejects select with zero options', () => {
     assertThrows(
-        () => validateAttributeDocumentCreate(
+        () => validateAttributeDocument(
             coreFields({
                 attribute_type: 'select',
                 options: [],
+                read_roles: ['member'],
+                write_roles: ['member'],
             }),
         ),
         ValidationError,
@@ -147,7 +145,7 @@ Deno.test('create rejects select with zero options', () => {
 Deno.test('create rejects constraint that does not'
 + ' apply to attribute_type', () => {
     assertThrows(
-        () => validateAttributeDocumentCreate(
+        () => validateAttributeDocument(
             coreFields({
                 attribute_type: 'number',
                 constraints: [
@@ -156,6 +154,8 @@ Deno.test('create rejects constraint that does not'
                         pattern: '^\\d+$',
                     },
                 ],
+                read_roles: ['member'],
+                write_roles: ['member'],
             }),
         ),
         ValidationError,

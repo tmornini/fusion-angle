@@ -10,7 +10,7 @@ import { requestMessageHash } from '../api/message-form.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -69,7 +69,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 

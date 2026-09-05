@@ -45,16 +45,6 @@ export type HumanMemberDraft =
         bio: string;
     };
 
-function emptyPersonProfile(): HumanProfile {
-    return {
-        present: true,
-        title: '',
-        department: '',
-        strengths: [],
-        team_dimensions: {},
-    };
-}
-
 function sessionOrganization(
     ctx: RequestContext,
 ): string | undefined {
@@ -102,7 +92,7 @@ export function buildHumanMemberMap(
             seat.identity_id,
             new HumanMember(
                 seatedHumanParent(seat.identity_id),
-                emptyPersonProfile(),
+                { present: false },
                 { erased: true },
             ),
         );
@@ -124,7 +114,7 @@ export async function getHumanMemberMap(
                 id,
                 new HumanMember(
                     seatedHumanParent(id),
-                    emptyPersonProfile(),
+                    { present: false },
                     pii,
                 ),
             ] as const;
@@ -245,4 +235,27 @@ export async function postHumanMemberCreation(
         { type: 'member', at: nowUtc() },
     );
     humanMemberChanges.notify();
+}
+
+// The seat's own DELETE — the identity survives; only its
+// place in this organization goes. The API refuses the last
+// admin seat (409); the page mirrors that guard through
+// getAdminSeatIds below rather than discovering it here.
+export async function deleteHumanMemberSeat(
+    ctx: RequestContext,
+    id: MemberId,
+): Promise<void> {
+    await ctx.DELETE(seatsCollection(ctx) + id);
+    humanMemberChanges.notify();
+}
+
+export async function getAdminSeatIds(
+    ctx: RequestContext,
+): Promise<MemberId[]> {
+    const seats = await ctx.GET<MembershipEntity[]>(
+        seatsCollection(ctx),
+    );
+    return seats
+        .filter(seat => seat.type === 'admin')
+        .map(seat => seat.identity_id);
 }

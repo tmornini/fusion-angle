@@ -35,7 +35,7 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
@@ -68,6 +68,7 @@ function req(
     token: string,
     body?: unknown,
     extraHeaders?: Record<string, string>,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
@@ -76,7 +77,7 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -524,7 +525,7 @@ async () => {
         organization: ORGANIZATION,
         responseStatus: 204,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -545,7 +546,7 @@ async () => {
     });
 });
 
-Deno.test('byte-identical PATCH create resend → 201 replay',
+Deno.test('byte-identical PATCH create resend → 200 replay',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -554,8 +555,10 @@ async () => {
     const body = setBody([
         { attribute_id: ATTR_ID, value: 'same' },
     ]);
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
+        undefined, operationId,
     ));
     assertStrictEquals(first.status, 201);
     const originalId = first.headers.get('Response-ID')!;
@@ -563,8 +566,9 @@ async () => {
     const originalBody = await first.json();
     const second = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
+        undefined, operationId,
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     assertStrictEquals(
         second.headers.get('Response-ID'),
         originalId,
@@ -664,4 +668,42 @@ async () => {
         atAddress.length, 2,
         'winner writes wire PATCH + inner PUT',
     );
+});
+
+// The measured 403: an admin's keyless nested create stored
+// no role keys, attributeSchemaOf read [] for both, and a
+// member's value write was forbidden. The gate now refuses
+// the keyless create; a keyed one lets the member write.
+Deno.test('an admin keyless nested attribute create is 400',
+async () => {
+    const { db, adminToken } = await adminDb();
+    await putLiveType(db, adminToken);
+    const put = await handleRequest(db, req(
+        'PUT', ATTRS + ATTR_ID, adminToken, {
+            name: 'Title',
+            attribute_type: 'text',
+            sort_order: 0,
+            options: [],
+            constraints: [],
+        },
+    ));
+    assertStrictEquals(put.status, 400);
+    assertEquals(await put.json(), {
+        error: 'missing required key "read_roles"'
+            + ' for AttributeDocumentBody',
+    });
+});
+
+Deno.test('a keyed nested create lets a member write its'
++ ' value',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
+    const res = await handleRequest(db, req(
+        'PATCH', INSTANCE_DETAIL, memberToken,
+        setBody([{ attribute_id: ATTR_ID, value: 'Hello' }]),
+    ));
+    assertStrictEquals(res.status, 201);
 });

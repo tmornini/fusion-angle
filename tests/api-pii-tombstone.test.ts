@@ -12,7 +12,7 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID, storedPutBodyText,
+    apiRequest, storedPutBodyText,
 } from './http-fixtures.ts';
 import {
     deriveIdentityPii,
@@ -43,13 +43,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -215,9 +216,10 @@ Deno.test('a byte-identical resend against the LIVE slot replays'
 + ' the stored response and appends nothing', async () => {
     const db = await freshDb();
     const id = 'uKYubOSYwiunzyPztWBtkw';
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
-        humanPii('Dana'),
+        humanPii('Dana'), operationId,
     ));
     assertStrictEquals(first.status, 201);
     const firstId = first.headers.get('Response-ID');
@@ -225,9 +227,9 @@ Deno.test('a byte-identical resend against the LIVE slot replays'
         .length;
     const resend = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
-        humanPii('Dana'),
+        humanPii('Dana'), operationId,
     ));
-    assertStrictEquals(resend.status, 201);
+    assertStrictEquals(resend.status, 200);
     assertStrictEquals(resend.headers.get('Response-ID'), firstId);
     assertStrictEquals(
         (await db.messagePairs.getAll()).length,
@@ -239,9 +241,10 @@ Deno.test('a byte-identical resend AFTER supersession replays'
 + ' the stored first pair and appends nothing', async () => {
     const db = await freshDb();
     const id = 'uLUQPJnlVuzeGqXLYqCItA';
+    const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
-        humanPii('Erin'),
+        humanPii('Erin'), operationId,
     ));
     assertStrictEquals(first.status, 201);
     const firstId = first.headers.get('Response-ID');
@@ -255,9 +258,9 @@ Deno.test('a byte-identical resend AFTER supersession replays'
         .length;
     const resend = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
-        humanPii('Erin'),
+        humanPii('Erin'), operationId,
     ));
-    assertStrictEquals(resend.status, 201);
+    assertStrictEquals(resend.status, 200);
     assertStrictEquals(resend.headers.get('Response-ID'), firstId);
     assertStrictEquals(
         (await db.messagePairs.getAll()).length,

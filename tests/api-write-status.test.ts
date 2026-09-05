@@ -1,4 +1,4 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import { assert, assertMatch, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -7,13 +7,16 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
 import { messageStore } from '../api/message-store.ts';
 import { strongEtagOf } from '../api/message-pair.ts';
-import { isIdentifier } from '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
 
 const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const MEMBERSHIP_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/';
@@ -49,6 +52,7 @@ function req(
     token: string,
     body?: unknown,
     headers?: Readonly<Record<string, string>>,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
@@ -57,7 +61,7 @@ function req(
         body,
         ...(headers !== undefined
             ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -112,15 +116,17 @@ Deno.test('first PUT is 201 and stores a 200 start-line',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const operationId = generateIdentifier();
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'yNqCXXgKLCqDESGScIzYrQ', token,
         ideaDocument('First', 'ev-ws-1'),
+        undefined, operationId,
     ));
     assertStrictEquals(res.status, 201);
     assertStrictEquals(
         res.headers.get('Operation-ID'),
-        TEST_OPERATION_ID,
+        operationId,
     );
     const stored = await storedResponseAt(
         db, IDEA_PREFIX, 'yNqCXXgKLCqDESGScIzYrQ',
@@ -183,7 +189,7 @@ async () => {
                 'Content-Type': 'application/json',
                 Authorization: 'Bearer ' + token,
                 'Idempotency-Key': 'k-ws-same',
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
             body: JSON.stringify(body),
         }),
@@ -196,15 +202,17 @@ async () => {
     );
 });
 
-Deno.test('exact retry returns the original 201',
+Deno.test('exact retry returns the original as 200',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const body = ideaDocument('Retry', 'ev-ws-retry');
+    const operationId = generateIdentifier();
     const first = await handleRequest(
         db, req('PUT'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'yggAqfvrChBmrMfrOilSUg', token, body),
+            + 'yggAqfvrChBmrMfrOilSUg', token, body,
+            undefined, operationId),
     );
     assertStrictEquals(first.status, 201);
     const firstId = first.headers.get('Response-ID');
@@ -213,9 +221,10 @@ async () => {
     const second = await handleRequest(
         db, req('PUT'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'yggAqfvrChBmrMfrOilSUg', token, body),
+            + 'yggAqfvrChBmrMfrOilSUg', token, body,
+            undefined, operationId),
     );
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     assertStrictEquals(
         second.headers.get('Operation-ID'), firstOp,
     );
@@ -293,7 +302,7 @@ async () => {
                 headers: {
                     Authorization: 'Bearer ' + token,
                     'Idempotency-Key': 'k-ws-del-gone',
-                    'operation-id': TEST_OPERATION_ID,
+                    'operation-id': generateIdentifier(),
                 },
             },
         ),
@@ -338,7 +347,7 @@ async () => {
             method: 'PUT',
             headers: {
                 Authorization: 'Bearer ' + token,
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
         }),
     );
@@ -360,4 +369,20 @@ async () => {
         IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
     );
     assert(live !== undefined, 'empty PUT must live');
+});
+
+// Memory serializes all ops, so the TOCTOU is
+// unreachable here; the pin is the comparison.
+Deno.test('the post-tx PUT answers 200 when the stored pair '
++ 'is not ours',
+() => {
+    const src = Deno.readTextFileSync('api/api.ts');
+    assertMatch(
+        src,
+        new RegExp(
+            'const response = sendWriteResponse\\('
+            + '\\s*stored, \'PUT\','
+            + '\\s*stored\\.id === messagePair\\.id,?\\s*\\)',
+        ),
+    );
 });
