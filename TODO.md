@@ -309,9 +309,6 @@ skew tests folded into item 7.
 
 Off the critical path; each with its oracle.
 
-- Mock seed's fixed 2026-06-15 anchor — after
-  2026-09-13 serial-mode FS3 carries in-flight heat
-  only
 - An inner pair of a composed operation skipped while
   the top-level pair landed still answers 201:
   `appendMessagePair` returns void and the gate never
@@ -504,9 +501,8 @@ Off the critical path; each with its oracle.
   Node"; `tests/drift-states.test.ts` says derive-states
   is unread in production while `api/routes.ts` imports
   it; `api/routes.ts` claims revival dual-write after
-  the states row half is stripped; `api/mock-data/seed-kit.ts`
-  cites `tests/mock-data-fingerprint.test.ts`, which is
-  gone. The run-four remediation's Evidence
+  the states row half is stripped. The run-four
+  remediation's Evidence
   (`docs/superpowers/specs/`
   `2026-08-23-test-plan-run-four-remediation-design.md:911-932`)
   lists provenance, not comments, and the reproductions
@@ -1364,8 +1360,6 @@ Off the critical path; each with its oracle.
   line in one commit
 - Item 6 precedes routing the roster through the
   profile
-- The mock-seed anchor bullet activates after
-  2026-09-13
 - `api/derive-states.ts:811-823` (claim-expiry as its
   own event) lands before any multi-process deployment
   — item 12's first commit, or item 11's if the worker
