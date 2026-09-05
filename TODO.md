@@ -317,16 +317,11 @@ Off the critical path; each with its oracle.
   `appendMessagePair` returns void and the gate never
   holds inner hashes (`api/message-pair.ts:686-701`)
 - A panel rename whose target is deleted during the
-  800 ms debounce still saves and still clears redo.
-  `withNodeNamed`, `withNodeTaskInstructions`, and
-  `withEdgeNamed` fire `#queueSave` and `#noteMutation`
-  unconditionally, so an `applyUpdateNode` that matches
-  nothing still ships a phantom idempotent PUT and a
-  spurious redo clear — a disclosed trade-off, not a
-  regression. Oracle:
-  `web-app/app/presenters/flow-designer.ts:808-885`;
-  the debounced schedules are
-  `web-app/flows/detail.ts:1349-1391`
+  800 ms debounce still advances history: the presenter
+  now hands back its held snapshot on a miss, but the
+  page's three debounced schedules still `commit()` it,
+  and `commit()` records a mutation. Oracle:
+  `web-app/flows/detail.ts:1375-1418`, `:235-237`
 - `mustFind` throws `gesture frame target missing:
   .flow-marquee` when a selecting-gesture rAF paints an
   SVG rebuilt without the rect. `renderMarqueeFrame`

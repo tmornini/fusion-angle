@@ -805,11 +805,29 @@ Auto Fit</label>
         return next;
     }
 
+    // A target deleted during the debounce is a miss: the
+    // snapshot the presenter holds, no save, no history
+    // note — the same idiom as the locked guard.
+    #hasNode(nodeId: string): boolean {
+        return this.#snapshot.nodes.some(
+            n => n.id === nodeId,
+        );
+    }
+
+    #hasEdge(edgeId: string): boolean {
+        return this.#snapshot.edges.some(
+            e => e.id === edgeId,
+        );
+    }
+
     withNodeNamed(
         nodeId: string,
         name: string,
     ): FlowSnapshot {
         if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
+        if (!this.#hasNode(nodeId)) {
             return this.#snapshot;
         }
         const next: FlowSnapshot = {
@@ -830,6 +848,9 @@ Auto Fit</label>
         text: string,
     ): FlowSnapshot {
         if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
+        if (!this.#hasNode(nodeId)) {
             return this.#snapshot;
         }
         const next: FlowSnapshot = {
@@ -872,6 +893,9 @@ Auto Fit</label>
         name: string,
     ): FlowSnapshot {
         if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
+        if (!this.#hasEdge(edgeId)) {
             return this.#snapshot;
         }
         const next: FlowSnapshot = {
