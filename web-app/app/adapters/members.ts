@@ -45,16 +45,6 @@ export type HumanMemberDraft =
         bio: string;
     };
 
-function emptyPersonProfile(): HumanProfile {
-    return {
-        present: true,
-        title: '',
-        department: '',
-        strengths: [],
-        team_dimensions: {},
-    };
-}
-
 function sessionOrganization(
     ctx: RequestContext,
 ): string | undefined {
@@ -102,7 +92,7 @@ export function buildHumanMemberMap(
             seat.identity_id,
             new HumanMember(
                 seatedHumanParent(seat.identity_id),
-                emptyPersonProfile(),
+                { present: false },
                 { erased: true },
             ),
         );
@@ -124,7 +114,7 @@ export async function getHumanMemberMap(
                 id,
                 new HumanMember(
                     seatedHumanParent(id),
-                    emptyPersonProfile(),
+                    { present: false },
                     pii,
                 ),
             ] as const;

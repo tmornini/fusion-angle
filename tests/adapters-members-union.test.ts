@@ -377,3 +377,27 @@ Deno.test(
         assert(filled.some(isHumanMember));
     }),
 );
+
+// A seat whose identity document carries no profile is an
+// absent profile — never a present one full of empty
+// strings. The roster fill (fillHumanMemberProfile) is what
+// turns absence into a read; before it, the row says so.
+Deno.test(
+    'a seat whose identity has no profile reads as absent',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const { db, ctx } = await adminContext();
+        const id = generateIdentifier();
+        await ctx.PUT('identities/' + id, { kind: 'person' });
+        const { seedSeat } = await import(
+            './root-admin-fixture.ts'
+        );
+        await seedSeat(
+            db, 'AjdvjuECVZEgZoFajaIEkg', id, 'member',
+        );
+        const row = (await getMembers(ctx)).find(
+            m => m.idForLink() === id,
+        );
+        assert(row !== undefined && isHumanMember(row));
+        assertStrictEquals(row.profile().present, false);
+    }),
+);
