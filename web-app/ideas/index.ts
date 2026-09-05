@@ -9,6 +9,7 @@ import {
     loadInto,
 } from '../app/loading-states.ts';
 import { subscribeOnce } from '../app/channels.ts';
+import { handlePageLoadError } from '../app/page-loader.ts';
 import {
     ICON_SIZE,
     iconPlus, iconLightbulb,
@@ -67,6 +68,7 @@ export async function init(): Promise<void> {
                 )?.classList.add('hidden');
                 subscribeOnce(
                     subscribeIdeaChanges, init,
+                    err => handlePageLoadError('ideas', err),
                 );
             },
         },

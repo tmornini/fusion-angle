@@ -345,14 +345,6 @@ Off the critical path; each with its oracle.
   `web-app/flows/detail.ts`, and Billing's `init()` is
   empty. TEST-PLAN.md G42's Billing console observation
   is not a Billing listener
-- A re-init failure degrades weaker than a first-boot one:
-  `subscribeOnce`'s `void fn()` lets the rejection reach the
-  global `unhandledrejection` handler, which logs and
-  toasts — but first boot gets `handlePageLoadError`'s full
-  error state with a Try Again button. Toast-only, no retry
-  — `web-app/app/channels.ts:152`,
-  `web-app/app/page-loader.ts:41-75`,
-  `web-app/app/error-helpers.ts:41-57`
 - `subscribeOnce`'s `const unsubscribe = subscribe(...)`
   would throw a TDZ ReferenceError if any `subscribe` fired
   its callback synchronously; all thirteen

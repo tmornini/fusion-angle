@@ -142,13 +142,19 @@ export function createSubscriptionChannel(
 // re-runs init — which either wires the steady state
 // (data now) or re-renders empty and re-arms. Teardown
 // precedes fn, so the steady-state subscription fn
-// wires never coexists with the one-shot.
+// wires never coexists with the one-shot. fn runs
+// synchronously inside the bell; a throw or a rejection
+// reaches onError — the caller decides what a failed
+// re-init looks like, never the global handler's toast.
 export function subscribeOnce(
     subscribe: (fn: () => void) => () => void,
     fn: () => void | Promise<void>,
+    onError: (err: unknown) => void,
 ): void {
     const unsubscribe = subscribe(() => {
         unsubscribe();
-        void fn();
+        new Promise<void>((resolve) => {
+            resolve(fn());
+        }).catch(onError);
     });
 }

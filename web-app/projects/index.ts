@@ -7,6 +7,7 @@ import {
     loadInto,
 } from '../app/loading-states.ts';
 import { subscribeOnce } from '../app/channels.ts';
+import { handlePageLoadError } from '../app/page-loader.ts';
 import { ICON_SIZE, iconFolderKanban } from '../app/icons.ts';
 import { navigateTo } from '../app/navigation.ts';
 import {
@@ -91,6 +92,7 @@ export async function init(): Promise<void> {
             onEmpty: () => {
                 subscribeOnce(
                     subscribeProjectChanges, init,
+                    err => handlePageLoadError('projects', err),
                 );
             },
         },
