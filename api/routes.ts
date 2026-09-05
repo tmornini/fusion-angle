@@ -5717,15 +5717,43 @@ export const routes: Route[] = [
             postMembershipDocumentOp(
                 db, param(p, 1), body, actor, messagePair,
             ),
-        delete: (db, _p, _actor, messagePair) => {
-            return db.transaction(
+        // The last admin seat cannot be removed: the actor
+        // is authorized, the organization's state forbids.
+        // The admin seats are derived INSIDE the transaction
+        // — a row op. The refusal is thrown after it, the
+        // invitations-domain shape.
+        delete: async (
+            db, p, _actor, messagePair, organization,
+        ) => {
+            const fenced = requireOrganization(organization);
+            const identityId = param(p, 1);
+            let lastAdmin = false;
+            await db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {
+                    const admins = (
+                        await deriveOrganizationMemberSeats(
+                            view, fenced,
+                        )
+                    ).filter(seat => seat.type === 'admin');
+                    if (
+                        admins.length === 1
+                        && admins[0]!.identity_id === identityId
+                    ) {
+                        lastAdmin = true;
+                        return;
+                    }
                     if (messagePair !== undefined) {
                         await appendMessagePair(view, messagePair);
                     }
                 },
             );
+            if (lastAdmin) {
+                throw new ApiError(
+                    'the last admin seat cannot be removed',
+                    HTTP_CONFLICT,
+                );
+            }
         },
     }),
     route(

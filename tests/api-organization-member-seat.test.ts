@@ -303,3 +303,56 @@ async () => {
         undefined,
     );
 });
+
+// Decision 7: the last admin seat cannot be removed. The
+// actor is authorized; the organization's state forbids —
+// 409, the domain conflict, never the wrong-actor 403.
+Deno.test('the last admin seat refuses removal', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const admin = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
+    const path = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+        + 'XXZruirZyAOoRpNxaDnpSA';
+    const refused = await handleRequest(db, req(
+        'DELETE', path, admin,
+    ));
+    assertStrictEquals(refused.status, 409);
+    assertEquals(await refused.json(), {
+        error: 'the last admin seat cannot be removed',
+    });
+    const still = await handleRequest(db, req(
+        'GET', path, admin,
+    ));
+    assertStrictEquals(still.status, 200);
+});
+
+Deno.test('an admin seat beside another admin is removable,'
++ ' the actor\'s own included',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const second = generateIdentifier();
+    await seedSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', second, 'admin', AT,
+    );
+    const admin = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
+    const own = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+        + 'XXZruirZyAOoRpNxaDnpSA';
+    const removed = await handleRequest(db, req(
+        'DELETE', own, admin,
+    ));
+    assertStrictEquals(removed.status, 204);
+    const gone = await handleRequest(db, req(
+        'GET', own, admin,
+    ));
+    assertStrictEquals(gone.status, 404);
+    // The seat that remains is now the last admin.
+    const last = await handleRequest(db, req(
+        'DELETE',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/members/' + second,
+        admin,
+    ));
+    assertStrictEquals(last.status, 409);
+});
