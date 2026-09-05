@@ -316,19 +316,6 @@ Off the critical path; each with its oracle.
   the top-level pair landed still answers 201:
   `appendMessagePair` returns void and the gate never
   holds inner hashes (`api/message-pair.ts:686-701`)
-- `mustFind` throws `gesture frame target missing:
-  .flow-marquee` when a selecting-gesture rAF paints an
-  SVG rebuilt without the rect. `renderMarqueeFrame`
-  (`web-app/app/flow-gesture-render.ts`) looks up
-  `.flow-marquee`; `buildGraphSvg` emits that rect only
-  while `marqueeRect` is set. Mid-gesture rAF skips
-  commit, so a resize `update()` rebuilds from the idle
-  snapshot and omits the rect while `bindInteractions`
-  still holds selecting state. Not global:
-  `bindInteractions` is called only from
-  `web-app/flows/detail.ts`, and Billing's `init()` is
-  empty. TEST-PLAN.md G42's Billing console observation
-  is not a Billing listener
 - The run-four remediation's remaining seams — R6 and
   R7, whose "toy" clauses need a Layer 3 observation
   before any rewrite. G9's staleness was the corrupted

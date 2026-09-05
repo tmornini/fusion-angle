@@ -382,6 +382,8 @@ function buildDefs(): string {
         + '</defs>';
 }
 
+const IDLE_MARQUEE_RECT = { x: 0, y: 0, w: 0, h: 0 };
+
 function buildGrid(
     vbX: number,
     vbY: number,
@@ -1366,16 +1368,21 @@ export function buildGraphSvg(
         svgCls += ' flow-canvas-locked';
     }
 
-    let marqueeMarkup = '';
-    if (marqueeRect) {
-        marqueeMarkup = '<rect'
-            + ` x="${marqueeRect.x}"`
-            + ` y="${marqueeRect.y}"`
-            + ` width="${marqueeRect.w}"`
-            + ` height="${marqueeRect.h}"`
-            + ' aria-hidden="true"'
-            + ' class="flow-marquee"/>';
-    }
+    // Always in the markup, zero-sized when idle, so a
+    // gesture frame landing on a rebuild from the idle
+    // snapshot finds its target (flow-gesture-render.ts
+    // mustFind) — the same unconditional presence as the
+    // grid and the connect-preview layer.
+    const marquee = marqueeRect === null
+        ? IDLE_MARQUEE_RECT
+        : marqueeRect;
+    const marqueeMarkup = '<rect'
+        + ` x="${marquee.x}"`
+        + ` y="${marquee.y}"`
+        + ` width="${marquee.w}"`
+        + ` height="${marquee.h}"`
+        + ' aria-hidden="true"'
+        + ' class="flow-marquee"/>';
 
     const stateLabel =
         nodes.length === 1
