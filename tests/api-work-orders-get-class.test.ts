@@ -15,8 +15,9 @@ import {
     nowUtc,
 } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
-    storedPutBodyText, storedCollectionText,
+    apiRequest,
+    storedPutBodyText,
+    storedCollectionText,
 } from './http-fixtures.ts';
 
 // GET work-orders (inbox), GET organizations/:id/work-orders/:id, and
@@ -61,7 +62,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 

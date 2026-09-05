@@ -6,7 +6,8 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const BASE = 'http://localhost';
 
@@ -31,7 +32,7 @@ async function deleteMembership(
             headers: {
                 'Authorization': 'Bearer '
                     + await organizationToken(),
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
         }));
     assertStrictEquals(res.status, 204);
@@ -47,7 +48,7 @@ function putDefaultOrganization(
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token,
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
             body: JSON.stringify({
                 organization_id: organization,

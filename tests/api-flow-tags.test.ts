@@ -18,7 +18,7 @@ import {
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 
 // Flow tags: the codebase's FIRST message-plane-ONLY document
@@ -44,7 +44,6 @@ function req(
         token,
         body,
         ...(headers !== undefined ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
     });
 }
 

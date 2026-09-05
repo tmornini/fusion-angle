@@ -23,7 +23,6 @@ import { captureConsole } from './fixtures/console-capture.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -220,7 +219,7 @@ Deno.test(
                         'Authorization':
                             'Bearer ' + DEV_TOKEN,
                         'operation-id':
-                            TEST_OPERATION_ID,
+                            generateIdentifier(),
                     },
                     body: '{not valid json',
                 },
@@ -253,7 +252,7 @@ Deno.test(
                         'Authorization':
                             'Bearer ' + DEV_TOKEN,
                         'Operation-ID':
-                            TEST_OPERATION_ID,
+                            generateIdentifier(),
                     },
                     body: '{not valid json',
                 },
@@ -344,7 +343,7 @@ Deno.test(
                             'Authorization':
                                 'Bearer ' + DEV_TOKEN,
                             'operation-id':
-                                TEST_OPERATION_ID,
+                                generateIdentifier(),
                         },
                         body: raw,
                     },

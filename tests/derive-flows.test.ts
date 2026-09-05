@@ -10,7 +10,7 @@ import {
 } from '../api/derive-flows.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -44,7 +44,6 @@ function req(
         body,
         ...(headers !== undefined
             ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
     });
 }
 

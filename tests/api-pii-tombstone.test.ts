@@ -12,7 +12,7 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID, storedPutBodyText,
+    apiRequest, storedPutBodyText,
 } from './http-fixtures.ts';
 import {
     deriveIdentityPii,
@@ -50,7 +50,7 @@ function req(
         path,
         token,
         body,
-        operationId: operationId ?? TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 

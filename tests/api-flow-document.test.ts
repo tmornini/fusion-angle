@@ -36,7 +36,7 @@ import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
-    apiRequest, TEST_OPERATION_ID, storedPutBodyText,
+    apiRequest, storedPutBodyText,
 } from './http-fixtures.ts';
 import { messageStore } from '../api/message-store.ts';
 
@@ -63,7 +63,7 @@ function req(
         token,
         body,
         ...(headers !== undefined ? { headers } : {}),
-        operationId: operationId ?? TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 

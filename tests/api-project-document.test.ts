@@ -13,7 +13,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { HttpMessage } from
@@ -51,7 +51,7 @@ function req(
         path,
         token,
         body,
-        operationId: operationId ?? TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 

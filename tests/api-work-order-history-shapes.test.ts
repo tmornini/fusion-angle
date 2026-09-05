@@ -28,7 +28,7 @@ import {
     deriveStateFieldValueReferrers,
 } from '../api/derive-state-field-values.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 
 // Task 3: history fold speaks BOTH transition shapes
@@ -59,7 +59,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -183,7 +182,7 @@ async function appendTransitionPair(
         organization,
         responseStatus: 204,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,

@@ -3,7 +3,7 @@ import { handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import {
     seedAdminSchema,
@@ -30,7 +30,7 @@ function req(
         path,
         token,
         body,
-        operationId: operationId ?? TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 

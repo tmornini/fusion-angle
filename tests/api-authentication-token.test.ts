@@ -44,7 +44,6 @@ import {
     seedIdentityCredential,
     seedPersonIdentity,
 } from './identity-fixtures.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
@@ -911,7 +910,7 @@ async () => {
         organization: undefined,
         responseStatus: 200,
         responseBody: { exp: now - 60 },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await putMessagePair(db, ticket);
     const assertion = await signer.sign({

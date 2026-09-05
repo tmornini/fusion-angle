@@ -33,7 +33,7 @@ import {
     documentFamilyWiring,
 } from '../api/document-family.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -62,7 +62,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -320,7 +319,7 @@ async () => {
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     // Phase Final Task 2: members ROW half stripped —
     // op returns the reconstructed entity; only pairs land.
@@ -353,7 +352,7 @@ async () => {
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     const written = await postAiMemberDocumentOp(
         db, 'VLoTvOKjXoNVDjLLBotQXA', body,
@@ -382,7 +381,7 @@ Deno.test('postHumanMemberDocumentOp writes exactly the pair and'
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     const written = await postHumanMemberDocumentOp(
         db, 'fVrMeaOxbnDcSKMPwtIEZg', body,

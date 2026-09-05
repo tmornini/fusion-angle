@@ -31,7 +31,7 @@ import {
 } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID, storedPutBodyText,
+    apiRequest, storedPutBodyText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -117,7 +117,6 @@ async () => {
         path: '/identities/XXZruirZyAOoRpNxaDnpSA/providers/' + id,
         token: DEV_TOKEN,
         body: goodRow,
-        operationId: TEST_OPERATION_ID,
     }));
     assertStrictEquals(put.status, 201);
     const stored = JSON.parse(
@@ -156,14 +155,12 @@ async () => {
         path: '/identities/XXZruirZyAOoRpNxaDnpSA/providers/' + id,
         token: DEV_TOKEN,
         body: withoutIdentity,
-        operationId: TEST_OPERATION_ID,
     }));
     assert(put.status === 200 || put.status === 201);
     const list = await handleRequest(db, apiRequest({
         method: 'GET',
         path: '/identities/XXZruirZyAOoRpNxaDnpSA/providers/',
         token: DEV_TOKEN,
-        operationId: TEST_OPERATION_ID,
     }));
     assertStrictEquals(list.status, 200);
     const rows = await list.json() as readonly {
@@ -177,7 +174,6 @@ async () => {
         method: 'GET',
         path: '/identities/XXZruirZyAOoRpNxaDnpSA/providers/' + id,
         token: DEV_TOKEN,
-        operationId: TEST_OPERATION_ID,
     }));
     assertStrictEquals(leaf.status, 200);
     const one = await leaf.json() as {
@@ -199,7 +195,6 @@ async () => {
             ...goodRow,
             identity_id: generateIdentifier(),
         },
-        operationId: TEST_OPERATION_ID,
     }));
     assertStrictEquals(res.status, 400);
 });
@@ -228,7 +223,7 @@ async () => {
             method: 'PUT',
             body,
         }),
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -273,7 +268,7 @@ async () => {
             method: 'PUT',
             body: flatBody,
         }),
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,

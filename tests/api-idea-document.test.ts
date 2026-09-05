@@ -18,7 +18,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { HttpMessage } from
@@ -58,7 +58,7 @@ function req(
         path,
         token,
         body,
-        operationId: operationId ?? TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -198,7 +198,7 @@ async () => {
                 'Content-Type': 'application/json',
                 Authorization: 'Bearer ' + token,
                 'Idempotency-Key': 'k-same-1',
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
             body: JSON.stringify(body),
         }),

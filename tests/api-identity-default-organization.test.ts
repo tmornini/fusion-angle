@@ -10,7 +10,6 @@ import { pathSegmentsOf } from
     '../api/path-segments.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -58,7 +57,7 @@ function putDefaultOrganization(
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token,
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
             body: JSON.stringify({
                 organization_id: organization,
@@ -166,7 +165,7 @@ Deno.test('PUT without organization_id returns 400', async () => {
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer ' + token,
-                    'operation-id': TEST_OPERATION_ID,
+                    'operation-id': generateIdentifier(),
                 },
                 body: JSON.stringify({}),
             },
@@ -191,7 +190,7 @@ async () => {
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer ' + token,
-                    'operation-id': TEST_OPERATION_ID,
+                    'operation-id': generateIdentifier(),
                 },
                 body: JSON.stringify({
                     organization_id: 'BBjWJsjYIDkTRKIIPrzWRw',
@@ -212,7 +211,7 @@ async () => {
                             'XXZruirZyAOoRpNxaDnpSA'
                                 , 'BBjWJsjYIDkTRKIIPrzWRw',
                         ),
-                    'operation-id': TEST_OPERATION_ID,
+                    'operation-id': generateIdentifier(),
                 },
             },
         ),

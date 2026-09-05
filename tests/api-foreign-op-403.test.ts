@@ -14,7 +14,7 @@ import {
     generateIdentifier,
 } from '../shared/identifier.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
@@ -39,7 +39,6 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: TEST_OPERATION_ID,
     });
 }
 

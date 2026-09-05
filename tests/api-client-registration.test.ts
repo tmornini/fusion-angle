@@ -19,7 +19,7 @@ import {
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID, storedPutBodyText,
+    apiRequest, storedPutBodyText,
 } from './http-fixtures.ts';
 import {
     deriveClientRegistration,
@@ -198,7 +198,6 @@ async () => {
         path: '/identities/' + id + '/registration',
         token: DEV_TOKEN,
         body: { ...REGISTRATION },
-        operationId: TEST_OPERATION_ID,
     }));
     assertStrictEquals(put.status, 201);
     const stored = JSON.parse(
@@ -222,7 +221,6 @@ async () => {
         method: 'GET',
         path: '/identities/' + id + '/registration',
         token: DEV_TOKEN,
-        operationId: TEST_OPERATION_ID,
     }));
     assertStrictEquals(got.status, 200);
     assertEquals(stored, await got.json());

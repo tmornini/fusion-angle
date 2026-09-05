@@ -22,7 +22,7 @@ import {
 } from '../api/derive-ideas.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
     storedPutBodyText,
     storedCollectionText,
 } from './http-fixtures.ts';
@@ -70,7 +70,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 

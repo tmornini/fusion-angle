@@ -55,7 +55,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { ApiError, HTTP_PRECONDITION_FAILED } from
     '../api/http-errors.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -87,7 +87,6 @@ function req(
         body,
         ...(headers !== undefined
             ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -206,6 +205,7 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
         state: 'active',
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
+    const operationId = generateIdentifier();
     const messagePair = await formWriteMessagePair({
         method: 'PUT'
             , pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -216,12 +216,12 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
         headerFields: [], body, requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId,
     });
     const written = await route.put!(
         db, ['AjdvjuECVZEgZoFajaIEkg', 'gZsGVjTnvrgHQLzbKnQckg'], body
             , 'XXZruirZyAOoRpNxaDnpSA', messagePair,
-        'AjdvjuECVZEgZoFajaIEkg', [], AT, TEST_OPERATION_ID,
+        'AjdvjuECVZEgZoFajaIEkg', [], AT, operationId,
     );
     assertStrictEquals(
         (written as { title: string }).title, 'Generic',
@@ -684,7 +684,7 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
         organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -707,7 +707,7 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
         responseBody: undefined,
         latchedHeadMessagePairId: genesis.id,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     const writerB = await formWriteMessagePair({
         method: 'PUT', pathname: '/' + TEST_PATTERN,
@@ -719,7 +719,7 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
         responseBody: undefined,
         latchedHeadMessagePairId: genesis.id,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await testDocumentOp(
         db, 'race', { v: 'a' }, 'XXZruirZyAOoRpNxaDnpSA', writerA,
@@ -863,7 +863,7 @@ async function putStatelessDocumentMessagePair(
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200,
         responseBody: { id, ...body },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -885,7 +885,7 @@ async function deleteStatelessDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,

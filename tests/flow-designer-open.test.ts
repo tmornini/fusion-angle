@@ -39,7 +39,7 @@ import {
 } from
     '../web-app/app/presenters/flow-designer.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { wrapInPageAdapter } from
     './in-page-facade.ts';
@@ -79,7 +79,6 @@ function req(
         body,
         ...(headers !== undefined
             ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
     });
 }
 

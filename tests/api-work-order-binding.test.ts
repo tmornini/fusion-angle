@@ -24,7 +24,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
@@ -77,7 +77,7 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: operationId ?? TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 

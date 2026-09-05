@@ -14,7 +14,8 @@ import {
     formWriteMessagePair,
     type MessagePair,
 } from '../api/message-pair.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Below-facade pair formation for the seeded writes below
 // (Phase 10 Task 8's fixture budget, finding 18) — the SAME
@@ -56,7 +57,7 @@ async function identityDocumentMessagePair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, undefined,
         ),
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
 }
 
@@ -87,7 +88,7 @@ async function identityPiiDocumentMessagePair(
         responseBody: spec.successBody?.(
             [id], pii, SYSTEM_MEMBER_ID, undefined,
         ),
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
 }
 
@@ -122,7 +123,7 @@ async function identityCredentialDocumentMessagePair(
         responseBody: spec.successBody?.(
             [id, cid], fields, SYSTEM_MEMBER_ID, undefined,
         ),
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
 }
 
@@ -161,7 +162,7 @@ async function identityProviderDocumentMessagePair(
             [identityId, id], body, SYSTEM_MEMBER_ID,
             undefined,
         ),
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
 }
 
@@ -281,7 +282,7 @@ async function clientRegistrationDocumentMessagePair(
         responseBody: spec.successBody?.(
             [id], fields, SYSTEM_MEMBER_ID, undefined,
         ),
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
 }
 
@@ -321,7 +322,7 @@ export async function seedClientRegistrationTombstone(
         organization: undefined,
         responseStatus: 204,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,

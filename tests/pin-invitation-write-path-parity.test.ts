@@ -11,7 +11,7 @@ import { ORGANIZATION_TWO } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -60,13 +60,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -341,6 +342,7 @@ Deno.test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
     ));
     assertStrictEquals(grant.status, 200);
 
+    const operationId = generateIdentifier();
     const accept = await handleRequest(db, req(
         'PUT',
         '/identities/' + inviteeId
@@ -351,6 +353,7 @@ Deno.test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
             eventId: INV_PARITY_MEMBERSHIP_EXISTS_ACCEPT,
             at: '2026-06-04T00:00:01.000000Z',
         },
+        operationId,
     ));
     assertStrictEquals(accept.status, 204);
 
@@ -368,7 +371,7 @@ Deno.test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
     );
     assertStrictEquals(
         seatRows.some((row) => row.uri_id === inviteeId
-            && row.operation_id === TEST_OPERATION_ID),
+            && row.operation_id === operationId),
         true,
     );
 });

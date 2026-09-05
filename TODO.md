@@ -365,19 +365,6 @@ Off the critical path; each with its oracle.
   `invitations/index.html` at next boot (TEST-PLAN
   B25–B29 driven live); restores B28's original
   "restore the deleted membership row" branch
-- A shared test operation id can produce false greens.
-  `tests/http-fixtures.ts:12` exports one hardcoded
-  `TEST_OPERATION_ID`; 126 test files use it, 101
-  through a local `req()` helper that pins it.
-  `apiRequest` already mints a fresh identifier when
-  `operationId` is omitted; the helpers still pass the
-  shared id. Because `appendMessagePair` dedupes on
-  `request_hash`, a test issuing two byte-identical
-  requests has the second silently dropped — which
-  made a security test in the run-four remediation
-  pass against unfixed code until it was caught.
-  Oracle:
-  `tests/api-record-types-composed-op.test.ts:436-442`
 - Toast pause on hover and focus
 - The run-four remediation's remaining seams — R6 and
   R7, whose "toy" clauses need a Layer 3 observation

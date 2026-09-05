@@ -3,7 +3,6 @@ import {
     assertStrictEquals,
     assertThrows,
 } from '@std/assert';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { withLocalStorageAsync } from
     './fixtures/local-storage.ts';
 import {
@@ -285,7 +284,7 @@ Deno.test(
                 [memberId], identityBody,
                 SYSTEM_MEMBER_ID, undefined,
             ),
-            operationId: TEST_OPERATION_ID,
+            operationId: generateIdentifier(),
         });
         await postIdentityDocumentOp(
             db, memberId, identityBody,

@@ -3,7 +3,8 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import { GET, handleRequest } from '../api/api.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const BASE = 'http://localhost';
 
@@ -68,7 +69,7 @@ Deno.test('admin may write a membership type', async () => {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + await devToken(),
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
             body: JSON.stringify({
                 type: 'member',

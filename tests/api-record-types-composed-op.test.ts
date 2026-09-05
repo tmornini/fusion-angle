@@ -30,7 +30,7 @@ import {
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
@@ -64,7 +64,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -211,7 +210,7 @@ async function seedFieldValueReferrer(
         organization: STARK_ORGANIZATION,
         responseStatus: 204,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postWorkOrderTransitionOp(
         db, WORK_ORDER_ID, body, SYSTEM_MEMBER_ID,
@@ -433,13 +432,6 @@ async () => {
     ));
     assertStrictEquals(restrict.status, 201);
 
-    // A fresh operationId (not req()'s shared
-    // TEST_OPERATION_ID): ATTR_ID's own fields are unchanged
-    // by this edit, so its stamped-default body would be
-    // byte-identical to its create-time PUT under the SAME
-    // operation id, and appendMessagePair's request-hash
-    // replay guard would silently drop it — masking the very
-    // reset this test exists to catch.
     const edit = await handleRequest(db, apiRequest({
         method: 'POST',
         path: COLLECTION,

@@ -7,7 +7,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
@@ -61,7 +61,7 @@ function req(
         body,
         ...(headers !== undefined
             ? { headers } : {}),
-        operationId: operationId ?? TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -116,15 +116,17 @@ Deno.test('first PUT is 201 and stores a 200 start-line',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const operationId = generateIdentifier();
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'yNqCXXgKLCqDESGScIzYrQ', token,
         ideaDocument('First', 'ev-ws-1'),
+        undefined, operationId,
     ));
     assertStrictEquals(res.status, 201);
     assertStrictEquals(
         res.headers.get('Operation-ID'),
-        TEST_OPERATION_ID,
+        operationId,
     );
     const stored = await storedResponseAt(
         db, IDEA_PREFIX, 'yNqCXXgKLCqDESGScIzYrQ',
@@ -187,7 +189,7 @@ async () => {
                 'Content-Type': 'application/json',
                 Authorization: 'Bearer ' + token,
                 'Idempotency-Key': 'k-ws-same',
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
             body: JSON.stringify(body),
         }),
@@ -300,7 +302,7 @@ async () => {
                 headers: {
                     Authorization: 'Bearer ' + token,
                     'Idempotency-Key': 'k-ws-del-gone',
-                    'operation-id': TEST_OPERATION_ID,
+                    'operation-id': generateIdentifier(),
                 },
             },
         ),
@@ -345,7 +347,7 @@ async () => {
             method: 'PUT',
             headers: {
                 Authorization: 'Bearer ' + token,
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
         }),
     );

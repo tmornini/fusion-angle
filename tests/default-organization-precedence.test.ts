@@ -10,7 +10,6 @@ import {
 } from '../api/message-pair.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -79,7 +78,7 @@ async function seedDefaultOrganizationEvent(
         organization: undefined,
         responseStatus: 204,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -208,7 +207,7 @@ Deno.test(
             organization: ORGANIZATION_TWO,
             responseStatus: 204,
             responseBody: undefined,
-            operationId: TEST_OPERATION_ID,
+            operationId: generateIdentifier(),
         });
         await db.transaction(
             MESSAGE_TABLES,

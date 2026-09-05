@@ -23,7 +23,6 @@ import {
 import {
     deriveDocumentsAt,
 } from '../api/derive-documents.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -145,7 +144,7 @@ Deno.test('postRecordAttributeDocumentOp writes exactly the'
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     // Phase Final Task 2: record_attributes ROW half stripped
     // — message plane + op return are the oracles.
@@ -250,7 +249,7 @@ async function putDocumentMessagePair(
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -285,7 +284,7 @@ async function deleteDocumentMessagePair(
         requestAt: '2026-01-02T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,

@@ -39,7 +39,7 @@ import {
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -84,7 +84,6 @@ function req(
         body,
         ...(headers !== undefined
             ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -114,7 +113,7 @@ async function leftoverMembershipMessagePair(
         organization,
         responseStatus: 200,
         responseBody: { id, ...body },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, messagePair,
@@ -144,7 +143,7 @@ async function leftoverMemberParent(
         organization: undefined,
         responseStatus: 200,
         responseBody: { id, ...body },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postMemberDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, messagePair,

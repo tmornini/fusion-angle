@@ -15,7 +15,6 @@ import {
 } from '../api/routes.ts';
 
 import {
-    TEST_OPERATION_ID,
     apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
@@ -155,7 +154,6 @@ async () => {
                 + 'toccYYkLEABmlbpHJalgtQ',
             token: DEV_TOKEN,
             body: first,
-            operationId: TEST_OPERATION_ID,
         }),
     );
     assertStrictEquals(firstPut.status, 201);
@@ -186,7 +184,6 @@ async () => {
                 + 'toccYYkLEABmlbpHJalgtQ',
             token: DEV_TOKEN,
             body: second,
-            operationId: TEST_OPERATION_ID,
         }),
     );
     assertStrictEquals(secondPut.status, 201);
@@ -221,7 +218,6 @@ Deno.test('a seat DELETE-head is absent', async () => {
                 type: 'member',
                 at: documentFields().at,
             },
-            operationId: TEST_OPERATION_ID,
         }),
     );
     const del = await handleRequest(
@@ -231,7 +227,6 @@ Deno.test('a seat DELETE-head is absent', async () => {
             path: '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
                 + 'toccYYkLEABmlbpHJalgtQ',
             token: DEV_TOKEN,
-            operationId: TEST_OPERATION_ID,
         }),
     );
     assertStrictEquals(del.status, 204);
@@ -263,7 +258,6 @@ async () => {
             path: '/organizations/AjdvjuECVZEgZoFajaIEkg/members/' + id,
             token: DEV_TOKEN,
             body,
-            operationId: TEST_OPERATION_ID,
         }),
     );
     assertStrictEquals(put.status, 201);

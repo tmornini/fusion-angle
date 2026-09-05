@@ -20,7 +20,7 @@ import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import { parseIfMatch } from '../api/message-pair.ts';
 import { sharedMockDb } from './mock-seed.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -57,7 +57,6 @@ function req(
         ...(token !== undefined ? { token } : {}),
         body,
         ...(headers !== undefined ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
     });
 }
 

@@ -37,7 +37,7 @@ import { deriveProjectFlows } from
     '../api/derive-project-flows.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 
 const SEED_FLOW_ORGANIZATION_TWO = seedIdentifier('seed-flow-org2');
@@ -101,7 +101,6 @@ function req(
         body,
         ...(headers !== undefined
             ? { headers } : {}),
-        operationId: TEST_OPERATION_ID,
     });
 }
 

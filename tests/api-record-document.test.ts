@@ -26,7 +26,7 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -57,7 +57,7 @@ function req(
         path,
         token,
         body,
-        operationId: operationId ?? TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -160,7 +160,7 @@ async () => {
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     const written = await postRecordDocumentOp(
         db, 'rbfHGatkwQzGZJVXKJEeyw', body,
@@ -212,7 +212,7 @@ async () => {
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, 'rcaSzEaORBkezCxyhLhecA', firstBody, 'XXZruirZyAOoRpNxaDnpSA'
@@ -257,7 +257,7 @@ Deno.test('postRecordDocumentOp with a fresh trio posts a'
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, 'rlBnfIvzDVVZeVSjBECxGg', firstBody, 'XXZruirZyAOoRpNxaDnpSA'
@@ -283,7 +283,7 @@ Deno.test('postRecordDocumentOp with a fresh trio posts a'
         requestAt: '2026-01-02T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, 'rlBnfIvzDVVZeVSjBECxGg', secondBody, 'XXZruirZyAOoRpNxaDnpSA'
@@ -371,7 +371,7 @@ async function storedMessagePairAt(
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     return {
         id: messagePair.id,

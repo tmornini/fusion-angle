@@ -10,7 +10,7 @@ import { routes, type Route } from '../api/routes.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -74,7 +74,6 @@ async () => {
                         path,
                         token: DEV_TOKEN,
                         body: write ? {} : undefined,
-                        operationId: TEST_OPERATION_ID,
                     }),
                 );
                 const text = await res.text();

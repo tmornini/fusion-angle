@@ -20,8 +20,9 @@ import {
     formWriteMessagePair,
     type MessagePair,
 } from '../api/message-pair.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // The catalog's first model — the fixture default.
 export function firstProviderModel() {
@@ -114,7 +115,7 @@ async function identityDocumentMessagePair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, undefined,
         ),
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
 }
 
@@ -145,7 +146,7 @@ async function identityPiiDocumentMessagePair(
         responseBody: spec.successBody?.(
             [id], pii, SYSTEM_MEMBER_ID, undefined,
         ),
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
 }
 
@@ -175,7 +176,7 @@ async function aiAgentDocumentMessagePair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, undefined,
         ),
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
 }
 

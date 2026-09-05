@@ -7,10 +7,6 @@ import type { DbAdapter } from '../api/db.ts';
 
 const BASE = 'http://localhost';
 
-// Fixed 22-char id for below-gate pair fixtures that do
-// not ride a public write (seed/tests). Not a public mint.
-export const TEST_OPERATION_ID = '0123456789ABCDEFGHIJKw';
-
 export function setCookieHeader(res: Response): string {
     const cookies = typeof res.headers.getSetCookie
         === 'function'

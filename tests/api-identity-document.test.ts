@@ -34,7 +34,6 @@ import {
     documentGetHandler,
 } from '../api/document-family.ts';
 import {
-    TEST_OPERATION_ID,
     apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
@@ -157,7 +156,7 @@ async () => {
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     const written = await postIdentityDocumentOp(
         db, 'gTMDzYjclgPKfPUYsUdtoQ', body,
@@ -215,7 +214,7 @@ async function putDocumentMessagePair(
         requestAt,
         organization: undefined,
         responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -240,7 +239,7 @@ async function deleteDocumentMessagePair(
         requestAt,
         organization: undefined,
         responseStatus: 204, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -341,7 +340,6 @@ async () => {
             path: '/identities/' + id,
             token: DEV_TOKEN,
             body,
-            operationId: TEST_OPERATION_ID,
         }),
     );
     assertStrictEquals(put.status, 201);
@@ -383,7 +381,6 @@ Deno.test('PUT service identity with title is 400', async () => {
             path: '/identities/uYxxmcHuFJghfKLveLDneg',
             token: DEV_TOKEN,
             body: { kind: 'service', title: 'Bot' },
-            operationId: TEST_OPERATION_ID,
         }),
     );
     assertStrictEquals(res.status, 400);
@@ -400,7 +397,6 @@ async () => {
             path: '/identities/qUceZILomWDFIEtnAaLHKg',
             token: DEV_TOKEN,
             body: { kind: 'person', title: 'Engineer' },
-            operationId: TEST_OPERATION_ID,
         }),
     );
     assertStrictEquals(res.status, 400);
@@ -428,7 +424,6 @@ async () => {
             path: '/identities/' + id,
             token: DEV_TOKEN,
             body: { kind: 'person', ...profile },
-            operationId: TEST_OPERATION_ID,
         }),
     );
     assert(put.status === 201 || put.status === 200);
@@ -467,7 +462,6 @@ async () => {
                 strengths: ['Leadership'],
                 team_dimensions: { driver: 60 },
             },
-            operationId: TEST_OPERATION_ID,
         }),
     );
     assert(
@@ -480,7 +474,6 @@ async () => {
             path: '/identities/XXZruirZyAOoRpNxaDnpSA/pii',
             token: DEV_TOKEN,
             body: PII_FACET,
-            operationId: TEST_OPERATION_ID,
         }),
     );
     assert(

@@ -24,8 +24,9 @@ import {
     generateIdentifier,
 } from '../shared/identifier.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
-    storedMessageBodyText, storedPutBodyText,
+    apiRequest,
+    storedMessageBodyText,
+    storedPutBodyText,
     refreshTokenFromSetCookie,
 } from './http-fixtures.ts';
 import {
@@ -107,7 +108,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -233,7 +233,7 @@ Deno.test('formTokenEventMessagePair stored body equals '
         chain_id: CHAIN_G4_SYNTH, at: AT,
     };
     const messagePair = await formTokenEventMessagePair(
-        id, event, TEST_OPERATION_ID,
+        id, event, generateIdentifier(),
     );
     const stored = JSON.parse(
         storedMessageBodyText(messagePair.responseMessage),
@@ -640,7 +640,7 @@ async () => {
             method: 'PUT',
             body: fields,
         }),
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,

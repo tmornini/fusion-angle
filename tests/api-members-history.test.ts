@@ -5,7 +5,7 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 
 function req(
@@ -19,7 +19,6 @@ function req(
         path,
         ...(token !== undefined ? { token } : {}),
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 

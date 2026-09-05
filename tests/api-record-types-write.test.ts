@@ -25,7 +25,7 @@ import {
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import {
@@ -68,7 +68,7 @@ function req(
         path,
         token,
         body,
-        operationId: operationId ?? TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -134,7 +134,7 @@ async function seedRecordTypeBelowGate(
             position: body['position'],
             state: body['state'],
         },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, messagePair,

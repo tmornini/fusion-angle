@@ -9,8 +9,10 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 const validIdea = {
     title: 'Op id pin',
@@ -101,6 +103,7 @@ Deno.test('public PUT with Operation-ID stores both columns',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
+    const operationId = generateIdentifier();
     const res = await handleRequest(
         db,
         apiRequest({
@@ -109,22 +112,22 @@ async () => {
                 + 'gBbNAWlPwMfXZvevoUPhFQ',
             token: DEV_TOKEN,
             body: validIdea,
-            operationId: TEST_OPERATION_ID,
+            operationId,
         }),
     );
     assertStrictEquals(res.status, 201);
     assertStrictEquals(
         res.headers.get('Operation-ID'),
-        TEST_OPERATION_ID,
+        operationId,
     );
     const rows = await db.messagePairs.getAll();
     const written = rows.find((r) => r.uri_id === 'gBbNAWlPwMfXZvevoUPhFQ');
     assert(written);
     assertStrictEquals(written.method, 'PUT');
-    assertStrictEquals(written.operation_id, TEST_OPERATION_ID);
+    assertStrictEquals(written.operation_id, operationId);
 });
 
-// 22-char id distinct from TEST_OPERATION_ID so the
+// 22-char id distinct from the public PUT above so the
 // envelope pin cannot pass by accident on fixture ids.
 const ROTATION_OP = 'RotationOpId000000000w';
 

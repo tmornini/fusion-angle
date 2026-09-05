@@ -48,7 +48,7 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
@@ -99,7 +99,7 @@ function req(
         body,
         ...(extraHeaders !== undefined
             ? { headers: extraHeaders } : {}),
-        operationId: operationId ?? TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -240,7 +240,7 @@ async function appendInstanceMessagePair(
         organization,
         responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await db.transaction(
         MESSAGE_TABLES,
@@ -1016,7 +1016,7 @@ async () => {
             set: staleBody.set,
             clear: [],
         },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     // Advance the real head past H0.
     const advance = await handleRequest(db, req(
@@ -1090,7 +1090,7 @@ async () => {
         requestAt: nowUtc(),
         organization: ORGANIZATION,
         response: { status: 200, body: {} },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     assertStrictEquals('follows' in revision, false);
     assertStrictEquals('supersedes' in revision, false);

@@ -35,7 +35,6 @@ import {
 import {
     formWriteMessagePair,
 } from '../api/message-pair.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -116,7 +115,7 @@ async function appendLegacyTransition(
         organization: STARK_ORGANIZATION,
         responseStatus: 204,
         responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postWorkOrderTransitionOp(
         db, 'yNSSnbrpacodQTzUEcdEVA', body, SYSTEM_MEMBER_ID,

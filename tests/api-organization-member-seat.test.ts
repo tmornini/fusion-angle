@@ -25,7 +25,7 @@ import {
 } from './test-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -47,13 +47,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    operationId?: string,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 
@@ -78,6 +79,7 @@ Deno.test('accept writes the seat at the invitation'
     ));
     assertStrictEquals(grant.status, 200);
 
+    const operationId = generateIdentifier();
     const accept = await handleRequest(db, req(
         'PUT',
         '/identities/' + SARAH_ID
@@ -90,6 +92,7 @@ Deno.test('accept writes the seat at the invitation'
             eventId: generateIdentifier(),
             at: '2026-06-05T00:00:01.000000Z',
         },
+        operationId,
     ));
     assertStrictEquals(accept.status, 204);
 
@@ -114,7 +117,7 @@ Deno.test('accept writes the seat at the invitation'
     );
     assert(written);
     assertStrictEquals(
-        written.operation_id, TEST_OPERATION_ID,
+        written.operation_id, operationId,
     );
     assertStrictEquals(
         await membershipExistsFor(
@@ -151,7 +154,7 @@ Deno.test('mint bakes claim roles from a seat, not a'
             identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             ...body,
         },
-        operationId: TEST_OPERATION_ID,
+        operationId: generateIdentifier(),
     });
     await postMembershipDocumentOp(
         db, 'XXZruirZyAOoRpNxaDnpSA', body, SYSTEM_MEMBER_ID,

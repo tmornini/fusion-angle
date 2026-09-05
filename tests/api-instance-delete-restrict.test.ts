@@ -14,7 +14,7 @@ import {
 } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import {
-    apiRequest, TEST_OPERATION_ID,
+    apiRequest,
 } from './http-fixtures.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
@@ -71,7 +71,7 @@ function req(
         path,
         token,
         body,
-        operationId: operationId ?? TEST_OPERATION_ID,
+        ...(operationId !== undefined ? { operationId } : {}),
     });
 }
 

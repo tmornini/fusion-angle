@@ -10,7 +10,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import {
-    apiRequest, TEST_OPERATION_ID, storedPutBodyText,
+    apiRequest, storedPutBodyText,
 } from './http-fixtures.ts';
 import {
     deriveIdeaSubmissions,
@@ -61,7 +61,6 @@ function req(
         path,
         token,
         body,
-        operationId: TEST_OPERATION_ID,
     });
 }
 

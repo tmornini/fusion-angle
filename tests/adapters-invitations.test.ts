@@ -35,7 +35,6 @@ import {
     organizationToken,
     reachableToken,
 } from './token-fixtures.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
 import {
@@ -277,7 +276,7 @@ async function eraseIdentityPii(
             method: 'DELETE',
             headers: {
                 'Authorization': 'Bearer ' + token,
-                'operation-id': TEST_OPERATION_ID,
+                'operation-id': generateIdentifier(),
             },
         },
     ));
