@@ -80,8 +80,10 @@ export {
     HumanMemberDetailEditPresenter,
     humanMemberDraftFromMember,
     humanMemberPatchFromDraft,
+    humanMemberCreationFromDraft,
     isHumanMemberFieldKey,
     type HumanMemberDraftFields,
+    type HumanMemberCreationDraft,
     type HumanMemberFieldKey,
 } from './human-member-detail.ts';
 export {

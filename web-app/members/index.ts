@@ -45,11 +45,10 @@ import {
     applyManagedMembersSearch,
     applyManagedMembersKind,
     buildModelOptgroups,
+    humanMemberCreationFromDraft,
     type ManagedMembersState,
     type MemberKindFilter,
 } from '../app/presenters/index.ts';
-
-const DEFAULT_DIM = 50;
 
 const { signal } = createPageAbort();
 
@@ -460,21 +459,14 @@ async function submitHumanForm(): Promise<void> {
         await postHumanMemberCreation(
             ctx,
             id,
-            trimStrings({
+            trimStrings(humanMemberCreationFromDraft({
                 name,
                 email,
                 title,
                 department: dept,
-                strengths: [],
-                team_dimensions: {
-                    driver: DEFAULT_DIM,
-                    analytical: DEFAULT_DIM,
-                    expressive: DEFAULT_DIM,
-                    amiable: DEFAULT_DIM,
-                },
                 phone,
                 bio,
-            }),
+            })),
         );
     } catch (err) {
         if (err instanceof HumanMemberPiiIntakeFailedError) {

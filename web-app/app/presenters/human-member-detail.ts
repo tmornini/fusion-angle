@@ -114,6 +114,41 @@ export function humanMemberPatchFromDraft(
     };
 }
 
+const DEFAULT_DIM = 50;
+
+// The Add Member dialog's fields, as the roster collects
+// them.
+export interface HumanMemberCreationDraft {
+    name: string;
+    email: string;
+    title: string;
+    department: string;
+    phone: string;
+    bio: string;
+}
+
+// The create body from the dialog's draft — the sibling of
+// humanMemberPatchFromDraft for the roster's Add Member.
+export function humanMemberCreationFromDraft(
+    draft: HumanMemberCreationDraft,
+): HumanMemberDraft {
+    return {
+        name: draft.name,
+        email: draft.email,
+        title: draft.title,
+        department: draft.department,
+        strengths: [],
+        team_dimensions: {
+            driver: DEFAULT_DIM,
+            analytical: DEFAULT_DIM,
+            expressive: DEFAULT_DIM,
+            amiable: DEFAULT_DIM,
+        },
+        phone: draft.phone,
+        bio: draft.bio,
+    };
+}
+
 function buildShell(
     container: HTMLElement,
 ): void {
