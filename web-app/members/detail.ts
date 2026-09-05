@@ -14,6 +14,7 @@ import {
     aiMemberPatchFromDraft,
     isAIMemberFieldKey,
     type AIMemberDraftFields,
+    seatRemovalOf, type SeatRemoval,
 } from '../app/presenters/index.ts';
 import { showToast } from '../app/toast.ts';
 import {
@@ -41,6 +42,7 @@ import {
     getAIMemberEntity,
     putAIMember,
     subscribeAIMemberChanges,
+    getAdminSeatIds,
     HumanMember,
     AIMember,
     type MemberPii,
@@ -79,6 +81,14 @@ type PageState = HumanState | AIState;
 
 let state: PageState | null = null;
 let pageContainer: HTMLElement | null = null;
+let removal: SeatRemoval | null = null;
+
+function removalOf(): SeatRemoval {
+    if (removal === null) {
+        throw new Error('seat removal not resolved');
+    }
+    return removal;
+}
 
 function buildPresenter():
     | HumanMemberDetailPresenter
@@ -94,7 +104,7 @@ function buildPresenter():
     if (state.variant === 'human') {
         return state.kind === 'reading'
             ? new HumanMemberDetailPresenter(
-                state.member,
+                state.member, removalOf(),
             )
             : new HumanMemberDetailEditPresenter(
                 state.member, state.draft,
@@ -164,18 +174,23 @@ export async function init(
     );
     pageContainer = container;
 
+    const ctx = sessionContext();
     await loadInto({
         container,
         skeleton: buildSkeleton('detail', 4),
-        fetch: () => loadMemberByEitherKind(
-            memberId,
-        ),
+        fetch: async () => ({
+            member: await loadMemberByEitherKind(memberId),
+            adminSeatIds: await getAdminSeatIds(ctx),
+        }),
         retry: () => init(params),
-        onData: member => {
+        onData: ({ member, adminSeatIds }) => {
             if (!member) {
                 navigateTo('members');
                 return;
             }
+            removal = seatRemovalOf(
+                adminSeatIds, memberId, ctx.identity.id,
+            );
 
             if (member.kind === 'human') {
                 state = {

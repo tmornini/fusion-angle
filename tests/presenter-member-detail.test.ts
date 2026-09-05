@@ -10,6 +10,7 @@ import {
     HumanMemberDetailEditPresenter,
     humanMemberCreationFromDraft,
     humanMemberDraftFromMember,
+    seatRemovalOf, type SeatRemoval,
 } from '../web-app/app/presenters/human-member-detail.ts';
 import {
     AIMemberDetailPresenter,
@@ -123,6 +124,10 @@ function makeAIMember() {
     );
 }
 
+const REMOVABLE: SeatRemoval = {
+    removable: true, isSelf: false,
+};
+
 Deno.test(
     'HumanMemberDetailPresenter renders the'
     + ' name, title, department, and'
@@ -130,7 +135,7 @@ Deno.test(
     () => {
         const rec = makeRecordingContainer();
         new HumanMemberDetailPresenter(
-            makeHumanMember(),
+            makeHumanMember(), REMOVABLE,
         ).renderShell(rec.container);
         const out = rec.allHtml();
         assertMatch(out, /Sarah Chen/);
@@ -263,4 +268,61 @@ Deno.test('a fresh creation draft records no dimension scores',
     });
     assertEquals(body.team_dimensions, {});
     assertEquals(body.strengths, []);
+});
+
+Deno.test(
+    'a removable seat renders Remove and its confirm dialog',
+    () => {
+        const rec = makeRecordingContainer();
+        new HumanMemberDetailPresenter(
+            makeHumanMember(), REMOVABLE,
+        ).renderShell(rec.container);
+        const out = rec.allHtml();
+        assertMatch(out, /id="member-remove-btn"/);
+        assertMatch(out, /data-dialog-open="confirm-remove"/);
+        assertMatch(out, /id="confirm-remove-dialog"/);
+        assertMatch(out, /role="alertdialog"/);
+        assertMatch(out, /data-member-action="confirm-remove"/);
+        assertMatch(out, /data-dialog-cancel="confirm-remove"/);
+        assertMatch(out, /next token refresh/);
+        assertMatch(out, /Their access/);
+    },
+);
+
+Deno.test('the viewer\'s own seat says so in the dialog', () => {
+    const rec = makeRecordingContainer();
+    new HumanMemberDetailPresenter(
+        makeHumanMember(), { removable: true, isSelf: true },
+    ).renderShell(rec.container);
+    assertMatch(rec.allHtml(), /You lose access/);
+});
+
+Deno.test('the last admin seat offers no Remove', () => {
+    const rec = makeRecordingContainer();
+    new HumanMemberDetailPresenter(
+        makeHumanMember(), { removable: false, isSelf: true },
+    ).renderShell(rec.container);
+    const out = rec.allHtml();
+    assertStrictEquals(out.includes('confirm-remove'), false);
+    assertStrictEquals(out.includes('member-remove-btn'), false);
+    assertMatch(out, /data-member-action="edit"/);
+});
+
+Deno.test('seatRemovalOf mirrors the last-admin guard', () => {
+    assertEquals(
+        seatRemovalOf(['a'], 'a', 'b'),
+        { removable: false, isSelf: false },
+    );
+    assertEquals(
+        seatRemovalOf(['a', 'b'], 'a', 'a'),
+        { removable: true, isSelf: true },
+    );
+    assertEquals(
+        seatRemovalOf(['a'], 'b', 'b'),
+        { removable: true, isSelf: true },
+    );
+    assertEquals(
+        seatRemovalOf([], 'b', 'a'),
+        { removable: true, isSelf: false },
+    );
 });

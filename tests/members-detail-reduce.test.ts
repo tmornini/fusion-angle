@@ -13,6 +13,7 @@ import {
 import { HumanMember } from '../api/types.ts';
 import {
     HumanMemberDetailPresenter,
+    type SeatRemoval,
 } from '../web-app/app/presenters/human-member-detail.ts';
 
 // None of these four modules reads localStorage (checked
@@ -25,6 +26,10 @@ globalThis.window = {
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
+
+const REMOVABLE: SeatRemoval = {
+    removable: true, isSelf: false,
+};
 
 const HUMAN_DRAFT = {
     name: 'Sarah-edited Chen',
@@ -275,7 +280,7 @@ Deno.test(
         assertStrictEquals(next.variant, 'human');
         assertStrictEquals(next.member, fresh);
         const rec = makeRecordingContainer();
-        new HumanMemberDetailPresenter(fresh)
+        new HumanMemberDetailPresenter(fresh, REMOVABLE)
             .renderShell(rec.container);
         const out = rec.allHtml();
         assertMatch(out, /555-0199/);
