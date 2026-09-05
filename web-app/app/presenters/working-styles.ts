@@ -11,6 +11,7 @@ import {
     isDimensionKey,
     type DimensionKey,
 } from '../adapters/index.ts';
+import { mutedEmptyNote } from './empty-note.ts';
 
 const LABELS: Record<DimensionKey, string> = {
     driver: 'Mover',
@@ -87,6 +88,11 @@ export class WorkingStylesPresenter {
                 key,
                 this.#dimensions[key]!,
             ] as [DimensionKey, number]);
+        if (entries.length === 0) {
+            return mutedEmptyNote(
+                'No working-styles assessment yet.',
+            );
+        }
         return html`${entries.map(
             ([key, value]) => this.#buildRow(
                 key, value,

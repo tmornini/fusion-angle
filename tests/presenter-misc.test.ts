@@ -659,6 +659,17 @@ Deno.test(
     },
 );
 
+Deno.test(
+    'WorkingStylesPresenter says why an empty map renders'
+    + ' no rows',
+    () => {
+        const out = new WorkingStylesPresenter({})
+            .buildRows().toString();
+        assertMatch(out, /No working-styles assessment yet\./);
+        assertStrictEquals(/user-dim-row/.test(out), false);
+    },
+);
+
 // flow-designer-view builders
 
 Deno.test(
