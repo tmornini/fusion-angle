@@ -6,7 +6,10 @@ import {
 } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { DEV_TOKEN } from './token-fixtures.ts';
+import {
+    DEV_TOKEN,
+    organizationToken,
+} from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
@@ -205,4 +208,49 @@ async () => {
         ),
     );
     assertStrictEquals(res.status, 401);
+});
+
+// Two helper-shaped writes with identical method, path, and
+// body are two requests: apiRequest mints an operation id
+// for each, the hashes differ, and the second reaches the
+// domain — here an instance create over a live instance,
+// which the handler refuses (428, If-Match required on a
+// live instance) rather than the ledger serving the
+// first's stored 201.
+Deno.test('identical helper-shaped writes each reach the'
++ ' domain',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const organization = 'AjdvjuECVZEgZoFajaIEkg';
+    const admin = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', organization,
+    );
+    const typeId = generateIdentifier();
+    const typeDetail = '/organizations/' + organization
+        + '/record-types/' + typeId;
+    const created = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: typeDetail,
+        token: admin,
+        body: {
+            name: 'Rental',
+            description: 'Rental desc',
+            position: 1,
+            state: 'active',
+        },
+    }));
+    assertStrictEquals(created.status, 201);
+    const instanceDetail = typeDetail + '/instances/'
+        + generateIdentifier();
+    const write = (): Request => apiRequest({
+        method: 'PATCH',
+        path: instanceDetail,
+        token: admin,
+        body: { set: [] },
+    });
+    const first = await handleRequest(db, write());
+    const second = await handleRequest(db, write());
+    assertStrictEquals(first.status, 201);
+    assertStrictEquals(second.status, 428);
 });
