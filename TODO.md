@@ -340,13 +340,6 @@ Off the critical path; each with its oracle.
   `web-app/flows/detail.ts`, and Billing's `init()` is
   empty. TEST-PLAN.md G42's Billing console observation
   is not a Billing listener
-- Member-removal affordance under members/identities —
-  zero-membership is seed-produced today (Riley Okafor);
-  no page deletes a membership row. Oracle: removing a
-  member's last seat lands that identity on
-  `invitations/index.html` at next boot (TEST-PLAN
-  B25–B29 driven live); restores B28's original
-  "restore the deleted membership row" branch
 - Toast pause on hover and focus
 - The run-four remediation's remaining seams — R6 and
   R7, whose "toy" clauses need a Layer 3 observation

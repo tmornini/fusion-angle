@@ -152,7 +152,10 @@ claim org else 403.
 `organizations/:id/members/:identity-id` is the
 identity↔org relationship, carrying `type` `"admin"` |
 `"member"`. The members roster is seats plus `/ai-agents`
-(not members, not identities). The system member is the
+(not members, not identities). Member detail removes a
+seat by its DELETE; the last admin seat refuses (409), and
+a removed member's access ends at the next mint, refresh,
+or expiry per the named covenant. The system member is the
 constant `SYSTEM_MEMBER_ID` (`api/types.ts`), not a seat.
 
 Invitation alphabet: pending, accepted, declined, revoked.

@@ -1412,7 +1412,7 @@ the second organization.
 
 ### Zero-membership landing (org gate)
 
-> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The mock seed provides that identity: Riley Okafor, `riley.okafor@example.net` — login-capable (its `username<TAB>password` line prints on crank stdout with the other demo sign-ins), holder of ZERO membership rows, with one seeded PENDING invitation from Stark Industries. Sign in as Riley with the stdout credentials to enter the zero-membership state. Do NOT accept (or decline) the pending invitation while B25–B29 are in flight — accepting grants the first membership and breaks B26/B29 on the same pass — and leave it pending for the rest of the walk (G43, V8). `getOrganizations` is fenced to the derived membership ledger, so an identity that truly reaches no org lands here regardless of how it got there.
+> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The mock seed provides that identity: Riley Okafor, `riley.okafor@example.net` — login-capable (its `username<TAB>password` line prints on crank stdout with the other demo sign-ins), holder of ZERO membership rows, with one seeded PENDING invitation from Stark Industries. Sign in as Riley with the stdout credentials to enter the zero-membership state. Member detail's Remove strips any seat but the last admin's live, so a zero-membership identity can also be MADE: remove a seeded single-seat member's seat, then sign in as them. Do NOT accept (or decline) the pending invitation while B25–B29 are in flight — accepting grants the first membership and breaks B26/B29 on the same pass — and leave it pending for the rest of the walk (G43, V8). `getOrganizations` is fenced to the derived membership ledger, so an identity that truly reaches no org lands here regardless of how it got there.
 
 - [ ] **B25** From the zero-membership state, click "Sign out", then sign in again with that member's credentials. PASS: the `refresh_token` cookie is cleared (`Set-Cookie` `Max-Age=0`) — sign-out is not org-fenced; a zero-membership identity must still revoke. Lands directly on `invitations/index.html` — NOT the `?return=` target and NOT the dashboard "Something went wrong" card; no flash of the dashboard shell (the auth-page short-circuit decides before the first navigation). Sidebar renders the member chip from token claims with NO org switcher. Navigating Back after sign-out does not boot into the account.
   Pin: tests/api-identity-token-revocations-self.test.ts
@@ -1451,18 +1451,23 @@ the second organization.
        Accept / Decline' (decides the card's shape);
        exploratory — the live stay and the rendered
        seeded card
-- [ ] **B28** Sign in as an untouched seeded member (any non-Riley credential from crank stdout, e.g. the demo admin), then load a gated page. PASS: lands on the `?return=` target / dashboard as before — the org gate does not fire for an identity that reaches an org (B16/B18 unaffected by the new gate). After PASS, sign back in as Riley for B29.
-  Pin: exploratory — the live landing on the target;
+- [ ] **B28** As the demo admin, open a seeded single-seat member's detail page (one no later case names), click Remove, confirm in the alertdialog (its copy says access ends at the next token refresh). PASS: a "Member removed" toast, the roster no longer lists them. Sign in as that member. PASS: lands on `invitations/index.html` — the gate fires for a made orphan exactly as for the seeded one. Then sign in as an untouched seeded member (e.g. the demo admin) and load a gated page. PASS: lands on the `?return=` target / dashboard as before — the org gate does not fire for an identity that reaches an org (B16/B18 unaffected). Also confirm the demo admin's own detail page shows no Remove — it is Stark's only admin seat. After PASS, sign back in as Riley for B29.
+  Pin: tests/api-organization-member-seat.test.ts
+       'the last admin seat refuses removal' (decides
+       the guard) and 'an admin seat beside another
+       admin is removable, the actor's own included'
+       (decides self-removal); tests/presenter-member-detail.test.ts
+       'a removable seat renders Remove and its
+       confirm dialog' and 'the last admin seat offers
+       no Remove' (decide the affordance);
+       tests/adapters-members.test.ts
+       'deleteHumanMemberSeat removes the seat'
+       (decides the wire DELETE); exploratory — the
+       live removal, the made orphan's landing, and
+       the untouched member's landing on the target;
        no test exercises `resolveOrganizationGate`
        with a non-empty organization list against a
-       page other than `invitations`, so nothing
-       today decides that the gate passes a
-       non-empty-org identity through on an ordinary
-       gated page like `dashboard` (the only cited
-       assertion for a non-empty list uses
-       `invitations` as the page, so it cannot tell
-       "fires for any page" from "fires only for
-       invitations" apart)
+       page other than `invitations`
 - [ ] **B29** As the zero-membership identity, open `design-system/`. PASS: renders normally with NO redirect to invitations — the org gate guards auth-gated pages; public pages degrade to the unscoped sidebar (B19). After PASS, sign back in as the demo admin before section C.
   Pin: tests/page-registry.test.ts 'public pages are
        auth-exempt only' (`design-system` carries

@@ -29,6 +29,10 @@ import {
 import { navigateTo } from '../app/navigation.ts';
 import { trimStrings } from '../app/format.ts';
 import {
+    closeDialog,
+    handleDialogClick,
+} from '../app/dialog.ts';
+import {
     RequestError,
     HTTP_NOT_FOUND,
 } from '../../api/http-errors.ts';
@@ -43,6 +47,7 @@ import {
     putAIMember,
     subscribeAIMemberChanges,
     getAdminSeatIds,
+    deleteHumanMemberSeat,
     HumanMember,
     AIMember,
     type MemberPii,
@@ -249,8 +254,12 @@ async function refresh(
     memberId: string,
 ): Promise<void> {
     if (!pageContainer || !state) return;
+    const ctx = sessionContext();
     const fresh = await loadMemberByEitherKind(
         memberId,
+    );
+    removal = seatRemovalOf(
+        await getAdminSeatIds(ctx), memberId, ctx.identity.id,
     );
     state = reduceRefresh(state, fresh);
     rerender();
@@ -276,6 +285,11 @@ function onClick(e: MouseEvent): void {
     const target = e.target as Element | null;
     if (!target) return;
 
+    // The Remove dialog lives inside the container, so its
+    // open, cancel, and backdrop clicks arrive here — one
+    // voice with every other dialog surface.
+    if (handleDialogClick(target, e)) return;
+
     const actionEl = target.closest(
         '[data-member-action]',
     );
@@ -296,6 +310,11 @@ function onClick(e: MouseEvent): void {
     }
     if (action === 'save') {
         void handleSave();
+        return;
+    }
+    if (action === 'confirm-remove') {
+        closeDialog('confirm-remove');
+        void performRemove();
         return;
     }
 
@@ -438,6 +457,20 @@ async function handleSave(): Promise<void> {
     } else {
         await saveAIMember(state);
     }
+}
+
+async function performRemove(): Promise<void> {
+    if (!state || state.variant !== 'human') return;
+    const ctx = sessionContext();
+    const memberId = state.member.idForLink();
+    try {
+        await deleteHumanMemberSeat(ctx, memberId);
+    } catch (err) {
+        reportFault(ctx, 'Failed to remove member', err);
+        return;
+    }
+    showToast('Member removed', 'success');
+    navigateTo('members');
 }
 
 // The detail save's dirty check for the PII second hop (Phase
