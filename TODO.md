@@ -316,12 +316,6 @@ Off the critical path; each with its oracle.
   the top-level pair landed still answers 201:
   `appendMessagePair` returns void and the gate never
   holds inner hashes (`api/message-pair.ts:686-701`)
-- A panel rename whose target is deleted during the
-  800 ms debounce still advances history: the presenter
-  now hands back its held snapshot on a miss, but the
-  page's three debounced schedules still `commit()` it,
-  and `commit()` records a mutation. Oracle:
-  `web-app/flows/detail.ts:1375-1418`, `:235-237`
 - `mustFind` throws `gesture frame target missing:
   .flow-marquee` when a selecting-gesture rAF paints an
   SVG rebuilt without the rect. `renderMarqueeFrame`

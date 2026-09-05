@@ -2,8 +2,11 @@ import { assertStrictEquals } from '@std/assert';
 import {
     reduceDesignerShortcut,
     isDesignerEditableTarget,
+    commitDebouncedEdit,
     type DesignerShortcutInput,
 } from '../web-app/flows/detail.ts';
+import type { FlowSnapshot } from
+    '../web-app/app/presenters/flow-designer.ts';
 
 // flows/detail.ts never reads localStorage (checked
 // against the full product tree); window/document are
@@ -214,3 +217,22 @@ Deno.test(
         );
     },
 );
+
+// A debounced edit that found no target hands back the
+// snapshot the presenter holds; the page must not commit
+// it — commit() would advance history for nothing.
+Deno.test('a debounced edit that changed nothing does not'
++ ' commit; one that did commits once', () => {
+    const held = {} as FlowSnapshot;
+    const committed: FlowSnapshot[] = [];
+    commitDebouncedEdit(
+        held, held, snapshot => { committed.push(snapshot); },
+    );
+    assertStrictEquals(committed.length, 0);
+    const next = { ...held };
+    commitDebouncedEdit(
+        held, next, snapshot => { committed.push(snapshot); },
+    );
+    assertStrictEquals(committed.length, 1);
+    assertStrictEquals(committed[0], next);
+});

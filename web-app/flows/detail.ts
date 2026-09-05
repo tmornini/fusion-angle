@@ -1377,13 +1377,20 @@ function bindPanelActions(
                     .presenter().selectedNodeId();
                 if (nodeId === null) return;
                 pageState.saveDebouncer().schedule(
-                    () => commit(
-                        pageState.presenter()
-                            .withNodeNamed(
+                    () => {
+                        const presenter = pageState
+                            .presenter();
+                        commitDebouncedEdit(
+                            presenter.snapshot(),
+                            presenter.withNodeNamed(
                                 nodeId, value,
                             ),
-                        { advanceHistory: true },
-                    ),
+                            next => commit(
+                                next,
+                                { advanceHistory: true },
+                            ),
+                        );
+                    },
                 );
             } else if (
                 id === 'prop-node-instructions'
@@ -1392,13 +1399,21 @@ function bindPanelActions(
                     .presenter().selectedNodeId();
                 if (nodeId === null) return;
                 pageState.saveDebouncer().schedule(
-                    () => commit(
-                        pageState.presenter()
-                            .withNodeTaskInstructions(
-                                nodeId, value,
+                    () => {
+                        const presenter = pageState
+                            .presenter();
+                        commitDebouncedEdit(
+                            presenter.snapshot(),
+                            presenter
+                                .withNodeTaskInstructions(
+                                    nodeId, value,
+                                ),
+                            next => commit(
+                                next,
+                                { advanceHistory: true },
                             ),
-                        { advanceHistory: true },
-                    ),
+                        );
+                    },
                 );
             } else if (
                 id === 'prop-edge-name'
@@ -1407,13 +1422,20 @@ function bindPanelActions(
                     .presenter().selectedEdgeId();
                 if (edgeId === null) return;
                 pageState.saveDebouncer().schedule(
-                    () => commit(
-                        pageState.presenter()
-                            .withEdgeNamed(
+                    () => {
+                        const presenter = pageState
+                            .presenter();
+                        commitDebouncedEdit(
+                            presenter.snapshot(),
+                            presenter.withEdgeNamed(
                                 edgeId, value,
                             ),
-                        { advanceHistory: true },
-                    ),
+                            next => commit(
+                                next,
+                                { advanceHistory: true },
+                            ),
+                        );
+                    },
                 );
             }
         },
@@ -1966,6 +1988,22 @@ export interface DesignerShortcutInput {
     readonly shiftKey: boolean;
     readonly isEditableFocused: boolean;
     readonly isPanelOpen: boolean;
+}
+
+// A debounced property edit commits only when the
+// presenter produced a new snapshot. A miss — the target
+// deleted during the debounce — hands back the snapshot
+// the presenter already holds; commit() would rebuild,
+// save through the presenter's own queue, and advance
+// history for nothing. Tell, don't ask: the caller says
+// what a commit is, and it runs only for a change.
+export function commitDebouncedEdit(
+    held: FlowSnapshot,
+    next: FlowSnapshot,
+    commitEdit: (snapshot: FlowSnapshot) => void,
+): void {
+    if (next === held) return;
+    commitEdit(next);
 }
 
 export function reduceDesignerShortcut(
