@@ -340,7 +340,6 @@ Off the critical path; each with its oracle.
   `web-app/flows/detail.ts`, and Billing's `init()` is
   empty. TEST-PLAN.md G42's Billing console observation
   is not a Billing listener
-- Toast pause on hover and focus
 - The run-four remediation's remaining seams — R6 and
   R7, whose "toy" clauses need a Layer 3 observation
   before any rewrite. G9's staleness was the corrupted

@@ -5869,9 +5869,14 @@ layout.
 
 ### Toasts
 
-- [ ] **I23** Trigger a toast (e.g. save an idea). PASS: toast appears at top-center of the viewport (fixed to `top: var(--space-4); left: 50%; translateX(-50%)`), auto-dismisses after ~6 seconds with fade-out. (Toast position was migrated from bottom-right to top-center.)
-  Pin: exploratory — the live position, the
-       ~6-second auto-dismiss, and the fade
+- [ ] **I23** Trigger a toast (e.g. save an idea). PASS: toast appears at top-center of the viewport (fixed to `top: var(--space-4); left: 50%; translateX(-50%)`), auto-dismisses after ~6 seconds with fade-out. Hover the toast before it dismisses: it stays while the pointer rests on it and resumes the remaining time on leave; Tab into its close button and it stays the same way. (Toast position was migrated from bottom-right to top-center.)
+  Pin: tests/toast-pause.test.ts 'a toast pauses its
+       auto-dismiss under the pointer and resumes with
+       the remainder on leave' and 'a toast pauses
+       under focus and resumes on focusout' (decide the
+       pause and the remainder); exploratory — the live
+       position, the ~6-second auto-dismiss, and the
+       fade
 - [ ] **I24** While a toast is visible, click its close button (×). PASS: toast dismisses immediately without waiting for auto-dismiss timer.
   Pin: tests/browser/toasts.test.ts 'the close button
        detaches a toast inside its fade' (the toast
