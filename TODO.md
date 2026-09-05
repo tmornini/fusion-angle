@@ -345,11 +345,6 @@ Off the critical path; each with its oracle.
   `web-app/flows/detail.ts`, and Billing's `init()` is
   empty. TEST-PLAN.md G42's Billing console observation
   is not a Billing listener
-- `subscribeOnce`'s `const unsubscribe = subscribe(...)`
-  would throw a TDZ ReferenceError if any `subscribe` fired
-  its callback synchronously; all thirteen
-  `subscribe<Entity>Changes` delegate to `createChannel`,
-  so it is inert — guard only if that changes
 - Member-removal affordance under members/identities —
   zero-membership is seed-produced today (Riley Okafor);
   no page deletes a membership row. Oracle: removing a
