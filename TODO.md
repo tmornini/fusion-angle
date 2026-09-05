@@ -312,8 +312,6 @@ Off the critical path; each with its oracle.
 - Mock seed's fixed 2026-06-15 anchor — after
   2026-09-13 serial-mode FS3 carries in-flight heat
   only
-- `DEFAULT_DIM` stands in for an assessment that never
-  happened — `web-app/members/index.ts:52`
 - An inner pair of a composed operation skipped while
   the top-level pair landed still answers 201:
   `appendMessagePair` returns void and the gate never

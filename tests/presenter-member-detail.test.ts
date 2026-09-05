@@ -1,9 +1,14 @@
-import { assertMatch, assertStrictEquals } from '@std/assert';
+import {
+    assertEquals,
+    assertMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import { HumanMember, AIMember } from '../api/types.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import {
     HumanMemberDetailPresenter,
     HumanMemberDetailEditPresenter,
+    humanMemberCreationFromDraft,
     humanMemberDraftFromMember,
 } from '../web-app/app/presenters/human-member-detail.ts';
 import {
@@ -242,3 +247,20 @@ Deno.test(
         );
     },
 );
+
+// No page collects an assessment, so a fresh member records
+// none: an empty map renders as zero rows, never as four
+// fabricated 50% scores.
+Deno.test('a fresh creation draft records no dimension scores',
+() => {
+    const body = humanMemberCreationFromDraft({
+        name: 'Ada',
+        email: 'ada@example.com',
+        title: 'Engineer',
+        department: 'Product',
+        phone: '',
+        bio: '',
+    });
+    assertEquals(body.team_dimensions, {});
+    assertEquals(body.strengths, []);
+});

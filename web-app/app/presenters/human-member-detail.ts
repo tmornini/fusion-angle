@@ -114,8 +114,6 @@ export function humanMemberPatchFromDraft(
     };
 }
 
-const DEFAULT_DIM = 50;
-
 // The Add Member dialog's fields, as the roster collects
 // them.
 export interface HumanMemberCreationDraft {
@@ -138,12 +136,10 @@ export function humanMemberCreationFromDraft(
         title: draft.title,
         department: draft.department,
         strengths: [],
-        team_dimensions: {
-            driver: DEFAULT_DIM,
-            analytical: DEFAULT_DIM,
-            expressive: DEFAULT_DIM,
-            amiable: DEFAULT_DIM,
-        },
+        // No page collects an assessment, so none is
+        // recorded — an empty map, never a fabricated
+        // score.
+        team_dimensions: {},
         phone: draft.phone,
         bio: draft.bio,
     };
