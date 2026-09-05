@@ -310,13 +310,22 @@ skew tests folded into item 7.
 Off the critical path; each with its oracle.
 
 - An inner pair of a composed operation skipped while
-  the top-level pair landed still answers 201:
+  the top-level pair landed answers 201;
   `appendMessagePair` returns void and the gate never
-  holds inner hashes (`api/message-pair.ts:686-701`)
+  holds inner hashes (`api/message-pair.ts:686-701`).
+  Oracle: a composed create whose inner hash collides
+  with an earlier pair
 - The run-four remediation's remaining seams — R6 and
-  R7, whose "toy" clauses need a Layer 3 observation
-  before any rewrite. G9's staleness was the corrupted
-  test name, restored by the small-items sweep
+  R7. R6 holds in a stronger form: no picker renders for
+  `select`. R7's primary clause is false: `regex` is
+  always offered and a second pick adds a second row
+  (`web-app/app/presenters/record-detail.ts:838-871,
+  901-909`; `api/validators.ts:2759-2775` accepts
+  duplicates). The walk decides whether that is a
+  defect; the pin
+  (`tests/presenter-record-detail.test.ts`) makes any
+  rewrite honest. G9's staleness was the corrupted test
+  name, restored by the small-items sweep
 
 ## Later work
 
