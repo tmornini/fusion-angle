@@ -65,7 +65,9 @@ Deno.test(
                 );
                 // Read back inside the same tx — the put is
                 // visible before commit.
-                return view.messagePairs.getAll();
+                return view.messagePairs.getCollectionPairs(
+                    aMessagePair.path,
+                );
             },
         );
         assertStrictEquals(seen.length, 1);
@@ -125,7 +127,9 @@ Deno.test(
         await db.postSchemaCreation();
         await db.messagePairs.append('syWUUcdBSbBgMwBiCrgbDw', aMessagePair);
         const seen = await db.readTransaction(
-            (view) => view.messagePairs.getAll(),
+            (view) => view.messagePairs.getCollectionPairs(
+                aMessagePair.path,
+            ),
         );
         assertStrictEquals(seen.length, 1);
         assertStrictEquals(seen[0]!.id, 'syWUUcdBSbBgMwBiCrgbDw');
@@ -162,7 +166,8 @@ Deno.test(
                 // Nested read joins the open write tx so the
                 // uncommitted put is visible (read-your-writes).
                 return view.readTransaction(
-                    (inner) => inner.messagePairs.getAll(),
+                    (inner) => inner.messagePairs
+                        .getCollectionPairs(aMessagePair.path),
                 );
             },
         );

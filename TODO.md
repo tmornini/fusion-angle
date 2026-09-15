@@ -300,16 +300,6 @@ Off the critical path; each with its oracle.
   under one lock order, with one notification. Lands beside
   items 7 and 10, which rewrite the largest handlers. Oracle:
   one append site in `api/api.ts`, zero in `api/routes.ts`.
-- Every read is a collection or a document. The six
-  whole-ledger folds, `deriveIdentityTokens`,
-  `invitationOpStates`, `deriveIdentityPiiRows`,
-  `deriveStateFieldValueReferrers`, `deriveWorkOrderLifecycle`,
-  `deriveInvitationStates`, each take the exact-read shape the
-  examination report names for them, with the data-shape
-  decisions it names first, the token chain's path from a jti
-  among them. `getAll` and `selectAll` retire with the last
-  fold. Oracle: no caller of `getAll` in `api/`, and the
-  whole-ledger pin deleted.
 - The ledger sweep, built into `./bin/measure` the way
   `./deploy` grew modes. A ledger mode that subsumes a
   generator and a loader: the mock seed as the base, a modeled

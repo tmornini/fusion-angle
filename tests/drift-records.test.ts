@@ -211,8 +211,13 @@ async function derivedRecordAttributes(
     return out;
 }
 
+// Takes the concrete adapter, not the `DbAdapter` face:
+// the attribute's owning record type is what this search
+// is for, so there is no known collection to read — only
+// the whole plane answers. Every caller holds the seeded
+// memory adapter.
 async function resolveAttributePath(
-    db: DbAdapter, organization: Id, id: Id,
+    db: MemoryDbAdapter, organization: Id, id: Id,
 ): Promise<string | null> {
     const hits = (await db.messagePairs.getAll()).filter(
         (row) => row.name === id,
@@ -238,7 +243,7 @@ async function resolveAttributePath(
 }
 
 async function derivedRecordAttribute(
-    db: DbAdapter, organization: Id, id: Id,
+    db: MemoryDbAdapter, organization: Id, id: Id,
 ): Promise<RecordAttributeEntity> {
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', organization,
