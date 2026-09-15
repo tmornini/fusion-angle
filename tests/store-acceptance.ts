@@ -521,4 +521,22 @@ export function defineStoreAcceptance(
             null,
         );
     });
+
+    Deno.test(name + ': a second append of an id changes'
+    + ' nothing and says so', async () => {
+        const { db } = await ready();
+        const id = generateIdentifier();
+        const first = pairRow(HEAD_PATH, 'once', 'PUT', stamp(1), 1);
+        const second = pairRow(HEAD_PATH, 'once', 'PUT', stamp(2), 2);
+        assertStrictEquals(
+            await db.messagePairs.append(id, first), true,
+        );
+        assertStrictEquals(
+            await db.messagePairs.append(id, second), false,
+        );
+        assertEquals(
+            await db.messagePairs.getById(id),
+            { id, ...first },
+        );
+    });
 }

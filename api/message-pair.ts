@@ -619,9 +619,8 @@ export async function storedMessagePairResponse(
     return sendWriteResponse(stored, method, true);
 }
 
-// In-tx append keyed by pair id: a byte-identical request
-// lands again. Auth grant pairs use this path so two
-// identical logins each land (their ids differ).
+// In-tx append keyed by pair id — ids are minted fresh per
+// request, so two byte-identical logins each land.
 // The view parameter is DbAdapter, NOT GuardedDbAdapter: route
 // handlers receive DbAdapter and their transaction callbacks are
 // typed (view: DbAdapter) — the fence spends the guard before
@@ -658,19 +657,28 @@ async function writeMessagePairRows(
     view: DbAdapter,
     messagePair: MessagePair,
 ): Promise<void> {
-    await view.messagePairs.append(messagePair.id, {
-        path: messagePair.path,
-        name: messagePair.name,
-        requester_identity_id:
-            messagePair.requesterIdentityId,
-        method: messagePair.method,
-        request_at: messagePair.requestAt,
-        request_hash: messagePair.requestHash,
-        request: messagePair.requestMessage,
-        response_at: nowUtc(),
-        response: messagePair.responseMessage,
-        operation_id: messagePair.operationId,
-    });
+    const appended = await view.messagePairs.append(
+        messagePair.id,
+        {
+            path: messagePair.path,
+            name: messagePair.name,
+            requester_identity_id:
+                messagePair.requesterIdentityId,
+            method: messagePair.method,
+            request_at: messagePair.requestAt,
+            request_hash: messagePair.requestHash,
+            request: messagePair.requestMessage,
+            response_at: nowUtc(),
+            response: messagePair.responseMessage,
+            operation_id: messagePair.operationId,
+        },
+    );
+    if (!appended) {
+        throw new Error(
+            'message pair ' + messagePair.id
+            + ' is already stored',
+        );
+    }
 }
 
 // Lock order: request if hash-deduped, document if

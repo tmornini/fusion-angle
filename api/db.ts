@@ -103,10 +103,12 @@ export interface EntityStore<
         containment: Record<string, unknown>,
     ): Promise<T[]>;
     getById(id: string): Promise<T>;
+    // Writes the row if its id is absent and reports whether
+    // it did. A later append of the same id changes nothing.
     append(
         id: string,
         fields: Omit<T, 'id'>,
-    ): Promise<T>;
+    ): Promise<boolean>;
 }
 
 // The storage-edge validator. Stores accept one at
@@ -150,7 +152,7 @@ export interface Tx {
     ): Promise<T[]>;
     append<T extends { id: string }>(
         row: T,
-    ): Promise<void>;
+    ): Promise<boolean>;
     getHead(path: string, name: string): Promise<{
         readonly id: string;
         readonly method: string;

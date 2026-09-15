@@ -117,17 +117,16 @@ export class HistoryEntityStore<
     async append(
         id: string,
         fields: Omit<T, 'id'>,
-    ): Promise<T> {
+    ): Promise<boolean> {
         const { id: _id, ...body } =
             fields as unknown as Record<string, unknown>;
         const written = {
             ...this.#validate(body),
             id,
         } as T;
-        await this.#run(
+        return this.#run(
             'readwrite',
-            tx => tx.append(written),
+            (tx) => tx.append(written),
         );
-        return written;
     }
 }

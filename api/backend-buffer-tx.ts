@@ -87,7 +87,8 @@ function documentRows(
 // backend fills and drains this buffer; Postgres does not
 // use it. The NOT-NULL gate runs at `append` time, so a
 // bad row throws inside `fn` and the whole transaction
-// rolls back.
+// rolls back. An existing id is left as it is and reported
+// `false` — the buffer is append-only like the table.
 //
 // Reads hand out copies, never the buffered or committed
 // row objects — the seam's value semantics: Postgres
@@ -228,8 +229,11 @@ export function bufferTx(
         },
         async append<T extends { id: string }>(
             row: T,
-        ): Promise<void> {
+        ): Promise<boolean> {
             assertWritable();
+            if (buffer.some((existing) => existing.id === row.id)) {
+                return false;
+            }
             // Scan BEFORE serializeRecord/splice: absence
             // is unindexed, so a row lacking the column
             // never collides (genesis rows coexist).
@@ -264,14 +268,8 @@ export function bufferTx(
                 ),
                 id: row.id,
             } as { id: string };
-            const idx = buffer.findIndex(
-                r => r.id === row.id,
-            );
-            if (idx >= 0) {
-                buffer[idx] = written;
-            } else {
-                buffer.push(written);
-            }
+            buffer.push(written);
+            return true;
         },
     };
 }

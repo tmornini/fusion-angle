@@ -1,6 +1,8 @@
 // Fourth StorageBackend. postgres.js stays behind
 // postgres-client. Write lock order is request, document,
-// then FOR UPDATE. Notify is in-transaction.
+// then FOR UPDATE. Notify is in-transaction. The write
+// appends: `ON CONFLICT (id) DO NOTHING`, the row count is
+// the report.
 
 import {
     type StorageBackend,
@@ -188,13 +190,13 @@ function postgresTx(
         },
         async append<T extends { id: string }>(
             row: T,
-        ): Promise<void> {
+        ): Promise<boolean> {
             assertWritable();
             const written = serializeRecord(
                 row as Record<string, unknown>,
                 'message_pairs',
             );
-            await upsertRow(sql, written);
+            return upsertRow(sql, written);
         },
         async lockRequest(hash: string): Promise<void> {
             await advisoryLock(sql, 'fusion.dedup.' + hash);
@@ -459,7 +461,7 @@ async function selectWhereBody(
 async function upsertRow(
     sql: SqlClient,
     row: Record<string, unknown>,
-): Promise<void> {
+): Promise<boolean> {
     const id = uuidTextOfIdentifier(
         textField(row, 'id'),
     );
@@ -477,7 +479,7 @@ async function upsertRow(
     const operationId = uuidTextOfIdentifier(
         textField(row, 'operation_id'),
     );
-    await sql.query`
+    const inserted = await sql.query<{ id: string }>`
         INSERT INTO message_pairs (
             id, path, name,
             requester_identity_id, method,
@@ -491,17 +493,8 @@ async function upsertRow(
             ${responseAt}, ${response},
             ${operationId}
         )
-        ON CONFLICT (id) DO UPDATE SET
-            path = EXCLUDED.path,
-            name = EXCLUDED.name,
-            requester_identity_id =
-                EXCLUDED.requester_identity_id,
-            method = EXCLUDED.method,
-            request_at = EXCLUDED.request_at,
-            request_hash = EXCLUDED.request_hash,
-            request = EXCLUDED.request,
-            response_at = EXCLUDED.response_at,
-            response = EXCLUDED.response,
-            operation_id = EXCLUDED.operation_id
+        ON CONFLICT (id) DO NOTHING
+        RETURNING id
     `;
+    return inserted.length === 1;
 }
