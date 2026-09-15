@@ -28,7 +28,7 @@ import { liveHeadId, messageStore } from
 
 // Flows' own reshaping of the generic message-plane reduction
 // (derive-documents.ts): the async fetching (one prefix scan per
-// derivation, per family address) plus the entity/lifecycle
+// derivation, per family document) plus the entity/lifecycle
 // knowledge only this family has. Read-only and additive — no
 // route, adapter, or seed row reads any of this yet (Task 8
 // wires the route); tests/drift-flows.test.ts is the proof of
@@ -41,7 +41,7 @@ import { liveHeadId, messageStore } from
 //
 // THREE HEAD notions coexist over a flow's message-plane rows
 // and must never be conflated (IV Logic):
-//   - The LOCK head: the latest pair at the address by envelope
+//   - The LOCK head: the latest pair at the document by envelope
 //     (at, id), ANY method — the store's document head read
 //     (`messageStore(db).get`), serving Supersedes/Follows
 //     provenance for the locked class. A DAG under races;
@@ -111,7 +111,7 @@ export function flowEntityOf(
 
 // G2 stored PUT: flowEntityOf minus the read-time stamp.
 // hasUndoHistory is COUNT(*) > 1 of PUT+DELETE pairs at the
-// flow address — GET adds it; the stored blob never carries
+// flow document — GET adds it; the stored blob never carries
 // it.
 export function flowStoredEntityOf(
     document: DerivedDocument,
@@ -227,7 +227,7 @@ export async function deriveFlow(
 }
 
 // Undo-as-replay's own resolution (Phase 14 Task 8): given this
-// flow's OWN undo-operation-pair address prefix (the route's
+// flow's OWN undo-operation-pair path prefix (the route's
 // own `messagePair.path` — already flow-specific,
 // since `undo` is a literal final route segment, so
 // pathAndNameOf folds the real id into the PREFIX rather
@@ -251,7 +251,7 @@ export async function deriveFlow(
 // `messagePair.requestAt`). `target: undefined` means
 // exhaustion (no pair exists before the current head); an
 // undefined RETURN means the flow has no document message pairs at
-// all at this address (should never happen for a routed
+// all at this document (should never happen for a routed
 // request against a real flow id — this derivation trusts
 // nothing beyond what it reads, same posture as
 // deriveFlow's own EntityNotFoundError guard).

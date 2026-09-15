@@ -39,9 +39,9 @@ Deno.test('an operation route is collection-shaped', () => {
 });
 
 Deno.test('pathAndNameOf names path', () => {
-    const addr = pathAndNameOf(
+    const pathAndName = pathAndNameOf(
         ['ideas', ':id'], ['ideas', '42'],
     );
-    assertStrictEquals(addr.path, '/ideas/');
-    assertStrictEquals(addr.name, '42');
+    assertStrictEquals(pathAndName.path, '/ideas/');
+    assertStrictEquals(pathAndName.name, '42');
 });

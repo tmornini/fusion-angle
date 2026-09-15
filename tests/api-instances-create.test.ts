@@ -501,7 +501,7 @@ async () => {
     assertStrictEquals(second.status, 428);
 });
 
-Deno.test('PATCH create at a tombstoned address → 409 spent',
+Deno.test('PATCH create at a tombstoned document → 409 spent',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -584,10 +584,10 @@ async () => {
             + '/record-types/' + TYPE_ID
             + '/instances/',
     );
-    const atAddress = responses.filter(
+    const pairsAt = responses.filter(
         (r) => r.name === INSTANCE_ID,
     );
-    assertStrictEquals(atAddress.length, 2);
+    assertStrictEquals(pairsAt.length, 2);
 });
 
 Deno.test('same-body instance PATCH with new Operation-ID'
@@ -630,7 +630,7 @@ async () => {
     );
 });
 
-Deno.test('two creates racing one address → first 201, '
+Deno.test('two creates racing one document → first 201, '
 + 'second 428',
 async () => {
     const { db, adminToken, memberToken } =
@@ -661,11 +661,11 @@ async () => {
             + '/record-types/' + TYPE_ID
             + '/instances/',
     );
-    const atAddress = responses.filter(
+    const pairsAt = responses.filter(
         (r) => r.name === INSTANCE_ID,
     );
     assertStrictEquals(
-        atAddress.length, 2,
+        pairsAt.length, 2,
         'winner writes wire PATCH + inner PUT',
     );
 });

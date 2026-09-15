@@ -1253,7 +1253,7 @@ export interface FlowRecordEntity {
 // A flow tag: the codebase's FIRST message-plane-ONLY document
 // family (Phase 14 Task 9) — no backing table, derived entirely
 // from message pairs at /flows/:id/tags/:name. `id` is the tag's
-// own NAME — user-authored address text (validateFlowTagName,
+// own NAME — user-authored path text (validateFlowTagName,
 // api/validators.ts), never a generated id, unlike every sibling
 // entity's `id` above. The body carries ONLY the pinned response
 // id of the flow document message pair this tag names — never a

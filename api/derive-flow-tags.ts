@@ -32,7 +32,7 @@ function flowTagsUriPrefix(
 }
 
 // G6: GET derive is the stored PUT. id-first; flow_id
-// from the address (never a client body key).
+// from the document (never a client body key).
 export function flowTagEntityOf(
     flowId: Id,
     document: DerivedDocument,

@@ -123,7 +123,7 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 }
 
 // Postgres coordinateWrite 412s an unlatched PUT at a
-// locked address. Memory omits writeLocks, so the undo
+// locked document. Memory omits writeLocks, so the undo
 // route's synthesized document message pair never hit that gate
 // in ./test — garden did. This wrapper installs the same
 // latestPutDelete check so the pin fails here too.

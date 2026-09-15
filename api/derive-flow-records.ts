@@ -18,13 +18,13 @@ import {
 // message-plane reduction (derive-documents.ts) — the
 // deriveFlowWorkOrders structural mirror (api/derive-flow-work-
 // orders.ts), re-nested one level deeper: one prefix scan per
-// flow, at the join address the live PUT/DELETE flows/:id/
+// flow, at the join document the live PUT/DELETE flows/:id/
 // records/:frid route (and the seed's own postFlowRecordDocument
 // Op invocation, Phase 6 Task 5) both write. A join row carries
 // no lifecycle trio of its own — a DELETE tombstones it outright
 // (deriveDocumentsAt's own DELETE-head exclusion mirrors the old
 // plane's physical splice; parity, not a new mechanism). Unlike
-// deriveFlowWorkOrders, this join's own :frid address carries a
+// deriveFlowWorkOrders, this join's own :frid document carries a
 // LIVE GET route (flows/:id/records/:frid), so a by-id read
 // (deriveFlowRecord) is needed alongside the collection read —
 // deriveIdea/deriveFlow's own absent/DELETE-head -> Entity

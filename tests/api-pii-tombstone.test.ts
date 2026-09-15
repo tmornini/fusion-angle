@@ -132,10 +132,10 @@ Deno.test('PUT-PUT leaves two pairs and Supersedes', async () => {
     assertStrictEquals(second.status, 201);
     const secondId = second.headers.get('Response-ID');
     assertNotStrictEquals(secondId, firstId);
-    const atAddress = await pairsAtPii(db, id);
-    assertStrictEquals(atAddress.length, 2);
-    assert(atAddress.some(r => r.id === firstId));
-    assert(atAddress.some(r => r.id === secondId));
+    const pairsAt = await pairsAtPii(db, id);
+    assertStrictEquals(pairsAt.length, 2);
+    assert(pairsAt.some(r => r.id === firstId));
+    assert(pairsAt.some(r => r.id === secondId));
     const head = await documentHeadAt(
         db, piiCollection(id), '',
     );
@@ -163,13 +163,13 @@ Deno.test('PUT-DELETE leaves a bodyless DELETE head and an'
     assertStrictEquals(del.status, 204);
     const delId = del.headers.get('Response-ID');
     assertNotStrictEquals(delId, putId);
-    const atAddress = await pairsAtPii(db, id);
-    assertStrictEquals(atAddress.length, 2);
-    const delRow = atAddress.find(r => r.id === delId);
+    const pairsAt = await pairsAtPii(db, id);
+    assertStrictEquals(pairsAt.length, 2);
+    const delRow = pairsAt.find(r => r.id === delId);
     assert(delRow);
     assertStrictEquals(delRow!.method, 'DELETE');
     assert(!delRow!.request.includes('Bob'));
-    assert(atAddress.some(r => r.id === putId
+    assert(pairsAt.some(r => r.id === putId
         && r.request.includes('Bob')));
     const head = await documentHeadAt(
         db, piiCollection(id), '',
@@ -199,8 +199,8 @@ Deno.test('DELETE-PUT is live again at three pairs', async () => {
         humanPii('Cara Restored'),
     ));
     assertStrictEquals(put.status, 201);
-    const atAddress = await pairsAtPii(db, id);
-    assertStrictEquals(atAddress.length, 3);
+    const pairsAt = await pairsAtPii(db, id);
+    assertStrictEquals(pairsAt.length, 3);
     const head = await documentHeadAt(
         db, piiCollection(id), '',
     );
@@ -266,8 +266,8 @@ Deno.test('a byte-identical resend AFTER supersession replays'
         (await db.messagePairs.getAll()).length,
         countAfterSecond,
     );
-    const atAddress = await pairsAtPii(db, id);
-    assertStrictEquals(atAddress.length, 2);
+    const pairsAt = await pairsAtPii(db, id);
+    assertStrictEquals(pairsAt.length, 2);
     const domainRow = await deriveIdentityPii(db, id);
     assertStrictEquals(domainRow.name, 'Erin Marie');
 });
@@ -347,9 +347,9 @@ async () => {
     assertStrictEquals(erase.status, 204);
     await assertRejects(() => deriveIdentityPii(db, id));
 
-    const atAddress = await pairsAtPii(db, id);
-    assertStrictEquals(atAddress.length, 3);
-    const piiText = atAddress
+    const pairsAt = await pairsAtPii(db, id);
+    assertStrictEquals(pairsAt.length, 3);
+    const piiText = pairsAt
         .map(r => r.request + r.response).join('');
     assert(piiText.includes(ERASED_NAME));
     assert(piiText.includes(ERASED_EMAIL));
@@ -382,9 +382,9 @@ async () => {
     }
 });
 
-// ── 6. Confinement: no address splices ──
+// ── 6. Confinement: no document splices ──
 
-Deno.test('PUT-PUT-DELETE adds exactly three pairs (no address'
+Deno.test('PUT-PUT-DELETE adds exactly three pairs (no document'
 + ' splices)', async () => {
     const db = await freshDb();
     const id = 'XSNEaxodzAorrAiVBegDGw';
@@ -402,8 +402,8 @@ Deno.test('PUT-PUT-DELETE adds exactly three pairs (no address'
         'DELETE', '/identities/' + id + '/pii', DEV_TOKEN,
     ));
     assertStrictEquals(del.status, 204);
-    const atAddress = await pairsAtPii(db, id);
-    assertStrictEquals(atAddress.length, 3);
+    const pairsAt = await pairsAtPii(db, id);
+    assertStrictEquals(pairsAt.length, 3);
     const head = await documentHeadAt(
         db, piiCollection(id), '',
     );

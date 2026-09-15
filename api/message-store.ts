@@ -10,7 +10,7 @@ import { compareIdentifiers } from
     '../shared/identifier.ts';
 
 // Named reads over the message plane. One document
-// is getAllAtAddress (collection + name). A
+// is getAllAtAddress (path + name). A
 // collection is getAllWhere('path').
 // Body containment is getAllWhereBody. No
 // name-only scan. The seam orders by

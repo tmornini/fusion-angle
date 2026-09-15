@@ -14,7 +14,7 @@ import {
 // message-plane reduction (derive-documents.ts) — the
 // deriveFlowRecords structural mirror (api/derive-flow-
 // records.ts): one prefix scan per parent objective, at the
-// nested address a live genesis create (POST /objectives, the
+// nested document a live genesis create (POST /objectives, the
 // synthesized revision pair) and a live PUT objectives/:id/
 // revisions/:rid (a fresh revision) both write. The GENERIC
 // entity/collection handlers (documentGetHandler/document
@@ -29,12 +29,12 @@ import {
 // derivation, or vice versa).
 //
 // Revisions carry NO lifecycle of their own — there is no
-// revision-level trio, no DELETE at this address, and no by-id
+// revision-level trio, no DELETE at this document, and no by-id
 // GET route (only objectives/:id/revisions is live; :rid is
 // PUT-only) — so this module exports the collection derivation
 // alone, unlike deriveFlowRecords' by-id sibling (deriveFlow
 // Record), which exists only because flows/:id/records/:frid
-// carries a live GET the revisions address never gained.
+// carries a live GET the revisions document never gained.
 //
 // H7: explicit id-lex sort — load-bearing, because the
 // backend's row order is not a contract and no caller may
@@ -75,7 +75,7 @@ export function objectiveRevisionEntityOf(
 // objectives/:id/revisions route (a future task's flip): the
 // SERVER already filters by the parent objective through this
 // derivation's own nested prefix, so the org fence and the
-// parent scope are both closed by the address alone — no
+// parent scope are both closed by the document alone — no
 // foreign-parent row can ever surface (a foreign organization or
 // a foreign objective id yields a distinct, empty prefix, never
 // a filtered-out row).

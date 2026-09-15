@@ -1391,7 +1391,7 @@ async function transitionWithFieldValue(
 }
 
 // Wire-shape pin (C4): GET organizations/:id/work-orders/:id/history is
-// 200 / 404 by address (own → rows with field_values;
+// 200 / 404 by document (own → rows with field_values;
 // never written here → 404; absent → 404). Field values
 // fold inline; the retired GET states/:id/field-values
 // three-way force lives here.
@@ -1435,7 +1435,7 @@ Deno.test('work-order history GET: 200/404 two-way for'
         ownTe!.field_values.map((r) => r.id), [fieldValueId],
     );
 
-    // (foreign) Org two 404s — never written at this address.
+    // (foreign) Org two 404s — never written at this document.
     const foreign = await handleRequest(
         db,
         req(

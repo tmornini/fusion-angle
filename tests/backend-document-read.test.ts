@@ -48,7 +48,7 @@ const ROWS: Row[] = [
     },
 ];
 
-Deno.test('getAddress is collection+name, ordered by at,id',
+Deno.test('getAddress is path+name, ordered by at,id',
 async () => {
     const backend = new MemoryStorageBackend();
     await backend.ensureTables(['t']);

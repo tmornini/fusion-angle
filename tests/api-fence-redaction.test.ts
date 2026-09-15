@@ -31,7 +31,7 @@ Deno.test(
         // DEV_TOKEN carries no `organization` claim, so
         // fenceRequest falls back to identityDefaultOrganization,
         // which derives from db.messagePairs/db.messagePairs at the
-        // identity's default-organization address. Fault THAT
+        // identity's default-organization document. Fault THAT
         // read alone
         // — every other read passes through unaffected.
         const original = db.messagePairs.getAllWhere.bind(db.messagePairs);

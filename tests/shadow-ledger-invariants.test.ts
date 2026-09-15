@@ -258,7 +258,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     );
 
     // Idea state-change trio PUT (states/:id retired) — a
-    // second lifecycle stamp on the same document address.
+    // second lifecycle stamp on the same document.
     const stateAppend = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'hwpssRPdIjwzeMdYPAhqrw', org1Token, {

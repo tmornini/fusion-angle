@@ -30,7 +30,7 @@ import {
 // GET <family>/:id/versions/ — Phase A3 of states-URI
 // elimination. Per trio family (ideas, projects, records,
 // flows, objectives): document-PUT lifecycle → 200 DESC
-// current-first; foreign miss at this address → 404;
+// current-first; foreign miss at this document → 404;
 // absent → 404. Shared handler builder wraps
 // derive*StateHistory (ASC) with DESC + missedReadError.
 // Product versions live under organizations/:id/.
@@ -278,7 +278,7 @@ Deno.test(
 
 Deno.test(
     'GET organizations/:id/ideas/:id/versions/ foreign'
-    + ' → 404 at this address',
+    + ' → 404 at this document',
     async () => {
         const db = await sharedMockDb();
         const list = await handleRequest(
@@ -451,7 +451,7 @@ Deno.test(
 
 Deno.test(
     'GET organizations/:id/projects/:id/versions foreign'
-    + ' → 404 at this address',
+    + ' → 404 at this document',
     async () => {
         const db = await sharedMockDb();
         const list = await handleRequest(
@@ -887,7 +887,7 @@ Deno.test(
 
 Deno.test(
     'GET organizations/:id/flows/:id/versions foreign'
-    + ' → 404 at this address',
+    + ' → 404 at this document',
     async () => {
         const db = await sharedMockDb();
         const list = await handleRequest(
@@ -1038,7 +1038,7 @@ Deno.test(
 
 Deno.test(
     'GET organizations/:id/objectives/:id/versions foreign'
-    + ' → 404 at this address',
+    + ' → 404 at this document',
     async () => {
         const db = await sharedMockDb();
         const list = await handleRequest(

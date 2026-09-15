@@ -725,11 +725,11 @@ async () => {
 });
 
 // -- 7. method-filter proof: the create-op POST pairs are never -
-// -- derived heads; exactly one document head per address after -
+// -- derived heads; exactly one document head per document after -
 // -- create ---------------------------------------------------------
 
 Deno.test('PUT ai-agents and PUT identities land exactly one'
-+ ' document message pair at each address — no composing POST',
++ ' document message pair at each document — no composing POST',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -867,7 +867,7 @@ async () => {
     assertStrictEquals(got.title, 'second');
 });
 
-// -- 9. plain PUT-supersession at a membership address (NAMED --
+// -- 9. plain PUT-supersession at a membership document (NAMED --
 // -- divergence from a literal genesis-wins-under-skew) ---------
 //
 // Memberships carry no lifecycle trio (MEMBERSHIPS_WIRING:
@@ -877,16 +877,16 @@ async () => {
 // globally monotonic and the response `at` is minted
 // synchronously pre-commit (the drift-work-orders.test.ts case-7
 // precedent makes the SAME admission for its own stateless
-// document address) — so no live two-PUT sequence can decouple
+// document) — so no live two-PUT sequence can decouple
 // "the (at, id) reduction" from arrival order here, and there is
 // no body timestamp to skew that any reduction other than
 // arrival order consults. This case proves plain PUT
-// supersession at a membership address instead, and separately
+// supersession at a membership document instead, and separately
 // proves deriveMembers' JOIN is insensitive to which PUT "won"
 // (it reads identity_id alone, unaffected by the membership's
 // own `at` field either way).
 
-Deno.test('plain PUT-supersession at a seat address — a'
+Deno.test('plain PUT-supersession at a seat document — a'
 + ' second PUT (an OLDER domain `at` than the first) still'
 + ' supersedes by ARRIVAL order on the message plane',
 async () => {

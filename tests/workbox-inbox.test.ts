@@ -123,7 +123,7 @@ function buildLinearGraph(): StoredGraph {
 
 // Seed a flow through the SAME gate-driven create/document-PUT
 // idiom the live route uses (postFlowCreation + putFlow), so a
-// message pair exists at this flow's address — required for the
+// message pair exists at this flow's document — required for the
 // flipped GET organizations/:id/flows/:id route (Phase 4 Task 8), which
 // postWorkOrderCreation reads before creating (this file's own
 // comment names that freeze dependency), to derive it.

@@ -107,7 +107,7 @@ Deno.test('postMockDataLoad seeds one revision per objective',
     });
 
 // All five objective seeds mint genesis state 'active' via
-// the create-body trio (states-address retirement) — none
+// the create-body trio (states-document retirement) — none
 // are archived. GET objectives stamps that trio on rows.
 Deno.test('postMockDataLoad seeds zero archived objectives',
     async () => {

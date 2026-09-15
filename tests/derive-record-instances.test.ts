@@ -319,7 +319,7 @@ Deno.test(
 );
 
 Deno.test(
-    'deriveInstanceHead absent address → undefined',
+    'deriveInstanceHead absent document → undefined',
     async () => {
         const db = await emptyDb();
         const head = await deriveInstanceHead(

@@ -19,7 +19,7 @@ function defaultOrganizationPrefix(identityId: Id): string {
 
 // The current SET document, or empty when never written.
 // Head-reduced (deriveDocumentsAt): a later PUT at the same
-// address is the document. TARGETED read: one identity-keyed
+// (path, name) is the document. TARGETED read: one identity-keyed
 // prefix via the path index.
 export async function deriveDefaultOrganization(
     db: DbAdapter,

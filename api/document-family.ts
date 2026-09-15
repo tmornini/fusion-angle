@@ -118,8 +118,8 @@ export interface DocumentFamilyWiring {
     // carry the Decision 7 lifecycle trio in every document
     // body and get the lifecycle walk + DELETED filter;
     // 'stateless' families carry entity fields only and skip
-    // both (their lifecycle, if any, lives in operation-
-    // addressed event pairs, never the document address).
+    // both (their lifecycle, if any, lives in operation-path
+    // event pairs, never the document).
     readonly lifecycle: 'trio' | 'stateless';
     // The identifier the wire 404 body speaks —
     // EntityNotFoundError's table. Family name for ideas/
@@ -228,7 +228,7 @@ export async function throwDocumentMiss(
 }
 
 // The generic per-id derivation: store.getMessagePairs at this
-// address, reduce to the head document (deriveDocumentsAt),
+// document, reduce to the head document (deriveDocumentsAt),
 // and — for a 'trio' family ONLY — walk the lifecycle
 // history over those same pairs to 404 a lifecycle-deleted
 // document too. A 'stateless' family's document body carries
@@ -321,9 +321,9 @@ export function documentGetHandler(
         );
 }
 
-// Live PUT pair id at this address — the store's document
+// Live PUT pair id at this document — the store's document
 // head read (`messageStore(db).get`). A DELETE head or
-// virgin address is undefined.
+// virgin document is undefined.
 export async function documentHeadMessagePairId(
     db: DbAdapter,
     path: string,
@@ -394,7 +394,7 @@ export function documentStateHistoryHandler(
 
 const PUT_METHOD = 'PUT';
 
-// Find the pair at this address whose id is the advertised
+// Find the pair at this document whose id is the advertised
 // ETag. A foreign or absent pair is simply not in the
 // collection — the caller's missedReadError ladder answers.
 export async function lookupStoredRevision(

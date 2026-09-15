@@ -10,11 +10,11 @@ import {
 // The invitation family's own reduction over the message
 // ledger — the roster phase's LAST derivation before the
 // readers flip (Task 8). The invitation ROW comes from the
-// grant's document head at the flat '/invitations/' address
+// grant's document head at the flat '/invitations/' path
 // (ONE keyed getAllWhere read per store — deriveDocumentsAt);
 // its STATE comes from a SEPARATE reduction this module owns,
 // since an invitation's lifecycle never rides the document
-// address (Decision 6 would require a trio the wire body has
+// (Decision 6 would require a trio the wire body has
 // no room for — the invitations side channel forms its
 // operation message pairs at 'invitations/:id/acceptance' etc,
 // api/invitations-domain.ts's formInvitationOperationMessagePair).
@@ -43,7 +43,7 @@ const OP_STATES: Readonly<Record<string, InvitationState>> = {
     revocation: 'revoked',
 };
 
-const OP_ADDRESS_PATTERN =
+const OP_PATH_PATTERN =
     /^\/invitations\/([^/]+)\/(acceptance|decline|revocation)\/$/;
 
 const INVITATION_OP_KINDS = [
@@ -68,7 +68,7 @@ async function invitationOpStates(
 ): Promise<Map<Id, InvitationState>> {
     const states = new Map<Id, InvitationState>();
     for (const messagePair of await db.messagePairs.getAll()) {
-        const match = OP_ADDRESS_PATTERN.exec(
+        const match = OP_PATH_PATTERN.exec(
             messagePair.path,
         );
         if (match === null) continue;

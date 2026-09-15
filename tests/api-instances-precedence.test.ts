@@ -453,9 +453,9 @@ async () => {
     );
 });
 
-// --- Step 12: spent-address 409 is last (in-tx) ---
+// --- Step 12: spent-document 409 is last (in-tx) ---
 
-Deno.test('12 PATCH create race at one address → 201/428 '
+Deno.test('12 PATCH create race at one document → 201/428 '
 + '(in-tx, last)',
 async () => {
     const { db, adminToken, memberToken } =

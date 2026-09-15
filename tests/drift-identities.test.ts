@@ -93,7 +93,7 @@ const INV_A = generateIdentifier();
 // identities and identity_pii were EntityStore-backed; the
 // states/:id escape hatch that once hid a row on the OLD
 // plane (a hand-crafted 'deleted' event) is RETIRED with the
-// address. Lifecycle for members rides PUT members/:id; no
+// document. Lifecycle for members rides PUT members/:id; no
 // shipped route posts a 'deleted' state for an identities/
 // identity_pii id, so derived-plane parity holds throughout
 // every case below regardless.
@@ -200,7 +200,7 @@ async function derivedIdentity(
 // as tests/drift-roster.test.ts's own derivedMemberships does);
 // the any-membership leg unions that SAME derivation across every
 // KNOWN seeded organization — memberships is org-nested
-// (family-registry.ts), so there is no single global address to
+// (family-registry.ts), so there is no single global document to
 // scan, and the two seeded organizations are the drift-roster.
 // test.ts precedent's own known-org set (its case 1's "10/6
 // split", its THIRD_ORGANIZATION empty leg).
@@ -523,13 +523,13 @@ Deno.test('credentials per identity + per cid (13 seeded) + the'
 });
 
 // -- 3b. GATE 15 FENCE-INPUT FIX (post-session review finding): --
-// -- a mismatched below-facade write — address under identity A, -
+// -- a mismatched below-facade write — document under identity A, -
 // -- body.identity_id names B — must fence on the ROW's -----------
 // -- identity_id (B), never the path (A), on BOTH planes; the -----
 // -- collection's WHERE(identity_id==path) semantics must ALSO ----
 // -- exclude it under path A on both planes, regardless of org ----
 
-Deno.test('credentials fence-input fix: a mismatched write (address'
+Deno.test('credentials fence-input fix: a mismatched write (document'
 + ' under identity A, body.identity_id names B) fences on the'
 + ' ROW identity (B), never the path (A) — the leaf, checked from'
 + " BOTH A's and B's org; the collection's WHERE(identity_id=="
@@ -565,7 +565,7 @@ Deno.test('credentials fence-input fix: a mismatched write (address'
         { type: 'member', at: nowUtc() },
     ));
 
-    // The mismatched write itself — address under A, body names
+    // The mismatched write itself — document under A, body names
     // B — producible only below-facade (no validator ties the
     // path to the body; no live write path can construct this).
     const cid = generateIdentifier();
@@ -613,7 +613,7 @@ Deno.test('credentials fence-input fix: a mismatched write (address'
 
 // -- 4. role-grants parity (both org fence legs) + getById + ----
 // -- 404 bytes, a LIVE-CREATED grant (gate 16); providers + ------
-// -- revocations parity (empty + live-write); a same-address -----
+// -- revocations parity (empty + live-write); a same-document -----
 // -- double-PUT proving derived (response.at, id) == row-plane --
 // -- last-call-wins ------------------------------------------------
 

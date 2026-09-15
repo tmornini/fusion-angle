@@ -29,7 +29,7 @@ import { liveHeadId, messageStore } from
 
 // Ideas' own reshaping of the generic message-plane reduction
 // (derive-documents.ts): the async fetching (one prefix scan per
-// derivation, per family address) plus the entity/lifecycle
+// derivation, per family document) plus the entity/lifecycle
 // knowledge only this family has. Read-only and additive — no
 // route, adapter, or seed row reads any of this yet (Task 5 wires
 // the route); tests/drift-ideas.test.ts is the proof of equality

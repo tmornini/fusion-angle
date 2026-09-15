@@ -228,7 +228,7 @@ async () => {
     assertMatch(text, /ORDER BY response_at, id/);
 });
 
-Deno.test('getAddress uses collection and id, ordered',
+Deno.test('getAddress uses path and name, ordered',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);

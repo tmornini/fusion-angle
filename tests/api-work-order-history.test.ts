@@ -36,7 +36,7 @@ import {
 // elimination. Lifecycle events DESC (index 0 = current),
 // with transition field_values folded inline; claim/birth/
 // release rows carry []. Miss posture: empty lifecycle →
-// missedReadError → 404 miss at this address / 404 absent.
+// missedReadError → 404 miss at this document / 404 absent.
 
 const WORK_ORDER_ID = generateIdentifier();
 const NODE_START = generateIdentifier();
@@ -292,7 +292,7 @@ Deno.test(
 );
 
 Deno.test(
-    'foreign work order history → 404 at this address',
+    'foreign work order history → 404 at this document',
     async () => {
         const db = await seededMockDb();
         const foreignId = buildWorkOrders()[0]!.id;

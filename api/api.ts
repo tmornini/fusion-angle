@@ -674,14 +674,14 @@ export async function handleRequest(
     // the one UNCONDITIONAL write guard below runs after body-
     // parse regardless of bearerExempt, mirroring Region A above.
     // The states/:id ownership authorizer RETIRED with the route
-    // (states-address retirement Task 13); field-values leaf
+    // (states-document retirement Task 13); field-values leaf
     // write authorizer RETIRED with the leaf routes (Phase 15
     // Task 7).
     try {
         // WP8 self-only revocation guard. MEMBER_VERBS widens
         // PUT /identities/:id/token-revocations to the member
         // tier (Region A's route-policy check already cleared
-        // it). The path identity IS the address — compare it
+        // it). The path identity IS the document — compare it
         // to the actor. A member may revoke only its OWN
         // chain; an admin may name any identity. The 403 body
         // reuses authorizeRequest's OWN wording
@@ -760,7 +760,7 @@ export async function handleRequest(
             }
         }
         // The shadow-ledger pair: formed pre-tx (all crypto and
-        // address resolution happen before a transaction opens
+        // document resolution happen before a transaction opens
         // — see api/message-pair.ts), gated to routes wired in
         // MESSAGE_PAIR_WIRED_ROUTE_PATTERNS so no unwired route ever
         // advertises a Response-ID it did not store. Runs
@@ -844,21 +844,21 @@ export async function handleRequest(
             const isLatchedOperation =
                 LATCHED_OPERATION_ROUTE_PATTERNS
                     .has(routePattern);
-            const latchAddress = isLatchedOperation
+            const latchPathAndName = isLatchedOperation
                 ? pathAndNameOf(
                     matched.segments.slice(0, -1),
                     pathSegments.slice(0, -1),
                 )
                 : undefined;
-            const latchHead = latchAddress === undefined
+            const latchHead = latchPathAndName === undefined
                 ? undefined
                 : await documentHeadMessagePairId(
                     effective,
                     canonicalPath(
                         organization,
-                        latchAddress.path,
+                        latchPathAndName.path,
                     ),
-                    latchAddress.name,
+                    latchPathAndName.name,
                 );
             const latchEcho = isLatchedOperation
                 ? request.headers.get(IF_MATCH_HEADER)
@@ -1563,7 +1563,7 @@ export async function handleRequest(
                     // (`messageStore(db).get`) — the
                     // ANY-method LOCK head, still the write path's
                     // source above). Same value for a document-
-                    // class address (tests/api-flow-document.test.ts
+                    // class route (tests/api-flow-document.test.ts
                     // pins the equality); one mechanism now.
                     const headMessagePairId =
                         await documentHeadMessagePairId(

@@ -870,14 +870,14 @@ async () => {
     assertStrictEquals(created.status, 201);
 
     const requests = await db.messagePairs.getAll();
-    const atAddress = requests.filter(
+    const pairsAt = requests.filter(
         (r) => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
             && r.name === flowId,
     );
     // Both an operation (POST, 204) pair and a document (PUT)
     // pair share the SAME name.
-    assertStrictEquals(atAddress.length, 2);
+    assertStrictEquals(pairsAt.length, 2);
 
     // If the POST pair leaked into the document reduction it
     // would either throw (its body has no top-level

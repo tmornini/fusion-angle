@@ -16,7 +16,7 @@ import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// Pre-write authorizer: probe this address. Same id at two
+// Pre-write authorizer: probe this document. Same id at two
 // collections is two documents. Foreign-id PUT geneses here;
 // foreign-id DELETE never-written here is 404; genesis
 // (owner-null) is unaffected.
@@ -84,7 +84,7 @@ async function twoOrganizationDb(): Promise<{
 }
 
 Deno.test('foreign-id PUT organizations/:id/ideas/:id geneses at this'
-+ ' address', async () => {
++ ' document', async () => {
     const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , ORGANIZATION_A);
@@ -192,7 +192,7 @@ async () => {
             + '/record-types/rlzgSSwpqXVHTYfBzjWFWQ',
         tokenB,
     ));
-    // Never written at B's record-types address: 404,
+    // Never written at B's record-types document: 404,
     // nothing stored. A's document is untouched.
     assertStrictEquals(foreign.status, 404);
     const still = await handleRequest(db, req(
@@ -246,7 +246,7 @@ async () => {
 });
 
 Deno.test('foreign-id PUT organizations/:id/projects/:id geneses at'
-+ ' this address', async () => {
++ ' this document', async () => {
     const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , ORGANIZATION_A);

@@ -435,7 +435,7 @@ async () => {
     );
 
     // Nested path org = token org (TWO); foreign id was
-    // never written at this address → 404.
+    // never written at this document → 404.
     const expectedRecordMessage =
         'Not found: record_types/'
         + customerProfileRecordId;
@@ -462,7 +462,7 @@ async () => {
 
     const attributeId = 'CPJmMPXRaBIiNdGBofUPVg';
     // Nested GET probes the parent type first — miss at
-    // this org's record-types address → 404.
+    // this org's record-types document → 404.
     const expectedTypeMessage =
         'Not found: record_types/'
         + customerProfileRecordId;
@@ -1038,11 +1038,11 @@ async () => {
         db.messagePairs.getAllWhere('path', recordsPrefix),
         db.messagePairs.getAllWhere('path', recordsPrefix),
     ]);
-    const atRecordAddress = recordRequests.filter(
+    const atRecord = recordRequests.filter(
         (r) => r.path === recordsPrefix
             && r.name === recordId,
     );
-    assertStrictEquals(atRecordAddress.length, 2);
+    assertStrictEquals(atRecord.length, 2);
 
     const recordDocumentMessagePairs = documentMessagePairsAt(
         recordRequests, recordsPrefix,
@@ -1050,7 +1050,7 @@ async () => {
     assertStrictEquals(recordDocumentMessagePairs.length, 1);
     assertStrictEquals(recordDocumentMessagePairs[0]!.method, 'PUT');
 
-    const postRow = atRecordAddress.find(
+    const postRow = atRecord.find(
         (r) => decodeRequestMessage(r.request).method === 'POST',
     )!;
     const createBodyKeys = new Set(

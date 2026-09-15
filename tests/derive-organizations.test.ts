@@ -33,7 +33,7 @@ import {
 // Phase Final Task 2: organizations dual-write stripped. This
 // file no longer compares derive vs row-plane oracles — the
 // row plane is empty after a live PUT. Coverage re-homes to
-// wire-body / derive agreement and message-plane address proofs.
+// wire-body / derive agreement and message-plane document proofs.
 // Every pair is still built through the live PUT route.
 
 function req(
@@ -147,7 +147,7 @@ Deno.test('a second live PUT supersedes the first; derive sees the'
     // Phase Final Stage B: organizations table retired.
 });
 
-// -- the un-nested address proof ---------------------------------
+// -- the un-nested document proof ---------------------------------
 
 Deno.test('the pair lives at the flat /organizations/ prefix, no'
 + ' organization segment — derive takes no org argument',

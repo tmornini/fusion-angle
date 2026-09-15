@@ -149,7 +149,7 @@ async function createFlow(
 }
 
 // Task 5: create's own operation message pair (204, no
-// body) is no longer the address's head — its synthesized
+// body) is no longer the document's head — its synthesized
 // document message pair (appended after, so strictly later)
 // is. A save must echo THIS id, read fresh via GET, exactly
 // as the real client (buildFlowPutBody's ctx.GETWithEtag)
@@ -583,7 +583,7 @@ async () => {
 
 // Task 5: create's own 204 operation message pair and its
 // synthesized document message pair are now TWO rows at
-// organizations/:id/flows/:id's address — the GET-attached
+// organizations/:id/flows/:id's document — the GET-attached
 // head is the DOCUMENT message pair (appended strictly
 // later; a live PUT chains Follows/Supersedes off it), never
 // the create response's own operation Response-ID.
@@ -611,13 +611,13 @@ async () => {
     assert(stored !== undefined);
     assertStrictEquals(etag, strongEtagOf(stored.id));
     const requests = await db.messagePairs.getAll();
-    const atAddress = requests.filter(
+    const pairsAt = requests.filter(
         r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
             && r.name === 'bWdlaTZZcKRsLsGXiKQZkw',
     );
-    assertStrictEquals(atAddress.length, 2);
-    assert(atAddress.some(r => r.id === headId));
+    assertStrictEquals(pairsAt.length, 2);
+    assert(pairsAt.some(r => r.id === headId));
 });
 
 // Task 8: the organizations/:id/flows/:id GET's Response-ID
@@ -627,7 +627,7 @@ async () => {
 // (document-family.ts's DOCUMENT head — the SAME
 // deriveDocumentsAt reduction the GET already runs to
 // build the entity). Design decision 6 means only PUT
-// ever writes at a document address, so the two
+// ever writes at a document, so the two
 // reductions agree for a live flow — this proves the
 // wire Response-ID equals the store's document head
 // read (`messageStore(db).get`)'s own, independently
@@ -635,7 +635,7 @@ async () => {
 // SOME header.
 Deno.test('e2e: the organizations/:id/flows/:id Response-ID'
     + ' equals the store head read\'s own'
-+ ' reduction over the same address (documentHeadMessagePairId parity)',
++ ' reduction over the same document (documentHeadMessagePairId parity)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -721,8 +721,8 @@ async () => {
 // --- Task 5: create + undo synthesized second pairs ---
 
 Deno.test('e2e: POST flows forms a document message pair at the flow\'s'
-+ ' own address and a join pair at the project_flows'
-+ ' address, all sharing the create\'s requestAt',
++ ' own document and a join pair at the project_flows'
++ ' document, all sharing the create\'s requestAt',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -738,16 +738,16 @@ async () => {
     const messagePairs = await db.messagePairs.getAll();
     assertStrictEquals(messagePairs.length, 5);
 
-    const flowAddress = messagePairs.filter(
+    const flowPairs = messagePairs.filter(
         r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
             && r.name === flowId,
     );
-    assertStrictEquals(flowAddress.length, 2);
-    const documentRow = flowAddress.find(
+    assertStrictEquals(flowPairs.length, 2);
+    const documentRow = flowPairs.find(
         r => decodeRequestMessage(r.request).method === 'PUT',
     );
-    assert(documentRow, 'no document message pair at the flow address');
+    assert(documentRow, 'no document message pair at the flow document');
     const decodedDocument =
         decodeRequestMessage(documentRow!.request);
     const expectedDocument = {
@@ -780,13 +780,13 @@ async () => {
     const joinPrefix =
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'qfhFObbtDfxUZwEGxySBoQ/flows/';
-    const joinAddress = messagePairs.filter(
+    const joinPairs = messagePairs.filter(
         r => r.path === joinPrefix
             && r.name === projectFlowId,
     );
-    assertStrictEquals(joinAddress.length, 1);
+    assertStrictEquals(joinPairs.length, 1);
     const decodedJoin =
-        decodeRequestMessage(joinAddress[0]!.request);
+        decodeRequestMessage(joinPairs[0]!.request);
     assertStrictEquals(decodedJoin.method, 'PUT');
     assertEquals(decodedJoin.body, {
         project_id: 'qfhFObbtDfxUZwEGxySBoQ',
@@ -833,17 +833,17 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
     assertStrictEquals(first.status, 201);
 
     const requestsAfterFirst = await db.messagePairs.getAll();
-    const flowAddressAfterFirst = requestsAfterFirst.filter(
+    const flowPairsAfterFirst = requestsAfterFirst.filter(
         r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
             && r.name === flowId,
     );
-    const firstDocumentRequest = flowAddressAfterFirst.find(
+    const firstDocumentRequest = flowPairsAfterFirst.find(
         r => decodeRequestMessage(r.request).method === 'PUT',
     );
     assert(
         firstDocumentRequest,
-        'no document message pair at the flow address after create 1',
+        'no document message pair at the flow document after create 1',
     );
     const firstDocumentResponse = await db.messagePairs.getById(
         firstDocumentRequest!.id,
@@ -875,12 +875,12 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
     );
 
     const requestsAfterSecond = await db.messagePairs.getAll();
-    const flowAddressAfterSecond = requestsAfterSecond.filter(
+    const flowPairsAfterSecond = requestsAfterSecond.filter(
         r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
             && r.name === flowId,
     );
-    const documentRequests = flowAddressAfterSecond.filter(
+    const documentRequests = flowPairsAfterSecond.filter(
         r => decodeRequestMessage(r.request).method === 'PUT',
     );
     assertStrictEquals(documentRequests.length, 2);
@@ -889,7 +889,7 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
     );
     assert(
         secondDocumentRequest,
-        'no second document message pair at the flow address',
+        'no second document message pair at the flow document',
     );
     const secondDocumentResponse = await db.messagePairs.getById(
         secondDocumentRequest!.id,
@@ -1324,7 +1324,7 @@ async function assertStoredPutOmitsUndoHistory(
 }
 
 // G2: stored PUT = flowEntityOf minus hasUndoHistory.
-// GET adds the stamp when this address has more than one
+// GET adds the stamp when this document has more than one
 // PUT or DELETE pair. Covers every G2 writer.
 Deno.test('hasUndoHistory is absent from the stored PUT and '
 + 'present on GET when COUNT(*) > 1',

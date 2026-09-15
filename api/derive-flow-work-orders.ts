@@ -13,13 +13,13 @@ import {
 // message-plane reduction (derive-documents.ts) — the
 // deriveProjectFlows structural mirror (api/derive-project-
 // flows.ts), re-nested one level deeper: one prefix scan per
-// flow, at the join address the live PUT flows/:id/work-
+// flow, at the join document the live PUT flows/:id/work-
 // orders/:woid route, Phase 5 Task 3's create, and Phase 5 Task
 // 4's seed all write — verified by content against a stored
 // :woid pair (tests/api-shadow-ledger-work-orders.test.ts's own
 // '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/aEsGMmBEFaVdWihhHXwCbw/work-or
 // ders/' + 'fwo-join'
-// address). A join row carries no lifecycle trio of its own — a
+// document). A join row carries no lifecycle trio of its own — a
 // DELETE tombstones it outright (deriveDocumentsAt's own
 // DELETE-head exclusion mirrors the old plane's physical
 // splice; parity, not a new mechanism — no DELETE route exists

@@ -114,7 +114,7 @@ function revocationFields() {
 // ── identity-tokens/:id — EVENT-APPEND (HistoryEntityStore) ──
 
 Deno.test('PUT identity-tokens/:id appends its pair at the entity'
-+ ' address', async () => {
++ ' document', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
@@ -154,7 +154,7 @@ Deno.test('two PUTs to DIFFERENT identity-tokens/:id ids each'
 });
 
 Deno.test('a second PUT to the SAME identity-tokens/:id id forms'
-+ ' its OWN genesis pair — no Supersedes, this address never'
++ ' its OWN genesis pair — no Supersedes, this document never'
 + ' chains — and the DERIVED read reflects the LATEST pair at'
 + ' that document (deriveDocumentsAt\'s latest-per-name head'
 + ' resolution, never a ledger guard)', async () => {
@@ -185,7 +185,7 @@ Deno.test('a second PUT to the SAME identity-tokens/:id id forms'
 // ── identities/:id/token-revocations/:rid — EVENT-APPEND ──
 
 Deno.test('PUT identities/:id/token-revocations/:rid appends its'
-+ ' pair at the entity address', async () => {
++ ' pair at the entity document', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
         'PUT',
@@ -211,13 +211,13 @@ Deno.test('PUT identities/:id/token-revocations/:rid appends its'
 });
 
 // ── identity-tokens/:jti/rotation — REPLAY-EXEMPT operation
-// address: the gate NEVER serves a stored response for a
+// document: the gate NEVER serves a stored response for a
 // byte-identical resend of this route (message-pair.ts
 // REPLAY_EXEMPT_ROUTE_PATTERNS), so a resent reuse attempt
 // re-enters rotateRefreshJti's own 409 guard for real instead
 // of silently replaying the first success.
 
-Deno.test('a rotation appends its pair at an operation address:'
+Deno.test('a rotation appends its pair at an operation path:'
 + ' name stays empty, and the wire {jti} equals the pair\'s'
 + ' own stored response body', async () => {
     const db = await seededDb();
@@ -294,9 +294,9 @@ async () => {
     assertStrictEquals((await db.messagePairs.getAll()).length, 3);
 });
 
-// ── identity-tokens/:jti/revocation — operation address ──
+// ── identity-tokens/:jti/revocation — operation path ──
 
-Deno.test('a revocation appends its pair at an operation address:'
+Deno.test('a revocation appends its pair at an operation path:'
 + ' name stays empty', async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
@@ -435,7 +435,7 @@ function postToken(
 }
 
 // The ONE identity-token event a bare issuance grant forms has
-// its own event pair at its own address — a genesis pair
+// its own event pair at its own document — a genesis pair
 // (identity-tokens/:id carries no DOCUMENT_CLASS entry, so no
 // head-read ever chains it), whose stored response deep-equals
 // the derived event itself.

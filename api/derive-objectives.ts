@@ -9,7 +9,7 @@ import {
 
 // Objectives' own reshaping of the generic message-plane
 // reduction (derive-documents.ts): the fifth trio family
-// (states-address retirement). One prefix scan per
+// (states-document retirement). One prefix scan per
 // derivation; the trio walk, its (state_at, id) ordering,
 // and echo dedup are the shared derive-documents.ts cores —
 // never rebuilt here (the derive-ideas.ts shape).

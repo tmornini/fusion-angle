@@ -205,7 +205,7 @@ export async function seedIdentityPii(
 
 // One identities/:id/credentials/:cid document. `id` is the
 // owning identity; `cid` is the credential's own row id (the
-// storage key raw puts addressed as e.g. 'cred-' + id).
+// storage key raw puts keyed as e.g. 'cred-' + id).
 export async function seedIdentityCredential(
     db: DbAdapter,
     id: string,

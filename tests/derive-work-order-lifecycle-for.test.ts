@@ -56,7 +56,7 @@ const WORKORDERID_FV2 = generateIdentifier();
 // known (organization, workOrderId) pair — name for the
 // create/document message pairs (they share ONE name at the work-orders
 // collection path), path for the claim/transition
-// sub-resource addresses, and the organization's own states/:id
+// sub-resource documents, and the organization's own states/:id
 // prefix (filtered locally to this entity) for gate 5a's rows —
 // rather than the whole-org scan deriveWorkOrderLifecycle needs
 // to discover EVERY work order's own ids at once. This file
@@ -337,7 +337,7 @@ async () => {
 // so workOrderLifecycleStatesFor INCLUDES the claim_released
 // event and matches the bulk subset. Claim history sees the
 // same row (it rides the replayed half, not gate 5a's states
-// address).
+// document).
 Deno.test('workOrderLifecycleStatesFor: a release op\'s'
 + ' claim_released is INCLUDED, matching'
 + ' deriveWorkOrderLifecycle\'s own bulk subset — claim-history'

@@ -76,7 +76,7 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 // api/store-parent-scoped.ts's rawOrganizationOwnedProbes table
 // exactly (ideas, projects, flows, records, objectives,
 // work-orders); invitations is handled separately below (its
-// address is flat, never organization-nested — message-pair.ts's
+// path is flat, never organization-nested — message-pair.ts's
 // canonicalPath / family-registry.ts has no entry for it).
 const ORGANIZATION_NESTED_ENTITY_FAMILIES = [
     'ideas', 'projects', 'flows',
@@ -91,7 +91,7 @@ const INVITATIONS_PREFIX =
 // organizations document id resolves to itself (Phase 15 Task
 // 1, Author gate 3 — the ONE new resolveOwningOrganization
 // leg).
-const ORGANIZATIONS_ADDRESS_PREFIX =
+const ORGANIZATIONS_PATH_PREFIX =
     canonicalPath(undefined, '/organizations/');
 
 // ALL-orgs, server-side ownership resolution — distinct from
@@ -111,7 +111,7 @@ async function organizationIds(
 // The invitation's own organization_id — carried in the STORED
 // REQUEST body (derive-invitations.ts's own precedent), never the
 // path (the invitations path is flat, unlike every
-// org-nested family above). Address read of this id at the
+// org-nested family above). Document read of this id at the
 // invitations collection — the same head fold, reused rather
 // than reimplemented.
 async function resolveInvitationOwner(
@@ -129,7 +129,7 @@ async function resolveInvitationOwner(
         : pickString(document.body, 'organization_id');
 }
 
-// flow_nodes/flow_edges carry NO address of their own
+// flow_nodes/flow_edges carry NO document of their own
 // (message-pair.ts: absent from both
 // MESSAGE_PAIR_WIRED_ROUTE_PATTERNS and
 // DOCUMENT_CLASS_ROUTE_PATTERNS) — they ride folded inside the
@@ -190,7 +190,7 @@ async function resolveFlowGraphOwner(
 
 // The org-less member/identity fallback (an ai-member/human-member
 // id, i.e. an identity id): seats are organization-nested, so
-// there is no single address to scan — THE GATE-15 PRECEDENT
+// there is no single document to scan — THE GATE-15 PRECEDENT
 // unions the same per-org derivation across every known
 // organization instead.
 //
@@ -252,11 +252,11 @@ async function computeOwningOrganization(
     boundOrganization: Id,
 ): Promise<Id | null> {
     // (e) organizations self-as-owner: the document id IS
-    // the owning organization. Address read of this id at
+    // the owning organization. Document read of this id at
     // the organizations collection.
     const organizationRows =
         await db.messagePairs.getAllAtAddress(
-            ORGANIZATIONS_ADDRESS_PREFIX, entityId,
+            ORGANIZATIONS_PATH_PREFIX, entityId,
         );
     if (organizationRows.length > 0) {
         return entityId;
@@ -288,7 +288,7 @@ async function computeOwningOrganization(
         }
     }
 
-    // (c) invitations: flat address, org lives in the body.
+    // (c) invitations: flat path, org lives in the body.
     const invitationOwner =
         await resolveInvitationOwner(db, entityId);
     if (invitationOwner !== null) return invitationOwner;
@@ -342,19 +342,19 @@ export async function resolveOwningOrganization(
     return owner;
 }
 
-// Address-scoped 403-vs-404 probe. Same id at two
-// collections is two documents. Miss at THIS address is
-// 404. 403 only when this address has a live PUT the
+// Document-scoped 403-vs-404 probe. Same id at two
+// collections is two documents. Miss at THIS document is
+// 404. 403 only when this document has a live PUT the
 // caller may not have.
 const ROLE_GRANTS_URI_PREFIX =
     canonicalPath(undefined, '/role-grants/');
 
-// Organization-nested document prefixes:
+// Organization-nested path prefixes:
 // /organizations/{id}/...
 const ORGANIZATION_NESTED_URI_PREFIX =
     /^\/organizations\/([^/]+)\//;
 
-// Table → family path segment for the address-scoped
+// Table → family path segment for the document-scoped
 // owner probe. Nested children (flow tags/records,
 // attributes, instances) probe the parent family at
 // this organization.
@@ -377,7 +377,7 @@ function ownerProbeCollection(
     table: string,
 ): string | undefined {
     if (table === 'organizations') {
-        return ORGANIZATIONS_ADDRESS_PREFIX;
+        return ORGANIZATIONS_PATH_PREFIX;
     }
     if (table === 'invitations') {
         return INVITATIONS_PREFIX;
@@ -406,12 +406,12 @@ function responseBodyOf(
         : {};
 }
 
-function ownerFromAddress(
+function ownerFromPath(
     path: string,
     name: Id,
     message: string,
 ): Id | null {
-    if (path === ORGANIZATIONS_ADDRESS_PREFIX) {
+    if (path === ORGANIZATIONS_PATH_PREFIX) {
         return name;
     }
     const nested = ORGANIZATION_NESTED_URI_PREFIX.exec(
@@ -441,13 +441,13 @@ export async function resolveGlobalOwner(
         ? undefined
         : ownerProbeCollection(boundOrganization, table);
     if (collection !== undefined) {
-        const atAddress =
+        const pairsAt =
             await db.messagePairs.getAllAtAddress(
                 collection, entityId,
             );
-        if (atAddress.length === 0) return null;
-        for (const messagePair of atAddress) {
-            const owner = ownerFromAddress(
+        if (pairsAt.length === 0) return null;
+        for (const messagePair of pairsAt) {
+            const owner = ownerFromPath(
                 messagePair.path,
                 entityId,
                 messagePair.response,
@@ -685,7 +685,7 @@ async function organizationHasOpBornEvent(
         }
     }
 
-    // Invitations (flat address): organization lives in the
+    // Invitations (flat path): organization lives in the
     // grant body; answering ops nest under invitations/:id/.
     {
         const stored = await dbOrView.messagePairs.getAllWhere(
@@ -748,7 +748,7 @@ async function organizationHasOpBornEvent(
 // retired isVisibleStateEvent row-plane fence; live callers
 // re-pointed Phase 15 Task 3). Always view-accepting
 // (dbOrView); opens no nested transaction. The states/:id
-// event-append tier is RETIRED with the address itself —
+// event-append tier is RETIRED with the document itself —
 // cheapest remaining first:
 //   (i) own-org operation-message-pair family scan — op-born claim /
 //       transition / document-trio ids;
@@ -822,7 +822,7 @@ export async function stateEventVisibilityFor(
 // deployment must record the actual expiry decision as
 // its own event rather than lean on this replay trick.
 
-// The work-orders COLLECTION address: POST 'work-orders' (create)
+// The work-orders COLLECTION path: POST 'work-orders' (create)
 // and PUT/DELETE 'work-orders/:id' (document) share this ONE
 // prefix per organization (family-registry.ts: work-orders is
 // organizationNested), partitioned apart by METHOD alone
@@ -831,7 +831,7 @@ export async function stateEventVisibilityFor(
 const WORK_ORDERS_COLLECTION_PATTERN =
     /^\/organizations\/[^/]+\/work-orders\/$/;
 
-// The claim/transition/release sub-resource addresses: UNLIKE
+// The claim/transition/release sub-resource documents: UNLIKE
 // the collection prefix above, the work-order id rides the
 // PREFIX itself here (routes.ts: 'work-orders/:id/claim' /
 // 'work-orders/:id/transition' / retired
@@ -843,13 +843,13 @@ const WORK_ORDER_CLAIM_PATTERN =
     /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/claim\/$/;
 // Exported (Phase 14 Task 6): api/derive-state-field-values.ts
 // scans for this SAME prefix shape to find every transition's
-// fieldValues fold, without re-deriving the address pattern.
+// fieldValues fold, without re-deriving the document pattern.
 export const WORK_ORDER_TRANSITION_PATTERN =
     /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/transition\/$/;
 const WORK_ORDER_RELEASE_PATTERN =
     /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/release\/$/;
 
-// One decoded 2xx POST pair — an OPERATION address (create/claim/
+// One decoded 2xx POST pair — an OPERATION path (create/claim/
 // transition are POST-only), the documentMessagePairsAt (derive-
 // documents.ts) twin restricted to the OTHER method: that reader
 // deliberately EXCLUDES POST (the DOCUMENT head is PUT/DELETE
@@ -911,12 +911,12 @@ function atIdCompare(
 // (deriveInvitationStates) — a flat, non-work-order
 // collection's own 2xx POST pairs, the exact shape this
 // function already reads generically. Source (c) once shared
-// this scan (deriveMemberGenesis); the states-address
+// this scan (deriveMemberGenesis); the states-document
 // retirement moved members onto the document-trio walk, so
 // only invitations remain. Exported (Phase 14 Task 6):
 // api/derive-state-field-values.ts's transition-fold reader
 // reuses this SAME decode over the work-orders/:id/transition
-// address, rather than re-implementing the POST-only,
+// document, rather than re-implementing the POST-only,
 // (at, id)-sorted read.
 const POST_ONLY: ReadonlySet<string> = new Set(['POST']);
 const POST_OR_PUT: ReadonlySet<string> = new Set([
@@ -1428,7 +1428,7 @@ function workOrderLifecycleFromPlane(
 // db.messagePairs (torn-read closure) — every grouping and
 // replay step below is pure over the fetched array, no
 // further db reads. (at, id) ascending overall: these rows are
-// SYNTHESIZED (no address of their own to read 1:1), so there
+// SYNTHESIZED (no document of their own to read 1:1), so there
 // is no raw-store scan order to reproduce — chronological
 // (at, id) is the meaningful order, and filtering this total
 // order by entity_id preserves it per work order.
@@ -1454,19 +1454,19 @@ export async function deriveWorkOrderLifecycle(
 // known (organization, workOrderId) pair, rather than the
 // whole-org scan the multi-work-order reader needs to discover
 // EVERY id at once —
-//   * create + document message pairs: address read at the
+//   * create + document message pairs: document read at the
 //     work-orders prefix + this workOrderId (both
 //     a create's response and its later document PUT/DELETE
 //     share ONE name — drift-work-orders.test.ts case 8);
 //   * claim/release/transition: path at each sub-
-//     resource's own per-id address (WORK_ORDER_CLAIM_PATTERN/
+//     resource's own per-id document (WORK_ORDER_CLAIM_PATTERN/
 //     WORK_ORDER_RELEASE_PATTERN/
 //     WORK_ORDER_TRANSITION_PATTERN's own shape, constructed
 //     directly since the id is already known).
 // dbOrView-shaped and opens no nested transaction — callable from
 // WITHIN an already-open write-gate transaction. Phase 14 Task 4
 // wires the claim gate to workOrderClaimHistoryFor below; with
-// the states/:id address retired both siblings return the SAME
+// the states/:id document retired both siblings return the SAME
 // operation-message-pair replay (releases ride the release op,
 // not a standalone event-append).
 interface WorkOrderClaimSources {
@@ -1682,7 +1682,7 @@ function historyEventsWithFieldValues(
 // Head-reduction per field-value row id matches
 // stateFieldValuesFrom (api/derive-state-field-values.ts);
 // claim/birth/release rows carry field_values: []. Empty
-// lifecycle → missedReadError (404 miss at this address).
+// lifecycle → missedReadError (404 miss at this document).
 // Entity-scoped indexed reads only — no whole-plane getAll.
 export async function workOrderHistoryFor(
     db: DbAdapter,
@@ -1720,7 +1720,7 @@ export async function workOrderHistoryFor(
 // deriveStatesFor's own whole-plane getAll (forbidden inside
 // a write-gate transaction — AGENTS.md's tx-body gotcha:
 // entity-scoped in-tx reads only, never a whole-plane getAll of
-// pairs). With the states/:id address retired this
+// pairs). With the states/:id document retired this
 // is the sole claim-history source — create/claim/transition/
 // release operation message pairs cover every live writer.
 // postWorkOrderClaimOp (api/routes.ts) is its only live caller.
@@ -1840,7 +1840,7 @@ export async function workOrderClaimDocumentFor(
 // reads for flow_graph (Task 2 re-anchors the call site).
 //
 // REUSE TARGET: the entity-scoped entityMessagePairs computation
-// inside workOrderClaimSourcesFor (address read) — NOT
+// inside workOrderClaimSourcesFor (document read) — NOT
 // derivedDocumentEntity / documentGetHandler, whose
 // collection-wide prefix scan is the forbidden whole-plane
 // shape inside a write gate.
@@ -1896,7 +1896,7 @@ export async function workOrderDocumentHeadFor(
 // ---- (gate 5f) ---------------------------------------------------
 
 // Source (f) of the states-log union. An invitation's own states
-// never ride the states/:id address (source a) — the invitations
+// never ride the states/:id document (source a) — the invitations
 // side channel forms its own operation message pairs at the flat
 // '/invitations/' collection (the grant) and at
 // 'invitations/:id/<op>/' (the three answering ops), api/
@@ -1907,7 +1907,7 @@ export async function workOrderDocumentHeadFor(
 // only a RESOLVED CURRENT STATE and DISCARD the event id and
 // member_id a StateEntity row needs (the brief's own NOTE) — this
 // is a fresh, StateEntity-emitting extraction over the SAME two
-// address families, never a retrofit of either.
+// document families, never a retrofit of either.
 //
 // THE GRANT'S OWN DUPLICATE-ECHO (grantInvitation, api/invitations-
 // domain.ts): an ALREADY-pending (org, identity) pair still forms
@@ -1932,7 +1932,7 @@ export async function workOrderDocumentHeadFor(
 // found the invitation still 'pending' and genuinely posted the
 // event — operationMessagePairsAt already returns each group (at, id)
 // ascending, so its first entry is that pair.
-const INVITATION_OP_ADDRESS_PATTERN =
+const INVITATION_OP_PATH_PATTERN =
     /^\/invitations\/([^/]+)\/(acceptance|decline|revocation)\/$/;
 
 interface InvitationOpFields {
@@ -1994,7 +1994,7 @@ export async function deriveInvitationStates(
 
             const opPrefixes = new Set<string>();
             for (const messagePair of stored) {
-                if (INVITATION_OP_ADDRESS_PATTERN.test(
+                if (INVITATION_OP_PATH_PATTERN.test(
                     messagePair.path,
                 )) {
                     opPrefixes.add(messagePair.path);
@@ -2002,7 +2002,7 @@ export async function deriveInvitationStates(
             }
             for (const prefix of opPrefixes) {
                 const match =
-                    INVITATION_OP_ADDRESS_PATTERN.exec(prefix)!;
+                    INVITATION_OP_PATH_PATTERN.exec(prefix)!;
                 const fields = INVITATION_OP_FIELDS[match[2]!];
                 if (fields === undefined) continue;
                 const earliest = operationMessagePairsAt(
@@ -2026,9 +2026,9 @@ export async function deriveInvitationStates(
 }
 
 // ENTITY-SCOPED sibling of deriveInvitationStates above (Phase
-// 14 Task 1): the SAME grant + op-address reduction, restricted
+// 14 Task 1): the SAME grant + op-path reduction, restricted
 // to ONE known invitation id via INDEXED reads —
-// address read at the invitations prefix + this id
+// document read at the invitations prefix + this id
 // (grant + document share ONE name) and
 // path for each of the three op documents —
 // rather than the whole-collection scan

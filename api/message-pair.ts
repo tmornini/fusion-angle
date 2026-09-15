@@ -67,9 +67,9 @@ export interface MessagePair {
     readonly latchedHeadMessagePairId?: string;
     // A latched OPERATION's pin: the head of the PARENT
     // document this operation acts on, not of this pair's
-    // own address. coordinateWrite never reads it — its
-    // latch is same-address by definition — the handler
-    // re-verifies it in-tx against the document address.
+    // own document. coordinateWrite never reads it — its
+    // latch is same-document by definition — the handler
+    // re-verifies it in-tx against the document.
     readonly pinnedDocumentMessagePairId?: string;
 }
 
@@ -125,7 +125,7 @@ const RESPONSE_ID_FIELD = 'response-id';
 // nested but not yet registered in family-registry.ts. A
 // registered family answers ONLY from its registration — its
 // entry here is deleted, never kept as a parallel truth. The
-// states/:id address retirement emptied this set; the
+// states/:id document retirement emptied this set; the
 // mechanism stays for any future un-registered nested segment.
 const ORGANIZATION_NESTED_FIRST_SEGMENTS: ReadonlySet<string> =
     new Set([
@@ -298,7 +298,7 @@ export async function formAuthMessagePair(
 }
 
 // The literal 'identities/:id/tokens/:tid' route pattern: the
-// wired PUT's own address family and response spec (routes.ts,
+// wired PUT's own document family and response spec (routes.ts,
 // WRITE_RESPONSE_SPECS['identities/:id/tokens/:tid']), reused
 // byte-for-byte by every synthesized identity_tokens row-write
 // pair (Phase 13 Task 5, Gate 7) — one derivation later serves
@@ -313,7 +313,7 @@ const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
     TOKEN_EVENT_ROUTE_PATTERN.split('/');
 
 // Synthesizes ONE identity_tokens row's event pair — the SAME
-// address, method, and response shape a real PUT
+// document, method, and response shape a real PUT
 // identities/:id/tokens/:tid would store for that exact row
 // (identityTokenEntityOf: jti, identity_id, action, chain_id,
 // at, id — GET wins). Formed PRE-TX like every other pair
@@ -360,7 +360,7 @@ export async function formTokenEventMessagePair(
     });
 }
 
-// Latest PUT or DELETE at the address. Virgin is undefined.
+// Latest PUT or DELETE at the document. Virgin is undefined.
 // DELETE head is a gone document, not a miss.
 export async function documentHeadAt(
     db: DbAdapter,
@@ -704,7 +704,7 @@ async function writeMessagePairRows(
     });
 }
 
-// Lock order: dedup if hash-deduped, address if
+// Lock order: dedup if hash-deduped, document if
 // gated, then FOR UPDATE + a new latest SELECT.
 async function coordinateWrite(
     view: DbAdapter,
@@ -779,8 +779,8 @@ function eventForMessagePair(
     };
 }
 
-function isGatedPath(collection: string): boolean {
-    const parts = collection
+function isGatedPath(path: string): boolean {
+    const parts = path
         .split('/')
         .filter((part) => part !== '');
     const family = parts[0] === 'organizations'
@@ -791,7 +791,7 @@ function isGatedPath(collection: string): boolean {
     return concurrency === 'locked';
 }
 
-// The create-address override table: which body field names
+// The create-document override table: which body field names
 // the created entity for create-shaped collection POSTs. Grown
 // family by family in Tasks 2-5. A registered family (family-
 // registry.ts) answers ONLY from its own createBodyIdField —
@@ -802,7 +802,7 @@ function isGatedPath(collection: string): boolean {
 // ONE entry this table keeps PERMANENTLY — the invitations side
 // channel is never a family-registry.ts registrant (it has no
 // organization-nesting tier, no concurrency class, no document
-// address of its own to register), so this literal table stays
+// of its own to register), so this literal table stays
 // its one consult forever, not a waypoint to registration.
 const CREATE_BODY_ID_FIELDS: Record<string, string> = {
     // Not gate-dispatched (the invitations side channel forms
@@ -877,7 +877,7 @@ export function createdEntityName(
 // on whatever its own pre-transaction resolution happened to
 // read, so the same request would 412 or succeed by scheduling
 // alone — a verdict the caller can neither predict nor retry
-// into. The latch target is the PARENT document address: the
+// into. The latch target is the PARENT document: the
 // route's segments minus its trailing literal.
 export const LATCHED_OPERATION_ROUTE_PATTERNS:
     Set<string> = new Set([
@@ -942,7 +942,7 @@ export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
     // states/:id/field-values/:fvid RETIRED from live wire
     // (Phase 15 Task 7); seed still forms pairs at that
-    // address via formSeedMessagePair + WRITE_RESPONSE_SPECS.
+    // document via formSeedMessagePair + WRITE_RESPONSE_SPECS.
 ]);
 
 // Route patterns wired for pair STORAGE (MESSAGE_PAIR_WIRED_
@@ -980,7 +980,7 @@ export const REPLAY_EXEMPT_ROUTE_PATTERNS: Set<string> =
 // a request's own name. A document is revisited
 // (create then update, or repeated PUT) and takes a pre-tx
 // head-read; an operation document (name always '') and an
-// event-append address (a fresh, client-minted id every write,
+// event-append document (a fresh, client-minted id every write,
 // e.g. states/:id) never head-read, even though an event-
 // append name is never ''. Grown family by family alongside
 // MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.
@@ -997,9 +997,9 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         // class 'flows' itself rides is structurally MOOT here —
         // api.ts's isLockedWrite is routePattern ===
         // documentEntityPattern(wiring), which for flows is
-        // organizations/:id/flows/:id — a tags address
+        // organizations/:id/flows/:id — a tags document
         // never equals that, so registering tags here
-        // safely opts that address into the ordinary
+        // safely opts that document into the ordinary
         // head-read, never the locked four-outcome table.
         'organizations/:id/flows/:id/tags/:name',
         'organizations/:id/work-orders/',
@@ -1036,5 +1036,5 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         ORGANIZATION_MEMBER_DETAIL_PATTERN,
         // states/:id/field-values/:fvid RETIRED from live wire
         // (Phase 15 Task 7); seed still forms pairs at that
-        // address via formSeedMessagePair + WRITE_RESPONSE_SPECS.
+        // document via formSeedMessagePair + WRITE_RESPONSE_SPECS.
     ]);

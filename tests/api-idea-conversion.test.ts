@@ -106,7 +106,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     }, DEV_TOKEN);
     // Phase Final Stage B: objectives table retired — seed
     // through the live document PUT with the lifecycle trio
-    // (states-address retirement) so the message plane owns it.
+    // (states-document retirement) so the message plane owns it.
     await PUT(db,
         'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + OBJ_1, {
@@ -208,7 +208,7 @@ Deno.test(
 Deno.test(
     'POST organizations/:id/ideas/:id/conversion also'
     + ' appends document message pairs at the project\'s'
-    + ' and the idea\'s own addresses',
+    + ' and the idea\'s own documents',
     async () => {
         const db = await seededDb();
         await POST(db
@@ -249,22 +249,22 @@ Deno.test(
         assertStrictEquals(allResponses.length, 10);
         assertStrictEquals(allRequests.length, allResponses.length);
 
-        const atProjectAddress = allRequests.filter(
+        const atProject = allRequests.filter(
             (r) =>
                 r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'projects/'
                 && r.name === 'psZcIMMgiSomMHzDxcUnYQ',
         );
-        assertStrictEquals(atProjectAddress.length, 1);
-        const responsesAtProjectAddress = allResponses.filter(
+        assertStrictEquals(atProject.length, 1);
+        const responsesAtProject = allResponses.filter(
             (r) =>
                 r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'projects/'
                 && r.name === 'psZcIMMgiSomMHzDxcUnYQ',
         );
-        assertStrictEquals(responsesAtProjectAddress.length, 1);
+        assertStrictEquals(responsesAtProject.length, 1);
 
-        const request = atProjectAddress[0]!;
+        const request = atProject[0]!;
         // The requester is the caller, never the idea's author.
         assertStrictEquals(
             request.requester_identity_id, 'XXZruirZyAOoRpNxaDnpSA',
@@ -280,25 +280,25 @@ Deno.test(
 
         // Seed genesis PUT + conversion's synthesized idea
         // document message pair both land at
-        // gVvtDIaqhnkXZQcxZeSuiw's address.
-        const atIdeaAddress = allRequests.filter(
+        // gVvtDIaqhnkXZQcxZeSuiw's document.
+        const atIdea = allRequests.filter(
             (r) =>
                 r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'ideas/'
                 && r.name === 'gVvtDIaqhnkXZQcxZeSuiw',
         );
-        assertStrictEquals(atIdeaAddress.length, 2);
-        const responsesAtIdeaAddress = allResponses.filter(
+        assertStrictEquals(atIdea.length, 2);
+        const responsesAtIdea = allResponses.filter(
             (r) =>
                 r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'ideas/'
                 && r.name === 'gVvtDIaqhnkXZQcxZeSuiw',
         );
-        assertStrictEquals(responsesAtIdeaAddress.length, 2);
+        assertStrictEquals(responsesAtIdea.length, 2);
 
         // The conversion's idea pair is the one carrying
         // 'promoted' (the seed carried 'approved').
-        const ideaRequest = atIdeaAddress.find((r) => {
+        const ideaRequest = atIdea.find((r) => {
             const body = (pairJsonOf(r.request) as {
                 body: Record<string, unknown>;
             }).body;
@@ -319,7 +319,7 @@ Deno.test(
         });
 
         // The baseline pairs (Phase 7 Task 4): one PUT-shaped
-        // pair per baseline, at that baseline's OWN address —
+        // pair per baseline, at that baseline's OWN document —
         // every baseline id is client-minted FRESH for this
         // conversion, so each pair is genesis there.
         const baselinesPrefix =
@@ -331,21 +331,21 @@ Deno.test(
             { id: BL_9B, fields: baselineFields(OBJ_2, -5) },
         ];
         for (const { id, fields } of baselineCases) {
-            const atBaselineAddress = allRequests.filter(
+            const atBaseline = allRequests.filter(
                 (r) =>
                     r.path === baselinesPrefix
                     && r.name === id,
             );
-            assertStrictEquals(atBaselineAddress.length, 1);
-            const responsesAtBaselineAddress = allResponses
+            assertStrictEquals(atBaseline.length, 1);
+            const responsesAtBaseline = allResponses
                 .filter(
                     (r) =>
                         r.path === baselinesPrefix
                         && r.name === id,
                 );
-            assertStrictEquals(responsesAtBaselineAddress.length, 1);
+            assertStrictEquals(responsesAtBaseline.length, 1);
 
-            const baselineRequest = atBaselineAddress[0]!;
+            const baselineRequest = atBaseline[0]!;
             assertStrictEquals(
                 baselineRequest.requester_identity_id,
                 'XXZruirZyAOoRpNxaDnpSA',

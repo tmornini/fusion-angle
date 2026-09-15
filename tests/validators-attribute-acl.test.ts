@@ -13,7 +13,7 @@ import {
 } from '../api/validators.ts';
 
 // Nested attribute document body fields — no record_id
-// (address parentage), no organization_id (fence stamp).
+// (path parentage), no organization_id (fence stamp).
 function coreFields(
     overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {

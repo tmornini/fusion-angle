@@ -117,7 +117,7 @@ async function saveGraph(
 
 // Seeds a project through the SAME document PUT the live route
 // uses (putProject), so a message pair exists at this project's
-// address — required for the flipped GET projects route
+// document — required for the flipped GET projects route
 // (Phase 3 Task 6), which getFlowsWithProjectNames /
 // getProjectFlowEntities read, to derive it. A SYNTHESIZED
 // trio (this helper never carried one) — the state itself is
@@ -467,7 +467,7 @@ Deno.test(
         // derives
         // from the message ledger, not the raw project_flows
         // table — a raw db.projectFlows.put leaves no pair at
-        // this address, so the link must land through the SAME
+        // this document, so the link must land through the SAME
         // wire-reachable PUT the live route serves.
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'psZcIMMgiSomMHzDxcUnYQ/flows/'

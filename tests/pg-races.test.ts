@@ -261,7 +261,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const holder = connectPostgres(
             urlWithSearchPath(POSTGRES_URL, schema),
         );
-        const addressKey = Number(await advisoryKey(
+        const documentLockKey = Number(await advisoryKey(
             'fusion.address.' + FLOW_PREFIX + id,
         ));
         let raced: Promise<[Response, Response]>
@@ -270,7 +270,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             await holder.begin(async (tx) => {
                 await tx.query`
                     SELECT pg_advisory_xact_lock(
-                        ${addressKey}
+                        ${documentLockKey}
                     )
                 `;
                 raced = Promise.all([

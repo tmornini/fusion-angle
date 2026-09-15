@@ -23,7 +23,7 @@ import {
 // row-write appends its own event pair at
 // 'identities/<identityId>/tokens/<rowId>'
 // (api/message-pair.ts's formTokenEventMessagePair — the SAME
-// address/method/response shape a real PUT
+// document/method/response shape a real PUT
 // identities/:id/tokens/:tid would store) — issued roots
 // (grant, client-credentials, token-
 // exchange, the org-exchange hop), rotations, and revocations ALL
@@ -47,7 +47,7 @@ import {
 //
 // EVENT-APPEND, not document-class (api/routes.ts's own route
 // comment): every row id is a fresh generateIdentifier()
-// mint, so in practice no address is ever revisited — but
+// mint, so in practice no document is ever revisited — but
 // deriveDocumentsAt's latest-per-name head resolution still
 // applies uniformly (the role_grants precedent), never assumed.
 //
@@ -87,7 +87,7 @@ const IDENTITY_TOKENS_TABLE = 'identity_tokens';
 const IDENTITY_TOKENS_FLAT_PREFIX =
     canonicalPath(undefined, '/identity-tokens/');
 
-const TOKENS_ADDRESS_PATTERN =
+const TOKENS_PATH_PATTERN =
     /^\/identities\/([^/]+)\/tokens\/$/;
 
 function tokensPrefixFor(identityId: Id): string {
@@ -106,7 +106,7 @@ export function identityTokenEntityOf(
     };
 }
 
-// Nested address is the source of truth — fill or overwrite
+// Nested document is the source of truth — fill or overwrite
 // the request body's identity_id from the path.
 function nestedTokenEntityOf(
     identityId: Id,
@@ -200,12 +200,12 @@ export async function deriveIdentityTokens(
     }
     const prefixes = new Set<string>();
     for (const messagePair of messagePairs) {
-        if (TOKENS_ADDRESS_PATTERN.test(messagePair.path)) {
+        if (TOKENS_PATH_PATTERN.test(messagePair.path)) {
             prefixes.add(messagePair.path);
         }
     }
     for (const prefix of prefixes) {
-        const match = TOKENS_ADDRESS_PATTERN.exec(prefix)!;
+        const match = TOKENS_PATH_PATTERN.exec(prefix)!;
         const identityId = match[1]!;
         const documents = deriveDocumentsAt(
             messagePairs, prefix,

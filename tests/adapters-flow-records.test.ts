@@ -30,7 +30,7 @@ const AT = '2026-05-01T00:00:00.000000Z';
 
 // Seeds a flow through the SAME gate-driven create the live
 // route uses (postFlowCreation), so a message pair exists at
-// this flow's address — required for the flipped GET flows
+// this flow's document — required for the flipped GET flows
 // route (Phase 4 Task 8), which getFlowSummariesForRecord /
 // getWorkOrdersForRecord read (via getFlowEntities), to derive
 // it. The default start/complete graph postFlowCreation seeds
@@ -70,7 +70,7 @@ async function seedWorkOrder(
     // NAMED re-pin (Task 7): getWorkOrdersForRecord reads the
     // work-orders collection through the flipped GET (this
     // commit) — a raw db.workOrders.put leaves no message pair
-    // at this address, so the entity must land through the
+    // at this document, so the entity must land through the
     // SAME wire-reachable PUT the live route serves.
     await putWorkOrder(ctx, id, {
         displayId,
@@ -80,7 +80,7 @@ async function seedWorkOrder(
     // NAMED re-pin (Task 7): getAllFlowWorkOrderEntities reads
     // organizations/:id/flows/:id/work-orders through the flipped GET too —
     // same
-    // reason, different address.
+    // reason, different document.
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
             + '/work-orders/' + generateIdentifier(),

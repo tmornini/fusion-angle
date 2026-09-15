@@ -475,11 +475,11 @@ function objectiveDocumentEntityOf(
     };
 }
 // The objectives wiring row — the seventh family, now the
-// FIFTH 'trio' one (states-address retirement). Its three
+// FIFTH 'trio' one (states-document retirement). Its three
 // old 'stateless' rationales are all RETIRED with the
-// states/:id address that anchored them: the wire body DOES
+// states/:id document that anchored them: the wire body DOES
 // grow the trio (the zero-delta covenant died with the
-// address), genesis IS an explicit minted event (the seed
+// document), genesis IS an explicit minted event (the seed
 // re-baselined its pins — no 911 pin survives), and
 // absence-as-active (R2) is retired — a fresh objective now
 // carries a genesis event like every other trio family.
@@ -647,7 +647,7 @@ type DeleteHandler = (
 // the gate resolved, never the path. Undefined organization
 // for a bearer-exempt or global route. Only the conversion
 // handler consults organization today (to form the created
-// project's OWN document-address pair beside the operation
+// project's OWN document pair beside the operation
 // message pair above); every other POST handler ignores the extra
 // trailing args, the same fewer-parameter-closure precedent
 // `messagePair` already established.
@@ -763,7 +763,7 @@ function ownerOrganizationViaMembershipPairPlane(
 // The bundle a live POST /records forms (Phase 6 Task 4, the
 // migration's first VARIABLE-CARDINALITY synthesis): the gate's
 // own operation message pair, the synthesized document message pair (at the
-// record's own records/:id address — the SAME address the
+// record's own records/:id document — the SAME document the
 // operation message pair shares, since records' createBodyIdField
 // override collapses the two onto one name, the flows
 // precedent), one synthesized attribute-PUT pair per
@@ -774,10 +774,10 @@ function ownerOrganizationViaMembershipPairPlane(
 // requestAt (the write's own origination) yet strictly-later
 // RESPONSE `at` stamps (appendMessagePair's nowUtc() is
 // monotonic), so the document message pair — appended after the
-// operation message pair — becomes the address's head; a duplicate
+// operation message pair — becomes the document's head; a duplicate
 // create's Supersedes therefore resolves against the prior
 // DOCUMENT message pair, not the prior operation message pair (the Phase 5
-// shared-address mechanism, re-pinned here).
+// shared-document mechanism, re-pinned here).
 export interface RecordWriteMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
@@ -855,7 +855,7 @@ export function recordAttributeDocumentBodyOf(
 }
 
 // Shared composed-write pair bundle for nested POST
-// .../record-types (Task 9 / Task 23). Document address is
+// .../record-types (Task 9 / Task 23). Document path is
 // RECORD_TYPE_DETAIL_PATTERN; attributes form at
 // ATTRIBUTE_DETAIL_PATTERN.
 async function formRecordWriteMessagePairs(
@@ -1024,7 +1024,7 @@ export async function loadAttributeSchemaById(
     return map;
 }
 
-// G6: GET derive is the stored PUT. Address echoes plus
+// G6: GET derive is the stored PUT. Document echoes plus
 // the stored nested document body (both ACL keys required).
 export function nestedAttributeWireOf(
     organization: Id,
@@ -1109,7 +1109,7 @@ export async function postRecordWriteOp(
             // LAST, in that order, so each pair's response `at`
             // strictly follows the one before it (nowUtc
             // monotonicity) and the document message pair becomes the
-            // shared address's head.
+            // shared document's head.
             if (messagePairs !== undefined) {
                 await appendMessagePair(view, messagePairs.operation);
                 await appendMessagePair(view, messagePairs.document);
@@ -1302,7 +1302,7 @@ export async function postRecordAttributeDocumentOp(
     );
 }
 
-// Idea submission write: a genesis-only document address (an
+// Idea submission write: a genesis-only document (an
 // idea is submitted once per sid; no edit/transition case
 // exists for this family). Phase Final Task 2: the
 // idea_submissions ROW half is stripped — pure message-plane
@@ -1375,7 +1375,7 @@ export function flowCreateDocumentBody(
 }
 
 // The three pairs a live POST /flows forms (Task 5): the gate's
-// own operation message pair (204, at the flows/:id address per Task 1's
+// own operation message pair (204, at the flows/:id document per Task 1's
 // createdEntityName override — POST 'flows' and PUT 'flows/:id'
 // collapse onto the SAME (path, name), see derive-
 // documents.ts's DOCUMENT_METHODS filter for why the two never
@@ -1384,7 +1384,7 @@ export function flowCreateDocumentBody(
 // create's own origination) yet strictly-later RESPONSE `at`
 // stamps (appendMessagePair's nowUtc() is monotonic), so the
 // document message pair — appended after the
-// operation message pair — becomes the address's head.
+// operation message pair — becomes the document's head.
 export interface FlowCreationMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
@@ -1617,7 +1617,7 @@ export async function postFlowUndoOp(
 }
 
 // The three pairs a live POST /objectives forms (Task 3): the
-// gate's own operation message pair (204, at the objectives/:id address
+// gate's own operation message pair (204, at the objectives/:id document
 // per the create-body-id-field override — POST 'objectives' and
 // PUT 'objectives/:id' collapse onto the SAME (path,
 // name), the flows/records precedent), the synthesized document
@@ -1626,8 +1626,8 @@ export async function postFlowUndoOp(
 // three share ONE requestAt (the create's own origination) yet
 // strictly-later RESPONSE `at` stamps (appendMessagePair's
 // nowUtc() is monotonic), so the document message pair — appended after
-// the operation message pair — becomes the shared address's head; the
-// revision pair lives at its OWN distinct address (a fresh
+// the operation message pair — becomes the shared document's head; the
+// revision pair lives at its OWN distinct document (a fresh
 // revision id per create), so it is always genesis there unless
 // a live PUT had already visited that exact revision id.
 export interface ObjectiveCreationMessagePairs {
@@ -1644,7 +1644,7 @@ export interface ObjectiveCreationMessagePairs {
 
 // The wire body a live PUT objectives/:id would carry for
 // this SAME write: the entity field (organization_id
-// STRIPPED — the org rides the address) plus the lifecycle
+// STRIPPED — the org rides the path) plus the lifecycle
 // trio mapped from the create body's initialState* — the
 // recordDocumentBodyOf shape, so a synthesized document message pair
 // is byte-indistinguishable from what a live PUT would have
@@ -1678,7 +1678,7 @@ export function objectiveRevisionBodyOf(
 // objectives + objective_revisions ROW halves stripped —
 // pure message-plane write. The genesis lifecycle trio folds
 // onto the document message pair via objectiveDocumentBodyOf
-// (states-address retirement); no separate states/:id event
+// (states-document retirement); no separate states/:id event
 // is written. Exported so the seed can drive objective
 // creation through the same gate the route uses (Decision
 // 6's below-facade carve-out). `messagePairs` is optional so the
@@ -1707,7 +1707,7 @@ export async function postObjectiveCreationOp(
 }
 
 // Objective document write — the fifth lifecycle-trio family
-// (states-address retirement). Phase Final Task 2: the
+// (states-document retirement). Phase Final Task 2: the
 // objectives ROW half is stripped — pure message-plane write
 // (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
 // successBody forms the wire bytes; the reconstructed return
@@ -1842,7 +1842,7 @@ function workOrderCreateDocumentBody(
 
 // The three pairs a live POST /work-orders forms (Task 3):
 // the gate's own operation message pair (204, at the work-orders/:id
-// address per the registry's createBodyIdField — POST
+// document per the registry's createBodyIdField — POST
 // 'work-orders' and PUT 'work-orders/:id' collapse onto the
 // SAME (path, name), exactly as flows/:id did for its
 // own create), plus the document and join pairs the route
@@ -1850,7 +1850,7 @@ function workOrderCreateDocumentBody(
 // create's own origination) yet strictly-later RESPONSE `at`
 // stamps (appendMessagePair's nowUtc() is monotonic), so the
 // document message pair — appended after the
-// operation message pair — becomes the address's head.
+// operation message pair — becomes the document's head.
 export interface WorkOrderCreationMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
@@ -1998,7 +1998,7 @@ export async function postWorkOrderClaimOp(
 
 // DELETE work-orders/:id/claim — tombstone the claim
 // document. The gate's DELETE table already 404s a never-
-// written address and 204s an already-DELETE head without
+// written document and 204s an already-DELETE head without
 // dispatch. A PUT head proceeds here; append the DELETE
 // pair. applyReleaseMessagePair synthesizes claim_released from
 // the pair (id/at/actor) — no caller-minted body.
@@ -2596,7 +2596,7 @@ export async function postFlowRecordDocumentOp(
 // Flow tag document write — the codebase's FIRST message-plane-ONLY
 // write (Phase 14 Task 9): no table, no row, no dual-write. The
 // pair alone carries everything (path/name encode the
-// address; the stored request's method distinguishes a PUT tag
+// document; the stored request's method distinguishes a PUT tag
 // from a DELETE tombstone), so this op needs neither `id`
 // nor `body` — the
 // SAME shape identity-tokens/:id's own pair-only PUT rides (Phase
@@ -3082,7 +3082,7 @@ export const WRITE_RESPONSE_SPECS:
         status: HTTP_NO_CONTENT,
     },
     // flows/:id/versions[+/:vid] WRITE_RESPONSE_SPECS RETIRED
-    // (Phase 15 Task 7): ZERO seed pairs at those addresses.
+    // (Phase 15 Task 7): ZERO seed pairs at those documents.
     'organizations/:id/work-orders/': {
         status: HTTP_NO_CONTENT,
     },
@@ -3108,7 +3108,7 @@ export const WRITE_RESPONSE_SPECS:
             }),
     },
     // Nested composed POST (Task 9 / Task 23): 204 op response;
-    // document + attribute pairs form at nested addresses.
+    // document + attribute pairs form at nested documents.
     [RECORD_TYPES_COLLECTION_PATTERN]: {
         status: HTTP_NO_CONTENT,
     },
@@ -3137,7 +3137,7 @@ export const WRITE_RESPONSE_SPECS:
         },
     },
     // Nested attributes detail (Task 7): put-only. Params:
-    // 0=org, 1=type, 2=attribute. Address-derived echoes for
+    // 0=org, 1=type, 2=attribute. Path-derived echoes for
     // organization_id / record_type_id. Create stamps ACL
     // defaults when keys omitted; replace requires both —
     // successBody picks by key presence for the response
@@ -3200,7 +3200,7 @@ export const WRITE_RESPONSE_SPECS:
     // malformed name or body throws BEFORE anything is stored
     // (the ideas/:id/submissions/:sid precedent above). GET/DELETE
     // never re-validate the name (route comment); `flow_id` is
-    // stamped from the address here, never a client body key.
+    // stamped from the document here, never a client body key.
     'organizations/:id/flows/:id/tags/:name': {
         status: HTTP_OK,
         successBody: (params, body) =>
@@ -3452,7 +3452,7 @@ export interface DocumentMessagePairFormInput {
     // Locked-class synthesized PUTs (flow undo) must
     // carry the document head they restored from, or
     // coordinateWrite 412s an unlatched PUT at a live
-    // locked address.
+    // locked document.
     readonly latchedHeadMessagePairId?: string;
     readonly headerFields?: readonly FieldLine[];
     readonly operationId: string;
@@ -3461,7 +3461,7 @@ export interface DocumentMessagePairFormInput {
 // The shared document-pair former (Phase 9 Task 2, Commandment
 // IX): replaces every route-inline formWriteMessagePair block that
 // shared this ONE core shape — resolve the response, resolve the
-// address, form the pair. Lives beside WRITE_RESPONSE_SPECS
+// document, form the pair. Lives beside WRITE_RESPONSE_SPECS
 // (routes.ts, not message-pair.ts): the specs live here, and
 // message-pair.ts must never import routes.ts (Step 0(c) — the
 // import graph stays acyclic; routes.ts already imports
@@ -3524,14 +3524,14 @@ export async function formDocumentMessagePairFor(
 }
 
 // Instance DELETE tombstone append (Task 18 / R4 / R9).
-// Spent address = any prior response at the instance
+// Spent document = any prior response at the instance
 // name (live head OR existing tombstone). Virgin
-// address → missedReadError (R2). Spent → append the
+// document → missedReadError (R2). Spent → append the
 // gate-formed DELETE pair in one tx (R4 tombstone-wins
 // is ledger-complete — every non-replay DELETE appends,
 // including over an already-tombstoned head). In-tx
 // re-probe (R9) closes a concurrent un-spend race:
-// never treat a virgin address as tombstonable. W5
+// never treat a virgin document as tombstonable. W5
 // placement RESTRICT: any org WO whose CURRENT bind
 // names this instance AND whose current node is
 // non-terminal in its OWN frozen flow_graph → 409.
@@ -3556,7 +3556,7 @@ export async function postInstanceDeleteOp(
         );
     }
     const prefix = instancesUriPrefix(org, typeId);
-    const spentPre = await instanceAddressSpent(
+    const spentPre = await instanceDocumentSpent(
         db, prefix, instanceId,
     );
     if (!spentPre) {
@@ -3569,10 +3569,10 @@ export async function postInstanceDeleteOp(
         async (view) => {
             // R9: re-probe spent inside the append tx so a
             // concurrent writer cannot leave us appending a
-            // tombstone onto a virgin address, and so a
+            // tombstone onto a virgin document, and so a
             // concurrent tombstone still lets us append
             // (tombstone-wins / ledger-complete).
-            const spent = await instanceAddressSpent(
+            const spent = await instanceDocumentSpent(
                 view, prefix, instanceId,
             );
             if (!spent) {
@@ -3660,7 +3660,7 @@ async function inFlightPlacementBlockersFor(
     return blockers;
 }
 
-async function instanceAddressSpent(
+async function instanceDocumentSpent(
     db: DbAdapter,
     prefix: string,
     instanceId: Id,
@@ -4017,7 +4017,7 @@ export const routes: Route[] = [
     // transaction as the write. DELETE is a marked tombstone.
     // The pattern's last segment ('pii') is not a :param, so
     // pathAndNameOf yields name '' (a singleton document at
-    // a collection-style address). GET is FLIPPED (Phase 10
+    // a collection-style path). GET is FLIPPED (Phase 10
     // Task 8): derived via deriveIdentityPii — wire-identical
     // to the hand-written db.identityPii.getById dispatch it
     // replaces.
@@ -4091,14 +4091,14 @@ export const routes: Route[] = [
     // matched-but-invisible row (never a 404 — getAllWhere never
     // throws).
     // FENCE-INPUT FIX (post-session review): the path :id only
-    // ADDRESSES the ledger scan (deriveCredentialsFor reads the
+    // keys the ledger scan (deriveCredentialsFor reads the
     // /identities/{path id}/credentials/ prefix — that is where
     // the pairs live); the pre-flip fence read each ROW's OWN
     // identity_id field (parentScope's getAllWhere('identity_id',
     // path id) filters the OLD-plane store by that field BEFORE
     // fencing, then viaMembership fences on that SAME field). A
     // below-facade write whose body.identity_id disagrees with
-    // its own address (producible below-facade, or via a hand-
+    // its own document (producible below-facade, or via a hand-
     // crafted admin PUT — no validator ties body.identity_id to
     // the path :id, so an admin-crafted request CAN produce it;
     // only a web-app-generated request cannot) would otherwise
@@ -4137,7 +4137,7 @@ export const routes: Route[] = [
     // deriveCredential, fenced the SAME way (gate 15) — a
     // foreign identity's credential 403s; a genuinely absent
     // one still 404s via EntityNotFoundError. FENCE-INPUT FIX
-    // (post-session review): the path :id only ADDRESSES the
+    // (post-session review): the path :id only keys the
     // scan (deriveCredential reads the row at
     // /identities/{path id}/credentials/{cid} — that is where
     // the pair lives); the pre-flip fence read the ROW's OWN
@@ -4147,7 +4147,7 @@ export const routes: Route[] = [
     // viaMembership on the ROW's stored identity_id. So the
     // fence input below is `credential.identity_id`, never the
     // path — a below-facade write whose body.identity_id
-    // disagrees with its own address now fences EXACTLY as the
+    // disagrees with its own document now fences EXACTLY as the
     // row plane did.
     route('identities/:id/credentials/:cid', {
         get: async (db, p, actor, organization) => {
@@ -4220,7 +4220,7 @@ export const routes: Route[] = [
     // keeps it self-only (path identity vs actor). Flat
     // /identity-token-revocations is retired (router 404).
     // EVENT-APPEND: no head-read, no Supersedes. Path
-    // identity is the address — stamped on write and GET.
+    // identity is the document — stamped on write and GET.
     route('identities/:id/token-revocations/:rid', {
         get: (db, p) =>
             deriveTokenRevocation(
@@ -4321,7 +4321,7 @@ export const routes: Route[] = [
     // TOCTOU). A live jti returns its successor; a
     // known-but-not-live jti is reuse — the whole chain's
     // revocation has already landed atomically — then 409.
-    // Operation document (name ''); REPLAY_EXEMPT_ROUTE_
+    // Operation path (name ''); REPLAY_EXEMPT_ROUTE_
     // PATTERNS-wired (message-pair.ts) — the gate never serves
     // a stored response for a byte-identical resend of this
     // route, so this handler always re-enters and re-checks
@@ -4458,22 +4458,22 @@ export const routes: Route[] = [
     // /ideas/:id/conversion is member-permitted.
     //
     // Phase 3 Task 4: the operation message pair above lives at the
-    // ideas-family OPERATION document (name '') — a projects-
+    // ideas-family OPERATION path (name '') — a projects-
     // prefix scan finds no pair for a conversion-born project
-    // without a SECOND pair at the project's OWN document
-    // address. Synthesized below, BYTE-INDISTINGUISHABLE from a
-    // live PUT /projects/:id's pair at that same address (same
+    // without a SECOND pair at the project's OWN document.
+    // Synthesized below, BYTE-INDISTINGUISHABLE from a
+    // live PUT /projects/:id's pair at that same document (same
     // response spec, same head-read), so derivation needs no
     // conversion special case. Phase 5 Task 5: the idea's OWN
     // 'promoted' transition gets a THIRD pair the same way, at
-    // the idea's EXISTING document address — unlike the project
-    // pair above (a fresh address, genesis), the idea's head-
+    // the idea's EXISTING document — unlike the project
+    // pair above (a fresh document, genesis), the idea's head-
     // read finds its prior pair, so this one records Supersedes
     // provenance. This closes the standing watch-point: before
     // this task, a converted idea's derived history MISSED its
     // 'promoted' event because no pair recorded it. Phase 7
     // Task 4: each validated baseline gets its OWN pair too, at
-    // its project-nested address (projects/:id/objective-
+    // its project-nested document (projects/:id/objective-
     // baseline-scores/:sid) — every baseline id is client-
     // minted FRESH per conversion, so these are genesis like
     // the project pair above, never Supersedes. All 3+N formed
@@ -4529,10 +4529,10 @@ export const routes: Route[] = [
                     organization,
                 });
                 // The idea's OWN document message pair, at its EXISTING
-                // address (the idea was created earlier, through
+                // document (the idea was created earlier, through
                 // a live PUT /ideas/:id) — this head-read finds
                 // that prior pair, so this one records Supersedes,
-                // unlike the project pair above (a fresh address,
+                // unlike the project pair above (a fresh document,
                 // genesis).
                 ideaMessagePair = await formDocumentMessagePairFor(db, {
                     routePattern:
@@ -4546,7 +4546,7 @@ export const routes: Route[] = [
                 });
                 // The per-baseline pairs (Task 4): N synthesized
                 // pairs, one per validated baseline, at each
-                // baseline's OWN address — every baseline id is
+                // baseline's OWN document — every baseline id is
                 // client-minted FRESH for this conversion, so
                 // each pair is genesis there (the store's document
                 // head read (`messageStore(db).get`) finds no
@@ -4617,7 +4617,7 @@ export const routes: Route[] = [
     // the collection to that idea (the org fence still rides
     // the facade re-entry). GET is FLIPPED (Phase 2 Task 5):
     // the collection derives from the message ledger at this
-    // idea's submissions address rather than the old
+    // idea's submissions document rather than the old
     // idea_submissions table. The leaf id is param 2; only PUT
     // is exposed on ideas/:id/submissions/:sid, exactly as the
     // flat makeIdRoute carried it.
@@ -4685,7 +4685,7 @@ export const routes: Route[] = [
                 // Genesis-undefined (chain 'none'): a flow's
                 // create-time join is always fresh (design
                 // decision — no duplicate-create carve-out at this
-                // address through this task; pinned by the same-
+                // document through this task; pinned by the same-
                 // join-id retry test in tests/drift-flows.test.ts).
                 const join = await formDocumentMessagePairFor(db, {
                     routePattern:
@@ -4775,7 +4775,7 @@ export const routes: Route[] = [
     // param 2; PUT and DELETE are exposed exactly as the
     // flat makeIdRoute carried them. GET is FLIPPED (Phase 4
     // Task 8): the join list derives from the
-    // message ledger at this project's flows address rather than
+    // message ledger at this project's flows document rather than
     // the old project_flows table — deriveProjectFlows is a
     // bespoke derivation (not a DocumentFamilyWiring family; a
     // join row carries no lifecycle trio of its own), so this
@@ -4899,7 +4899,7 @@ export const routes: Route[] = [
                 // Genesis-undefined (chain 'none'): a work
                 // order's create-time join is always fresh
                 // (design decision — no duplicate-create carve-
-                // out at this address through this task; pinned
+                // out at this document through this task; pinned
                 // by the same-join-id retry test in
                 // tests/drift-work-orders.test.ts).
                 const join = await formDocumentMessagePairFor(db, {
@@ -5074,7 +5074,7 @@ export const routes: Route[] = [
     // id is param 2; only PUT is exposed (the
     // flat route never carried GET/DELETE on the leaf). GET is
     // FLIPPED (Task 7): the join list derives from the message
-    // ledger at this flow's work-orders address rather than the
+    // ledger at this flow's work-orders document rather than the
     // old flow_work_orders table — deriveFlowWorkOrders is a
     // bespoke derivation (not a DocumentFamilyWiring family; a
     // join row carries no lifecycle trio of its own), so this
@@ -5098,11 +5098,11 @@ export const routes: Route[] = [
     // GET organizations/:id/work-orders/:id/history.
     // PUT/DELETE states/:id/field-values/:fvid RETIRED
     // (Phase 15 Task 7): live writes ride the transition
-    // fold only. WRITE_RESPONSE_SPECS entry + seed address
+    // fold only. WRITE_RESPONSE_SPECS entry + seed document
     // formation SURVIVE (finding 7).
     // Nested record-types surface (Task 2 READ + Task 3
     // WRITE + Task 9 composed POST). Org-nested primary
-    // addresses; member GET via MEMBER_VERBS
+    // documents; member GET via MEMBER_VERBS
     // '/organizations/:id/record-types'; mutations stay admin
     // by absence. Handlers are inline (param index 1 is
     // :record-type-id) rather than the document-family
@@ -5110,7 +5110,7 @@ export const routes: Route[] = [
     // on an org nest (param 0 is the path org). PUT
     // reuses postRecordDocumentOp (same trio body /
     // pair append). POST reuses formRecordWriteMessagePairs +
-    // postRecordWriteOp with nested document addresses.
+    // postRecordWriteOp with nested documents.
     // DELETE is inline records/:id posture plus type RESTRICT.
     route(RECORD_TYPES_COLLECTION_PATTERN, {
         get: (db, _p, _actor, organization) =>
@@ -5120,7 +5120,7 @@ export const routes: Route[] = [
         // Admin-only composed create/edit (MEMBER_VERBS has
         // GET only). Same transaction / RESTRICT discipline
         // as flat POST /records; document message pair at the nested
-        // detail address, attributes at ATTRIBUTE_DETAIL_
+        // detail document, attributes at ATTRIBUTE_DETAIL_
         // PATTERN.
         post: async (
             db, _p, body, actor, messagePair, organization,
@@ -5461,7 +5461,7 @@ export const routes: Route[] = [
     // ACL 403 → value 400 → two-pair tx (wire + inner
     // PUT). Ladder PATCH update: shape → unknown attr
     // → ACL on set∪clear → value on set → two-pair tx.
-    // Ladder DELETE: parent type 404 → address spent
+    // Ladder DELETE: parent type 404 → document spent
     // (any pair, including tombstone) else missedReadError;
     // in-tx re-probe + append tombstone (R4 ledger-
     // complete). No WRITE_AUTHORIZERS (deep sub-family).
@@ -5561,23 +5561,23 @@ export const routes: Route[] = [
     // the locked class flows itself rides is structurally
     // MOOT here — api.ts's isLockedWrite is routePattern ===
     // documentEntityPattern(wiring), which for flows is
-    // organizations/:id/flows/:id — this tags address never
+    // organizations/:id/flows/:id — this tags document never
     // equals that entity pattern, so it never rides that arm
     // no matter what family-registry.ts declares for 'flows'. The
     // tag NAME (param 2) is the document's own name — the FIRST
-    // user-authored address segment in this codebase
+    // user-authored path segment in this codebase
     // (validateFlowTagName, api/validators.ts), validated ONLY at
     // the write gate below (WRITE_RESPONSE_SPECS), never re-checked
     // on GET/DELETE — mirroring how every sibling family's :id
-    // param is unchecked on read (an address that never validly
+    // param is unchecked on read (a document that never validly
     // wrote can never be found either way). DELETE is MARKED, not
     // physical: postFlowTagDocumentOp appends a DELETE pair at the
-    // SAME address, and deriveFlowTag's own deriveDocumentsAt call
+    // SAME document, and deriveFlowTag's own deriveDocumentsAt call
     // already excludes a DELETE head, exactly like every other
     // document family. PUT and DELETE share ONE op
     // (postFlowTagDocumentOp) since NEITHER needs `id` or `body` —
     // the pair alone (formed by the gate from the matched route)
-    // carries the address and the method; a hand-written DELETE
+    // carries the document and the method; a hand-written DELETE
     // closure calling the SAME op keeps the PUT-only op's own name
     // honest (it writes a tag document, never a tombstone) while
     // avoiding a second, byte-identical transaction body.
@@ -5905,7 +5905,7 @@ export const routes: Route[] = [
     // (the org fence still rides the facade re-entry). GET
     // is FLIPPED (Task 7): rides deriveObjectiveRevisions —
     // a bespoke derivation, not a DocumentFamilyWiring family
-    // (a nested address carries no lifecycle trio of its
+    // (a nested document carries no lifecycle trio of its
     // own), so this calls it directly rather than through a
     // generic constructor, mirroring deriveFlowRecords' own
     // precedent above. The leaf id is param 2; only PUT is
@@ -5952,7 +5952,7 @@ export const routes: Route[] = [
     // re-entry). GET is FLIPPED (Task 7): rides
     // deriveBaselineScores — the SAME bespoke-derivation
     // reasoning as deriveObjectiveRevisions above (a project-
-    // nested address, not a DocumentFamilyWiring family). The
+    // nested document, not a DocumentFamilyWiring family). The
     // leaf id is param 2; only PUT is exposed, unchanged from
     // before this flip.
     route(
@@ -6005,7 +6005,7 @@ export const routes: Route[] = [
     // (work-orders stay /history; trio families stay
     // /versions/). Nested field-values collection retired
     // with C4 (inline fold on WO history). bare states/:id
-    // is already a router 404 (states-address retirement
+    // is already a router 404 (states-document retirement
     // Task 13). Per-entity history alias retired with C2.
 ];
 

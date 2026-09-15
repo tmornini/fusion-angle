@@ -94,7 +94,7 @@
 // itself (the work-order deferral's last piece, named above):
 // every trace event formed its own message pair through the
 // SAME formSeedMessagePair pipeline every family above already rides.
-// States-address retirement Task 12 reshapes those 861 traces
+// States-document retirement Task 12 reshapes those 861 traces
 // (212 hand-authored + 649 generated) 1:1 into
 // work-orders/:id/transition op-shaped pairs (op: true),
 // folding the 7 mockStateFieldValues into the parent
@@ -1254,7 +1254,7 @@ interface ObjectiveSeed {
 // The create body for POST /objectives — objective row,
 // first revision, and the genesis lifecycle trio. The trio
 // folds onto the document message pair via
-// objectiveDocumentBodyOf (states-address retirement); pair
+// objectiveDocumentBodyOf (states-document retirement); pair
 // count is unchanged — only body bytes grow. Genesis event
 // id mirrors aiMemberSeedBody's seed-member-${id}-active
 // pattern.
@@ -1406,7 +1406,7 @@ interface MockDataInvocation {
 // memberships + human-members, ideas, organizations (Phase 12
 // Task 3), idea-submissions, projects, flows, work-orders,
 // flow-work-orders, the work-order historical traces as
-// work-orders/:id/transition ops (states-address retirement
+// work-orders/:id/transition ops (states-document retirement
 // Task 12; field values fold into those bodies), memberships
 // + ai-members, the system member's own document, records,
 // flow-records, objectives. A dropped or reordered invocation
@@ -1502,7 +1502,7 @@ export function buildMockDataInvocations():
         });
         // Phase 10 Task 2: the PII facet's own document
         // message pair, closing the intake decomposition's
-        // seed side — its own address (identities/:id/pii),
+        // seed side — its own document (identities/:id/pii),
         // formed the SAME way
         // every other per-member invocation above is, over the
         // SAME body humanMemberPiiSeedBody hands the actual write
@@ -1656,8 +1656,8 @@ export function buildMockDataInvocations():
         });
         // Task 5: create appends THREE pairs — the operation
         // message pair above, plus a document message pair
-        // (at the flow's own address) and a join pair (at the
-        // project_flows address), each keyed by its OWN
+        // (at the flow's own document) and a join pair (at the
+        // project_flows document), each keyed by its OWN
         // deterministic invocation entry, mirroring the
         // idea-submissions two-idParams precedent. The
         // document body is built through
@@ -1760,7 +1760,7 @@ export function buildMockDataInvocations():
             body: flowWorkOrderJoinSeedBody(join),
         });
     }
-    // States-address retirement: every trace event (212 hand-
+    // States-document retirement: every trace event (212 hand-
     // authored + 649 generated = 861) reshapes 1:1 into a
     // work-orders/:id/transition op-shaped pair — the LIVE op
     // shape, nothing invented: transitionEventId = the event's
@@ -1820,7 +1820,7 @@ export function buildMockDataInvocations():
             r, i, event, attributes,
         );
         // Task 23: record document/op invocations ride the
-        // nested record-types patterns (same storage addresses
+        // nested record-types patterns (same storage documents
         // as the retired flat alias window; counts unchanged).
         invocations.push({
             key: seedMessagePairKey(
@@ -1834,7 +1834,7 @@ export function buildMockDataInvocations():
             body: createBody,
         });
         // Phase 6 Task 4: create appends the document message
-        // pair (at the type's own nested address) and one
+        // pair (at the type's own nested document) and one
         // attribute-PUT pair per seeded attribute, each keyed
         // by its OWN deterministic invocation entry — the
         // flows document + join precedent above, generalized
@@ -1915,8 +1915,8 @@ export function buildMockDataInvocations():
             body: createBody,
         });
         // Task 3: create appends the document message pair
-        // (at the objective's own address) and the revision
-        // pair (at its first revision's own address), each
+        // (at the objective's own document) and the revision
+        // pair (at its first revision's own document), each
         // keyed by its OWN deterministic invocation entry —
         // the flows document + join precedent, objectives'
         // own fixed 1+1+1. Bodies via the shared BODY builders
@@ -2002,7 +2002,7 @@ export function buildMockDataInvocations():
     // (the lone org-2 project is seeded 'submitted', so it never
     // reaches the scoring loop), but the organization is still
     // looked up per row's own project rather than hardcoded, so
-    // a future org-2 score would surface at the correct address.
+    // a future org-2 score would surface at the correct document.
     const scoreProjects = buildScoreSeedProjects();
     const scoreProjectOrganizationById = new Map(
         scoreProjects.map(p => [p.id, p.organization_id]),
@@ -2060,11 +2060,11 @@ export function buildMockDataInvocations():
 // createdEntityName (message-pair.ts's CREATE_BODY_ID_FIELDS)
 // overrides it to the created entity's own id. Document-class
 // genesis PUTs (ideas/:id, ideas/:id/submissions/:sid, …)
-// carry idParams and the id-tailed address is built directly
+// carry idParams and the id-tailed document is built directly
 // — pathAndNameOf derives the real name from the path
 // segment itself. Operation-shaped POSTs at id-carrying
 // patterns (work-orders/:id/transition, op: true) also carry
-// idParams for the ADDRESS, but form as POST with {status:
+// idParams for the path, but form as POST with {status:
 // 204} — name stays '' because pathAndNameOf keys on the
 // LAST segment.
 export async function formSeedMessagePair(
@@ -2291,7 +2291,7 @@ export async function formInvitationSeedMessagePairs(
 }
 
 // The instance chain cannot ride formSeedMessagePair: its
-// revisions share an address and its head depends on
+// revisions share a document and its head depends on
 // (response_at, id) order, made deterministic by forming
 // sequentially — response_at is minted (nowUtc(), at
 // append) in that same order, not by requestAt. This pass

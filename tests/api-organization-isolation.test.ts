@@ -416,7 +416,7 @@ async function seedChain(
     assertStrictEquals(flowWrite.status, 201);
     // Phase Final Task 2: objectives row half stripped — seed
     // through the live document PUT with the lifecycle trio
-    // (states-address retirement) so the message plane owns it
+    // (states-document retirement) so the message plane owns it
     // (nested revisions/scores re-pins already ride pairs).
     await handleRequest(db, req(
         'PUT',
@@ -470,7 +470,7 @@ async function seedChain(
     // organizations/:id/projects/:id/flows derives from the message ledger,
     // not
     // the raw project_flows table — a raw db.projectFlows.put
-    // leaves no pair at this address, so the link must land
+    // leaves no pair at this document, so the link must land
     // through the SAME wire-reachable PUT the live route serves.
     // The two OTHER nested-flow sub-collections (versions/
     // records) genuinely stay old-plane, each with its own
@@ -490,7 +490,7 @@ async function seedChain(
     // NAMED re-pin (Task 7): the flipped GET organizations/:id/flows/:id/
     // work-orders derives from the message ledger too, the SAME
     // reason as the project-flow join above — a raw
-    // db.flowWorkOrders.put leaves no pair at this address.
+    // db.flowWorkOrders.put leaves no pair at this document.
     await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
@@ -506,7 +506,7 @@ async function seedChain(
     // organizations/:id/flows/:id/records
     // derives from the message ledger too, the SAME reason as
     // the flow-work-order join above — a raw db.flowRecords.put
-    // leaves no pair at this address.
+    // leaves no pair at this document.
     const bindingWrite = await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
@@ -537,7 +537,7 @@ async function seedChain(
     // GET organizations/:id/objectives/:id/revisions and GET
     // organizations/:id/projects/:id/
     // objective-<kind>-scores routes derive from the message
-    // ledger — a raw put leaves no pair at these addresses.
+    // ledger — a raw put leaves no pair at these documents.
     // Objectives themselves are message-plane seeded above.
     await handleRequest(db, req(
         'PUT',
@@ -576,7 +576,7 @@ async function seedChain(
         },
     ));
     // Transition op with a fieldValues fold — the sole SFV
-    // source after the states-address retirement (leaf pairs
+    // source after the states-document retirement (leaf pairs
     // and states/:id writes are gone). transitionEventId
     // keeps the se* ids the fence tests name.
     // Task 8 CUT: legacy bag is below-gate (stored SFV truth).
@@ -759,7 +759,7 @@ async function deepDb(): Promise<DeepDb> {
     // wrote above: the flipped GET organizations/:id/ideas/:id/submissions
     // route
     // (Phase 2 Task 5) derives from the ledger at this idea's
-    // submissions address, so the ideas LEAF_CASES case below
+    // submissions document, so the ideas LEAF_CASES case below
     // needs a pair to find it. isB stays a raw row — it is read
     // only through org A's facade, which the fence hides either
     // way.
@@ -959,10 +959,10 @@ for (const c of NESTED_FLOW_CASES) {
 // `store` to probe). A DIRECT fence, not the facade re-entry:
 // fB belongs to org B (seeded via seedChain(db, 'B', 'B', 'pb')
 // in deepDb()), so a tag written there through 'pb's org-B token
-// lands at the '/organizations/B/flows/fB/tags/' address; a read
+// lands at the '/organizations/B/flows/fB/tags/' document; a read
 // of the SAME path with 'XXZruirZyAOoRpNxaDnpSA's org-A-scoped token resolves
 // an entirely different '/organizations/A/...' prefix — the
-// same structural fence every org-nested address rides, with no
+// same structural fence every org-nested document rides, with no
 // tag-specific code of its own.
 Deno.test('nested organizations/:id/flows/:id/tags 404s a foreign-org flow',
     async () => {
@@ -1120,7 +1120,7 @@ async () => {
 Deno.test('organizations/:id/work-orders/:id/history 404s a foreign work'
 + ' order', async () => {
     const fx = await deepDb();
-    // woB is B-org; never written at A's address → 404.
+    // woB is B-org; never written at A's document → 404.
     const res = await facadeGet(
         fx.db, fx.organizationA,
         '/work-orders/' + fx.chainB.workOrder + '/history');
@@ -1133,7 +1133,7 @@ Deno.test('organizations/:id/work-orders/:id/history 404s a foreign work'
 });
 
 // Family versions route (states-URI elimination C1): fence
-// rides organizations/:id/ideas/:id/versions. A miss at this address is 404.
+// rides organizations/:id/ideas/:id/versions. A miss at this document is 404.
 Deno.test('ideas history gates on parent ownership',
 async () => {
     const fx = await deepDb();
@@ -1391,7 +1391,7 @@ async () => {
     assertEquals(ids, [orphan]);
 });
 
-// Orphan states/:id writes retired with the address. Pin
+// Orphan states/:id writes retired with the document. Pin
 // that a ghost body is a router 404 (no injection path).
 // Path is built without a contiguous slash-states token so
 // the vocabulary gate stays clean. Collection isolation

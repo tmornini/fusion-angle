@@ -11,7 +11,7 @@ import {
 
 // The project<->flow join's own reshaping of the generic
 // message-plane reduction (derive-documents.ts): one prefix
-// scan per project, at the join address the live route and the
+// scan per project, at the join document the live route and the
 // Phase 4 Task 5 create/seed writes both share — verified by
 // content against a stored :pfid pair (tests/api-flow-
 // document.test.ts's joinPrefix): /organizations/{org}/

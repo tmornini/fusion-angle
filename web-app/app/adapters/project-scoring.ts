@@ -433,7 +433,7 @@ export async function postProjectBaselineScoring(
 ): Promise<void> {
     const at = nowUtc();
     const member = await getCurrentHumanMember(ctx);
-    // Fresh base62 address per PUT; shared `at` minted once
+    // Fresh base62 name per PUT; shared `at` minted once
     // before the member await (position unchanged).
     await Promise.all(scores.map(s =>
         ctx.PUT(

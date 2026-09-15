@@ -10,8 +10,8 @@ import {
 // Pre-write ownership authorizer on the message plane. Probes
 // THIS route's collection, not any row with this id. Same
 // id at two collections is two documents. owner-null
-// (never written at this address) → genesis proceeds;
-// this address has a live PUT the caller may not have →
+// (never written at this document) → genesis proceeds;
+// this document has a live PUT the caller may not have →
 // ForeignOrganizationError (HTTP 403).
 //
 // Designed ONCE at the gate/op seam (api.ts consults
@@ -24,7 +24,7 @@ export interface WriteAuthorizer {
     readonly idParamIndex: number;
 }
 
-// Org-scoped existing-id PUT/DELETE/PATCH addresses.
+// Org-scoped existing-id PUT/DELETE/PATCH documents.
 // Collection POSTs (genesis of a new id) are
 // intentionally absent — owner-null is the happy path for
 // those. PATCH must share this map so a future flat PATCH

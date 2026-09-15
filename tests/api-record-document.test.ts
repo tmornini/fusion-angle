@@ -340,10 +340,10 @@ Deno.test('a byte-identical resend replays the stored response:'
 // -- 4. the DELETE-pair walk filter (Author gate 9) ----------
 //
 // documentLifecycleEvents walks every 2xx PUT/DELETE pair at a
-// document address; a DELETE pair's stored body is empty
+// document; a DELETE pair's stored body is empty
 // (design decision 6), so before the fix it threw inside
 // pickString the moment it reached the DELETE pair. records is
-// the first trio family with a live DELETE at its :id address,
+// the first trio family with a live DELETE at its :id document,
 // so a delete-then-recreate history is the first live
 // reproduction of the throw. No route dispatches records/:id
 // through this walk yet (GET stays hand-written until Task 7),

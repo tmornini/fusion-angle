@@ -538,7 +538,7 @@ Deno.test('case 2: GET <family>/:id/history parity — one entity'
         }
     }
     // Every seeded objective now carries an explicit genesis
-    // event (states-address retirement) — absence-as-active
+    // event (states-document retirement) — absence-as-active
     // is RETIRED. Expect exactly one genesis row per seed.
     const objectiveEntry = CASE_2_FAMILY_ENTITY_IDS.find(
         (e) => e.family === 'objective',
@@ -565,10 +565,10 @@ Deno.test('case 2: GET <family>/:id/history parity — one entity'
 // ---- case 3: the fence's legs + the deleted-entity leg ---------
 
 // Fence legs on the message plane. Orphan states/:id writes
-// retired with the address — the own/foreign/deleted legs
+// retired with the document — the own/foreign/deleted legs
 // ride document trios.
 Deno.test('case 3: the fence\'s legs — own-org history visible,'
-+ ' foreign history 404 (miss at this address), and a'
++ ' foreign history 404 (miss at this document), and a'
 + ' DELETED foreign entity still names its owner',
 async () => {
     const db = await seededDb();
@@ -598,7 +598,7 @@ async () => {
 
     // The DELETED-entity leg: org 2 tombstones its OWN idea —
     // message plane is IMMUNE to deleted filter, so owner still
-    // resolves. STARK history is a miss at this address.
+    // resolves. STARK history is a miss at this document.
     const foreignDeleted = await handleRequest(db, req(
         'PUT',
         '/organizations/' + ORGANIZATION_TWO
@@ -673,7 +673,7 @@ async () => {
 // ---- case 4: the WO lifecycle legs (Task 4) ---------------------
 
 Deno.test('case 4a: a SEEDED work order\'s births ride the'
-+ ' transition-op source (states-address retirement) —'
++ ' transition-op source (states-document retirement) —'
 + ' deriveWorkOrderLifecycle contributes the trace events'
 + ' and workOrderLifecycleStatesFor reproduces history',
 async () => {
@@ -1347,7 +1347,7 @@ async () => {
     );
 });
 
-// States-address retirement: archive/reactivate ride PUT
+// States-document retirement: archive/reactivate ride PUT
 // /members/:id with the lifecycle trio — message-plane pin.
 Deno.test('case 7b: live-write chain — AI agent create then'
 + ' update — message-plane pin via PUT ai-agents/:id',
@@ -1388,7 +1388,7 @@ async () => {
     );
 });
 
-// States-address retirement: archive/reactivate ride PUT
+// States-document retirement: archive/reactivate ride PUT
 // /organizations/:id/objectives/:id with the lifecycle
 // trio — message-plane pin.
 Deno.test('case 7c: live-write chain — objective archive, reactivate'
@@ -1403,7 +1403,7 @@ async () => {
     const position = objectiveSeed.position;
 
     // Seeded objective carries genesis 'active'. Archive then
-    // reactivate via the document address — history is
+    // reactivate via the document — history is
     // [active, archived, active].
     const archived = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
@@ -1498,7 +1498,7 @@ Deno.test('case 8: the tombstone-fix interaction — a FENCED cross-org'
     assertStrictEquals(foreignCreated.status, 201);
 
     // A STARK admin attempts to inject via the retired
-    // states/:id address naming the FOREIGN idea — router
+    // states/:id document naming the FOREIGN idea — router
     // 404 (route gone); the event never lands anywhere.
     // Path is built without a contiguous slash-states token
     // so the vocabulary gate stays clean. Cross-org document

@@ -18,13 +18,13 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 const PUT_METHOD = 'PUT';
 const DELETE_METHOD = 'DELETE';
 
-// The two methods a document-address pair can carry (design
+// The two methods a document pair can carry (design
 // decision 6): PUT writes/edits/transitions the document,
-// DELETE tombstones it. A POST at the SAME address is an
+// DELETE tombstones it. A POST at the SAME document is an
 // OPERATION record, never a document — no-op for ideas/
-// projects (neither ever POSTs at its own document address);
+// projects (neither ever POSTs at its own document);
 // load-bearing once a family's create-shaped genesis pair
-// shares its document address (the flows family: POST
+// shares its (path, name) (the flows family: POST
 // 'flows' mints the create operation message pair at the
 // SAME name a subsequent PUT 'flows/:id' revisits).
 // Defense-in-depth, not the deciding mechanism —
@@ -71,7 +71,7 @@ export interface DocumentMessagePair {
 // Supersedes/Follows provenance (the LOCK head) — while
 // this function excludes every method but PUT/DELETE
 // (the DOCUMENT head — design decision 6).
-// POST/PATCH rows at the same address are not heads. Only
+// POST/PATCH rows at the same document are not heads. Only
 // successful writes are stored, so there is no status
 // filter. Method comes from the pair's `method` column.
 // DocumentMessagePair.at is the response stamp.
@@ -177,11 +177,11 @@ export interface DocumentLifecycleEvent {
 // state_event_id key. The tombstone signal itself lives in
 // deriveDocumentsAt's head-absence check, not in this lifecycle
 // walk. Author gate 9: records is the first trio family whose
-// :id address carries a live DELETE route, so a delete-then-
+// :id document carries a live DELETE route, so a delete-then-
 // recreate history (PUT, DELETE, PUT) is the first live case
 // that would otherwise crash here; behavior-preserving for
 // ideas/projects/flows, none of which has a DELETE at its own
-// document address.
+// document.
 export function documentLifecycleEvents(
     messagePairs: readonly DocumentMessagePair[],
 ): DocumentLifecycleEvent[] {

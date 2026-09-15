@@ -752,7 +752,7 @@ async () => {
 // DOCUMENT plane to exclude a duplicate grant's own
 // operation message pair (which forms but writes neither a
 // document nor a states event), and takes only the EARLIEST
-// pair per answering-op address to exclude an idempotent
+// pair per answering-op document to exclude an idempotent
 // resend's own operation message pair (which forms but
 // posts no second lifecycle event). Both
 // exclusions are hand-trace-verified in deriveInvitationStates'

@@ -104,7 +104,7 @@ function messagePairJsonOf(message: string): {
 // 15 objectives-family (5 ops + 5 documents + 5 revisions —
 // Phase 7 Task 3's fixed 1+1+1 bundle synthesis, the flows
 // precedent, over the same 4 STARK + seed-objective-org2 set;
-// states-address retirement rides the genesis trio on those
+// states-document retirement rides the genesis trio on those
 // same create/document bodies — pair COUNT unchanged)
 // + 145 work-order documents + 145 flow-work-order joins
 // (Phase 5 Task 4: the entity/join gap closed, one document
@@ -117,7 +117,7 @@ function messagePairJsonOf(message: string): {
 // 11 identity_pii document message pairs (Phase 10 Task 2's
 // intake decomposition: each seeded human's PUT
 // identities/:id/pii, formerly folded into the human-members
-// create body, now its own document address, closed through
+// create body, now its own document, closed through
 // postIdentityPiiDocumentOp) +
 // 11 identities-document message pairs (Phase 10 Task 5: each
 // seeded human-member create ALSO forms its own identities/:id
@@ -138,7 +138,7 @@ function messagePairJsonOf(message: string): {
 // file's shared pre-tx pass) + 0 role-grant document message
 // pairs (retired: membership type carries privilege; mint
 // bakes claims) + 859 legacy work-order historical-trace
-// transition operation message pairs (states-address
+// transition operation message pairs (states-document
 // retirement Task 12: 861 traces minus WO01's two
 // value-bearing events, which migrate to the
 // instance chain) + 6 WO-instance SoT chain pairs (Task 6:
@@ -146,7 +146,7 @@ function messagePairJsonOf(message: string): {
 // each with a revision — net +4 vs 1494) + 11 identity-default-
 // organization pairs (Phase 11 Task 8: one event-append pair
 // per seeded human member at its identity-keyed
-// /identities/:id/default-organization/ address; Phase Final
+// /identities/:id/default-organization/ document; Phase Final
 // Task 2
 // strips the identity_default_organizations ROW half — pairs
 // alone remain) + 1 gate0001 Capture step (R1-FIX-A re-home)
@@ -189,7 +189,7 @@ Deno.test('every seed op body carries a unique entity id, so no'
     assertStrictEquals(distinctHashes.size, requests.length);
 });
 
-Deno.test('a seeded idea create pair sits at its entity address',
+Deno.test('a seeded idea create pair sits at its entity document',
 async () => {
     const db = await sharedMockDb();
     const firstIdea = buildIdeas()[0]!;
@@ -203,7 +203,7 @@ async () => {
 });
 
 Deno.test('a seeded organizations pair sits at the global'
-+ ' (non-org-nested) address, its actor is the system member,'
++ ' (non-org-nested) document, its actor is the system member,'
 + ' and its stored body\'s fields equal the derived'
 + ' organization exactly (Phase Final Task 2: organizations'
 + ' ROW half stripped — message-plane truth)',
@@ -234,7 +234,7 @@ async () => {
 });
 
 Deno.test('a seeded person identity pair sits at the global'
-+ ' identities address', async () => {
++ ' identities document', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
@@ -249,7 +249,7 @@ Deno.test('a seeded person identity pair sits at the global'
 });
 
 Deno.test('a seeded human member\'s PII intake pair sits at its own'
-+ ' identities/:id/pii address, its body carrying the four PII'
++ ' identities/:id/pii document, its body carrying the four PII'
 + ' keys (Phase 10 Task 2\'s intake decomposition)', async () => {
     const db = await sharedMockDb();
     const firstMember = buildMembers()[0]!;
@@ -270,7 +270,7 @@ Deno.test('a seeded human member\'s PII intake pair sits at its own'
 });
 
 Deno.test('a seeded human member\'s identities-document message pair'
-+ ' sits at the shared identities/:id address, its body carrying'
++ ' sits at the shared identities/:id document, its body carrying'
 + ' `kind` alone (Phase 10 Task 5)', async () => {
     const db = await sharedMockDb();
     const firstMember = buildMembers()[0]!;
@@ -290,7 +290,7 @@ Deno.test('a seeded human member\'s identities-document message pair'
 });
 
 Deno.test('a seeded flow create pair sits at its org-nested'
-+ ' entity address', async () => {
++ ' entity document', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
@@ -302,7 +302,7 @@ Deno.test('a seeded flow create pair sits at its org-nested'
 });
 
 Deno.test('a seeded AI agent pair sits at the global'
-+ ' ai-agents address', async () => {
++ ' ai-agents document', async () => {
     const db = await sharedMockDb();
     const firstAgent = buildAiMembers()[0]!;
     const requests = await db.messagePairs.getAll();
@@ -321,7 +321,7 @@ Deno.test('a seeded AI agent pair sits at the global'
 });
 
 Deno.test('a seeded seat document message pair sits at its org-nested'
-+ ' members address', async () => {
++ ' members document', async () => {
     const db = await sharedMockDb();
     const firstMember = buildMembers()[0]!;
     const requests = await db.messagePairs.getAll();
@@ -343,7 +343,7 @@ Deno.test('a seeded seat document message pair sits at its org-nested'
 });
 
 Deno.test('a seeded default-organization pair sits at its'
-+ ' identity-keyed address, its body carrying'
++ ' identity-keyed document, its body carrying'
 + ' organization_id',
 async () => {
     const db = await sharedMockDb();
@@ -370,7 +370,7 @@ async () => {
 });
 
 Deno.test('a seeded record create pair sits at its org-nested'
-+ ' entity address', async () => {
++ ' entity document', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
@@ -385,11 +385,11 @@ Deno.test('a seeded record create pair sits at its org-nested'
 });
 
 Deno.test('a seeded record\'s document message pair sits at its'
-+ ' entity address, its body carrying the entity plus the'
++ ' entity document, its body carrying the entity plus the'
 + ' state trio (no id or organization_id key)', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
-    // The document message pair shares its address with the
+    // The document message pair shares its (path, name) with the
     // operation message pair (records' createBodyIdField
     // collapses both onto the SAME name) — distinguish it
     // by PUT, the operation message pair being POST.
@@ -405,7 +405,7 @@ Deno.test('a seeded record\'s document message pair sits at its'
     // The id-strip covenant (verification finding, lens 4) made
     // falsifiable: a spurious id/organization_id key riding the
     // recorded body would drift from wire fidelity with no
-    // address-only check catching it.
+    // document-only check catching it.
     const embedded = messagePairJsonOf(documentRow!.request) as {
         body: Record<string, unknown>;
     };
@@ -419,7 +419,7 @@ Deno.test('a seeded record\'s document message pair sits at its'
 });
 
 Deno.test('a seeded record attribute\'s document message pair sits at'
-+ ' its nested type-attributes address, its body carrying'
++ ' its nested type-attributes document, its body carrying'
 + ' no id, organization_id, or record_id key and both ACL'
 + ' arrays', async () => {
     const db = await sharedMockDb();
@@ -450,11 +450,11 @@ Deno.test('a seeded record attribute\'s document message pair sits at'
 });
 
 Deno.test('a seeded objective create pair sits at its org-nested'
-+ ' entity address, per org', async () => {
++ ' entity document, per org', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
     const starkSeed = OBJECTIVE_SEEDS[0]!;
-    // The document message pair now shares this address with
+    // The document message pair now shares this (path, name) with
     // the operation message pair (Task 3's create-time bundle),
     // so a positional/single .find() is unsafe — filter/count
     // instead (the H7/arrival-order hazard class).
@@ -481,12 +481,12 @@ Deno.test('a seeded objective create pair sits at its org-nested'
 });
 
 Deno.test('a seeded objective\'s document message pair sits at its'
-+ ' entity address, body carrying position plus the'
++ ' entity document, body carrying position plus the'
 + ' lifecycle trio and no organization_id key', async () => {
     const db = await sharedMockDb();
     const starkSeed = OBJECTIVE_SEEDS[0]!;
     const requests = await db.messagePairs.getAll();
-    // The document message pair shares its address with the
+    // The document message pair shares its (path, name) with the
     // operation message pair (objectives' createBodyIdField
     // collapses both onto the SAME name) — distinguish it
     // by PUT, the operation message pair being POST.
@@ -512,7 +512,7 @@ Deno.test('a seeded objective\'s document message pair sits at its'
 });
 
 Deno.test('a seeded objective\'s revision pair sits at its own'
-+ ' entity address, its body carrying the five revision'
++ ' entity document, its body carrying the five revision'
 + ' keys', async () => {
     const db = await sharedMockDb();
     const starkSeed = OBJECTIVE_SEEDS[0]!;
@@ -539,7 +539,7 @@ Deno.test('a seeded objective\'s revision pair sits at its own'
 });
 
 Deno.test('a seeded work-order document message pair sits at its'
-+ ' org-nested entity address, its body carrying no id key',
++ ' org-nested entity document, its body carrying no id key',
 async () => {
     const db = await sharedMockDb();
     const firstWorkOrder = buildWorkOrders()[0]!;
@@ -552,7 +552,7 @@ async () => {
         , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/');
     // The id-strip covenant (verification finding, lens 4): a
     // spurious `id` key riding the recorded body would drift
-    // from wire fidelity with no address-only check catching
+    // from wire fidelity with no document-only check catching
     // it, so the key set itself is the falsifiable pin.
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
@@ -564,7 +564,7 @@ async () => {
 });
 
 Deno.test('a seeded flow-work-order join pair sits at its'
-+ ' org-nested join address, its body carrying no id key',
++ ' org-nested join document, its body carrying no id key',
 async () => {
     const db = await sharedMockDb();
     const firstJoin = buildFlowWorkOrderJoins()[0]!;
@@ -586,7 +586,7 @@ async () => {
 });
 
 Deno.test('a seeded flow-record join pair sits at its org-nested'
-+ ' join address, its body carrying no id key', async () => {
++ ' join document, its body carrying no id key', async () => {
     const db = await sharedMockDb();
     const firstJoin = mockFlowRecords[0]!;
     const requests = await db.messagePairs.getAll();
@@ -632,7 +632,7 @@ function transitionRequestForEvent(
 }
 
 Deno.test('a seeded work-order trace event\'s pair sits at its'
-+ ' org-nested transition address, its body carrying the'
++ ' org-nested transition document, its body carrying the'
 + ' transition keys (states/:id retired)', async () => {
     const db = await sharedMockDb();
     const firstTrace = buildWorkOrderStateEvents()[0]!;
@@ -790,7 +790,7 @@ async () => {
 // every seeded baseline/actual-score row now forms its own
 // message pair, driven through postBaselineScoreDocumentOp /
 // postActualScoreDocumentOp, mirroring the flow-record join
-// precedent above (address + no-`id`-key body shape). The
+// precedent above (document + no-`id`-key body shape). The
 // expected rows come straight from buildSeedScoreRows — the SAME
 // pure builder pass 1 (seed-message-pairs.ts) and pass 2
 // (mock-data.ts) both consume — so this test can never drift
@@ -801,7 +801,7 @@ const scoreRows = buildSeedScoreRows(
 );
 
 Deno.test('a seeded baseline-score pair sits at its org-nested'
-+ ' entity address, its body carrying no id key', async () => {
++ ' entity document, its body carrying no id key', async () => {
     const db = await sharedMockDb();
     const firstBaseline = scoreRows.baselines[0]!;
     const requests = await db.messagePairs.getAll();
@@ -823,7 +823,7 @@ Deno.test('a seeded baseline-score pair sits at its org-nested'
 });
 
 Deno.test('a seeded actual-score pair sits at its org-nested'
-+ ' entity address, its body carrying no id key', async () => {
++ ' entity document, its body carrying no id key', async () => {
     const db = await sharedMockDb();
     const firstActual = scoreRows.actuals[0]!;
     const requests = await db.messagePairs.getAll();
@@ -874,7 +874,7 @@ async () => {
         ) as { body: { member_id: string } };
         // The operation message pair alone embeds the full
         // create body (its own `revision` sub-object) — the
-        // document message pair now sharing this address
+        // document message pair now sharing this (path, name)
         // carries `{position}` only, so select by POST, never
         // a positional first match (the H7/arrival-order
         // hazard class).

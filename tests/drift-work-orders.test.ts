@@ -945,13 +945,13 @@ async () => {
         db.messagePairs.getAllWhere('path', prefix),
         db.messagePairs.getAllWhere('path', prefix),
     ]);
-    const atAddress = requests.filter(
+    const pairsAt = requests.filter(
         (r) => r.path === prefix
             && r.name === workOrderId,
     );
     // Both an operation (POST, 204) pair and a document (PUT)
     // pair share the SAME name.
-    assertStrictEquals(atAddress.length, 2);
+    assertStrictEquals(pairsAt.length, 2);
 
     const documentMessagePairs = documentMessagePairsAt(
         requests, prefix,
@@ -959,7 +959,7 @@ async () => {
     assertStrictEquals(documentMessagePairs.length, 1);
     assertStrictEquals(documentMessagePairs[0]!.method, 'PUT');
 
-    const postRow = atAddress.find(
+    const postRow = pairsAt.find(
         (r) => decodeRequestMessage(r.request).method === 'POST',
     )!;
     const createBodyKeys = new Set(

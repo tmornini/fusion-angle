@@ -468,7 +468,7 @@ async () => {
         },
         operationId: generateIdentifier(),
     });
-    // Concurrent DELETE tombstones the address.
+    // Concurrent DELETE tombstones the document.
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));

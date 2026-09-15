@@ -527,7 +527,7 @@ async function readTokenChainFromLedger(
 }
 
 // Each append's event, paired with its OWN formed event pair —
-// formTokenEventMessagePair mints a fresh id per event and addresses the
+// formTokenEventMessagePair mints a fresh id per event and names the
 // pair by it (Phase 13 Task 5). Formed pre-tx — crypto,
 // hashing, and timers never run inside an open
 // transaction (AGENTS.md § Transaction bodies await only
@@ -1221,7 +1221,7 @@ async function authorizeCodeIssuer(
 // transaction view in-tx. A genuine event already lives at
 // 'identities/<identityId>/tokens/<derivedId>' exactly when
 // this code has already minted a chain root — the pair append
-// at that KEYED address IS the spend marker (KEY-BY-ANCHOR),
+// at that KEYED document IS the spend marker (KEY-BY-ANCHOR),
 // replacing the retired authorization_codes 'consumed' row.
 // Dual-reads leftover /identity-tokens/<derivedId> so a
 // pre-nest spend still fails closed. Filtered to those two

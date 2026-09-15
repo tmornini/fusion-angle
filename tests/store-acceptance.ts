@@ -285,7 +285,7 @@ export function defineStoreAcceptance(
         );
     });
 
-    Deno.test(name + ': address miss is 404', async () => {
+    Deno.test(name + ': document miss is 404', async () => {
         const { db, token } = await ready();
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'

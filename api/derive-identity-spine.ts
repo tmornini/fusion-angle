@@ -37,20 +37,20 @@ import {
 // E13 FULL-SCAN NAMED CLASS (derive-invitations.ts's own named
 // class): '/pii' forms ONE distinct prefix PER IDENTITY
 // ('/identities/<id>/pii/', name '' — a singleton document at a
-// collection-style address, message-address.ts), so no index can
+// collection-style path, path-and-name.ts), so no index can
 // serve "every request whose path has this shape" for an
 // arbitrary id. deriveIdentityPiiRows reads db.messagePairs
-// IN FULL (ONE shared tx) and matches PII_ADDRESS_PATTERN — the
+// IN FULL (ONE shared tx) and matches PII_PATH_PATTERN — the
 // segment-boundary rule verified against derive-invitations.ts's
-// OP_ADDRESS_PATTERN at Step 0: '[^/]+' between two literal
+// OP_PATH_PATTERN at Step 0: '[^/]+' between two literal
 // slashes, anchored at both ends, so '/identities/42/pii/' can
-// never be confused with a sibling address sharing the
+// never be confused with a sibling document sharing the
 // '/identities/' root ('/identities/42/credentials/c1/', or the
 // identity's own '/identities/42/' document) — the '/members' vs
 // '/memberships' precedent class this task's brief names.
 //
 // READ SEMANTICS (concurrency lens): '/pii' is an ordinary
-// document address. Two INDEPENDENT half-store reads could
+// document. Two INDEPENDENT half-store reads could
 // still straddle a concurrent append: the first read
 // captures the OLD request row, a concurrent write then
 // appends a NEW pair, and the second read captures
@@ -84,7 +84,7 @@ import {
 // ---- rule is deriveIdentityPiiRows/deriveIdentityPii, never ----
 // ---- deriveIdentityPiis/deriveIdentityPiiRow ---------------------
 
-const PII_ADDRESS_PATTERN = /^\/identities\/([^/]+)\/pii\/$/;
+const PII_PATH_PATTERN = /^\/identities\/([^/]+)\/pii\/$/;
 
 function piiPrefixFor(identityId: Id): string {
     return canonicalPath(
@@ -120,7 +120,7 @@ export async function deriveIdentityPiiRows(
             const prefixes = new Set<string>();
             for (const messagePair of messagePairs) {
                 if (
-                    PII_ADDRESS_PATTERN.test(
+                    PII_PATH_PATTERN.test(
                         messagePair.path,
                     )
                 ) {
@@ -129,7 +129,7 @@ export async function deriveIdentityPiiRows(
             }
             const rows: IdentityPiiEntity[] = [];
             for (const prefix of prefixes) {
-                const match = PII_ADDRESS_PATTERN.exec(prefix)!;
+                const match = PII_PATH_PATTERN.exec(prefix)!;
                 const identityId = match[1]!;
                 const document = deriveDocumentsAt(
                     messagePairs, prefix,
@@ -269,7 +269,7 @@ export function identityProviderEntityOf(
     };
 }
 
-// Nested address is the source of truth — fill or overwrite
+// Nested document is the source of truth — fill or overwrite
 // the request body's identity_id from the path.
 function nestedProviderEntityOf(
     identityId: Id,
@@ -375,7 +375,7 @@ export function tokenRevocationEntityOf(
     };
 }
 
-// Nested address is the source of truth — fill or overwrite
+// Nested document is the source of truth — fill or overwrite
 // the request body's identity_id from the path.
 function nestedTokenRevocationEntityOf(
     identityId: Id,
@@ -434,7 +434,7 @@ export async function deriveTokenRevocation(
 }
 
 // ---- client_registration — the clients-table replacement: a ----
-// ---- singleton document at the identity's own nested address ---
+// ---- singleton document at the identity's own nested path ---
 // ---- (the /pii single-slot shape: literal last segment, ------
 // ---- name ''), Supersedes-chained like /credentials. NOT a ---
 // ---- delete zone — a DELETE head is a deregistration ----------

@@ -158,12 +158,12 @@ async () => {
     // (Phase 15 gate 6), the organizations/:id document
     // (Stage B), and the grant's own 2 pairs.
     assertStrictEquals(requests.length, 6);
-    const atAddress = requests.filter(
+    const pairsAt = requests.filter(
         r => r.path === '/invitations/'
             && r.name === INV_DOC_1,
     );
-    assertStrictEquals(atAddress.length, 2);
-    // The document head: the ONE PUT/2xx pair at this address —
+    assertStrictEquals(pairsAt.length, 2);
+    // The document head: the ONE PUT/2xx pair at this document —
     // documentMessagePairsAt excludes the operation message pair's POST
     // method by construction (design decision 6), so a match
     // here IS the document.
@@ -251,7 +251,7 @@ async function accept(
 }
 
 Deno.test('a fresh accept appends its seat document at the'
-+ ' invitation-org members address', async () => {
++ ' invitation-org members document', async () => {
     const db = await freshDb();
     await grant(db, INV_DOC_3);
     const res = await accept(

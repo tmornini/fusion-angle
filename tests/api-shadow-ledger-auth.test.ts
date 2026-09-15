@@ -40,7 +40,7 @@ import {
 // secrets in BOTH directions (a request's password/code/
 // refresh_token, a response's minted tokens) and store them
 // as wire bytes — accepted dev-tier plaintext ledger cost.
-// This file proves pair plumbing (counts, addresses, genesis
+// This file proves pair plumbing (counts, documents, genesis
 // cols, domain-guard replays) and that live secrets DO land
 // in the ledger. The two grant routes' own domain guards
 // (double-spend, reuse) — not a stored-response replay —
@@ -228,7 +228,7 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     // + pbkdf2-to-scrypt rehash (4) = 8.
     assertStrictEquals(requests.length, 8);
     // The AUTH hops stay operation documents (name ''); the
-    // token grant's row event pair rides its OWN row's address
+    // token grant's row event pair rides its OWN row's document
     // instead, so it alone carries a non-empty name in this
     // slice. Indices 4–5 are authorize + token.
     const authHops = requests.slice(4).filter(
@@ -246,7 +246,7 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     assert(tokenEventRequest);
     assertNotStrictEquals(tokenEventRequest!.name, '');
     // name mirrors the SAME partition the requests loop above
-    // pins: the two AUTH hops stay operation-addressed, the token
+    // pins: the two AUTH hops stay operation-path, the token
     // grant's row event response carries its OWN row's (non-
     // empty) name — a request/response pair shares one `id`
     // AND one (path, name) document (appendMessagePair),
@@ -429,7 +429,7 @@ Deno.test('a token-exchange grant stores its own pair with live'
     // 6: the fixture's own pii + credential pairs (2, Phase 13
     // Task 8) + seedRootAdmin's 2 fixture pairs + the exchange's
     // own event pair (Phase 13 Task 5: issueTokenPair's root
-    // gains its own pair at the row's address) + its operation
+    // gains its own pair at the row's document) + its operation
     // pair.
     assertStrictEquals(requests.length, 6);
     const exchangeRequest = requests.find(
@@ -516,7 +516,7 @@ Deno.test('a client_credentials grant stores its own pair with live'
     // (Phase 13 Task 1) + the registration-facet pair the
     // fixture seeds (clients elimination) precede the token
     // grant's spent-jti ticket, its own event pair (Phase 13
-    // Task 5: the issued root's pair at the row's address),
+    // Task 5: the issued root's pair at the row's document),
     // and its operation message pair.
     assertStrictEquals(requests.length, 7);
     const credRequest = requests.find(

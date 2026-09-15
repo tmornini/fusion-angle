@@ -19,9 +19,9 @@ import {
 // postWorkOrderTransitionOp (api/routes.ts) — ONE transition
 // OPERATION message pair (work-orders/:id/transition) whose
 // body carries the fold (fieldValues: [{id, fields}]) — no
-// per-value pair of its own. The STANDALONE leaf address
+// per-value pair of its own. The STANDALONE leaf document
 // (states/:id/field-values/:fvid) retired with the states
-// address; GET states/:id/field-values retired (states-URI
+// document; GET states/:id/field-values retired (states-URI
 // elimination C4) — product reads fold field values on
 // work-order history. This module keeps the single-source
 // fold for RESTRICT (deriveStateFieldValueReferrers). Seed

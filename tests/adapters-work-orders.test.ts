@@ -175,7 +175,7 @@ function buildLinearGraph(): StoredGraph {
 
 // Seed (or re-save) a flow through the SAME gate-driven create/
 // document-PUT idiom the live route uses (postFlowCreation +
-// putFlow), so a message pair exists at this flow's address —
+// putFlow), so a message pair exists at this flow's document —
 // required for the flipped GET organizations/:id/flows/:id route (Phase 4
 // Task
 // 8), which postWorkOrderCreation reads before creating, to
@@ -915,7 +915,7 @@ Deno.test(
         // the
         // message ledger, not the raw flow_work_orders table —
         // a raw db.flowWorkOrders.put leaves no pair at this
-        // address, so each join must land through the SAME
+        // document, so each join must land through the SAME
         // wire-reachable PUT the live route serves.
         const flow1 = generateIdentifier();
         const flow2 = generateIdentifier();
@@ -1074,7 +1074,7 @@ Deno.test(
         const { db, ctx } = await setupDb();
         await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
         // Birth create leaves a live claim; DELETE
-        // on the claim address ends it.
+        // on the claim path ends it.
         const woId = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
         await deleteWorkOrderClaim(ctx, woId);
         const events = await ctx.GET<StateEntity[]>(

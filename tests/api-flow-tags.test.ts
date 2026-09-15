@@ -353,7 +353,7 @@ Deno.test('e2e: a member-role identity (not just admin) can'
 });
 
 // Two DIFFERENT tag names, PUT concurrently on one flow: distinct
-// addresses (no follows/supersedes collision), so both land —
+// documents (no follows/supersedes collision), so both land —
 // structural assertions only (both readable afterward), no timing.
 Deno.test('e2e: two different tag names PUT concurrently on one flow'
 + ' both land', async () => {

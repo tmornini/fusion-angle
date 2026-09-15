@@ -787,7 +787,7 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        // States-address retirement Task 12: every historical
+        // States-document retirement Task 12: every historical
         // trace drives through the live transition op — body
         // validates via validateWorkOrderTransitionBody. WO-
         // instance SoT Task 6: value-bearing WO01 events leave

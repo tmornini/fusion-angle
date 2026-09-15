@@ -43,8 +43,8 @@ import { generateIdentifier } from
 // Phase 10 Task 4 (twelfth registered family): PUT
 // /identities/:id takes `kind` plus, for a person, the
 // optional human profile — no lifecycle trio. Member
-// lifecycle rides the members/:id document address
-// (states-address retirement), and the shared identity id
+// lifecycle rides the members/:id document
+// (states-document retirement), and the shared identity id
 // (member.id === identity.id) must not carry a competing trio
 // that would FREEZE or double-emit lifecycle. Global plane
 // (organizationNested:false), like members/ai-members/

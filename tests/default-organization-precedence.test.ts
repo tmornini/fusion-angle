@@ -53,7 +53,7 @@ async function seedMembershipPair(
     );
 }
 
-// A SET default-organization document at the live address.
+// A SET default-organization document at the live document.
 async function seedDefaultOrganizationEvent(
     db: MemoryDbAdapter,
     identityId: string,

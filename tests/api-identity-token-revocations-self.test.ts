@@ -30,7 +30,7 @@ import { generateIdentifier } from
 
 // Nested under the identity: GET|PUT
 // /identities/:id/token-revocations/:rid. Path identity is
-// the address — stamped on write and GET. MEMBER_VERBS
+// the document — stamped on write and GET. MEMBER_VERBS
 // widens PUT to the member tier; Region B keeps it
 // self-only (path identity vs actor). GET stays admin-only.
 // Flat /identity-token-revocations/:rid is RETIRED (404).

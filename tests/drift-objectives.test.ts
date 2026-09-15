@@ -74,7 +74,7 @@ const OBJ_DRIFT_SKEW_1_GENESIS = generateIdentifier();
 // order; never function-vs-function only).
 //
 // Objectives are the FIFTH lifecycle-trio family (states-
-// address retirement). Absence-as-active (R2) is RETIRED —
+// document retirement). Absence-as-active (R2) is RETIRED —
 // every objective carries an explicit genesis event; archive/
 // reactivate ride PUT /organizations/:id/objectives/:id.
 // OBJECTIVES_TEST_WIRING
@@ -859,9 +859,9 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     assertStrictEquals(derivedActualsFinal.length, 1);
 
     // Duplicate create — same id, fresh revisionId.
-    // Entity-address pairs before: create op + create doc +
+    // Entity-document pairs before: create op + create doc +
     // reposition + archive + reactivate = 5 (archive/reactivate
-    // ride PUT /organizations/:id/objectives/:id after states-address
+    // ride PUT /organizations/:id/objectives/:id after states-document
     // retirement).
     const revisionId3 = OBJECTIVEID_REV_3;
     const objectivesPrefix = canonicalPath(
@@ -886,7 +886,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
         ),
     ));
     assertStrictEquals(duplicate.status, 201);
-    // Supersedes the latest prior entity-address response
+    // Supersedes the latest prior entity-document response
     // (reactivate), not the earlier reposition.
     assertStrictEquals(
         duplicate.headers.get('Supersedes'),
@@ -897,11 +897,11 @@ Deno.test('live-write chain: create, reposition, revision edit,'
         db.messagePairs.getAllWhere('path', objectivesPrefix),
         db.messagePairs.getAllWhere('path', objectivesPrefix),
     ]);
-    const afterAtAddress = afterResponses.filter(
+    const afterPairsAt = afterResponses.filter(
         (r) => r.name === objectiveId,
     );
-    assertStrictEquals(afterAtAddress.length, 7);
-    const newRows = afterAtAddress.filter(
+    assertStrictEquals(afterPairsAt.length, 7);
+    const newRows = afterPairsAt.filter(
         (r) => !beforeDuplicateIds.has(r.id),
     );
     assertStrictEquals(newRows.length, 2);
@@ -916,7 +916,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     assertStrictEquals(documentMessagePairsAfter.length, 5);
     const newestDocumentMessagePair =
         documentMessagePairsAfter.at(-1)!;
-    const newestDocumentResponseRow = afterAtAddress.find(
+    const newestDocumentResponseRow = afterPairsAt.find(
         (r) => r.id === newestDocumentMessagePair.id,
     )!;
     assertStrictEquals(
@@ -947,7 +947,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
 
 Deno.test('the create-op POST pair is not read as a document message pair —'
 + ' the create body and the document body share zero top-level'
-+ ' keys; exactly one PUT pair lands at the objective address'
++ ' keys; exactly one PUT pair lands at the objective document'
 + ' after create', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -970,11 +970,11 @@ Deno.test('the create-op POST pair is not read as a document message pair —'
         db.messagePairs.getAllWhere('path', prefix),
         db.messagePairs.getAllWhere('path', prefix),
     ]);
-    const atAddress = requests.filter(
+    const pairsAt = requests.filter(
         (r) => r.path === prefix
             && r.name === objectiveId,
     );
-    assertStrictEquals(atAddress.length, 2);
+    assertStrictEquals(pairsAt.length, 2);
 
     const documentMessagePairs = documentMessagePairsAt(
         requests, prefix,
@@ -982,7 +982,7 @@ Deno.test('the create-op POST pair is not read as a document message pair —'
     assertStrictEquals(documentMessagePairs.length, 1);
     assertStrictEquals(documentMessagePairs[0]!.method, 'PUT');
 
-    const postRow = atAddress.find(
+    const postRow = pairsAt.find(
         (r) => decodeRequestMessage(r.request).method === 'POST',
     )!;
     const createBodyKeys = new Set(
@@ -1015,7 +1015,7 @@ async () => {
     ));
 
     // Position body carries the echoed genesis trio — required
-    // by the document gate after states-address retirement.
+    // by the document gate after states-document retirement.
     const positionBody = {
         position: 99,
         state: 'active' as const,

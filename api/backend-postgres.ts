@@ -1,5 +1,5 @@
 // Fourth StorageBackend. postgres.js stays behind
-// postgres-client. Write lock order is dedup, address,
+// postgres-client. Write lock order is dedup, document,
 // then FOR UPDATE. Notify is in-transaction.
 
 import {

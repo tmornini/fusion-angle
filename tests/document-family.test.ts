@@ -658,7 +658,7 @@ Deno.test('locked arm: a fresh-keyed replay echoing a superseded'
             { v: 'second' },
             { [IF_MATCH_HEADER]: genesisEtag },
         ));
-        // A DIFFERENT (fresh) address has no head of its own;
+        // A DIFFERENT (fresh) document has no head of its own;
         // echoing YMhCOBWvbUQVTDYjSloGqw's now-superseded genesis tag is
         // neither
         // "absent" nor "matches MY head" — 412.

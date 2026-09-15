@@ -44,7 +44,7 @@ const WORKORDERID_REL1 = generateIdentifier();
 const WORKORDERID_GENESIS = generateIdentifier();
 
 // The work-order lifecycle derivation — create/claim/
-// transition/release OPERATION message pairs (states-address
+// transition/release OPERATION message pairs (states-document
 // retirement: the sole work-order source; bare states/:id
 // births are gone). Seeded traces reshape into transition
 // ops, so this reader also covers historical births.
