@@ -32,6 +32,7 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { OPERATION_ID_HEADER } from '../api/message-pair.ts';
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
@@ -370,7 +371,12 @@ Deno.test(
             graphDelta: EMPTY_GRAPH_DELTA,
             revivals: [],
         };
-        const headers = ifMatchHeaders(etag);
+        // A resend of one operation carries its operation id.
+        const operationId = generateIdentifier();
+        const headers: readonly (readonly [string, string])[] = [
+            [OPERATION_ID_HEADER, operationId],
+            ...(ifMatchHeaders(etag) ?? []),
+        ];
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aEsGMmBEFaVdWihhHXwCbw', body, headers);
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
