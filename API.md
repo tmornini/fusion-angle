@@ -27,7 +27,7 @@ Concurrency class is `api/family-registry.ts`.
    client supplies Operation-ID; the server never
    mints it for a public write. An Operation-ID names
    one write and is never reused — a retry or resend of
-   one operation carries the SAME Operation-ID, which is
+   one operation carries the same Operation-ID, which is
    what makes the resend byte-identical and lets it
    replay (Step 5). A handler that forms a revision pair
    beside the wire pair (the instance PUT and PATCH
