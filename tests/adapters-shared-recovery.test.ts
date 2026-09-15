@@ -64,7 +64,7 @@ import {
     apiRequest,
     refreshTokenFromSetCookie,
 } from './http-fixtures.ts';
-import { seedIdentityPii } from './identity-fixtures.ts';
+import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
     postInvitationAcceptance,
 } from '../web-app/app/adapters/invitations.ts';
@@ -492,7 +492,7 @@ Deno.test('a concurrent facade refresh and remint present'
         db, ORGANIZATION_B, wayneAdmin, 'admin',
         '2026-06-04T00:00:00.000000Z',
     );
-    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
+    await seedPersonIdentity(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Tony', email: 'demo@example.com',
         phone: '', bio: '',
     });

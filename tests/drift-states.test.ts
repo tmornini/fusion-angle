@@ -45,7 +45,7 @@ import { buildWorkOrders } from '../api/mock-data/work-orders.ts';
 import { OBJECTIVE_SEEDS } from '../api/mock-data/objectives.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
-import { seedIdentityPii } from './identity-fixtures.ts';
+import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
@@ -219,12 +219,14 @@ function ideaDocument(
 }
 
 // Phase 15 gate 6: grantInvitation resolves email via
-// deriveIdentityPiiRows — seedIdentityPii dual-writes the row
-// and the identities/:id/pii pair so email resolution works.
+// deriveIdentityPiiRows, which lists the identities collection
+// and reads one PII document each — seedPersonIdentity writes
+// the identities/:id document and its PII, so email resolution
+// finds the person.
 async function person(
     db: MemoryDbAdapter, id: string, name: string, email: string,
 ): Promise<void> {
-    await seedIdentityPii(db, id, {
+    await seedPersonIdentity(db, id, {
         name, email, phone: '', bio: '',
     });
 }

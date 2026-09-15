@@ -18,7 +18,7 @@ import {
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import {
     seedIdentityCredential,
-    seedIdentityPii,
+    seedPersonIdentity,
 } from './identity-fixtures.ts';
 import {
     MS_PER_SECOND, setClockForTest, resetClock,
@@ -90,7 +90,7 @@ async function noStoredAuthorizeResponse(
 async function dbWithPasswordUser(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
+    await seedPersonIdentity(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Demo', email: 'demo@example.com',
         phone: '555-0100', bio: 'demo user',
     });
@@ -203,7 +203,7 @@ Deno.test('a revoked password credential is the same 401',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
+    await seedPersonIdentity(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Demo', email: 'demo@example.com',
         phone: '555-0100', bio: 'demo user',
     });

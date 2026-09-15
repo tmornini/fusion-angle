@@ -28,27 +28,24 @@ import {
     type DerivedDocument,
 } from './derive-documents.ts';
 
-// The identity spine's own reduction over the message ledger —
-// Phase 10 Task 7, the roster phase's LAST derivation before the
-// readers flip (Task 8). Facets (registration joined at the
-// clients elimination):
+// The identity spine's reduction over the message ledger. The
+// facets: identity_pii, identity_credentials,
+// identity_providers, identity_token_revocations, and
+// client_registration — each a document or a collection of
+// documents under the identity's own path — plus the identity
+// document's own kind.
 //
-// READ SEMANTICS (concurrency lens): '/pii' is an ordinary
-// document. Two INDEPENDENT half-store reads could
-// still straddle a concurrent append: the first read
-// captures the OLD request row, a concurrent write then
-// appends a NEW pair, and the second read captures
-// the NEW response row alone — the two rows never share an
-// id, so deriveDocumentsAt's match fails and a LIVE
-// identity spuriously 404s. Both pii derives below close
-// this by reading db.messagePairs inside ONE shared
-// readonly db.readTransaction(...) —
-// greenfield code, closed at zero cost. Other facets in
-// this module are not this concurrent-append race, so
-// none of the other reads need this — a prefix getAllWhere
-// outside a transaction (the
-// deriveMembers/deriveInvitations precedent) is sufficient
-// for them.
+// Every read below is an exact read: a collection read on one
+// path, or a document read on one (path, name). Nothing here
+// scans the ledger and nothing matches a path by pattern.
+//
+// Both pii derives read inside ONE readonly
+// db.readTransaction(...). deriveIdentityPiiRows needs the
+// snapshot: it lists the identities collection and then reads
+// one document per id, and only one snapshot makes the list and
+// its reads agree. deriveIdentityPii is a single document read
+// that no concurrent append can tear; it keeps the wrapper so
+// both pii derives read the same way.
 //
 // Role-grants RETIRED: membership `type` bakes claim roles at
 // mint; Gate-16 response-body deviation deleted with the family.
@@ -58,14 +55,12 @@ import {
 // derive-members.ts and api/derive-invitations.ts. Production
 // reads this module today: the identity facet routes
 // (api/routes.ts) and api/authentication.ts.
-//
-// Measured costs (the E13 full scan; the per-identity/per-event
-// prefix reads) are recorded at Task 9's CLI leg, not here.
 
-// ---- identity_pii — the E13 scan + the exact-prefix single-id --
-// ---- read; 'pii' does not pluralize as a count noun, so the ----
-// ---- one accommodation to the bare-plural/bare-singular naming -
-// ---- rule is deriveIdentityPiiRows/deriveIdentityPii, never ----
+// ---- identity_pii — the identities collection lists the ids, --
+// ---- then one document read each; 'pii' does not pluralize as -
+// ---- a count noun, so the one accommodation to the bare- -------
+// ---- plural/bare-singular naming rule is -----------------------
+// ---- deriveIdentityPiiRows/deriveIdentityPii, never ------------
 // ---- deriveIdentityPiis/deriveIdentityPiiRow ---------------------
 
 // The PII slot is the identity's own singleton: `path =
@@ -74,13 +69,15 @@ import {
 // storedPathAndNameOf). One document read serves it.
 const PII_DOCUMENT_NAME = 'pii';
 
+const IDENTITIES_PREFIX = canonicalPath(
+    undefined, '/identities/',
+);
+
 function identityPrefixFor(identityId: Id): string {
     return canonicalPath(
         undefined, '/identities/' + identityId + '/',
     );
 }
-
-const PII_PATH_PATTERN = /^\/identities\/([^/]+)\/$/;
 
 // G5: GET derive is the stored PUT. id-first via
 // validateIdentityPiiEntity (withoutId first). A leaked
@@ -95,32 +92,32 @@ export function piiEntityOf(
     };
 }
 
-// Every LIVE /pii slot, id-lex ordered (byIdAscending —
-// the derivation's own order, never the backend's). A
-// DELETE-head slot (an erasure tombstone)
-// is silently absent — deriveDocumentsAt's own head-absence rule,
-// unchanged here.
+// Every LIVE PII slot, id-lex: the identities collection
+// lists the ids (ONE collection read), then ONE document
+// read per identity — O(identities), never O(ledger). A
+// DELETE-head slot (an erasure tombstone) is absent
+// (deriveDocumentsAt's own head-absence rule). An identity
+// with no identities/:id document has no slot to read: PII
+// rides its identity. One readonly transaction so the list
+// and its reads see one snapshot.
 export async function deriveIdentityPiiRows(
     db: DbAdapter,
 ): Promise<IdentityPiiEntity[]> {
     return db.readTransaction(async (view) => {
-            const messagePairs = await view.messagePairs.getAll();
-            const prefixes = new Set<string>();
-            for (const messagePair of messagePairs) {
-                if (
-                    PII_PATH_PATTERN.test(
-                        messagePair.path,
-                    )
-                ) {
-                    prefixes.add(messagePair.path);
-                }
-            }
+            const identities = deriveDocumentsAt(
+                await view.messagePairs.getCollectionPairs(
+                    IDENTITIES_PREFIX,
+                ),
+                IDENTITIES_PREFIX,
+            );
             const rows: IdentityPiiEntity[] = [];
-            for (const prefix of prefixes) {
-                const match = PII_PATH_PATTERN.exec(prefix)!;
-                const identityId = match[1]!;
+            for (const identityId of identities.keys()) {
+                const prefix = identityPrefixFor(identityId);
                 const document = deriveDocumentsAt(
-                    messagePairs, prefix,
+                    await view.messagePairs.getDocumentHistory(
+                        prefix, PII_DOCUMENT_NAME,
+                    ),
+                    prefix,
                 ).get(PII_DOCUMENT_NAME);
                 if (document === undefined) continue;
                 rows.push(piiEntityOf(identityId, document));
@@ -420,8 +417,8 @@ export async function deriveTokenRevocation(
 // ---- name ''), Supersedes-chained like /credentials. NOT a ---
 // ---- delete zone — a DELETE head is a deregistration ----------
 // ---- tombstone, not an erasure — so a prefix getAllWhere -----
-// ---- read shape suffices (the module header's torn-read -------
-// ---- closure stays pii-only) -------------------------------------
+// ---- read shape suffices (the module header's readonly- -------
+// ---- transaction wrapper stays pii-only) -------------------------
 
 function registrationPrefixFor(identityId: Id): string {
     return canonicalPath(
@@ -470,19 +467,17 @@ export async function deriveClientRegistration(
 // One identity's document kind, or undefined when no identity
 // document exists — the registration route's kind gate reads
 // this (absent -> 404, person -> 400) before every verb. The
-// whole-family prefix read is the one
-// `deriveIdentityPiiRows` already makes.
+// identities collection read is the one
+// deriveIdentityPiiRows begins with.
 export async function deriveIdentityKind(
     db: DbAdapter,
     identityId: Id,
 ): Promise<IdentityKind | undefined> {
-    const prefix = canonicalPath(
-        undefined, '/identities/',
-    );
-    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(
+        IDENTITIES_PREFIX,
     );
     const document = deriveDocumentsAt(
-        messagePairs, prefix,
+        messagePairs, IDENTITIES_PREFIX,
     ).get(identityId);
     return document === undefined
         ? undefined

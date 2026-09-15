@@ -36,7 +36,7 @@ import {
     reachableToken,
 } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
-import { seedIdentityPii } from './identity-fixtures.ts';
+import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
     postInvitationGrant,
     postInvitationAcceptance,
@@ -195,7 +195,7 @@ async function seedPerson(
     name: string,
     email: string,
 ): Promise<void> {
-    await seedIdentityPii(db, id, {
+    await seedPersonIdentity(db, id, {
         name, email, phone: '', bio: '',
     });
 }

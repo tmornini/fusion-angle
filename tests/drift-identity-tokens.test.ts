@@ -14,7 +14,7 @@ import { testHashPassword } from './mock-seed.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import {
-    seedIdentityPii,
+    seedPersonIdentity,
     seedIdentityCredential,
 } from './identity-fixtures.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
@@ -414,7 +414,7 @@ Deno.test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedRootAdmin(db);
-    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
+    await seedPersonIdentity(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Security Pin', email: 'security-pin@example.com',
         phone: '', bio: '',
     });
@@ -488,7 +488,7 @@ async function dbWithCodeLoginUser(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedRootAdmin(db);
-    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
+    await seedPersonIdentity(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Gate 3', email: CODE_EMAIL,
         phone: '', bio: '',
     });

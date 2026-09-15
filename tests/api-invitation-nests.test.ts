@@ -11,7 +11,7 @@ import { organizationToken, reachableToken } from
     './token-fixtures.ts';
 import { seedOrganizationDocument } from
     './test-fixtures.ts';
-import { seedIdentityPii } from
+import { seedPersonIdentity } from
     './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { deriveInvitations } from
@@ -117,7 +117,7 @@ async function seedPerson(
     name: string,
     email: string,
 ): Promise<void> {
-    await seedIdentityPii(db, id, {
+    await seedPersonIdentity(db, id, {
         name, email, phone: '', bio: '',
     });
 }

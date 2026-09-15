@@ -182,11 +182,12 @@ export async function seedIdentityProvider(
     );
 }
 
-// The PII facet alone — the identities/:id/pii document, no
-// identities/:id row alongside it. Callers whose identities row
-// stays a raw put (never read through a flipping GET in their
-// own file) use this rather than seedPersonIdentity, so the row
-// SET stays exactly what it was — only PII gains a pair.
+// The PII facet alone — the pii document with NO identities/:id
+// document beside it. deriveIdentityPiiRows lists identities
+// and reads one document each, so a slot seeded this way is
+// unlisted by construction: that is what the orphan-slot pin
+// (tests/drift-identities.test.ts) proves. seedPersonIdentity
+// below is what a caller whose PII must be visible uses.
 export async function seedIdentityPii(
     db: DbAdapter,
     id: string,

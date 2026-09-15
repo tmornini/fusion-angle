@@ -21,7 +21,7 @@ import {
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
     seedIdentityCredential,
-    seedIdentityPii,
+    seedPersonIdentity,
 } from './identity-fixtures.ts';
 import { sha256Bytes } from '../shared/digest.ts';
 import { bytesToBase64Url } from '../shared/base64url.ts';
@@ -71,7 +71,7 @@ async function passwordUserCtx() {
     // grant's pii-by-email lookup and credential check now derive
     // from the message ledger, so a raw row here would go
     // derivation-invisible.
-    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
+    await seedPersonIdentity(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Demo', email: 'demo@example.com',
         phone: '555-0100', bio: 'demo user',
     });

@@ -35,7 +35,6 @@ import {
 } from '../api/routes.ts';
 import { deriveMembers } from '../api/derive-members.ts';
 import {
-    seedIdentityPii,
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import {
@@ -199,12 +198,14 @@ async function seed(): Promise<{
 }
 
 // Phase 15 gate 6: grantInvitation resolves email via
-// deriveIdentityPiiRows — seedIdentityPii dual-writes the row
-// and the identities/:id/pii pair so email resolution works.
+// deriveIdentityPiiRows, which lists the identities collection
+// and reads one PII document each — seedPersonIdentity writes
+// the identities/:id document and its PII, so email resolution
+// finds the person.
 async function person(
     db: MemoryDbAdapter, id: string, name: string, email: string,
 ): Promise<void> {
-    await seedIdentityPii(db, id, {
+    await seedPersonIdentity(db, id, {
         name, email, phone: '', bio: '',
     });
 }

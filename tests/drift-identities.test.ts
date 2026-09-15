@@ -48,7 +48,11 @@ import {
     buildUnaffiliatedIdentity,
 } from '../api/mock-data/members.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { seedIdentityCredential } from './identity-fixtures.ts';
+import {
+    seedIdentityCredential,
+    seedIdentityPii,
+    seedPersonIdentity,
+} from './identity-fixtures.ts';
 import { identityByEmail } from '../api/authentication.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
@@ -717,3 +721,27 @@ Deno.test('invitations enrichment parity: the personName/'
 // -- 7. method-filter proof + genesis-wins-under-skew + the -----
 // -- E6 resend branches at drift altitude ------------------------
 
+
+// Spec 2026-09-15 § 3: the rows fold lists identities, then
+// reads one document each. A PII document with no
+// identities/:id document is unreachable by construction —
+// PII rides its identity.
+Deno.test('deriveIdentityPiiRows lists a slot only through its'
++ ' identity document', async () => {
+    const db = await seededDb();
+    const orphanSlot = generateIdentifier();
+    const person = generateIdentifier();
+    await seedIdentityPii(db, orphanSlot, {
+        name: 'Orphan Slot', email: 'orphan@example.net',
+        phone: '', bio: '',
+    });
+    await seedPersonIdentity(db, person, {
+        name: 'Whole Person', email: 'whole@example.net',
+        phone: '', bio: '',
+    });
+    const ids = new Set(
+        (await deriveIdentityPiiRows(db)).map((row) => row.id),
+    );
+    assertStrictEquals(ids.has(person), true);
+    assertStrictEquals(ids.has(orphanSlot), false);
+});
