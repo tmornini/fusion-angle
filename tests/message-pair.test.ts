@@ -4,10 +4,10 @@ import { MESSAGE_TABLES } from '../api/db.ts';
 import { requestMessageHash } from '../api/message-form.ts';
 import {
     formWriteMessagePair,
-    headMessagePairIdAt,
     storedResponseFor,
     appendMessagePair,
 } from '../api/message-pair.ts';
+import { messageStore } from '../api/message-store.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -171,9 +171,9 @@ Deno.test('append then head-read round-trips', async () => {
         (view) => appendMessagePair(view, messagePair),
     );
     assertStrictEquals(
-        await headMessagePairIdAt(
-            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42',
-        ),
+        (await messageStore(db).get(
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42',
+        ))?.id,
         messagePair.id,
     );
     const stored =

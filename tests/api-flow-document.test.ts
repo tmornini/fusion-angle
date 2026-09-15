@@ -26,7 +26,6 @@ import {
     validateFlowDocumentBody,
 } from '../api/validators.ts';
 import {
-    headMessagePairIdAt,
     canonicalUriCollection,
     strongEtagOf,
 } from '../api/message-pair.ts';
@@ -621,18 +620,21 @@ async () => {
     assert(atAddress.some(r => r.id === headId));
 });
 
-// Task 8: the organizations/:id/flows/:id GET's Response-ID source switched
-// from
-// headMessagePairIdAt (message-pair.ts's ANY-method LOCK head) to
-// documentHeadMessagePairId (document-family.ts's DOCUMENT head — the
-// SAME deriveDocumentsAt reduction the GET already runs to build
-// the entity). Design decision 6 means only PUT ever writes at a
-// document address, so the two reductions agree for a live flow
-// — this proves the wire Response-ID equals headMessagePairIdAt's own,
-// independently computed value, not merely that the route
-// returns SOME header.
+// Task 8: the organizations/:id/flows/:id GET's Response-ID
+// source switched from the store's document head read
+// (`messageStore(db).get`) (message-pair.ts's ANY-method
+// LOCK head) to documentHeadMessagePairId
+// (document-family.ts's DOCUMENT head — the SAME
+// deriveDocumentsAt reduction the GET already runs to
+// build the entity). Design decision 6 means only PUT
+// ever writes at a document address, so the two
+// reductions agree for a live flow — this proves the
+// wire Response-ID equals the store's document head
+// read (`messageStore(db).get`)'s own, independently
+// computed value, not merely that the route returns
+// SOME header.
 Deno.test('e2e: the organizations/:id/flows/:id Response-ID'
-    + ' equals headMessagePairIdAt\'s own'
+    + ' equals the store head read\'s own'
 + ' reduction over the same address (documentHeadMessagePairId parity)',
 async () => {
     const db = await freshDb();
@@ -646,11 +648,10 @@ async () => {
     assertStrictEquals(got.status, 200);
     const headId = got.headers.get('Response-ID');
     assert(headId);
-    const lockHead = await headMessagePairIdAt(
-        db,
+    const lockHead = (await messageStore(db).get(
         canonicalUriCollection('AjdvjuECVZEgZoFajaIEkg', '/flows/'),
         'biSFoHVEGnaArklDDblCXQ',
-    );
+    ))?.id;
     assertStrictEquals(headId, lockHead);
 });
 

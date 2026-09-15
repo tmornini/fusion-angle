@@ -305,9 +305,8 @@ export async function formAuthMessagePair(
 // fixture pairs, real PUT pairs, and these synthesized
 // grant/rotation/revocation pairs uniformly. Kept as a literal
 // here rather than imported from routes.ts: routes.ts imports
-// FROM message-pair.ts (formWriteMessagePair,
-// headMessagePairIdAt), never the reverse — the import
-// graph stays acyclic (see
+// FROM message-pair.ts (formWriteMessagePair), never the
+// reverse — the import graph stays acyclic (see
 // formDocumentMessagePairFor's own comment, routes.ts).
 const TOKEN_EVENT_ROUTE_PATTERN = 'identities/:id/tokens/:tid';
 const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
@@ -359,19 +358,6 @@ export async function formTokenEventMessagePair(
         },
         operationId,
     });
-}
-
-// Live PUT pair id at the address. POST/PATCH are not
-// heads. DELETE head and a virgin address are undefined.
-export async function headMessagePairIdAt(
-    db: DbAdapter,
-    uriCollection: string,
-    uriId: string,
-): Promise<string | undefined> {
-    const stored = await messageStore(db).get(
-        uriCollection, uriId,
-    );
-    return stored?.id;
 }
 
 // Latest PUT or DELETE at the address. Virgin is undefined.

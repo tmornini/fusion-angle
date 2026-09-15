@@ -42,8 +42,8 @@ import { liveHeadId, messageStore } from
 // THREE HEAD notions coexist over a flow's message-plane rows
 // and must never be conflated (IV Logic):
 //   - The LOCK head: the latest pair at the address by envelope
-//     (at, id), ANY method — headMessagePairIdAt's own
-//     reduction (message-pair.ts), serving Supersedes/Follows
+//     (at, id), ANY method — the store's document head read
+//     (`messageStore(db).get`), serving Supersedes/Follows
 //     provenance for the locked class. A DAG under races;
 //     provenance-only, never consulted here.
 //   - The DOCUMENT head: the latest PUT/DELETE pair by envelope

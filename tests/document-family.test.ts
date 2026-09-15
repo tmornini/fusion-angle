@@ -20,10 +20,10 @@ import { handleRequest } from '../api/api.ts';
 import {
     formWriteMessagePair,
     appendMessagePair,
-    headMessagePairIdAt,
     IF_MATCH_HEADER,
     strongEtagOf,
 } from '../api/message-pair.ts';
+import { messageStore } from '../api/message-store.ts';
 import type { MessagePair } from '../api/message-pair.ts';
 import {
     routes,
@@ -266,9 +266,9 @@ async function testDocumentOp(
         async (view) => {
             if (messagePair !== undefined) {
                 const latchedId = messagePair.latchedHeadMessagePairId;
-                const latest = await headMessagePairIdAt(
-                    view, messagePair.uriCollection, messagePair.uriId,
-                );
+                const latest = (await messageStore(view).get(
+                    messagePair.uriCollection, messagePair.uriId,
+                ))?.id;
                 if (
                     latchedId !== undefined
                     && latest !== latchedId
@@ -738,8 +738,9 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
 // handleRequest itself — never formWriteMessagePair/appendMessagePair
 // directly — so the in-tx head re-read's 412 is what's under
 // test. On the memory backend, the global transaction
-// serializer (store-serializer.ts) processes each racer's
-// headMessagePairIdAt read and dispatch as separate queued steps, so
+// serializer (store-serializer.ts) processes the store's
+// document head read (`messageStore(db).get`) and
+// dispatch of each racer as separate queued steps, so
 // BOTH racers observe genesis as their head and pass the
 // pre-dispatch echo check before either's write commits — the
 // SECOND-dispatched racer's in-tx re-read then 412s.

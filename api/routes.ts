@@ -95,7 +95,6 @@ import {
     canonicalUriCollection,
     documentHeadAt,
     formWriteMessagePair,
-    headMessagePairIdAt,
     messagePairResponseBody,
     ifMatchFromMessagePair,
     rawIfMatchFromMessagePair,
@@ -104,6 +103,7 @@ import {
     strongEtagOf,
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
+import { messageStore } from './message-store.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
 import {
     generateIdentifier,
@@ -1476,9 +1476,9 @@ export async function postFlowDocumentOp(
             // states-trace strip; pair body also carries
             // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
             if (messagePair !== undefined) {
-                const latest = await headMessagePairIdAt(
-                    view, messagePair.uriCollection, messagePair.uriId,
-                );
+                const latest = (await messageStore(view).get(
+                    messagePair.uriCollection, messagePair.uriId,
+                ))?.id;
                 if (
                     latchedId !== undefined
                     && latest !== latchedId
@@ -1591,11 +1591,10 @@ export async function postFlowUndoOp(
         // Phase Final Task 2: flows + graph ROW halves stripped.
         MESSAGE_TABLES,
         async (view) => {
-            const latest = await headMessagePairIdAt(
-                view,
+            const latest = (await messageStore(view).get(
                 documentMessagePair.uriCollection,
                 documentMessagePair.uriId,
-            );
+            ))?.id;
             // The CLIENT's pin, not this walk's own read:
             // the gate proved it matched the head before
             // dispatch, so a mismatch here means a racer
@@ -2375,11 +2374,10 @@ export async function postWorkOrderTransitionOp(
             }
             // R9: lock head must still be the latched pair
             // id.
-            const latest = await headMessagePairIdAt(
-                view,
+            const latest = (await messageStore(view).get(
                 revisionMessagePair.uriCollection,
                 revisionMessagePair.uriId,
-            );
+            ))?.id;
             if (latest !== latchedMessagePairId) {
                 throw new ApiError(
                     'If-Match does not match the current '
@@ -3850,11 +3848,10 @@ export async function postInstancePatchOp(
         async (view) => {
             // R9: lock head must still be the latched pair
             // id.
-            const latest = await headMessagePairIdAt(
-                view,
+            const latest = (await messageStore(view).get(
                 revisionMessagePair.uriCollection,
                 revisionMessagePair.uriId,
-            );
+            ))?.id;
             if (latest !== latchedMessagePairId) {
                 throw new ApiError(
                     'If-Match does not match the current '
@@ -4551,8 +4548,9 @@ export const routes: Route[] = [
                 // pairs, one per validated baseline, at each
                 // baseline's OWN address — every baseline id is
                 // client-minted FRESH for this conversion, so
-                // each pair is genesis there (headMessagePairIdAt finds
-                // no prior pair) unless a live PUT had already
+                // each pair is genesis there (the store's document
+                // head read (`messageStore(db).get`) finds no
+                // prior pair) unless a live PUT had already
                 // visited that exact id. Body is the baseline's
                 // `fields` VERBATIM — the live standalone PUT
                 // body, unlike projectDocument/ideaDocument above

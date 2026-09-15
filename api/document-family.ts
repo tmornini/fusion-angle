@@ -321,9 +321,9 @@ export function documentGetHandler(
         );
 }
 
-// Live PUT pair id at this address — store.get, the same
-// live-document reduction headMessagePairIdAt now uses. A DELETE
-// head or virgin address is undefined.
+// Live PUT pair id at this address — the store's document
+// head read (`messageStore(db).get`). A DELETE head or
+// virgin address is undefined.
 export async function documentHeadMessagePairId(
     db: DbAdapter,
     uriCollection: string,

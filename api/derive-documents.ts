@@ -63,9 +63,10 @@ export interface DocumentMessagePair {
 
 // Every PUT/DELETE pair at `uriCollection`, decoded once —
 // ascending by the envelope (at, id), the SAME arrival order
-// headMessagePairIdAt (message-pair.ts) picks a single
-// head from. That shared mechanism is ordering ONLY:
-// headMessagePairIdAt filters by uri_id/uri_collection
+// the store's document head read (`messageStore(db).get`)
+// picks a single head from. That shared mechanism is
+// ordering ONLY: the store's document head read
+// (`messageStore(db).get`) filters by uri_id/uri_collection
 // alone — every method, since it serves
 // Supersedes/Follows provenance (the LOCK head) — while
 // this function excludes every method but PUT/DELETE

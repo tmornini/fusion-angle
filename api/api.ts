@@ -1559,7 +1559,8 @@ export async function handleRequest(
                     // Task 8) — the SAME reduction the flipped GET
                     // above just ran to build `result`, not a
                     // second, divergent one
-                    // (headMessagePairIdAt's own
+                    // (the store's document head read
+                    // (`messageStore(db).get`) — the
                     // ANY-method LOCK head, still the write path's
                     // source above). Same value for a document-
                     // class address (tests/api-flow-document.test.ts
