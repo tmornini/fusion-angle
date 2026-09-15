@@ -1295,10 +1295,11 @@ async function grantAuthorizationCode(
         return invalid;
     }
     const refreshJti = generateIdentifier();
-    // KEY-BY-ANCHOR: the root row's id (and, by construction, its
-    // own event pair's name) IS the derived id — see
-    // deriveAuthorizationCodeId's own comment for why that
-    // collision is the spend guard itself.
+    // KEY-BY-ANCHOR: the root row's id IS the derived id, and
+    // this call passes it as the event pair's name (Auth 1b's
+    // named exception — formTokenEventMessagePair takes the
+    // name) — see deriveAuthorizationCodeId's own comment for
+    // why that collision is the spend guard itself.
     const rootId = derivedId;
     const chainId = generateIdentifier();
     const at = nowUtc();
@@ -1487,13 +1488,13 @@ async function authorizePassword(
     const denied: AuthorizeResult = {
         ok: false, status: HTTP_UNAUTHORIZED, error: 'invalid credentials',
     };
-    // FLIPPED (Phase 13 Task 8): deriveIdentityPiiRows is the E13
-    // full-scan derive (derive-identity-spine.ts) — a whole-
-    // ledger scan is unavoidable here, exactly as the row-plane
-    // getAllWhere on email it replaces was: email carries no
-    // dedicated index either plane, so both planes scan every
-    // slot to find the match. identityByEmail (the reducer) is
-    // BYTE-UNCHANGED — only the row source moves.
+    // FLIPPED (Phase 13 Task 8): the row source is
+    // deriveIdentityPiiRows (derive-identity-spine.ts) — one
+    // identities collection read plus one PII document read
+    // per identity (spec 2026-09-15 § 3), never the whole
+    // ledger. Email carries no dedicated index either plane,
+    // so the match is still found by walking every live slot.
+    // identityByEmail (the reducer) is BYTE-UNCHANGED.
     const piiRows = await deriveIdentityPiiRows(adapter);
     const identityId = identityByEmail(piiRows, username);
     if (identityId === null) {

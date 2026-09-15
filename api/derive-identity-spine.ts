@@ -413,12 +413,14 @@ export async function deriveTokenRevocation(
 
 // ---- client_registration — the clients-table replacement: a ----
 // ---- singleton document at the identity's own nested path ---
-// ---- (the /pii single-slot shape: literal last segment, ------
-// ---- name ''), Supersedes-chained like /credentials. NOT a ---
-// ---- delete zone — a DELETE head is a deregistration ----------
-// ---- tombstone, not an erasure — so a prefix getAllWhere -----
-// ---- read shape suffices (the module header's readonly- -------
-// ---- transaction wrapper stays pii-only) -------------------------
+// ---- (literal last segment, name ''), Supersedes-chained -----
+// ---- like /credentials. PII no longer shares that shape —
+// ---- its slot is ('/identities/<id>/', 'pii'), spec ----------
+// ---- 2026-09-15 § 3. NOT a delete zone — a DELETE head is a --
+// ---- deregistration tombstone, not an erasure — so one -------
+// ---- getCollectionPairs read of this prefix suffices (the ----
+// ---- module header's readonly-transaction wrapper stays ------
+// ---- pii-only) -----------------------------------------------
 
 function registrationPrefixFor(identityId: Id): string {
     return canonicalPath(

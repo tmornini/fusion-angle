@@ -16,7 +16,14 @@ import {
 // revoked (api/message-pair.ts formTokenEventMessagePair). The
 // authorization_code grant's chain root is the one document
 // not named by its jti: its name is the code's sha256 spend
-// marker (api/authentication.ts authorizationCodeSpent). A
+// marker (api/authentication.ts authorizationCodeSpent). That
+// root's history therefore splits — its 'issued' sits at the
+// marker document while its 'rotated'/'revoked' land at the
+// jti document — so once such a root rotates, this derive
+// returns TWO heads carrying one jti and GET
+// identities/:id/tokens/ shows one extra 'issued' row for it.
+// Every fold groups by jti and resolves by `at` with the
+// fail-closed rank, so the chain reads correctly regardless. A
 // collection read returns heads — one row per document, its
 // latest event; every event of a jti carries the same
 // chain_id, so the chain fold (readTokenChainFromLedger)

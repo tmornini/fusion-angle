@@ -2754,7 +2754,7 @@ export async function postIdentityPiiDocumentOp(
     messagePair?: MessagePair,
 ): Promise<IdentityPiiEntity> {
     const entity = piiEntityOf(id, {
-        name: '',
+        name: 'pii',
         messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
