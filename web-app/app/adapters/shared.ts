@@ -211,7 +211,6 @@ function makeRequestContext(
     // REQUEST_ID_HEADER so the server gate reuses it instead
     // of minting a second, unrelated trace.
     const requestId = generateIdentifier();
-    const operationId = generateIdentifier();
     function writeHeaders(
         extra?:
             readonly (readonly [string, string])[],
@@ -222,7 +221,7 @@ function makeRequestContext(
             return extra;
         }
         return [
-            [OPERATION_ID_HEADER, operationId],
+            [OPERATION_ID_HEADER, generateIdentifier()],
             ...(extra ?? []),
         ];
     }

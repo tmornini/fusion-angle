@@ -29,14 +29,13 @@ export async function deriveObjectiveStateHistory(
     objectiveId: Id,
 ): Promise<StateEntity[]> {
     const prefix = objectivesUriPrefix(organization);
-    const stored = await db.messagePairs.getCollectionPairs(prefix,
+    const stored = await db.messagePairs.getDocumentHistory(
+        prefix, objectiveId,
     );
-    const messagePairs = documentMessagePairsAt(
-        stored, prefix,
-    ).filter((messagePair) =>
-        messagePair.name === objectiveId);
     return stateHistoryFrom(
-        documentLifecycleEvents(messagePairs),
+        documentLifecycleEvents(
+            documentMessagePairsAt(stored, prefix),
+        ),
         objectiveId,
     );
 }

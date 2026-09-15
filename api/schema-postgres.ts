@@ -13,18 +13,12 @@ export const POSTGRES_MESSAGE_PAIRS_TABLE =
     method text COLLATE "C" NOT NULL
         CONSTRAINT message_pairs_method_chk
         CHECK (method ~ '^[A-Z]+$'),
-    request_at text COLLATE "C" NOT NULL
-        CONSTRAINT message_pairs_request_at_chk
-        CHECK (request_at ~
-        '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$'),
+    request_at timestamptz NOT NULL,
     request_hash text COLLATE "C" NOT NULL
         CONSTRAINT message_pairs_request_hash_chk
         CHECK (request_hash ~ '^[0-9a-f]{64}$'),
     request bytea NOT NULL,
-    response_at text COLLATE "C" NOT NULL
-        CONSTRAINT message_pairs_response_at_chk
-        CHECK (response_at ~
-        '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$'),
+    response_at timestamptz NOT NULL,
     response bytea NOT NULL,
     operation_id uuid NOT NULL
 );`;

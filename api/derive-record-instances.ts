@@ -146,13 +146,15 @@ async function fetchInstanceMessagePairs(
     db: DbAdapter,
     organization: Id,
     recordTypeId: Id,
+    instanceId: Id,
 ): Promise<readonly DocumentMessagePair[]> {
     const prefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
+    const history = await db.messagePairs.getDocumentHistory(
+        prefix, instanceId,
     );
-    return documentMessagePairsAt(messagePairs, prefix);
+    return documentMessagePairsAt(history, prefix);
 }
 
 // undefined when absent OR tombstoned (DELETE is the last
@@ -168,10 +170,11 @@ export async function deriveInstanceHead(
     const prefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
+    const history = await db.messagePairs.getDocumentHistory(
+        prefix, instanceId,
     );
     const document = deriveDocumentsAt(
-        messagePairs, prefix,
+        history, prefix,
     ).get(instanceId);
     if (document === undefined) return undefined;
     return {
@@ -214,10 +217,9 @@ export async function deriveInstanceRevisions(
     recordTypeId: Id,
     instanceId: Id,
 ): Promise<InstanceRevision[]> {
-    const messagePairs = (await fetchInstanceMessagePairs(
-        db, organization, recordTypeId,
-    )).filter((messagePair) =>
-        messagePair.name === instanceId);
+    const messagePairs = await fetchInstanceMessagePairs(
+        db, organization, recordTypeId, instanceId,
+    );
     if (messagePairs.length === 0) return [];
     const last = messagePairs[messagePairs.length - 1]!;
     if (last.method === DELETE_METHOD) return [];

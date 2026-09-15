@@ -141,6 +141,23 @@ async function fetchFlowMessagePairs(
     };
 }
 
+async function fetchFlowDocumentMessagePairs(
+    db: DbAdapter,
+    prefix: string,
+    flowId: Id,
+): Promise<{
+    readonly document: DerivedDocument | undefined;
+    readonly messagePairs: readonly DocumentMessagePair[];
+}> {
+    const history = await db.messagePairs.getDocumentHistory(
+        prefix, flowId,
+    );
+    return {
+        document: deriveDocumentsAt(history, prefix).get(flowId),
+        messagePairs: documentMessagePairsAt(history, prefix),
+    };
+}
+
 // Oldest live head (at, id) first via getCollection,
 // deleted-filtered — the head lifecycle state 'deleted'
 // excludes a flow exactly as EntityStore's states-log
@@ -200,19 +217,15 @@ export async function deriveFlow(
     flowId: Id,
 ): Promise<FlowWithGraph> {
     const prefix = flowsUriPrefix(organization);
-    const { documents, messagePairs } =
-        await fetchFlowMessagePairs(db, prefix);
-    const document = documents.get(flowId);
+    const { document, messagePairs } =
+        await fetchFlowDocumentMessagePairs(db, prefix, flowId);
     if (document === undefined) {
         throw await missedReadError(
             db, flowId, organization, FLOWS_TABLE,
         );
     }
-    const ownMessagePairs = messagePairs.filter(
-        (messagePair) => messagePair.name === flowId,
-    );
     const history = stateHistoryFrom(
-        documentLifecycleEvents(ownMessagePairs),
+        documentLifecycleEvents(messagePairs),
         flowId,
     );
     if (currentDocumentState(history) === DELETED_STATE) {
@@ -221,7 +234,7 @@ export async function deriveFlow(
         );
     }
     return flowEntityOf(
-        document, organization, ownMessagePairs.length,
+        document, organization, messagePairs.length,
     );
 }
 
@@ -267,15 +280,10 @@ export async function resolveFlowUndoTarget(
 ): Promise<FlowUndoResolution | undefined> {
     const prefix = flowsUriPrefix(organization);
     const [stored, undoMessagePairs] = await Promise.all([
-        db.messagePairs.getCollectionPairs(prefix),
-        db.messagePairs.getCollectionPairs(undoUriPrefix,
-        ),
+        db.messagePairs.getDocumentHistory(prefix, flowId),
+        db.messagePairs.getCollectionPairs(undoUriPrefix),
     ]);
-    const messagePairs = documentMessagePairsAt(
-        stored, prefix,
-    ).filter(
-        (messagePair) => messagePair.name === flowId,
-    );
+    const messagePairs = documentMessagePairsAt(stored, prefix);
     const current = messagePairs.at(-1);
     if (current === undefined) return undefined;
     const undoRequestAts = new Set(
@@ -337,13 +345,9 @@ export async function deriveFlowStateHistory(
 ): Promise<StateEntity[]> {
     const prefix = flowsUriPrefix(organization);
     const { messagePairs } =
-        await fetchFlowMessagePairs(db, prefix);
+        await fetchFlowDocumentMessagePairs(db, prefix, flowId);
     return stateHistoryFrom(
-        documentLifecycleEvents(
-            messagePairs.filter(
-                (messagePair) => messagePair.name === flowId,
-            ),
-        ),
+        documentLifecycleEvents(messagePairs),
         flowId,
     );
 }

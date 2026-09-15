@@ -95,6 +95,24 @@ async function fetchProjectMessagePairs(
     };
 }
 
+async function fetchProjectDocumentMessagePairs(
+    db: DbAdapter,
+    prefix: string,
+    projectId: Id,
+): Promise<{
+    readonly document: DerivedDocument | undefined;
+    readonly messagePairs: readonly DocumentMessagePair[];
+}> {
+    const history = await db.messagePairs.getDocumentHistory(
+        prefix, projectId,
+    );
+    return {
+        document: deriveDocumentsAt(history, prefix)
+            .get(projectId),
+        messagePairs: documentMessagePairsAt(history, prefix),
+    };
+}
+
 // Oldest live head (at, id) first via getCollection,
 // deleted-filtered — the head lifecycle state 'deleted'
 // excludes a project exactly as EntityStore's states-log
@@ -155,19 +173,17 @@ export async function deriveProject(
     projectId: Id,
 ): Promise<ProjectEntity> {
     const prefix = projectsUriPrefix(organization);
-    const { documents, messagePairs } =
-        await fetchProjectMessagePairs(db, prefix);
-    const document = documents.get(projectId);
+    const { document, messagePairs } =
+        await fetchProjectDocumentMessagePairs(
+            db, prefix, projectId,
+        );
     if (document === undefined) {
         throw await missedReadError(
             db, projectId, organization, PROJECTS_TABLE,
         );
     }
     const history = stateHistoryFrom(
-        documentLifecycleEvents(
-            messagePairs.filter((messagePair) =>
-                messagePair.name === projectId),
-        ),
+        documentLifecycleEvents(messagePairs),
         projectId,
     );
     if (currentDocumentState(history) === DELETED_STATE) {
@@ -193,12 +209,11 @@ export async function deriveProjectStateHistory(
 ): Promise<StateEntity[]> {
     const prefix = projectsUriPrefix(organization);
     const { messagePairs } =
-        await fetchProjectMessagePairs(db, prefix);
+        await fetchProjectDocumentMessagePairs(
+            db, prefix, projectId,
+        );
     return stateHistoryFrom(
-        documentLifecycleEvents(
-            messagePairs.filter((messagePair) =>
-                messagePair.name === projectId),
-        ),
+        documentLifecycleEvents(messagePairs),
         projectId,
     );
 }

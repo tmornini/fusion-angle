@@ -37,6 +37,7 @@ import {
 } from '../api/derive-documents.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { OPERATION_ID_HEADER } from '../api/message-pair.ts';
 
 const NODE_A = generateIdentifier();
 const NODE_B = generateIdentifier();
@@ -442,6 +443,8 @@ Deno.test(
         const working = buildWorkingGraph();
         // Capture ONE PUT body (with one graphDelta) AND its
         // If-Match echo, and replay both.
+        // A resend of one operation carries its operation id.
+        const operationId = generateIdentifier();
         let captured: Record<string, unknown> | null = null;
         let capturedHeaders:
             readonly (readonly [string, string])[]
@@ -455,13 +458,18 @@ Deno.test(
                 headerFields?:
                     readonly (readonly [string, string])[],
             ): Promise<T> => {
+                const headers:
+                    readonly (readonly [string, string])[] = [
+                        [OPERATION_ID_HEADER, operationId],
+                        ...(headerFields ?? []),
+                    ];
                 if (path === 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + flowId
                     && captured === null) {
                     captured = body;
-                    capturedHeaders = headerFields;
+                    capturedHeaders = headers;
                 }
-                return origPut<T>(path, body, headerFields);
+                return origPut<T>(path, body, headers);
             },
         };
         await putFlow(spyCtx, flowId, save(

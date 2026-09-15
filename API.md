@@ -25,7 +25,14 @@ Concurrency class is `api/family-registry.ts`.
 3. **Body parse** for PUT/POST/PATCH. Live
    `requireOperationId` runs before body parse. The
    client supplies Operation-ID; the server never
-   mints it for a public write.
+   mints it for a public write. An Operation-ID names
+   one write and is never reused — a retry or resend of
+   one operation carries the SAME Operation-ID, which is
+   what makes the resend byte-identical and lets it
+   replay (Step 5). A handler that forms a revision pair
+   beside the wire pair (the instance PUT and PATCH
+   handlers) writes both under that one id, and the
+   PATCH replay finds its revision pair by it.
 4. **Region B + write authorizer.** Self-only token-
    revocations (member revokes own chain; admin may
    name any identity). `writeAuthorizerFor` on

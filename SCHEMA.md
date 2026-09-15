@@ -28,10 +28,14 @@ same rows in an in-process Map keyed by table name.
 1. **`message_body` plus the GIN index** —
    `POSTGRES_MESSAGE_BODY_FUNCTION` and `message_pairs_body`
    → `getAllWhereBody` (`api/db.ts`).
-2. **`COLLATE "C"` plus the six-digit CHECK** —
-   `message_pairs_request_at_chk` /
-   `message_pairs_response_at_chk` → lexical order is
-   chronological → the `(at, id)` total order.
+2. **`timestamptz` plus the formatter** — `request_at` and
+   `response_at` are `timestamptz NOT NULL`; the type is the
+   storage-edge validator (a month-13 stamp is rejected where
+   the old regex accepted it), and every read formats them
+   back to six-digit zulu text with `to_char(… AT TIME ZONE
+   'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
+   (`api/backend-postgres.ts`), so the native `(response_at,
+   id)` order and the seam's lexical order agree.
 3. **`message_pairs_document`** — head and history for
    free (`path`, `name`, `response_at`, `id`). The seam
    promises `(response_at, id)` order on every read, on
@@ -77,10 +81,12 @@ contract — `tests/flow-graph-roundtrip.test.ts`.
 
 ## Timestamps
 
-Every persisted timestamp is RFC-3339 zulu at exactly six
-fraction digits. The validation gate rejects any other
-width. Render to local time for display only
-(`tests/timestamps.test.ts`).
+Every timestamp crosses the seam as RFC-3339 zulu at exactly
+six fraction digits; the validation gate rejects any other
+width. Postgres holds the two envelope stamps as `timestamptz`
+and formats them back on every read (`tests/timestamps.test.ts`
+pins the mint; the Postgres acceptance suite pins the round
+trip). Render to local time for display only.
 
 ## Secrets
 

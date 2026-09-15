@@ -307,6 +307,9 @@ function preconditionDocument(
     );
 }
 
+// The revision pair an instance PATCH wrote beside its wire
+// pair: same document, same operation, the other id. An
+// operation id names one write, so the join is an identity.
 async function revisionMessagePairIdForPatch(
     db: DbAdapter,
     wireMessagePairId: string,
@@ -314,13 +317,12 @@ async function revisionMessagePairIdForPatch(
     const wireReq = await db.messagePairs.getById(
         wireMessagePairId,
     );
-    if (wireReq === undefined) return undefined;
-    const siblings = await db.messagePairs.getCollectionPairs(wireReq.path,
+    const siblings = await db.messagePairs.getDocumentHistory(
+        wireReq.path, wireReq.name,
     );
     const revision = siblings.find(
         (row) =>
-            row.name === wireReq.name
-            && row.request_at === wireReq.request_at
+            row.operation_id === wireReq.operation_id
             && row.id !== wireMessagePairId,
     );
     return revision?.id;

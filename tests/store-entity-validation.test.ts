@@ -52,8 +52,9 @@ Deno.test('HistoryEntityStore.append writes the validator output',
                 n: (b['n'] as number) + 1,
             }),
         );
-        const written = await store.append('a', { n: 7 });
-        assertStrictEquals(written.n, 8);
+        assertStrictEquals(
+            await store.append('a', { n: 7 }), true,
+        );
         const fetched = await store.getById('a');
         assertStrictEquals(fetched.n, 8);
     });

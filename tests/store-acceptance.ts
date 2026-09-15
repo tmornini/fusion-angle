@@ -521,4 +521,43 @@ export function defineStoreAcceptance(
             null,
         );
     });
+
+    Deno.test(name + ': a second append of an id changes'
+    + ' nothing and says so', async () => {
+        const { db } = await ready();
+        const id = generateIdentifier();
+        const first = pairRow(HEAD_PATH, 'once', 'PUT', stamp(1), 1);
+        const second = pairRow(HEAD_PATH, 'once', 'PUT', stamp(2), 2);
+        assertStrictEquals(
+            await db.messagePairs.append(id, first), true,
+        );
+        assertStrictEquals(
+            await db.messagePairs.append(id, second), false,
+        );
+        assertEquals(
+            await db.messagePairs.getById(id),
+            { id, ...first },
+        );
+    });
+
+    Deno.test(name + ': padded stamps round-trip byte for'
+    + ' byte', async () => {
+        const { db } = await ready();
+        const id = generateIdentifier();
+        const row = {
+            ...pairRow(
+                HEAD_PATH, 'stamp', 'PUT',
+                '2026-03-04T05:06:07.100000Z', 1,
+            ),
+            request_at: '2026-03-04T05:06:07.000000Z',
+        };
+        await db.messagePairs.append(id, row);
+        const stored = await db.messagePairs.getById(id);
+        assertStrictEquals(
+            stored.request_at, '2026-03-04T05:06:07.000000Z',
+        );
+        assertStrictEquals(
+            stored.response_at, '2026-03-04T05:06:07.100000Z',
+        );
+    });
 }
