@@ -539,4 +539,25 @@ export function defineStoreAcceptance(
             { id, ...first },
         );
     });
+
+    Deno.test(name + ': padded stamps round-trip byte for'
+    + ' byte', async () => {
+        const { db } = await ready();
+        const id = generateIdentifier();
+        const row = {
+            ...pairRow(
+                HEAD_PATH, 'stamp', 'PUT',
+                '2026-03-04T05:06:07.100000Z', 1,
+            ),
+            request_at: '2026-03-04T05:06:07.000000Z',
+        };
+        await db.messagePairs.append(id, row);
+        const stored = await db.messagePairs.getById(id);
+        assertStrictEquals(
+            stored.request_at, '2026-03-04T05:06:07.000000Z',
+        );
+        assertStrictEquals(
+            stored.response_at, '2026-03-04T05:06:07.100000Z',
+        );
+    });
 }
