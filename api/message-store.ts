@@ -13,10 +13,12 @@ import { compareIdentifiers } from
 // is getAllAtAddress (collection + uri_id). A
 // collection is getAllWhere('uri_collection').
 // Body containment is getAllWhereBody. No
-// uri_id-only scan. Live document = latest PUT or
-// DELETE at (uri_collection, uri_id) by (at, id).
-// Head PUT → that pair. Head DELETE → none. POST/PATCH
-// are not heads.
+// uri_id-only scan. The seam orders by
+// (response_at, id); the store never re-sorts rows.
+// Live document = latest PUT or DELETE at
+// (uri_collection, uri_id) by (at, id). Head PUT →
+// that pair. Head DELETE → none. POST/PATCH are
+// not heads.
 
 const PUT_METHOD = 'PUT';
 const DELETE_METHOD = 'DELETE';
@@ -56,9 +58,9 @@ export function messageStore(db: DbAdapter): MessageStore {
             return messagePairsInCollection(db, collection);
         },
         async getAllWhereBody(collection, containment) {
-            return (await db.messagePairs.getAllWhereBody(
+            return db.messagePairs.getAllWhereBody(
                 collection, containment,
-            )).slice().sort(compareMessagePair);
+            );
         },
         async getCollection(collection) {
             return entitiesOf(
@@ -143,6 +145,10 @@ function livePutsOf(
             live.push(row.messagePair);
         }
     }
+    // Heads sorted by the HEAD pair's (response_at, id).
+    // The seam's row order would yield each document's
+    // FIRST pair — a different order once documents
+    // interleave updates.
     return live.sort(compareMessagePair);
 }
 
@@ -175,24 +181,16 @@ export function liveHeadId(entity: unknown): string {
 async function messagePairsInCollection(
     db: DbAdapter,
     collection: string,
-): Promise<MessagePairEntity[]> {
-    const messagePairs = [
-        ...await db.messagePairs.getAllWhere(
-            'uri_collection', collection,
-        ),
-    ];
-    return messagePairs.sort(compareMessagePair);
+): Promise<readonly MessagePairEntity[]> {
+    return db.messagePairs.getAllWhere(
+        'uri_collection', collection,
+    );
 }
 
 async function messagePairsAt(
     db: DbAdapter,
     collection: string,
     id: string,
-): Promise<MessagePairEntity[]> {
-    const messagePairs = [
-        ...await db.messagePairs.getAllAtAddress(
-            collection, id,
-        ),
-    ];
-    return messagePairs.sort(compareMessagePair);
+): Promise<readonly MessagePairEntity[]> {
+    return db.messagePairs.getAllAtAddress(collection, id);
 }
