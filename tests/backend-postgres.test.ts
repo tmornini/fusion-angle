@@ -208,10 +208,14 @@ Deno.test('getAddress uses collection and id, ordered',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
-    await backend.getAddress(
-        'message_pairs',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-        '42',
+    await backend.transaction(
+        ['message_pairs'],
+        'readonly',
+        (tx) => tx.getAddress(
+            'message_pairs',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+            '42',
+        ),
     );
     const text = fake.calls[0]!.text;
     assertMatch(text, /WHERE uri_collection = \$1/);

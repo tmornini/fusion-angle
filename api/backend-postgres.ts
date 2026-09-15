@@ -117,20 +117,6 @@ export class PostgresBackend implements StorageBackend {
             throw mapPostgresError(error);
         }
     }
-
-    async getAddress<T extends { id: string }>(
-        table: string,
-        collection: string,
-        uriId: string,
-    ): Promise<T[]> {
-        return this.transaction(
-            [table],
-            'readonly',
-            (tx) => (tx as PostgresTx).getAddress<T>(
-                table, collection, uriId,
-            ),
-        );
-    }
 }
 
 function postgresTx(
