@@ -108,6 +108,23 @@ async function fetchIdeaMessagePairs(
     };
 }
 
+async function fetchIdeaDocumentMessagePairs(
+    db: DbAdapter,
+    prefix: string,
+    ideaId: Id,
+): Promise<{
+    readonly document: DerivedDocument | undefined;
+    readonly messagePairs: readonly DocumentMessagePair[];
+}> {
+    const history = await db.messagePairs.getDocumentHistory(
+        prefix, ideaId,
+    );
+    return {
+        document: deriveDocumentsAt(history, prefix).get(ideaId),
+        messagePairs: documentMessagePairsAt(history, prefix),
+    };
+}
+
 // Oldest live head (at, id) first via getCollection,
 // deleted-filtered — the head lifecycle state 'deleted'
 // excludes an idea exactly as EntityStore's states-log
@@ -169,19 +186,15 @@ export async function deriveIdea(
     ideaId: Id,
 ): Promise<IdeaEntity> {
     const prefix = ideasUriPrefix(organization);
-    const { documents, messagePairs } =
-        await fetchIdeaMessagePairs(db, prefix);
-    const document = documents.get(ideaId);
+    const { document, messagePairs } =
+        await fetchIdeaDocumentMessagePairs(db, prefix, ideaId);
     if (document === undefined) {
         throw await missedReadError(
             db, ideaId, organization, IDEAS_TABLE,
         );
     }
     const history = stateHistoryFrom(
-        documentLifecycleEvents(
-            messagePairs.filter((messagePair) =>
-                messagePair.name === ideaId),
-        ),
+        documentLifecycleEvents(messagePairs),
         ideaId,
     );
     if (currentDocumentState(history) === DELETED_STATE) {
@@ -237,12 +250,9 @@ export async function deriveIdeaStateHistory(
 ): Promise<StateEntity[]> {
     const prefix = ideasUriPrefix(organization);
     const { messagePairs } =
-        await fetchIdeaMessagePairs(db, prefix);
+        await fetchIdeaDocumentMessagePairs(db, prefix, ideaId);
     return stateHistoryFrom(
-        documentLifecycleEvents(
-            messagePairs.filter((messagePair) =>
-                messagePair.name === ideaId),
-        ),
+        documentLifecycleEvents(messagePairs),
         ideaId,
     );
 }
