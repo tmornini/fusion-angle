@@ -1341,6 +1341,11 @@ export interface InvitationEntity {
     // Same name on this entity and on that versions row,
     // different facts.
     at: string;
+    // The document's head IS the lifecycle: the grant PUTs
+    // 'pending'; accept, decline, and revoke each PUT the
+    // same document again with the terminal state (spec
+    // 2026-09-15 exact-read folds § 2). Required, never null.
+    state: InvitationState;
 }
 
 export interface IdeaSubmissionEntity {

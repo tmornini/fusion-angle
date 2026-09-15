@@ -475,27 +475,16 @@ async function grantInvitation(
     if (replay !== undefined) {
         return responseBody;
     }
-    const documentBody = {
-        organization_id: organization,
-        identity_id: identityId,
-        at: grantAt,
-    };
     const document = preOutcome.kind === 'fresh'
-        ? await formWriteMessagePair({
-            method: 'PUT',
-            pathname: '/invitations/' + invitationId,
-            routePattern: 'invitations/:id',
-            routeSegments: ['invitations', ':id'],
-            pathSegments: ['invitations', invitationId],
-            headerFields: [],
-            body: documentBody,
-            requesterIdentityId: actor,
-            requestAt,
-            organization: undefined,
-            responseStatus: HTTP_OK,
-            responseBody: { id: invitationId, ...documentBody },
-            operationId,
-        })
+        ? await formInvitationDocumentMessagePair(
+            actor, requestAt, operationId, invitationId,
+            {
+                organization_id: organization,
+                identity_id: identityId,
+                at: grantAt,
+                state: 'pending',
+            },
+        )
         : undefined;
     await db.transaction(async (view) => {
             const outcome = await grantOutcomeFor(
@@ -565,6 +554,44 @@ export async function pendingInvitationFor(
         }
     }
     return null;
+}
+
+// The invitation document: `path = /invitations/`, `name =
+// <id>`, body = the three grant fields plus `state` (spec
+// 2026-09-15 § 2). Its head IS the state — the grant writes
+// 'pending'; accept, decline, and revoke each append a full
+// PUT with the terminal state, so a collection read of
+// /invitations/ or a document read of one id answers "what
+// state" with no op-prefix scan. The operation POST pairs
+// (acceptance / decline / revocation) remain the HTTP audit
+// of each request; derivation never reads them.
+async function formInvitationDocumentMessagePair(
+    actor: Id,
+    requestAt: string,
+    operationId: string,
+    invitationId: Id,
+    body: {
+        readonly organization_id: Id;
+        readonly identity_id: Id;
+        readonly at: string;
+        readonly state: InvitationState;
+    },
+): Promise<MessagePair> {
+    return formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/invitations/' + invitationId,
+        routePattern: 'invitations/:id',
+        routeSegments: ['invitations', ':id'],
+        pathSegments: ['invitations', invitationId],
+        headerFields: [],
+        body,
+        requesterIdentityId: actor,
+        requestAt,
+        organization: undefined,
+        responseStatus: HTTP_OK,
+        responseBody: { id: invitationId, ...body },
+        operationId,
+    });
 }
 
 async function formInvitationOperationMessagePair(
@@ -642,6 +669,15 @@ async function acceptInvitation(
     if (replay !== undefined) {
         return undefined;
     }
+    const terminal = await formInvitationDocumentMessagePair(
+        actor, requestAt, operationId, id,
+        {
+            organization_id: inv.organization_id,
+            identity_id: inv.identity_id,
+            at: inv.at,
+            state: 'accepted',
+        },
+    );
     const seatDocumentBody = {
         type: 'member',
         at: transition.at,
@@ -678,6 +714,7 @@ async function acceptInvitation(
                 await appendMessagePairOnce(view, seatDocument);
             }
             await appendMessagePairOnce(view, messagePair);
+            await appendMessagePairOnce(view, terminal);
             committed = true;
         },
     );
@@ -739,6 +776,15 @@ async function declineInvitation(
     if (replay !== undefined) {
         return undefined;
     }
+    const terminal = await formInvitationDocumentMessagePair(
+        actor, requestAt, operationId, id,
+        {
+            organization_id: inv.organization_id,
+            identity_id: inv.identity_id,
+            at: inv.at,
+            state: 'declined',
+        },
+    );
     let conflict = false;
     let committed = false;
     await db.transaction(async (view) => {
@@ -752,6 +798,7 @@ async function declineInvitation(
                 return;
             }
             await appendMessagePairOnce(view, messagePair);
+            await appendMessagePairOnce(view, terminal);
             committed = true;
         },
     );
@@ -811,6 +858,15 @@ async function revokeInvitation(
     if (replay !== undefined) {
         return undefined;
     }
+    const terminal = await formInvitationDocumentMessagePair(
+        actor, requestAt, operationId, id,
+        {
+            organization_id: inv.organization_id,
+            identity_id: inv.identity_id,
+            at: inv.at,
+            state: 'revoked',
+        },
+    );
     let conflict = false;
     await db.transaction(async (view) => {
             const state = await currentInvitationState(view, id);
@@ -819,6 +875,7 @@ async function revokeInvitation(
                 return;
             }
             await appendMessagePairOnce(view, messagePair);
+            await appendMessagePairOnce(view, terminal);
         },
     );
     if (conflict) {

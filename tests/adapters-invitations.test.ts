@@ -287,12 +287,12 @@ Deno.test('validateInvitationEntity accepts a full body',
         validateInvitationEntity({
             organization_id: 'BBjWJsjYIDkTRKIIPrzWRw',
             identity_id: 'toccYYkLEABmlbpHJalgtQ',
-            at: AT,
+            at: AT, state: 'pending',
         }),
         {
             organization_id: 'BBjWJsjYIDkTRKIIPrzWRw',
             identity_id: 'toccYYkLEABmlbpHJalgtQ',
-            at: AT,
+            at: AT, state: 'pending',
         },
     );
 }));
@@ -303,7 +303,7 @@ Deno.test('validateInvitationEntity rejects an extra key',
         validateInvitationEntity({
             organization_id: 'BBjWJsjYIDkTRKIIPrzWRw'
                 , identity_id: 'toccYYkLEABmlbpHJalgtQ',
-            at: AT, state: 'pending',
+            at: AT, state: 'pending', email: 'sarah@x.com',
         }));
 }));
 
@@ -313,9 +313,28 @@ Deno.test('validateInvitationEntity rejects a bad timestamp',
         validateInvitationEntity({
             organization_id: 'BBjWJsjYIDkTRKIIPrzWRw'
                 , identity_id: 'toccYYkLEABmlbpHJalgtQ',
-            at: 'not-a-date',
+            at: 'not-a-date', state: 'pending',
         }));
 }));
+
+Deno.test('validateInvitationEntity rejects a missing state',
+    () => {
+        assertThrows(() => validateInvitationEntity({
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: 'toccYYkLEABmlbpHJalgtQ',
+            at: '2026-01-01T00:00:00.000000Z',
+        }));
+    });
+
+Deno.test('validateInvitationEntity rejects an unknown state',
+    () => {
+        assertThrows(() => validateInvitationEntity({
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: 'toccYYkLEABmlbpHJalgtQ',
+            at: '2026-01-01T00:00:00.000000Z',
+            state: 'lost',
+        }));
+    });
 
 // Phase Final Stage B: invitations table retired — store
 // round-trip pins live on message-plane document tests.

@@ -2263,6 +2263,7 @@ export async function formInvitationSeedMessagePairs(
         organization_id: STARK_ORGANIZATION,
         identity_id: identityId,
         at: grantAt,
+        state: 'pending',
     };
     messagePairs.set(
         seedMessagePairKey(

@@ -58,6 +58,7 @@ import {
     assertConstraintAppliesTo,
     assertFlowState,
     assertIdeaState,
+    assertInvitationState,
     assertObjectiveState,
     assertProjectState,
     assertRecordState,
@@ -2051,7 +2052,7 @@ export function validateSeatDocumentBody(
 }
 
 const INVITATION_BODY_KEYS: readonly string[] = [
-    'organization_id', 'identity_id', 'at',
+    'organization_id', 'identity_id', 'at', 'state',
 ];
 
 export function validateInvitationEntity(
@@ -2067,6 +2068,9 @@ export function validateInvitationEntity(
         organization_id: pickIdentifier(body, 'organization_id'),
         identity_id: pickIdentifier(body, 'identity_id'),
         at,
+        state: assertInvitationState(
+            pickString(body, 'state'), 'InvitationEntity',
+        ),
     };
 }
 
