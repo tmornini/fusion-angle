@@ -33,21 +33,6 @@ import {
 // readers flip (Task 8). Facets (registration joined at the
 // clients elimination):
 //
-// E13 FULL-SCAN NAMED CLASS (derive-invitations.ts's own named
-// class): '/pii' forms ONE distinct prefix PER IDENTITY
-// ('/identities/<id>/pii/', name '' — a singleton document at a
-// collection-style path, path-and-name.ts), so no index can
-// serve "every request whose path has this shape" for an
-// arbitrary id. deriveIdentityPiiRows reads db.messagePairs
-// IN FULL (ONE shared tx) and matches PII_PATH_PATTERN — the
-// segment-boundary rule verified against derive-invitations.ts's
-// OP_PATH_PATTERN at Step 0: '[^/]+' between two literal
-// slashes, anchored at both ends, so '/identities/42/pii/' can
-// never be confused with a sibling document sharing the
-// '/identities/' root ('/identities/42/credentials/c1/', or the
-// identity's own '/identities/42/' document) — the '/members' vs
-// '/memberships' precedent class this task's brief names.
-//
 // READ SEMANTICS (concurrency lens): '/pii' is an ordinary
 // document. Two INDEPENDENT half-store reads could
 // still straddle a concurrent append: the first read
@@ -83,13 +68,19 @@ import {
 // ---- rule is deriveIdentityPiiRows/deriveIdentityPii, never ----
 // ---- deriveIdentityPiis/deriveIdentityPiiRow ---------------------
 
-const PII_PATH_PATTERN = /^\/identities\/([^/]+)\/pii\/$/;
+// The PII slot is the identity's own singleton: `path =
+// /identities/<id>/`, `name = pii` — the same pathname as
+// PUT identities/:id/pii (message-pair.ts
+// storedPathAndNameOf). One document read serves it.
+const PII_DOCUMENT_NAME = 'pii';
 
-function piiPrefixFor(identityId: Id): string {
+function identityPrefixFor(identityId: Id): string {
     return canonicalPath(
-        undefined, '/identities/' + identityId + '/pii/',
+        undefined, '/identities/' + identityId + '/',
     );
 }
+
+const PII_PATH_PATTERN = /^\/identities\/([^/]+)\/$/;
 
 // G5: GET derive is the stored PUT. id-first via
 // validateIdentityPiiEntity (withoutId first). A leaked
@@ -130,7 +121,7 @@ export async function deriveIdentityPiiRows(
                 const identityId = match[1]!;
                 const document = deriveDocumentsAt(
                     messagePairs, prefix,
-                ).get('');
+                ).get(PII_DOCUMENT_NAME);
                 if (document === undefined) continue;
                 rows.push(piiEntityOf(identityId, document));
             }
@@ -139,24 +130,23 @@ export async function deriveIdentityPiiRows(
     );
 }
 
-// The single-slot read at the identity's own exact prefix — ONE
-// getAllWhere on db.messagePairs, inside the SAME shared tx (the
-// module header's torn-read closure). Throws
-// EntityNotFoundError('identity_pii', id) on absence OR a
-// DELETE-head slot (an erasure tombstone) — the 404-byte anchor
-// tests/drift-identities.test.ts pins against the old plane.
+// The single-slot read: ONE document read of (the identity's
+// prefix, 'pii'). Throws EntityNotFoundError('identity_pii',
+// id) on absence OR a DELETE-head slot (an erasure
+// tombstone) — the 404-byte anchor
+// tests/drift-identities.test.ts pins.
 export async function deriveIdentityPii(
     db: DbAdapter,
     id: Id,
 ): Promise<IdentityPiiEntity> {
-    const prefix = piiPrefixFor(id);
+    const prefix = identityPrefixFor(id);
     return db.readTransaction(async (view) => {
-            const messagePairs =
-                await view.messagePairs.getCollectionPairs(prefix,
-                );
+            const history = await view.messagePairs.getDocumentHistory(
+                prefix, PII_DOCUMENT_NAME,
+            );
             const document = deriveDocumentsAt(
-                messagePairs, prefix,
-            ).get('');
+                history, prefix,
+            ).get(PII_DOCUMENT_NAME);
             if (document === undefined) {
                 throw new EntityNotFoundError(
                     'identity_pii', id,

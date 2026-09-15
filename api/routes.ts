@@ -3214,7 +3214,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) => piiEntityOf(
             param(params, 0),
             {
-                name: '',
+                name: 'pii',
                 messagePairId: param(params, 0),
                 method: 'PUT',
                 body: withoutId(body ?? {}),

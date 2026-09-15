@@ -22,8 +22,8 @@ import {
     formWriteMessagePair,
     appendMessagePairOnce,
     getPairByRequestHash,
-    createdEntityName,
     canonicalPath,
+    storedPathAndNameOf,
     hoistedHeaderFields,
     sendWriteResponse,
     documentHeadAt,
@@ -774,15 +774,14 @@ export async function handleRequest(
             // Nested attribute paths store under the type
             // attributes prefix directly (flat rewrite retired
             // Task 23).
-            const pathAndName = pathAndNameOf(
-                matched.segments, pathSegments,
-            );
-            const canonicalPrefix = canonicalPath(
-                organization, pathAndName.path,
-            );
-            const name = createdEntityName(
-                routePattern, body,
-            ) ?? pathAndName.name;
+            const { path: canonicalPrefix, name } =
+                storedPathAndNameOf({
+                    routePattern,
+                    routeSegments: matched.segments,
+                    pathSegments,
+                    organization,
+                    body,
+                });
             // The locked/simple divide (spec §The two PUT classes): keyed by
             // the route's family registration THROUGH THE WIRING CONSULT —
             // never a blanket family-registry or

@@ -8,6 +8,7 @@ import {
     isIdentifier,
 } from '../shared/identifier.ts';
 import { pathAndNameOf } from './path-and-name.ts';
+import type { PathAndName } from './path-and-name.ts';
 import {
     buildRequestModel,
     buildResponseModel,
@@ -200,6 +201,50 @@ function headerFieldsWithOperationId(
     ];
 }
 
+// The stored (path, name) of a write, in ONE place for the
+// gate (api.ts's head read, DELETE table, and locks) and the
+// former: the route splitter, then the canonical
+// organization prefix, then the two named overrides — a
+// create-shaped collection POST names its created entity
+// (createdEntityName), and PII names its singleton. PII is
+// the one route whose literal last segment is a document
+// name, not an operation (spec 2026-09-15 exact-read folds
+// § 3): `path = /identities/<id>/`, `name = pii`, the same
+// pathname as its URL. pathAndNameOf keeps its literal-tail
+// rule — widening it would rename every operation
+// (transition, rotation, acceptance).
+const PII_ROUTE_PATTERN = 'identities/:id/pii';
+const PII_DOCUMENT_NAME = 'pii';
+
+export function storedPathAndNameOf(input: {
+    readonly routePattern: string;
+    readonly routeSegments: readonly string[];
+    readonly pathSegments: readonly string[];
+    readonly organization: Id | undefined;
+    readonly body: Record<string, unknown> | undefined;
+}): PathAndName {
+    if (input.routePattern === PII_ROUTE_PATTERN) {
+        return {
+            path: canonicalPath(
+                input.organization,
+                '/' + input.pathSegments.slice(0, -1).join('/')
+                    + '/',
+            ),
+            name: PII_DOCUMENT_NAME,
+        };
+    }
+    const pathAndName = pathAndNameOf(
+        input.routeSegments, input.pathSegments,
+    );
+    const createdId = createdEntityName(
+        input.routePattern, input.body,
+    );
+    return {
+        path: canonicalPath(input.organization, pathAndName.path),
+        name: createdId ?? pathAndName.name,
+    };
+}
+
 export async function formWriteMessagePair(
     input: WriteMessagePairInput,
 ): Promise<MessagePair> {
@@ -210,16 +255,7 @@ export async function formWriteMessagePair(
         );
     }
     const id = generateIdentifier();
-    const pathAndName = pathAndNameOf(
-        input.routeSegments, input.pathSegments,
-    );
-    const path = canonicalPath(
-        input.organization, pathAndName.path,
-    );
-    const createdId = createdEntityName(
-        input.routePattern, input.body,
-    );
-    const name = createdId ?? pathAndName.name;
+    const { path, name } = storedPathAndNameOf(input);
     const headerFields = headerFieldsWithOperationId(
         input.headerFields, input.operationId,
     );

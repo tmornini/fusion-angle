@@ -36,8 +36,8 @@ async () => {
     );
 });
 
-Deno.test('a global-plane pair keeps its flat prefix',
-async () => {
+Deno.test('the PII route stores at the identity\'s own path'
++ ' under the name pii', async () => {
     const messagePair = await formWriteMessagePair({
         ...INPUT,
         pathname: '/identities/ada/pii',
@@ -47,9 +47,8 @@ async () => {
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         operationId: generateIdentifier(),
     });
-    assertStrictEquals(
-        messagePair.path, '/identities/ada/pii/',
-    );
+    assertStrictEquals(messagePair.path, '/identities/ada/');
+    assertStrictEquals(messagePair.name, 'pii');
 });
 
 Deno.test('nested attribute pattern stores under type attributes',

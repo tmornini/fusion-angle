@@ -78,8 +78,8 @@ function humanDetail() {
     };
 }
 
-function piiCollection(id: string): string {
-    return '/identities/' + id + '/pii/';
+function piiPath(id: string): string {
+    return '/identities/' + id + '/';
 }
 
 async function pairsAtPii(
@@ -88,7 +88,7 @@ async function pairsAtPii(
 ) {
     const messagePairs = await db.messagePairs.getAll();
     return messagePairs.filter(
-        r => r.path === piiCollection(id),
+        r => r.path === piiPath(id) && r.name === 'pii',
     );
 }
 
@@ -137,7 +137,7 @@ Deno.test('PUT-PUT leaves two pairs and Supersedes', async () => {
     assert(pairsAt.some(r => r.id === firstId));
     assert(pairsAt.some(r => r.id === secondId));
     const head = await documentHeadAt(
-        db, piiCollection(id), '',
+        db, piiPath(id), 'pii',
     );
     assertStrictEquals(head?.id, secondId);
     assertStrictEquals(head?.method, 'PUT');
@@ -172,7 +172,7 @@ Deno.test('PUT-DELETE leaves a bodyless DELETE head and an'
     assert(pairsAt.some(r => r.id === putId
         && r.request.includes('Bob')));
     const head = await documentHeadAt(
-        db, piiCollection(id), '',
+        db, piiPath(id), 'pii',
     );
     assertStrictEquals(head?.id, delId);
     assertStrictEquals(head?.method, 'DELETE');
@@ -202,7 +202,7 @@ Deno.test('DELETE-PUT is live again at three pairs', async () => {
     const pairsAt = await pairsAtPii(db, id);
     assertStrictEquals(pairsAt.length, 3);
     const head = await documentHeadAt(
-        db, piiCollection(id), '',
+        db, piiPath(id), 'pii',
     );
     assertStrictEquals(head?.id, pairIdOf(put));
     assertStrictEquals(head?.method, 'PUT');
@@ -405,7 +405,7 @@ Deno.test('PUT-PUT-DELETE adds exactly three pairs (no document'
     const pairsAt = await pairsAtPii(db, id);
     assertStrictEquals(pairsAt.length, 3);
     const head = await documentHeadAt(
-        db, piiCollection(id), '',
+        db, piiPath(id), 'pii',
     );
     assertStrictEquals(head?.id, pairIdOf(del));
     assertStrictEquals(head?.method, 'DELETE');
@@ -424,11 +424,11 @@ Deno.test('stored PUT body equals piiEntityOf', async () => {
     assertStrictEquals(put.status, 201);
     const stored = JSON.parse(
         await storedPutBodyText(
-            db, '/identities/' + id + '/pii/', '',
+            db, '/identities/' + id + '/', 'pii',
         ),
     );
     const expected = piiEntityOf(id, {
-        name: '',
+        name: 'pii',
         messagePairId: id,
         method: 'PUT',
         body: fields,
