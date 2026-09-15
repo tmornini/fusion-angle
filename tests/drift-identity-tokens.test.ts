@@ -35,8 +35,6 @@ import {
 } from '../api/derive-identity-tokens.ts';
 import {
     formTokenEventMessagePair,
-    formWriteMessagePair,
-    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
 import {
@@ -46,28 +44,19 @@ import {
 
 const JTI_ORDER = generateIdentifier();
 const CHAIN_ORDER = generateIdentifier();
-const TOK_ORDER = generateIdentifier();
 const JTI_G4 = generateIdentifier();
 const CHAIN_G4 = generateIdentifier();
 const JTI_G4_SYNTH = generateIdentifier();
 const CHAIN_G4_SYNTH = generateIdentifier();
-const TOK_G4 = generateIdentifier();
 const JTI_W3 = generateIdentifier();
 const CHAIN_W3 = generateIdentifier();
 const JTI_W1 = generateIdentifier();
 const CHAIN_W = generateIdentifier();
-const TOK_W1 = generateIdentifier();
-const TOK_W2 = generateIdentifier();
-const TOK_W3 = generateIdentifier();
-const TOK_TX1 = generateIdentifier();
-const TOK_TX2 = generateIdentifier();
 const JTI_TX = generateIdentifier();
 const CHAIN_TX = generateIdentifier();
 const GHOST_JTI = generateIdentifier();
 const JTI_OMIT = generateIdentifier();
 const CHAIN_OMIT = generateIdentifier();
-const JTI_FLAT = generateIdentifier();
-const CHAIN_FLAT = generateIdentifier();
 
 // Phase 13 Task 6/7 shipped two ledger-derived reads that replace
 // row-plane lookups on Commandment II hot paths: the by-jti fold
@@ -173,13 +162,13 @@ Deno.test('KEY ORDER: the derived row is id-LAST — matching'
 async () => {
     const db = await freshDb();
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-        + TOK_ORDER, {
+        + JTI_ORDER, {
         jti: JTI_ORDER, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_ORDER, at: AT,
     }, DEV_TOKEN);
 
     const derived = await deriveIdentityToken(
-        db, 'XXZruirZyAOoRpNxaDnpSA', TOK_ORDER,
+        db, 'XXZruirZyAOoRpNxaDnpSA', JTI_ORDER,
     );
     const expectedOrder = [
         'jti', 'identity_id', 'action', 'chain_id', 'at', 'id',
@@ -192,31 +181,30 @@ async () => {
 Deno.test('stored PUT body equals identityTokenEntityOf id-last',
 async () => {
     const db = await freshDb();
-    const id = generateIdentifier();
     const fields = {
         jti: JTI_G4, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_G4, at: AT,
     };
     const put = await handleRequest(db, req(
-        'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + id,
+        'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + JTI_G4,
         DEV_TOKEN, fields,
     ));
     assertStrictEquals(put.status, 201);
     const stored = JSON.parse(
         await storedPutBodyText(
-            db, '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/', id,
+            db, '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/', JTI_G4,
         ),
     );
     const expected = identityTokenEntityOf({
-        name: id,
-        messagePairId: id,
+        name: JTI_G4,
+        messagePairId: JTI_G4,
         method: 'PUT',
         body: fields,
     });
     assertStrictEquals(Object.keys(expected).at(-1), 'id');
     assertEquals(stored, expected);
     const derived = await deriveIdentityToken(
-        db, 'XXZruirZyAOoRpNxaDnpSA', id,
+        db, 'XXZruirZyAOoRpNxaDnpSA', JTI_G4,
     );
     assertEquals(stored, derived);
     const wire = await put.json();
@@ -225,21 +213,20 @@ async () => {
 
 Deno.test('formTokenEventMessagePair stored body equals '
 + 'identityTokenEntityOf id-last', async () => {
-    const id = generateIdentifier();
     const event = {
         jti: JTI_G4_SYNTH, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued' as const,
         chain_id: CHAIN_G4_SYNTH, at: AT,
     };
     const messagePair = await formTokenEventMessagePair(
-        id, event, generateIdentifier(),
+        JTI_G4_SYNTH, event, generateIdentifier(),
     );
     const stored = JSON.parse(
         storedMessageBodyText(messagePair.responseMessage),
     );
     const expected = identityTokenEntityOf({
-        name: id,
-        messagePairId: id,
+        name: JTI_G4_SYNTH,
+        messagePairId: JTI_G4_SYNTH,
         method: 'PUT',
         body: event,
     });
@@ -249,13 +236,13 @@ Deno.test('formTokenEventMessagePair stored body equals '
 
 // Writer matches GET: successBody is identityTokenEntityOf
 // (id-last). The id-first pin is deleted.
-Deno.test('identities/:id/tokens/:tid successBody is id-last',
+Deno.test('identities/:id/tokens/:jti successBody is id-last',
 () => {
     const entry =
-        WRITE_RESPONSE_SPECS['identities/:id/tokens/:tid'];
+        WRITE_RESPONSE_SPECS['identities/:id/tokens/:jti'];
     assert(entry !== undefined && 'successBody' in entry);
     const body = entry.successBody!(
-        ['XXZruirZyAOoRpNxaDnpSA', TOK_G4],
+        ['XXZruirZyAOoRpNxaDnpSA', JTI_G4],
         {
             jti: JTI_G4, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'issued', chain_id: CHAIN_G4, at: AT,
@@ -264,60 +251,56 @@ Deno.test('identities/:id/tokens/:tid successBody is id-last',
         undefined,
     ) as { id: string };
     assertStrictEquals(Object.keys(body).at(-1), 'id');
-    assertStrictEquals(body.id, TOK_G4);
+    assertStrictEquals(body.id, JTI_G4);
 });
 
 // -- 2: GET wire byte-parity — the ACTUAL flipped route against --
 // -- a LITERAL id-LAST reconstruction of what was PUT: -----------
 // -- byIdAscending collection order, and the 404 body -------------
 
-Deno.test('GET /identities/:id/tokens + /:tid are wire'
+Deno.test('GET /identities/:id/tokens + /:jti are wire'
 + ' byte-identical to a literal id-LAST reconstruction of'
-+ ' what was PUT: byIdAscending collection order and the'
++ ' each jti\'s HEAD: byIdAscending collection order and the'
 + ' 404 body',
 async () => {
     const db = await freshDb();
-    // Inserted in NON-lex order (w3, then xdaJyuuPyHfffCGLhqDrOQ, then w2) so
-    // the
-    // memory backend's own insertion order and the derivation's
-    // byIdAscending order genuinely diverge — a test that
-    // inserted in lex order already would pass by ACCIDENT of
-    // insertion order, never by the property it claims to prove.
+    // Inserted in NON-lex order (the w3 jti, then the w1 jti) so
+    // the memory backend's own insertion order and the
+    // derivation's byIdAscending order genuinely diverge — a
+    // test that inserted in lex order already would pass by
+    // ACCIDENT of insertion order, never by the property it
+    // claims to prove. The third PUT revisits the w1 jti's OWN
+    // document, so the collection returns its 'rotated' HEAD.
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-        + TOK_W3, {
+        + JTI_W3, {
         jti: JTI_W3, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_W3, at: AT,
     }, DEV_TOKEN);
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-        + TOK_W1, {
+        + JTI_W1, {
         jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_W, at: AT,
     }, DEV_TOKEN);
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-        + TOK_W2, {
+        + JTI_W1, {
         jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'rotated', chain_id: CHAIN_W, at: AT2,
     }, DEV_TOKEN);
 
-    // The literal id-LAST reconstruction of each PUT body,
-    // identifier order (byIdAscending — the derivation's
-    // own order, never the backend's) — the expected wire
-    // text, independent of any stored row.
+    // The literal id-LAST reconstruction of each document's
+    // HEAD body, identifier order (byIdAscending — the
+    // derivation's own order, never the backend's) — the
+    // expected wire text, independent of any stored row.
     const expected = [
         {
             jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-            action: 'issued', chain_id: CHAIN_W, at: AT,
-            id: TOK_W1,
-        },
-        {
-            jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'rotated', chain_id: CHAIN_W, at: AT2,
-            id: TOK_W2,
+            id: JTI_W1,
         },
         {
             jti: JTI_W3, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'issued', chain_id: CHAIN_W3, at: AT,
-            id: TOK_W3,
+            id: JTI_W3,
         },
     ].sort((a, b) => compareIdentifiers(a.id, b.id));
 
@@ -367,12 +350,12 @@ Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
 + ' list) — the membershipExistsFor precedent', async () => {
     const db = await freshDb();
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-        + TOK_TX1, {
+        + JTI_TX, {
         jti: JTI_TX, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_TX, at: AT,
     }, DEV_TOKEN);
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-        + TOK_TX2, {
+        + JTI_TX, {
         jti: JTI_TX, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'rotated', chain_id: CHAIN_TX, at: AT2,
     }, DEV_TOKEN);
@@ -386,7 +369,8 @@ Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
         ),
     );
     assertEquals(inTx, preTx);
-    assertStrictEquals(preTx.length, 2);
+    assertStrictEquals(preTx.length, 1);
+    assertStrictEquals(preTx[0]!.action, 'rotated');
 
     const preTxMissing = await deriveIdentityTokenEventsForJti(
         db, GHOST_JTI, 'XXZruirZyAOoRpNxaDnpSA',
@@ -577,13 +561,12 @@ async () => {
 Deno.test('GET stamps identity_id from the path when PUT omits it',
 async () => {
     const db = await freshDb();
-    const id = generateIdentifier();
     const withoutIdentity = {
         jti: JTI_OMIT, action: 'issued',
         chain_id: CHAIN_OMIT, at: AT,
     };
     const put = await handleRequest(db, req(
-        'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + id,
+        'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + JTI_OMIT,
         DEV_TOKEN, withoutIdentity,
     ));
     assert(put.status === 200 || put.status === 201);
@@ -596,11 +579,12 @@ async () => {
         readonly id: string;
         readonly identity_id: string;
     }[];
-    const row = rows.find(r => r.id === id);
+    const row = rows.find(r => r.id === JTI_OMIT);
     assert(row, 'omitted-id event is in the collection');
     assertStrictEquals(row.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
     const leaf = await handleRequest(db, req(
-        'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + id, DEV_TOKEN,
+        'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + JTI_OMIT,
+        DEV_TOKEN,
     ));
     assertStrictEquals(leaf.status, 200);
     const one = await leaf.json() as {
@@ -609,48 +593,18 @@ async () => {
     assertStrictEquals(one.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
-Deno.test('GET /identities/:id/tokens dual-reads leftover flat',
+Deno.test('a PUT whose body jti disagrees with the path is 400',
 async () => {
     const db = await freshDb();
-    const id = generateIdentifier();
-    const fields = {
-        jti: JTI_FLAT, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-        action: 'issued', chain_id: CHAIN_FLAT, at: AT,
-    };
-    const flatPair = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/identity-tokens/' + id,
-        routePattern: 'identity-tokens/:id',
-        routeSegments: ['identity-tokens', ':id'],
-        pathSegments: ['identity-tokens', id],
-        headerFields: [],
-        body: fields,
-        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
-        requestAt: AT,
-        organization: undefined,
-        responseStatus: 200,
-        responseBody: identityTokenEntityOf({
-            name: id,
-            messagePairId: id,
-            method: 'PUT',
-            body: fields,
-        }),
-        operationId: generateIdentifier(),
-    });
-    await db.transaction(async (view) => {
-            await appendMessagePairOnce(view, flatPair);
+    const res = await handleRequest(db, req(
+        'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
+            + JTI_W1,
+        DEV_TOKEN,
+        {
+            jti: generateIdentifier(),
+            identity_id: 'XXZruirZyAOoRpNxaDnpSA',
+            action: 'issued', chain_id: CHAIN_W, at: AT,
         },
-    );
-    const res = await handleRequest(
-        db, req('GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-            , DEV_TOKEN),
-    );
-    assertStrictEquals(res.status, 200);
-    const rows = await res.json() as readonly {
-        readonly id: string;
-        readonly identity_id: string;
-    }[];
-    const row = rows.find(r => r.id === id);
-    assert(row, 'leftover flat event is in the collection');
-    assertStrictEquals(row.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
+    ));
+    assertStrictEquals(res.status, 400);
 });

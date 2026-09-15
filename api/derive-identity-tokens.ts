@@ -10,82 +10,23 @@ import {
     type DerivedDocument,
 } from './derive-documents.ts';
 
-// The identity_tokens ledger's own reduction — Phase 13 Task 6,
-// the task that discharges gate 7. A DEDICATED module rather than
-// a sixth facet on api/derive-identity-spine.ts (that module's own
-// header frames itself as "Five facets, four shapes" over pii/
-// credentials/role_grants/providers/revocations — identity_tokens
-// carries its OWN key-order subtlety, its OWN by-jti fold, and an
-// adapter-shaped in-tx reader none of those five need; folding it
-// in would both bloat that header's claim and mix an unrelated
-// shape into it). identity_tokens is a HistoryEntityStore row
-// (api/store-history-entity.ts): from Phase 13 Task 5 on, EVERY
-// row-write appends its own event pair at
-// 'identities/<identityId>/tokens/<rowId>'
-// (api/message-pair.ts's formTokenEventMessagePair — the SAME
-// document/method/response shape a real PUT
-// identities/:id/tokens/:tid would store) — issued roots
-// (grant, client-credentials, token-
-// exchange, the org-exchange hop), rotations, and revocations ALL
-// form one, so this derivation now sees every LIVE row the row
-// plane does. Before Task 5 a pair-less writer would have left
-// this derivation blind to rows the Tokens page still showed —
-// exactly the hazard api/routes.ts's own NOT-FLIPPED comment named
-// before this task retired it.
-//
-// THE KEY-ORDER SUBTLETY: the derived row is id-LAST —
-// validateIdentityTokenEntity's return-literal order plus `id`.
-// G4: GET wins. WRITE_RESPONSE_SPECS['identities/:id/tokens/:tid']
-// and formTokenEventMessagePair emit this mapper, not the older
-// id-first stamp. withoutId FIRST, always (the
-// organizationEntityOf / deriveMembershipsForIdentity
-// precedent): a synthesized event pair's request body never
-// carries a stray id, but a below-facade PUT could, and
-// stripping unconditionally costs nothing.
-// tests/drift-identity-tokens.test.ts pins stored PUT =
-// identityTokenEntityOf.
-//
-// EVENT-APPEND, not document-class (api/routes.ts's own route
-// comment): every row id is a fresh generateIdentifier()
-// mint, so in practice no document is ever revisited — but
-// deriveDocumentsAt's latest-per-name head resolution still
-// applies uniformly (the role_grants precedent), never assumed.
-//
-// deriveIdentityTokenEventsForJti is the by-jti fold this task
-// discharges gate 7 for: tokenRevocationReason's SECOND read
-// (api/authentication.ts) — isTokenRevoked treats an unknown jti
-// as NOT revoked, so this fold sits on the Commandment II hot
-// path; a derivation miss here fails OPEN, admitting a revoked
-// session. ADAPTER-SHAPED (`dbOrView: DbAdapter`, the
-// membershipExistsFor precedent, api/derive-memberships.ts) so a
-// live open transaction view can call it without nesting a
-// transaction of its own — Task 9a re-anchors
-// rotateRefreshJti/revokeTokenChain's own IN-TX re-reads here too
-// (this task flipped only their PRE-TX provisional reads plus
-// tokenRevocationReason's own by-jti read). tests/drift-identity-
-// tokens.test.ts ships the pre-tx-vs-in-tx PARITY leg (the
-// membershipExistsFor leg-5 precedent).
-//
-// No internal db.transaction wrap here (unlike derive-
-// organizations.ts / deriveIdentityPiiRows): identity_tokens is
-// never a hard-delete zone (api/derive-identity-spine.ts's own
-// header draws this line for its own siblings) — one
-// getAllWhere on db.messagePairs, outside any transaction, is the
-// cheaper shape every OTHER derive-identity-spine.ts facet
-// but pii already uses.
-//
-// Reads db.messagePairs (+ pickString/validate-
-// IdentityTokenEntity over their decoded bodies) ONLY — never
-// db.identityTokens, the row-plane table this task's GET flip
-// retired as a production READ; Phase 13 Task 9 retires the
-// row-plane WRITE too (the PUT route goes pair-only), so the
-// table itself carries no production traffic on either side from
-// here on.
+// The identity's tokens collection: `path =
+// /identities/<id>/tokens/`, `name = <jti>` — each jti is one
+// document whose history is its own issued → rotated →
+// revoked (api/message-pair.ts formTokenEventMessagePair). The
+// authorization_code grant's chain root is the one document
+// not named by its jti: its name is the code's sha256 spend
+// marker (api/authentication.ts authorizationCodeSpent). A
+// collection read returns heads — one row per document, its
+// latest event; every event of a jti carries the same
+// chain_id, so the chain fold (readTokenChainFromLedger)
+// filters heads. The derived row is id-LAST
+// (validateIdentityTokenEntity's order plus `id`); `id` is
+// the document name. withoutId FIRST, always. Spec
+// 2026-09-15 exact-read folds § 6; nothing here reads
+// /identity-tokens/.
 
 const IDENTITY_TOKENS_TABLE = 'identity_tokens';
-
-const IDENTITY_TOKENS_FLAT_PREFIX =
-    canonicalPath(undefined, '/identity-tokens/');
 
 function tokensPrefixFor(identityId: Id): string {
     return canonicalPath(
@@ -103,8 +44,8 @@ export function identityTokenEntityOf(
     };
 }
 
-// Nested document is the source of truth — fill or overwrite
-// the request body's identity_id from the path.
+// The nested document is the source of truth — fill or
+// overwrite the request body's identity_id from the path.
 function nestedTokenEntityOf(
     identityId: Id,
     document: DerivedDocument,
@@ -118,75 +59,45 @@ function nestedTokenEntityOf(
     });
 }
 
-async function fetchTokenDocumentsAt(
-    dbOrView: DbAdapter,
-    prefix: string,
-): Promise<Map<string, DerivedDocument>> {
-    const messagePairs = await dbOrView.messagePairs.getCollectionPairs(
-        prefix,
-    );
-    return deriveDocumentsAt(messagePairs, prefix);
-}
-
-// Nested docs plus leftover flat docs whose identity_id
-// matches. Nested wins on the same event id.
+// One identity's collection: the head of every document
+// there, id-lex.
 export async function deriveIdentityTokensFor(
     db: DbAdapter,
     identityId: Id,
 ): Promise<IdentityTokenEntity[]> {
-    const nested = await fetchTokenDocumentsAt(
-        db, tokensPrefixFor(identityId),
+    const prefix = tokensPrefixFor(identityId);
+    const documents = deriveDocumentsAt(
+        await db.messagePairs.getCollectionPairs(prefix),
+        prefix,
     );
-    const flat = await fetchTokenDocumentsAt(
-        db, IDENTITY_TOKENS_FLAT_PREFIX,
-    );
-    const byId = new Map<string, IdentityTokenEntity>();
-    for (const document of flat.values()) {
-        const entity = identityTokenEntityOf(document);
-        if (entity.identity_id === identityId) {
-            byId.set(entity.id, entity);
-        }
+    const rows: IdentityTokenEntity[] = [];
+    for (const document of documents.values()) {
+        rows.push(nestedTokenEntityOf(identityId, document));
     }
-    for (const document of nested.values()) {
-        const entity = nestedTokenEntityOf(
-            identityId, document,
-        );
-        byId.set(entity.id, entity);
-    }
-    return [...byId.values()].sort(byIdAscending);
+    return rows.sort(byIdAscending);
 }
 
+// One document: the jti's latest event.
 export async function deriveIdentityToken(
     db: DbAdapter,
     identityId: Id,
-    tid: Id,
+    jti: Id,
 ): Promise<IdentityTokenEntity> {
-    const nested = await fetchTokenDocumentsAt(
-        db, tokensPrefixFor(identityId),
-    );
-    const nestedDocument = nested.get(tid);
-    if (nestedDocument !== undefined) {
-        return nestedTokenEntityOf(identityId, nestedDocument);
+    const prefix = tokensPrefixFor(identityId);
+    const document = deriveDocumentsAt(
+        await db.messagePairs.getDocumentHistory(prefix, jti),
+        prefix,
+    ).get(jti);
+    if (document === undefined) {
+        throw new EntityNotFoundError(IDENTITY_TOKENS_TABLE, jti);
     }
-    const flat = await fetchTokenDocumentsAt(
-        db, IDENTITY_TOKENS_FLAT_PREFIX,
-    );
-    const flatDocument = flat.get(tid);
-    if (flatDocument !== undefined) {
-        const entity = identityTokenEntityOf(flatDocument);
-        if (entity.identity_id === identityId) {
-            return entity;
-        }
-    }
-    throw new EntityNotFoundError(IDENTITY_TOKENS_TABLE, tid);
+    return nestedTokenEntityOf(identityId, document);
 }
 
-// Every LIVE event naming `jti` in ONE identity's own
-// collection, id-lex ordered — the by-jti fold
-// tokenRevocationReason's SECOND read (isTokenRevoked)
-// folds over. A jti that has never appeared in this
-// identity's collection returns []. Never the plane: the
-// Bearer gate hot path reads one collection.
+// Every LIVE head naming `jti` in ONE identity's own
+// collection — the by-jti fold tokenRevocationReason's
+// SECOND read (isTokenRevoked) folds over. A jti that has
+// never appeared in this identity's collection returns [].
 export async function deriveIdentityTokenEventsForJti(
     dbOrView: DbAdapter,
     jti: string,

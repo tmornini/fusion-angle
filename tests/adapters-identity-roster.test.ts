@@ -140,30 +140,33 @@ async () => {
     const { ctx } = await setup();
     const chain2 = generateIdentifier();
     const otherId = generateIdentifier();
+    const secondJti = generateIdentifier();
+    const thirdJti = generateIdentifier();
+    const otherJti = generateIdentifier();
     await ctx.PUT('identities/pnXmXrxOWayANgDLdCjuBw/tokens/'
-        + generateIdentifier(), {
+        + 'jmvogLnzTmiQlAkVvDHrvQ', {
         jti: 'jmvogLnzTmiQlAkVvDHrvQ', identity_id: 'pnXmXrxOWayANgDLdCjuBw'
             , action: 'issued',
         chain_id: 'WeXjAaAxGSpLpamfEuvcww',
         at: '2026-01-01T00:00:00.000000Z',
     });
     await ctx.PUT('identities/pnXmXrxOWayANgDLdCjuBw/tokens/'
-        + generateIdentifier(), {
-        jti: generateIdentifier(),
+        + secondJti, {
+        jti: secondJti,
         identity_id: 'pnXmXrxOWayANgDLdCjuBw', action: 'issued',
         chain_id: 'WeXjAaAxGSpLpamfEuvcww',
         at: '2026-01-02T00:00:00.000000Z',
     });
     await ctx.PUT('identities/pnXmXrxOWayANgDLdCjuBw/tokens/'
-        + generateIdentifier(), {
-        jti: generateIdentifier(),
+        + thirdJti, {
+        jti: thirdJti,
         identity_id: 'pnXmXrxOWayANgDLdCjuBw', action: 'issued',
         chain_id: chain2,
         at: '2026-01-03T00:00:00.000000Z',
     });
     await ctx.PUT('identities/' + otherId + '/tokens/'
-        + generateIdentifier(), {
-        jti: generateIdentifier(),
+        + otherJti, {
+        jti: otherJti,
         identity_id: otherId, action: 'issued',
         chain_id: generateIdentifier(),
         at: '2026-01-04T00:00:00.000000Z',

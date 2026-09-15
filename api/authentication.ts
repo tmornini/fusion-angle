@@ -407,7 +407,6 @@ async function issueTokenPair(
     readonly messagePairId: string | undefined;
 }> {
     const refreshJti = generateIdentifier();
-    const rootId = generateIdentifier();
     const chainId = generateIdentifier();
     const at = nowUtc();
     const organizations =
@@ -430,10 +429,12 @@ async function issueTokenPair(
     // event pair alone.
     const operationId = messagePair?.operationId
         ?? generateIdentifier();
-    const eventMessagePair = await formTokenEventMessagePair(rootId, {
-        jti: refreshJti, identity_id: identityId,
-        action: 'issued', chain_id: chainId, at,
-    }, operationId);
+    const eventMessagePair = await formTokenEventMessagePair(
+        refreshJti, {
+            jti: refreshJti, identity_id: identityId,
+            action: 'issued', chain_id: chainId, at,
+        }, operationId,
+    );
     await adapter.transaction(async (view) => {
             await appendMessagePairOnce(view, eventMessagePair);
             if (messagePair !== undefined) {
@@ -490,11 +491,10 @@ export async function tokenRevocationReason(
 // The two-step narrow shared by rotation and revocation, run
 // BOTH pre-tx (the provisional read) and in-tx (the
 // authoritative re-read): ONE collection read of the
-// identity's own tokens (deriveIdentityTokensFor — the
-// nested prefix plus, until Auth 1b, the leftover flat
-// prefix filtered to this identity), folded in memory first
-// for the presented jti's chain_id, then for every row of
-// that chain — planRotation's replay path and an explicit
+// identity's own tokens (deriveIdentityTokensFor — one head
+// per jti document at the nested prefix), folded in memory
+// first for the presented jti's chain_id, then for every row
+// of that chain — planRotation's replay path and an explicit
 // revocation act on every jti the chain has ever held, so a
 // jti-only fold would under-revoke. A jti absent from this
 // identity's collection is unknown: chainId null, rows
@@ -520,12 +520,10 @@ async function readTokenChainFromLedger(
     return { chainId, rows };
 }
 
-// Each append's event, paired with its OWN formed event pair —
-// formTokenEventMessagePair mints a fresh id per event and names the
-// pair by it (Phase 13 Task 5). Formed pre-tx — crypto,
-// hashing, and timers never run inside an open
-// transaction (AGENTS.md § Transaction bodies await only
-// row ops).
+// Each append's event, paired with its OWN event pair at the
+// jti's document. Formed pre-tx — crypto, hashing, and timers
+// never run inside an open transaction (AGENTS.md §
+// Transaction bodies await only row ops).
 interface TokenEventWrite {
     readonly event: Omit<IdentityTokenEntity, 'id'>;
     readonly messagePair: MessagePair;
@@ -537,11 +535,10 @@ async function formTokenEventWrites(
 ): Promise<TokenEventWrite[]> {
     const writes: TokenEventWrite[] = [];
     for (const event of appends) {
-        const id = generateIdentifier();
         writes.push({
             event,
             messagePair: await formTokenEventMessagePair(
-                id, event, operationId,
+                event.jti, event, operationId,
             ),
         });
     }
@@ -1038,7 +1035,6 @@ async function grantClientCredentials(
     );
     const name = await nameFor(adapter, clientId);
     const refreshJti = generateIdentifier();
-    const rootId = generateIdentifier();
     const chainId = generateIdentifier();
     const at = nowUtc();
     const organizations =
@@ -1052,10 +1048,12 @@ async function grantClientCredentials(
     const messagePair = await formAuthMessagePair(
         seed, body, clientId, HTTP_OK, response,
     );
-    const eventMessagePair = await formTokenEventMessagePair(rootId, {
-        jti: refreshJti, identity_id: clientId,
-        action: 'issued', chain_id: chainId, at,
-    }, messagePair.operationId);
+    const eventMessagePair = await formTokenEventMessagePair(
+        refreshJti, {
+            jti: refreshJti, identity_id: clientId,
+            action: 'issued', chain_id: chainId, at,
+        }, messagePair.operationId,
+    );
     const ticketBody = { exp: verdict.exp };
     const ticketMessagePair = await formWriteMessagePair({
         method: 'PUT',
@@ -1113,11 +1111,10 @@ async function grantClientCredentials(
 // GATE 3 — KEY-BY-ANCHOR (Phase 13 Task 7): the presented code's
 // sha256 digest, pre-tx always — formed pre-tx — crypto,
 // hashing, and timers never run inside an open transaction
-// (AGENTS.md § Transaction bodies await only row ops). It
-// keys
-// the issued root's row id (and, by construction, that row's own
-// event pair's name — formTokenEventMessagePair derives name from the
-// id it is given). authorizeCodeIssuer matches the LIVE code
+// (AGENTS.md § Transaction bodies await only row ops). It IS
+// the issued root's event pair name — the one token document
+// not named by its jti (formTokenEventMessagePair takes the
+// name). authorizeCodeIssuer matches the LIVE code
 // against the authorize response family's stored `code` field
 // (pairs are stored verbatim).
 export async function deriveAuthorizationCodeId(
@@ -1128,8 +1125,6 @@ export async function deriveAuthorizationCodeId(
 
 const AUTHORIZE_PREFIX =
     canonicalPath(undefined, '/authentication/authorize/');
-const IDENTITY_TOKENS_FLAT_PREFIX =
-    canonicalPath(undefined, '/identity-tokens/');
 
 function tokensEventPrefixFor(identityId: Id): string {
     return canonicalPath(
@@ -1217,25 +1212,19 @@ async function authorizeCodeIssuer(
 // this code has already minted a chain root — the pair append
 // at that KEYED document IS the spend marker (KEY-BY-ANCHOR),
 // replacing the retired authorization_codes 'consumed' row.
-// Dual-reads leftover /identity-tokens/<derivedId> so a
-// pre-nest spend still fails closed. Filtered to those two
-// prefixes so a coincidental non-token hit — astronomically
-// unlikely for a 64-hex-char sha256 digest against 22-char
-// base62 ids, but never assumed — cannot false-positive the
-// guard.
+// Scoped to that ONE collection so a coincidental non-token
+// hit — astronomically unlikely for a 64-hex-char sha256
+// digest against 22-char base62 ids, but never assumed —
+// cannot false-positive the guard.
 export async function authorizationCodeSpent(
     dbOrView: DbAdapter,
     derivedId: Id,
     identityId: Id,
 ): Promise<boolean> {
-    const nested = await dbOrView.messagePairs.getDocumentHistory(
+    const spent = await dbOrView.messagePairs.getDocumentHistory(
         tokensEventPrefixFor(identityId), derivedId,
     );
-    if (nested.length > 0) return true;
-    const leftover = await dbOrView.messagePairs.getDocumentHistory(
-        IDENTITY_TOKENS_FLAT_PREFIX, derivedId,
-    );
-    return leftover.length > 0;
+    return spent.length > 0;
 }
 
 // authorization_code grant: consume an ISSUED code, then issue a

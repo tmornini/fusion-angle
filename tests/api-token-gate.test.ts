@@ -155,11 +155,12 @@ Deno.test('a token minted within a revocation second still'
 Deno.test('a jti revoked in the ledger still admits the access'
 + ' token until exp', async () => {
     const db = await freshDb();
+    const liveJti = generateIdentifier();
+    const revokedJti = generateIdentifier();
     await PUT(
-        db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-            + 'YiJPbufDpkyrZcZCYbUJpg',
+        db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + liveJti,
         {
-            jti: generateIdentifier(),
+            jti: liveJti,
             identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'issued', chain_id: 'WeXjAaAxGSpLpamfEuvcww',
             at: '2026-01-01T00:00:00.000000Z',
@@ -167,10 +168,9 @@ Deno.test('a jti revoked in the ledger still admits the access'
         await devToken(),
     );
     await PUT(
-        db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-            + generateIdentifier(),
+        db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + revokedJti,
         {
-            jti: generateIdentifier(),
+            jti: revokedJti,
             identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'revoked', chain_id: 'WeXjAaAxGSpLpamfEuvcww',
             at: '2026-02-01T00:00:00.000000Z',

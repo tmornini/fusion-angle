@@ -56,6 +56,7 @@ const UNKNOWN_JTI = generateIdentifier();
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
+const AT2 = '2026-01-01T00:00:01.000000Z';
 const ROOT_JTI = 'kHAXckusBqJjgcJLEuEurg';
 const CURRENT_ID = 'XXZruirZyAOoRpNxaDnpSA';
 
@@ -93,7 +94,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     // its pair, the SAME mechanism a live write uses.
     await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-            + 'udpCrXJSdUfkFbImFbBsWw', DEV_TOKEN, {
+            + ROOT_JTI, DEV_TOKEN, {
             jti: ROOT_JTI, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'issued', chain_id: CHAIN_ID, at: AT,
         },
@@ -120,7 +121,7 @@ Deno.test('PUT identity-tokens/:id appends its pair at the entity'
     const res = await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
             + 'vNIIMoezHOyoUeTsbqSzCA', DEV_TOKEN,
-        tokenFields(generateIdentifier()),
+        tokenFields('vNIIMoezHOyoUeTsbqSzCA'),
     ));
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
@@ -141,12 +142,12 @@ Deno.test('two PUTs to DIFFERENT identity-tokens/:id ids each'
     const first = await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
             + 'vsxvgdODnVqhbIthTouQXw', DEV_TOKEN,
-        tokenFields(generateIdentifier()),
+        tokenFields('vsxvgdODnVqhbIthTouQXw'),
     ));
     const second = await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
             + 'vwxtxVdVgndfJUdQHRgVTA', DEV_TOKEN,
-        tokenFields(generateIdentifier()),
+        tokenFields('vwxtxVdVgndfJUdQHRgVTA'),
     ));
     assertStrictEquals(first.status, 201);
     assertStrictEquals(second.status, 201);
@@ -154,25 +155,26 @@ Deno.test('two PUTs to DIFFERENT identity-tokens/:id ids each'
     assertStrictEquals(second.headers.get('Supersedes'), null);
 });
 
-Deno.test('a second PUT to the SAME identity-tokens/:id id forms'
+Deno.test('a second PUT to the SAME identity-tokens/:jti id forms'
 + ' its OWN genesis pair — no Supersedes, this document never'
-+ ' chains — and the DERIVED read reflects the LATEST pair at'
-+ ' that document (deriveDocumentsAt\'s latest-per-name head'
-+ ' resolution, never a ledger guard)', async () => {
++ ' chains — and the DERIVED read is the jti\'s LATEST event'
++ ' (its document head)', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
             + 'wFKZmVsOBJcqYFjJjxrlMw', DEV_TOKEN,
-        tokenFields(generateIdentifier()),
+        tokenFields('wFKZmVsOBJcqYFjJjxrlMw'),
     ));
     assertStrictEquals(first.status, 201);
     const firstId = pairIdOf(first);
     assertStrictEquals(first.headers.get('Supersedes'), null);
-    const laterJti = generateIdentifier();
     const second = await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
             + 'wFKZmVsOBJcqYFjJjxrlMw', DEV_TOKEN,
-        tokenFields(laterJti),
+        {
+            ...tokenFields('wFKZmVsOBJcqYFjJjxrlMw'),
+            action: 'rotated', at: AT2,
+        },
     ));
     assertStrictEquals(second.status, 201);
     assertNotStrictEquals(pairIdOf(second), firstId);
@@ -180,7 +182,7 @@ Deno.test('a second PUT to the SAME identity-tokens/:id id forms'
     const domainRow = await deriveIdentityToken(
         db, 'XXZruirZyAOoRpNxaDnpSA', 'wFKZmVsOBJcqYFjJjxrlMw',
     );
-    assertStrictEquals(domainRow.jti, laterJti);
+    assertStrictEquals(domainRow.action, 'rotated');
 });
 
 // ── identities/:id/token-revocations/:rid — EVENT-APPEND ──
@@ -371,7 +373,7 @@ async () => {
     await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
             + 'wIaoeaYyeYsvGvfewbCmLQ', DEV_TOKEN,
-        tokenFields(generateIdentifier()),
+        tokenFields('wIaoeaYyeYsvGvfewbCmLQ'),
     ));
     await handleRequest(db, req(
         'POST', tokenOpPath('rotation'),
@@ -395,7 +397,7 @@ Deno.test('a reused rotation 409s and a token-revocations PUT'
     await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
             + 'vQieDXOxEzKAgYYRecEQuA', DEV_TOKEN,
-        tokenFields(generateIdentifier()),
+        tokenFields('vQieDXOxEzKAgYYRecEQuA'),
     ));
     await handleRequest(db, req(
         'POST', tokenOpPath('rotation'),
@@ -579,23 +581,25 @@ Deno.test('a client_credentials grant appends its root\'s own'
 // every row EITHER function writes gets its own event pair,
 // distinct from the wired route's own operation message pair.
 
-// ANY identity_tokens row has its own event pair whose stored
-// response deep-equals the row itself — the SAME shape
-// assertRootEventMessagePair checks for a bare issuance, generalized to
-// an arbitrary row id (rotation and revocation can write more
-// than one row per call).
+// ANY jti's document has a HEAD event pair whose stored
+// response deep-equals the derived row — the SAME shape
+// assertRootEventMessagePair checks for a bare issuance,
+// generalized to an arbitrary jti (rotation and revocation can
+// write more than one document per call). The jti's document
+// now carries its WHOLE history, so the head is the LAST pair
+// at that name, never the first.
 async function assertEventMessagePairForRow(
-    db: MemoryDbAdapter, rowId: string,
+    db: MemoryDbAdapter, jti: string,
 ): Promise<void> {
     const row = await deriveIdentityToken(
-        db, 'XXZruirZyAOoRpNxaDnpSA', rowId,
+        db, 'XXZruirZyAOoRpNxaDnpSA', jti,
     );
     const requests = await db.messagePairs.getAll();
-    const eventRequest = requests.find(
+    const eventRequest = requests.findLast(
         r => r.path === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-            && r.name === rowId,
+            && r.name === jti,
     );
-    assert(eventRequest, 'no event pair for row ' + rowId);
+    assert(eventRequest, 'no event pair for jti ' + jti);
     // requesterIdentityId is the event's OWN identity_id — same
     // NAMED convention as assertRootEventMessagePair above.
     assertStrictEquals(
@@ -731,12 +735,11 @@ Deno.test('two concurrent rotations of one jti: exactly one'
         latestActionForJti(rows, ROOT_JTI), 'revoked');
     assertStrictEquals(
         latestActionForJti(rows, successorJti), 'revoked');
-    // Every NEWLY written row (the winner's rotate pair, the
-    // loser's replay revocations) carries its own event pair —
-    // excluding the pre-existing seeded root, which predates any
-    // pair-forming writer and so never got one.
+    // Every NEWLY named document (the winner's successor jti)
+    // carries its own head event pair — the seeded root's own
+    // document predates the race and is excluded by id.
     const newRows = rows.filter(r => !beforeIds.has(r.id));
-    assertStrictEquals(newRows.length, 4);
+    assertStrictEquals(newRows.length, 1);
     for (const row of newRows) {
         await assertEventMessagePairForRow(db, row.id);
     }

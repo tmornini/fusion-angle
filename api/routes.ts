@@ -3274,7 +3274,7 @@ export const WRITE_RESPONSE_SPECS:
     // G4: GET wins. identityTokenEntityOf is id-last;
     // identity_id is stamped from the path so stored PUT
     // = GET (omit-PUT cannot poison GET).
-    'identities/:id/tokens/:tid': {
+    'identities/:id/tokens/:jti': {
         status: HTTP_OK,
         successBody: (params, body) =>
             identityTokenEntityOf({
@@ -3284,6 +3284,7 @@ export const WRITE_RESPONSE_SPECS:
                 body: {
                     ...withoutId(body ?? {}),
                     identity_id: param(params, 0),
+                    jti: param(params, 1),
                 },
             }),
     },
@@ -4191,7 +4192,6 @@ export const routes: Route[] = [
         },
     }),
     // Nested token events (credentials/providers shape).
-    // Dual-read still sees leftover /identity-tokens/ pairs.
     // GET is admin-only (not in MEMBER_VERBS). POST on
     // rotation/revocation stays member-legal via
     // '/identities/:id/tokens' POST. Flat /identity-tokens
@@ -4205,14 +4205,14 @@ export const routes: Route[] = [
     // and append its message pair without a row write.
     // GET is FLIPPED: derived via deriveIdentityToken —
     // 404 body unchanged. PUT is PAIR-ONLY.
-    route('identities/:id/tokens/:tid', {
+    route('identities/:id/tokens/:jti', {
         get: (db, p) =>
             deriveIdentityToken(
                 db, param(p, 0), param(p, 1),
             ),
         put: (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
-            const id = param(p, 1);
+            const jti = param(p, 1);
             const raw = withoutId(body);
             if (
                 'identity_id' in raw
@@ -4223,12 +4223,18 @@ export const routes: Route[] = [
                     HTTP_BAD_REQUEST,
                 );
             }
+            if ('jti' in raw && raw['jti'] !== jti) {
+                throw new ApiError(
+                    'jti does not match path jti',
+                    HTTP_BAD_REQUEST,
+                );
+            }
             const stamped = {
-                ...raw, identity_id: identityId,
+                ...raw, identity_id: identityId, jti,
             };
             const entity = identityTokenEntityOf({
-                name: id,
-                messagePairId: id,
+                name: jti,
+                messagePairId: jti,
                 method: 'PUT',
                 body: stamped,
             });

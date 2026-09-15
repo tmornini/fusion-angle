@@ -68,11 +68,11 @@ Deno.test(
         const db = await seededDb();
         const { jti: next } = await rotate(db, ROOT_JTI);
         assertNotStrictEquals(next, ROOT_JTI);
-        // issued(root) + rotated(root) + issued(next) = 3
+        // root head 'rotated' + successor head 'issued' = 2
         const rows = await deriveIdentityTokensFor(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );
-        assertStrictEquals(rows.length, 3);
+        assertStrictEquals(rows.length, 2);
         assertStrictEquals(
             latestActionForJti(rows, ROOT_JTI), 'rotated');
         assertStrictEquals(

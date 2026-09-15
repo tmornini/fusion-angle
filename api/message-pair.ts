@@ -331,9 +331,9 @@ export async function formAuthMessagePair(
     });
 }
 
-// The literal 'identities/:id/tokens/:tid' route pattern: the
+// The literal 'identities/:id/tokens/:jti' route pattern: the
 // wired PUT's own document family and response spec (routes.ts,
-// WRITE_RESPONSE_SPECS['identities/:id/tokens/:tid']), reused
+// WRITE_RESPONSE_SPECS['identities/:id/tokens/:jti']), reused
 // byte-for-byte by every synthesized identity_tokens row-write
 // pair (Phase 13 Task 5, Gate 7) — one derivation later serves
 // fixture pairs, real PUT pairs, and these synthesized
@@ -342,28 +342,24 @@ export async function formAuthMessagePair(
 // FROM message-pair.ts (formWriteMessagePair), never the
 // reverse — the import graph stays acyclic (see
 // formDocumentMessagePairFor's own comment, routes.ts).
-const TOKEN_EVENT_ROUTE_PATTERN = 'identities/:id/tokens/:tid';
+const TOKEN_EVENT_ROUTE_PATTERN = 'identities/:id/tokens/:jti';
 const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
     TOKEN_EVENT_ROUTE_PATTERN.split('/');
 
-// Synthesizes ONE identity_tokens row's event pair — the SAME
-// document, method, and response shape a real PUT
-// identities/:id/tokens/:tid would store for that exact row
-// (identityTokenEntityOf: jti, identity_id, action, chain_id,
-// at, id — GET wins). Formed PRE-TX like every other pair
-// (formed pre-tx — crypto, hashing, and timers never run
-// inside an open transaction (AGENTS.md § Transaction
-// bodies await only row ops)). EVENT-APPEND, like
-// every identity_tokens row: identities/:id/tokens/:tid
-// carries no DOCUMENT_CLASS_ROUTE_PATTERNS entry — no
-// head-read. requesterIdentityId is the event's OWN
-// identity_id (the affected identity) — the NAMED convention
-// for a write with no authenticated actor in view at this
-// depth (an internal grant, a rotation, a chain revocation).
-// jti is an identifier, not a bearer secret — stored
-// plaintext as the live wired PUT's own pairs already do.
+// Synthesizes ONE token event pair at the jti's own
+// document — `name` is the jti, or, for the
+// authorization_code chain root, the code's sha256 spend
+// marker (api/authentication.ts authorizationCodeSpent; spec
+// 2026-09-15 § 6). The SAME document, method, and response
+// shape a real PUT identities/:id/tokens/:jti stores; the
+// response `id` is the name (identityTokenEntityOf: GET
+// wins). Formed PRE-TX — crypto, hashing, and timers never
+// run inside an open transaction. requesterIdentityId is the
+// event's OWN identity_id — the named convention for a write
+// with no authenticated actor in view at this depth. A jti
+// is an identifier, not a bearer secret.
 export async function formTokenEventMessagePair(
-    id: Id,
+    name: Id,
     event: Omit<IdentityTokenEntity, 'id'>,
     operationId: string,
 ): Promise<MessagePair> {
@@ -371,7 +367,7 @@ export async function formTokenEventMessagePair(
         TOKEN_EVENT_ROUTE_SEGMENTS[0]!,
         event.identity_id,
         TOKEN_EVENT_ROUTE_SEGMENTS[2]!,
-        id,
+        name,
     ];
     const body = event as unknown as Record<string, unknown>;
     return formWriteMessagePair({
@@ -388,7 +384,7 @@ export async function formTokenEventMessagePair(
         responseStatus: HTTP_OK,
         responseBody: {
             ...validateIdentityTokenEntity(body),
-            id,
+            id: name,
         },
         operationId,
     });
@@ -936,7 +932,7 @@ export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'identities/:id/credentials/:cid',
     'identities/:id/registration',
     'identities/:id/default-organization',
-    'identities/:id/tokens/:tid',
+    'identities/:id/tokens/:jti',
     'identities/:id/token-revocations/:rid',
     'identities/:id/tokens/:jti/rotation',
     'identities/:id/tokens/:jti/revocation',

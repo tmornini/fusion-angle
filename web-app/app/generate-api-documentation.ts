@@ -276,7 +276,7 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
     ),
     writeExample(
         'put',
-        '/identities/:id/tokens/:tid',
+        '/identities/:id/tokens/:jti',
         {
             jti: 'jti',
             identity_id: 'id',

@@ -326,7 +326,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // mechanism a live write uses.
     const tokenRootPut = await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-            + 'iynelXdEDRLXHNzEFQYtqQ',
+            + 'hwrugEJrEVicRwurEJxFvw',
         org1Token, {
             jti: 'hwrugEJrEVicRwurEJxFvw'
                 , identity_id: 'XXZruirZyAOoRpNxaDnpSA',

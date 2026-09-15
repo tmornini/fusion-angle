@@ -28,7 +28,7 @@ import { generateIdentifier } from
 // identities/:id/credentials/:cid, identities/:id/token-
 // revocations/:rid, role-grants, role-grants/:id,
 // identities/:id/tokens,
-// identities/:id/tokens/:tid, identities/:id/tokens/:jti/
+// identities/:id/tokens/:jti, identities/:id/tokens/:jti/
 // rotation, identities/:id/tokens/:jti/revocation,
 // identities/:id/providers, identities/:id/providers/:eid):
 // a matched pattern with no handler for the request's verb
@@ -706,7 +706,7 @@ async () => {
     const token = await organizationToken();
     const put = await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-            + 'wLQNiqsEnyBvOQwlbvBXwA',
+            + TOKEN_JTI,
         token, {
             jti: TOKEN_JTI, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'issued', chain_id: TOKEN_CHAIN,
@@ -827,7 +827,7 @@ Deno.test('POST rotation 409s when path identity is not the'
     const token = await organizationToken();
     const put = await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-            + 'wTpHaplkXlJqajbBNhnkbg',
+            + 'kGolXBkfDPCBVKcZzZIHnQ',
         token, {
             jti: 'kGolXBkfDPCBVKcZzZIHnQ'
                 , identity_id: 'XXZruirZyAOoRpNxaDnpSA',
@@ -845,7 +845,7 @@ Deno.test('POST rotation 409s when path identity is not the'
     assertStrictEquals(res.status, 409);
 });
 
-Deno.test('GET /identities/:id/tokens/:tid 404s for an absent'
+Deno.test('GET /identities/:id/tokens/:jti 404s for an absent'
 + ' jti', async () => {
     const db = await freshDb();
     const token = await organizationToken();

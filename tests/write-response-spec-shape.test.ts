@@ -135,7 +135,7 @@ const DUMMY_BODIES: Readonly<
     [ORGANIZATION_MEMBER_DETAIL_PATTERN]: {
         type: 'member', at: AT,
     },
-    'identities/:id/tokens/:tid': {
+    'identities/:id/tokens/:jti': {
         jti: ID, identity_id: ID,
         action: 'issued', chain_id: ID, at: AT,
     },

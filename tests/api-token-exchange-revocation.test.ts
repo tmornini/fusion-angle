@@ -24,7 +24,6 @@ const USER_1 = generateIdentifier();
 const USER_2 = generateIdentifier();
 const ORGANIZATION_A = generateIdentifier();
 const LIVE_JTI = generateIdentifier();
-const LIVE_TOKEN_ID = generateIdentifier();
 
 // A revoked-but-unexpired token must not be launderable into a
 // fresh valid pair by the token-exchange or refresh grants —
@@ -187,7 +186,7 @@ Deno.test('refresh on a logged-out but live jti is the'
     // already grants 'XXZruirZyAOoRpNxaDnpSA' admin, the role this route
     // needs.
     await PUT(db, 'identities/' + USER_1
-        + '/tokens/' + LIVE_TOKEN_ID, {
+        + '/tokens/' + LIVE_JTI, {
         jti: LIVE_JTI, identity_id: USER_1,
         action: 'issued', chain_id: 'WeXjAaAxGSpLpamfEuvcww',
         at: '2019-01-01T00:00:00.000000Z',
