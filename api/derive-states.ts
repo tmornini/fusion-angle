@@ -53,7 +53,11 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 //       resolveFlowGraphOwner below resolves their owners.
 //       No bulk derive remains (C3).
 //   (e) deriveInvitationStates / invitationLifecycleStatesFor —
-//       invitation grant + three answering ops (gate 5f).
+//       the invitation document's own PUT history: the
+//       grant's 'pending' and the later terminal PUT (spec
+//       2026-09-15 § 2). The answering ops (acceptance /
+//       decline / revocation) are the HTTP audit alone; no
+//       derive reads them.
 // bare states/:id, the per-entity history alias, the bulk
 // lifecycle collection, the five-source union (deriveStates),
 // and nested field-values collection are RETIRED (C3/C4).
@@ -524,17 +528,6 @@ export async function missedReadError(
 // deployment must record the actual expiry decision as
 // its own event rather than lean on this replay trick.
 
-// The transition sub-resource document: the work-order id rides
-// the PREFIX itself here (routes.ts: 'work-orders/:id/transition'),
-// so each match names ONE work order directly — captured, the
-// organization segment is not (a work-order id is globally
-// unique, so it is never needed to disambiguate). Exported: the
-// transition sub-resource prefix shape, reused below by this
-// module's own transition readers rather than re-deriving the
-// document pattern per caller.
-export const WORK_ORDER_TRANSITION_PATTERN =
-    /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/transition\/$/;
-
 // One decoded 2xx POST pair — an OPERATION path (create/claim/
 // transition are POST-only), the documentMessagePairsAt (derive-
 // documents.ts) twin restricted to the OTHER method: that reader
@@ -595,22 +588,22 @@ function atIdCompare(
 }
 
 // Every successful (2xx) POST pair at `path`, (at, id)
-// ascending. REUSED below by source (f)
-// (deriveInvitationStates) — a flat, non-work-order
-// collection's own 2xx POST pairs, the exact shape this
-// function already reads generically. Source (c) once shared
-// this scan (deriveMemberGenesis); the states-document
-// retirement moved members onto the document-trio walk, so
-// only invitations remain. Exported: this module's own
-// transition-fold readers below reuse this SAME decode over
-// the work-orders/:id/transition document, rather than
-// re-implementing the POST-only, (at, id)-sorted read.
+// ascending. Source (c)'s work-order replay is the only
+// consumer left: source (e) once shared this scan, and the
+// invitation-document fold (spec 2026-09-15 § 2) moved
+// deriveInvitationStates onto documentMessagePairsAt; the
+// states-document retirement had already moved
+// deriveMemberGenesis onto the document-trio walk. Module-
+// private: this module's own transition-fold readers below
+// reuse this SAME decode over the work-orders/:id/transition
+// document, rather than re-implementing the POST-only,
+// (at, id)-sorted read.
 const POST_ONLY: ReadonlySet<string> = new Set(['POST']);
 const POST_OR_PUT: ReadonlySet<string> = new Set([
     'POST', 'PUT',
 ]);
 
-export function operationMessagePairsAt(
+function operationMessagePairsAt(
     messagePairs: readonly MessagePairEntity[],
     path: string,
     methods: ReadonlySet<string> = POST_ONLY,
