@@ -49,6 +49,7 @@ function stamped(stamp: string): boolean {
 async function runGun(
     script: string,
     args: string[],
+    home?: string,
 ): Promise<GunResult> {
     const dockerStamp = join(
         Deno.makeTempDirSync({
@@ -76,6 +77,7 @@ async function runGun(
             ),
             POSTGRES_URL: '',
             JWT_HMAC_SIGNING_KEY: '',
+            ...(home === undefined ? {} : { HOME: home }),
         },
     }).output();
     const decoder = new TextDecoder();
@@ -246,4 +248,54 @@ Deno.test('gun source render path is the CLI',
     assertNotMatch(src, /http_json/);
     assertNotMatch(src, /api\.render\.com/);
     assertNotMatch(src, /jobs get "/);
+});
+
+// The installed render CLI (v2.26.0) writes
+// expires_at as epoch seconds, not RFC-3339.
+function homeWithSession(expiresAt: string): string {
+    const home = Deno.makeTempDirSync({
+        prefix: 'fusion-render-home-',
+    });
+    Deno.mkdirSync(join(home, '.render'));
+    Deno.writeTextFileSync(
+        join(home, '.render', 'cli.yaml'),
+        'version: 1\n'
+        + 'api:\n'
+        + '    key: rnd_stub\n'
+        + `    expires_at: ${expiresAt}\n`,
+    );
+    return home;
+}
+
+Deno.test('wipe render accepts an epoch expires_at',
+async () => {
+    const future = Math.floor(Date.now() / 1000)
+        + 3600;
+    const result = await runGun(
+        './bin/postgres-wipe',
+        ['--postgres', 'render', 'rnd_stub'],
+        homeWithSession(String(future)),
+    );
+    assertNotMatch(result.stderr, /expired/);
+    assertStrictEquals(
+        stamped(result.renderStamp),
+        true,
+    );
+});
+
+Deno.test('wipe render rejects a past epoch expires_at',
+async () => {
+    const past = Math.floor(Date.now() / 1000)
+        - 3600;
+    const result = await runGun(
+        './bin/postgres-wipe',
+        ['--postgres', 'render', 'rnd_stub'],
+        homeWithSession(String(past)),
+    );
+    assertStrictEquals(result.status, 1);
+    assertMatch(result.stderr, /expired/);
+    assertStrictEquals(
+        stamped(result.renderStamp),
+        false,
+    );
 });
