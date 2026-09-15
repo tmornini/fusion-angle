@@ -32,13 +32,6 @@ export interface MessageStore {
         collection: string,
         id: string,
     ): Promise<readonly MessagePairEntity[]>;
-    getAllAt(
-        collection: string,
-    ): Promise<readonly MessagePairEntity[]>;
-    getAllWhereBody(
-        collection: string,
-        containment: Record<string, unknown>,
-    ): Promise<readonly MessagePairEntity[]>;
     getCollection(
         collection: string,
     ): Promise<unknown[]>;
@@ -53,14 +46,6 @@ export function messageStore(db: DbAdapter): MessageStore {
         },
         async getMessagePairs(collection, id) {
             return messagePairsAt(db, collection, id);
-        },
-        async getAllAt(collection) {
-            return messagePairsInCollection(db, collection);
-        },
-        async getAllWhereBody(collection, containment) {
-            return db.messagePairs.getAllWhereBody(
-                collection, containment,
-            );
         },
         async getCollection(collection) {
             return entitiesOf(

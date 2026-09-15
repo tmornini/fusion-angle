@@ -1187,7 +1187,7 @@ async function authorizeCodeIssuer(
     adapter: DbAdapter,
     code: string,
 ): Promise<AuthorizeCodeIssuer | null> {
-    const hits = await messageStore(adapter)
+    const hits = await adapter.messagePairs
         .getAllWhereBody(AUTHORIZE_PREFIX, { code });
     const messagePair = hits[0];
     if (messagePair === undefined) return null;
