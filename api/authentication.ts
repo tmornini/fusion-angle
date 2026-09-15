@@ -1084,11 +1084,11 @@ async function grantClientCredentials(
                     verdict.jti,
                 );
             }
-            const existing = await messageStore(view).get(
+            const existing = await messageStore(view).getDocumentHead(
                 '/authentication/assertion-jtis/',
                 verdict.jti,
             );
-            if (existing !== undefined) {
+            if (existing !== null) {
                 return false;
             }
             await putMessagePair(view, ticketMessagePair);

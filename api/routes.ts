@@ -1462,7 +1462,7 @@ export async function postFlowDocumentOp(
             // states-trace strip; pair body also carries
             // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
             if (messagePair !== undefined) {
-                const latest = (await messageStore(view).get(
+                const latest = (await messageStore(view).getDocumentHead(
                     messagePair.path, messagePair.name,
                 ))?.id;
                 if (
@@ -1574,7 +1574,7 @@ export async function postFlowUndoOp(
     return db.transaction(
         // Phase Final Task 2: flows + graph ROW halves stripped.
         async (view) => {
-            const latest = (await messageStore(view).get(
+            const latest = (await messageStore(view).getDocumentHead(
                 documentMessagePair.path,
                 documentMessagePair.name,
             ))?.id;
@@ -2344,7 +2344,7 @@ export async function postWorkOrderTransitionOp(
             }
             // R9: lock head must still be the latched pair
             // id.
-            const latest = (await messageStore(view).get(
+            const latest = (await messageStore(view).getDocumentHead(
                 revisionMessagePair.path,
                 revisionMessagePair.name,
             ))?.id;
@@ -3788,7 +3788,7 @@ export async function postInstancePatchOp(
     await db.transaction(async (view) => {
             // R9: lock head must still be the latched pair
             // id.
-            const latest = (await messageStore(view).get(
+            const latest = (await messageStore(view).getDocumentHead(
                 revisionMessagePair.path,
                 revisionMessagePair.name,
             ))?.id;
@@ -4481,7 +4481,7 @@ export const routes: Route[] = [
                 // baseline's OWN document — every baseline id is
                 // client-minted FRESH for this conversion, so
                 // each pair is genesis there (the store's document
-                // head read (`messageStore(db).get`) finds no
+                // head read (`messageStore(db).getDocumentHead`) finds no
                 // prior pair) unless a live PUT had already
                 // visited that exact id. Body is the baseline's
                 // `fields` VERBATIM — the live standalone PUT

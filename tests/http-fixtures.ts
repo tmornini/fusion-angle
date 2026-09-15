@@ -75,10 +75,10 @@ export async function storedPutBodyText(
     collection: string,
     id: string,
 ): Promise<string> {
-    const stored = await messageStore(db).get(
+    const stored = await messageStore(db).getDocumentHead(
         collection, id,
     );
-    if (stored === undefined) {
+    if (stored === null) {
         throw new Error(
             'no live PUT at ' + collection + id,
         );

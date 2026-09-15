@@ -227,7 +227,7 @@ export async function throwDocumentMiss(
     );
 }
 
-// The generic per-id derivation: store.getMessagePairs at this
+// The generic per-id derivation: store.getDocumentHistory at this
 // document, reduce to the head document (deriveDocumentsAt),
 // and — for a 'trio' family ONLY — walk the lifecycle
 // history over those same pairs to 404 a lifecycle-deleted
@@ -245,7 +245,7 @@ async function derivedDocumentEntity(
     const prefix = canonicalPath(
         organization, '/' + wiring.family + '/',
     );
-    const stored = await messageStore(db).getMessagePairs(
+    const stored = await messageStore(db).getDocumentHistory(
         prefix, id,
     );
     const document = deriveDocumentsAt(
@@ -322,14 +322,14 @@ export function documentGetHandler(
 }
 
 // Live PUT pair id at this document — the store's document
-// head read (`messageStore(db).get`). A DELETE head or
+// head read (`messageStore(db).getDocumentHead`). A DELETE head or
 // virgin document is undefined.
 export async function documentHeadMessagePairId(
     db: DbAdapter,
     path: string,
     id: Id,
 ): Promise<string | undefined> {
-    const stored = await messageStore(db).get(
+    const stored = await messageStore(db).getDocumentHead(
         path, id,
     );
     return stored?.id;
@@ -403,7 +403,7 @@ export async function lookupStoredRevision(
     id: Id,
     etag: string,
 ): Promise<MessagePairEntity | undefined> {
-    const messagePairs = await messageStore(db).getMessagePairs(
+    const messagePairs = await messageStore(db).getDocumentHistory(
         prefix, id,
     );
     return messagePairs.find(
@@ -440,7 +440,7 @@ export async function versionSnapshotsAt(
     id: Id,
     toEntity: (document: DerivedDocument) => object,
 ): Promise<Record<string, unknown>[]> {
-    const stored = await messageStore(db).getMessagePairs(
+    const stored = await messageStore(db).getDocumentHistory(
         prefix, id,
     );
     const messagePairs = documentMessagePairsAt(
@@ -473,7 +473,7 @@ async function documentStateHistoryAt(
     const prefix = canonicalPath(
         organization, '/' + wiring.family + '/',
     );
-    const stored = await messageStore(db).getMessagePairs(
+    const stored = await messageStore(db).getDocumentHistory(
         prefix, id,
     );
     return stateHistoryFrom(
@@ -785,7 +785,7 @@ export async function streamedTrioEntityOf(
     entityOf: DocumentFamilyWiring['entityOf'],
 ): Promise<unknown> {
     const raw = withoutId(body);
-    const stored = await messageStore(db).getMessagePairs(
+    const stored = await messageStore(db).getDocumentHistory(
         prefix, id,
     );
     const existing = documentMessagePairsAt(

@@ -307,11 +307,11 @@ Deno.test('GET /organizations/:id/ideas/:id body octets equal the live PUT '
             ideaDocument('Streamed', 'active'),
         ));
         assertStrictEquals(put.status, 201);
-        const stored = await messageStore(db).get(
+        const stored = await messageStore(db).getDocumentHead(
             '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 , 'uTrFecjHJxcgUGbYxyDPfw',
         );
-        assert(stored !== undefined);
+        assert(stored !== null);
         const storedBody = HttpMessage.fromWire(
             stored.response,
         ).body();

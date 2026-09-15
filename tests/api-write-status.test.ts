@@ -363,10 +363,10 @@ async () => {
     );
     assertStrictEquals(stored.method, 'PUT');
     assertStrictEquals(stored.status, 200);
-    const live = await messageStore(db).get(
+    const live = await messageStore(db).getDocumentHead(
         IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
     );
-    assert(live !== undefined, 'empty PUT must live');
+    assert(live !== null, 'empty PUT must live');
 });
 
 // Memory serializes all ops, so the TOCTOU is

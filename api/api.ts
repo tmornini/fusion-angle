@@ -1554,7 +1554,7 @@ export async function handleRequest(
                     // above just ran to build `result`, not a
                     // second, divergent one
                     // (the store's document head read
-                    // (`messageStore(db).get`) — the
+                    // (`messageStore(db).getDocumentHead`) — the
                     // ANY-method LOCK head, still the write path's
                     // source above). Same value for a document-
                     // class route (tests/api-flow-document.test.ts
@@ -2318,8 +2318,8 @@ async function streamStoredDocumentGet(
     const prefix = canonicalPath(
         organizationId, '/' + wiring.family + '/',
     );
-    const stored = await messageStore(db).get(prefix, id);
-    if (stored === undefined) {
+    const stored = await messageStore(db).getDocumentHead(prefix, id);
+    if (stored === null) {
         throw await throwDocumentMiss(
             wiring, db, organizationId, id,
         );

@@ -62,7 +62,7 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-Deno.test('get returns the live PUT and ignores POST',
+Deno.test('getDocumentHead returns the live PUT and ignores POST',
 async () => {
     const db = await freshDb();
     const put = await writePair(db, {
@@ -75,13 +75,13 @@ async () => {
         name: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { n: 2 },
     });
-    const got = await messageStore(db).get(
+    const got = await messageStore(db).getDocumentHead(
         COLLECTION, 'XufQcWIKhZshfJYOVNeUSw',
     );
     assertStrictEquals(got?.id, put.id);
 });
 
-Deno.test('get returns undefined when head is DELETE',
+Deno.test('getDocumentHead returns null when head is DELETE',
 async () => {
     const db = await freshDb();
     await writePair(db, {
@@ -93,10 +93,10 @@ async () => {
         method: 'DELETE',
         name: 'XufQcWIKhZshfJYOVNeUSw',
     });
-    const got = await messageStore(db).get(
+    const got = await messageStore(db).getDocumentHead(
         COLLECTION, 'XufQcWIKhZshfJYOVNeUSw',
     );
-    assertStrictEquals(got, undefined);
+    assertStrictEquals(got, null);
 });
 
 Deno.test('getCollection is oldest live head first',

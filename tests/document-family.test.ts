@@ -263,7 +263,7 @@ async function testDocumentOp(
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
                 const latchedId = messagePair.latchedHeadMessagePairId;
-                const latest = (await messageStore(view).get(
+                const latest = (await messageStore(view).getDocumentHead(
                     messagePair.path, messagePair.name,
                 ))?.id;
                 if (
@@ -734,7 +734,7 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
 // directly — so the in-tx head re-read's 412 is what's under
 // test. On the memory backend, the global transaction
 // serializer (store-serializer.ts) processes the store's
-// document head read (`messageStore(db).get`) and
+// document head read (`messageStore(db).getDocumentHead`) and
 // dispatch of each racer as separate queued steps, so
 // BOTH racers observe genesis as their head and pass the
 // pre-dispatch echo check before either's write commits — the

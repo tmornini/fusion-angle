@@ -622,7 +622,7 @@ async () => {
 
 // Task 8: the organizations/:id/flows/:id GET's Response-ID
 // source switched from the store's document head read
-// (`messageStore(db).get`) (message-pair.ts's ANY-method
+// (`messageStore(db).getDocumentHead`) (message-pair.ts's ANY-method
 // LOCK head) to documentHeadMessagePairId
 // (document-family.ts's DOCUMENT head — the SAME
 // deriveDocumentsAt reduction the GET already runs to
@@ -630,7 +630,7 @@ async () => {
 // ever writes at a document, so the two
 // reductions agree for a live flow — this proves the
 // wire Response-ID equals the store's document head
-// read (`messageStore(db).get`)'s own, independently
+// read (`messageStore(db).getDocumentHead`)'s own, independently
 // computed value, not merely that the route returns
 // SOME header.
 Deno.test('e2e: the organizations/:id/flows/:id Response-ID'
@@ -648,7 +648,7 @@ async () => {
     assertStrictEquals(got.status, 200);
     const headId = got.headers.get('Response-ID');
     assert(headId);
-    const lockHead = (await messageStore(db).get(
+    const lockHead = (await messageStore(db).getDocumentHead(
         canonicalPath('AjdvjuECVZEgZoFajaIEkg', '/flows/'),
         'biSFoHVEGnaArklDDblCXQ',
     ))?.id;
@@ -1247,7 +1247,7 @@ async function documentMessagePairCount(
     flowId: string,
 ): Promise<number> {
     const messagePairs = await messageStore(db)
-        .getMessagePairs(FLOW_PREFIX, flowId);
+        .getDocumentHistory(FLOW_PREFIX, flowId);
     return messagePairs.filter((messagePair) =>
         messagePair.method === 'PUT'
         || messagePair.method === 'DELETE',
@@ -1259,7 +1259,7 @@ async function latestPutRequestBody(
     flowId: string,
 ): Promise<Record<string, unknown>> {
     const messagePairs = await messageStore(db)
-        .getMessagePairs(FLOW_PREFIX, flowId);
+        .getDocumentHistory(FLOW_PREFIX, flowId);
     const puts = messagePairs.filter((messagePair) =>
         messagePair.method === 'PUT',
     );

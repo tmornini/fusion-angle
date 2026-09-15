@@ -24,34 +24,36 @@ const PUT_METHOD = 'PUT';
 const DELETE_METHOD = 'DELETE';
 
 export interface MessageStore {
-    get(
-        collection: string,
-        id: string,
-    ): Promise<MessagePairEntity | undefined>;
-    getMessagePairs(
-        collection: string,
-        id: string,
+    getDocumentHead(
+        path: string,
+        name: string,
+    ): Promise<MessagePairEntity | null>;
+    getDocumentHistory(
+        path: string,
+        name: string,
     ): Promise<readonly MessagePairEntity[]>;
-    getCollection(
-        collection: string,
-    ): Promise<unknown[]>;
+    getCollection(path: string): Promise<unknown[]>;
 }
 
 export function messageStore(db: DbAdapter): MessageStore {
     return {
-        async get(collection, id) {
+        async getDocumentHead(path, name) {
             return livePutOf(
-                await messagePairsAt(db, collection, id),
+                await db.messagePairs.getDocumentHistory(
+                    path, name,
+                ),
             );
         },
-        async getMessagePairs(collection, id) {
-            return messagePairsAt(db, collection, id);
+        async getDocumentHistory(path, name) {
+            return db.messagePairs.getDocumentHistory(
+                path, name,
+            );
         },
-        async getCollection(collection) {
+        async getCollection(path) {
             return entitiesOf(
                 livePutsOf(
-                    await messagePairsInCollection(
-                        db, collection,
+                    await db.messagePairs.getCollectionPairs(
+                        path,
                     ),
                 ),
             );
@@ -81,20 +83,20 @@ function compareMessagePair(
 
 function latestOf(
     messagePairs: readonly MessagePairEntity[],
-): MessagePairEntity | undefined {
-    if (messagePairs.length === 0) return undefined;
+): MessagePairEntity | null {
+    if (messagePairs.length === 0) return null;
     const rows = messagePairs.map((messagePair) => ({
         at: messagePair.response_at,
         id: messagePair.id,
         messagePair,
     }));
     return latestByKey(rows, () => 'head').get('head')
-        ?.messagePair;
+        ?.messagePair ?? null;
 }
 
 function livePutOf(
     messagePairs: readonly MessagePairEntity[],
-): MessagePairEntity | undefined {
+): MessagePairEntity | null {
     const head = latestOf(
         messagePairs.filter(
             (messagePair) => isDocumentMethod(
@@ -102,8 +104,8 @@ function livePutOf(
             ),
         ),
     );
-    if (head?.method !== PUT_METHOD) {
-        return undefined;
+    if (head === null || head.method !== PUT_METHOD) {
+        return null;
     }
     return head;
 }
@@ -161,20 +163,4 @@ export function liveHeadId(entity: unknown): string {
         throw new Error('live head has no id');
     }
     return entity.id;
-}
-
-async function messagePairsInCollection(
-    db: DbAdapter,
-    collection: string,
-): Promise<readonly MessagePairEntity[]> {
-    return db.messagePairs.getCollectionPairs(collection,
-    );
-}
-
-async function messagePairsAt(
-    db: DbAdapter,
-    collection: string,
-    id: string,
-): Promise<readonly MessagePairEntity[]> {
-    return db.messagePairs.getDocumentHistory(collection, id);
 }

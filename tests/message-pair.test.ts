@@ -168,7 +168,7 @@ Deno.test('append then head-read round-trips', async () => {
     await db.transaction((view) => appendMessagePair(view, messagePair),
     );
     assertStrictEquals(
-        (await messageStore(db).get(
+        (await messageStore(db).getDocumentHead(
             '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42',
         ))?.id,
         messagePair.id,

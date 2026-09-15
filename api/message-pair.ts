@@ -367,7 +367,7 @@ export async function documentHeadAt(
     path: string,
     name: string,
 ): Promise<{ id: string; method: string } | undefined> {
-    const messagePairs = await messageStore(db).getMessagePairs(
+    const messagePairs = await messageStore(db).getDocumentHistory(
         path, name,
     );
     let head: {
