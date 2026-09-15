@@ -788,8 +788,7 @@ function isGatedAddress(collection: string): boolean {
         : (parts[0] ?? '');
     const concurrency = familyRegistration(family)
         ?.concurrency;
-    return concurrency === 'locked'
-        || concurrency === 'create-only';
+    return concurrency === 'locked';
 }
 
 // The create-address override table: which body field names

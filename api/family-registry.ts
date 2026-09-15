@@ -15,8 +15,7 @@
 // among others) wait for their own demand before a slot, a
 // registration, or a helper is added on their behalf.
 
-export type ConcurrencyClass =
-    'simple' | 'locked' | 'create-only';
+export type ConcurrencyClass = 'simple' | 'locked';
 
 export interface FamilyRegistration {
     readonly family: string;        // first path segment
