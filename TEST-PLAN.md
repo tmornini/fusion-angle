@@ -484,8 +484,11 @@ the second organization.
   Pin: tests/adapters-members.test.ts
        'postHumanMemberCreation persists identity PII
        and a seat' (decides the identity + PII + seat
-       write this Create triggers); exploratory — the
-       live toast and roster append
+       write this Create triggers);
+       tests/browser/member-create.test.ts
+       'adding a human member toasts success and
+       stays (AA5)' (the live toast, no-reload, and
+       roster append)
 - [ ] **AA6** The mock seed already holds all 10
   humans — Sarah Chen, Mike Thompson, Jessica Park,
   David Martinez, Emily Rodriguez, Alex Kim, Marcus

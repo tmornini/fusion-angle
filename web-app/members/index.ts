@@ -485,7 +485,6 @@ async function submitHumanForm(): Promise<void> {
     }
     showToast('Member added', 'success');
     closeDialog('add-member');
-    navigateTo('members');
 }
 
 async function submitAIForm(): Promise<void> {
@@ -536,5 +535,4 @@ async function submitAIForm(): Promise<void> {
     }
     showToast('AI member added', 'success');
     closeDialog('add-member');
-    navigateTo('members');
 }
