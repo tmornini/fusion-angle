@@ -53,6 +53,7 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
     storedPutBodyText,
     storedCollectionText,
 } from './http-fixtures.ts';
@@ -613,7 +614,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     ));
     assertStrictEquals(reposition.status, 201);
     const repositionResponseId =
-        reposition.headers.get('Response-ID');
+        pairIdOf(reposition);
     assert(repositionResponseId);
     assertStrictEquals(reposition.headers.get('Supersedes'), null);
     {
@@ -711,7 +712,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     ));
     assertStrictEquals(reactivated.status, 201);
     const reactivatedResponseId =
-        reactivated.headers.get('Response-ID');
+        pairIdOf(reactivated);
     assert(reactivatedResponseId);
     {
         const getRes = await handleRequest(
@@ -1039,8 +1040,8 @@ async () => {
     const afterSecond = (await db.messagePairs.getAll()).length;
     assertStrictEquals(afterSecond, afterFirst);
     assertStrictEquals(
-        first.headers.get('Response-ID'),
-        second.headers.get('Response-ID'),
+        pairIdOf(first),
+        pairIdOf(second),
     );
 
     const getRes = await handleRequest(

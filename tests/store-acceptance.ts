@@ -7,6 +7,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import {
     compareIdentifiers, generateIdentifier,
@@ -261,7 +262,7 @@ export function defineStoreAcceptance(
                 undefined, operationId),
         );
         assertStrictEquals(first.status, 201);
-        const firstId = first.headers.get('Response-ID');
+        const firstId = pairIdOf(first);
         const firstOp = first.headers.get('Operation-ID');
         const firstBytes = await first.text();
         const second = await handleRequest(
@@ -275,13 +276,27 @@ export function defineStoreAcceptance(
             second.headers.get('Operation-ID'), firstOp,
         );
         assertStrictEquals(
-            second.headers.get('Response-ID'), firstId,
+            pairIdOf(second), firstId,
         );
         assertStrictEquals(await second.text(), firstBytes);
         assertStrictEquals(
             await messagePairsAt(db, IDEA_PREFIX, 'tjrZLujBtBVqFwOsBDWdQQ'),
             1,
         );
+    });
+
+    Deno.test(name + ': a write carries ETag and no'
+    + ' Response-ID', async () => {
+        const { db, token } = await ready();
+        const put = await handleRequest(db, req(
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'tWirePinAAAAAAAAAAAAAw', token,
+            ideaDocument('Wire', 'ev-sa-wire'),
+        ));
+        assertStrictEquals(put.status, 201);
+        assertStrictEquals(put.headers.get('Response-ID'), null);
+        const etag = put.headers.get('ETag');
+        assert(etag !== null && etag.startsWith('"'));
     });
 
     Deno.test(name + ': document miss is 404', async () => {

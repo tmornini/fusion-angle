@@ -21,6 +21,7 @@ import { parseIfMatch } from '../api/message-pair.ts';
 import { sharedMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -701,7 +702,7 @@ async function seedFlowLifecycle(
         ),
     );
     assertStrictEquals(g.status, 201);
-    const headId = g.headers.get('Response-ID');
+    const headId = pairIdOf(g);
     assert(headId !== null);
     const t = await handleRequest(
         db,

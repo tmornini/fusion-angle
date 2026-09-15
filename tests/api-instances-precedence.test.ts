@@ -25,6 +25,7 @@ import {
 } from '../api/types.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
@@ -517,7 +518,7 @@ async () => {
         operationId,
     ));
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID')!;
+    const firstId = pairIdOf(first)!;
     const YiJPbufDpkyrZcZCYbUJpg = first.headers.get('ETag')!;
     assertNotStrictEquals(YiJPbufDpkyrZcZCYbUJpg, e0);
     // Same body, fresh If-Match: a NEW message (not a
@@ -528,7 +529,7 @@ async () => {
     ));
     assertStrictEquals(second.status, 201);
     assertNotStrictEquals(
-        second.headers.get('Response-ID'),
+        pairIdOf(second),
         firstId,
         'different If-Match must not replay first',
     );
@@ -545,7 +546,7 @@ async () => {
     ));
     assertStrictEquals(replay.status, 200);
     assertStrictEquals(
-        replay.headers.get('Response-ID'),
+        pairIdOf(replay),
         firstId,
     );
 });

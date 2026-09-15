@@ -56,14 +56,12 @@ path is never exempt.
 ## Wire contract
 
 The response is rebuilt from the stored row
-(`responseFromStored` in `api/message-pair.ts`). Four
-headers (`wireHeadersFor` + `attachEtag`): Date,
-Response-ID, Operation-ID, ETag (quoted message-pair
-identifier). A document PUT's ETag equals its
-Response-ID (both the pair id). Instance reads do not
-emit Response-ID. A byte-identical replay answers 200
-with the original — Response-ID, ETag, and Date. If-Match
-is the sole conflict
+(`responseFromStored` in `api/message-pair.ts`). Three
+headers (`wireHeadersFor`): Date, ETag (quoted
+message-pair identifier), Operation-ID. A document PUT's
+ETag is its pair id, the same value a later GET advertises.
+A byte-identical replay answers 200 with the original —
+ETag and Date. If-Match is the sole conflict
 mechanism: exactly one strong validator (`"<identifier>"`);
 `*`, weak, lists, unquoted, or 64-hex yield 400.
 

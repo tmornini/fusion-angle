@@ -19,13 +19,14 @@ import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 
 // Flow tags: the codebase's FIRST message-plane-ONLY document
 // family (Phase 14 Task 9) — no backing table, derived entirely
 // from message pairs at /organizations/:id/flows/:id/tags/:name.
 // PUT/GET/DELETE
-// lifecycle, Response-ID resolution (pinning), marked delete,
+// lifecycle, ETag resolution (pinning), marked delete,
 // and two-tag concurrency — the api-flow-document.test.ts
 // precedent, re-nested one level deeper.
 
@@ -124,7 +125,7 @@ async function headResponseId(
     const got = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
-    const id = got.headers.get('Response-ID');
+    const id = pairIdOf(got);
     assert(id
         , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
         + '' + flowId);
@@ -135,7 +136,7 @@ async function headResponseId(
 
 Deno.test('e2e: PUT organizations/:id/flows/:id/tags/:name'
     + ' creates a tag pinning the'
-+ ' flow\'s current Response-ID; GET returns it', async () => {
++ ' flow\'s current pair id; GET returns it', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'bsdgjfOvCYtykdqKWBOlWA');
@@ -193,7 +194,7 @@ Deno.test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
         { flow_response_id: r1 },
     ));
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     assert(firstId);
 
     // A genuinely DIFFERENT body (a second save's own response
@@ -222,7 +223,7 @@ Deno.test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
         { flow_response_id: r2 },
     ));
     assertStrictEquals(second.status, 201);
-    const secondId = second.headers.get('Response-ID');
+    const secondId = pairIdOf(second);
     assert(secondId);
     assertNotStrictEquals(secondId, firstId);
 
@@ -254,7 +255,7 @@ Deno.test('e2e: DELETE marks the tag — GET 404s after, and the'
             + 'cKweIyGvtrOHqQULtGJUZQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
     ));
     assertStrictEquals(del.status, 204);
-    const delId = del.headers.get('Response-ID');
+    const delId = pairIdOf(del);
     assert(delId);
 
     const responses = await db.messagePairs.getAll();

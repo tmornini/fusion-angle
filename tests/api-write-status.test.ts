@@ -8,11 +8,11 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
 import { messageStore } from '../api/message-store.ts';
-import { strongEtagOf } from '../api/message-pair.ts';
 import {
     generateIdentifier,
     isIdentifier,
@@ -134,7 +134,7 @@ async () => {
     assertStrictEquals(stored.hasOperationId, false);
 });
 
-Deno.test('document GET detail ETag equals Response-ID',
+Deno.test('document GET detail ETag equals the PUT pair id',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -146,16 +146,14 @@ async () => {
         )),
     );
     assertStrictEquals(put.status, 201);
-    const putId = put.headers.get('Response-ID');
+    const putId = pairIdOf(put);
     assert(putId !== null && isIdentifier(putId));
-    assertStrictEquals(put.headers.get('ETag'), strongEtagOf(putId));
     const got = await handleRequest(
         db, req('GET', path, token),
     );
     assertStrictEquals(got.status, 200);
-    const getId = got.headers.get('Response-ID');
+    const getId = pairIdOf(got);
     assert(getId !== null && isIdentifier(getId));
-    assertStrictEquals(got.headers.get('ETag'), strongEtagOf(getId));
     assertStrictEquals(getId, putId);
 });
 
@@ -170,10 +168,9 @@ async () => {
             + 'yjsYYXruOryrZjnfLsgSJg', token, body),
     );
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     assert(firstId !== null && isIdentifier(firstId));
     const firstEtag = first.headers.get('ETag');
-    assertStrictEquals(firstEtag, strongEtagOf(firstId));
     const before = await pairsAt(
         db, IDEA_PREFIX, 'yjsYYXruOryrZjnfLsgSJg',
     );
@@ -213,7 +210,7 @@ async () => {
             undefined, operationId),
     );
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     const firstOp = first.headers.get('Operation-ID');
     const firstBytes = await first.text();
     const second = await handleRequest(
@@ -227,7 +224,7 @@ async () => {
         second.headers.get('Operation-ID'), firstOp,
     );
     assertStrictEquals(
-        second.headers.get('Response-ID'), firstId,
+        pairIdOf(second), firstId,
     );
     assertStrictEquals(await second.text(), firstBytes);
     assertStrictEquals(
@@ -350,13 +347,9 @@ async () => {
         }),
     );
     assertStrictEquals(res.status, 201);
-    const responseId = res.headers.get('Response-ID');
+    const responseId = pairIdOf(res);
     assert(
         responseId !== null && isIdentifier(responseId),
-    );
-    assertStrictEquals(
-        res.headers.get('ETag'),
-        strongEtagOf(responseId),
     );
     const stored = await storedResponseAt(
         db, IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',

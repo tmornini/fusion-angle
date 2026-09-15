@@ -12,7 +12,7 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
 import {
-    apiRequest, storedPutBodyText,
+    apiRequest, pairIdOf, storedPutBodyText,
 } from './http-fixtures.ts';
 import {
     deriveIdentityPii,
@@ -124,13 +124,13 @@ Deno.test('PUT-PUT leaves two pairs and Supersedes', async () => {
         humanPii('Ann'),
     ));
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     const second = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Ann Marie'),
     ));
     assertStrictEquals(second.status, 201);
-    const secondId = second.headers.get('Response-ID');
+    const secondId = pairIdOf(second);
     assertNotStrictEquals(secondId, firstId);
     const pairsAt = await pairsAtPii(db, id);
     assertStrictEquals(pairsAt.length, 2);
@@ -156,12 +156,12 @@ Deno.test('PUT-DELETE leaves a bodyless DELETE head and an'
         humanPii('Bob'),
     ));
     assertStrictEquals(put.status, 201);
-    const putId = put.headers.get('Response-ID');
+    const putId = pairIdOf(put);
     const del = await handleRequest(db, req(
         'DELETE', '/identities/' + id + '/pii', DEV_TOKEN,
     ));
     assertStrictEquals(del.status, 204);
-    const delId = del.headers.get('Response-ID');
+    const delId = pairIdOf(del);
     assertNotStrictEquals(delId, putId);
     const pairsAt = await pairsAtPii(db, id);
     assertStrictEquals(pairsAt.length, 2);
@@ -204,7 +204,7 @@ Deno.test('DELETE-PUT is live again at three pairs', async () => {
     const head = await documentHeadAt(
         db, piiCollection(id), '',
     );
-    assertStrictEquals(head?.id, put.headers.get('Response-ID'));
+    assertStrictEquals(head?.id, pairIdOf(put));
     assertStrictEquals(head?.method, 'PUT');
     const domainRow = await deriveIdentityPii(db, id);
     assertStrictEquals(domainRow.name, 'Cara Restored');
@@ -222,7 +222,7 @@ Deno.test('a byte-identical resend against the LIVE slot replays'
         humanPii('Dana'), operationId,
     ));
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     const countAfterFirst = (await db.messagePairs.getAll())
         .length;
     const resend = await handleRequest(db, req(
@@ -230,7 +230,7 @@ Deno.test('a byte-identical resend against the LIVE slot replays'
         humanPii('Dana'), operationId,
     ));
     assertStrictEquals(resend.status, 200);
-    assertStrictEquals(resend.headers.get('Response-ID'), firstId);
+    assertStrictEquals(pairIdOf(resend), firstId);
     assertStrictEquals(
         (await db.messagePairs.getAll()).length,
         countAfterFirst,
@@ -247,13 +247,13 @@ Deno.test('a byte-identical resend AFTER supersession replays'
         humanPii('Erin'), operationId,
     ));
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     const second = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Erin Marie'),
     ));
     assertStrictEquals(second.status, 201);
-    assertNotStrictEquals(second.headers.get('Response-ID'), firstId);
+    assertNotStrictEquals(pairIdOf(second), firstId);
     const countAfterSecond = (await db.messagePairs.getAll())
         .length;
     const resend = await handleRequest(db, req(
@@ -261,7 +261,7 @@ Deno.test('a byte-identical resend AFTER supersession replays'
         humanPii('Erin'), operationId,
     ));
     assertStrictEquals(resend.status, 200);
-    assertStrictEquals(resend.headers.get('Response-ID'), firstId);
+    assertStrictEquals(pairIdOf(resend), firstId);
     assertStrictEquals(
         (await db.messagePairs.getAll()).length,
         countAfterSecond,
@@ -407,7 +407,7 @@ Deno.test('PUT-PUT-DELETE adds exactly three pairs (no document'
     const head = await documentHeadAt(
         db, piiCollection(id), '',
     );
-    assertStrictEquals(head?.id, del.headers.get('Response-ID'));
+    assertStrictEquals(head?.id, pairIdOf(del));
     assertStrictEquals(head?.method, 'DELETE');
 });
 

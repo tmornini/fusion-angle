@@ -30,6 +30,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -808,8 +809,8 @@ Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
     const afterSecond = (await db.messagePairs.getAll()).length;
     assertStrictEquals(afterSecond, afterFirst);
     assertStrictEquals(
-        first.headers.get('Response-ID'),
-        second.headers.get('Response-ID'),
+        pairIdOf(first),
+        pairIdOf(second),
     );
 
     const got = await handleRequest(
@@ -905,7 +906,7 @@ async () => {
         },
     ));
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     assert(firstId);
 
     const second = await handleRequest(db, req(

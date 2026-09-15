@@ -63,6 +63,7 @@ import {
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 
 const N_START = generateIdentifier();
@@ -1041,7 +1042,7 @@ Deno.test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
             + flowId, token),
     );
     assertStrictEquals(headGet.status, 200);
-    const headId = headGet.headers.get('Response-ID');
+    const headId = pairIdOf(headGet);
     assert(headId);
 
     const putRemove = await handleRequest(db, req(
@@ -1205,7 +1206,7 @@ Deno.test('residual pin: soft-deleted node drops from'
             + flowId, token),
     );
     assertStrictEquals(headGet.status, 200);
-    const headId = headGet.headers.get('Response-ID');
+    const headId = pairIdOf(headGet);
     assert(headId);
 
     // Soft-delete the bound node only — residual 'added'

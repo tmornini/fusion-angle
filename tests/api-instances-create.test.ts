@@ -2,7 +2,6 @@ import {
     assert,
     assertEquals,
     assertMatch,
-    assertNotStrictEquals,
     assertStrictEquals,
 } from '@std/assert';
 import {
@@ -20,7 +19,6 @@ import {
     formWriteMessagePair,
     appendMessagePairOnce,
     IF_MATCH_HEADER,
-    strongEtagOf,
 } from '../api/message-pair.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
@@ -35,6 +33,7 @@ import {
 } from '../api/types.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
@@ -237,17 +236,11 @@ async () => {
         'PATCH', INSTANCE_DETAIL, memberToken, body,
     ));
     assertStrictEquals(res.status, 201);
-    const responseId = res.headers.get('Response-ID');
+    const responseId = pairIdOf(res);
     assert(
-        responseId !== null && responseId !== '',
-        'Response-ID present',
+        responseId !== null && isIdentifier(responseId),
+        'ETag present',
     );
-    const createEtag = res.headers.get('ETag');
-    assert(
-        createEtag !== null
-        && isIdentifier(createEtag.slice(1, -1)),
-    );
-    assertNotStrictEquals(createEtag, strongEtagOf(responseId!));
     const echo = await res.json() as {
         id: string;
         organization_id: string;
@@ -268,11 +261,7 @@ async () => {
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
     assert(head !== undefined);
-    assertNotStrictEquals(head.messagePairId, responseId);
-    assertStrictEquals(
-        createEtag,
-        strongEtagOf(head.messagePairId),
-    );
+    assertStrictEquals(responseId, head.messagePairId);
     assertEquals(head.values, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -558,7 +547,7 @@ async () => {
         undefined, operationId,
     ));
     assertStrictEquals(first.status, 201);
-    const originalId = first.headers.get('Response-ID')!;
+    const originalId = pairIdOf(first)!;
     const originalEtag = first.headers.get('ETag');
     const originalBody = await first.json();
     const second = await handleRequest(db, req(
@@ -567,7 +556,7 @@ async () => {
     ));
     assertStrictEquals(second.status, 200);
     assertStrictEquals(
-        second.headers.get('Response-ID'),
+        pairIdOf(second),
         originalId,
     );
     assertStrictEquals(

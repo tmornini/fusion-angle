@@ -110,8 +110,7 @@ export function documentMessagePairsAt(
 export interface DerivedDocument {
     readonly name: string;
     readonly messagePairId: string; // head pair (== the
-                                    // advertisable
-                                    // Response-ID)
+                                    // advertisable ETag)
     readonly method: string;        // head method; DELETE
                                      // head == absent
     readonly body: Record<string, unknown>;

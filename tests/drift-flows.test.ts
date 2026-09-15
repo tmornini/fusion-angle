@@ -38,6 +38,7 @@ import { deriveProjectFlows } from
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 
 const SEED_FLOW_ORGANIZATION_TWO = seedIdentifier('seed-flow-org2');
@@ -246,7 +247,7 @@ async function headResponseId(
     const got = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
-    const id = got.headers.get('Response-ID');
+    const id = pairIdOf(got);
     assert(id
         , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
         + '' + flowId);
@@ -978,7 +979,7 @@ Deno.test('the lock-head terminal reaches exactly the derived '
         documentBody('Genesis', FLOW_DRIFT_LOCK_HEAD_GENESIS),
     ));
     assertStrictEquals(genesis.status, 201);
-    const genesisId = genesis.headers.get('Response-ID')!;
+    const genesisId = pairIdOf(genesis)!;
     let headId = genesisId;
 
     const saveCount = 4; // N >= 3 sequential saves beyond genesis
@@ -993,7 +994,7 @@ Deno.test('the lock-head terminal reaches exactly the derived '
         ));
         assertStrictEquals(saved.status, 201);
         assertStrictEquals(saved.headers.get('Follows'), null);
-        headId = saved.headers.get('Response-ID')!;
+        headId = pairIdOf(saved)!;
     }
 
     const headMessagePairId = await derivedHeadMessagePairId(

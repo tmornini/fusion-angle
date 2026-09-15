@@ -55,6 +55,7 @@ import { ApiError, HTTP_PRECONDITION_FAILED } from
     '../api/http-errors.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -386,18 +387,14 @@ async () => {
         assertStrictEquals(res.status, 201);
         assertStrictEquals(res.headers.get('Follows'), null);
         assertStrictEquals(res.headers.get('Supersedes'), null);
-        const responseId = res.headers.get('Response-ID');
+        const responseId = pairIdOf(res);
         assert(
             responseId !== null && isIdentifier(responseId),
-        );
-        assertStrictEquals(
-            res.headers.get('ETag'),
-            strongEtagOf(responseId),
         );
     });
 });
 
-Deno.test('locked arm: GET ETag equals Response-ID',
+Deno.test('locked arm: GET ETag names the stored pair',
 async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -412,17 +409,12 @@ async () => {
             'GET', path, token,
         ));
         assertStrictEquals(got.status, 200);
-        const responseId = got.headers.get('Response-ID');
+        const responseId = pairIdOf(got);
         assert(
             responseId !== null && isIdentifier(responseId),
         );
         assertStrictEquals(
-            got.headers.get('ETag'),
-            strongEtagOf(responseId),
-        );
-        assertStrictEquals(
-            got.headers.get('ETag'),
-            put.headers.get('ETag'),
+            pairIdOf(got), pairIdOf(put),
         );
     });
 });
@@ -439,12 +431,8 @@ async () => {
             'PUT', path, token, { v: 'first' },
         ));
         assertStrictEquals(genesis.status, 201);
-        const pairId = genesis.headers.get('Response-ID');
+        const pairId = pairIdOf(genesis);
         assert(pairId !== null);
-        assertStrictEquals(
-            genesis.headers.get('ETag'),
-            strongEtagOf(pairId),
-        );
         const matched = await handleRequest(db, req(
             'PUT', path, token, { v: 'second' },
             { [IF_MATCH_HEADER]: strongEtagOf(pairId) },
@@ -490,21 +478,6 @@ async () => {
         assertNotStrictEquals(tagA, tagB);
         assertNotStrictEquals(tagB, tagA2);
         assertNotStrictEquals(tagA, tagA2);
-        assertStrictEquals(
-            tagA, strongEtagOf(first.headers.get(
-                'Response-ID',
-            )!),
-        );
-        assertStrictEquals(
-            tagB, strongEtagOf(second.headers.get(
-                'Response-ID',
-            )!),
-        );
-        assertStrictEquals(
-            tagA2, strongEtagOf(third.headers.get(
-                'Response-ID',
-            )!),
-        );
     });
 });
 
@@ -594,7 +567,7 @@ Deno.test('locked arm: a matching echo stores no predecessor'
         assertStrictEquals(second.status, 201);
         assertStrictEquals(second.headers.get('Follows'), null);
         assertStrictEquals(second.headers.get('Supersedes'), null);
-        const secondId = second.headers.get('Response-ID')!;
+        const secondId = pairIdOf(second)!;
         const stored = (await db.messagePairs.getAll())
             .find((row) => row.id === secondId);
         assertStrictEquals(
@@ -633,8 +606,8 @@ async () => {
         assertStrictEquals(resend.status, 200);
         assertStrictEquals(resend.headers.get('Date'), editDate);
         assertStrictEquals(
-            resend.headers.get('Response-ID'),
-            edit.headers.get('Response-ID'),
+            pairIdOf(resend),
+            pairIdOf(edit),
         );
         assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     });

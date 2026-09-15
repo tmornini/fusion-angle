@@ -524,7 +524,7 @@ export function hoistedHeaderFields(request: Request): FieldLine[] {
 export function wireHeadersFor(stored: MessagePairEntity): HeadersInit {
     const headers: Record<string, string> = {
         'Date': httpDateOf(stored.response_at),
-        'Response-ID': stored.id,
+        'ETag': strongEtagOf(stored.id),
         'Operation-ID': stored.operation_id,
     };
     return headers;
@@ -554,7 +554,7 @@ export function responseFromStored(stored: MessagePairEntity): Response {
 
 // Stream a stored PUT as this caller's GET: same body
 // octets, Date replaced with now, no Operation-ID.
-// ETag and Response-ID both name the stored pair.
+// ETag names the stored pair.
 export function streamGetFromStored(
     stored: MessagePairEntity,
     at: string,
@@ -568,7 +568,6 @@ export function streamGetFromStored(
     }
     const headers = new Headers();
     headers.set('Date', httpDateOf(at));
-    headers.set('Response-ID', stored.id);
     const storedBody = HttpMessage.fromModel(model).body();
     if (storedBody.exists()) {
         headers.set('Content-Type', 'application/json');
@@ -882,8 +881,8 @@ export const LATCHED_OPERATION_ROUTE_PATTERNS:
 // fast-path fire ONLY for wired route patterns. Seeded with the
 // ideas patterns in Task 1; every Task 2/3 family commit
 // extends it; the Task 6 exit test asserts it covers every
-// write route — so no intermediate commit ever advertises a
-// Response-ID it did not store.
+// write route — so no intermediate commit ever advertises an
+// ETag it did not store.
 export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'organizations/:id/ideas/:id',
     'organizations/:id/ideas/:id/conversion',

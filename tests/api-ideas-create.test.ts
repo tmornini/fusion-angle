@@ -4,6 +4,7 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import {
     seedAdminSchema,
@@ -173,8 +174,8 @@ Deno.test(
         ));
         assertStrictEquals(second.status, 200);
         assertStrictEquals(
-            second.headers.get('Response-ID'),
-            first.headers.get('Response-ID'),
+            pairIdOf(second),
+            pairIdOf(first),
         );
         const { deriveIdeaStateHistory } = await import(
             '../api/derive-ideas.ts'

@@ -71,6 +71,7 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -1217,7 +1218,7 @@ async () => {
                 + '/record-types/' + recordId, token,
     ));
     assertStrictEquals(deleted.status, 204);
-    const deleteResponseId = deleted.headers.get('Response-ID');
+    const deleteResponseId = pairIdOf(deleted);
     assert(deleteResponseId);
 
     const miss = await handleRequest(

@@ -27,7 +27,6 @@ import {
 } from '../api/validators.ts';
 import {
     canonicalPath,
-    strongEtagOf,
 } from '../api/message-pair.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
@@ -35,7 +34,7 @@ import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
-    apiRequest, storedPutBodyText,
+    apiRequest, pairIdOf, storedPutBodyText,
 } from './http-fixtures.ts';
 import { messageStore } from '../api/message-store.ts';
 
@@ -162,7 +161,7 @@ async function headResponseId(
     const got = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
-    const id = got.headers.get('Response-ID');
+    const id = pairIdOf(got);
     assert(id
         , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
         + '' + flowId);
@@ -512,7 +511,7 @@ Deno.test('e2e: a byte-identical resend converges (one event, one'
         operationId,
     ));
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     const eventsAfterFirst =
         await deriveFlowStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
             , 'bZXXOWeDHCowVkWMhrZGgg');
@@ -524,13 +523,10 @@ Deno.test('e2e: a byte-identical resend converges (one event, one'
         operationId,
     ));
     assertStrictEquals(second.status, 200);
-    assertStrictEquals(second.headers.get('Response-ID'), firstId);
+    assertStrictEquals(pairIdOf(second), firstId);
     const stored = await db.messagePairs.getById(firstId!);
     assert(stored !== undefined);
-    assertStrictEquals(
-        second.headers.get('ETag'),
-        strongEtagOf(stored.id),
-    );
+    assertStrictEquals(pairIdOf(second), stored.id);
     const eventsAfterSecond =
         await deriveFlowStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
             , 'bZXXOWeDHCowVkWMhrZGgg');
@@ -586,16 +582,16 @@ async () => {
 // organizations/:id/flows/:id's document — the GET-attached
 // head is the DOCUMENT message pair (appended strictly
 // later; a live PUT chains Follows/Supersedes off it), never
-// the create response's own operation Response-ID.
+// the create response's own operation pair id.
 Deno.test('e2e: GET organizations/:id/flows/:id carries'
-    + ' Response-ID == the head pair'
+    + ' ETag == the head pair'
 + ' id — create\'s own synthesized document message pair, never its'
 + ' operation response (Task 8: ledger-derived handler)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const created = await createFlow(db, token, 'bWdlaTZZcKRsLsGXiKQZkw');
-    const createdId = created.headers.get('Response-ID');
+    const createdId = pairIdOf(created);
     assert(createdId);
     const got = await handleRequest(
         db, req('GET'
@@ -603,13 +599,12 @@ async () => {
             + 'bWdlaTZZcKRsLsGXiKQZkw', token),
     );
     assertStrictEquals(got.status, 200);
-    const headId = got.headers.get('Response-ID');
+    const headId = pairIdOf(got);
     assert(headId);
     assertNotStrictEquals(headId, createdId);
-    const etag = await headEtag(db, token, 'bWdlaTZZcKRsLsGXiKQZkw');
     const stored = await db.messagePairs.getById(headId);
     assert(stored !== undefined);
-    assertStrictEquals(etag, strongEtagOf(stored.id));
+    assertStrictEquals(pairIdOf(got), stored.id);
     const requests = await db.messagePairs.getAll();
     const pairsAt = requests.filter(
         r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
@@ -620,7 +615,7 @@ async () => {
     assert(pairsAt.some(r => r.id === headId));
 });
 
-// Task 8: the organizations/:id/flows/:id GET's Response-ID
+// Task 8: the organizations/:id/flows/:id GET's ETag
 // source switched from the store's document head read
 // (`messageStore(db).getDocumentHead`) (message-pair.ts's ANY-method
 // LOCK head) to documentHeadMessagePairId
@@ -629,11 +624,11 @@ async () => {
 // build the entity). Design decision 6 means only PUT
 // ever writes at a document, so the two
 // reductions agree for a live flow — this proves the
-// wire Response-ID equals the store's document head
+// wire ETag equals the store's document head
 // read (`messageStore(db).getDocumentHead`)'s own, independently
 // computed value, not merely that the route returns
 // SOME header.
-Deno.test('e2e: the organizations/:id/flows/:id Response-ID'
+Deno.test('e2e: the organizations/:id/flows/:id ETag'
     + ' equals the store head read\'s own'
 + ' reduction over the same document (documentHeadMessagePairId parity)',
 async () => {
@@ -646,7 +641,7 @@ async () => {
             + 'biSFoHVEGnaArklDDblCXQ', token),
     );
     assertStrictEquals(got.status, 200);
-    const headId = got.headers.get('Response-ID');
+    const headId = pairIdOf(got);
     assert(headId);
     const lockHead = (await messageStore(db).getDocumentHead(
         canonicalPath('AjdvjuECVZEgZoFajaIEkg', '/flows/'),

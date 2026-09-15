@@ -29,6 +29,7 @@ import {
 import type { DbAdapter } from '../api/db.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import {
     makeAssertionSigner,
@@ -165,7 +166,7 @@ Deno.test('a second PUT to the SAME identity-tokens/:id id forms'
         tokenFields(generateIdentifier()),
     ));
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     assertStrictEquals(first.headers.get('Supersedes'), null);
     const laterJti = generateIdentifier();
     const second = await handleRequest(db, req(
@@ -174,7 +175,7 @@ Deno.test('a second PUT to the SAME identity-tokens/:id id forms'
         tokenFields(laterJti),
     ));
     assertStrictEquals(second.status, 201);
-    assertNotStrictEquals(second.headers.get('Response-ID'), firstId);
+    assertNotStrictEquals(pairIdOf(second), firstId);
     assertStrictEquals(second.headers.get('Supersedes'), null);
     const domainRow = await deriveIdentityToken(
         db, 'XXZruirZyAOoRpNxaDnpSA', 'wFKZmVsOBJcqYFjJjxrlMw',

@@ -28,6 +28,7 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -444,7 +445,7 @@ Deno.test('a duplicate work-order create\'s own OPERATION pair'
         workOrderCreateBody(WO_C3, WO_C3_FWO_B, FLOW_C3),
     ));
     assertStrictEquals(second.status, 201);
-    const secondOperationId = second.headers.get('Response-ID');
+    const secondOperationId = pairIdOf(second);
     assert(secondOperationId);
     const secondOperationResponse = await db.messagePairs.getById(
         secondOperationId!,

@@ -49,6 +49,7 @@ import { seedIdentityPii } from './identity-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 
 const DRIFT_STATES_FENCE_OWN_IDEA = generateIdentifier();
@@ -269,7 +270,7 @@ async function headResponseId(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + flowId, token),
     );
-    const id = got.headers.get('Response-ID');
+    const id = pairIdOf(got);
     assert(id
         , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
         + '' + flowId);

@@ -48,6 +48,7 @@ import {
 } from '../api/types.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
@@ -873,7 +874,7 @@ async () => {
     const originalEtag = first.headers.get('ETag')!;
     const originalBody = await first.json();
     const originalResponseId =
-        first.headers.get('Response-ID')!;
+        pairIdOf(first)!;
     // Later revision advances the head.
     const secondWrite = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
@@ -906,7 +907,7 @@ async () => {
         'replay carries ORIGINAL etag',
     );
     assertStrictEquals(
-        replay.headers.get('Response-ID'),
+        pairIdOf(replay),
         originalResponseId,
     );
     assertEquals(

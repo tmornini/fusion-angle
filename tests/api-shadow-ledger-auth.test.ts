@@ -31,6 +31,7 @@ import {
     seedIdentityPii,
 } from './identity-fixtures.ts';
 import {
+    pairIdOf,
     refreshTokenFromSetCookie,
     setCookieHeader,
 } from './http-fixtures.ts';
@@ -328,7 +329,7 @@ async () => {
         (await db.messagePairs.getAll()).length, before);
 });
 
-Deno.test('the wire response on a 2xx carries a Response-ID and'
+Deno.test('the wire response on a 2xx carries an ETag and'
 + ' Date header derived from the stored pair',
 async () => {
     const db = await dbWithPasswordUser();
@@ -342,7 +343,7 @@ async () => {
                 pkce.code_challenge_method,
         }));
     assertStrictEquals(res.status, 201);
-    assert(res.headers.get('Response-ID'));
+    assert(pairIdOf(res));
     assert(res.headers.get('Date'));
 });
 

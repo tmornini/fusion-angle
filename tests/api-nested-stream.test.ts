@@ -10,7 +10,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import {
-    apiRequest, storedPutBodyText,
+    apiRequest, pairIdOf, storedPutBodyText,
 } from './http-fixtures.ts';
 import {
     deriveIdeaSubmissions,
@@ -343,7 +343,7 @@ async () => {
     const head = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
-    const responseId = head.headers.get('Response-ID');
+    const responseId = pairIdOf(head);
     assert(responseId);
     const name = 'xDyDkxEPwtcNmJVknUHDsg';
     const fields = { flow_response_id: responseId };

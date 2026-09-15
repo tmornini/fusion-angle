@@ -761,7 +761,7 @@ export async function handleRequest(
         // document resolution happen before a transaction opens
         // — see api/message-pair.ts), gated to routes wired in
         // MESSAGE_PAIR_WIRED_ROUTE_PATTERNS so no unwired route ever
-        // advertises a Response-ID it did not store. Runs
+        // advertises an ETag it did not store. Runs
         // INSIDE the try so a validation error raised while
         // precomputing the success body (below) is caught and
         // mapped to its usual HTTP status, exactly as if the
@@ -1520,7 +1520,7 @@ export async function handleRequest(
                     organization,
                     roles,
                 );
-                // Response-ID attach (spec §The two PUT
+                // ETag attach (spec §The two PUT
                 // classes): a locked-family document GET
                 // carries the current head pair id as
                 // provenance — the C6 client save's baseline
@@ -1568,12 +1568,7 @@ export async function handleRequest(
                         );
                     if (headMessagePairId !== undefined) {
                         return attachEtag(
-                            Response.json(result, {
-                                headers: {
-                                    'Response-ID':
-                                        headMessagePairId,
-                                },
-                            }),
+                            Response.json(result),
                             headMessagePairId,
                         );
                     }

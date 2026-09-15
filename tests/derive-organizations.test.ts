@@ -14,6 +14,7 @@ import { EntityNotFoundError } from '../api/db.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     apiRequest,
+    pairIdOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import {
@@ -130,7 +131,7 @@ Deno.test('a second live PUT supersedes the first; derive sees the'
     const db = await freshDb();
     const organizationId = generateIdentifier();
     const first = await putOrganization(db, organizationId, 'First');
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     assert(firstId);
     const second = await putOrganization(db, organizationId, 'Second');
     assertStrictEquals(second.headers.get('Supersedes'), null);
