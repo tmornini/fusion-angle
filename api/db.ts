@@ -88,6 +88,16 @@ export interface EntityStore<
         path: string,
         name: string,
     ): Promise<T[]>;
+    // The latest PUT or DELETE at the document, projected
+    // to what the write gate compares; null when none.
+    getHead(path: string, name: string): Promise<{
+        readonly id: string;
+        readonly method: string;
+    } | null>;
+    // The head pair itself, PUT or DELETE; null when none.
+    getHeadPair(path: string, name: string): Promise<T | null>;
+    // The live PUT heads of a collection, (response_at, id).
+    getCollectionHeadPairs(path: string): Promise<T[]>;
     getAllWhereBody(
         path: string,
         containment: Record<string, unknown>,
@@ -141,15 +151,22 @@ export interface Tx {
     append<T extends { id: string }>(
         row: T,
     ): Promise<void>;
+    getHead(path: string, name: string): Promise<{
+        readonly id: string;
+        readonly method: string;
+    } | null>;
+    getHeadPair<T extends { id: string }>(
+        path: string,
+        name: string,
+    ): Promise<T | null>;
+    getCollectionHeadPairs<T extends { id: string }>(
+        path: string,
+    ): Promise<T[]>;
     // Postgres write coordination. Other backends omit
     // these; callers treat absence as a no-op.
     lockRequest?(hash: string): Promise<void>;
     lockDocument?(path: string, name: string): Promise<void>;
     lockHead?(id: string): Promise<void>;
-    getHead?(path: string, name: string): Promise<{
-        readonly id: string;
-        readonly method: string;
-    } | null>;
     notify?(event: NotificationEvent): Promise<void>;
 }
 

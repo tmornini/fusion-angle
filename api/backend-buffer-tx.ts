@@ -13,6 +13,7 @@ import { parseWire } from
     '../shared/http-message/wire-codec.ts';
 import { compareIdentifiers } from
     '../shared/identifier.ts';
+import { latestByKey } from '../shared/ledger-reduction.ts';
 
 function compareResponseAtThenId(
     left: { id: string },
@@ -36,6 +37,47 @@ function byResponseAtThenId(
         String(l['response_at'] ?? ''),
         String(r['response_at'] ?? ''),
     );
+}
+
+const PUT_METHOD = 'PUT';
+const DELETE_METHOD = 'DELETE';
+
+function isDocumentMethod(method: unknown): boolean {
+    return method === PUT_METHOD || method === DELETE_METHOD;
+}
+
+// The (at, id) key latestByKey reduces over, beside the row
+// it came from. response_at is NOT NULL past the seam.
+function keyedByResponseAt(row: { id: string }): {
+    readonly at: string;
+    readonly id: string;
+    readonly row: Record<string, unknown> & { id: string };
+} {
+    const rec = row as Record<string, unknown> & { id: string };
+    return { at: String(rec['response_at']), id: row.id, row: rec };
+}
+
+// The latest PUT or DELETE among `rows` by (response_at, id).
+function headOf(
+    rows: readonly { id: string }[],
+): (Record<string, unknown> & { id: string }) | null {
+    const head = latestByKey(
+        rows.map(keyedByResponseAt), () => 'head',
+    ).get('head');
+    return head === undefined ? null : head.row;
+}
+
+function documentRows(
+    buffer: readonly { id: string }[],
+    path: string,
+    name: string,
+): { id: string }[] {
+    return buffer.filter((row) => {
+        const rec = row as Record<string, unknown>;
+        return rec['path'] === path
+            && rec['name'] === name
+            && isDocumentMethod(rec['method']);
+    });
 }
 
 // Builds a row-granular Tx handle over a pre-loaded copy
@@ -111,6 +153,47 @@ export function bufferTx(
                         === path
                         && rec['name'] === name;
                 })
+                .sort(byResponseAtThenId)
+                .map((row) => ({ ...row })) as T[];
+        },
+        async getHead(
+            path: string,
+            name: string,
+        ): Promise<{
+            readonly id: string;
+            readonly method: string;
+        } | null> {
+            const head = headOf(documentRows(buffer, path, name));
+            return head === null
+                ? null
+                : { id: head.id, method: String(head['method']) };
+        },
+        async getHeadPair<T extends { id: string }>(
+            path: string,
+            name: string,
+        ): Promise<T | null> {
+            const head = headOf(documentRows(buffer, path, name));
+            return head === null ? null : { ...head } as T;
+        },
+        async getCollectionHeadPairs<
+            T extends { id: string },
+        >(path: string): Promise<T[]> {
+            const documents = buffer.filter((row) => {
+                const rec = row as Record<string, unknown>;
+                return rec['path'] === path
+                    && isDocumentMethod(rec['method']);
+            });
+            const heads = latestByKey(
+                documents.map(keyedByResponseAt),
+                (keyed) => String(keyed.row['name']),
+            );
+            const live: { id: string }[] = [];
+            for (const head of heads.values()) {
+                if (head.row['method'] === PUT_METHOD) {
+                    live.push(head.row);
+                }
+            }
+            return live
                 .sort(byResponseAtThenId)
                 .map((row) => ({ ...row })) as T[];
         },

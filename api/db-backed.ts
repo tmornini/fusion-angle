@@ -155,16 +155,20 @@ function writeLocksOf(tx: Tx): WriteLocks | undefined {
     const lockRequest = tx.lockRequest;
     const lockDocument = tx.lockDocument;
     const lockHead = tx.lockHead;
-    const getHead = tx.getHead;
     const notify = tx.notify;
     if (
         lockRequest === undefined
         || lockDocument === undefined
         || lockHead === undefined
-        || getHead === undefined
         || notify === undefined
     ) {
         return undefined;
     }
-    return { lockRequest, lockDocument, lockHead, getHead, notify };
+    return {
+        lockRequest,
+        lockDocument,
+        lockHead,
+        getHead: (path, name) => tx.getHead(path, name),
+        notify,
+    };
 }

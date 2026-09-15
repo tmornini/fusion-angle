@@ -159,6 +159,24 @@ function postgresTx(
             );
             return rows.map((row) => entityOf<T>(row));
         },
+        async getHeadPair<T extends { id: string }>(
+            path: string,
+            name: string,
+        ): Promise<T | null> {
+            const rows = await selectHeadPair(sql, path, name);
+            const row = rows[0];
+            return row === undefined
+                ? null
+                : entityOf<T>(row);
+        },
+        async getCollectionHeadPairs<
+            T extends { id: string },
+        >(path: string): Promise<T[]> {
+            const rows = await selectCollectionHeadPairs(
+                sql, path,
+            );
+            return rows.map((row) => entityOf<T>(row));
+        },
         async getWhereBody<T extends { id: string }>(
             path: string,
             containment: Record<string, unknown>,
@@ -385,6 +403,42 @@ async function selectHead(
           AND method IN ('PUT', 'DELETE')
         ORDER BY response_at DESC, id DESC
         LIMIT 1
+    `;
+}
+
+// One backward walk of the document index under a Limit.
+async function selectHeadPair(
+    sql: SqlClient,
+    path: string,
+    name: string,
+): Promise<Record<string, unknown>[]> {
+    return sql.query`
+        SELECT * FROM message_pairs
+        WHERE path = ${path}
+          AND name = ${name}
+          AND method IN ('PUT', 'DELETE')
+        ORDER BY response_at DESC, id DESC
+        LIMIT 1
+    `;
+}
+
+// DISTINCT ON takes the first row per name straight off
+// the document index read backward; the outer sort orders
+// the heads, a small set.
+async function selectCollectionHeadPairs(
+    sql: SqlClient,
+    path: string,
+): Promise<Record<string, unknown>[]> {
+    return sql.query`
+        SELECT * FROM (
+            SELECT DISTINCT ON (name) *
+            FROM message_pairs
+            WHERE path = ${path}
+              AND method IN ('PUT', 'DELETE')
+            ORDER BY name DESC, response_at DESC, id DESC
+        ) heads
+        WHERE method = 'PUT'
+        ORDER BY response_at, id
     `;
 }
 

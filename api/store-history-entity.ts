@@ -59,6 +59,36 @@ export class HistoryEntityStore<
         );
     }
 
+    async getHead(
+        path: string,
+        name: string,
+    ): Promise<{
+        readonly id: string;
+        readonly method: string;
+    } | null> {
+        return this.#run(
+            'readonly',
+            (tx) => tx.getHead(path, name),
+        );
+    }
+
+    async getHeadPair(
+        path: string,
+        name: string,
+    ): Promise<T | null> {
+        return this.#run(
+            'readonly',
+            (tx) => tx.getHeadPair<T>(path, name),
+        );
+    }
+
+    async getCollectionHeadPairs(path: string): Promise<T[]> {
+        return this.#run(
+            'readonly',
+            (tx) => tx.getCollectionHeadPairs<T>(path),
+        );
+    }
+
     async getAllWhereBody(
         path: string,
         containment: Record<string, unknown>,
