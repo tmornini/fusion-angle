@@ -33,7 +33,7 @@ Concurrency class is `api/family-registry.ts`.
    foreign 403 before pair crypto.
 5. **Pair plane.** Wired writes form the pair pre-tx
    (`formWriteMessagePair`). Replay via
-   `storedResponseFor` unless exempt. After miss:
+   `getPairByRequestHash` unless exempt. After miss:
    If-Match table, instance PATCH table, same-body
    document PUT (200, no append; octets, not ETag),
    DELETE never-written 404 (stores nothing) /
@@ -106,7 +106,7 @@ Status ladder:
 - **latched operation** — a sub-resource POST that acts
   ON its parent document (flow undo today,
   `LATCHED_OPERATION_ROUTE_PATTERNS`). If-Match pins the
-  PARENT head, not the operation's own address: absent
+  PARENT head, not the operation's own path: absent
   → 428; malformed → 400; ≠ head → 412. No parent head
   at all is absence, not conflict — the gate stands
   aside and the handler 404s. The pin rides

@@ -10,8 +10,13 @@ alphabets live in code; this file does not restate them.
 
 A pair is the request wire bytes plus the response wire
 bytes (`api/schema-postgres.ts`
-`POSTGRES_MESSAGE_PAIRS_TABLE`). Columns are addressing
-metadata. The ledger stores writes only — no GET rows. The
+`POSTGRES_MESSAGE_PAIRS_TABLE`). A document is `path` plus
+`name`: `pathname = path + name`, the URL API's word. `path`
+is the collection's path, always slash-bounded; `name` is
+the document's name within it — an identifier for most
+documents, a word (`pii`, `default-organization`, `binding`)
+for the singleton sub-documents, and empty for an
+operation. The ledger stores writes only — no GET rows. The
 table is named once, here, and anchored to `TABLE_NAMES` in
 `api/db.ts` (length 1). Today that name is `message_pairs`.
 
@@ -27,8 +32,10 @@ same rows in an in-process Map keyed by table name.
    `message_pairs_request_at_chk` /
    `message_pairs_response_at_chk` → lexical order is
    chronological → the `(at, id)` total order.
-3. **`message_pairs_address`** — head and history for free
-   (`uri_collection`, `uri_id`, `response_at`, `id`).
+3. **`message_pairs_document`** — head and history for
+   free (`path`, `name`, `response_at`, `id`). The seam
+   promises `(response_at, id)` order on every read, on
+   both backends; nothing above it re-sorts rows.
 4. **The pair `id` is the ETag** — If-Match names that
    identifier; integrity is `request_hash`; lineage is
    the latched head (`api/message-pair.ts`). No chain.
@@ -40,7 +47,7 @@ same rows in an in-process Map keyed by table name.
 7. **`schema_marker` stamped last** —
    `POSTGRES_SCHEMA_MARKER_TABLE`; seed stamps it last so a
    failed seed reads as empty (`./bin/postgres-seed`).
-8. **Tenancy rides `uri_collection`** — the store is
+8. **Tenancy rides `path`** — the store is
    global; the fence and the write authorizer
    (`api/write-authorizer.ts`) enforce organization.
 9. **`operation_id` groups one client operation** — wire
@@ -51,6 +58,12 @@ same rows in an in-process Map keyed by table name.
     (`api/backend-postgres.ts`). There is no LISTEN and no
     SSE client. The memory backend simulates the same
     transaction semantics (`api/backend-memory.ts`).
+11. **Three reads over the ledger** — `messageStore(db)`
+    (`api/message-store.ts`): `getDocumentHead(path, name)`
+    is the live PUT head pair or `null`;
+    `getDocumentHistory(path, name)` is every pair at the
+    document, in seam order; `getCollection(path)` is the
+    live documents as entities.
 
 ## Document bodies
 

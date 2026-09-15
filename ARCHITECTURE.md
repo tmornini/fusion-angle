@@ -172,9 +172,9 @@ Two HTTP nests over one prefix: receive at
 
 ## Derivation
 
-Every family is a fold over pairs at an address —
-`api/derive-*.ts`. The view-accepting convention is five
-rules, not a framework:
+Every family is a fold over pairs at a document
+or a collection — `api/derive-*.ts`. The view-accepting
+convention is five rules, not a framework:
 
 (a) every core takes `dbOrView: DbAdapter`, so it is
 callable both pre-tx (passed `db`) and from within an
@@ -182,8 +182,8 @@ already-open write-gate transaction (passed `view`);
 (b) a core never opens its own nested transaction;
 (c) a core reads only the stores its caller listed in
 `transaction(...)`;
-(d) write-gate reads are entity-scoped (`getAllAtAddress`,
-`getAllWhere`), never a whole-plane `getAll()` of
+(d) write-gate reads are entity-scoped (`getDocumentHistory`,
+`getCollectionPairs`), never a whole-plane `getAll()` of
 `message_pairs` on a hot path;
 (e) a pre-tx call and an in-tx call of the same core
 return byte-identical results.
@@ -309,7 +309,7 @@ KNOWN.
 
 ## Do not resurrect
 
-- `states` table and the event-append address —
+- `states` table and the event-append path —
   pinned by comments in
   `tests/api-entity-history-routes.test.ts`
 - flat `/records` and `/record-attributes` —
