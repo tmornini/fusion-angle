@@ -703,8 +703,8 @@ async function writeMessagePairRows(
     });
 }
 
-// Lock order: dedup if hash-deduped, document if
-// gated, then FOR UPDATE + a new latest SELECT.
+// Lock order: request if hash-deduped, document if
+// gated, then FOR UPDATE + a fresh head read.
 async function coordinateWrite(
     view: DbAdapter,
     messagePair: MessagePair,
@@ -713,18 +713,18 @@ async function coordinateWrite(
     const locks = view.writeLocks;
     if (locks === undefined) return;
     if (hashDeduped) {
-        await locks.lockDedup(messagePair.requestHash);
+        await locks.lockRequest(messagePair.requestHash);
     }
     const gated = isGatedPath(messagePair.path);
     if (gated) {
-        await locks.lockAddress(
+        await locks.lockDocument(
             messagePair.path, messagePair.name,
         );
     }
     const latched = messagePair.latchedHeadMessagePairId;
     if (latched !== undefined) {
         await locks.lockHead(latched);
-        const latest = await locks.latestPutDelete(
+        const latest = await locks.getHead(
             messagePair.path, messagePair.name,
         );
         if (latest === null || latest.id !== latched) {
@@ -738,7 +738,7 @@ async function coordinateWrite(
         return;
     }
     if (!gated) return;
-    const latest = await locks.latestPutDelete(
+    const latest = await locks.getHead(
         messagePair.path, messagePair.name,
     );
     if (latest !== null && latest.method === 'PUT') {

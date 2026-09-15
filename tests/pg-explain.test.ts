@@ -381,7 +381,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
     });
 
-    Deno.test('latestPutDelete uses document and pkey',
+    Deno.test('getHead uses the document index and pkey',
     async () => {
         const plans = await sql.query<
             Record<string, unknown>

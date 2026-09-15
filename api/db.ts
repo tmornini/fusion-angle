@@ -143,12 +143,10 @@ export interface Tx {
     ): Promise<void>;
     // Postgres write coordination. Other backends omit
     // these; callers treat absence as a no-op.
-    lock?(label: string): Promise<void>;
+    lockRequest?(hash: string): Promise<void>;
+    lockDocument?(path: string, name: string): Promise<void>;
     lockHead?(id: string): Promise<void>;
-    latestPutDelete?(
-        path: string,
-        name: string,
-    ): Promise<{
+    getHead?(path: string, name: string): Promise<{
         readonly id: string;
         readonly method: string;
     } | null>;
@@ -156,16 +154,10 @@ export interface Tx {
 }
 
 export interface WriteLocks {
-    lockDedup(hash: string): Promise<void>;
-    lockAddress(
-        collection: string,
-        name: string,
-    ): Promise<void>;
+    lockRequest(hash: string): Promise<void>;
+    lockDocument(path: string, name: string): Promise<void>;
     lockHead(id: string): Promise<void>;
-    latestPutDelete(
-        collection: string,
-        name: string,
-    ): Promise<{
+    getHead(path: string, name: string): Promise<{
         readonly id: string;
         readonly method: string;
     } | null>;

@@ -259,7 +259,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             urlWithSearchPath(POSTGRES_URL, schema),
         );
         const documentLockKey = Number(await advisoryKey(
-            'fusion.address.' + FLOW_PREFIX + id,
+            'fusion.document.' + FLOW_PREFIX + id,
         ));
         let raced: Promise<[Response, Response]>
             | undefined;
@@ -428,19 +428,27 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const left = backend.transaction('readonly',
             async (tx) => {
                 const pg = tx as PostgresTx;
-                await pg.lock('fusion.test.deadlock.l');
+                await pg.lockDocument(
+                    '/fusion-test/deadlock/', 'l',
+                );
                 leftHeld.resolve();
                 await rightHeld.promise;
-                await pg.lock('fusion.test.deadlock.r');
+                await pg.lockDocument(
+                    '/fusion-test/deadlock/', 'r',
+                );
             },
         );
         const right = backend.transaction('readonly',
             async (tx) => {
                 const pg = tx as PostgresTx;
-                await pg.lock('fusion.test.deadlock.r');
+                await pg.lockDocument(
+                    '/fusion-test/deadlock/', 'r',
+                );
                 rightHeld.resolve();
                 await leftHeld.promise;
-                await pg.lock('fusion.test.deadlock.l');
+                await pg.lockDocument(
+                    '/fusion-test/deadlock/', 'l',
+                );
             },
         );
         const settled = await Promise.allSettled([
@@ -469,7 +477,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
         const tightSql = connectPostgres(tightUrl.href);
         const tight = new PostgresBackend(tightSql);
-        const label = 'fusion.test.timeout';
+        const label = 'fusion.document./fusion-test/timeout/x';
         try {
             await holder.begin(async (tx) => {
                 await tx.query`
@@ -483,7 +491,10 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                     () => tight.transaction('readonly',
                         (txn) => (
                             txn as PostgresTx
-                        ).lock(label),
+                        ).lockDocument(
+                            '/fusion-test/timeout/',
+                            'x',
+                        ),
                     ),
                 ) as ApiError;
                 assertInstanceOf(error, ApiError);

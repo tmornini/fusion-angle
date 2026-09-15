@@ -1,5 +1,5 @@
 // Fourth StorageBackend. postgres.js stays behind
-// postgres-client. Write lock order is dedup, document,
+// postgres-client. Write lock order is request, document,
 // then FOR UPDATE. Notify is in-transaction.
 
 import {
@@ -35,12 +35,10 @@ export interface PostgresTx extends Tx {
         path: string,
         name: string,
     ): Promise<T[]>;
-    lock(label: string): Promise<void>;
+    lockRequest(hash: string): Promise<void>;
+    lockDocument(path: string, name: string): Promise<void>;
     lockHead(id: string): Promise<void>;
-    latestPutDelete(
-        collection: string,
-        name: string,
-    ): Promise<{
+    getHead(path: string, name: string): Promise<{
         readonly id: string;
         readonly method: string;
     } | null>;
@@ -180,8 +178,16 @@ function postgresTx(
             );
             await upsertRow(sql, written);
         },
-        async lock(label: string): Promise<void> {
-            await advisoryLock(sql, label);
+        async lockRequest(hash: string): Promise<void> {
+            await advisoryLock(sql, 'fusion.dedup.' + hash);
+        },
+        async lockDocument(
+            path: string,
+            name: string,
+        ): Promise<void> {
+            await advisoryLock(
+                sql, 'fusion.document.' + path + name,
+            );
         },
         async lockHead(id: string): Promise<void> {
             await sql.query`
@@ -190,25 +196,14 @@ function postgresTx(
                 FOR UPDATE
             `;
         },
-        async latestPutDelete(
-            collection: string,
+        async getHead(
+            path: string,
             name: string,
         ): Promise<{
             readonly id: string;
             readonly method: string;
         } | null> {
-            const rows = await sql.query<{
-                id: string;
-                method: string;
-            }>`
-                SELECT id, method
-                FROM message_pairs
-                WHERE path = ${collection}
-                  AND name = ${name}
-                  AND method IN ('PUT', 'DELETE')
-                ORDER BY response_at DESC, id DESC
-                LIMIT 1
-            `;
+            const rows = await selectHead(sql, path, name);
             const row = rows[0];
             if (row === undefined) {
                 return null;
@@ -374,6 +369,22 @@ async function selectDocumentHistory(
         WHERE path = ${path}
           AND name = ${name}
         ORDER BY response_at, id
+    `;
+}
+
+async function selectHead(
+    sql: SqlClient,
+    path: string,
+    name: string,
+): Promise<{ id: string; method: string }[]> {
+    return sql.query<{ id: string; method: string }>`
+        SELECT id, method
+        FROM message_pairs
+        WHERE path = ${path}
+          AND name = ${name}
+          AND method IN ('PUT', 'DELETE')
+        ORDER BY response_at DESC, id DESC
+        LIMIT 1
     `;
 }
 

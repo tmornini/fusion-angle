@@ -35,7 +35,8 @@ Deno.test(
 
         const labels = [
             'fusion.dedup.' + 'a'.repeat(64),
-            'fusion.address./organizations/AjdvjuECVZEgZoFajaIEkg/ideas/42',
+            'fusion.document.'
+            + '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/42',
         ];
         for (const label of labels) {
             const key = await advisoryKey(label);

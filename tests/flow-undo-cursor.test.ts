@@ -126,7 +126,7 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 // locked document. Memory omits writeLocks, so the undo
 // route's synthesized document message pair never hit that gate
 // in ./test — garden did. This wrapper installs the same
-// latestPutDelete check so the pin fails here too.
+// getHead check so the pin fails here too.
 function withWriteGate(
     db: MemoryDbAdapter,
 ): MemoryDbAdapter {
@@ -137,12 +137,12 @@ function withWriteGate(
     ): GuardedDbAdapter => ({
         ...view,
         writeLocks: {
-            lockDedup: async () => {},
-            lockAddress: async () => {},
+            lockRequest: async () => {},
+            lockDocument: async () => {},
             lockHead: async () => {},
-            latestPutDelete: async (collection, name) => {
+            getHead: async (path, name) => {
                 const head = await documentHeadAt(
-                    view, collection, name,
+                    view, path, name,
                 );
                 return head ?? null;
             },

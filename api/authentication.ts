@@ -1079,7 +1079,7 @@ async function grantClientCredentials(
     const consumed = await adapter.transaction(async (view) => {
             const locks = view.writeLocks;
             if (locks !== undefined) {
-                await locks.lockAddress(
+                await locks.lockDocument(
                     '/authentication/assertion-jtis/',
                     verdict.jti,
                 );

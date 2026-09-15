@@ -152,28 +152,19 @@ export class BackedDbAdapter
 }
 
 function writeLocksOf(tx: Tx): WriteLocks | undefined {
-    const lock = tx.lock;
+    const lockRequest = tx.lockRequest;
+    const lockDocument = tx.lockDocument;
     const lockHead = tx.lockHead;
-    const latestPutDelete = tx.latestPutDelete;
+    const getHead = tx.getHead;
     const notify = tx.notify;
     if (
-        lock === undefined
+        lockRequest === undefined
+        || lockDocument === undefined
         || lockHead === undefined
-        || latestPutDelete === undefined
+        || getHead === undefined
         || notify === undefined
     ) {
         return undefined;
     }
-    return {
-        lockDedup: (hash) =>
-            lock('fusion.dedup.' + hash),
-        lockAddress: (collection, name) =>
-            lock(
-                'fusion.address.' + collection
-                + name,
-            ),
-        lockHead,
-        latestPutDelete,
-        notify,
-    };
+    return { lockRequest, lockDocument, lockHead, getHead, notify };
 }
