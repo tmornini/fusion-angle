@@ -211,11 +211,6 @@ function postgresTx(
             );
             await upsertRow(sql, name, written);
         },
-        async clear(table: string): Promise<void> {
-            assertWritable();
-            const name = assertMessageTable(table);
-            await deleteAll(sql, name);
-        },
         async lock(label: string): Promise<void> {
             await advisoryLock(sql, label, false);
         },
@@ -465,13 +460,6 @@ async function selectWhereBody(
               ${containment}::jsonb
         ORDER BY response_at, id
     `;
-}
-
-async function deleteAll(
-    sql: SqlClient,
-    _table: 'message_pairs',
-): Promise<void> {
-    await sql.query`DELETE FROM message_pairs`;
 }
 
 async function upsertRow(

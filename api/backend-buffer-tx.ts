@@ -205,12 +205,6 @@ export function bufferTx(
             }
             dirty.add(table);
         },
-        async clear(table: string): Promise<void> {
-            assertWritable();
-            scoped(table);
-            buffer.set(table, []);
-            dirty.add(table);
-        },
     };
 }
 

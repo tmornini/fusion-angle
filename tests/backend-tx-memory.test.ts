@@ -171,58 +171,6 @@ Deno.test(
 );
 
 Deno.test(
-    'clear empties a table within the tx',
-    async () => {
-        const backend = new MemoryStorageBackend();
-        await backend.ensureTables(['t']);
-        await backend.transaction(
-            ['t'], 'readwrite',
-            async (tx) => {
-                await tx.put<Row>('t', { id: 'a', n: 1 });
-                await tx.put<Row>('t', { id: 'b', n: 2 });
-            },
-        );
-        await backend.transaction(
-            ['t'], 'readwrite',
-            tx => tx.clear('t'),
-        );
-        const rows = await backend.transaction(
-            ['t'], 'readonly',
-            tx => tx.getAll<Row>('t'),
-        );
-        assertEquals(rows, []);
-    },
-);
-
-Deno.test(
-    'a rolled-back tx discards a clear',
-    async () => {
-        const backend = new MemoryStorageBackend();
-        await backend.ensureTables(['t']);
-        await backend.transaction(
-            ['t'], 'readwrite',
-            tx => tx.put<Row>('t', { id: 'a', n: 1 }),
-        );
-        await assertRejects(
-            () => backend.transaction(
-                ['t'], 'readwrite',
-                async (tx) => {
-                    await tx.clear('t');
-                    throw new Error('boom');
-                },
-            ),
-            Error,
-            'boom',
-        );
-        const rows = await backend.transaction(
-            ['t'], 'readonly',
-            tx => tx.getAll<Row>('t'),
-        );
-        assertStrictEquals(rows.length, 1);
-    },
-);
-
-Deno.test(
     'a readonly tx rejects a put',
     async () => {
         const backend = new MemoryStorageBackend();

@@ -156,7 +156,6 @@ export interface Tx {
         table: string,
         row: T,
     ): Promise<void>;
-    clear(table: string): Promise<void>;
     // Postgres write coordination. Other backends omit
     // these; callers treat absence as a no-op.
     lock?(label: string): Promise<void>;
