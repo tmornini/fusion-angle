@@ -1544,13 +1544,11 @@ async () => {
 function sortedReferrerShape(
     refs: AttributeReferrers,
 ): {
-    valueCount: number;
     flowIds: string[];
     workOrderIds: string[];
     instanceIds: string[];
 } {
     return {
-        valueCount: refs.valueCount,
         flowIds: [...refs.flowIds].sort(),
         workOrderIds: [...refs.workOrderIds].sort(),
         instanceIds: [...refs.instanceIds].sort(),

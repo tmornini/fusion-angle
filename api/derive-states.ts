@@ -834,9 +834,9 @@ const WORK_ORDERS_COLLECTION_PATTERN =
 // it is never needed to disambiguate).
 const WORK_ORDER_CLAIM_PATTERN =
     /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/claim\/$/;
-// Exported (Phase 14 Task 6): api/derive-state-field-values.ts
-// scans for this SAME prefix shape to find every transition's
-// fieldValues fold, without re-deriving the document pattern.
+// Exported: the transition sub-resource prefix shape, reused
+// below by this module's own transition readers rather than
+// re-deriving the document pattern per caller.
 export const WORK_ORDER_TRANSITION_PATTERN =
     /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/transition\/$/;
 const WORK_ORDER_RELEASE_PATTERN =
@@ -906,11 +906,10 @@ function atIdCompare(
 // function already reads generically. Source (c) once shared
 // this scan (deriveMemberGenesis); the states-document
 // retirement moved members onto the document-trio walk, so
-// only invitations remain. Exported (Phase 14 Task 6):
-// api/derive-state-field-values.ts's transition-fold reader
-// reuses this SAME decode over the work-orders/:id/transition
-// document, rather than re-implementing the POST-only,
-// (at, id)-sorted read.
+// only invitations remain. Exported: this module's own
+// transition-fold readers below reuse this SAME decode over
+// the work-orders/:id/transition document, rather than
+// re-implementing the POST-only, (at, id)-sorted read.
 const POST_ONLY: ReadonlySet<string> = new Set(['POST']);
 const POST_OR_PUT: ReadonlySet<string> = new Set([
     'POST', 'PUT',
@@ -1669,11 +1668,12 @@ function historyEventsWithFieldValues(
 // workOrderLifecycleStatesFor (ASC) reborn with an inline
 // field-values fold from this work order's OWN transition
 // prefix pairs, returned (at, id) DESC so index 0 is current.
-// Head-reduction per field-value row id matches
-// stateFieldValuesFrom (api/derive-state-field-values.ts);
-// claim/birth/release rows carry field_values: []. Empty
-// lifecycle → missedReadError (404 miss at this document).
-// Entity-scoped indexed reads only — no whole-plane getAll.
+// Head-reduction per field-value row id uses the same
+// latestByKey pooling fieldValuesByTransitionEvent applies
+// above; claim/birth/release rows carry field_values: [].
+// Empty lifecycle → missedReadError (404 miss at this
+// document). Entity-scoped indexed reads only — no
+// whole-plane getAll.
 export async function workOrderHistoryFor(
     db: DbAdapter,
     organization: Id,

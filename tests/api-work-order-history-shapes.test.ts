@@ -24,9 +24,6 @@ import { STARK_ORGANIZATION } from
 import { workOrderHistoryFor } from
     '../api/derive-states.ts';
 import {
-    deriveStateFieldValueReferrers,
-} from '../api/derive-state-field-values.ts';
-import {
     apiRequest,
 } from './http-fixtures.ts';
 
@@ -44,8 +41,6 @@ const NODE_FINISH = generateIdentifier();
 const EDGE_2 = generateIdentifier();
 const ATTR_SEVERITY = generateIdentifier();
 const ATTR_X = generateIdentifier();
-const ATTR_RESTRICT = generateIdentifier();
-const ATTR_OTHER = generateIdentifier();
 
 function req(
     method: string,
@@ -453,62 +448,4 @@ async () => {
             'history must be (at, id) DESC',
         );
     }
-});
-
-// Pin 5: RESTRICT census ignores new-shape pairs; counts
-// legacy bag values only; does not crash.
-Deno.test('deriveStateFieldValueReferrers counts legacy only;'
-+ ' new-shape pairs do not crash',
-async () => {
-    const db = await seedBaseDb();
-    const workOrderId = generateIdentifier();
-    await createWorkOrder(db, workOrderId);
-
-    const teLegacy = generateIdentifier();
-    const teNew = generateIdentifier();
-    const fvId = generateIdentifier();
-    const attrId = ATTR_RESTRICT;
-
-    await appendTransitionPair(
-        db, ORGANIZATION, workOrderId,
-        {
-            transitionEventId: teLegacy,
-            targetState: NODE_MIDDLE,
-            fieldValues: [{
-                id: fvId,
-                fields: {
-                    state_event_id: teLegacy,
-                    attribute_id: attrId,
-                    value: 'counted',
-                },
-            }],
-            release: null,
-            transitionAt: nowUtc(),
-        },
-        nowUtc(),
-    );
-    await appendTransitionPair(
-        db, ORGANIZATION, workOrderId,
-        {
-            transitionEventId: teNew,
-            targetState: 'n-finish',
-            set: [
-                { attribute_id: attrId, value: 'ignored' },
-            ],
-            clear: [ATTR_OTHER],
-            release: null,
-            transitionAt: nowUtc(),
-        },
-        nowUtc(),
-    );
-
-    const derived = await deriveStateFieldValueReferrers(
-        db, ORGANIZATION, [attrId],
-    );
-    const rows = derived.get(attrId) ?? [];
-    assertStrictEquals(rows.length, 1);
-    assertStrictEquals(rows[0]!.id, fvId);
-    assertStrictEquals(rows[0]!.attribute_id, attrId);
-    assertStrictEquals(rows[0]!.value, 'counted');
-    assertStrictEquals(rows[0]!.state_event_id, teLegacy);
 });

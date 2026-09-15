@@ -188,11 +188,6 @@ caller handed in `transaction(fn)`;
 (e) a pre-tx call and an in-tx call of the same core
 return byte-identical results.
 
-The one named whole-plane scan is
-`deriveStateFieldValueReferrers` in
-`api/derive-state-field-values.ts` (SFV RESTRICT): no
-`attribute_id` index exists, so the gate scans.
-
 ## Flow graph
 
 Graph truth rides the flow document pair body as native
