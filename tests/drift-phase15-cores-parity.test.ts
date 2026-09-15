@@ -19,8 +19,10 @@ import {
     workOrderHistoryFor,
     stateEventVisibilityFor,
     resolveOwningOrganization,
-    deriveWorkOrderLifecycle,
+    workOrderLifecycleStatesFor,
 } from '../api/derive-states.ts';
+import { canonicalPath } from '../api/message-pair.ts';
+import { deriveDocumentsAt } from '../api/derive-documents.ts';
 import {
     appendLegacyTransition,
 } from './legacy-transition-fixture.ts';
@@ -34,7 +36,9 @@ import {
 } from '../api/flow-graph-relations.ts';
 import { latestByKey } from
     '../shared/ledger-reduction.ts';
-import type { GraphEdge, WorkOrderEntity } from '../api/types.ts';
+import type {
+    GraphEdge, WorkOrderEntity, StateEntity,
+} from '../api/types.ts';
 import {
     collectAttributeReferrers,
     type AttributeReferrers,
@@ -120,6 +124,33 @@ function req(
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
+}
+
+// Every seeded work order's lifecycle across both seeded
+// organizations, by the entity-scoped derive (the bulk fold
+// is gone — spec 2026-09-15 § 5): one collection read per
+// organization lists the ids, then one scoped read each.
+async function seededWorkOrderLifecycle(
+    db: MemoryDbAdapter,
+): Promise<StateEntity[]> {
+    const rows: StateEntity[] = [];
+    for (const organization of [
+        STARK_ORGANIZATION, ORGANIZATION_TWO,
+    ]) {
+        const prefix = canonicalPath(
+            organization, '/work-orders/',
+        );
+        const heads = deriveDocumentsAt(
+            await db.messagePairs.getCollectionPairs(prefix),
+            prefix,
+        );
+        for (const workOrderId of heads.keys()) {
+            rows.push(...await workOrderLifecycleStatesFor(
+                db, organization, workOrderId,
+            ));
+        }
+    }
+    return rows;
 }
 
 function workOrderFlowGraph(
@@ -393,7 +424,7 @@ Deno.test('stateEventVisibilityFor: tier (i) event-append pairs'
     // C3: bulk deriveStates retired — sample event ids from
     // surviving family lifecycle derives.
     const sampleRows = [
-        ...await deriveWorkOrderLifecycle(db),
+        ...await seededWorkOrderLifecycle(db),
         ...await deriveIdeaStateHistory(
             db, STARK_ORGANIZATION, buildIdeas()[0]!.id,
         ),
@@ -738,7 +769,7 @@ Deno.test('residual pin: stateEventVisibilityFor matches the'
     const db = await seededDb();
     // C3: sample from surviving lifecycle derives (bulk
     // deriveStates retired).
-    const allStates = await deriveWorkOrderLifecycle(db);
+    const allStates = await seededWorkOrderLifecycle(db);
     assert(
         allStates.length >= 7,
         'need enough WO lifecycle rows for sampling',

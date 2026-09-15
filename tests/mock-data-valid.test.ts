@@ -9,6 +9,7 @@ import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
 import { deriveDocumentsAt } from
     '../api/derive-documents.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import {
     validateIdeaEntity,
     validateProjectEntity,
@@ -56,7 +57,7 @@ import { postWorkOrderDocumentOp } from
 import { deriveFlowWorkOrders } from
     '../api/derive-flow-work-orders.ts';
 import {
-    deriveWorkOrderLifecycle,
+    workOrderLifecycleStatesFor,
     deriveInvitationStates,
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
@@ -66,6 +67,7 @@ import { buildIdeas } from '../api/mock-data/ideas.ts';
 import {
     assignOrganization,
     STARK_ORGANIZATION,
+    ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { buildWorkOrders } from
     '../api/mock-data/work-orders.ts';
@@ -77,6 +79,7 @@ import { l2cFlowId } from
 import {
     SYSTEM_MEMBER_ID,
     type WorkOrderEntity,
+    type StateEntity,
 } from '../api/types.ts';
 import { seededMockDb } from './mock-seed.ts';
 
@@ -93,6 +96,33 @@ type Validator = (b: Record<string, unknown>) => unknown;
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
+}
+
+// Every seeded work order's lifecycle across both seeded
+// organizations, by the entity-scoped derive (the bulk fold
+// is gone — spec 2026-09-15 § 5): one collection read per
+// organization lists the ids, then one scoped read each.
+async function seededWorkOrderLifecycle(
+    db: MemoryDbAdapter,
+): Promise<StateEntity[]> {
+    const rows: StateEntity[] = [];
+    for (const organization of [
+        STARK_ORGANIZATION, ORGANIZATION_TWO,
+    ]) {
+        const prefix = canonicalPath(
+            organization, '/work-orders/',
+        );
+        const heads = deriveDocumentsAt(
+            await db.messagePairs.getCollectionPairs(prefix),
+            prefix,
+        );
+        for (const workOrderId of heads.keys()) {
+            rows.push(...await workOrderLifecycleStatesFor(
+                db, organization, workOrderId,
+            ));
+        }
+    }
+    return rows;
 }
 
 // Each entry: table name, getAll fn, validator.
@@ -128,7 +158,7 @@ Deno.test('mock-data seeds non-empty derived lifecycle states',
 async () => {
     const db = await seededDb();
     const rows = [
-        ...await deriveWorkOrderLifecycle(db),
+        ...await seededWorkOrderLifecycle(db),
         ...await deriveInvitationStates(db),
         ...await deriveIdeaStateHistory(
             db, STARK_ORGANIZATION, buildIdeas()[0]!.id,
@@ -323,7 +353,7 @@ Deno.test('mock-data derived lifecycle .at is 6-digit zulu',
 async () => {
     const db = await seededDb();
     const rows = [
-        ...await deriveWorkOrderLifecycle(db),
+        ...await seededWorkOrderLifecycle(db),
     ];
     assert(rows.length > 0, 'derived lifecycle empty');
     for (const row of rows) {
@@ -507,7 +537,7 @@ Deno.test(
         ) as WorkOrderEntity[];
         // C3: bulk deriveStates retired — WO lifecycle
         // from the message-plane work-order derive.
-        const states = await deriveWorkOrderLifecycle(db);
+        const states = await seededWorkOrderLifecycle(db);
         // Phase Final Task 2: memberships + members from
         // the message plane.
         const organizationByWo = new Map(

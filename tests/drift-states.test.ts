@@ -10,7 +10,6 @@ import {
     setClockForTest, resetClock,
 } from '../api/types.ts';
 import {
-    deriveWorkOrderLifecycle,
     deriveInvitationStates,
     workOrderLifecycleStatesFor,
     workOrderHistoryFor,
@@ -677,23 +676,23 @@ async () => {
 
 Deno.test('case 4a: a SEEDED work order\'s births ride the'
 + ' transition-op source (states-document retirement) —'
-+ ' deriveWorkOrderLifecycle contributes the trace events'
-+ ' and workOrderLifecycleStatesFor reproduces history',
++ ' workOrderLifecycleStatesFor contributes the trace events'
++ ' and reproduces history',
 async () => {
     const db = await seededDb();
     // WO02 (buildWorkOrders()[1]) — a DIFFERENT seeded work order
     // than case 2's own WO01, so this leg stays orthogonal.
     const seededWorkOrderId = buildWorkOrders()[1]!.id;
-    const lifecycle = (await deriveWorkOrderLifecycle(db))
-        .filter((row) => row.entity_id === seededWorkOrderId);
+    const lifecycle = await workOrderLifecycleStatesFor(
+        db, STARK_ORGANIZATION, seededWorkOrderId,
+    );
     assert(
         lifecycle.length > 0,
         'seeded traces must derive from transition ops',
     );
-    const derived = await assertHistoryParity(
+    await assertHistoryParity(
         db, STARK_ORGANIZATION, seededWorkOrderId,
     );
-    assertStrictEquals(derived.length, lifecycle.length);
 });
 
 Deno.test('case 4b: work-order live-write chain — birth-claimed'

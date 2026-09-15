@@ -45,9 +45,9 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 //   (b) deriveMemberStates RETIRED (C4) — leftover
 //       /members/ document-trio history; nothing reads
 //       that collection.
-//   (c) deriveWorkOrderLifecycle / workOrderLifecycleStatesFor /
-//       workOrderHistoryFor — the work-order operation-message-pair replay
-//       (gate 5d).
+//   (c) workOrderLifecycleStatesFor / workOrderHistoryFor — the
+//       work-order operation-message-pair replay (gate 5d; the
+//       whole-plane bulk fold retired — spec 2026-09-15 § 5).
 //   (d) flow-graph node/edge sidecars — live on the flow
 //       document-pair body (graphDelta.deletions / revivals);
 //       resolveFlowGraphOwner below resolves their owners.
@@ -777,7 +777,7 @@ export async function stateEventVisibilityFor(
     return 'orphan';
 }
 
-// ---- deriveWorkOrderLifecycle — the operation-message-pair
+// ---- workOrderLifecycleStatesFor — the operation-message-pair
 // reader (gate 5d) ---
 
 // Source (c) of the states-log union — the only one that reads
@@ -815,32 +815,16 @@ export async function stateEventVisibilityFor(
 // deployment must record the actual expiry decision as
 // its own event rather than lean on this replay trick.
 
-// The work-orders COLLECTION path: POST 'work-orders' (create)
-// and PUT/DELETE 'work-orders/:id' (document) share this ONE
-// prefix per organization (family-registry.ts: work-orders is
-// organizationNested), partitioned apart by METHOD alone
-// (tests/drift-work-orders.test.ts case 8) — the create's name is
-// the body's OWN minted id, the SAME id a later PUT's name names.
-const WORK_ORDERS_COLLECTION_PATTERN =
-    /^\/organizations\/[^/]+\/work-orders\/$/;
-
-// The claim/transition/release sub-resource documents: UNLIKE
-// the collection prefix above, the work-order id rides the
-// PREFIX itself here (routes.ts: 'work-orders/:id/claim' /
-// 'work-orders/:id/transition' / retired
-// 'work-orders/:id/release'), so each distinct match names
-// ONE work order directly — captured, the organization
-// segment is not (a work-order id is globally unique, so
-// it is never needed to disambiguate).
-const WORK_ORDER_CLAIM_PATTERN =
-    /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/claim\/$/;
-// Exported: the transition sub-resource prefix shape, reused
-// below by this module's own transition readers rather than
-// re-deriving the document pattern per caller.
+// The transition sub-resource document: the work-order id rides
+// the PREFIX itself here (routes.ts: 'work-orders/:id/transition'),
+// so each match names ONE work order directly — captured, the
+// organization segment is not (a work-order id is globally
+// unique, so it is never needed to disambiguate). Exported: the
+// transition sub-resource prefix shape, reused below by this
+// module's own transition readers rather than re-deriving the
+// document pattern per caller.
 export const WORK_ORDER_TRANSITION_PATTERN =
     /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/transition\/$/;
-const WORK_ORDER_RELEASE_PATTERN =
-    /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/release\/$/;
 
 // One decoded 2xx POST pair — an OPERATION path (create/claim/
 // transition are POST-only), the documentMessagePairsAt (derive-
@@ -888,8 +872,10 @@ function decodeRequestOperation(message: string): {
 }
 
 // (at, id) ascending — the total order every replay step below
-// orders its actions by, and the order the final derivation
-// returns rows in (deriveWorkOrderLifecycle's own header).
+// orders its actions by, and the order workOrderLifecycleStatesFor
+// returns rows in: these rows are SYNTHESIZED (no document of
+// their own to read 1:1), so there is no raw-store scan order to
+// reproduce — chronological (at, id) is the meaningful order.
 function atIdCompare(
     a: { readonly at: string; readonly id: string },
     b: { readonly at: string; readonly id: string },
@@ -1263,202 +1249,25 @@ function replayWorkOrderOperations(
     return events;
 }
 
-// Prefix-filtered pure core of the operation-message-pair reader (gate 5d).
-// When `organization` is set, only that org's work-orders
-// path family is considered (collection + claim/release/
-// transition); when undefined, every org — the whole-plane
-// scan deriveWorkOrderLifecycle needs. Returns ASC events and
-// the transition pairs consumed so bulk history can fold
-// field_values without a second plane pass.
-interface WorkOrderLifecyclePlane {
-    readonly events: readonly StateEntity[];
-    readonly transitionMessagePairs: readonly OperationMessagePair[];
-}
-
-function workOrderLifecycleFromPlane(
-    messagePairs: readonly MessagePairEntity[],
-    organization: Id | undefined,
-): WorkOrderLifecyclePlane {
-    const collectionPrefixes = new Set<string>();
-    if (organization !== undefined) {
-        collectionPrefixes.add(
-            canonicalPath(organization, '/work-orders/'),
-        );
-    } else {
-        for (const messagePair of messagePairs) {
-            if (WORK_ORDERS_COLLECTION_PATTERN.test(
-                messagePair.path,
-            )) {
-                collectionPrefixes.add(
-                    messagePair.path,
-                );
-            }
-        }
-    }
-    const createMessagePairs: OperationMessagePair[] = [];
-    const entityMessagePairs: DocumentMessagePair[] = [];
-    for (const prefix of collectionPrefixes) {
-        createMessagePairs.push(...operationMessagePairsAt(
-            messagePairs, prefix,
-        ));
-        entityMessagePairs.push(...documentMessagePairsAt(
-            messagePairs, prefix,
-        ));
-    }
-    const createMessagePairsByWorkOrder = Map.groupBy(
-        createMessagePairs, (messagePair) => messagePair.name,
-    );
-    const entityMessagePairsByWorkOrder = Map.groupBy(
-        entityMessagePairs, (messagePair) => messagePair.name,
-    );
-
-    const organizationRoot = organization === undefined
-        ? null
-        : '/organizations/' + organization + '/work-orders/';
-
-    const claimPrefixByWorkOrder = new Map<Id, string>();
-    const releasePrefixByWorkOrder = new Map<Id, string>();
-    const transitionPrefixByWorkOrder = new Map<Id, string>();
-    for (const messagePair of messagePairs) {
-        if (
-            organizationRoot !== null
-            && !messagePair.path.startsWith(
-                organizationRoot,
-            )
-        ) {
-            continue;
-        }
-        const claimMatch = WORK_ORDER_CLAIM_PATTERN.exec(
-            messagePair.path,
-        );
-        if (claimMatch !== null) {
-            claimPrefixByWorkOrder.set(
-                claimMatch[1]!, messagePair.path,
-            );
-        }
-        const releaseMatch =
-            WORK_ORDER_RELEASE_PATTERN.exec(
-                messagePair.path,
-            );
-        if (releaseMatch !== null) {
-            releasePrefixByWorkOrder.set(
-                releaseMatch[1]!,
-                messagePair.path,
-            );
-        }
-        const transitionMatch =
-            WORK_ORDER_TRANSITION_PATTERN.exec(
-                messagePair.path,
-            );
-        if (transitionMatch !== null) {
-            transitionPrefixByWorkOrder.set(
-                transitionMatch[1]!,
-                messagePair.path,
-            );
-        }
-    }
-
-    const workOrderIds = new Set<Id>([
-        ...createMessagePairsByWorkOrder.keys(),
-        ...claimPrefixByWorkOrder.keys(),
-        ...releasePrefixByWorkOrder.keys(),
-        ...transitionPrefixByWorkOrder.keys(),
-    ]);
-
-    const events: StateEntity[] = [];
-    const allTransitionMessagePairs: OperationMessagePair[] = [];
-    for (const workOrderId of workOrderIds) {
-        const claimPrefix =
-            claimPrefixByWorkOrder.get(workOrderId);
-        const releasePrefix =
-            releasePrefixByWorkOrder.get(workOrderId);
-        const transitionPrefix =
-            transitionPrefixByWorkOrder.get(workOrderId);
-        const claimMessagePairs = claimPrefix === undefined
-            ? []
-            : operationMessagePairsAt(
-                messagePairs, claimPrefix, POST_OR_PUT,
-            );
-        const releasePosts = releasePrefix === undefined
-            ? []
-            : operationMessagePairsAt(
-                messagePairs, releasePrefix,
-            );
-        const releaseDeletes = claimPrefix === undefined
-            ? []
-            : documentDeletesAsOperations(
-                documentMessagePairsAt(
-                    messagePairs, claimPrefix,
-                ),
-            );
-        const releaseMessagePairs = [
-            ...releasePosts, ...releaseDeletes,
-        ];
-        const transitionMessagePairs =
-            transitionPrefix === undefined
-                ? []
-                : operationMessagePairsAt(
-                    messagePairs, transitionPrefix,
-                );
-        allTransitionMessagePairs.push(...transitionMessagePairs);
-        events.push(...replayWorkOrderOperations(
-            createMessagePairsByWorkOrder.get(workOrderId) ?? [],
-            entityMessagePairsByWorkOrder.get(workOrderId) ?? [],
-            claimMessagePairs,
-            releaseMessagePairs,
-            transitionMessagePairs,
-            workOrderId,
-        ));
-    }
-    return {
-        events: events.sort(atIdCompare),
-        transitionMessagePairs: allTransitionMessagePairs,
-    };
-}
-
-// The operation-message-pair reader (gate 5d). ONE shared readonly tx over
-// db.messagePairs (torn-read closure) — every grouping and
-// replay step below is pure over the fetched array, no
-// further db reads. (at, id) ascending overall: these rows are
-// SYNTHESIZED (no document of their own to read 1:1), so there
-// is no raw-store scan order to reproduce — chronological
-// (at, id) is the meaningful order, and filtering this total
-// order by entity_id preserves it per work order.
-export async function deriveWorkOrderLifecycle(
-    db: DbAdapter,
-): Promise<StateEntity[]> {
-    return db.readTransaction(async (view) => {
-            const messagePairs = await view.messagePairs.getAll();
-            return [
-                ...workOrderLifecycleFromPlane(
-                    messagePairs, undefined,
-                ).events,
-            ];
-        },
-    );
-}
-
-// ENTITY-SCOPED sibling of deriveWorkOrderLifecycle above (Phase
-// 14 Task 1): reuses the SAME pure replay core
-// (replayWorkOrderOperations) over INDEXED reads scoped to ONE
-// known (organization, workOrderId) pair, rather than the
-// whole-org scan the multi-work-order reader needs to discover
-// EVERY id at once —
+// The work-order lifecycle read (gate 5d): reads INDEXED,
+// scoped to ONE known (organization, workOrderId) pair, then
+// replays with the pure replay core (replayWorkOrderOperations)
+// the retired whole-plane fold once shared with this reader
+// (spec 2026-09-15 § 5) —
 //   * create + document message pairs: document read at the
 //     work-orders prefix + this workOrderId (both
 //     a create's response and its later document PUT/DELETE
 //     share ONE name — drift-work-orders.test.ts case 8);
-//   * claim/release/transition: path at each sub-
-//     resource's own per-id document (WORK_ORDER_CLAIM_PATTERN/
-//     WORK_ORDER_RELEASE_PATTERN/
-//     WORK_ORDER_TRANSITION_PATTERN's own shape, constructed
-//     directly since the id is already known).
+//   * claim/release/transition: path at each sub-resource's
+//     own per-id document, its prefix constructed directly
+//     (canonicalPath + the known workOrderId) since the id is
+//     already known — no pattern match needed to discover it.
 // dbOrView-shaped and opens no nested transaction — callable from
 // WITHIN an already-open write-gate transaction. Phase 14 Task 4
 // wires the claim gate to workOrderClaimHistoryFor below; with
-// the states/:id document retired both siblings return the SAME
-// operation-message-pair replay (releases ride the release op,
-// not a standalone event-append).
+// the states/:id document retired both readers below return the
+// SAME operation-message-pair replay (releases ride the release
+// op, not a standalone event-append).
 interface WorkOrderClaimSources {
     readonly replayed: readonly StateEntity[];
 }
