@@ -189,11 +189,9 @@ async function membershipsFor(
             + organization.id + '/members/';
         const [seatRequests] =
             await Promise.all([
-                db.messagePairs.getAllWhere(
-                    'path', seatPrefix,
+                db.messagePairs.getCollectionPairs(seatPrefix,
                 ),
-                db.messagePairs.getAllWhere(
-                    'path', seatPrefix,
+                db.messagePairs.getCollectionPairs(seatPrefix,
                 ),
             ]);
         for (const document of deriveDocumentsAt(

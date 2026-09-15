@@ -193,8 +193,7 @@ async function countInstanceMessagePairs(
     const prefix = instancesUriPrefix(
         ORGANIZATION, TYPE_ID,
     );
-    const responses = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const responses = await db.messagePairs.getCollectionPairs(prefix,
     );
     return responses.filter(
         (r) => r.name === INSTANCE_ID,
@@ -208,8 +207,8 @@ async function countDeleteMessagePairs(
         ORGANIZATION, TYPE_ID,
     );
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('path', prefix),
-        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     return documentMessagePairsAt(
         requests, prefix,

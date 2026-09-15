@@ -131,8 +131,7 @@ async function messagePairsAt(
     collection: string,
     name: string,
 ): Promise<number> {
-    const rows = await db.messagePairs.getAllWhere(
-        'path', collection,
+    const rows = await db.messagePairs.getCollectionPairs(collection,
     );
     return rows.filter((row) => row.name === name)
         .length;
@@ -361,23 +360,23 @@ export function defineStoreAcceptance(
         const late = '2026-01-01T00:00:00.000002Z';
         // Appended newest-first, so insertion order
         // disagrees with the promised order on every row.
-        await db.messagePairs.put(
+        await db.messagePairs.append(
             third, orderRow('doc', late, 3),
         );
-        await db.messagePairs.put(
+        await db.messagePairs.append(
             second, orderRow('doc', early, 2),
         );
-        await db.messagePairs.put(
+        await db.messagePairs.append(
             first, orderRow('doc', early, 1),
         );
         const history = await db.messagePairs
-            .getAllAtAddress(ORDER_PATH, 'doc');
+            .getDocumentHistory(ORDER_PATH, 'doc');
         assertEquals(
             history.map((row) => row.id),
             [first, second, third],
         );
         const collection = await db.messagePairs
-            .getAllWhere('path', ORDER_PATH);
+            .getCollectionPairs(ORDER_PATH);
         assertEquals(
             collection.map((row) => row.id),
             [first, second, third],

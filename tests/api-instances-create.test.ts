@@ -578,8 +578,7 @@ async () => {
         originalEtag,
     );
     assertEquals(await second.json(), originalBody);
-    const responses = await db.messagePairs.getAllWhere(
-        'path',
+    const responses = await db.messagePairs.getCollectionPairs(
         '/organizations/' + ORGANIZATION
             + '/record-types/' + TYPE_ID
             + '/instances/',
@@ -609,8 +608,7 @@ async () => {
     const prefix = '/organizations/' + ORGANIZATION
         + '/record-types/' + TYPE_ID
         + '/instances/';
-    const before = (await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const before = (await db.messagePairs.getCollectionPairs(prefix,
     )).filter((row) => row.name === INSTANCE_ID);
     const second = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
@@ -620,8 +618,7 @@ async () => {
         },
     ));
     assertStrictEquals(second.status, 201);
-    const after = (await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const after = (await db.messagePairs.getCollectionPairs(prefix,
     )).filter((row) => row.name === INSTANCE_ID);
     assertStrictEquals(
         after.length,
@@ -655,8 +652,7 @@ async () => {
         [a.status, b.status].sort(),
         [201, 428],
     );
-    const responses = await db.messagePairs.getAllWhere(
-        'path',
+    const responses = await db.messagePairs.getCollectionPairs(
         '/organizations/' + ORGANIZATION
             + '/record-types/' + TYPE_ID
             + '/instances/',

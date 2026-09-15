@@ -24,7 +24,7 @@ Deno.test(
         await db.transaction(
             ['message_pairs'],
             async (view) => {
-                await view.messagePairs.put(
+                await view.messagePairs.append(
                     'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                 );
             },
@@ -45,7 +45,7 @@ Deno.test(
             () => db.transaction(
                 ['message_pairs'],
                 async (view) => {
-                    await view.messagePairs.put(
+                    await view.messagePairs.append(
                     'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                 );
                     throw new Error('boom');
@@ -66,7 +66,7 @@ Deno.test(
         const seen = await db.transaction(
             ['message_pairs'],
             async (view) => {
-                await view.messagePairs.put(
+                await view.messagePairs.append(
                     'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                 );
                 // Read back inside the same tx — the put is
@@ -90,7 +90,7 @@ Deno.test(
                 await view.transaction(
                     ['message_pairs'],
                     async (inner) => {
-                        await inner.messagePairs.put(
+                        await inner.messagePairs.append(
                             'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                         );
                     },
@@ -116,7 +116,7 @@ Deno.test(
                     await view.transaction(
                         ['message_pairs'],
                         async (inner) => {
-                            await inner.messagePairs.put(
+                            await inner.messagePairs.append(
                                 'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                             );
                         },
@@ -157,7 +157,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        await db.messagePairs.put('syWUUcdBSbBgMwBiCrgbDw', aMessagePair);
+        await db.messagePairs.append('syWUUcdBSbBgMwBiCrgbDw', aMessagePair);
         const seen = await db.readTransaction(
             ['message_pairs'],
             (view) => view.messagePairs.getAll(),
@@ -175,7 +175,7 @@ Deno.test(
         await assertRejects(
             () => db.readTransaction(
                 ['message_pairs'],
-                (view) => view.messagePairs.put(
+                (view) => view.messagePairs.append(
                     'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                 ),
             ),
@@ -195,7 +195,7 @@ Deno.test(
         const seen = await db.transaction(
             ['message_pairs'],
             async (view) => {
-                await view.messagePairs.put(
+                await view.messagePairs.append(
                     'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                 );
                 // Nested read joins the open write tx so the

@@ -73,7 +73,7 @@ async () => {
     );
 });
 
-Deno.test('getAllAtAddress delegates to Tx.getAddress',
+Deno.test('getDocumentHistory delegates to Tx.getAddress',
 async () => {
     const backend = new MemoryStorageBackend();
     await backend.ensureTables(['message_pairs']);
@@ -82,17 +82,17 @@ async () => {
         backendRunner(backend),
         (body) => body as Omit<Row, 'id'>,
     );
-    await store.put('a', {
+    await store.append('a', {
         path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         name: 'AjdvjuECVZEgZoFajaIEkg',
         response_at: '2026-01-01T00:00:00.000001Z',
     });
-    await store.put('c', {
+    await store.append('c', {
         path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         name: 'BBjWJsjYIDkTRKIIPrzWRw',
         response_at: '2026-01-01T00:00:00.000001Z',
     });
-    const got = await store.getAllAtAddress(
+    const got = await store.getDocumentHistory(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             , 'AjdvjuECVZEgZoFajaIEkg',
     );

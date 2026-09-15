@@ -65,7 +65,7 @@ async function putPair(
     adapter: DbAdapter,
     id: string,
 ): Promise<void> {
-    await adapter.messagePairs.put(id, {
+    await adapter.messagePairs.append(id, {
         path:
             '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/',
@@ -90,7 +90,7 @@ async function putPair(
 async function idsAtDocument(
     adapter: DbAdapter,
 ): Promise<string[]> {
-    const rows = await adapter.messagePairs.getAllAtAddress(
+    const rows = await adapter.messagePairs.getDocumentHistory(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/',
         '42',

@@ -142,8 +142,7 @@ async () => {
     const prefix =
         '/organizations/' + STARK_ORGANIZATION
         + '/work-orders/' + WO01_ID + '/binding/';
-    const requests = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const requests = await db.messagePairs.getCollectionPairs(prefix,
     );
     assertStrictEquals(requests.length, 1);
     const model = parseWire(requests[0]!.request);
@@ -182,8 +181,7 @@ async () => {
     const otherPrefix =
         '/organizations/' + STARK_ORGANIZATION
         + '/work-orders/' + otherWoId + '/transition/';
-    const otherReqs = await db.messagePairs.getAllWhere(
-        'path', otherPrefix,
+    const otherReqs = await db.messagePairs.getCollectionPairs(otherPrefix,
     );
     assert(otherReqs.length > 0);
     for (const request of otherReqs) {
@@ -215,8 +213,8 @@ async () => {
         STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
     );
     const [requests, responses] = await Promise.all([
-        db.messagePairs.getAllWhere('path', prefix),
-        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     const byId = new Map(
         responses

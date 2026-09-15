@@ -17,8 +17,8 @@ import { generateIdentifier } from
 
 // The Phase 14 Task 1 core: invitationOpStateFor is the ENTITY-
 // SCOPED sibling of the whole-ledger-scanning (private)
-// invitationOpStates — three indexed getAllWhere('path',
-// ...) reads (one per op kind) instead of a db.messagePairs.getAll()
+// invitationOpStates — three indexed getCollectionPairs
+// reads (one per op kind) instead of a db.messagePairs.getAll()
 // walk. This file proves it correct against the ROW-PLANE
 // (states table) currentInvitationState reproduces, over three
 // live lifecycles (accept/decline/revoke) plus the never-

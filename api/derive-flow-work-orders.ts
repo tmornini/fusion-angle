@@ -27,7 +27,7 @@ import {
 // the deriveProjectFlows mechanics verbatim). LIVE: GET
 // flows/:id/work-orders is wired to deriveFlowWorkOrders below
 // (Phase 5 Task 7); tests/drift-work-orders.test.ts proves
-// equality against flow_work_orders.getAllWhere('flow_id', ...).
+// equality against flow_work_orders.getAllWhere on flow_id.
 
 function flowWorkOrdersUriPrefix(
     organization: Id,
@@ -63,8 +63,7 @@ export async function deriveFlowWorkOrders(
     flowId: Id,
 ): Promise<FlowWorkOrderEntity[]> {
     const prefix = flowWorkOrdersUriPrefix(organization, flowId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const documents = deriveDocumentsAt(messagePairs, prefix);
     const rows: FlowWorkOrderEntity[] = [];

@@ -79,8 +79,7 @@ async function fetchScoreDocuments(
     segment: string,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = scoresUriPrefix(organization, projectId, segment);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }

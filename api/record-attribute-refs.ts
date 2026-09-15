@@ -115,8 +115,8 @@ export async function collectAttributeReferrers(
     const workOrdersPrefix = canonicalPath(
         boundOrganization, '/work-orders/',
     );
-    const woMessagePairs = await view.messagePairs.getAllWhere(
-        'path', workOrdersPrefix,
+    const woMessagePairs = await view.messagePairs.getCollectionPairs(
+        workOrdersPrefix,
     );
     const woHeads = deriveDocumentsAt(
         woMessagePairs, workOrdersPrefix,

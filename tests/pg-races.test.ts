@@ -180,8 +180,7 @@ async function messagePairsAt(
     collection: string,
     name: string,
 ): Promise<number> {
-    const rows = await db.messagePairs.getAllWhere(
-        'path', collection,
+    const rows = await db.messagePairs.getCollectionPairs(collection,
     );
     return rows.filter((row) => row.name === name)
         .length;
@@ -192,8 +191,7 @@ async function putHeadsAt(
     collection: string,
     name: string,
 ): Promise<number> {
-    const rows = await db.messagePairs.getAllWhere(
-        'path', collection,
+    const rows = await db.messagePairs.getCollectionPairs(collection,
     );
     return rows.filter((row) =>
         row.name === name && row.method === 'PUT',
@@ -329,8 +327,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assertStrictEquals(live.status, 200);
         const etag = live.headers.get('ETag');
         assert(etag !== null && etag !== '');
-        const heads = await db.messagePairs.getAllWhere(
-            'path', FLOW_PREFIX,
+        const heads = await db.messagePairs.getCollectionPairs(FLOW_PREFIX,
         );
         const liveHead = heads
             .filter((row) => row.name === id)

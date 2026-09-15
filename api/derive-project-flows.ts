@@ -21,7 +21,7 @@ import {
 // old plane's physical splice; parity, not a new mechanism).
 // Read-only and additive — no route reads this yet (Task 8
 // wires it); tests/drift-flows.test.ts proves equality against
-// project_flows.getAllWhere('project_id', ...).
+// project_flows.getAllWhere on project_id.
 
 function projectFlowsUriPrefix(
     organization: Id,
@@ -54,8 +54,7 @@ export async function deriveProjectFlows(
     projectId: Id,
 ): Promise<ProjectFlowEntity[]> {
     const prefix = projectFlowsUriPrefix(organization, projectId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const documents = deriveDocumentsAt(messagePairs, prefix);
     const rows: ProjectFlowEntity[] = [];

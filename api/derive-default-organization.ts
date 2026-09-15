@@ -26,8 +26,7 @@ export async function deriveDefaultOrganization(
     identityId: Id,
 ): Promise<IdentityDefaultOrganizationEntity[]> {
     const prefix = defaultOrganizationPrefix(identityId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,

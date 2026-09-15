@@ -58,8 +58,7 @@ export async function deriveFlowTag(
     name: Id,
 ): Promise<FlowTagEntity> {
     const prefix = flowTagsUriPrefix(organization, flowId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,

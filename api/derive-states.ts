@@ -118,7 +118,7 @@ async function resolveInvitationOwner(
     db: DbAdapter,
     entityId: Id,
 ): Promise<Id | null> {
-    const messagePairs = await db.messagePairs.getAllAtAddress(
+    const messagePairs = await db.messagePairs.getDocumentHistory(
         INVITATIONS_PREFIX, entityId,
     );
     const document = deriveDocumentsAt(
@@ -174,8 +174,7 @@ async function resolveFlowGraphOwner(
     ];
     for (const organization of ordered) {
         const prefix = canonicalPath(organization, '/flows/');
-        const stored = await db.messagePairs.getAllWhere(
-            'path', prefix,
+        const stored = await db.messagePairs.getCollectionPairs(prefix,
         );
         for (const messagePair of documentMessagePairsAt(
             stored, prefix,
@@ -213,7 +212,7 @@ async function organizationHasMemberMessagePair(
 ): Promise<boolean> {
     const seatPrefix = '/organizations/' + organization
         + '/members/';
-    const seatMessagePairs = await db.messagePairs.getAllAtAddress(
+    const seatMessagePairs = await db.messagePairs.getDocumentHistory(
         seatPrefix, identityId,
     );
     return deriveDocumentsAt(
@@ -255,7 +254,7 @@ async function computeOwningOrganization(
     // the owning organization. Document read of this id at
     // the organizations collection.
     const organizationRows =
-        await db.messagePairs.getAllAtAddress(
+        await db.messagePairs.getDocumentHistory(
             ORGANIZATIONS_PATH_PREFIX, entityId,
         );
     if (organizationRows.length > 0) {
@@ -279,7 +278,7 @@ async function computeOwningOrganization(
                 organization, '/' + family + '/',
             );
             const rows =
-                await db.messagePairs.getAllAtAddress(
+                await db.messagePairs.getDocumentHistory(
                     prefix, entityId,
                 );
             if (rows.length > 0) {
@@ -442,7 +441,7 @@ export async function resolveGlobalOwner(
         : ownerProbeCollection(boundOrganization, table);
     if (collection !== undefined) {
         const pairsAt =
-            await db.messagePairs.getAllAtAddress(
+            await db.messagePairs.getDocumentHistory(
                 collection, entityId,
             );
         if (pairsAt.length === 0) return null;
@@ -591,8 +590,7 @@ async function organizationHasOpBornEvent(
         const prefix = canonicalPath(
             organization, '/' + family + '/',
         );
-        const stored = await dbOrView.messagePairs.getAllWhere(
-            'path', prefix,
+        const stored = await dbOrView.messagePairs.getCollectionPairs(prefix,
         );
         for (const messagePair of documentMessagePairsAt(
             stored, prefix,
@@ -619,8 +617,7 @@ async function organizationHasOpBornEvent(
         organization, '/work-orders/',
     );
     const workOrderMessagePairs =
-        await dbOrView.messagePairs.getAllWhere(
-            'path', workOrdersPrefix,
+        await dbOrView.messagePairs.getCollectionPairs(workOrdersPrefix,
         );
     const workOrderIds = new Set<Id>(
         workOrderMessagePairs.map((row) => row.name),
@@ -635,8 +632,7 @@ async function organizationHasOpBornEvent(
                     + '/' + sub + '/',
             );
             const stored =
-                await dbOrView.messagePairs.getAllWhere(
-                    'path', prefix,
+                await dbOrView.messagePairs.getCollectionPairs(prefix,
                 );
             for (const messagePair of operationMessagePairsAt(
                 stored, prefix,
@@ -664,8 +660,7 @@ async function organizationHasOpBornEvent(
         canonicalPath(undefined, '/ai-members/'),
         canonicalPath(undefined, '/human-members/'),
     ]) {
-        const stored = await dbOrView.messagePairs.getAllWhere(
-            'path', prefix,
+        const stored = await dbOrView.messagePairs.getCollectionPairs(prefix,
         );
         for (const messagePair of operationMessagePairsAt(
             stored, prefix,
@@ -688,8 +683,8 @@ async function organizationHasOpBornEvent(
     // Invitations (flat path): organization lives in the
     // grant body; answering ops nest under invitations/:id/.
     {
-        const stored = await dbOrView.messagePairs.getAllWhere(
-            'path', INVITATIONS_PREFIX,
+        const stored = await dbOrView.messagePairs.getCollectionPairs(
+            INVITATIONS_PREFIX,
         );
         for (const messagePair of operationMessagePairsAt(
             stored, INVITATIONS_PREFIX,
@@ -717,8 +712,7 @@ async function organizationHasOpBornEvent(
                         + '/' + sub + '/',
                 );
                 const operationMessagePairs =
-                    await dbOrView.messagePairs.getAllWhere(
-                        'path', prefix,
+                    await dbOrView.messagePairs.getCollectionPairs(prefix,
                     );
                 for (const messagePair of operationMessagePairsAt(
                     operationMessagePairs, prefix,
@@ -1486,7 +1480,7 @@ async function workOrderClaimSourcesFor(
         organization, '/work-orders/',
     );
     const collectionMessagePairs =
-        await dbOrView.messagePairs.getAllAtAddress(
+        await dbOrView.messagePairs.getDocumentHistory(
             collectionPrefix, workOrderId,
         );
     const createMessagePairs = operationMessagePairsAt(
@@ -1500,8 +1494,8 @@ async function workOrderClaimSourcesFor(
         organization,
         '/work-orders/' + workOrderId + '/claim/',
     );
-    const claimStored = await dbOrView.messagePairs.getAllWhere(
-        'path', claimPrefix,
+    const claimStored = await dbOrView.messagePairs.getCollectionPairs(
+        claimPrefix,
     );
     const claimMessagePairs = operationMessagePairsAt(
         claimStored, claimPrefix, POST_OR_PUT,
@@ -1514,8 +1508,8 @@ async function workOrderClaimSourcesFor(
         organization,
         '/work-orders/' + workOrderId + '/release/',
     );
-    const releaseStored = await dbOrView.messagePairs.getAllWhere(
-        'path', releasePrefix,
+    const releaseStored = await dbOrView.messagePairs.getCollectionPairs(
+        releasePrefix,
     );
     const releaseMessagePairs = [
         ...operationMessagePairsAt(
@@ -1529,8 +1523,7 @@ async function workOrderClaimSourcesFor(
         '/work-orders/' + workOrderId + '/transition/',
     );
     const transitionStored =
-        await dbOrView.messagePairs.getAllWhere(
-            'path', transitionPrefix,
+        await dbOrView.messagePairs.getCollectionPairs(transitionPrefix,
         );
     const transitionMessagePairs = operationMessagePairsAt(
         transitionStored, transitionPrefix,
@@ -1702,8 +1695,8 @@ export async function workOrderHistoryFor(
         organization,
         '/work-orders/' + workOrderId + '/transition/',
     );
-    const transitionStored = await db.messagePairs.getAllWhere(
-        'path', transitionPrefix,
+    const transitionStored = await db.messagePairs.getCollectionPairs(
+        transitionPrefix,
     );
     const transitionMessagePairs = operationMessagePairsAt(
         transitionStored, transitionPrefix,
@@ -1750,8 +1743,7 @@ export async function workOrderBindingFor(
         organization,
         '/work-orders/' + workOrderId + '/binding/',
     );
-    const stored = await dbOrView.messagePairs.getAllWhere(
-        'path', prefix,
+    const stored = await dbOrView.messagePairs.getCollectionPairs(prefix,
     );
     const messagePairs = operationMessagePairsAt(
         stored, prefix, POST_OR_PUT,
@@ -1788,8 +1780,7 @@ export async function workOrderClaimDocumentFor(
         organization,
         '/work-orders/' + workOrderId + '/claim/',
     );
-    const fetched = await dbOrView.messagePairs.getAllWhere(
-        'path', prefix,
+    const fetched = await dbOrView.messagePairs.getCollectionPairs(prefix,
     );
     const messagePairs = documentMessagePairsAt(
         fetched, prefix,
@@ -1861,7 +1852,7 @@ export async function workOrderDocumentHeadFor(
         organization, '/work-orders/',
     );
     const collectionMessagePairs =
-        await dbOrView.messagePairs.getAllAtAddress(
+        await dbOrView.messagePairs.getDocumentHistory(
             collectionPrefix, workOrderId,
         );
     const entityMessagePairs = documentMessagePairsAt(
@@ -2052,7 +2043,7 @@ export async function invitationLifecycleStatesFor(
     const rows: StateEntity[] = [];
 
     const collectionMessagePairs =
-        await dbOrView.messagePairs.getAllAtAddress(
+        await dbOrView.messagePairs.getDocumentHistory(
             INVITATIONS_PREFIX, id,
         );
     const hasDocument = documentMessagePairsAt(
@@ -2080,9 +2071,10 @@ export async function invitationLifecycleStatesFor(
         const prefix = canonicalPath(
             undefined, '/invitations/' + id + '/' + op + '/',
         );
-        const operationMessagePairs = await dbOrView.messagePairs.getAllWhere(
-            'path', prefix,
-        );
+        const operationMessagePairs =
+            await dbOrView.messagePairs.getCollectionPairs(
+                prefix,
+            );
         const fields = INVITATION_OP_FIELDS[op]!;
         const earliest = operationMessagePairsAt(
             operationMessagePairs, prefix,

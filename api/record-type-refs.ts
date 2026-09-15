@@ -42,8 +42,8 @@ export async function collectRecordTypeReferrers(
     const instancesPrefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const instanceMessagePairs = await view.messagePairs.getAllWhere(
-        'path', instancesPrefix,
+    const instanceMessagePairs = await view.messagePairs.getCollectionPairs(
+        instancesPrefix,
     );
     const instanceHeads = deriveDocumentsAt(
         instanceMessagePairs, instancesPrefix,

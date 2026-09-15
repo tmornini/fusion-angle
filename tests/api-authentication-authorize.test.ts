@@ -81,8 +81,7 @@ async function s256Fields(): Promise<{
 async function noStoredAuthorizeResponse(
     db: MemoryDbAdapter,
 ): Promise<boolean> {
-    const responses = await db.messagePairs.getAllWhere(
-        'path',
+    const responses = await db.messagePairs.getCollectionPairs(
         canonicalPath(undefined, '/authentication/authorize/'),
     );
     return responses.length === 0;

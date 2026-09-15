@@ -64,8 +64,7 @@ async function fetchRecordTypeMessagePairs(
     readonly documents: Map<string, DerivedDocument>;
     readonly messagePairs: readonly DocumentMessagePair[];
 }> {
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return {
         documents: deriveDocumentsAt(messagePairs, prefix),

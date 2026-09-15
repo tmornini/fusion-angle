@@ -98,10 +98,8 @@ Deno.test('accept writes the seat at the invitation'
 
     const prefix = seatsPrefix(ORGANIZATION_TWO);
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere(
-            'path', prefix),
-        db.messagePairs.getAllWhere(
-            'path', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     const seats = documentMessagePairsAt(
         requests, prefix,

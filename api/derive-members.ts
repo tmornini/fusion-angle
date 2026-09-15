@@ -35,8 +35,7 @@ export async function deriveMembers(
 ): Promise<MemberEntity[]> {
     const [seats, identityMessagePairs] = await Promise.all([
         deriveOrganizationMemberSeats(db, organization),
-        db.messagePairs.getAllWhere(
-            'path', IDENTITIES_PREFIX,
+        db.messagePairs.getCollectionPairs(IDENTITIES_PREFIX,
         ),
     ]);
     const identities = deriveDocumentsAt(

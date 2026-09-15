@@ -10,8 +10,8 @@ import { compareIdentifiers } from
     '../shared/identifier.ts';
 
 // Named reads over the message plane. One document
-// is getAllAtAddress (path + name). A
-// collection is getAllWhere('path').
+// is getDocumentHistory (path + name). A
+// collection is getCollectionPairs.
 // Body containment is getAllWhereBody. No
 // name-only scan. The seam orders by
 // (response_at, id); the store never re-sorts rows.
@@ -167,8 +167,7 @@ async function messagePairsInCollection(
     db: DbAdapter,
     collection: string,
 ): Promise<readonly MessagePairEntity[]> {
-    return db.messagePairs.getAllWhere(
-        'path', collection,
+    return db.messagePairs.getCollectionPairs(collection,
     );
 }
 
@@ -177,5 +176,5 @@ async function messagePairsAt(
     collection: string,
     id: string,
 ): Promise<readonly MessagePairEntity[]> {
-    return db.messagePairs.getAllAtAddress(collection, id);
+    return db.messagePairs.getDocumentHistory(collection, id);
 }

@@ -457,7 +457,7 @@ Deno.test('identity-pii derive (12 seeded slots) fenced both'
 // -- 2b. the by-email login-shape leg (Phase 13 Task 8, concern -
 // -- 2): authorizePassword's identity lookup now feeds -----------
 // -- identityByEmail from deriveIdentityPiiRows rather than the --
-// -- row-plane identityPii.getAllWhere('email', ...) scan — this -
+// -- row-plane identityPii.getAllWhere on email scan — this -
 // -- proves the reducer resolves the SAME identity id from BOTH --
 // -- planes, for every seeded email AND an unknown one (both -----
 // -- null, the no-enumeration shape) -------------------------------

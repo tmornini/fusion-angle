@@ -531,11 +531,9 @@ Deno.test(
         }
         const [agentRequests] =
             await Promise.all([
-                db.messagePairs.getAllWhere(
-                    'path', '/ai-agents/',
+                db.messagePairs.getCollectionPairs('/ai-agents/',
                 ),
-                db.messagePairs.getAllWhere(
-                    'path', '/ai-agents/',
+                db.messagePairs.getCollectionPairs('/ai-agents/',
                 ),
             ]);
         const agentIds = new Set(

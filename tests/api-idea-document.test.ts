@@ -183,8 +183,7 @@ async () => {
     const firstEtag = first.headers.get('ETag');
     assert(firstEtag !== null && firstEtag !== '');
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
-    const before = (await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const before = (await db.messagePairs.getCollectionPairs(prefix,
     )).filter((row) => row.name === 'tmPPRaXkMetWxTSisIPFLA');
     assertStrictEquals(before.length, 1);
     // Different hoisted header → different request hash,
@@ -205,8 +204,7 @@ async () => {
     );
     assertStrictEquals(second.status, 200);
     assertStrictEquals(second.headers.get('ETag'), firstEtag);
-    const after = (await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const after = (await db.messagePairs.getCollectionPairs(prefix,
     )).filter((row) => row.name === 'tmPPRaXkMetWxTSisIPFLA');
     assertStrictEquals(after.length, 1);
 });

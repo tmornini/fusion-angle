@@ -34,7 +34,7 @@ Deno.test(
     async () => {
         const adapter = memoryDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.messagePairs.put('u1', {
+        await adapter.messagePairs.append('u1', {
             path:
                 '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
             name: '42',

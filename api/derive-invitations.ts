@@ -82,7 +82,7 @@ async function invitationOpStates(
 // ENTITY-SCOPED sibling of invitationOpStates above (Phase 14
 // Task 1): the SAME OP_STATES mutual-exclusivity covenant,
 // restricted to ONE known invitation id via three INDEXED
-// getAllWhere('path', ...) reads (one per op kind) rather
+// getCollectionPairs reads (one per op kind) rather
 // than the whole-ledger db.messagePairs.getAll() invitationOpStates
 // needs to DISCOVER every invitation's own op prefix out of an
 // unknown set of ids. dbOrView-shaped and opens no nested
@@ -102,8 +102,7 @@ export async function invitationOpStateFor(
         const prefix = canonicalPath(
             undefined, '/invitations/' + id + '/' + op + '/',
         );
-        const rows = await dbOrView.messagePairs.getAllWhere(
-            'path', prefix,
+        const rows = await dbOrView.messagePairs.getCollectionPairs(prefix,
         );
         if (rows.length > 0) return OP_STATES[op];
     }
@@ -116,8 +115,8 @@ export async function invitationOpStateFor(
 export async function deriveInvitations(
     db: DbAdapter,
 ): Promise<DerivedInvitationRow[]> {
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', INVITATIONS_PREFIX,
+    const messagePairs = await db.messagePairs.getCollectionPairs(
+        INVITATIONS_PREFIX,
     );
     const documents = deriveDocumentsAt(
         messagePairs, INVITATIONS_PREFIX,

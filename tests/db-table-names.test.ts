@@ -79,7 +79,7 @@ Deno.test(
 Deno.test('MemoryDbAdapter exposes message stores', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await db.messagePairs.put('pair-1', {
+    await db.messagePairs.append('pair-1', {
         path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         name: '42',
         requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',

@@ -175,11 +175,9 @@ async function liveIdentityIds(
     db: MemoryDbAdapter,
 ): Promise<string[]> {
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere(
-            'path', '/identities/',
+        db.messagePairs.getCollectionPairs('/identities/',
         ),
-        db.messagePairs.getAllWhere(
-            'path', '/identities/',
+        db.messagePairs.getCollectionPairs('/identities/',
         ),
     ]);
     return [...deriveDocumentsAt(requests, '/identities/').keys()];

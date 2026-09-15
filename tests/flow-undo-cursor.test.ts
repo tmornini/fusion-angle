@@ -756,8 +756,7 @@ Deno.test(
 
         const prefix = canonicalPath('AjdvjuECVZEgZoFajaIEkg'
             , '/flows/');
-        const stored = await db.messagePairs.getAllWhere(
-            'path', prefix,
+        const stored = await db.messagePairs.getCollectionPairs(prefix,
         );
         const messagePairs = documentMessagePairsAt(
             stored, prefix,

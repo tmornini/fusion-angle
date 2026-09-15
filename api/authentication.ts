@@ -467,7 +467,7 @@ export async function tokenRevocationReason(
 ): Promise<string | null> {
     // FIRST read FLIPPED (Phase 13 Task 4): derived via
     // deriveTokenRevocationsFor — row-identical to the
-    // getAllWhere('identity_id', sub) read it replaces.
+    // getAllWhere on identity_id it replaces.
     const revs = await deriveTokenRevocationsFor(adapter, sub);
     const revokedThrough = revokedThroughSeconds(revs, sub);
     if (revokedThrough !== null && iat <= revokedThrough) {
@@ -475,7 +475,7 @@ export async function tokenRevocationReason(
     }
     // SECOND read FLIPPED (Phase 13 Task 6, gate 7 discharged):
     // derived via deriveIdentityTokenEventsForJti — row-identical
-    // to the getAllWhere('jti', jti) read it replaces, now that
+    // to the getAllWhere on jti it replaces, now that
     // every identity_tokens writer forms its own event pair
     // (Phase 13 Task 5). The gate check needs only THIS jti's
     // events: a chain-wide revoke writes a 'revoked' event per
@@ -1234,11 +1234,11 @@ export async function authorizationCodeSpent(
     derivedId: Id,
     identityId: Id,
 ): Promise<boolean> {
-    const nested = await dbOrView.messagePairs.getAllAtAddress(
+    const nested = await dbOrView.messagePairs.getDocumentHistory(
         tokensEventPrefixFor(identityId), derivedId,
     );
     if (nested.length > 0) return true;
-    const leftover = await dbOrView.messagePairs.getAllAtAddress(
+    const leftover = await dbOrView.messagePairs.getDocumentHistory(
         IDENTITY_TOKENS_FLAT_PREFIX, derivedId,
     );
     return leftover.length > 0;
@@ -1509,7 +1509,7 @@ async function authorizePassword(
     // FLIPPED (Phase 13 Task 8): deriveIdentityPiiRows is the E13
     // full-scan derive (derive-identity-spine.ts) — a whole-
     // ledger scan is unavoidable here, exactly as the row-plane
-    // getAllWhere('email', ...) it replaces was: email carries no
+    // getAllWhere on email it replaces was: email carries no
     // dedicated index either plane, so both planes scan every
     // slot to find the match. identityByEmail (the reducer) is
     // BYTE-UNCHANGED — only the row source moves.

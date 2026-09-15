@@ -88,8 +88,8 @@ export async function deriveOrganizations(
     return db.readTransaction(
         MESSAGE_TABLES,
         async (view) => {
-            const messagePairs = await view.messagePairs.getAllWhere(
-                'path', ORGANIZATIONS_PREFIX,
+            const messagePairs = await view.messagePairs.getCollectionPairs(
+                ORGANIZATIONS_PREFIX,
             );
             const documents = deriveDocumentsAt(
                 messagePairs, ORGANIZATIONS_PREFIX,
@@ -114,8 +114,8 @@ export async function deriveOrganization(
     return db.readTransaction(
         MESSAGE_TABLES,
         async (view) => {
-            const messagePairs = await view.messagePairs.getAllWhere(
-                'path', ORGANIZATIONS_PREFIX,
+            const messagePairs = await view.messagePairs.getCollectionPairs(
+                ORGANIZATIONS_PREFIX,
             );
             const document = deriveDocumentsAt(
                 messagePairs, ORGANIZATIONS_PREFIX,

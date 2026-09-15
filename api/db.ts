@@ -79,31 +79,28 @@ export interface EntityStore<
     T extends { id: string },
 > {
     getAll(): Promise<T[]>;
-    // The keyed sub-collection read: the rows whose indexed
-    // `column` equals `key`. Concrete stores serve it over
-    // `Tx.getWhere`. Every store face honors the same read,
-    // so no caller re-acquires it by assertion.
-    getAllWhere(
-        column: string,
-        key: string,
-    ): Promise<T[]>;
-    getAllAtAddress(
-        collection: string,
+    // The keyed sub-collection read: the literal `WHERE
+    // path = $1`: every pair of every document in the
+    // collection.
+    getCollectionPairs(path: string): Promise<T[]>;
+    getPairsByRequestHash(hash: string): Promise<T[]>;
+    getDocumentHistory(
+        path: string,
         name: string,
     ): Promise<T[]>;
     getAllWhereBody(
-        collection: string,
+        path: string,
         containment: Record<string, unknown>,
     ): Promise<T[]>;
     getById(id: string): Promise<T>;
-    put(
+    append(
         id: string,
         fields: Omit<T, 'id'>,
     ): Promise<T>;
 }
 
 // The storage-edge validator. Stores accept one at
-// construction and re-verify every `put` body through
+// construction and re-verify every `append` body through
 // it — the same telling-shape function used by the
 // HTTP route validator. Threaded into stores so the
 // gate sits at the storage edge, not only at the

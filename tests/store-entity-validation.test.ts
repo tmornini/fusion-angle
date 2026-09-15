@@ -15,7 +15,7 @@ async function primedBackend(): Promise<MemoryStorageBackend> {
     return backend;
 }
 
-Deno.test('HistoryEntityStore.put invokes the validator',
+Deno.test('HistoryEntityStore.append invokes the validator',
     async () => {
         const backend = await primedBackend();
         let seen: Record<string, unknown> | null = null;
@@ -26,11 +26,11 @@ Deno.test('HistoryEntityStore.put invokes the validator',
                 return b as unknown as Omit<Thing, 'id'>;
             },
         );
-        await store.put('a', { n: 7 });
+        await store.append('a', { n: 7 });
         assertEquals(seen, { n: 7 });
     });
 
-Deno.test('HistoryEntityStore.put rethrows validator errors',
+Deno.test('HistoryEntityStore.append rethrows validator errors',
     async () => {
         const backend = await primedBackend();
         const store = new HistoryEntityStore<Thing>(
@@ -38,12 +38,12 @@ Deno.test('HistoryEntityStore.put rethrows validator errors',
             () => { throw new Error('nope'); },
         );
         await assertRejects(
-            () => store.put('a', { n: 1 }),
+            () => store.append('a', { n: 1 }),
             Error, 'nope',
         );
     });
 
-Deno.test('HistoryEntityStore.put writes the validator output',
+Deno.test('HistoryEntityStore.append writes the validator output',
     async () => {
         const backend = await primedBackend();
         const store = new HistoryEntityStore<Thing>(
@@ -52,7 +52,7 @@ Deno.test('HistoryEntityStore.put writes the validator output',
                 n: (b['n'] as number) + 1,
             }),
         );
-        const written = await store.put('a', { n: 7 });
+        const written = await store.append('a', { n: 7 });
         assertStrictEquals(written.n, 8);
         const fetched = await store.getById('a');
         assertStrictEquals(fetched.n, 8);

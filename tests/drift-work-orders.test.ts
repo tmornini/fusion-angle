@@ -641,8 +641,7 @@ async () => {
     // workOrder.flow_graph against the entity PUT's STORED,
     // round-tripped response — two independently re-encoded
     // values, not the same in-memory literal.
-    const storedCreatePostRow = (await db.messagePairs.getAllWhere(
-        'path',
+    const storedCreatePostRow = (await db.messagePairs.getCollectionPairs(
         canonicalPath(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
         (r) => r.name === workOrderId
@@ -942,8 +941,8 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
     );
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('path', prefix),
-        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     const pairsAt = requests.filter(
         (r) => r.path === prefix
@@ -1289,8 +1288,8 @@ async function replayWorkOrderStates(
         organization, '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
     );
     const [woRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('path', woPrefix),
-        db.messagePairs.getAllWhere('path', woPrefix),
+        db.messagePairs.getCollectionPairs(woPrefix),
+        db.messagePairs.getCollectionPairs(woPrefix),
     ]);
     const allWoMessagePairs = allMessagePairsAt(woRequests, woPrefix);
     const createMessagePair = allWoMessagePairs.find(
@@ -1311,8 +1310,8 @@ async function replayWorkOrderStates(
             + '/claim/',
     );
     const [claimRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('path', claimPrefix),
-        db.messagePairs.getAllWhere('path', claimPrefix),
+        db.messagePairs.getCollectionPairs(claimPrefix),
+        db.messagePairs.getCollectionPairs(claimPrefix),
     ]);
     const claimMessagePairs = allMessagePairsAt(
         claimRequests, claimPrefix,
@@ -1330,11 +1329,9 @@ async function replayWorkOrderStates(
     );
     const [releaseRequests] =
         await Promise.all([
-            db.messagePairs.getAllWhere(
-                'path', releasePrefix,
+            db.messagePairs.getCollectionPairs(releasePrefix,
             ),
-            db.messagePairs.getAllWhere(
-                'path', releasePrefix,
+            db.messagePairs.getCollectionPairs(releasePrefix,
             ),
         ]);
     const releaseMessagePairs = [
@@ -1352,8 +1349,8 @@ async function replayWorkOrderStates(
     const [
         transitionRequests,
     ] = await Promise.all([
-        db.messagePairs.getAllWhere('path', transitionPrefix),
-        db.messagePairs.getAllWhere('path', transitionPrefix),
+        db.messagePairs.getCollectionPairs(transitionPrefix),
+        db.messagePairs.getCollectionPairs(transitionPrefix),
     ]);
     const transitionMessagePairs = allMessagePairsAt(
         transitionRequests, transitionPrefix,
@@ -1493,8 +1490,7 @@ async () => {
     // independently re-encoded values, not the same in-memory
     // literal — so a canonical-JSON regression that mangled
     // either differently would be caught.
-    const storedCreatePostRow = (await db.messagePairs.getAllWhere(
-        'path',
+    const storedCreatePostRow = (await db.messagePairs.getCollectionPairs(
         canonicalPath(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
         (r) => r.name === workOrderId
@@ -1745,7 +1741,7 @@ Deno.test('same-join-id retry: two different work-order creates '
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
             + '/work-orders/',
     );
-    const joinResponses = await db.messagePairs.getAllAtAddress(
+    const joinResponses = await db.messagePairs.getDocumentHistory(
         joinPrefix, sharedFwoId,
     );
     assertStrictEquals(joinResponses.length, 2);

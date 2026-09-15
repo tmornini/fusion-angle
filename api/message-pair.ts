@@ -403,8 +403,7 @@ export async function storedResponseFor(
     db: DbAdapter,
     requestHash: string,
 ): Promise<MessagePairEntity | undefined> {
-    const prior = await db.messagePairs.getAllWhere(
-        'request_hash', requestHash,
+    const prior = await db.messagePairs.getPairsByRequestHash(requestHash,
     );
     return prior[0];
 }
@@ -677,8 +676,8 @@ export async function appendMessagePair(
     messagePair: MessagePair,
 ): Promise<void> {
     await coordinateWrite(view, messagePair, true);
-    const replay = await view.messagePairs.getAllWhere(
-        'request_hash', messagePair.requestHash,
+    const replay = await view.messagePairs.getPairsByRequestHash(
+        messagePair.requestHash,
     );
     if (replay.length > 0) return;
     await writeMessagePairRows(view, messagePair);
@@ -689,7 +688,7 @@ async function writeMessagePairRows(
     view: DbAdapter,
     messagePair: MessagePair,
 ): Promise<void> {
-    await view.messagePairs.put(messagePair.id, {
+    await view.messagePairs.append(messagePair.id, {
         path: messagePair.path,
         name: messagePair.name,
         requester_identity_id:

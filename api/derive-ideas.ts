@@ -98,8 +98,7 @@ async function fetchIdeaMessagePairs(
     readonly documents: Map<string, DerivedDocument>;
     readonly messagePairs: readonly DocumentMessagePair[];
 }> {
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return {
         documents: deriveDocumentsAt(messagePairs, prefix),
@@ -213,8 +212,7 @@ export async function deriveIdeaSubmissions(
     ideaId: Id,
 ): Promise<IdeaSubmissionEntity[]> {
     const prefix = submissionsUriPrefix(organization, ideaId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const documents = deriveDocumentsAt(
         messagePairs, prefix,

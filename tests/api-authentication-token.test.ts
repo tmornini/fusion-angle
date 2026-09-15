@@ -989,8 +989,8 @@ async () => {
     // requests.getAllWhere — the fault-injection point that
     // replaced the retired rawReadRow stub.
     (db.messagePairs as unknown as {
-        getAllWhere: () => Promise<never>;
-    }).getAllWhere = async () => {
+        getCollectionPairs: () => Promise<never>;
+    }).getCollectionPairs = async () => {
         throw new Error('store exploded');
     };
     const { result: res, calls } = await captureConsole(

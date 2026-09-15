@@ -32,7 +32,7 @@ import {
 // family. LIVE: GET flows/:id/records and GET flows/:id/
 // records/:frid are wired to deriveFlowRecords/deriveFlowRecord
 // below (Phase 6 Task 7); tests/drift-records.test.ts proves
-// equality against flow_records.getAllWhere('flow_id', ...) and
+// equality against flow_records.getAllWhere on flow_id and
 // flow_records.getById(...).
 
 const FLOW_RECORDS_TABLE = 'flow_records';
@@ -64,8 +64,7 @@ async function fetchFlowRecordDocuments(
     flowId: Id,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = flowRecordsUriPrefix(organization, flowId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }

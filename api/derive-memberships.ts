@@ -159,8 +159,8 @@ export async function deriveMembershipsForIdentity(
     const rows: MembershipEntity[] = [];
     for (const organization of organizations) {
         const seatPrefix = seatsPrefixFor(organization.id);
-        const seatMessagePairs = await db.messagePairs.getAllWhere(
-            'path', seatPrefix,
+        const seatMessagePairs = await db.messagePairs.getCollectionPairs(
+            seatPrefix,
         );
         const seat = deriveDocumentsAt(
             seatMessagePairs, seatPrefix,
@@ -187,8 +187,7 @@ export async function membershipExistsFor(
 ): Promise<boolean> {
     const seatPrefix = seatsPrefixFor(organization);
     const seatMessagePairs =
-        await dbOrView.messagePairs.getAllWhere(
-            'path', seatPrefix,
+        await dbOrView.messagePairs.getCollectionPairs(seatPrefix,
         );
     return deriveDocumentsAt(
         seatMessagePairs, seatPrefix,
@@ -200,8 +199,7 @@ export async function deriveOrganizationMemberSeats(
     organization: Id,
 ): Promise<MembershipEntity[]> {
     const prefix = seatsPrefixFor(organization);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const documents = deriveDocumentsAt(messagePairs, prefix);
     const rows: MembershipEntity[] = [];
@@ -217,8 +215,7 @@ export async function deriveOrganizationMemberSeat(
     identityId: Id,
 ): Promise<MembershipEntity> {
     const prefix = seatsPrefixFor(organization);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,

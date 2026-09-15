@@ -147,7 +147,7 @@ async function flowDocumentPairCount(
             + '/flows/',
     );
     const stored = await db.messagePairs
-        .getAllWhere('path', prefix);
+        .getCollectionPairs(prefix);
     return documentMessagePairsAt(
         stored, prefix,
     ).filter(

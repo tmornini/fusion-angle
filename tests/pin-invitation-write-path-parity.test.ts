@@ -366,8 +366,7 @@ Deno.test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
 
     const seatPrefix = '/organizations/'
         + ORGANIZATION_TWO + '/members/';
-    const seatRows = await db.messagePairs.getAllWhere(
-        'path', seatPrefix,
+    const seatRows = await db.messagePairs.getCollectionPairs(seatPrefix,
     );
     assertStrictEquals(
         seatRows.some((row) => row.name === inviteeId

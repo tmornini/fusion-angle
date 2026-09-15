@@ -150,8 +150,7 @@ async function fetchInstanceMessagePairs(
     const prefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return documentMessagePairsAt(messagePairs, prefix);
 }
@@ -169,8 +168,7 @@ export async function deriveInstanceHead(
     const prefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,
@@ -192,8 +190,7 @@ export async function deriveInstanceCollection(
     const prefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const documents = deriveDocumentsAt(
         messagePairs, prefix,

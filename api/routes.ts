@@ -1008,8 +1008,7 @@ export async function loadAttributeSchemaById(
     const prefix = attributesUriPrefix(
         organization, recordTypeId,
     );
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const documents = deriveDocumentsAt(
         messagePairs, prefix,
@@ -2575,7 +2574,7 @@ export async function postFlowRecordDocumentOp(
             // create an existence oracle; W1 / W7), the
             // work-order binding's instance-probe posture.
             const recordHead = deriveDocumentsAt(
-                await view.messagePairs.getAllAtAddress(
+                await view.messagePairs.getDocumentHistory(
                     recordsPrefix, entity.record_id,
                 ),
                 recordsPrefix,
@@ -3619,8 +3618,8 @@ async function inFlightPlacementBlockersFor(
     const workOrdersPrefix = canonicalPath(
         organization, '/work-orders/',
     );
-    const woMessagePairs = await view.messagePairs.getAllWhere(
-        'path', workOrdersPrefix,
+    const woMessagePairs = await view.messagePairs.getCollectionPairs(
+        workOrdersPrefix,
     );
     const woHeads = deriveDocumentsAt(
         woMessagePairs, workOrdersPrefix,
@@ -3666,7 +3665,7 @@ async function instanceDocumentSpent(
     instanceId: Id,
 ): Promise<boolean> {
     const messagePairs =
-        await db.messagePairs.getAllAtAddress(
+        await db.messagePairs.getDocumentHistory(
             prefix, instanceId,
         );
     return messagePairs.length > 0;
@@ -4094,7 +4093,7 @@ export const routes: Route[] = [
     // keys the ledger scan (deriveCredentialsFor reads the
     // /identities/{path id}/credentials/ prefix — that is where
     // the pairs live); the pre-flip fence read each ROW's OWN
-    // identity_id field (parentScope's getAllWhere('identity_id',
+    // identity_id field (parentScope's getAllWhere on identity_id,
     // path id) filters the OLD-plane store by that field BEFORE
     // fencing, then viaMembership fences on that SAME field). A
     // below-facade write whose body.identity_id disagrees with
@@ -5247,8 +5246,8 @@ export const routes: Route[] = [
             const typeId = param(p, 1);
             await requireRecordTypeExists(db, org, typeId);
             const prefix = attributesUriPrefix(org, typeId);
-            const messagePairs = await db.messagePairs.getAllWhere(
-                'path', prefix,
+            const messagePairs = await db.messagePairs.getCollectionPairs(
+                prefix,
             );
             const documents = deriveDocumentsAt(
                 messagePairs, prefix,
@@ -5274,8 +5273,8 @@ export const routes: Route[] = [
             const attrId = param(p, 2);
             await requireRecordTypeExists(db, org, typeId);
             const prefix = attributesUriPrefix(org, typeId);
-            const messagePairs = await db.messagePairs.getAllWhere(
-                'path', prefix,
+            const messagePairs = await db.messagePairs.getCollectionPairs(
+                prefix,
             );
             const document = deriveDocumentsAt(
                 messagePairs, prefix,
@@ -5314,8 +5313,8 @@ export const routes: Route[] = [
                 );
             }
             const prefix = attributesUriPrefix(org, typeId);
-            const messagePairs = await db.messagePairs.getAllWhere(
-                'path', prefix,
+            const messagePairs = await db.messagePairs.getCollectionPairs(
+                prefix,
             );
             if (!deriveDocumentsAt(
                 messagePairs, prefix,

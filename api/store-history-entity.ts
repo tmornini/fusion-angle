@@ -35,41 +35,40 @@ export class HistoryEntityStore<
         );
     }
 
-    // The keyed-collection read: getAll narrowed to one
-    // indexed column. History rows never tombstone, so —
-    // like getAll — no deleted-id scan; just the index slice.
-    async getAllWhere(
-        column: string,
-        key: string,
-    ): Promise<T[]> {
+    async getCollectionPairs(path: string): Promise<T[]> {
+        return this.#run(
+            [this.#table], 'readonly',
+            tx => tx.getWhere<T>(this.#table, 'path', path),
+        );
+    }
+
+    async getPairsByRequestHash(hash: string): Promise<T[]> {
         return this.#run(
             [this.#table], 'readonly',
             tx => tx.getWhere<T>(
-                this.#table, column, key,
+                this.#table, 'request_hash', hash,
             ),
         );
     }
 
-    async getAllAtAddress(
-        collection: string,
+    async getDocumentHistory(
+        path: string,
         name: string,
     ): Promise<T[]> {
         return this.#run(
             [this.#table], 'readonly',
-            tx => tx.getAddress<T>(
-                this.#table, collection, name,
-            ),
+            tx => tx.getAddress<T>(this.#table, path, name),
         );
     }
 
     async getAllWhereBody(
-        collection: string,
+        path: string,
         containment: Record<string, unknown>,
     ): Promise<T[]> {
         return this.#run(
             [this.#table], 'readonly',
             tx => tx.getWhereBody<T>(
-                this.#table, collection, containment,
+                this.#table, path, containment,
             ),
         );
     }
@@ -91,7 +90,7 @@ export class HistoryEntityStore<
         );
     }
 
-    async put(
+    async append(
         id: string,
         fields: Omit<T, 'id'>,
     ): Promise<T> {

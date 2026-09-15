@@ -870,8 +870,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     );
     const beforeDuplicateIds = new Set(
         (
-            await db.messagePairs.getAllWhere(
-                'path', objectivesPrefix,
+            await db.messagePairs.getCollectionPairs(objectivesPrefix,
             )
         ).filter((r) => r.name === objectiveId)
             .map((r) => r.id),
@@ -894,8 +893,8 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     );
 
     const [afterRequests, afterResponses] = await Promise.all([
-        db.messagePairs.getAllWhere('path', objectivesPrefix),
-        db.messagePairs.getAllWhere('path', objectivesPrefix),
+        db.messagePairs.getCollectionPairs(objectivesPrefix),
+        db.messagePairs.getCollectionPairs(objectivesPrefix),
     ]);
     const afterPairsAt = afterResponses.filter(
         (r) => r.name === objectiveId,
@@ -967,8 +966,8 @@ Deno.test('the create-op POST pair is not read as a document message pair —'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
     );
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('path', prefix),
-        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     const pairsAt = requests.filter(
         (r) => r.path === prefix

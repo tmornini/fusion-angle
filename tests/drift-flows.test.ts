@@ -350,8 +350,8 @@ async function derivedHeadMessagePairId(
 ): Promise<string> {
     const prefix = canonicalPath(organization, '/flows/');
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('path', prefix),
-        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     const documents = deriveDocumentsAt(requests, prefix);
     const document = documents.get(flowId);
@@ -1138,7 +1138,7 @@ Deno.test('same-join-id retry: two different flow creates reusing '
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
             + '/flows/',
     );
-    const joinResponses = await db.messagePairs.getAllAtAddress(
+    const joinResponses = await db.messagePairs.getDocumentHistory(
         joinPrefix, sharedPfid,
     );
     assertStrictEquals(joinResponses.length, 2);

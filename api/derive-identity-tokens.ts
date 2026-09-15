@@ -125,8 +125,8 @@ async function fetchTokenDocumentsAt(
     dbOrView: DbAdapter,
     prefix: string,
 ): Promise<Map<string, DerivedDocument>> {
-    const messagePairs = await dbOrView.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await dbOrView.messagePairs.getCollectionPairs(
+        prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }

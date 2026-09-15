@@ -34,17 +34,19 @@ Deno.test(
         // identity's default-organization document. Fault THAT
         // read alone
         // — every other read passes through unaffected.
-        const original = db.messagePairs.getAllWhere.bind(db.messagePairs);
+        const original = db.messagePairs.getCollectionPairs.bind(
+            db.messagePairs,
+        );
         (db.messagePairs as unknown as {
-            getAllWhere: (
-                column: string, key: string,
+            getCollectionPairs: (
+                path: string,
             ) => ReturnType<typeof original>;
-        }).getAllWhere = async (column, key) => {
-            if (key === '/identities/XXZruirZyAOoRpNxaDnpSA/'
+        }).getCollectionPairs = async (path) => {
+            if (path === '/identities/XXZruirZyAOoRpNxaDnpSA/'
                 + 'default-organization/') {
                 throw new Error('secret fence fault detail');
             }
-            return original(column, key);
+            return original(path);
         };
         const flatToken = await reachableToken();
         const { result: response, calls } =
@@ -78,17 +80,19 @@ Deno.test(
     + ' never redacted to the fixed 500',
     async () => {
         const db = await freshDb();
-        const original = db.messagePairs.getAllWhere.bind(db.messagePairs);
+        const original = db.messagePairs.getCollectionPairs.bind(
+            db.messagePairs,
+        );
         (db.messagePairs as unknown as {
-            getAllWhere: (
-                column: string, key: string,
+            getCollectionPairs: (
+                path: string,
             ) => ReturnType<typeof original>;
-        }).getAllWhere = async (column, key) => {
-            if (key === '/identities/XXZruirZyAOoRpNxaDnpSA/'
+        }).getCollectionPairs = async (path) => {
+            if (path === '/identities/XXZruirZyAOoRpNxaDnpSA/'
                 + 'default-organization/') {
                 throw new MissingTableError('message_pairs');
             }
-            return original(column, key);
+            return original(path);
         };
         const flatToken = await reachableToken();
         await assertRejects(

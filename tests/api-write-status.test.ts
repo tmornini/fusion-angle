@@ -76,8 +76,7 @@ async function pairsAt(
     prefix: string,
     name: string,
 ): Promise<number> {
-    const rows = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const rows = await db.messagePairs.getCollectionPairs(prefix,
     );
     return rows.filter((row) => row.name === name)
         .length;
@@ -93,8 +92,7 @@ async function storedResponseAt(
     readonly status: number;
     readonly hasOperationId: boolean;
 }> {
-    const requests = (await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const requests = (await db.messagePairs.getCollectionPairs(prefix,
     )).filter((row) => row.name === name);
     const last = requests[requests.length - 1];
     assert(last !== undefined, 'no stored request');

@@ -949,8 +949,7 @@ async () => {
     assertStrictEquals(first.status, 201);
 
     const firstDocumentMessagePairs = documentMessagePairsAt(
-        await db.messagePairs.getAllWhere(
-            'path', prefix,
+        await db.messagePairs.getCollectionPairs(prefix,
         ),
         prefix,
     ).filter((messagePair) => messagePair.name === recordId);
@@ -974,9 +973,9 @@ async () => {
     assertStrictEquals(second.status, 201);
 
     const allRequests =
-        await db.messagePairs.getAllWhere('path', prefix);
+        await db.messagePairs.getCollectionPairs(prefix);
     const allResponses =
-        await db.messagePairs.getAllWhere('path', prefix);
+        await db.messagePairs.getCollectionPairs(prefix);
     const secondDocumentMessagePairs = documentMessagePairsAt(
         allRequests, prefix,
     ).filter((messagePair) => messagePair.name === recordId);
@@ -1035,8 +1034,8 @@ async () => {
         STARK_ORGANIZATION, '/record-types/',
     );
     const [recordRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('path', recordsPrefix),
-        db.messagePairs.getAllWhere('path', recordsPrefix),
+        db.messagePairs.getCollectionPairs(recordsPrefix),
+        db.messagePairs.getCollectionPairs(recordsPrefix),
     ]);
     const atRecord = recordRequests.filter(
         (r) => r.path === recordsPrefix
@@ -1071,11 +1070,9 @@ async () => {
         + '/record-types/' + recordId + '/attributes/';
     const [attributeRequests] =
         await Promise.all([
-            db.messagePairs.getAllWhere(
-                'path', attributesPrefix,
+            db.messagePairs.getCollectionPairs(attributesPrefix,
             ),
-            db.messagePairs.getAllWhere(
-                'path', attributesPrefix,
+            db.messagePairs.getCollectionPairs(attributesPrefix,
             ),
         ]);
     const attributeDocumentMessagePairs = documentMessagePairsAt(
@@ -1281,8 +1278,8 @@ async function transitionFieldValueCounts(
             + '/transition/',
     );
     const [requests, responses] = await Promise.all([
-        db.messagePairs.getAllWhere('path', prefix),
-        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     const requestById = new Map(
         requests.map((request) => [request.id, request]),

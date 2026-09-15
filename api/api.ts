@@ -316,8 +316,7 @@ async function revisionMessagePairIdForPatch(
         wireMessagePairId,
     );
     if (wireReq === undefined) return undefined;
-    const siblings = await db.messagePairs.getAllWhere(
-        'path', wireReq.path,
+    const siblings = await db.messagePairs.getCollectionPairs(wireReq.path,
     );
     const revision = siblings.find(
         (row) =>

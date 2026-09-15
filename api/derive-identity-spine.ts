@@ -157,8 +157,7 @@ export async function deriveIdentityPii(
         MESSAGE_TABLES,
         async (view) => {
             const messagePairs =
-                await view.messagePairs.getAllWhere(
-                    'path', prefix,
+                await view.messagePairs.getCollectionPairs(prefix,
                 );
             const document = deriveDocumentsAt(
                 messagePairs, prefix,
@@ -207,8 +206,7 @@ async function fetchCredentialDocuments(
     identityId: Id,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = credentialsPrefixFor(identityId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
@@ -288,8 +286,7 @@ async function fetchProviderDocumentsAt(
     db: DbAdapter,
     prefix: string,
 ): Promise<Map<string, DerivedDocument>> {
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
@@ -395,8 +392,7 @@ async function fetchRevocationDocumentsFor(
     identityId: Id,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = tokenRevocationsPrefixFor(identityId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
@@ -473,8 +469,7 @@ export async function deriveClientRegistration(
     identityId: Id,
 ): Promise<ClientRegistrationEntity> {
     const prefix = registrationPrefixFor(identityId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,
@@ -499,8 +494,7 @@ export async function deriveIdentityKind(
     const prefix = canonicalPath(
         undefined, '/identities/',
     );
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'path', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,

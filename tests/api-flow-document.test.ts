@@ -330,8 +330,8 @@ Deno.test('postFlowDocumentOp with revivals posts the restored'
     const prefix = canonicalPath('AjdvjuECVZEgZoFajaIEkg', '/flows/'
         + '');
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('path', prefix),
-        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     const messagePairs = documentMessagePairsAt(
         requests, prefix,
