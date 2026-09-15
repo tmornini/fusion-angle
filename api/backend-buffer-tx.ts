@@ -26,6 +26,19 @@ function compareResponseAtThenId(
     return compareIdentifiers(left.id, right.id);
 }
 
+function byResponseAtThenId(
+    left: { id: string },
+    right: { id: string },
+): number {
+    const l = left as Record<string, unknown>;
+    const r = right as Record<string, unknown>;
+    return compareResponseAtThenId(
+        left, right,
+        String(l['response_at'] ?? ''),
+        String(r['response_at'] ?? ''),
+    );
+}
+
 // Builds a row-granular Tx handle over a pre-loaded buffer
 // of the touched tables. The buffer IS the unit of
 // atomicity: every op mutates only the buffer, so a backend
@@ -91,6 +104,7 @@ export function bufferTx(
                 .filter(row => (
                     row as Record<string, unknown>
                 )[column] === key)
+                .sort(byResponseAtThenId)
                 .map(row => ({ ...row })) as T[];
         },
         async getAddress<T extends { id: string }>(
@@ -106,17 +120,7 @@ export function bufferTx(
                         === collection
                         && rec['uri_id'] === uriId;
                 })
-                .sort((left, right) => {
-                    const l = left as
-                        Record<string, unknown>;
-                    const r = right as
-                        Record<string, unknown>;
-                    return compareResponseAtThenId(
-                        left, right,
-                        String(l['response_at'] ?? ''),
-                        String(r['response_at'] ?? ''),
-                    );
-                })
+                .sort(byResponseAtThenId)
                 .map((row) => ({ ...row })) as T[];
         },
         async getWhereBody<T extends { id: string }>(
@@ -146,17 +150,7 @@ export function bufferTx(
                         body, containment,
                     );
                 })
-                .sort((left, right) => {
-                    const l = left as
-                        Record<string, unknown>;
-                    const r = right as
-                        Record<string, unknown>;
-                    return compareResponseAtThenId(
-                        left, right,
-                        String(l['response_at'] ?? ''),
-                        String(r['response_at'] ?? ''),
-                    );
-                })
+                .sort(byResponseAtThenId)
                 .map((row) => ({ ...row })) as T[];
         },
         async put<T extends { id: string }>(
