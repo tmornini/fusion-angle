@@ -38,6 +38,7 @@ const FILLER_START = 1000;
 const FILLER_COUNT = 2000;
 const REQUESTER = 'WOTMsfERBVJEuTRTgrQptQ';
 const OPERATION = 'WvNiHVgksjrlfhPfdgfcyQ';
+const EXPLAIN_INSERT_N = 9000;
 const AUTH_CONTAINMENT = { code: 'abc' };
 
 function schemaName(): string {
@@ -508,4 +509,37 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             assertIndexPlan(text, ['message_pairs_pkey']);
         },
     );
+
+    Deno.test('insert resolves an id conflict by doing nothing',
+    async () => {
+        const wire = Octets.fromLatin1(
+            putWire(IDEA_COLLECTION + '9', ''),
+        ).asBytes();
+        const plans = await sql.query<
+            Record<string, unknown>
+        >`
+            EXPLAIN
+            INSERT INTO message_pairs (
+                id, path, name,
+                requester_identity_id, method,
+                request_at, request_hash, request,
+                response_at, response,
+                operation_id
+            ) VALUES (
+                ${uuidTextOfIdentifier(id22(EXPLAIN_INSERT_N))},
+                ${IDEA_COLLECTION}, ${'9'},
+                ${REQUESTER}, ${'PUT'},
+                ${atStamp(EXPLAIN_INSERT_N)},
+                ${hex64(EXPLAIN_INSERT_N)}, ${wire},
+                ${atStamp(EXPLAIN_INSERT_N)}, ${wire},
+                ${uuidTextOfIdentifier(OPERATION)}
+            )
+            ON CONFLICT (id) DO NOTHING
+        `;
+        const text = explainText(plans);
+        assertMatch(text, /Conflict Resolution: NOTHING/);
+        assertMatch(
+            text, /Conflict Arbiter Indexes: message_pairs_pkey/,
+        );
+    });
 }
