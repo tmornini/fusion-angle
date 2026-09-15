@@ -270,6 +270,23 @@ function assertIndexPlan(
     assertNotMatch(text, /Seq Scan/);
 }
 
+// Every line after `node`'s own is its subtree: EXPLAIN
+// text indents children beneath their parent.
+function assertNoSortBeneath(
+    text: string,
+    node: string,
+): void {
+    const lines = text.split('\n');
+    const at = lines.findIndex((line) => line.includes(node));
+    assert(at >= 0, 'expected ' + node + ' in\n' + text);
+    for (const line of lines.slice(at + 1)) {
+        assertNotMatch(
+            line, /Sort/, 'Sort beneath ' + node
+            + ' in\n' + text,
+        );
+    }
+}
+
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     Deno.test(
         'postgres explain skipped without POSTGRES_URL',
@@ -403,6 +420,54 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assertNotMatch(text, /requests_pkey/);
         assertNotMatch(text, /Join/);
         assertIndexPlan(text, ['message_pairs_document']);
+        assertMatch(text, /Limit/);
+        assertMatch(
+            text,
+            /Index Scan Backward using message_pairs_document/,
+        );
+        assertNotMatch(text, /Sort/);
+    });
+
+    Deno.test('collection head pairs come off the document'
+    + ' index backward under Unique', async () => {
+        const plans = await sql.query<
+            Record<string, unknown>
+        >`
+            EXPLAIN
+            SELECT * FROM (
+                SELECT DISTINCT ON (name) *
+                FROM message_pairs
+                WHERE path = ${IDEA_COLLECTION}
+                  AND method IN ('PUT', 'DELETE')
+                ORDER BY name DESC, response_at DESC, id DESC
+            ) heads
+            WHERE method = 'PUT'
+            ORDER BY response_at, id
+        `;
+        const text = explainText(plans);
+        assertMatch(text, /Unique/);
+        assertMatch(
+            text,
+            /Index Scan Backward using message_pairs_document/,
+        );
+        assertNoSortBeneath(text, 'Unique');
+        assertNotMatch(text, /Seq Scan/);
+    });
+
+    Deno.test('head pair is one backward walk under a Limit',
+    async () => {
+        const plans = await sql.query<
+            Record<string, unknown>
+        >`
+            EXPLAIN
+            SELECT * FROM message_pairs
+            WHERE path = ${VERSION_COLLECTION}
+              AND name = ${VERSION_NAME}
+              AND method IN ('PUT', 'DELETE')
+            ORDER BY response_at DESC, id DESC
+            LIMIT 1
+        `;
+        const text = explainText(plans);
         assertMatch(text, /Limit/);
         assertMatch(
             text,
