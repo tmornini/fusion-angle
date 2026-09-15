@@ -740,24 +740,28 @@ async () => {
                 a.at < b.at ? -1 : a.at > b.at ? 1
                     : a.id < b.id ? -1
                         : a.id > b.id ? 1 : 0)
-            .map((row) => row.id),
-        [fx.grantEventId, fx.acceptEventId],
+            .map((row) => row.state),
+        ['pending', 'accepted'],
     );
 });
 
 // ---- 3. invitation phantom-pair regressions (gate 5f) -----------
 
-// deriveInvitationStates cross-references the invitation
-// DOCUMENT plane to exclude a duplicate grant's own
-// operation message pair (which forms but writes neither a
-// document nor a states event), and takes only the EARLIEST
-// pair per answering-op document to exclude an idempotent
-// resend's own operation message pair (which forms but
-// posts no second lifecycle event). Both
-// exclusions are hand-trace-verified in deriveInvitationStates'
-// own header comment above but had no regression coverage before
-// this section — these three tests drive each phantom shape
-// through handleRequest and assert row counts, not just presence.
+// deriveInvitationStates folds the invitation document's own
+// PUT history: every PUT at /invitations/<id> is one row. A
+// duplicate grant on an already-pending (organization,
+// identity) pair writes no document at its own submitted id
+// (grantInvitation's own header, api/invitations-domain.ts),
+// so there is structurally nothing to read there. An
+// idempotent resend (re-accept/re-decline/re-revoke) appends
+// no second PUT once the invitation has reached that
+// terminal state, so only the first answering write's PUT
+// ever exists. Both are hand-trace-verified in
+// invitationLifecycleRowsOf's own header comment
+// (api/derive-states.ts) but had no regression coverage
+// before this section — these three tests drive each phantom
+// shape through handleRequest and assert row counts, not
+// just presence.
 
 Deno.test('deriveInvitationStates: a duplicate grant on the same'
 + ' pending (organization, invitee) pair derives exactly ONE'
@@ -814,7 +818,6 @@ Deno.test('deriveInvitationStates: a duplicate grant on the same'
             && row.state === 'pending',
     );
     assertStrictEquals(pendingForOriginal.length, 1);
-    assertStrictEquals(pendingForOriginal[0]!.id, grantA);
 
     // No phantom row was derived for the duplicate's own id.
     assertStrictEquals(
@@ -823,8 +826,8 @@ Deno.test('deriveInvitationStates: a duplicate grant on the same'
 });
 
 Deno.test('deriveInvitationStates: a re-accept (idempotent resend)'
-+ ' derives exactly ONE \'accepted\' row, keyed to the FIRST'
-+ ' accept\'s own event id', async () => {
++ ' derives exactly ONE \'accepted\' row, appended by the'
++ ' first accept only', async () => {
     const { db, organizationA, adminA } = await seed();
     const tokenA = await adminToken(adminA, organizationA);
     const inviteeId = 'jLMftvmIlvkHfyyIXYElhQ';
@@ -882,21 +885,21 @@ Deno.test('deriveInvitationStates: a re-accept (idempotent resend)'
     );
 
     const rows = await deriveInvitationStates(db);
-    const accepted = rows.filter(
-        (row) => row.entity_id === invitationId
-            && row.state === 'accepted',
-    );
-    assertStrictEquals(accepted.length, 1);
-    assertStrictEquals(accepted[0]!.id, accept1);
     assertStrictEquals(
-        rows.some((row) => row.id === accept2),
-        false,
+        rows.filter((row) => row.entity_id === invitationId)
+            .length,
+        2,
+    );
+    assertStrictEquals(
+        rows.filter((row) => row.entity_id === invitationId
+            && row.state === 'accepted').length,
+        1,
     );
 });
 
 Deno.test('deriveInvitationStates: a re-decline (idempotent resend)'
-+ ' derives exactly ONE \'declined\' row, keyed to the FIRST'
-+ ' decline\'s own event id', async () => {
++ ' derives exactly ONE \'declined\' row, appended by the'
++ ' first decline only', async () => {
     const { db, organizationA, adminA } = await seed();
     const tokenA = await adminToken(adminA, organizationA);
     const inviteeId = 'jLwvLbZCGaiaFioqVNEetA';
@@ -953,15 +956,15 @@ Deno.test('deriveInvitationStates: a re-decline (idempotent resend)'
     );
 
     const rows = await deriveInvitationStates(db);
-    const declined = rows.filter(
-        (row) => row.entity_id === invitationId
-            && row.state === 'declined',
-    );
-    assertStrictEquals(declined.length, 1);
-    assertStrictEquals(declined[0]!.id, decline1);
     assertStrictEquals(
-        rows.some((row) => row.id === decline2),
-        false,
+        rows.filter((row) => row.entity_id === invitationId)
+            .length,
+        2,
+    );
+    assertStrictEquals(
+        rows.filter((row) => row.entity_id === invitationId
+            && row.state === 'declined').length,
+        1,
     );
 });
 

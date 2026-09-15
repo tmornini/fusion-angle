@@ -1880,211 +1880,58 @@ export async function workOrderDocumentHeadFor(
 // their owners for fences. Visibility of named sidecar
 // event ids rides stateEventVisibilityFor.
 
-// ---- deriveInvitationStates — the invitation lifecycle reader ---
-// ---- (gate 5f) ---------------------------------------------------
-
-// Source (f) of the states-log union. An invitation's own states
-// never ride the states/:id document (source a) — the invitations
-// side channel forms its own operation message pairs at the flat
-// '/invitations/' collection (the grant) and at
-// 'invitations/:id/<op>/' (the three answering ops), api/
-// invitations-domain.ts's own formWriteMessagePair/
-// formInvitationOperationMessagePair calls. Deliberately
-// NOT built atop deriveInvitations/
-// invitationOpStates (api/derive-invitations.ts) — both resolve
-// only a RESOLVED CURRENT STATE and DISCARD the event id and
-// member_id a StateEntity row needs (the brief's own NOTE) — this
-// is a fresh, StateEntity-emitting extraction over the SAME two
-// document families, never a retrofit of either.
-//
-// THE GRANT'S OWN DUPLICATE-ECHO (grantInvitation, api/invitations-
-// domain.ts): an ALREADY-pending (org, identity) pair still forms
-// its OWN operation message pair at whatever invitationId the SECOND
-// caller submitted (the 'existing' outcome branch) — but writes
-// NEITHER a states event NOR a document there. Cross-referencing
-// against the invitation's DOCUMENT plane (formed ONLY on the
-// 'fresh' outcome, at the SAME invitationId) excludes that phantom
-// pair: a document exists at an id iff its grant operation message pair
-// genuinely posted 'pending'.
-//
-// THE ANSWERING OPS' OWN NO-OP RESENDS (accept/decline/revoke):
-// each is idempotent on its OWN already-reached terminal state (a
-// re-accept/re-decline/re-revoke still forms an operation message pair but
-// posts NO event) — mutual exclusivity across the three op KINDS
-// is the domain gate's own covenant (derive-invitations.ts's
-// header), so at most one op kind ever succeeds per invitation,
-// but THAT kind can still accumulate repeat pairs. Since
-// appendMessagePairOnce mints each pair's response `at` synchronously
-// inside its own (serialized) transaction, the group's
-// chronologically EARLIEST (at, id) pair is always the one that
-// found the invitation still 'pending' and genuinely posted the
-// event — operationMessagePairsAt already returns each group (at, id)
-// ascending, so its first entry is that pair.
-const INVITATION_OP_PATH_PATTERN =
-    /^\/invitations\/([^/]+)\/(acceptance|decline|revocation)\/$/;
-
-interface InvitationOpFields {
-    readonly state: string;
-    readonly eventIdField: string;
-    readonly atField: string;
+// The invitation lifecycle, from the invitation document's
+// own history (api/derive-invitations.ts owns the head
+// read): every PUT at /invitations/<id> is one lifecycle
+// row — one row per PUT, the grant's 'pending' and the
+// terminal — id-lex ordered (a caller wanting chronological
+// order sorts by (at, id) itself). `id` and `at` are the
+// pair's own; `member_id` is the pair's requester (the
+// granting admin, the answering invitee, the revoking
+// admin). A duplicate grant writes no document and a no-op
+// resend appends no PUT, so neither has a row.
+function invitationLifecycleRowsOf(
+    messagePairs: readonly DocumentMessagePair[],
+): StateEntity[] {
+    const rows: StateEntity[] = [];
+    for (const messagePair of messagePairs) {
+        rows.push({
+            id: messagePair.id,
+            entity_id: messagePair.name,
+            state: pickString(messagePair.body, 'state'),
+            member_id: messagePair.requesterIdentityId,
+            at: messagePair.at,
+        });
+    }
+    return rows.sort(byIdAscending);
 }
 
-const INVITATION_OP_FIELDS: Readonly<
-    Record<string, InvitationOpFields>
-> = {
-    acceptance: {
-        state: 'accepted',
-        eventIdField: 'acceptEventId',
-        atField: 'acceptAt',
-    },
-    decline: {
-        state: 'declined',
-        eventIdField: 'declineEventId',
-        atField: 'declineAt',
-    },
-    revocation: {
-        state: 'revoked',
-        eventIdField: 'revokeEventId',
-        atField: 'revokeAt',
-    },
-};
-
+// Every invitation's lifecycle: ONE collection read of
+// /invitations/ — every pair of every document there.
 export async function deriveInvitationStates(
     db: DbAdapter,
 ): Promise<StateEntity[]> {
-    return db.readTransaction(async (view) => {
-            const stored = await view.messagePairs.getAll();
-            const rows: StateEntity[] = [];
-
-            const documentIds = new Set(
-                documentMessagePairsAt(
-                    stored, INVITATIONS_PREFIX,
-                ).map((messagePair) => messagePair.name),
-            );
-            for (const messagePair of operationMessagePairsAt(
-                stored, INVITATIONS_PREFIX,
-            )) {
-                if (!documentIds.has(messagePair.name)) {
-                    continue;
-                }
-                rows.push({
-                    id: pickString(
-                        messagePair.body, 'grantEventId',
-                    ),
-                    entity_id: messagePair.name,
-                    state: 'pending',
-                    member_id: messagePair.requesterIdentityId,
-                    at: pickString(messagePair.body, 'grantAt'),
-                });
-            }
-
-            const opPrefixes = new Set<string>();
-            for (const messagePair of stored) {
-                if (INVITATION_OP_PATH_PATTERN.test(
-                    messagePair.path,
-                )) {
-                    opPrefixes.add(messagePair.path);
-                }
-            }
-            for (const prefix of opPrefixes) {
-                const match =
-                    INVITATION_OP_PATH_PATTERN.exec(prefix)!;
-                const fields = INVITATION_OP_FIELDS[match[2]!];
-                if (fields === undefined) continue;
-                const earliest = operationMessagePairsAt(
-                    stored, prefix,
-                )[0];
-                if (earliest === undefined) continue;
-                rows.push({
-                    id: pickString(
-                        earliest.body, fields.eventIdField,
-                    ),
-                    entity_id: match[1]!,
-                    state: fields.state,
-                    member_id: earliest.requesterIdentityId,
-                    at: pickString(earliest.body, fields.atField),
-                });
-            }
-
-            return rows.sort(byIdAscending);
-        },
+    const stored = await db.messagePairs.getCollectionPairs(
+        INVITATIONS_PREFIX,
+    );
+    return invitationLifecycleRowsOf(
+        documentMessagePairsAt(stored, INVITATIONS_PREFIX),
     );
 }
 
-// ENTITY-SCOPED sibling of deriveInvitationStates above (Phase
-// 14 Task 1): the SAME grant + op-path reduction, restricted
-// to ONE known invitation id via INDEXED reads —
-// document read at the invitations prefix + this id
-// (grant + document share ONE name) and
-// path for each of the three op documents —
-// rather than the whole-collection scan
-// (documentIds discovery) and the whole-ledger pairs.getAll()
-// (op-prefix discovery) the multi-invitation reader above needs
-// to find EVERY id at once. dbOrView-shaped and opens no nested
-// transaction — callable from WITHIN an already-open write-gate
-// transaction (currentInvitationState's own accept/decline/
-// revoke in-tx reads, api/invitations-domain.ts — a LATER task
-// wires the call site; this task lands the core alone).
-//
-// THE PHANTOM-ECHO EXCLUSION carries over unchanged (deriveInvit-
-// ationStates' own header): the documentIds cross-reference,
-// applied here to the id-scoped read alone, still excludes a
-// duplicate grant's own operation message pair when no document was ever
-// written at this id.
+// One invitation's lifecycle: ONE document read. dbOrView-
+// shaped; opens no nested transaction
+// (currentInvitationState's in-tx gate reads through it).
 export async function invitationLifecycleStatesFor(
     dbOrView: DbAdapter,
     id: Id,
 ): Promise<StateEntity[]> {
-    const rows: StateEntity[] = [];
-
-    const collectionMessagePairs =
-        await dbOrView.messagePairs.getDocumentHistory(
-            INVITATIONS_PREFIX, id,
-        );
-    const hasDocument = documentMessagePairsAt(
-        collectionMessagePairs, INVITATIONS_PREFIX,
-    ).some((messagePair) => messagePair.name === id);
-    if (hasDocument) {
-        for (const messagePair of operationMessagePairsAt(
-            collectionMessagePairs, INVITATIONS_PREFIX,
-        )) {
-            rows.push({
-                id: pickString(
-                    messagePair.body, 'grantEventId',
-                ),
-                entity_id: messagePair.name,
-                state: 'pending',
-                member_id: messagePair.requesterIdentityId,
-                at: pickString(messagePair.body, 'grantAt'),
-            });
-        }
-    }
-
-    for (const op of [
-        'acceptance', 'decline', 'revocation',
-    ] as const) {
-        const prefix = canonicalPath(
-            undefined, '/invitations/' + id + '/' + op + '/',
-        );
-        const operationMessagePairs =
-            await dbOrView.messagePairs.getCollectionPairs(
-                prefix,
-            );
-        const fields = INVITATION_OP_FIELDS[op]!;
-        const earliest = operationMessagePairsAt(
-            operationMessagePairs, prefix,
-        )[0];
-        if (earliest === undefined) continue;
-        rows.push({
-            id: pickString(earliest.body, fields.eventIdField),
-            entity_id: id,
-            state: fields.state,
-            member_id: earliest.requesterIdentityId,
-            at: pickString(earliest.body, fields.atField),
-        });
-    }
-
-    return rows.sort(byIdAscending);
+    const history = await dbOrView.messagePairs.getDocumentHistory(
+        INVITATIONS_PREFIX, id,
+    );
+    return invitationLifecycleRowsOf(
+        documentMessagePairsAt(history, INVITATIONS_PREFIX),
+    );
 }
 
 // deriveTrioFamilyStates / deriveStates / fenceStatesByOwner /

@@ -2,7 +2,7 @@ import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { nowUtc } from '../api/types.ts';
-import { invitationOpStateFor } from '../api/derive-invitations.ts';
+import { deriveInvitation } from '../api/derive-invitations.ts';
 import {
     invitationLifecycleStatesFor,
     workOrderLifecycleStatesFor,
@@ -38,7 +38,7 @@ const WORKORDERID_EV2 = generateIdentifier();
 const WORKORDERID_EV3 = generateIdentifier();
 
 // The Author gate 1 rule (e) pre-tx-vs-in-tx PARITY pins for the
-// three Phase 14 Task 1 cores (invitationOpStateFor,
+// three Phase 14 Task 1 cores (deriveInvitation,
 // invitationLifecycleStatesFor, workOrderLifecycleStatesFor) —
 // the membershipExistsFor / deriveIdentityTokenEventsForJti
 // precedent (tests/drift-memberships-identity.test.ts leg 5,
@@ -94,9 +94,9 @@ async function grant(
     assertStrictEquals(res.status, 200);
 }
 
-// -- invitationOpStateFor --------------------------------------
+// -- deriveInvitation ---------------------------------------
 
-Deno.test('invitationOpStateFor: byte-identical pre-tx (the plain'
+Deno.test('deriveInvitation: byte-identical pre-tx (the plain'
 + ' adapter) vs in-tx (an open db.transaction view sharing'
 + ' acceptInvitation\'s own table list) — the membershipExistsFor'
 + ' precedent', async () => {
@@ -119,22 +119,22 @@ Deno.test('invitationOpStateFor: byte-identical pre-tx (the plain'
 
     // Phase Final Task 2: memberships ROW half stripped from
     // acceptInvitation's tx list.
-    const preTx = await invitationOpStateFor(db, id);
+    const preTx = await deriveInvitation(db, id);
     const inTx = await db.transaction(
-        (view) => invitationOpStateFor(view, id),
+        (view) => deriveInvitation(view, id),
     );
-    assertStrictEquals(inTx, preTx);
-    assertStrictEquals(preTx, 'accepted');
+    assertEquals(inTx, preTx);
+    assertStrictEquals(preTx?.state, 'accepted');
 
     // A never-granted id, same parity.
-    const preTxMissing = await invitationOpStateFor(
+    const preTxMissing = await deriveInvitation(
         db, NO_SUCH_INVITATION,
     );
     const inTxMissing = await db.transaction(
         (view) =>
-            invitationOpStateFor(view, NO_SUCH_INVITATION),
+            deriveInvitation(view, NO_SUCH_INVITATION),
     );
-    assertStrictEquals(inTxMissing, preTxMissing);
+    assertEquals(inTxMissing, preTxMissing);
     assertStrictEquals(preTxMissing, undefined);
 });
 

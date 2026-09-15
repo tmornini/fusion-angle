@@ -7,8 +7,8 @@ import {
     deriveIdentityPiiRows,
 } from '../api/derive-identity-spine.ts';
 import {
+    deriveInvitation,
     deriveInvitations,
-    invitationOpStateFor,
 } from '../api/derive-invitations.ts';
 import {
     getIdentityInvitations,
@@ -63,8 +63,8 @@ Deno.test('the unaffiliated identity holds exactly one'
     );
     assertStrictEquals(invitation.state, 'pending');
     assertStrictEquals(
-        await invitationOpStateFor(db, invitation.id),
-        undefined,
+        (await deriveInvitation(db, invitation.id))?.state,
+        'pending',
     );
 });
 

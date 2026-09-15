@@ -30,8 +30,8 @@ import { formDocumentMessagePairFor } from './routes.ts';
 import { ORGANIZATION_MEMBER_DETAIL_PATTERN } from
     './family-registry.ts';
 import {
+    deriveInvitation,
     deriveInvitations,
-    invitationOpStateFor,
 } from './derive-invitations.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
 import {
@@ -544,16 +544,14 @@ export async function pendingInvitationFor(
     organization: Id,
     identityId: Id,
 ): Promise<{ id: Id; at: string } | null> {
-    const candidates = (await deriveInvitations(adapter))
-        .filter(inv => inv.organization_id === organization
-            && inv.identity_id === identityId);
-    for (const inv of candidates) {
-        const state = await invitationOpStateFor(adapter, inv.id);
-        if (state === undefined) {
-            return { id: inv.id, at: inv.at };
-        }
-    }
-    return null;
+    const pending = (await deriveInvitations(adapter)).find(
+        inv => inv.organization_id === organization
+            && inv.identity_id === identityId
+            && inv.state === 'pending',
+    );
+    return pending === undefined
+        ? null
+        : { id: pending.id, at: pending.at };
 }
 
 // The invitation document: `path = /invitations/`, `name =
@@ -894,9 +892,8 @@ async function loadInvitation(
     adapter: DbAdapter,
     id: Id,
 ): Promise<InvitationRow | null> {
-    const found = (await deriveInvitations(adapter))
-        .find(inv => inv.id === id);
-    return found === undefined ? null : found;
+    const row = await deriveInvitation(adapter, id);
+    return row === undefined ? null : row;
 }
 
 const INVITATIONS_STORAGE_PREFIX =
