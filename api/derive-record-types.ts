@@ -74,6 +74,23 @@ async function fetchRecordTypeMessagePairs(
     };
 }
 
+async function fetchRecordTypeDocumentMessagePairs(
+    db: DbAdapter,
+    prefix: string,
+    id: Id,
+): Promise<{
+    readonly document: DerivedDocument | undefined;
+    readonly messagePairs: readonly DocumentMessagePair[];
+}> {
+    const history = await db.messagePairs.getDocumentHistory(
+        prefix, id,
+    );
+    return {
+        document: deriveDocumentsAt(history, prefix).get(id),
+        messagePairs: documentMessagePairsAt(history, prefix),
+    };
+}
+
 export async function deriveRecordTypeCollection(
     db: DbAdapter,
     organization: Id,
@@ -127,19 +144,17 @@ export async function deriveRecordTypeEntity(
     id: Id,
 ): Promise<RecordTypeWireRow> {
     const prefix = recordTypesUriPrefix(organization);
-    const { documents, messagePairs } =
-        await fetchRecordTypeMessagePairs(db, prefix);
-    const document = documents.get(id);
+    const { document, messagePairs } =
+        await fetchRecordTypeDocumentMessagePairs(
+            db, prefix, id,
+        );
     if (document === undefined) {
         throw await missedReadError(
             db, id, organization, RECORD_TYPES_TABLE,
         );
     }
     const history = stateHistoryFrom(
-        documentLifecycleEvents(
-            messagePairs.filter((messagePair) =>
-                messagePair.name === id),
-        ),
+        documentLifecycleEvents(messagePairs),
         id,
     );
     if (currentDocumentState(history) === DELETED_STATE) {
@@ -163,12 +178,11 @@ export async function deriveRecordTypeStateHistory(
 ): Promise<StateEntity[]> {
     const prefix = recordTypesUriPrefix(organization);
     const { messagePairs } =
-        await fetchRecordTypeMessagePairs(db, prefix);
+        await fetchRecordTypeDocumentMessagePairs(
+            db, prefix, id,
+        );
     return stateHistoryFrom(
-        documentLifecycleEvents(
-            messagePairs.filter((messagePair) =>
-                messagePair.name === id),
-        ),
+        documentLifecycleEvents(messagePairs),
         id,
     );
 }
