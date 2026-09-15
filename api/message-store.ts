@@ -40,10 +40,6 @@ export interface MessageStore {
     getCollection(
         collection: string,
     ): Promise<unknown[]>;
-    getCollectionFiltered(
-        collection: string,
-        filters: Readonly<Record<string, string>>,
-    ): Promise<unknown[]>;
 }
 
 export function messageStore(db: DbAdapter): MessageStore {
@@ -73,18 +69,6 @@ export function messageStore(db: DbAdapter): MessageStore {
                 ),
             );
         },
-        async getCollectionFiltered(collection, filters) {
-            const rows = entitiesOf(
-                livePutsOf(
-                    await messagePairsInCollection(
-                        db, collection,
-                    ),
-                ),
-            );
-            return rows.filter((row) => matchesFilters(
-                row, filters,
-            ));
-        },
     };
 }
 
@@ -98,20 +82,6 @@ function jsonBodyOf(message: string): unknown | undefined {
     const body = HttpMessage.fromModel(model).body();
     if (!body.exists()) return undefined;
     return JSON.parse(body.toText());
-}
-
-function matchesFilters(
-    entity: unknown,
-    filters: Readonly<Record<string, string>>,
-): boolean {
-    if (entity === null || typeof entity !== 'object') {
-        return false;
-    }
-    const record = entity as Record<string, unknown>;
-    for (const [key, value] of Object.entries(filters)) {
-        if (record[key] !== value) return false;
-    }
-    return true;
 }
 
 function compareMessagePair(
