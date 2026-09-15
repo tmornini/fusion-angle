@@ -340,10 +340,10 @@ Deno.test('a byte-identical resend replays the stored response:'
 // -- 4. the DELETE-pair walk filter (Author gate 9) ----------
 //
 // documentLifecycleEvents walks every 2xx PUT/DELETE pair at a
-// document address; a DELETE pair's stored body is empty
+// document; a DELETE pair's stored body is empty
 // (design decision 6), so before the fix it threw inside
 // pickString the moment it reached the DELETE pair. records is
-// the first trio family with a live DELETE at its :id address,
+// the first trio family with a live DELETE at its :id document,
 // so a delete-then-recreate history is the first live
 // reproduction of the throw. No route dispatches records/:id
 // through this walk yet (GET stays hand-written until Task 7),
@@ -352,18 +352,18 @@ Deno.test('a byte-identical resend replays the stored response:'
 
 async function storedMessagePairAt(
     method: string,
-    uriId: string,
+    name: string,
     at: string,
     body: Record<string, unknown> | undefined,
 ): Promise<MessagePairEntity> {
     const messagePair = await formWriteMessagePair({
         method,
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + uriId,
+            + name,
         routePattern: RECORD_TYPE_DETAIL_PATTERN,
         routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
         pathSegments: ['organizations', 'AjdvjuECVZEgZoFajaIEkg'
-            , 'record-types', uriId],
+            , 'record-types', name],
         headerFields: [],
         body,
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
@@ -375,8 +375,8 @@ async function storedMessagePairAt(
     });
     return {
         id: messagePair.id,
-        uri_collection: messagePair.uriCollection,
-        uri_id: messagePair.uriId,
+        path: messagePair.path,
+        name: messagePair.name,
         requester_identity_id: messagePair.requesterIdentityId,
         method: messagePair.method,
         request_at: at,
@@ -410,7 +410,7 @@ Deno.test('documentLifecycleEvents skips a DELETE-method pair,'
     const messagePairs = documentMessagePairsAt(
         [first, deleted, second], prefix,
     )
-        .filter(messagePair => messagePair.uriId === 'rec-x');
+        .filter(messagePair => messagePair.name === 'rec-x');
     assertStrictEquals(messagePairs.length, 3);
     const events = documentLifecycleEvents(messagePairs);
     assertEquals(

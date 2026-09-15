@@ -829,7 +829,7 @@ export interface IdentityDocumentBody {
 // in routes.ts for the full rationale-contrast) — the shared id
 // (member.id === identity.id, always) already receives a genesis
 // states event at create and archive/reactivate via PUT
-// states/:id, so a document-address trio here would FREEZE that
+// states/:id, so a document trio here would FREEZE that
 // lifecycle at genesis forever. THE LABEL MANDATE (the Phase 7
 // Objective precedent, a NAMED byte-parity-over-convention
 // choice): this gate delegates to validateIdentityEntity, so
@@ -2198,10 +2198,10 @@ export function validateObjectiveEntity(
 
 // The HTTP-body gate for PUT /objectives/:id: entity field
 // plus the lifecycle trio — the fifth trio family (states-
-// address retirement). The old absence-as-active covenant
+// document retirement). The old absence-as-active covenant
 // (R2) and the genesis dilemma are RETIRED: genesis is an
 // explicit event minted at create, archive/reactivate ride
-// this SAME address, and no states/:id pair ever carries an
+// this SAME document, and no states/:id pair ever carries an
 // objective lifecycle again. THE LABEL MANDATE (a NAMED
 // byte-parity-over-convention choice): the assertOnlyKeys
 // label is 'Objective', matching TODAY'S store validator
@@ -2352,7 +2352,7 @@ const MESSAGE_HASH = /^[0-9a-f]{64}$/;
 const HTTP_METHOD = /^[A-Z]+$/;
 
 const MESSAGE_PAIR_BODY_KEYS: readonly string[] = [
-    'uri_collection', 'uri_id',
+    'path', 'name',
     'requester_identity_id', 'method',
     'request_at', 'request_hash', 'request',
     'response_at', 'response',
@@ -2365,13 +2365,10 @@ export function validateMessagePairEntity(
     assertOnlyKeys(
         body, MESSAGE_PAIR_BODY_KEYS, 'MessagePairEntity',
     );
-    const uriCollection = pickString(
-        body, 'uri_collection',
-    );
-    if (!uriCollection.endsWith('/')) {
+    const path = pickString(body, 'path');
+    if (!path.endsWith('/')) {
         throw new ValidationError(
-            'MessagePairEntity.uri_collection must end'
-            + ' with "/"',
+            'MessagePairEntity.path must end with "/"',
         );
     }
     const requestHash = pickString(
@@ -2393,8 +2390,8 @@ export function validateMessagePairEntity(
         body, 'operation_id',
     );
     return {
-        uri_collection: uriCollection,
-        uri_id: pickString(body, 'uri_id'),
+        path,
+        name: pickString(body, 'name'),
         requester_identity_id: pickIdentifier(
             body, 'requester_identity_id',
         ),
@@ -2921,7 +2918,7 @@ export function validateRecordAttributeDocumentBody(
     };
 }
 
-// Nested attribute document under a record-type address
+// Nested attribute document under a record-type document
 // (Task 6). No record_id — parentage is the URI. Both ACL
 // keys are required on create and replace alike: the nested
 // PUT appends the wire it was given, so a keyless head would
@@ -3047,11 +3044,11 @@ export function validateFlowRecordEntity(
     };
 }
 
-// A flow tag's own NAME is the FIRST user-authored address
+// A flow tag's own NAME is the FIRST user-authored path
 // segment this codebase validates (every prior :id path segment
 // is either server-generated or a client-picked-but-opaque
 // identifier never rendered) — pinned to [A-Za-z0-9_-]
-// plus a length cap, since an address segment has no
+// plus a length cap, since a path segment has no
 // natural bound the way a body field's own pickString
 // does.
 const FLOW_TAG_NAME_MAX_LENGTH = 64;
@@ -3074,7 +3071,7 @@ export function validateFlowTagName(value: string): string {
 // The tag's own body (design decision — Step 0, Phase 14 Task
 // 9): MINIMAL — the pinned response id of the flow document
 // message pair this tag names, and nothing else. `flow_id` is
-// never a client key here (the address's own :id segment
+// never a client key here (the document's own :id segment
 // already names it; the route stamps it onto the wire
 // response) — Omit<FlowTagEntity, 'id' | 'flow_id'> mirrors
 // validateFlowRecordEntity's own Omit<_, 'id'> shape, one
@@ -3406,7 +3403,7 @@ const OBJECTIVE_CREATE_KEYS: readonly string[] = [
 // The HTTP-body gate for POST /objectives: the objective row
 // plus its FIRST revision and the genesis lifecycle trio,
 // written atomically. Genesis is an explicit event minted at
-// create (states-address retirement); the trio folds onto
+// create (states-document retirement); the trio folds onto
 // the document message pair via objectiveDocumentBodyOf. The
 // objective fields are NOT fully validated here: the org-
 // scoped store stamps organization_id from the verified
@@ -3554,7 +3551,7 @@ export function validateFlowCreateBody(
 // an empty body would make every undo POST for the same flow
 // canonically byte-identical (same method/path/headers),
 // colliding on the gate's pre-tx idempotency fast path
-// (storedResponseFor) and silently replaying the FIRST call's
+// (getPairByRequestHash) and silently replaying the FIRST call's
 // cached 204 for every later undo. `eventId`/`at` are the SAME
 // state-trio convention every other document write already
 // uses to keep each attempt's stored request unique — S1 (body

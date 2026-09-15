@@ -26,7 +26,7 @@ import { seedSeat } from './root-admin-fixture.ts';
 // Nested record-types READ surface (Task 2): collection,
 // detail, lifecycle history, member tier, and the shared
 // org-match fence arm. Seeds via below-gate formWriteMessagePair +
-// postRecordDocumentOp at the nested detail address.
+// postRecordDocumentOp at the nested detail document.
 
 const AT = '2026-01-01T00:00:00.000000Z';
 const PATH_ORGANIZATION_MISMATCH_ERROR =

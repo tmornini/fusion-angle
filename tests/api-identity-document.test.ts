@@ -15,7 +15,6 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { ValidationError } from '../api/types.ts';
 import {
     EntityNotFoundError,
-    MESSAGE_TABLES,
 } from '../api/db.ts';
 import {
     validateIdentityDocumentBody,
@@ -27,7 +26,7 @@ import {
 } from '../api/routes.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import {
     documentFamilyWiring,
@@ -43,8 +42,8 @@ import { generateIdentifier } from
 // Phase 10 Task 4 (twelfth registered family): PUT
 // /identities/:id takes `kind` plus, for a person, the
 // optional human profile — no lifecycle trio. Member
-// lifecycle rides the members/:id document address
-// (states-address retirement), and the shared identity id
+// lifecycle rides the members/:id document
+// (states-document retirement), and the shared identity id
 // (member.id === identity.id) must not carry a competing trio
 // that would FREEZE or double-emit lifecycle. Global plane
 // (organizationNested:false), like members/ai-members/
@@ -216,9 +215,7 @@ async function putDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
     return messagePair.id;
 }
@@ -241,9 +238,7 @@ async function deleteDocumentMessagePair(
         responseStatus: 204, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
 }
 
@@ -350,7 +345,7 @@ async () => {
         stored,
         identityDocumentEntityOf(
             {
-                uriId: id,
+                name: id,
                 messagePairId: id,
                 method: 'PUT',
                 body,

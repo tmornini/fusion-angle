@@ -30,7 +30,7 @@ import { generateIdentifier } from
 
 // Nested under the identity: GET|PUT
 // /identities/:id/token-revocations/:rid. Path identity is
-// the address — stamped on write and GET. MEMBER_VERBS
+// the document — stamped on write and GET. MEMBER_VERBS
 // widens PUT to the member tier; Region B keeps it
 // self-only (path identity vs actor). GET stays admin-only.
 // Flat /identity-token-revocations/:rid is RETIRED (404).
@@ -150,16 +150,16 @@ Deno.test('a member PUT identities/:id/token-revocations/:rid'
     );
     const requests = await db.messagePairs.getAll();
     const own = requests.find(
-        r => r.uri_collection
+        r => r.path
             === '/identities/nkgaOHZISTQrILTfPThWCA/token-revocations/'
-            && r.uri_id === rid,
+            && r.name === rid,
     );
     assert(own);
     const responses = await db.messagePairs.getAll();
     const ownResponse = responses.find(
-        r => r.uri_collection
+        r => r.path
             === '/identities/nkgaOHZISTQrILTfPThWCA/token-revocations/'
-            && r.uri_id === rid,
+            && r.name === rid,
     );
     assert(ownResponse);
 });
@@ -262,7 +262,7 @@ async () => {
     assertStrictEquals(res.status, 403);
     const requests = await db.messagePairs.getAll();
     assertStrictEquals(
-        requests.filter(r => r.uri_id === rid).length,
+        requests.filter(r => r.name === rid).length,
         0,
     );
 });
@@ -337,7 +337,7 @@ Deno.test('a member PUT naming ANOTHER identity 403s, byte-pinned'
     const requests = await db.messagePairs.getAll();
     assertStrictEquals(
         requests.filter(
-            r => r.uri_id === rid,
+            r => r.name === rid,
         ).length,
         0,
     );
@@ -362,7 +362,7 @@ async () => {
         ),
     );
     const expected = tokenRevocationEntityOf({
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: 'PUT',
         body: fields,

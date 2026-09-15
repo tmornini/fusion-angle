@@ -20,7 +20,7 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 // Foreign-op miss pins: work-order claim/release/transition
 // and flow undo. The write authorizer never covers these
-// POSTs; a miss at this address is 404.
+// POSTs; a miss at this document is 404.
 
 const ORGANIZATION_A = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2020-01-01T00:00:00.000000Z';

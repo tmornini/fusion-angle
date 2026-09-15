@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, InvitationState } from './types.ts';
 import { pickString } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import {
     deriveDocumentsAt,
     byIdAscending,
@@ -10,17 +10,17 @@ import {
 // The invitation family's own reduction over the message
 // ledger — the roster phase's LAST derivation before the
 // readers flip (Task 8). The invitation ROW comes from the
-// grant's document head at the flat '/invitations/' address
+// grant's document head at the flat '/invitations/' path
 // (ONE keyed getAllWhere read per store — deriveDocumentsAt);
 // its STATE comes from a SEPARATE reduction this module owns,
 // since an invitation's lifecycle never rides the document
-// address (Decision 6 would require a trio the wire body has
+// (Decision 6 would require a trio the wire body has
 // no room for — the invitations side channel forms its
 // operation message pairs at 'invitations/:id/acceptance' etc,
 // api/invitations-domain.ts's formInvitationOperationMessagePair).
 //
 // E13 FULL-SCAN NAMED CLASS: no index can serve "every pair
-// whose uri_collection has the shape /invitations/<id>/<op>/"
+// whose path has the shape /invitations/<id>/<op>/"
 // for an arbitrary id, so invitationOpStates below reads
 // db.messagePairs.getAll() — ONE full table scan, regardless of how
 // many invitations exist. Grown alongside every future
@@ -33,7 +33,7 @@ import {
 // succeed; a conflict appends nothing), never re-derived here —
 // an id can accumulate repeat pairs of only ONE op kind.
 
-const INVITATIONS_PREFIX = canonicalUriCollection(
+const INVITATIONS_PREFIX = canonicalPath(
     undefined, '/invitations/',
 );
 
@@ -43,7 +43,7 @@ const OP_STATES: Readonly<Record<string, InvitationState>> = {
     revocation: 'revoked',
 };
 
-const OP_ADDRESS_PATTERN =
+const OP_PATH_PATTERN =
     /^\/invitations\/([^/]+)\/(acceptance|decline|revocation)\/$/;
 
 const INVITATION_OP_KINDS = [
@@ -68,8 +68,8 @@ async function invitationOpStates(
 ): Promise<Map<Id, InvitationState>> {
     const states = new Map<Id, InvitationState>();
     for (const messagePair of await db.messagePairs.getAll()) {
-        const match = OP_ADDRESS_PATTERN.exec(
-            messagePair.uri_collection,
+        const match = OP_PATH_PATTERN.exec(
+            messagePair.path,
         );
         if (match === null) continue;
         const state = OP_STATES[match[2]!];
@@ -82,7 +82,7 @@ async function invitationOpStates(
 // ENTITY-SCOPED sibling of invitationOpStates above (Phase 14
 // Task 1): the SAME OP_STATES mutual-exclusivity covenant,
 // restricted to ONE known invitation id via three INDEXED
-// getAllWhere('uri_collection', ...) reads (one per op kind) rather
+// getCollectionPairs reads (one per op kind) rather
 // than the whole-ledger db.messagePairs.getAll() invitationOpStates
 // needs to DISCOVER every invitation's own op prefix out of an
 // unknown set of ids. dbOrView-shaped and opens no nested
@@ -99,11 +99,10 @@ export async function invitationOpStateFor(
     id: Id,
 ): Promise<InvitationState | undefined> {
     for (const op of INVITATION_OP_KINDS) {
-        const prefix = canonicalUriCollection(
+        const prefix = canonicalPath(
             undefined, '/invitations/' + id + '/' + op + '/',
         );
-        const rows = await dbOrView.messagePairs.getAllWhere(
-            'uri_collection', prefix,
+        const rows = await dbOrView.messagePairs.getCollectionPairs(prefix,
         );
         if (rows.length > 0) return OP_STATES[op];
     }
@@ -116,8 +115,8 @@ export async function invitationOpStateFor(
 export async function deriveInvitations(
     db: DbAdapter,
 ): Promise<DerivedInvitationRow[]> {
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', INVITATIONS_PREFIX,
+    const messagePairs = await db.messagePairs.getCollectionPairs(
+        INVITATIONS_PREFIX,
     );
     const documents = deriveDocumentsAt(
         messagePairs, INVITATIONS_PREFIX,

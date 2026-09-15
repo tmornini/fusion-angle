@@ -5,7 +5,7 @@ import type {
     ProjectObjectiveActualScoreEntity,
 } from './types.ts';
 import { pickString, pickNumber } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -18,7 +18,7 @@ import {
 // deriveFlowRecords structural mirror (api/derive-flow-
 // records.ts), for TWO byte-twin nested collections that share
 // one module because they are the SAME shape at two sibling
-// addresses: /projects/{id}/objective-baseline-scores/ and
+// documents: /projects/{id}/objective-baseline-scores/ and
 // /projects/{id}/objective-actual-scores/, written by a live
 // standalone PUT at either leaf AND by the idea-conversion
 // bundle's per-baseline synthesized pairs (routes.ts's
@@ -29,7 +29,7 @@ import {
 // needed its own.
 //
 // Neither leaf carries a lifecycle, a DELETE, or a by-id GET
-// route (only the bare collection GET is live at each address;
+// route (only the bare collection GET is live at each document;
 // the leaf is PUT-only) — so, like deriveObjectiveRevisions, this
 // module exports the two collection derivations alone, no by-id
 // sibling.
@@ -46,7 +46,7 @@ function scoresUriPrefix(
     projectId: Id,
     segment: string,
 ): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         organization, '/projects/' + projectId + '/' + segment + '/',
     );
 }
@@ -63,7 +63,7 @@ export function scoreEntityOf(document: DerivedDocument): {
 } {
     const body = withoutId(document.body);
     return {
-        id: document.uriId,
+        id: document.name,
         project_id: pickString(body, 'project_id'),
         objective_id: pickString(body, 'objective_id'),
         score: pickNumber(body, 'score'),
@@ -79,8 +79,7 @@ async function fetchScoreDocuments(
     segment: string,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = scoresUriPrefix(organization, projectId, segment);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
@@ -90,7 +89,7 @@ async function fetchScoreDocuments(
 // GET projects/:id/objective-baseline-scores route: the SERVER
 // already filters by the parent project through this
 // derivation's own nested prefix, so the org fence and the
-// parent scope are both closed by the address alone.
+// parent scope are both closed by the document alone.
 export async function deriveBaselineScores(
     db: DbAdapter,
     organization: Id,
@@ -107,7 +106,7 @@ export async function deriveBaselineScores(
 }
 
 // The actuals byte-twin of deriveBaselineScores above — same
-// prefix shape, same reduction, the sibling address.
+// prefix shape, same reduction, the sibling document.
 export async function deriveActualScores(
     db: DbAdapter,
     organization: Id,

@@ -124,7 +124,7 @@ async () => {
         operationId,
     );
     const rows = await db.messagePairs.getAll();
-    const written = rows.find((r) => r.uri_id === 'gBbNAWlPwMfXZvevoUPhFQ');
+    const written = rows.find((r) => r.name === 'gBbNAWlPwMfXZvevoUPhFQ');
     assert(written);
     assertStrictEquals(written.method, 'PUT');
     assertStrictEquals(written.operation_id, operationId);
@@ -175,7 +175,7 @@ async () => {
         .filter((r) => !before.has(r.id));
     assert(fresh.length > 1);
     const outer = fresh.find((r) =>
-        r.uri_collection
+        r.path
             === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
                 + 'kHAXckusBqJjgcJLEuEurg/rotation/',
     );
@@ -184,7 +184,7 @@ async () => {
     for (const row of fresh) {
         assertStrictEquals(
             row.operation_id, ROTATION_OP,
-            row.uri_collection + row.uri_id,
+            row.path + row.name,
         );
     }
 });

@@ -38,11 +38,11 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// Members are a lifecycle-trio family (states-address
+// Members are a lifecycle-trio family (states-document
 // retirement): PUT /members/:id carries {type} plus the trio
 // (state/state_at/state_event_id). The old FREEZE-at-genesis
 // refutation is RETIRED — its premise (a competing states/:id
-// log) died with the address; documentLifecycleEvents' echo
+// log) died with the document; documentLifecycleEvents' echo
 // dedup by state_event_id is what keeps a re-put from minting
 // a phantom transition.
 // human-members/:id has NO live PUT route (the first registered

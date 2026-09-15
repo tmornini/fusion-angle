@@ -10,7 +10,7 @@ import { PostgresBackend } from
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import { memoryDbAdapter } from
     '../api/db-memory.ts';
-import { TABLE_NAMES, type DbAdapter } from
+import type { DbAdapter } from
     '../api/db.ts';
 import {
     compareIdentifiers,
@@ -65,11 +65,11 @@ async function putPair(
     adapter: DbAdapter,
     id: string,
 ): Promise<void> {
-    await adapter.messagePairs.put(id, {
-        uri_collection:
+    await adapter.messagePairs.append(id, {
+        path:
             '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/',
-        uri_id: '42',
+        name: '42',
         requester_identity_id:
             'XXZruirZyAOoRpNxaDnpSA',
         method: 'PUT',
@@ -87,10 +87,10 @@ async function putPair(
     });
 }
 
-async function idsAtAddress(
+async function idsAtDocument(
     adapter: DbAdapter,
 ): Promise<string[]> {
-    const rows = await adapter.messagePairs.getAllAtAddress(
+    const rows = await adapter.messagePairs.getDocumentHistory(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/',
         '42',
@@ -116,7 +116,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
-        await backend.ensureTables(TABLE_NAMES);
+        await backend.ensureTable();
     });
 
     Deno.test.afterAll(async () => {
@@ -167,10 +167,10 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 await putPair(postgres, id);
                 await putPair(memory, id);
             }
-            const pgIds = await idsAtAddress(
+            const pgIds = await idsAtDocument(
                 postgres,
             );
-            const memIds = await idsAtAddress(
+            const memIds = await idsAtDocument(
                 memory,
             );
             assertEquals(pgIds, identifierOrder);

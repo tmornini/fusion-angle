@@ -19,7 +19,7 @@ import type {
     ObjectiveEntity,
     ObjectiveRevisionEntity,
 } from '../api/types.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {
     documentGetHandler,
@@ -53,6 +53,7 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
     storedPutBodyText,
     storedCollectionText,
 } from './http-fixtures.ts';
@@ -74,7 +75,7 @@ const OBJ_DRIFT_SKEW_1_GENESIS = generateIdentifier();
 // order; never function-vs-function only).
 //
 // Objectives are the FIFTH lifecycle-trio family (states-
-// address retirement). Absence-as-active (R2) is RETIRED —
+// document retirement). Absence-as-active (R2) is RETIRED —
 // every objective carries an explicit genesis event; archive/
 // reactivate ride PUT /organizations/:id/objectives/:id.
 // OBJECTIVES_TEST_WIRING
@@ -113,7 +114,7 @@ const OBJECTIVES_TEST_WIRING: DocumentFamilyWiring = {
     // Mirror routes.ts objectiveDocumentEntityOf: stamp trio
     // from lifecycle-current (required on trio path).
     entityOf: (document, organization, current) => ({
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
         state: current!.state,
@@ -613,7 +614,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     ));
     assertStrictEquals(reposition.status, 201);
     const repositionResponseId =
-        reposition.headers.get('Response-ID');
+        pairIdOf(reposition);
     assert(repositionResponseId);
     assertStrictEquals(reposition.headers.get('Supersedes'), null);
     {
@@ -711,7 +712,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     ));
     assertStrictEquals(reactivated.status, 201);
     const reactivatedResponseId =
-        reactivated.headers.get('Response-ID');
+        pairIdOf(reactivated);
     assert(reactivatedResponseId);
     {
         const getRes = await handleRequest(
@@ -859,21 +860,20 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     assertStrictEquals(derivedActualsFinal.length, 1);
 
     // Duplicate create — same id, fresh revisionId.
-    // Entity-address pairs before: create op + create doc +
+    // Entity-document pairs before: create op + create doc +
     // reposition + archive + reactivate = 5 (archive/reactivate
-    // ride PUT /organizations/:id/objectives/:id after states-address
+    // ride PUT /organizations/:id/objectives/:id after states-document
     // retirement).
     const revisionId3 = OBJECTIVEID_REV_3;
-    const objectivesPrefix = canonicalUriCollection(
+    const objectivesPrefix = canonicalPath(
         STARK_ORGANIZATION
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
     );
     const beforeDuplicateIds = new Set(
         (
-            await db.messagePairs.getAllWhere(
-                'uri_collection', objectivesPrefix,
+            await db.messagePairs.getCollectionPairs(objectivesPrefix,
             )
-        ).filter((r) => r.uri_id === objectiveId)
+        ).filter((r) => r.name === objectiveId)
             .map((r) => r.id),
     );
     assertStrictEquals(beforeDuplicateIds.size, 5);
@@ -886,7 +886,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
         ),
     ));
     assertStrictEquals(duplicate.status, 201);
-    // Supersedes the latest prior entity-address response
+    // Supersedes the latest prior entity-document response
     // (reactivate), not the earlier reposition.
     assertStrictEquals(
         duplicate.headers.get('Supersedes'),
@@ -894,14 +894,14 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     );
 
     const [afterRequests, afterResponses] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', objectivesPrefix),
-        db.messagePairs.getAllWhere('uri_collection', objectivesPrefix),
+        db.messagePairs.getCollectionPairs(objectivesPrefix),
+        db.messagePairs.getCollectionPairs(objectivesPrefix),
     ]);
-    const afterAtAddress = afterResponses.filter(
-        (r) => r.uri_id === objectiveId,
+    const afterPairsAt = afterResponses.filter(
+        (r) => r.name === objectiveId,
     );
-    assertStrictEquals(afterAtAddress.length, 7);
-    const newRows = afterAtAddress.filter(
+    assertStrictEquals(afterPairsAt.length, 7);
+    const newRows = afterPairsAt.filter(
         (r) => !beforeDuplicateIds.has(r.id),
     );
     assertStrictEquals(newRows.length, 2);
@@ -910,13 +910,13 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     }
     const documentMessagePairsAfter = documentMessagePairsAt(
         afterRequests, objectivesPrefix,
-    ).filter((messagePair) => messagePair.uriId === objectiveId);
+    ).filter((messagePair) => messagePair.name === objectiveId);
     // create doc + reposition + archive + reactivate +
     // duplicate create's document = 5
     assertStrictEquals(documentMessagePairsAfter.length, 5);
     const newestDocumentMessagePair =
         documentMessagePairsAfter.at(-1)!;
-    const newestDocumentResponseRow = afterAtAddress.find(
+    const newestDocumentResponseRow = afterPairsAt.find(
         (r) => r.id === newestDocumentMessagePair.id,
     )!;
     assertStrictEquals(
@@ -947,7 +947,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
 
 Deno.test('the create-op POST pair is not read as a document message pair —'
 + ' the create body and the document body share zero top-level'
-+ ' keys; exactly one PUT pair lands at the objective address'
++ ' keys; exactly one PUT pair lands at the objective document'
 + ' after create', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -962,27 +962,27 @@ Deno.test('the create-op POST pair is not read as a document message pair —'
     ));
     assertStrictEquals(created.status, 201);
 
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         STARK_ORGANIZATION
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
     );
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
-    const atAddress = requests.filter(
-        (r) => r.uri_collection === prefix
-            && r.uri_id === objectiveId,
+    const pairsAt = requests.filter(
+        (r) => r.path === prefix
+            && r.name === objectiveId,
     );
-    assertStrictEquals(atAddress.length, 2);
+    assertStrictEquals(pairsAt.length, 2);
 
     const documentMessagePairs = documentMessagePairsAt(
         requests, prefix,
-    ).filter((messagePair) => messagePair.uriId === objectiveId);
+    ).filter((messagePair) => messagePair.name === objectiveId);
     assertStrictEquals(documentMessagePairs.length, 1);
     assertStrictEquals(documentMessagePairs[0]!.method, 'PUT');
 
-    const postRow = atAddress.find(
+    const postRow = pairsAt.find(
         (r) => decodeRequestMessage(r.request).method === 'POST',
     )!;
     const createBodyKeys = new Set(
@@ -1015,7 +1015,7 @@ async () => {
     ));
 
     // Position body carries the echoed genesis trio — required
-    // by the document gate after states-address retirement.
+    // by the document gate after states-document retirement.
     const positionBody = {
         position: 99,
         state: 'active' as const,
@@ -1040,8 +1040,8 @@ async () => {
     const afterSecond = (await db.messagePairs.getAll()).length;
     assertStrictEquals(afterSecond, afterFirst);
     assertStrictEquals(
-        first.headers.get('Response-ID'),
-        second.headers.get('Response-ID'),
+        pairIdOf(first),
+        pairIdOf(second),
     );
 
     const getRes = await handleRequest(

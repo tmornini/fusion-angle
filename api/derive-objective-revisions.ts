@@ -2,7 +2,7 @@ import type { DbAdapter } from './db.ts';
 import type { Id, ObjectiveRevisionEntity } from './types.ts';
 import { validateObjectiveRevisionEntity } from
     './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -14,7 +14,7 @@ import {
 // message-plane reduction (derive-documents.ts) — the
 // deriveFlowRecords structural mirror (api/derive-flow-
 // records.ts): one prefix scan per parent objective, at the
-// nested address a live genesis create (POST /objectives, the
+// nested document a live genesis create (POST /objectives, the
 // synthesized revision pair) and a live PUT objectives/:id/
 // revisions/:rid (a fresh revision) both write. The GENERIC
 // entity/collection handlers (documentGetHandler/document
@@ -23,18 +23,18 @@ import {
 // derivation — so this nested sub-resource needs its own bespoke
 // module, exactly as flow_records did (research finding 10:
 // param() throws on '', and documentMessagePairsAt
-// matches uri_collection by EQUALITY, so a revision pair
+// matches path by EQUALITY, so a revision pair
 // at .../objectives/{id}/
 // revisions/ can never leak into the objectives-collection
 // derivation, or vice versa).
 //
 // Revisions carry NO lifecycle of their own — there is no
-// revision-level trio, no DELETE at this address, and no by-id
+// revision-level trio, no DELETE at this document, and no by-id
 // GET route (only objectives/:id/revisions is live; :rid is
 // PUT-only) — so this module exports the collection derivation
 // alone, unlike deriveFlowRecords' by-id sibling (deriveFlow
 // Record), which exists only because flows/:id/records/:frid
-// carries a live GET the revisions address never gained.
+// carries a live GET the revisions document never gained.
 //
 // H7: explicit id-lex sort — load-bearing, because the
 // backend's row order is not a contract and no caller may
@@ -51,7 +51,7 @@ function objectiveRevisionsUriPrefix(
     organization: Id,
     objectiveId: Id,
 ): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         organization,
         '/objectives/' + objectiveId + '/revisions/',
     );
@@ -63,7 +63,7 @@ export function objectiveRevisionEntityOf(
     document: DerivedDocument,
 ): ObjectiveRevisionEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateObjectiveRevisionEntity(
             withoutId(document.body),
         ),
@@ -75,7 +75,7 @@ export function objectiveRevisionEntityOf(
 // objectives/:id/revisions route (a future task's flip): the
 // SERVER already filters by the parent objective through this
 // derivation's own nested prefix, so the org fence and the
-// parent scope are both closed by the address alone — no
+// parent scope are both closed by the document alone — no
 // foreign-parent row can ever surface (a foreign organization or
 // a foreign objective id yields a distinct, empty prefix, never
 // a filtered-out row).
@@ -87,8 +87,7 @@ export async function deriveObjectiveRevisions(
     const prefix = objectiveRevisionsUriPrefix(
         organization, objectiveId,
     );
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const documents = deriveDocumentsAt(
         messagePairs, prefix,

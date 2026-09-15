@@ -7,6 +7,18 @@ import type { DbAdapter } from '../api/db.ts';
 
 const BASE = 'http://localhost';
 
+// The pair id a response advertises: its strong ETag,
+// unquoted. No ETag → null.
+export function pairIdOf(response: Response): string | null {
+    const raw = response.headers.get('ETag');
+    if (raw === null) return null;
+    return raw.length >= 2
+        && raw.startsWith('"')
+        && raw.endsWith('"')
+        ? raw.slice(1, -1)
+        : raw;
+}
+
 export function setCookieHeader(res: Response): string {
     const cookies = typeof res.headers.getSetCookie
         === 'function'
@@ -75,10 +87,10 @@ export async function storedPutBodyText(
     collection: string,
     id: string,
 ): Promise<string> {
-    const stored = await messageStore(db).get(
+    const stored = await messageStore(db).getDocumentHead(
         collection, id,
     );
-    if (stored === undefined) {
+    if (stored === null) {
         throw new Error(
             'no live PUT at ' + collection + id,
         );

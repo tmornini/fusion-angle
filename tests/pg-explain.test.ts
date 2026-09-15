@@ -3,7 +3,7 @@ import { connectPostgres } from
     '../api/postgres-client.ts';
 import { PostgresBackend } from
     '../api/backend-postgres.ts';
-import { TABLE_NAMES, type Tx } from '../api/db.ts';
+import type { Tx } from '../api/db.ts';
 import { serializeWire } from
     '../shared/http-message/wire-codec.ts';
 import { Octets } from
@@ -26,7 +26,7 @@ const IDEA_N = 1;
 const AUTH_N = 9;
 const AUTH_OTHER_START = 10;
 const AUTH_OTHER_COUNT = 199;
-const VERSION_URI_ID = 'AjdvjuECVZEgZoFajaIEkg';
+const VERSION_NAME = 'AjdvjuECVZEgZoFajaIEkg';
 const VERSION_N = 500;
 const VERSION_EXTRA_START = 501;
 const VERSION_EXTRA_COUNT = 80;
@@ -120,20 +120,20 @@ function jsonWire(body: unknown): string {
     });
 }
 
-async function putMessagePair(
+async function appendRow(
     tx: Tx,
     n: number,
     collection: string,
-    uriId: string,
+    name: string,
     message: string,
     method: string,
 ): Promise<void> {
     const id = id22(n);
     const at = atStamp(n);
-    await tx.put('message_pairs', {
+    await tx.append({
         id,
-        uri_collection: collection,
-        uri_id: uriId,
+        path: collection,
+        name: name,
         requester_identity_id: REQUESTER,
         method,
         request_at: at,
@@ -152,10 +152,10 @@ async function putAuthorize(
 ): Promise<void> {
     const id = id22(n);
     const at = atStamp(n);
-    await tx.put('message_pairs', {
+    await tx.append({
         id,
-        uri_collection: AUTH_COLLECTION,
-        uri_id: '',
+        path: AUTH_COLLECTION,
+        name: '',
         requester_identity_id: REQUESTER,
         method: 'GET',
         request_at: at,
@@ -172,9 +172,7 @@ async function putAuthorize(
 async function seedRows(
     backend: PostgresBackend,
 ): Promise<void> {
-    await backend.transaction(
-        TABLE_NAMES,
-        'readwrite',
+    await backend.transaction('readwrite',
         async (tx) => {
             await putAuthorize(
                 tx,
@@ -186,7 +184,7 @@ async function seedRows(
                 await putAuthorize(tx, n, 'c' + String(n));
             }
             for (let n = 1; n <= 4; n++) {
-                await putMessagePair(
+                await appendRow(
                     tx,
                     n,
                     IDEA_COLLECTION,
@@ -198,30 +196,31 @@ async function seedRows(
                     'PUT',
                 );
             }
-            // Fat address (81 pairs at one uri_id):
-            // address ORDER BY prefers message_pairs_address.
+            // Fat document (81 pairs at one name):
+            // document ORDER BY prefers
+            // message_pairs_document.
             // Keep /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/ small for the
             // collection pin.
-            await putMessagePair(
+            await appendRow(
                 tx,
                 VERSION_N,
                 VERSION_COLLECTION,
-                VERSION_URI_ID,
+                VERSION_NAME,
                 putWire(
-                    VERSION_COLLECTION + VERSION_URI_ID,
+                    VERSION_COLLECTION + VERSION_NAME,
                     '',
                 ),
                 'PUT',
             );
             for (let i = 0; i < VERSION_EXTRA_COUNT; i++) {
                 const n = VERSION_EXTRA_START + i;
-                await putMessagePair(
+                await appendRow(
                     tx,
                     n,
                     VERSION_COLLECTION,
-                    VERSION_URI_ID,
+                    VERSION_NAME,
                     putWire(
-                        VERSION_COLLECTION + VERSION_URI_ID,
+                        VERSION_COLLECTION + VERSION_NAME,
                         '',
                     ),
                     'PUT',
@@ -229,7 +228,7 @@ async function seedRows(
             }
             for (let i = 0; i < FILLER_COUNT; i++) {
                 const n = FILLER_START + i;
-                await putMessagePair(
+                await appendRow(
                     tx,
                     n,
                     FILLER_COLLECTION,
@@ -286,7 +285,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
-        await backend.ensureTables(TABLE_NAMES);
+        await backend.ensureTable();
         await seedRows(backend);
         await sql.query`ANALYZE message_pairs`;
     });
@@ -324,7 +323,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         >`
             EXPLAIN
             SELECT * FROM message_pairs
-            WHERE uri_collection = ${IDEA_COLLECTION}
+            WHERE path = ${IDEA_COLLECTION}
             ORDER BY response_at, id
         `;
         assertIndexPlan(
@@ -347,19 +346,20 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
     });
 
-    Deno.test('address uses address index', async () => {
+    Deno.test('document read uses the document index',
+    async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
             SELECT * FROM message_pairs
-            WHERE uri_collection = ${VERSION_COLLECTION}
-              AND uri_id = ${VERSION_URI_ID}
+            WHERE path = ${VERSION_COLLECTION}
+              AND name = ${VERSION_NAME}
             ORDER BY response_at, id
         `;
         assertIndexPlan(
             explainText(plans),
-            ['message_pairs_address'],
+            ['message_pairs_document'],
         );
     });
 
@@ -370,7 +370,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         >`
             EXPLAIN
             SELECT * FROM message_pairs
-            WHERE uri_collection = ${AUTH_COLLECTION}
+            WHERE path = ${AUTH_COLLECTION}
               AND message_body(response) @>
                   ${AUTH_CONTAINMENT}::jsonb
             ORDER BY response_at, id
@@ -381,7 +381,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
     });
 
-    Deno.test('latestPutDelete uses address and pkey',
+    Deno.test('getHead uses the document index and pkey',
     async () => {
         const plans = await sql.query<
             Record<string, unknown>
@@ -389,8 +389,8 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             EXPLAIN
             SELECT id, method
             FROM message_pairs
-            WHERE uri_collection = ${VERSION_COLLECTION}
-              AND uri_id = ${VERSION_URI_ID}
+            WHERE path = ${VERSION_COLLECTION}
+              AND name = ${VERSION_NAME}
               AND method IN ('PUT', 'DELETE')
             ORDER BY response_at DESC, id DESC
             LIMIT 1
@@ -398,6 +398,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const text = explainText(plans);
         assertNotMatch(text, /requests_pkey/);
         assertNotMatch(text, /Join/);
-        assertIndexPlan(text, ['message_pairs_address']);
+        assertIndexPlan(text, ['message_pairs_document']);
     });
 }

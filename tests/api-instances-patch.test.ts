@@ -11,7 +11,6 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     organizationToken,
@@ -26,7 +25,7 @@ import {
 } from '../api/routes.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
     IF_MATCH_HEADER,
     strongEtagOf,
     parseIfMatch,
@@ -49,6 +48,7 @@ import {
 } from '../api/types.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
@@ -207,11 +207,10 @@ async function countInstanceMessagePairs(
     const prefix = instancesUriPrefix(
         ORGANIZATION, TYPE_ID,
     );
-    const responses = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const responses = await db.messagePairs.getCollectionPairs(prefix,
     );
     return responses.filter(
-        (r) => r.uri_id === INSTANCE_ID,
+        (r) => r.name === INSTANCE_ID,
     ).length;
 }
 
@@ -242,9 +241,7 @@ async function appendInstanceMessagePair(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
     return messagePair.id;
 }
@@ -877,7 +874,7 @@ async () => {
     const originalEtag = first.headers.get('ETag')!;
     const originalBody = await first.json();
     const originalResponseId =
-        first.headers.get('Response-ID')!;
+        pairIdOf(first)!;
     // Later revision advances the head.
     const secondWrite = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
@@ -910,7 +907,7 @@ async () => {
         'replay carries ORIGINAL etag',
     );
     assertStrictEquals(
-        replay.headers.get('Response-ID'),
+        pairIdOf(replay),
         originalResponseId,
     );
     assertEquals(

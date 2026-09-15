@@ -1,9 +1,8 @@
 // Fourth StorageBackend. postgres.js stays behind
-// postgres-client. Write lock order is dedup, address,
+// postgres-client. Write lock order is request, document,
 // then FOR UPDATE. Notify is in-transaction.
 
 import {
-    assertGetWhereColumn,
     type StorageBackend,
     type Tx,
     type TxMode,
@@ -32,23 +31,18 @@ export const POSTGRES_DROP_SCHEMA =
     + 'GRANT ALL ON SCHEMA public TO public;';
 
 export interface PostgresTx extends Tx {
-    getAddress<T extends { id: string }>(
-        table: string,
-        collection: string,
-        uriId: string,
+    getDocumentHistory<T extends { id: string }>(
+        path: string,
+        name: string,
     ): Promise<T[]>;
-    lock(label: string): Promise<void>;
-    lockShared(label: string): Promise<void>;
+    lockRequest(hash: string): Promise<void>;
+    lockDocument(path: string, name: string): Promise<void>;
     lockHead(id: string): Promise<void>;
-    latestPutDelete(
-        collection: string,
-        uriId: string,
-    ): Promise<{
+    getHead(path: string, name: string): Promise<{
         readonly id: string;
         readonly method: string;
     } | null>;
     notify(event: NotificationEvent): Promise<void>;
-    stampSchemaMarker(): Promise<void>;
 }
 
 export class PostgresBackend implements StorageBackend {
@@ -59,13 +53,9 @@ export class PostgresBackend implements StorageBackend {
     }
 
     async transaction<R>(
-        tables: readonly string[],
         mode: TxMode,
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R> {
-        for (const table of tables) {
-            assertMessageTable(table);
-        }
         try {
             return await this.#sql.begin(
                 (sql) => fn(postgresTx(sql, mode)),
@@ -75,9 +65,7 @@ export class PostgresBackend implements StorageBackend {
         }
     }
 
-    async ensureTables(
-        _tables: readonly string[],
-    ): Promise<void> {
+    async ensureTable(): Promise<void> {
         try {
             await this.#sql.unsafe(POSTGRES_SCHEMA);
         } catch (error) {
@@ -119,20 +107,6 @@ export class PostgresBackend implements StorageBackend {
             throw mapPostgresError(error);
         }
     }
-
-    async getAddress<T extends { id: string }>(
-        table: string,
-        collection: string,
-        uriId: string,
-    ): Promise<T[]> {
-        return this.transaction(
-            [table],
-            'readonly',
-            (tx) => (tx as PostgresTx).getAddress<T>(
-                table, collection, uriId,
-            ),
-        );
-    }
 }
 
 function postgresTx(
@@ -147,88 +121,73 @@ function postgresTx(
         }
     };
     return {
-        async get<T extends { id: string }>(
-            table: string,
+        async getById<T extends { id: string }>(
             id: string,
         ): Promise<T | null> {
-            const name = assertMessageTable(table);
-            const rows = await selectById(sql, name, id);
+            const rows = await selectPairById(sql, id);
             const row = rows[0];
             return row === undefined
                 ? null
                 : entityOf<T>(row);
         },
-        async getAll<T extends { id: string }>(
-            table: string,
-        ): Promise<T[]> {
-            const name = assertMessageTable(table);
-            const rows = await selectAll(sql, name);
+        async getAll<T extends { id: string }>(): Promise<T[]> {
+            const rows = await selectAll(sql);
             return rows.map((row) => entityOf<T>(row));
         },
-        async getWhere<T extends { id: string }>(
-            table: string,
-            column: string,
-            key: string,
+        async getCollectionPairs<T extends { id: string }>(
+            path: string,
         ): Promise<T[]> {
-            const name = assertMessageTable(table);
-            assertIndexedColumn(name, column);
-            const rows = await selectWhere(
-                sql, name, column, key,
+            const rows = await selectCollectionPairs(
+                sql, path,
             );
             return rows.map((row) => entityOf<T>(row));
         },
-        async getAddress<T extends { id: string }>(
-            table: string,
-            collection: string,
-            uriId: string,
+        async getPairsByRequestHash<T extends { id: string }>(
+            hash: string,
         ): Promise<T[]> {
-            const name = assertMessageTable(table);
-            const rows = await selectAddress(
-                sql, name, collection, uriId,
+            const rows = await selectPairsByRequestHash(
+                sql, hash,
+            );
+            return rows.map((row) => entityOf<T>(row));
+        },
+        async getDocumentHistory<T extends { id: string }>(
+            path: string,
+            name: string,
+        ): Promise<T[]> {
+            const rows = await selectDocumentHistory(
+                sql, path, name,
             );
             return rows.map((row) => entityOf<T>(row));
         },
         async getWhereBody<T extends { id: string }>(
-            table: string,
-            collection: string,
+            path: string,
             containment: Record<string, unknown>,
         ): Promise<T[]> {
-            const name = assertMessageTable(table);
             const rows = await selectWhereBody(
-                sql, name, collection, containment,
+                sql, path, containment,
             );
             return rows.map((row) => entityOf<T>(row));
         },
-        async put<T extends { id: string }>(
-            table: string,
+        async append<T extends { id: string }>(
             row: T,
         ): Promise<void> {
             assertWritable();
-            const name = assertMessageTable(table);
             const written = serializeRecord(
                 row as Record<string, unknown>,
-                name,
+                'message_pairs',
             );
-            await upsertRow(sql, name, written);
+            await upsertRow(sql, written);
         },
-        async delete(
-            table: string,
-            id: string,
+        async lockRequest(hash: string): Promise<void> {
+            await advisoryLock(sql, 'fusion.dedup.' + hash);
+        },
+        async lockDocument(
+            path: string,
+            name: string,
         ): Promise<void> {
-            assertWritable();
-            const name = assertMessageTable(table);
-            await deleteById(sql, name, id);
-        },
-        async clear(table: string): Promise<void> {
-            assertWritable();
-            const name = assertMessageTable(table);
-            await deleteAll(sql, name);
-        },
-        async lock(label: string): Promise<void> {
-            await advisoryLock(sql, label, false);
-        },
-        async lockShared(label: string): Promise<void> {
-            await advisoryLock(sql, label, true);
+            await advisoryLock(
+                sql, 'fusion.document.' + path + name,
+            );
         },
         async lockHead(id: string): Promise<void> {
             await sql.query`
@@ -237,25 +196,14 @@ function postgresTx(
                 FOR UPDATE
             `;
         },
-        async latestPutDelete(
-            collection: string,
-            uriId: string,
+        async getHead(
+            path: string,
+            name: string,
         ): Promise<{
             readonly id: string;
             readonly method: string;
         } | null> {
-            const rows = await sql.query<{
-                id: string;
-                method: string;
-            }>`
-                SELECT id, method
-                FROM message_pairs
-                WHERE uri_collection = ${collection}
-                  AND uri_id = ${uriId}
-                  AND method IN ('PUT', 'DELETE')
-                ORDER BY response_at DESC, id DESC
-                LIMIT 1
-            `;
+            const rows = await selectHead(sql, path, name);
             const row = rows[0];
             if (row === undefined) {
                 return null;
@@ -276,47 +224,17 @@ function postgresTx(
                 )
             `;
         },
-        async stampSchemaMarker(): Promise<void> {
-            await sql.query`
-                INSERT INTO schema_marker ("only")
-                VALUES (true)
-                ON CONFLICT DO NOTHING
-            `;
-        },
     };
 }
 
 async function advisoryLock(
     sql: SqlClient,
     label: string,
-    shared: boolean,
 ): Promise<void> {
     const key = Number(await advisoryKey(label));
-    if (shared) {
-        await sql.query`
-            SELECT pg_advisory_xact_lock_shared(${key})
-        `;
-        return;
-    }
     await sql.query`
         SELECT pg_advisory_xact_lock(${key})
     `;
-}
-
-function assertMessageTable(
-    table: string,
-): 'message_pairs' {
-    if (table === 'message_pairs') {
-        return table;
-    }
-    throw new Error('unknown table: ' + table);
-}
-
-function assertIndexedColumn(
-    table: 'message_pairs',
-    column: string,
-): void {
-    assertGetWhereColumn(table, column);
 }
 
 function uuidTextOfIdentifier(id: string): string {
@@ -400,9 +318,8 @@ function textField(
     return value;
 }
 
-async function selectById(
+async function selectPairById(
     sql: SqlClient,
-    _table: 'message_pairs',
     id: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
@@ -413,7 +330,6 @@ async function selectById(
 
 async function selectAll(
     sql: SqlClient,
-    _table: 'message_pairs',
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
         SELECT * FROM message_pairs
@@ -421,88 +337,80 @@ async function selectAll(
     `;
 }
 
-async function selectWhere(
+async function selectCollectionPairs(
     sql: SqlClient,
-    _table: 'message_pairs',
-    column: string,
-    key: string,
-): Promise<Record<string, unknown>[]> {
-    if (column === 'uri_collection') {
-        return sql.query`
-            SELECT * FROM message_pairs
-            WHERE uri_collection = ${key}
-            ORDER BY response_at, id
-        `;
-    }
-    if (column === 'request_hash') {
-        return sql.query`
-            SELECT * FROM message_pairs
-            WHERE request_hash = ${key}
-            ORDER BY response_at, id
-        `;
-    }
-    throw new Error(
-        'getWhere does not accept ' + column,
-    );
-}
-
-async function selectAddress(
-    sql: SqlClient,
-    _table: 'message_pairs',
-    collection: string,
-    uriId: string,
+    path: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
         SELECT * FROM message_pairs
-        WHERE uri_collection = ${collection}
-          AND uri_id = ${uriId}
+        WHERE path = ${path}
         ORDER BY response_at, id
+    `;
+}
+
+async function selectPairsByRequestHash(
+    sql: SqlClient,
+    hash: string,
+): Promise<Record<string, unknown>[]> {
+    return sql.query`
+        SELECT * FROM message_pairs
+        WHERE request_hash = ${hash}
+        ORDER BY response_at, id
+    `;
+}
+
+async function selectDocumentHistory(
+    sql: SqlClient,
+    path: string,
+    name: string,
+): Promise<Record<string, unknown>[]> {
+    return sql.query`
+        SELECT * FROM message_pairs
+        WHERE path = ${path}
+          AND name = ${name}
+        ORDER BY response_at, id
+    `;
+}
+
+async function selectHead(
+    sql: SqlClient,
+    path: string,
+    name: string,
+): Promise<{ id: string; method: string }[]> {
+    return sql.query<{ id: string; method: string }>`
+        SELECT id, method
+        FROM message_pairs
+        WHERE path = ${path}
+          AND name = ${name}
+          AND method IN ('PUT', 'DELETE')
+        ORDER BY response_at DESC, id DESC
+        LIMIT 1
     `;
 }
 
 async function selectWhereBody(
     sql: SqlClient,
-    _table: 'message_pairs',
-    collection: string,
+    path: string,
     containment: Record<string, unknown>,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
         SELECT * FROM message_pairs
-        WHERE uri_collection = ${collection}
+        WHERE path = ${path}
           AND message_body(response) @>
               ${containment}::jsonb
         ORDER BY response_at, id
     `;
 }
 
-async function deleteById(
-    sql: SqlClient,
-    _table: 'message_pairs',
-    id: string,
-): Promise<void> {
-    await sql.query`
-        DELETE FROM message_pairs
-        WHERE id = ${uuidTextOfIdentifier(id)}
-    `;
-}
-
-async function deleteAll(
-    sql: SqlClient,
-    _table: 'message_pairs',
-): Promise<void> {
-    await sql.query`DELETE FROM message_pairs`;
-}
-
 async function upsertRow(
     sql: SqlClient,
-    _table: 'message_pairs',
     row: Record<string, unknown>,
 ): Promise<void> {
     const id = uuidTextOfIdentifier(
         textField(row, 'id'),
     );
-    const collection = textField(row, 'uri_collection');
-    const uriId = textField(row, 'uri_id');
+    const collection = textField(row, 'path');
+    const name = textField(row, 'name');
     const requester = textField(
         row, 'requester_identity_id',
     );
@@ -517,21 +425,21 @@ async function upsertRow(
     );
     await sql.query`
         INSERT INTO message_pairs (
-            id, uri_collection, uri_id,
+            id, path, name,
             requester_identity_id, method,
             request_at, request_hash, request,
             response_at, response,
             operation_id
         ) VALUES (
-            ${id}, ${collection}, ${uriId},
+            ${id}, ${collection}, ${name},
             ${requester}, ${method},
             ${requestAt}, ${requestHash}, ${request},
             ${responseAt}, ${response},
             ${operationId}
         )
         ON CONFLICT (id) DO UPDATE SET
-            uri_collection = EXCLUDED.uri_collection,
-            uri_id = EXCLUDED.uri_id,
+            path = EXCLUDED.path,
+            name = EXCLUDED.name,
             requester_identity_id =
                 EXCLUDED.requester_identity_id,
             method = EXCLUDED.method,

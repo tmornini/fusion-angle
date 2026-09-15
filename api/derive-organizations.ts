@@ -1,11 +1,10 @@
 import type { DbAdapter } from './db.ts';
 import {
     EntityNotFoundError,
-    MESSAGE_TABLES,
 } from './db.ts';
 import type { Id, OrganizationEntity } from './types.ts';
 import { validateOrganizationEntity } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -22,7 +21,7 @@ import {
 //
 // GLOBAL plane, like members/ai-members/human-members/
 // identities: organizations IS the tenant root, so it is never
-// itself organization-nested — canonicalUriCollection(undefined,
+// itself organization-nested — canonicalPath(undefined,
 // '/organizations/') resolves the SAME flat prefix whether or
 // not the family is registered (ORGANIZATION_NESTED_FIRST_
 // SEGMENTS's fallback in message-pair.ts and the eventual
@@ -52,9 +51,9 @@ import {
 // pair the live PUT legitimately formed.
 //
 // ONE shared readonly tx per call (Efficiency): db.messagePairs
-// read inside the SAME db.readTransaction(
-// MESSAGE_TABLES, ...) rather than an independent
-// getAllWhere that would open its own transaction. One
+// read inside the SAME db.readTransaction(...) rather
+// than an independent getAllWhere that would open its
+// own transaction. One
 // physical transaction per derivation, mirroring
 // api/derive-identity-spine.ts's own closure — there it
 // also closes a torn-read hazard; organizations/:id is
@@ -69,14 +68,14 @@ import {
 const ORGANIZATIONS_TABLE = 'organizations';
 
 const ORGANIZATIONS_PREFIX =
-    canonicalUriCollection(undefined, '/organizations/');
+    canonicalPath(undefined, '/organizations/');
 
 export function organizationEntityOf(
     document: DerivedDocument,
 ): OrganizationEntity {
     return {
         ...validateOrganizationEntity(withoutId(document.body)),
-        id: document.uriId,
+        id: document.name,
     };
 }
 
@@ -85,11 +84,9 @@ export function organizationEntityOf(
 export async function deriveOrganizations(
     db: DbAdapter,
 ): Promise<OrganizationEntity[]> {
-    return db.readTransaction(
-        MESSAGE_TABLES,
-        async (view) => {
-            const messagePairs = await view.messagePairs.getAllWhere(
-                'uri_collection', ORGANIZATIONS_PREFIX,
+    return db.readTransaction(async (view) => {
+            const messagePairs = await view.messagePairs.getCollectionPairs(
+                ORGANIZATIONS_PREFIX,
             );
             const documents = deriveDocumentsAt(
                 messagePairs, ORGANIZATIONS_PREFIX,
@@ -111,11 +108,9 @@ export async function deriveOrganization(
     db: DbAdapter,
     id: Id,
 ): Promise<OrganizationEntity> {
-    return db.readTransaction(
-        MESSAGE_TABLES,
-        async (view) => {
-            const messagePairs = await view.messagePairs.getAllWhere(
-                'uri_collection', ORGANIZATIONS_PREFIX,
+    return db.readTransaction(async (view) => {
+            const messagePairs = await view.messagePairs.getCollectionPairs(
+                ORGANIZATIONS_PREFIX,
             );
             const document = deriveDocumentsAt(
                 messagePairs, ORGANIZATIONS_PREFIX,

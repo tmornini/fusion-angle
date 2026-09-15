@@ -124,13 +124,13 @@ Deno.test('getProjectScoring returns both lists',
 
 // Seeds both projects through the SAME document PUT the live
 // route uses (putProject), so a message pair exists at each
-// project's address — required for the flipped GET projects
+// project's document — required for the flipped GET projects
 // route (Phase 3 Task 6), which getPortfolioImpactSummary /
 // getObjectiveScoringInputs / getProjectsScoreColumn read, to
 // derive them. The objective, its revision, and both baseline
 // scores are seeded the SAME wire-reachable way (Phase 7
 // Task 7) — a raw db.objectives.put/db.projectObjective
-// BaselineScores.put leaves no pair at these addresses, and the
+// BaselineScores.put leaves no pair at these documents, and the
 // flipped GET objectives / GET
 // organizations/:id/projects/:id/objective-baseline-
 // scores routes now derive from the ledger, not the old tables.

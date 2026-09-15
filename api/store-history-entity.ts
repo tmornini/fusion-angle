@@ -1,7 +1,6 @@
 import {
     EntityNotFoundError,
     type EntityStore as EntityStoreInterface,
-    type EntityPut,
     type EntityValidator,
     type TxRunner,
 } from './db.ts';
@@ -9,8 +8,8 @@ import {
 // History tables hold immutable point-in-time facts. Their
 // only valid removal is hard splice (eviction for cap
 // enforcement, schema reset, etc.) — never a tombstone.
-// A history store never consults a lifecycle log: it
-// declares only its own table on every tx.
+// A history store never consults a lifecycle log. `#table`
+// names the entity for EntityNotFoundError only.
 export class HistoryEntityStore<
     T extends { id: string },
 > implements EntityStoreInterface<T>
@@ -31,57 +30,50 @@ export class HistoryEntityStore<
 
     async getAll(): Promise<T[]> {
         return this.#run(
-            [this.#table], 'readonly',
-            tx => tx.getAll<T>(this.#table),
+            'readonly',
+            tx => tx.getAll<T>(),
         );
     }
 
-    // The keyed-collection read: getAll narrowed to one
-    // indexed column. History rows never tombstone, so —
-    // like getAll — no deleted-id scan; just the index slice.
-    async getAllWhere(
-        column: string,
-        key: string,
-    ): Promise<T[]> {
+    async getCollectionPairs(path: string): Promise<T[]> {
         return this.#run(
-            [this.#table], 'readonly',
-            tx => tx.getWhere<T>(
-                this.#table, column, key,
-            ),
+            'readonly',
+            tx => tx.getCollectionPairs<T>(path),
         );
     }
 
-    async getAllAtAddress(
-        collection: string,
-        uriId: string,
+    async getPairsByRequestHash(hash: string): Promise<T[]> {
+        return this.#run(
+            'readonly',
+            tx => tx.getPairsByRequestHash<T>(hash),
+        );
+    }
+
+    async getDocumentHistory(
+        path: string,
+        name: string,
     ): Promise<T[]> {
         return this.#run(
-            [this.#table], 'readonly',
-            tx => tx.getAddress<T>(
-                this.#table, collection, uriId,
-            ),
+            'readonly',
+            tx => tx.getDocumentHistory<T>(path, name),
         );
     }
 
     async getAllWhereBody(
-        collection: string,
+        path: string,
         containment: Record<string, unknown>,
     ): Promise<T[]> {
         return this.#run(
-            [this.#table], 'readonly',
-            tx => tx.getWhereBody<T>(
-                this.#table, collection, containment,
-            ),
+            'readonly',
+            tx => tx.getWhereBody<T>(path, containment),
         );
     }
 
     async getById(id: string): Promise<T> {
         return this.#run(
-            [this.#table], 'readonly',
+            'readonly',
             async (tx) => {
-                const row = await tx.get<T>(
-                    this.#table, id,
-                );
+                const row = await tx.getById<T>(id);
                 if (!row) {
                     throw new EntityNotFoundError(
                         this.#table, id,
@@ -92,7 +84,7 @@ export class HistoryEntityStore<
         );
     }
 
-    async put(
+    async append(
         id: string,
         fields: Omit<T, 'id'>,
     ): Promise<T> {
@@ -103,38 +95,9 @@ export class HistoryEntityStore<
             id,
         } as T;
         await this.#run(
-            [this.#table], 'readwrite',
-            tx => tx.put(this.#table, written),
+            'readwrite',
+            tx => tx.append(written),
         );
         return written;
-    }
-
-    async putMany(
-        entries: readonly EntityPut<T>[],
-        deleteIds: readonly string[],
-    ): Promise<void> {
-        // Validate every entry before opening the tx, so a
-        // bad row throws before any write — the whole batch
-        // is all-or-nothing.
-        const written = entries.map(entry => {
-            const { id: _id, ...body } =
-                entry.fields as unknown as
-                    Record<string, unknown>;
-            return {
-                ...this.#validate(body),
-                id: entry.id,
-            } as T;
-        });
-        await this.#run(
-            [this.#table], 'readwrite',
-            async (tx) => {
-                for (const id of deleteIds) {
-                    await tx.delete(this.#table, id);
-                }
-                for (const row of written) {
-                    await tx.put(this.#table, row);
-                }
-            },
-        );
     }
 }

@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import { TABLE_NAMES, MESSAGE_TABLES } from './db.ts';
+
 import {
     postIdeaDocumentOp,
     postIdeaSubmissionOp,
@@ -34,7 +34,7 @@ import { generateSecret } from
     '../shared/secret.ts';
 import { hashPassword } from '../shared/password-hash.ts';
 import type { MessagePair } from './message-pair.ts';
-import { appendMessagePair } from './message-pair.ts';
+import { appendMessagePairOnce } from './message-pair.ts';
 import {
     humanMemberPoolsByOrganization,
     pickHumanMember,
@@ -178,13 +178,8 @@ export interface SeededCredentials {
 // pass-2 split (formSeedCredentialMessagePairs, seed-message-pairs.ts),
 // since a credential's body embeds the post-hash secret computed
 // HERE, after formMockDataMessagePairs / formBootstrapMessagePair
-// already ran. The write transaction opens
-// MESSAGE_TABLES — the bare
-// ['identity_credentials'] set from before this task would trip
-// postIdentityCredentialDocumentOp's OWN nested
-// MESSAGE_TABLES transaction
-// on the nested-subset guard (api/db-backed.ts's #assertSubset:
-// message-plane stores not in the outer declared set).
+// already ran. The write transaction is one table; a nested
+// view.transaction re-enters the same tx.
 //
 // Phase Final Task 1(d): recipients are the in-memory
 // person/PII list (buildMembers / bootstrap PII body) — never
@@ -287,9 +282,7 @@ export async function seedHumanCredentials(
     // the identity_credentials ROW half).
     // postIdentityCredential DocumentOp is the SAME op
     // every live PUT identities/:id/credentials/:cid rides.
-    await adapter.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await adapter.transaction(async (view) => {
             await Promise.all([
                 ...planned.map(cred =>
                     postIdentityCredentialDocumentOp(
@@ -361,9 +354,8 @@ export async function postMockDataLoad(
     // cannot run inside the tx. The schema marker stamps LAST,
     // so a failed seed leaves hasSchema() false: the datastore
     // reads as empty and the seed can be retried cleanly.
-    await adapter.ensureTables(TABLE_NAMES);
+    await adapter.ensureTable();
     await adapter.transaction(
-        TABLE_NAMES,
         (view) => postMockDataLoadIn(view, messagePairs),
     );
     // Task 1(d): same buildMembers (+ the unaffiliated
@@ -417,7 +409,7 @@ async function postMockDataLoadIn(
                             ),
                         ),
                     )),
-                appendMessagePair(
+                appendMessagePairOnce(
                     adapter,
                     requireMessagePair(
                         messagePairs,
@@ -490,7 +482,7 @@ async function postMockDataLoadIn(
         (async () => {
             // Live grant order: operation, then document
             // (grantInvitation, invitations-domain.ts).
-            await appendMessagePair(
+            await appendMessagePairOnce(
                 adapter,
                 requireMessagePair(
                     messagePairs,
@@ -500,7 +492,7 @@ async function postMockDataLoadIn(
                     ),
                 ),
             );
-            await appendMessagePair(
+            await appendMessagePairOnce(
                 adapter,
                 requireMessagePair(
                     messagePairs,
@@ -549,7 +541,7 @@ async function postMockDataLoadIn(
         // Phase Final Task 2: organizations ROW half stripped —
         // message-plane only (organizationSeedBody still
         // shapes the pair body in seed-message-pairs.ts).
-        appendMessagePair(
+        appendMessagePairOnce(
             adapter,
             requireMessagePair(
                 messagePairs,
@@ -558,7 +550,7 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        appendMessagePair(
+        appendMessagePairOnce(
             adapter,
             requireMessagePair(
                 messagePairs,
@@ -787,7 +779,7 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        // States-address retirement Task 12: every historical
+        // States-document retirement Task 12: every historical
         // trace drives through the live transition op — body
         // validates via validateWorkOrderTransitionBody. WO-
         // instance SoT Task 6: value-bearing WO01 events leave
@@ -904,7 +896,7 @@ async function postMockDataLoadIn(
                 SEED_INSTANCE_ID + '-complete',
             ),
         ].map((key) =>
-            appendMessagePair(
+            appendMessagePairOnce(
                 adapter, requireMessagePair(messagePairs, key),
             ),
         ),
@@ -1151,10 +1143,8 @@ export async function postBootstrap(
     // hashing is ALSO async crypto and cannot run inside the tx.
     // The schema marker stamps LAST so a failed bootstrap leaves
     // the anonymous plane open for retry.
-    await adapter.ensureTables(TABLE_NAMES);
-    await adapter.transaction(
-        TABLE_NAMES,
-        (view) => postBootstrapIn(
+    await adapter.ensureTable();
+    await adapter.transaction((view) => postBootstrapIn(
             view, identityMessagePair, seatMessagePair, piiMessagePair,
             systemIdentityMessagePair,
             defaultOrganizationMessagePair, organizationMessagePair,
@@ -1212,12 +1202,12 @@ export async function postBootstrapIn(
             SYSTEM_MEMBER_ID,
             seatMessagePair,
         ),
-        appendMessagePair(adapter, defaultOrganizationMessagePair),
+        appendMessagePairOnce(adapter, defaultOrganizationMessagePair),
         postIdentityPiiDocumentOp(
             adapter, 'XXZruirZyAOoRpNxaDnpSA'
                 , bootstrapCurrentMemberPiiBody(),
             SYSTEM_MEMBER_ID, piiMessagePair,
         ),
-        appendMessagePair(adapter, organizationMessagePair),
+        appendMessagePairOnce(adapter, organizationMessagePair),
     ]);
 }

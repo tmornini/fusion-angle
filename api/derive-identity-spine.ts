@@ -1,7 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import {
     EntityNotFoundError,
-    MESSAGE_TABLES,
 } from './db.ts';
 import type {
     Id,
@@ -21,7 +20,7 @@ import {
     validateIdentityProviderEntity,
     validateIdentityTokenRevocationEntity,
 } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -36,21 +35,21 @@ import {
 //
 // E13 FULL-SCAN NAMED CLASS (derive-invitations.ts's own named
 // class): '/pii' forms ONE distinct prefix PER IDENTITY
-// ('/identities/<id>/pii/', uriId '' — a singleton document at a
-// collection-style address, message-address.ts), so no index can
-// serve "every request whose uri_collection has this shape" for an
+// ('/identities/<id>/pii/', name '' — a singleton document at a
+// collection-style path, path-and-name.ts), so no index can
+// serve "every request whose path has this shape" for an
 // arbitrary id. deriveIdentityPiiRows reads db.messagePairs
-// IN FULL (ONE shared tx) and matches PII_ADDRESS_PATTERN — the
+// IN FULL (ONE shared tx) and matches PII_PATH_PATTERN — the
 // segment-boundary rule verified against derive-invitations.ts's
-// OP_ADDRESS_PATTERN at Step 0: '[^/]+' between two literal
+// OP_PATH_PATTERN at Step 0: '[^/]+' between two literal
 // slashes, anchored at both ends, so '/identities/42/pii/' can
-// never be confused with a sibling address sharing the
+// never be confused with a sibling document sharing the
 // '/identities/' root ('/identities/42/credentials/c1/', or the
 // identity's own '/identities/42/' document) — the '/members' vs
 // '/memberships' precedent class this task's brief names.
 //
 // READ SEMANTICS (concurrency lens): '/pii' is an ordinary
-// document address. Two INDEPENDENT half-store reads could
+// document. Two INDEPENDENT half-store reads could
 // still straddle a concurrent append: the first read
 // captures the OLD request row, a concurrent write then
 // appends a NEW pair, and the second read captures
@@ -58,7 +57,7 @@ import {
 // id, so deriveDocumentsAt's match fails and a LIVE
 // identity spuriously 404s. Both pii derives below close
 // this by reading db.messagePairs inside ONE shared
-// readonly db.readTransaction(MESSAGE_TABLES, ...) —
+// readonly db.readTransaction(...) —
 // greenfield code, closed at zero cost. Other facets in
 // this module are not this concurrent-append race, so
 // none of the other reads need this — a prefix getAllWhere
@@ -84,10 +83,10 @@ import {
 // ---- rule is deriveIdentityPiiRows/deriveIdentityPii, never ----
 // ---- deriveIdentityPiis/deriveIdentityPiiRow ---------------------
 
-const PII_ADDRESS_PATTERN = /^\/identities\/([^/]+)\/pii\/$/;
+const PII_PATH_PATTERN = /^\/identities\/([^/]+)\/pii\/$/;
 
 function piiPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined, '/identities/' + identityId + '/pii/',
     );
 }
@@ -113,23 +112,21 @@ export function piiEntityOf(
 export async function deriveIdentityPiiRows(
     db: DbAdapter,
 ): Promise<IdentityPiiEntity[]> {
-    return db.readTransaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.readTransaction(async (view) => {
             const messagePairs = await view.messagePairs.getAll();
             const prefixes = new Set<string>();
             for (const messagePair of messagePairs) {
                 if (
-                    PII_ADDRESS_PATTERN.test(
-                        messagePair.uri_collection,
+                    PII_PATH_PATTERN.test(
+                        messagePair.path,
                     )
                 ) {
-                    prefixes.add(messagePair.uri_collection);
+                    prefixes.add(messagePair.path);
                 }
             }
             const rows: IdentityPiiEntity[] = [];
             for (const prefix of prefixes) {
-                const match = PII_ADDRESS_PATTERN.exec(prefix)!;
+                const match = PII_PATH_PATTERN.exec(prefix)!;
                 const identityId = match[1]!;
                 const document = deriveDocumentsAt(
                     messagePairs, prefix,
@@ -153,12 +150,9 @@ export async function deriveIdentityPii(
     id: Id,
 ): Promise<IdentityPiiEntity> {
     const prefix = piiPrefixFor(id);
-    return db.readTransaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.readTransaction(async (view) => {
             const messagePairs =
-                await view.messagePairs.getAllWhere(
-                    'uri_collection', prefix,
+                await view.messagePairs.getCollectionPairs(prefix,
                 );
             const document = deriveDocumentsAt(
                 messagePairs, prefix,
@@ -178,7 +172,7 @@ export async function deriveIdentityPii(
 // ---- (api/derive-project-scores.ts) ------------------------------
 
 function credentialsPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined,
         '/identities/' + identityId + '/credentials/',
     );
@@ -192,7 +186,7 @@ function credentialEntityOf(
 ): IdentityCredentialEntity {
     const body = document.body;
     return {
-        id: document.uriId,
+        id: document.name,
         identity_id: pickString(body, 'identity_id'),
         kind: pickString(body, 'kind') as IdentityCredentialKind,
         status:
@@ -207,14 +201,13 @@ async function fetchCredentialDocuments(
     identityId: Id,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = credentialsPrefixFor(identityId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
 
 // id-lex ordered. Pairs at the exact credentials prefix;
-// latest-per-uriId (deriveDocumentsAt) — a re-PUT of the same cid
+// latest-per-name (deriveDocumentsAt) — a re-PUT of the same cid
 // overwrites, matching the row plane's own put() semantics.
 export async function deriveCredentialsFor(
     db: DbAdapter,
@@ -249,10 +242,10 @@ export async function deriveCredential(
 // ---- the old flat prefix so leftover seed pairs still derive.
 
 const IDENTITY_PROVIDERS_PREFIX =
-    canonicalUriCollection(undefined, '/identity-providers/');
+    canonicalPath(undefined, '/identity-providers/');
 
 function providersPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined,
         '/identities/' + identityId + '/providers/',
     );
@@ -262,14 +255,14 @@ export function identityProviderEntityOf(
     document: DerivedDocument,
 ): IdentityProviderEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateIdentityProviderEntity(
             withoutId(document.body),
         ),
     };
 }
 
-// Nested address is the source of truth — fill or overwrite
+// Nested document is the source of truth — fill or overwrite
 // the request body's identity_id from the path.
 function nestedProviderEntityOf(
     identityId: Id,
@@ -288,8 +281,7 @@ async function fetchProviderDocumentsAt(
     db: DbAdapter,
     prefix: string,
 ): Promise<Map<string, DerivedDocument>> {
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
@@ -358,7 +350,7 @@ export async function deriveIdentityProvider(
 // ---- reader.
 
 function tokenRevocationsPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined,
         '/identities/' + identityId + '/token-revocations/',
     );
@@ -368,14 +360,14 @@ export function tokenRevocationEntityOf(
     document: DerivedDocument,
 ): IdentityTokenRevocationEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateIdentityTokenRevocationEntity(
             withoutId(document.body),
         ),
     };
 }
 
-// Nested address is the source of truth — fill or overwrite
+// Nested document is the source of truth — fill or overwrite
 // the request body's identity_id from the path.
 function nestedTokenRevocationEntityOf(
     identityId: Id,
@@ -395,8 +387,7 @@ async function fetchRevocationDocumentsFor(
     identityId: Id,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = tokenRevocationsPrefixFor(identityId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
@@ -434,16 +425,16 @@ export async function deriveTokenRevocation(
 }
 
 // ---- client_registration — the clients-table replacement: a ----
-// ---- singleton document at the identity's own nested address ---
+// ---- singleton document at the identity's own nested path ---
 // ---- (the /pii single-slot shape: literal last segment, ------
-// ---- uriId ''), Supersedes-chained like /credentials. NOT a ---
+// ---- name ''), Supersedes-chained like /credentials. NOT a ---
 // ---- delete zone — a DELETE head is a deregistration ----------
 // ---- tombstone, not an erasure — so a prefix getAllWhere -----
 // ---- read shape suffices (the module header's torn-read -------
 // ---- closure stays pii-only) -------------------------------------
 
 function registrationPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined,
         '/identities/' + identityId + '/registration/',
     );
@@ -473,8 +464,7 @@ export async function deriveClientRegistration(
     identityId: Id,
 ): Promise<ClientRegistrationEntity> {
     const prefix = registrationPrefixFor(identityId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,
@@ -496,11 +486,10 @@ export async function deriveIdentityKind(
     db: DbAdapter,
     identityId: Id,
 ): Promise<IdentityKind | undefined> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         undefined, '/identities/',
     );
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,

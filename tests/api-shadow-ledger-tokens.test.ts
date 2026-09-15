@@ -17,7 +17,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { latestActionForJti } from '../api/identity-tokens.ts';
 import {
-    putMessagePair, formAuthMessagePair, responseFromStored,
+    appendMessagePairAlways, formAuthMessagePair, responseFromStored,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import {
@@ -29,6 +29,7 @@ import {
 import type { DbAdapter } from '../api/db.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import {
     makeAssertionSigner,
@@ -114,7 +115,7 @@ function revocationFields() {
 // ── identity-tokens/:id — EVENT-APPEND (HistoryEntityStore) ──
 
 Deno.test('PUT identity-tokens/:id appends its pair at the entity'
-+ ' address', async () => {
++ ' document', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
@@ -124,9 +125,9 @@ Deno.test('PUT identity-tokens/:id appends its pair at the entity'
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
     assertStrictEquals(requests.length, 3);
-    assertStrictEquals(requests[2]!.uri_collection
+    assertStrictEquals(requests[2]!.path
         , '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/');
-    assertStrictEquals(requests[2]!.uri_id, 'vNIIMoezHOyoUeTsbqSzCA');
+    assertStrictEquals(requests[2]!.name, 'vNIIMoezHOyoUeTsbqSzCA');
     const domainRow = await deriveIdentityToken(
         db, 'XXZruirZyAOoRpNxaDnpSA', 'vNIIMoezHOyoUeTsbqSzCA',
     );
@@ -154,9 +155,9 @@ Deno.test('two PUTs to DIFFERENT identity-tokens/:id ids each'
 });
 
 Deno.test('a second PUT to the SAME identity-tokens/:id id forms'
-+ ' its OWN genesis pair — no Supersedes, this address never'
++ ' its OWN genesis pair — no Supersedes, this document never'
 + ' chains — and the DERIVED read reflects the LATEST pair at'
-+ ' that address (deriveDocumentsAt\'s latest-per-uriId head'
++ ' that document (deriveDocumentsAt\'s latest-per-name head'
 + ' resolution, never a ledger guard)', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
@@ -165,7 +166,7 @@ Deno.test('a second PUT to the SAME identity-tokens/:id id forms'
         tokenFields(generateIdentifier()),
     ));
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     assertStrictEquals(first.headers.get('Supersedes'), null);
     const laterJti = generateIdentifier();
     const second = await handleRequest(db, req(
@@ -174,7 +175,7 @@ Deno.test('a second PUT to the SAME identity-tokens/:id id forms'
         tokenFields(laterJti),
     ));
     assertStrictEquals(second.status, 201);
-    assertNotStrictEquals(second.headers.get('Response-ID'), firstId);
+    assertNotStrictEquals(pairIdOf(second), firstId);
     assertStrictEquals(second.headers.get('Supersedes'), null);
     const domainRow = await deriveIdentityToken(
         db, 'XXZruirZyAOoRpNxaDnpSA', 'wFKZmVsOBJcqYFjJjxrlMw',
@@ -185,7 +186,7 @@ Deno.test('a second PUT to the SAME identity-tokens/:id id forms'
 // ── identities/:id/token-revocations/:rid — EVENT-APPEND ──
 
 Deno.test('PUT identities/:id/token-revocations/:rid appends its'
-+ ' pair at the entity address', async () => {
++ ' pair at the entity document', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
         'PUT',
@@ -198,10 +199,10 @@ Deno.test('PUT identities/:id/token-revocations/:rid appends its'
     const requests = await db.messagePairs.getAll();
     assertStrictEquals(requests.length, 3);
     assertStrictEquals(
-        requests[2]!.uri_collection,
+        requests[2]!.path,
         '/identities/XXZruirZyAOoRpNxaDnpSA/token-revocations/',
     );
-    assertStrictEquals(requests[2]!.uri_id, 'sVWUntTCtQYFCpONjkzAKg');
+    assertStrictEquals(requests[2]!.name, 'sVWUntTCtQYFCpONjkzAKg');
     // Phase Final Task 2: identity_token_revocations ROW half
     // stripped — oracle is the message plane.
     const domainRow = await deriveTokenRevocation(
@@ -211,14 +212,14 @@ Deno.test('PUT identities/:id/token-revocations/:rid appends its'
 });
 
 // ── identity-tokens/:jti/rotation — REPLAY-EXEMPT operation
-// address: the gate NEVER serves a stored response for a
+// document: the gate NEVER serves a stored response for a
 // byte-identical resend of this route (message-pair.ts
 // REPLAY_EXEMPT_ROUTE_PATTERNS), so a resent reuse attempt
 // re-enters rotateRefreshJti's own 409 guard for real instead
 // of silently replaying the first success.
 
-Deno.test('a rotation appends its pair at an operation address:'
-+ ' uriId stays empty, and the wire {jti} equals the pair\'s'
+Deno.test('a rotation appends its pair at an operation path:'
++ ' name stays empty, and the wire {jti} equals the pair\'s'
 + ' own stored response body', async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
@@ -230,11 +231,11 @@ Deno.test('a rotation appends its pair at an operation address:'
     assertNotStrictEquals(wireBody.jti, ROOT_JTI);
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
-        r => r.uri_collection
+        r => r.path
             === tokenOpPath('rotation', '/'),
     );
     assert(row);
-    assertStrictEquals(row!.uri_id, '');
+    assertStrictEquals(row!.name, '');
 
     const stored = await db.messagePairs.getById(row!.id);
     const storedBody = await responseFromStored(stored).json();
@@ -294,10 +295,10 @@ async () => {
     assertStrictEquals((await db.messagePairs.getAll()).length, 3);
 });
 
-// ── identity-tokens/:jti/revocation — operation address ──
+// ── identity-tokens/:jti/revocation — operation path ──
 
-Deno.test('a revocation appends its pair at an operation address:'
-+ ' uriId stays empty', async () => {
+Deno.test('a revocation appends its pair at an operation path:'
++ ' name stays empty', async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
         'POST', tokenOpPath('revocation'),
@@ -306,11 +307,11 @@ Deno.test('a revocation appends its pair at an operation address:'
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
-        r => r.uri_collection
+        r => r.path
             === tokenOpPath('revocation', '/'),
     );
     assert(row);
-    assertStrictEquals(row!.uri_id, '');
+    assertStrictEquals(row!.name, '');
     const rows = await deriveIdentityTokens(db);
     assertStrictEquals(latestActionForJti(rows, ROOT_JTI), 'revoked');
 });
@@ -327,7 +328,7 @@ async () => {
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
-        r => r.uri_collection
+        r => r.path
             === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
                 + UNKNOWN_JTI + '/revocation/',
     );
@@ -358,7 +359,7 @@ async () => {
     const requests = await db.messagePairs.getAll();
 
     const rows = requests.filter(
-        r => r.uri_collection
+        r => r.path
             === tokenOpPath('revocation', '/'),
     );
     assertStrictEquals(rows.length, 2);
@@ -435,7 +436,7 @@ function postToken(
 }
 
 // The ONE identity-token event a bare issuance grant forms has
-// its own event pair at its own address — a genesis pair
+// its own event pair at its own document — a genesis pair
 // (identity-tokens/:id carries no DOCUMENT_CLASS entry, so no
 // head-read ever chains it), whose stored response deep-equals
 // the derived event itself.
@@ -447,10 +448,10 @@ async function assertRootEventMessagePair(
     const root = rows[0]!;
     const requests = await db.messagePairs.getAll();
     const eventRequest = requests.find(
-        r => r.uri_collection
+        r => r.path
             === '/identities/' + root.identity_id
                 + '/tokens/'
-            && r.uri_id === root.id,
+            && r.name === root.id,
     );
     assert(eventRequest, 'no event pair for the issued root');
     // requesterIdentityId is the event's OWN identity_id (the
@@ -501,7 +502,7 @@ async function seedAuthorizationCodeMessagePair(
     const messagePair = await formAuthMessagePair(
         seed, requestBody, identityId, 200, { code },
     );
-    await putMessagePair(db, messagePair);
+    await appendMessagePairAlways(db, messagePair);
 }
 
 Deno.test('an authorization_code grant appends its root\'s own'
@@ -518,16 +519,16 @@ async () => {
     await assertRootEventMessagePair(db);
     // KEY-BY-ANCHOR (Phase 13 Task 7, gate 3): the issued root's
     // row id is now the code's OWN sha256 digest, not a fresh
-    // mint — the same value the SAME address's event pair uri_id
-    // carries (assertRootEventMessagePair's own uri_id match above).
+    // mint — the same value the SAME document's event pair name
+    // carries (assertRootEventMessagePair's own name match above).
     const [root] = await deriveIdentityTokens(db);
     assertStrictEquals(root!.id, await sha256Hex(AUTH_CODE));
     const requests = await db.messagePairs.getAll();
     const operationMessagePair = requests.find(
-        r => r.uri_collection === '/authentication/token/',
+        r => r.path === '/authentication/token/',
     );
     assert(operationMessagePair);
-    assertStrictEquals(operationMessagePair!.uri_id, '');
+    assertStrictEquals(operationMessagePair!.name, '');
     // 3 bootstrap + the seeded authorize pair (Phase 13 Task 7:
     // the pre-tx lookup now needs a real authorize pair, not a
     // raw authorizationCodes row alone) + the root's own event
@@ -590,8 +591,8 @@ async function assertEventMessagePairForRow(
     );
     const requests = await db.messagePairs.getAll();
     const eventRequest = requests.find(
-        r => r.uri_collection === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-            && r.uri_id === rowId,
+        r => r.path === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
+            && r.name === rowId,
     );
     assert(eventRequest, 'no event pair for row ' + rowId);
     // requesterIdentityId is the event's OWN identity_id — same
@@ -631,11 +632,11 @@ Deno.test('a rotation\'s ROTATE branch appends an event pair for'
     await assertEventMessagePairForRow(db, issued!.id);
     const requests = await db.messagePairs.getAll();
     const operationMessagePair = requests.find(
-        r => r.uri_collection
+        r => r.path
             === tokenOpPath('rotation', '/'),
     );
     assert(operationMessagePair);
-    assertStrictEquals(operationMessagePair!.uri_id, '');
+    assertStrictEquals(operationMessagePair!.name, '');
 });
 
 Deno.test('a rotation\'s REPLAY branch appends an event pair for'
@@ -769,7 +770,7 @@ async () => {
     const requests = await db.messagePairs.getAll();
     assertStrictEquals(
         requests.filter(
-            r => r.uri_collection === '/authentication/token/',
+            r => r.path === '/authentication/token/',
         ).length, 0,
     );
 });

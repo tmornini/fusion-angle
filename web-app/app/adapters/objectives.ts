@@ -316,7 +316,7 @@ export async function postObjectiveCreation(
     // the org fence stamps it from the verified token. The
     // revision's member_id is a row column (who authored the
     // definition), supplied here. Genesis trio mints with the
-    // create body (states-address retirement) — no separate
+    // create body (states-document retirement) — no separate
     // states/:id event.
     await ctx.POST(
         organizationCollection(ctx, 'objectives'),

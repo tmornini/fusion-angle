@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, FlowWorkOrderEntity } from './types.ts';
 import { validateFlowWorkOrderEntity } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -13,13 +13,13 @@ import {
 // message-plane reduction (derive-documents.ts) — the
 // deriveProjectFlows structural mirror (api/derive-project-
 // flows.ts), re-nested one level deeper: one prefix scan per
-// flow, at the join address the live PUT flows/:id/work-
+// flow, at the join document the live PUT flows/:id/work-
 // orders/:woid route, Phase 5 Task 3's create, and Phase 5 Task
 // 4's seed all write — verified by content against a stored
 // :woid pair (tests/api-shadow-ledger-work-orders.test.ts's own
 // '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/aEsGMmBEFaVdWihhHXwCbw/work-or
 // ders/' + 'fwo-join'
-// address). A join row carries no lifecycle trio of its own — a
+// document). A join row carries no lifecycle trio of its own — a
 // DELETE tombstones it outright (deriveDocumentsAt's own
 // DELETE-head exclusion mirrors the old plane's physical
 // splice; parity, not a new mechanism — no DELETE route exists
@@ -27,13 +27,13 @@ import {
 // the deriveProjectFlows mechanics verbatim). LIVE: GET
 // flows/:id/work-orders is wired to deriveFlowWorkOrders below
 // (Phase 5 Task 7); tests/drift-work-orders.test.ts proves
-// equality against flow_work_orders.getAllWhere('flow_id', ...).
+// equality against flow_work_orders.getAllWhere on flow_id.
 
 function flowWorkOrdersUriPrefix(
     organization: Id,
     flowId: Id,
 ): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         organization, '/flows/' + flowId + '/work-orders/',
     );
 }
@@ -45,7 +45,7 @@ export function flowWorkOrderEntityOf(
     document: DerivedDocument,
 ): FlowWorkOrderEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateFlowWorkOrderEntity(
             withoutId(document.body),
         ),
@@ -63,8 +63,7 @@ export async function deriveFlowWorkOrders(
     flowId: Id,
 ): Promise<FlowWorkOrderEntity[]> {
     const prefix = flowWorkOrdersUriPrefix(organization, flowId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const documents = deriveDocumentsAt(messagePairs, prefix);
     const rows: FlowWorkOrderEntity[] = [];

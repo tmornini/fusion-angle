@@ -3,10 +3,9 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { identityDefaultOrganization } from '../api/authentication.ts';
 import {
-    formWriteMessagePair, appendMessagePair,
+    formWriteMessagePair, appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
@@ -53,7 +52,7 @@ async function seedMembershipPair(
     );
 }
 
-// A SET default-organization document at the live address.
+// A SET default-organization document at the live document.
 async function seedDefaultOrganizationEvent(
     db: MemoryDbAdapter,
     identityId: string,
@@ -80,10 +79,8 @@ async function seedDefaultOrganizationEvent(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
-            await appendMessagePair(view, messagePair);
+    await db.transaction(async (view) => {
+            await appendMessagePairOnce(view, messagePair);
         },
     );
 }
@@ -209,10 +206,8 @@ Deno.test(
             responseBody: undefined,
             operationId: generateIdentifier(),
         });
-        await db.transaction(
-            MESSAGE_TABLES,
-            async (view) => {
-                await appendMessagePair(view, tombstone);
+        await db.transaction(async (view) => {
+                await appendMessagePairOnce(view, tombstone);
             },
         );
         assertStrictEquals(

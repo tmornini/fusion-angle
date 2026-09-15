@@ -4,7 +4,6 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { ValidationError } from '../api/types.ts';
@@ -15,7 +14,7 @@ import {
 import { postRecordAttributeDocumentOp } from '../api/routes.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
@@ -251,9 +250,7 @@ async function putDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
 }
 
@@ -286,9 +283,7 @@ async function deleteDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
 }
 
@@ -303,8 +298,8 @@ Deno.test('a DELETE-head derives absent on the nested attributes'
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
         + typeId + '/attributes/';
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     const head = deriveDocumentsAt(requests, prefix).get(
         deletedId,

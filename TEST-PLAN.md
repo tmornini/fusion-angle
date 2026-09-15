@@ -3458,7 +3458,7 @@ API-ONLY: no designer affordance lands this phase. The
 automated suite (`tests/api-flow-tags.test.ts`,
 `tests/api-organization-isolation.test.ts`'s "nested
 flows/:id/tags" fence case) is the sole coverage: PUT/GET/
-DELETE lifecycle, Response-ID pinning survives further flow
+DELETE lifecycle, ETag pinning survives further flow
 saves, marked delete, member-tier authorization, two-tag
 concurrency, and the org fence. A designer "tag current" action is tracked in
 `TODO.md`.)
@@ -4989,7 +4989,7 @@ FSM, unlike `flows/detail`).
   `postInvitationAcceptance`, `acceptInvitation` (atomic
   seat document message pair + invitations/:id/
   acceptance operation message pair via
-  `appendMessagePair`).
+  `appendMessagePairOnce`).
   Pin: tests/presenter-invitation-list.test.ts 'a pending
        invitation shows the org, inviter, and Accept /
        Decline' (decides the pending card's org name,
@@ -5380,7 +5380,7 @@ FSM, unlike `flows/detail`).
   read "—" (`DISPLAY_ABSENT`); the identity row still
   exists in the roster (erasure splices `identity_pii`
   only, leaving the identity and every `member_id`
-  reference intact). The surviving pair at the address is
+  reference intact). The surviving pair at the document is
   the bodyless DELETE tombstone (head). Erased name
   remains in superseded pairs; derived reads and login
   show none. Cancel/Escape

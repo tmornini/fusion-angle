@@ -59,7 +59,7 @@ async () => {
         [['if-match', '"probe-value-123"']],
     );
     const stored = (await db.messagePairs.getAll())
-        .find(r => r.uri_id === ideaId);
+        .find(r => r.name === ideaId);
     assert(stored, 'a request row was stored');
     assert(
         stored!.request.includes('probe-value-123'),

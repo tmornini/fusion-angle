@@ -183,9 +183,8 @@ async () => {
     const firstEtag = first.headers.get('ETag');
     assert(firstEtag !== null && firstEtag !== '');
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
-    const before = (await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
-    )).filter((row) => row.uri_id === 'tmPPRaXkMetWxTSisIPFLA');
+    const before = (await db.messagePairs.getCollectionPairs(prefix,
+    )).filter((row) => row.name === 'tmPPRaXkMetWxTSisIPFLA');
     assertStrictEquals(before.length, 1);
     // Different hoisted header → different request hash,
     // so this is same-body, not replay.
@@ -205,9 +204,8 @@ async () => {
     );
     assertStrictEquals(second.status, 200);
     assertStrictEquals(second.headers.get('ETag'), firstEtag);
-    const after = (await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
-    )).filter((row) => row.uri_id === 'tmPPRaXkMetWxTSisIPFLA');
+    const after = (await db.messagePairs.getCollectionPairs(prefix,
+    )).filter((row) => row.name === 'tmPPRaXkMetWxTSisIPFLA');
     assertStrictEquals(after.length, 1);
 });
 
@@ -309,11 +307,11 @@ Deno.test('GET /organizations/:id/ideas/:id body octets equal the live PUT '
             ideaDocument('Streamed', 'active'),
         ));
         assertStrictEquals(put.status, 201);
-        const stored = await messageStore(db).get(
+        const stored = await messageStore(db).getDocumentHead(
             '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 , 'uTrFecjHJxcgUGbYxyDPfw',
         );
-        assert(stored !== undefined);
+        assert(stored !== null);
         const storedBody = HttpMessage.fromWire(
             stored.response,
         ).body();
@@ -360,7 +358,7 @@ async () => {
     );
     const expected = ideaEntityOf(
         {
-            uriId: id,
+            name: id,
             messagePairId: id,
             method: 'PUT',
             body,

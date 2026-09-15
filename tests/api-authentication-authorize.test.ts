@@ -10,7 +10,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { GET, handleRequest } from '../api/api.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import {
     setPasswordHasher,
     setScryptDerive,
@@ -81,9 +81,8 @@ async function s256Fields(): Promise<{
 async function noStoredAuthorizeResponse(
     db: MemoryDbAdapter,
 ): Promise<boolean> {
-    const responses = await db.messagePairs.getAllWhere(
-        'uri_collection',
-        canonicalUriCollection(undefined, '/authentication/authorize/'),
+    const responses = await db.messagePairs.getCollectionPairs(
+        canonicalPath(undefined, '/authentication/authorize/'),
     );
     return responses.length === 0;
 }

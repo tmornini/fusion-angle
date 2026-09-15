@@ -1,8 +1,7 @@
 import type { DbAdapter } from './db.ts';
-import { MESSAGE_TABLES } from './db.ts';
 import type { Id, OrganizationEntity } from './types.ts';
 import {
-    appendMessagePair,
+    appendMessagePairOnce,
     type MessagePair,
 } from './message-pair.ts';
 import {
@@ -119,11 +118,9 @@ export async function putIdentityDefaultOrganization(
             HTTP_BAD_REQUEST,
         );
     }
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+                await appendMessagePairOnce(view, pair);
             }
         },
     );

@@ -92,7 +92,7 @@ function buildFlowEntity(
 
 // Seed a flow through the SAME gate-driven create/document-PUT
 // idiom the live route uses (postFlowCreation + putFlow), so a
-// message pair exists at this flow's address — required for the
+// message pair exists at this flow's document — required for the
 // flipped GET flows route (Phase 4 Task 8), which
 // getFlowsForCreation reads, to derive it. postFlowCreation
 // seeds a default start/complete graph; the immediate putFlow

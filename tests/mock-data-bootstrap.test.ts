@@ -31,8 +31,8 @@ Deno.test('pristine bootstrap seeds no Records', async () => {
     // flow_records joins (…/organizations/:id/flows/:id/records/).
     const requests = await db.messagePairs.getAll();
     const recordFamily = requests.filter((r) =>
-        r.uri_collection.includes('/records/')
-        || r.uri_collection.includes('/record-attributes/')
+        r.path.includes('/records/')
+        || r.path.includes('/record-attributes/')
     );
     assertStrictEquals(
         recordFamily.length, 0,
@@ -47,15 +47,15 @@ Deno.test(
         const requests = await db.messagePairs.getAll();
         assert(
             requests.some(r =>
-                r.uri_collection === '/identities/'
-                && r.uri_id === 'XXZruirZyAOoRpNxaDnpSA',
+                r.path === '/identities/'
+                && r.name === 'XXZruirZyAOoRpNxaDnpSA',
             ),
             'current identity seeded',
         );
         assert(
             requests.some(r =>
-                r.uri_collection === '/identities/'
-                && r.uri_id === SYSTEM_MEMBER_ID,
+                r.path === '/identities/'
+                && r.name === SYSTEM_MEMBER_ID,
             ),
             'system identity seeded',
         );

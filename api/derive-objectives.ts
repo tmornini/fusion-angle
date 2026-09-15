@@ -1,6 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, StateEntity } from './types.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import {
     documentMessagePairsAt,
     documentLifecycleEvents,
@@ -9,13 +9,13 @@ import {
 
 // Objectives' own reshaping of the generic message-plane
 // reduction (derive-documents.ts): the fifth trio family
-// (states-address retirement). One prefix scan per
+// (states-document retirement). One prefix scan per
 // derivation; the trio walk, its (state_at, id) ordering,
 // and echo dedup are the shared derive-documents.ts cores —
 // never rebuilt here (the derive-ideas.ts shape).
 
 function objectivesUriPrefix(organization: Id): string {
-    return canonicalUriCollection(organization, '/objectives/');
+    return canonicalPath(organization, '/objectives/');
 }
 
 // One row per pair whose state_event_id is NEW — the document
@@ -29,13 +29,12 @@ export async function deriveObjectiveStateHistory(
     objectiveId: Id,
 ): Promise<StateEntity[]> {
     const prefix = objectivesUriPrefix(organization);
-    const stored = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const stored = await db.messagePairs.getCollectionPairs(prefix,
     );
     const messagePairs = documentMessagePairsAt(
         stored, prefix,
     ).filter((messagePair) =>
-        messagePair.uriId === objectiveId);
+        messagePair.name === objectiveId);
     return stateHistoryFrom(
         documentLifecycleEvents(messagePairs),
         objectiveId,

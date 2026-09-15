@@ -102,10 +102,10 @@ function buildFlowGraph(
 // organizations/:id/work-orders/:id through the flipped GET (this commit), so
 // the fixture must land through the SAME wire-reachable PUT
 // the live route serves — a raw db.workOrders.put leaves no
-// message pair at this address. The genesis transition ALSO
+// message pair at this document. The genesis transition ALSO
 // re-pins here (finding 15's fixture budget): getWorkOrder
 // TransitionEvents reads family /history, which is flipped
-// too — a raw db.states.put left no pair at that address
+// too — a raw db.states.put left no pair at that document
 // either.
 async function seedWorkOrder(
     db: MemoryDbAdapter,
@@ -164,7 +164,7 @@ async function ensureRecord(
 // message ledger too, the SAME reason as seedFlowLink's
 // own organizations/:id/flows/:id/work-orders re-pin
 // above — a raw db.flowRecords.put leaves no pair at
-// this address, so the binding must land through the
+// this document, so the binding must land through the
 // SAME wire-reachable PUT the live route serves.
 async function seedBinding(
     db: MemoryDbAdapter,
@@ -193,7 +193,7 @@ async function seedBinding(
 // pair, so the flipped list would never find this flow and the
 // record binding lookup would silently resolve empty. Seeded
 // through the SAME document PUT the live route uses
-// (postFlowCreation) so a pair exists at this flow's address.
+// (postFlowCreation) so a pair exists at this flow's document.
 async function seedFlowLink(
     db: MemoryDbAdapter,
     flowId: string,
@@ -212,7 +212,7 @@ async function seedFlowLink(
     // NAMED re-pin (Task 7): getAllFlowWorkOrderEntities reads
     // organizations/:id/flows/:id/work-orders through the flipped GET (this
     // commit) — a raw db.flowWorkOrders.put leaves no message
-    // pair at this address, so the join must land through the
+    // pair at this document, so the join must land through the
     // SAME wire-reachable PUT the live route serves.
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
@@ -227,7 +227,7 @@ async function seedFlowLink(
 
 // Nested attributes (Task 21): parent type must exist for
 // the collection probe; attribute lands at the nested
-// detail address the flipped adapter GETs.
+// detail document the flipped adapter GETs.
 async function seedAttribute(
     db: MemoryDbAdapter,
     id: string,

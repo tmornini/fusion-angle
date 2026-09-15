@@ -169,7 +169,7 @@ async function messagePairGraphDeltaEvents(
     const requests = await db.messagePairs.getAll();
     const messagePairs = documentMessagePairsAt(
         requests, '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',
-    ).filter((p) => p.uriId === flowId);
+    ).filter((p) => p.name === flowId);
     const memberEvents: {
         flow_node_id: string;
         member_id: string;

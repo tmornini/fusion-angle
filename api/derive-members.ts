@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, MemberEntity } from './types.ts';
 import { pickString } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import {
     deriveDocumentsAt,
     byIdAscending,
@@ -14,7 +14,7 @@ import {
 // documents do not join. A person identity with a live seat
 // is a human roster row; absence of either is not a member.
 
-const IDENTITIES_PREFIX = canonicalUriCollection(
+const IDENTITIES_PREFIX = canonicalPath(
     undefined, '/identities/',
 );
 
@@ -35,8 +35,7 @@ export async function deriveMembers(
 ): Promise<MemberEntity[]> {
     const [seats, identityMessagePairs] = await Promise.all([
         deriveOrganizationMemberSeats(db, organization),
-        db.messagePairs.getAllWhere(
-            'uri_collection', IDENTITIES_PREFIX,
+        db.messagePairs.getCollectionPairs(IDENTITIES_PREFIX,
         ),
     ]);
     const identities = deriveDocumentsAt(

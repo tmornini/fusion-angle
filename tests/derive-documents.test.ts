@@ -15,7 +15,7 @@ const AT = '2026-01-01T00:00:00.000000Z';
 // A stored pair for a given method, built through the SAME
 // formWriteMessagePair every live write uses — never
 // hand-assembled JSON — so the fixture's message shape stays
-// truthful to what appendMessagePair actually persists.
+// truthful to what appendMessagePairOnce actually persists.
 async function storedMessagePairAt(
     method: string,
     status: number,
@@ -38,8 +38,8 @@ async function storedMessagePairAt(
     });
     return {
         id: messagePair.id,
-        uri_collection: messagePair.uriCollection,
-        uri_id: messagePair.uriId,
+        path: messagePair.path,
+        name: messagePair.name,
         requester_identity_id: messagePair.requesterIdentityId,
         method: messagePair.method,
         request_at: AT,
@@ -51,14 +51,14 @@ async function storedMessagePairAt(
     };
 }
 
-// design decision 6: a document-address pair's method decides
+// design decision 6: a document pair's method decides
 // whether it is a DOCUMENT (PUT/DELETE) or an OPERATION (POST,
 // e.g. a create-shaped genesis pair sharing the document's own
-// address). No-op for organizations/AjdvjuECVZEgZoFajaIEkg/ideas/projects
+// document). No-op for organizations/AjdvjuECVZEgZoFajaIEkg/ideas/projects
 // today
-// (neither ever POSTs at its own document address);
+// (neither ever POSTs at its own document);
 // load-bearing once a family's create pair shares the
-// document address (flows).
+// document (flows).
 
 Deno.test('2-arg documentMessagePairsAt decodes a PUT pair',
 async () => {
@@ -73,7 +73,7 @@ async () => {
 });
 
 Deno.test('documentMessagePairsAt excludes a POST pair at a'
-+ ' document address', async () => {
++ ' document', async () => {
     const messagePair = await storedMessagePairAt('POST', 200);
     const messagePairs = documentMessagePairsAt(
         [messagePair],
@@ -83,7 +83,7 @@ Deno.test('documentMessagePairsAt excludes a POST pair at a'
 });
 
 Deno.test('documentMessagePairsAt includes a PUT pair at a'
-+ ' document address', async () => {
++ ' document', async () => {
     const messagePair = await storedMessagePairAt('PUT', 200);
     const messagePairs = documentMessagePairsAt(
         [messagePair],
@@ -94,7 +94,7 @@ Deno.test('documentMessagePairsAt includes a PUT pair at a'
 });
 
 Deno.test('documentMessagePairsAt includes a DELETE pair at a'
-+ ' document address', async () => {
++ ' document', async () => {
     const messagePair = await storedMessagePairAt(
         'DELETE', 204,
     );
@@ -106,7 +106,7 @@ Deno.test('documentMessagePairsAt includes a DELETE pair at a'
     assertStrictEquals(messagePairs[0]!.method, 'DELETE');
 });
 
-Deno.test('deriveDocumentsAt never sees a POST-only address',
+Deno.test('deriveDocumentsAt never sees a POST-only document',
 async () => {
     const messagePair = await storedMessagePairAt('POST', 200);
     const documents = deriveDocumentsAt(

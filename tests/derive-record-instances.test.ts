@@ -3,10 +3,9 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import {
     revisionValuesOf,
@@ -81,9 +80,7 @@ async function appendInstancePair(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
     return messagePair.id;
 }
@@ -319,7 +316,7 @@ Deno.test(
 );
 
 Deno.test(
-    'deriveInstanceHead absent address → undefined',
+    'deriveInstanceHead absent document → undefined',
     async () => {
         const db = await emptyDb();
         const head = await deriveInstanceHead(

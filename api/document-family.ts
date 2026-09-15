@@ -8,7 +8,7 @@ import {
     validateRecordDocumentBody,
 } from './validators.ts';
 import type { MessagePair } from './message-pair.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import {
     familyRegistration,
     RECORD_TYPE_DETAIL_PATTERN,
@@ -118,8 +118,8 @@ export interface DocumentFamilyWiring {
     // carry the Decision 7 lifecycle trio in every document
     // body and get the lifecycle walk + DELETED filter;
     // 'stateless' families carry entity fields only and skip
-    // both (their lifecycle, if any, lives in operation-
-    // addressed event pairs, never the document address).
+    // both (their lifecycle, if any, lives in operation-path
+    // event pairs, never the document).
     readonly lifecycle: 'trio' | 'stateless';
     // The identifier the wire 404 body speaks —
     // EntityNotFoundError's table. Family name for ideas/
@@ -197,7 +197,7 @@ export async function liveGlobalDocumentIds(
     db: DbAdapter,
     family: string,
 ): Promise<Set<string>> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         undefined, '/' + family + '/',
     );
     const live = await messageStore(db).getCollection(
@@ -227,8 +227,8 @@ export async function throwDocumentMiss(
     );
 }
 
-// The generic per-id derivation: store.getMessagePairs at this
-// address, reduce to the head document (deriveDocumentsAt),
+// The generic per-id derivation: store.getDocumentHistory at this
+// document, reduce to the head document (deriveDocumentsAt),
 // and — for a 'trio' family ONLY — walk the lifecycle
 // history over those same pairs to 404 a lifecycle-deleted
 // document too. A 'stateless' family's document body carries
@@ -242,10 +242,10 @@ async function derivedDocumentEntity(
     organization: Id,
     id: Id,
 ): Promise<unknown> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organization, '/' + wiring.family + '/',
     );
-    const stored = await messageStore(db).getMessagePairs(
+    const stored = await messageStore(db).getDocumentHistory(
         prefix, id,
     );
     const document = deriveDocumentsAt(
@@ -259,7 +259,7 @@ async function derivedDocumentEntity(
     if (wiring.lifecycle === 'trio') {
         const messagePairs = documentMessagePairsAt(
             stored, prefix,
-        ).filter((messagePair) => messagePair.uriId === id);
+        ).filter((messagePair) => messagePair.name === id);
         const history = stateHistoryFrom(
             documentLifecycleEvents(messagePairs), id,
         );
@@ -321,16 +321,16 @@ export function documentGetHandler(
         );
 }
 
-// Live PUT pair id at this address — store.get, the same
-// live-document reduction headMessagePairIdAt now uses. A DELETE
-// head or virgin address is undefined.
+// Live PUT pair id at this document — the store's document
+// head read (`messageStore(db).getDocumentHead`). A DELETE head or
+// virgin document is undefined.
 export async function documentHeadMessagePairId(
     db: DbAdapter,
-    uriCollection: string,
+    path: string,
     id: Id,
 ): Promise<string | undefined> {
-    const stored = await messageStore(db).get(
-        uriCollection, id,
+    const stored = await messageStore(db).getDocumentHead(
+        path, id,
     );
     return stored?.id;
 }
@@ -394,7 +394,7 @@ export function documentStateHistoryHandler(
 
 const PUT_METHOD = 'PUT';
 
-// Find the pair at this address whose id is the advertised
+// Find the pair at this document whose id is the advertised
 // ETag. A foreign or absent pair is simply not in the
 // collection — the caller's missedReadError ladder answers.
 export async function lookupStoredRevision(
@@ -403,7 +403,7 @@ export async function lookupStoredRevision(
     id: Id,
     etag: string,
 ): Promise<MessagePairEntity | undefined> {
-    const messagePairs = await messageStore(db).getMessagePairs(
+    const messagePairs = await messageStore(db).getDocumentHistory(
         prefix, id,
     );
     return messagePairs.find(
@@ -427,7 +427,7 @@ export async function storedRevisionDocument(
         return undefined;
     }
     return {
-        uriId: id,
+        name: id,
         messagePairId: found.id,
         method: found.method,
         body: requestBodyOf(found.request),
@@ -440,18 +440,18 @@ export async function versionSnapshotsAt(
     id: Id,
     toEntity: (document: DerivedDocument) => object,
 ): Promise<Record<string, unknown>[]> {
-    const stored = await messageStore(db).getMessagePairs(
+    const stored = await messageStore(db).getDocumentHistory(
         prefix, id,
     );
     const messagePairs = documentMessagePairsAt(
         stored, prefix,
-    ).filter((messagePair) => messagePair.uriId === id);
+    ).filter((messagePair) => messagePair.name === id);
     const snapshots: Record<string, unknown>[] = [];
     for (const messagePair of messagePairs.toReversed()) {
         if (messagePair.method !== PUT_METHOD) continue;
         snapshots.push({
             ...toEntity({
-                uriId: id,
+                name: id,
                 messagePairId: messagePair.id,
                 method: messagePair.method,
                 body: messagePair.body,
@@ -470,17 +470,17 @@ async function documentStateHistoryAt(
     organization: Id,
     id: Id,
 ): Promise<StateEntity[]> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organization, '/' + wiring.family + '/',
     );
-    const stored = await messageStore(db).getMessagePairs(
+    const stored = await messageStore(db).getDocumentHistory(
         prefix, id,
     );
     return stateHistoryFrom(
         documentLifecycleEvents(
             documentMessagePairsAt(
                 stored, prefix,
-            ).filter((messagePair) => messagePair.uriId === id),
+            ).filter((messagePair) => messagePair.name === id),
         ),
         id,
     );
@@ -493,7 +493,7 @@ async function serveDocumentRevision(
     id: Id,
     etag: string,
 ): Promise<unknown> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organization, '/' + wiring.family + '/',
     );
     const found = await lookupStoredRevision(
@@ -509,7 +509,7 @@ async function serveDocumentRevision(
     }
     const body = requestBodyOf(found.request);
     const document: DerivedDocument = {
-        uriId: id,
+        name: id,
         messagePairId: found.id,
         method: found.method,
         body,
@@ -566,7 +566,7 @@ export function documentVersionListHandler(
     return async (db, params, _actor, organization) => {
         const org = requireOrganization(organization);
         const id = entityIdParam(wiring, params);
-        const prefix = canonicalUriCollection(
+        const prefix = canonicalPath(
             org, '/' + wiring.family + '/',
         );
         const snapshots = await versionSnapshotsAt(
@@ -625,12 +625,13 @@ export function documentCollectionGetHandler(
         const organizationId = requireOrganization(
             organization,
         );
-        const prefix = canonicalUriCollection(
+        const prefix = canonicalPath(
             organizationId, '/' + wiring.family + '/',
         );
         const store = messageStore(db);
         const live = await store.getCollection(prefix);
-        const stored = await store.getAllAt(prefix);
+        const stored = await db.messagePairs.getCollectionPairs(prefix,
+        );
         const documents = deriveDocumentsAt(
             stored, prefix,
         );
@@ -647,11 +648,11 @@ export function documentCollectionGetHandler(
                 stored, prefix,
             )) {
                 const list = messagePairsById.get(
-                    messagePair.uriId,
+                    messagePair.name,
                 );
                 if (list === undefined) {
                     messagePairsById.set(
-                        messagePair.uriId, [messagePair],
+                        messagePair.name, [messagePair],
                     );
                 } else {
                     list.push(messagePair);
@@ -767,7 +768,7 @@ function trioDocumentFromBody(
     body: Record<string, unknown>,
 ): DerivedDocument {
     return {
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: PUT_METHOD,
         body,
@@ -784,7 +785,7 @@ export async function streamedTrioEntityOf(
     entityOf: DocumentFamilyWiring['entityOf'],
 ): Promise<unknown> {
     const raw = withoutId(body);
-    const stored = await messageStore(db).getMessagePairs(
+    const stored = await messageStore(db).getDocumentHistory(
         prefix, id,
     );
     const existing = documentMessagePairsAt(
@@ -793,7 +794,7 @@ export async function streamedTrioEntityOf(
     const incoming: DocumentMessagePair = {
         id: INCOMING_MESSAGE_PAIR_ID,
         at: INCOMING_MESSAGE_PAIR_AT,
-        uriId: id,
+        name: id,
         method: PUT_METHOD,
         body: raw,
         requesterIdentityId: actor,
@@ -817,7 +818,7 @@ async function streamedTrioWriteBody(
 ): Promise<unknown> {
     const raw = withoutId(body);
     wiring.validateDocument(raw);
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organization,
         '/' + wiring.family + '/',
     );
@@ -876,13 +877,13 @@ export async function resolveStreamedTrioWriteBody(
 
 // The registration-first consult (Phase 8 Task 3, the first
 // global-plane families: identities/ai-agents,
-// organizationNested:false) — mirrors canonicalUriCollection's own
+// organizationNested:false) — mirrors canonicalPath's own
 // registration-first pattern (message-pair.ts): a family's
 // registration decides whether organization_id belongs on the
 // wire response AT ALL, never a blanket stamp. One clause
 // overstates the mirror: their UNREGISTERED-family fallbacks
 // point opposite ways — this consult defaults to STAMPING
-// organization_id, while canonicalUriCollection defaults per its
+// organization_id, while canonicalPath defaults per its
 // own tier rule instead (dead code today — every wired family
 // is registered). For the eight org-nested families registered
 // before this task, the stamp below was a no-op — their

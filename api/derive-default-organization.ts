@@ -10,7 +10,7 @@ import {
 
 // Task 53: the SET default-organization document lives at
 // /identities/:id/default-organization/ — a singleton
-// (uriId '') like identities/:id/pii. GET returns that
+// (name '') like identities/:id/pii. GET returns that
 // document or 404; token resolution is a separate read.
 function defaultOrganizationPrefix(identityId: Id): string {
     return '/identities/' + identityId
@@ -19,15 +19,14 @@ function defaultOrganizationPrefix(identityId: Id): string {
 
 // The current SET document, or empty when never written.
 // Head-reduced (deriveDocumentsAt): a later PUT at the same
-// address is the document. TARGETED read: one identity-keyed
-// prefix via the uri_collection index.
+// (path, name) is the document. TARGETED read: one identity-keyed
+// prefix via the path index.
 export async function deriveDefaultOrganization(
     db: DbAdapter,
     identityId: Id,
 ): Promise<IdentityDefaultOrganizationEntity[]> {
     const prefix = defaultOrganizationPrefix(identityId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,

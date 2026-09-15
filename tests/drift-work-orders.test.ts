@@ -21,7 +21,7 @@ import {
     MS_PER_SECOND, nowUtc,
     setClockForTest, resetClock,
 } from '../api/types.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import {
     documentMessagePairsAt,
     type DocumentMessagePair,
@@ -69,6 +69,7 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 
 const N_START = generateIdentifier();
@@ -228,7 +229,7 @@ const WORK_ORDERS_TEST_WIRING: DocumentFamilyWiring = {
     validateDocument: validateWorkOrderDocumentBody,
     documentOp: postWorkOrderDocumentOp,
     entityOf: (document, organization) => ({
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         ...document.body,
     }),
@@ -641,11 +642,10 @@ async () => {
     // workOrder.flow_graph against the entity PUT's STORED,
     // round-tripped response — two independently re-encoded
     // values, not the same in-memory literal.
-    const storedCreatePostRow = (await db.messagePairs.getAllWhere(
-        'uri_collection',
-        canonicalUriCollection(STARK_ORGANIZATION, '/work-orders/'),
+    const storedCreatePostRow = (await db.messagePairs.getCollectionPairs(
+        canonicalPath(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
-        (r) => r.uri_id === workOrderId
+        (r) => r.name === workOrderId
             && decodeRequestMessage(r.request).method === 'POST',
     )!;
     const storedCreateFlowGraph = (
@@ -870,7 +870,7 @@ async () => {
         },
     ));
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     assert(firstId);
 
     const second = await handleRequest(db, req(
@@ -937,29 +937,29 @@ async () => {
     ));
     assertStrictEquals(created.status, 201);
 
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         STARK_ORGANIZATION
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
     );
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
-    const atAddress = requests.filter(
-        (r) => r.uri_collection === prefix
-            && r.uri_id === workOrderId,
+    const pairsAt = requests.filter(
+        (r) => r.path === prefix
+            && r.name === workOrderId,
     );
     // Both an operation (POST, 204) pair and a document (PUT)
-    // pair share the SAME uriId.
-    assertStrictEquals(atAddress.length, 2);
+    // pair share the SAME name.
+    assertStrictEquals(pairsAt.length, 2);
 
     const documentMessagePairs = documentMessagePairsAt(
         requests, prefix,
-    ).filter((messagePair) => messagePair.uriId === workOrderId);
+    ).filter((messagePair) => messagePair.name === workOrderId);
     assertStrictEquals(documentMessagePairs.length, 1);
     assertStrictEquals(documentMessagePairs[0]!.method, 'PUT');
 
-    const postRow = atAddress.find(
+    const postRow = pairsAt.find(
         (r) => decodeRequestMessage(r.request).method === 'POST',
     )!;
     const createBodyKeys = new Set(
@@ -1019,7 +1019,7 @@ function decodeRequestMessage(message: string): {
 interface AnyMessagePair {
     readonly id: string;
     readonly at: string;
-    readonly uriId: string;
+    readonly name: string;
     readonly method: string;
     readonly body: Record<string, unknown>;
     readonly requesterIdentityId: string;
@@ -1038,18 +1038,18 @@ function atIdCompare(
 
 function allMessagePairsAt(
     rows: readonly MessagePairEntity[],
-    uriCollection: string,
+    path: string,
 ): AnyMessagePair[] {
     const messagePairs: AnyMessagePair[] = [];
     for (const row of rows) {
-        if (row.uri_collection !== uriCollection) {
+        if (row.path !== path) {
             continue;
         }
         const decoded = decodeRequestMessage(row.request);
         messagePairs.push({
             id: row.id,
             at: row.response_at,
-            uriId: row.uri_id,
+            name: row.name,
             method: decoded.method,
             body: decoded.body,
             requesterIdentityId: row.requester_identity_id,
@@ -1285,16 +1285,16 @@ async function replayWorkOrderStates(
     organization: string,
     workOrderId: string,
 ): Promise<ReplayResult> {
-    const woPrefix = canonicalUriCollection(
+    const woPrefix = canonicalPath(
         organization, '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
     );
     const [woRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', woPrefix),
-        db.messagePairs.getAllWhere('uri_collection', woPrefix),
+        db.messagePairs.getCollectionPairs(woPrefix),
+        db.messagePairs.getCollectionPairs(woPrefix),
     ]);
     const allWoMessagePairs = allMessagePairsAt(woRequests, woPrefix);
     const createMessagePair = allWoMessagePairs.find(
-        (p) => p.method === 'POST' && p.uriId === workOrderId,
+        (p) => p.method === 'POST' && p.name === workOrderId,
     );
     if (createMessagePair === undefined) {
         throw new Error(
@@ -1303,16 +1303,16 @@ async function replayWorkOrderStates(
     }
     const entityMessagePairs = documentMessagePairsAt(
         woRequests, woPrefix,
-    ).filter((messagePair) => messagePair.uriId === workOrderId);
+    ).filter((messagePair) => messagePair.name === workOrderId);
 
-    const claimPrefix = canonicalUriCollection(
+    const claimPrefix = canonicalPath(
         organization,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/claim/',
     );
     const [claimRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', claimPrefix),
-        db.messagePairs.getAllWhere('uri_collection', claimPrefix),
+        db.messagePairs.getCollectionPairs(claimPrefix),
+        db.messagePairs.getCollectionPairs(claimPrefix),
     ]);
     const claimMessagePairs = allMessagePairsAt(
         claimRequests, claimPrefix,
@@ -1323,18 +1323,16 @@ async function replayWorkOrderStates(
         claimRequests, claimPrefix,
     ).filter((p) => p.method === 'DELETE');
 
-    const releasePrefix = canonicalUriCollection(
+    const releasePrefix = canonicalPath(
         organization,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/release/',
     );
     const [releaseRequests] =
         await Promise.all([
-            db.messagePairs.getAllWhere(
-                'uri_collection', releasePrefix,
+            db.messagePairs.getCollectionPairs(releasePrefix,
             ),
-            db.messagePairs.getAllWhere(
-                'uri_collection', releasePrefix,
+            db.messagePairs.getCollectionPairs(releasePrefix,
             ),
         ]);
     const releaseMessagePairs = [
@@ -1344,7 +1342,7 @@ async function replayWorkOrderStates(
         ...claimDeletes,
     ];
 
-    const transitionPrefix = canonicalUriCollection(
+    const transitionPrefix = canonicalPath(
         organization,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/transition/',
@@ -1352,8 +1350,8 @@ async function replayWorkOrderStates(
     const [
         transitionRequests,
     ] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', transitionPrefix),
-        db.messagePairs.getAllWhere('uri_collection', transitionPrefix),
+        db.messagePairs.getCollectionPairs(transitionPrefix),
+        db.messagePairs.getCollectionPairs(transitionPrefix),
     ]);
     const transitionMessagePairs = allMessagePairsAt(
         transitionRequests, transitionPrefix,
@@ -1493,11 +1491,10 @@ async () => {
     // independently re-encoded values, not the same in-memory
     // literal — so a canonical-JSON regression that mangled
     // either differently would be caught.
-    const storedCreatePostRow = (await db.messagePairs.getAllWhere(
-        'uri_collection',
-        canonicalUriCollection(STARK_ORGANIZATION, '/work-orders/'),
+    const storedCreatePostRow = (await db.messagePairs.getCollectionPairs(
+        canonicalPath(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
-        (r) => r.uri_id === workOrderId
+        (r) => r.name === workOrderId
             && decodeRequestMessage(r.request).method === 'POST',
     )!;
     const storedCreateFlowGraph = (
@@ -1740,12 +1737,12 @@ Deno.test('same-join-id retry: two different work-order creates '
     ));
     assertStrictEquals(second.status, 201);
 
-    const joinPrefix = canonicalUriCollection(
+    const joinPrefix = canonicalPath(
         STARK_ORGANIZATION,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
             + '/work-orders/',
     );
-    const joinResponses = await db.messagePairs.getAllAtAddress(
+    const joinResponses = await db.messagePairs.getDocumentHistory(
         joinPrefix, sharedFwoId,
     );
     assertStrictEquals(joinResponses.length, 2);

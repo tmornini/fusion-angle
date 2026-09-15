@@ -1,13 +1,12 @@
 import { assert, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { requestMessageHash } from '../api/message-form.ts';
 import {
     formWriteMessagePair,
-    headMessagePairIdAt,
-    storedResponseFor,
-    appendMessagePair,
+    getPairByRequestHash,
+    appendMessagePairOnce,
 } from '../api/message-pair.ts';
+import { messageStore } from '../api/message-store.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -32,7 +31,7 @@ Deno.test('an org-owned pair stores at the org-nested prefix',
 async () => {
     const messagePair = await formWriteMessagePair({ ...INPUT });
     assertStrictEquals(
-        messagePair.uriCollection,
+        messagePair.path,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
 });
@@ -49,7 +48,7 @@ async () => {
         operationId: generateIdentifier(),
     });
     assertStrictEquals(
-        messagePair.uriCollection, '/identities/ada/pii/',
+        messagePair.path, '/identities/ada/pii/',
     );
 });
 
@@ -83,7 +82,7 @@ async () => {
         operationId: generateIdentifier(),
     });
     assertStrictEquals(
-        messagePair.uriCollection,
+        messagePair.path,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
         + typeId + '/attributes/',
     );
@@ -109,7 +108,7 @@ async () => {
         operationId: generateIdentifier(),
     });
     assertStrictEquals(
-        messagePair.uriCollection,
+        messagePair.path,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/',
     );
 });
@@ -118,10 +117,10 @@ Deno.test('a formed pair binds request and response by one id',
 async () => {
     const messagePair = await formWriteMessagePair({ ...INPUT });
     assertStrictEquals(
-        messagePair.uriCollection,
+        messagePair.path,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
-    assertStrictEquals(messagePair.uriId, '42');
+    assertStrictEquals(messagePair.name, '42');
     assertStrictEquals(
         messagePair.requestHash,
         await requestMessageHash(messagePair.requestMessage),
@@ -166,18 +165,16 @@ Deno.test('append then head-read round-trips', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const messagePair = await formWriteMessagePair({ ...INPUT });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
     assertStrictEquals(
-        await headMessagePairIdAt(
-            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42',
-        ),
+        (await messageStore(db).getDocumentHead(
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42',
+        ))?.id,
         messagePair.id,
     );
     const stored =
-        await storedResponseFor(db, messagePair.requestHash);
+        await getPairByRequestHash(db, messagePair.requestHash);
     assertStrictEquals(stored?.id, messagePair.id);
     // Early request, late response: the request row keeps
     // the arrival stamp verbatim; response_at was minted
@@ -192,11 +189,9 @@ Deno.test('a same-hash re-append writes nothing', async () => {
     await db.postSchemaCreation();
     const messagePair = await formWriteMessagePair({ ...INPUT });
     const replay = { ...messagePair, id: 'other-uuidAAAAAAAAAAAAw' };
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
-            await appendMessagePair(view, messagePair);
-            await appendMessagePair(view, replay);
+    await db.transaction(async (view) => {
+            await appendMessagePairOnce(view, messagePair);
+            await appendMessagePairOnce(view, replay);
         },
     );
     assertStrictEquals((await db.messagePairs.getAll()).length, 1);

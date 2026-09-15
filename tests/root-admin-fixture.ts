@@ -1,5 +1,4 @@
 import type { DbAdapter } from '../api/db.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import {
     nowUtc, SYSTEM_MEMBER_ID, type Id,
     type OrganizationEntity,
@@ -12,7 +11,7 @@ import { ORGANIZATION_MEMBER_DETAIL_PATTERN } from
     '../api/family-registry.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
     type MessagePair,
 } from '../api/message-pair.ts';
 import { deriveOrganizations } from '../api/derive-organizations.ts';
@@ -98,9 +97,8 @@ export async function seedOrganizationDocument(
     });
     await db.transaction(
         // Phase Final Task 2: organizations ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
         },
     );
 }

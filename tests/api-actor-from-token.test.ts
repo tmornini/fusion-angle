@@ -22,8 +22,8 @@ Deno.test(
         }, DEV_TOKEN);
         const requests = await db.messagePairs.getAll();
         const row = requests.find(r =>
-            r.uri_collection === '/identities/'
-            && r.uri_id === 'XXZruirZyAOoRpNxaDnpSA'
+            r.path === '/identities/'
+            && r.name === 'XXZruirZyAOoRpNxaDnpSA'
             && r.requester_identity_id === 'XXZruirZyAOoRpNxaDnpSA',
         );
         assert(row, 'identity PUT pair missing');

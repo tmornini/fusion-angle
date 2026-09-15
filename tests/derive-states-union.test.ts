@@ -27,7 +27,7 @@ import {
 } from '../api/derive-documents.ts';
 import {
     formWriteMessagePair,
-    canonicalUriCollection,
+    canonicalPath,
 } from '../api/message-pair.ts';
 import {
     postMembershipDocumentOp,
@@ -682,9 +682,8 @@ async () => {
         [...fx.workOrderEventIds],
     );
     // Graph sidecars on the flow document message pairs (C3).
-    const prefix = canonicalUriCollection(fx.organizationA, '/flows/');
-    const stored = await fx.db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const prefix = canonicalPath(fx.organizationA, '/flows/');
+    const stored = await fx.db.messagePairs.getCollectionPairs(prefix,
     );
     const sidecarIds: string[] = [];
     for (const messagePair of documentMessagePairsAt(
@@ -752,7 +751,7 @@ async () => {
 // DOCUMENT plane to exclude a duplicate grant's own
 // operation message pair (which forms but writes neither a
 // document nor a states event), and takes only the EARLIEST
-// pair per answering-op address to exclude an idempotent
+// pair per answering-op document to exclude an idempotent
 // resend's own operation message pair (which forms but
 // posts no second lifecycle event). Both
 // exclusions are hand-trace-verified in deriveInvitationStates'

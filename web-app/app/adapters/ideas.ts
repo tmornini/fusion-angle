@@ -251,7 +251,7 @@ export async function putIdea(
 
 // Idea creation (Decision 7, Phase 2 Task 3, R1): genesis is
 // head-presence-defined — the FIRST document version at this
-// address IS the birth, so create folds into the SAME PUT
+// document IS the birth, so create folds into the SAME PUT
 // ideas/:id that putIdea already drives for edits and
 // transitions. The id and the trio (state, stateAt,
 // stateEventId) are minted ONCE here, before the single

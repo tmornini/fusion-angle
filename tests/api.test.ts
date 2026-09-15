@@ -282,16 +282,18 @@ Deno.test(
         // — so the fault is targeted at the ideas prefix alone,
         // letting the fence's own read through to the real
         // implementation unaffected.
-        const original = db.messagePairs.getAllWhere.bind(db.messagePairs);
+        const original = db.messagePairs.getCollectionPairs.bind(
+            db.messagePairs,
+        );
         (db.messagePairs as unknown as {
-            getAllWhere: (
-                column: string, key: string,
+            getCollectionPairs: (
+                path: string,
             ) => ReturnType<typeof original>;
-        }).getAllWhere = async (column, key) => {
-            if (key === '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/') {
+        }).getCollectionPairs = async (path) => {
+            if (path === '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/') {
                 throw new Error('secret fault detail');
             }
-            return original(column, key);
+            return original(path);
         };
         const { result: response, calls } =
             await captureConsole(

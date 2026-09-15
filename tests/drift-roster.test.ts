@@ -15,7 +15,7 @@ import type {
 } from '../api/types.ts';
 import { nowUtc } from
     '../api/types.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {
     deriveOrganizationMemberSeat,
@@ -30,6 +30,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -725,11 +726,11 @@ async () => {
 });
 
 // -- 7. method-filter proof: the create-op POST pairs are never -
-// -- derived heads; exactly one document head per address after -
+// -- derived heads; exactly one document head per document after -
 // -- create ---------------------------------------------------------
 
 Deno.test('PUT ai-agents and PUT identities land exactly one'
-+ ' document message pair at each address — no composing POST',
++ ' document message pair at each document — no composing POST',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -742,16 +743,16 @@ async () => {
     ));
     assertStrictEquals(aiCreated.status, 201);
 
-    const aiPrefix = canonicalUriCollection(
+    const aiPrefix = canonicalPath(
         undefined, '/ai-agents/',
     );
     const [aiRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', aiPrefix),
-        db.messagePairs.getAllWhere('uri_collection', aiPrefix),
+        db.messagePairs.getCollectionPairs(aiPrefix),
+        db.messagePairs.getCollectionPairs(aiPrefix),
     ]);
     const aiDocumentMessagePairs = documentMessagePairsAt(
         aiRequests, aiPrefix,
-    ).filter((messagePair) => messagePair.uriId === aiId);
+    ).filter((messagePair) => messagePair.name === aiId);
     assertStrictEquals(aiDocumentMessagePairs.length, 1);
     assertStrictEquals(aiDocumentMessagePairs[0]!.method, 'PUT');
 
@@ -766,16 +767,16 @@ async () => {
     ));
     assertStrictEquals(humanCreated.status, 201);
 
-    const humanPrefix = canonicalUriCollection(
+    const humanPrefix = canonicalPath(
         undefined, '/identities/',
     );
     const [humanRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', humanPrefix),
-        db.messagePairs.getAllWhere('uri_collection', humanPrefix),
+        db.messagePairs.getCollectionPairs(humanPrefix),
+        db.messagePairs.getCollectionPairs(humanPrefix),
     ]);
     const humanDocumentMessagePairs = documentMessagePairsAt(
         humanRequests, humanPrefix,
-    ).filter((messagePair) => messagePair.uriId === humanId);
+    ).filter((messagePair) => messagePair.name === humanId);
     assertStrictEquals(humanDocumentMessagePairs.length, 1);
     assertStrictEquals(humanDocumentMessagePairs[0]!.method, 'PUT');
 });
@@ -808,8 +809,8 @@ Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
     const afterSecond = (await db.messagePairs.getAll()).length;
     assertStrictEquals(afterSecond, afterFirst);
     assertStrictEquals(
-        first.headers.get('Response-ID'),
-        second.headers.get('Response-ID'),
+        pairIdOf(first),
+        pairIdOf(second),
     );
 
     const got = await handleRequest(
@@ -867,7 +868,7 @@ async () => {
     assertStrictEquals(got.title, 'second');
 });
 
-// -- 9. plain PUT-supersession at a membership address (NAMED --
+// -- 9. plain PUT-supersession at a membership document (NAMED --
 // -- divergence from a literal genesis-wins-under-skew) ---------
 //
 // Memberships carry no lifecycle trio (MEMBERSHIPS_WIRING:
@@ -877,16 +878,16 @@ async () => {
 // globally monotonic and the response `at` is minted
 // synchronously pre-commit (the drift-work-orders.test.ts case-7
 // precedent makes the SAME admission for its own stateless
-// document address) — so no live two-PUT sequence can decouple
+// document) — so no live two-PUT sequence can decouple
 // "the (at, id) reduction" from arrival order here, and there is
 // no body timestamp to skew that any reduction other than
 // arrival order consults. This case proves plain PUT
-// supersession at a membership address instead, and separately
+// supersession at a membership document instead, and separately
 // proves deriveMembers' JOIN is insensitive to which PUT "won"
 // (it reads identity_id alone, unaffected by the membership's
 // own `at` field either way).
 
-Deno.test('plain PUT-supersession at a seat address — a'
+Deno.test('plain PUT-supersession at a seat document — a'
 + ' second PUT (an OLDER domain `at` than the first) still'
 + ' supersedes by ARRIVAL order on the message plane',
 async () => {
@@ -905,7 +906,7 @@ async () => {
         },
     ));
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     assert(firstId);
 
     const second = await handleRequest(db, req(

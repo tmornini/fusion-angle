@@ -1,6 +1,5 @@
 import {
     MissingTableError,
-    TABLE_NAMES,
     type StorageBackend,
     type Tx,
     type TxMode,
@@ -11,8 +10,7 @@ import { createSerializer } from './store-serializer.ts';
 export class MemoryStorageBackend
     implements StorageBackend
 {
-    readonly #tables:
-        Map<string, { id: string }[]>;
+    #rows: { id: string }[] | undefined;
     // Orders whole transactions within this backend
     // instance — global ordering, stronger than the
     // per-store mutex it replaces (A2). Cross-process
@@ -22,61 +20,45 @@ export class MemoryStorageBackend
         <R>(fn: () => Promise<R>) => Promise<R>;
 
     constructor() {
-        this.#tables = new Map();
+        this.#rows = undefined;
         this.#serialize = createSerializer();
     }
 
-    // Simulated transaction: buffer the declared tables,
-    // serve every row op from the buffer, flush the dirty
-    // tables only when `fn` resolves. A throw skips the
-    // flush, so the live store is byte-identical — rollback
-    // is "don't flush", never "undo".
+    // Simulated transaction: copy the table, serve every
+    // row op from the copy, adopt the copy when `fn`
+    // resolves. A throw skips the adoption, so the live
+    // rows are byte-identical — rollback is "don't adopt",
+    // never "undo".
     async transaction<R>(
-        tables: readonly string[],
         mode: TxMode,
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R> {
         return this.#serialize(async () => {
-            const buffer =
-                new Map<string, { id: string }[]>();
-            for (const table of tables) {
-                const rows = this.#tables.get(table);
-                if (rows === undefined) {
-                    throw new MissingTableError(table);
-                }
-                buffer.set(table, [...rows]);
+            if (this.#rows === undefined) {
+                throw new MissingTableError('message_pairs');
             }
-            const dirty = new Set<string>();
-            const tx = bufferTx(buffer, mode, dirty);
-            const result = await fn(tx);
-            for (const table of dirty) {
-                this.#tables.set(
-                    table, buffer.get(table)!,
-                );
-            }
+            const buffer = [...this.#rows];
+            const result = await fn(bufferTx(buffer, mode));
+            this.#rows = buffer;
             return result;
         });
     }
 
-    async ensureTables(
-        tables: readonly string[],
-    ): Promise<void> {
-        for (const table of tables) {
-            if (!this.#tables.has(table)) {
-                this.#tables.set(table, []);
-            }
+    async ensureTable(): Promise<void> {
+        if (this.#rows === undefined) {
+            this.#rows = [];
         }
     }
 
     async hasSchema(): Promise<boolean> {
-        return this.#tables.size > 0;
+        return this.#rows !== undefined;
     }
 
     async postSchemaCreation(): Promise<void> {
-        await this.ensureTables(TABLE_NAMES);
+        await this.ensureTable();
     }
 
     async deleteSchema(): Promise<void> {
-        this.#tables.clear();
+        this.#rows = undefined;
     }
 }

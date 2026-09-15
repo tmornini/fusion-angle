@@ -1,6 +1,5 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import type { Id, MembershipEntity } from '../api/types.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
@@ -216,15 +215,12 @@ Deno.test('leg 5: membershipExistsFor — member + non-member parity'
 
     // Phase Final Task 2: invitations + memberships ROW
     // halves stripped from grantInvitation's tx list.
-    const grantTxTables = MESSAGE_TABLES;
     const inTxMemberCheck = await db.transaction(
-        grantTxTables,
         (view) => membershipExistsFor(
             view, STARK_ORGANIZATION, 'XXZruirZyAOoRpNxaDnpSA',
         ),
     );
     const inTxNonMemberCheck = await db.transaction(
-        grantTxTables,
         (view) => membershipExistsFor(
             view, STARK_ORGANIZATION, mikeId,
         ),

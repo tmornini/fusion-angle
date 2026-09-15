@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, FlowRecordEntity } from './types.ts';
 import { validateFlowRecordEntity } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -18,13 +18,13 @@ import {
 // message-plane reduction (derive-documents.ts) — the
 // deriveFlowWorkOrders structural mirror (api/derive-flow-work-
 // orders.ts), re-nested one level deeper: one prefix scan per
-// flow, at the join address the live PUT/DELETE flows/:id/
+// flow, at the join document the live PUT/DELETE flows/:id/
 // records/:frid route (and the seed's own postFlowRecordDocument
 // Op invocation, Phase 6 Task 5) both write. A join row carries
 // no lifecycle trio of its own — a DELETE tombstones it outright
 // (deriveDocumentsAt's own DELETE-head exclusion mirrors the old
 // plane's physical splice; parity, not a new mechanism). Unlike
-// deriveFlowWorkOrders, this join's own :frid address carries a
+// deriveFlowWorkOrders, this join's own :frid document carries a
 // LIVE GET route (flows/:id/records/:frid), so a by-id read
 // (deriveFlowRecord) is needed alongside the collection read —
 // deriveIdea/deriveFlow's own absent/DELETE-head -> Entity
@@ -32,7 +32,7 @@ import {
 // family. LIVE: GET flows/:id/records and GET flows/:id/
 // records/:frid are wired to deriveFlowRecords/deriveFlowRecord
 // below (Phase 6 Task 7); tests/drift-records.test.ts proves
-// equality against flow_records.getAllWhere('flow_id', ...) and
+// equality against flow_records.getAllWhere on flow_id and
 // flow_records.getById(...).
 
 const FLOW_RECORDS_TABLE = 'flow_records';
@@ -41,7 +41,7 @@ function flowRecordsUriPrefix(
     organization: Id,
     flowId: Id,
 ): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         organization, '/flows/' + flowId + '/records/',
     );
 }
@@ -53,7 +53,7 @@ export function flowRecordEntityOf(
     document: DerivedDocument,
 ): FlowRecordEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateFlowRecordEntity(withoutId(document.body)),
     };
 }
@@ -64,8 +64,7 @@ async function fetchFlowRecordDocuments(
     flowId: Id,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = flowRecordsUriPrefix(organization, flowId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
@@ -95,7 +94,7 @@ export async function deriveFlowRecords(
 // under this flow/organization) or a DELETE head throws
 // EntityNotFoundError('flow_records', id) — deriveDocumentsAt's
 // own DELETE-head exclusion already collapses both cases into
-// "no document at this uriId".
+// "no document at this name".
 export async function deriveFlowRecord(
     db: DbAdapter,
     organization: Id,

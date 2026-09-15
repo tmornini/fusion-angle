@@ -28,6 +28,7 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -219,12 +220,12 @@ Deno.test('a byte-identical PUT resend to'
 // -- 4. postWorkOrderCreationOp's synthesized create pairs
 // (Phase 5 Task 3, the flow-creation-triple precedent): a live
 // POST /work-orders now forms THREE pairs pre-tx — the gate's
-// own operation message pair (shares the WO's document
-// address, per the registry-driven create-address override),
+// own operation message pair (shares the WO's document,
+// per the registry-driven create-document override),
 // a synthesized document message pair (PUT-shaped, at the
-// WO's own address), and a synthesized join pair
+// WO's own document), and a synthesized join pair
 // (PUT-shaped, at the
-// organizations/:id/flows/:id/work-orders/:woid address).
+// organizations/:id/flows/:id/work-orders/:woid document).
 // ----------------------
 
 function req(
@@ -252,7 +253,7 @@ function req(
 // pair's hash covers ONLY {display_id, flow_graph, position}
 // (workOrderCreateDocumentBody's own three picked keys), so
 // two creates sharing that sub-body would collide on
-// appendMessagePair's concurrent-retry guard and the second
+// appendMessagePairOnce's concurrent-retry guard and the second
 // pair would never land, an artifact of the test fixture, not
 // the create op.
 function workOrderCreateBody(
@@ -317,20 +318,20 @@ function decodeRequestMessage(message: string): {
     };
 }
 
-// The PUT-shaped row at a given address, excluding a prior
+// The PUT-shaped row at a given document, excluding a prior
 // id — never positional (an index-0/AjdvjuECVZEgZoFajaIEkg read is an
 // implicit
 // arrival-order dependency, the H7 hazard class): filter by
-// address AND method instead.
+// document AND method instead.
 function documentRowAt(
     messagePairs: readonly MessagePairEntity[],
     prefix: string,
-    uriId: string,
+    name: string,
     excludeId?: string,
 ): MessagePairEntity | undefined {
     return messagePairs.find(
-        r => r.uri_collection === prefix
-            && r.uri_id === uriId
+        r => r.path === prefix
+            && r.name === name
             && r.id !== excludeId
             && decodeRequestMessage(r.request).method
                 === 'PUT',
@@ -340,8 +341,8 @@ function documentRowAt(
 const ENTITY_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/';
 
 Deno.test('a work-order create appends a PUT-shaped document'
-+ ' message pair at the WO address and a PUT-shaped join pair'
-+ ' at the join address, all three sharing one requestAt',
++ ' message pair at the WO document and a PUT-shaped join pair'
++ ' at the join document, all three sharing one requestAt',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
@@ -356,7 +357,7 @@ async () => {
     const documentRow =
         documentRowAt(messagePairs, ENTITY_PREFIX, WO_C1);
     assert(
-        documentRow, 'no document message pair at the WO address',
+        documentRow, 'no document message pair at the WO document',
     );
     assertEquals(
         validateWorkOrderDocumentBody(
@@ -370,7 +371,7 @@ async () => {
             + 'work-orders/';
     const joinRow =
         documentRowAt(messagePairs, joinPrefix, WO_C1_FWO);
-    assert(joinRow, 'no join pair at the join address');
+    assert(joinRow, 'no join pair at the join document');
 
     // slice(3): the fixture's own root-admin pairs (organization
     // document + role grant + membership, Phase 13 Tasks 1 and 3)
@@ -444,7 +445,7 @@ Deno.test('a duplicate work-order create\'s own OPERATION pair'
         workOrderCreateBody(WO_C3, WO_C3_FWO_B, FLOW_C3),
     ));
     assertStrictEquals(second.status, 201);
-    const secondOperationId = second.headers.get('Response-ID');
+    const secondOperationId = pairIdOf(second);
     assert(secondOperationId);
     const secondOperationResponse = await db.messagePairs.getById(
         secondOperationId!,

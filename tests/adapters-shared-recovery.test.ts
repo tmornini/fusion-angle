@@ -53,7 +53,7 @@ import {
     getSessionToken,
 } from '../web-app/app/adapters/init.ts';
 import {
-    putMessagePair, formAuthMessagePair,
+    appendMessagePairAlways, formAuthMessagePair,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
@@ -148,7 +148,7 @@ async function seedAuthorizationCodeMessagePair(
     const messagePair = await formAuthMessagePair(
         seed, requestBody, 'XXZruirZyAOoRpNxaDnpSA', 200, { code },
     );
-    await putMessagePair(db, messagePair);
+    await appendMessagePairAlways(db, messagePair);
 }
 
 async function issuePair(db: MemoryDbAdapter): Promise<{

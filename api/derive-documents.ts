@@ -18,17 +18,17 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 const PUT_METHOD = 'PUT';
 const DELETE_METHOD = 'DELETE';
 
-// The two methods a document-address pair can carry (design
+// The two methods a document pair can carry (design
 // decision 6): PUT writes/edits/transitions the document,
-// DELETE tombstones it. A POST at the SAME address is an
+// DELETE tombstones it. A POST at the SAME document is an
 // OPERATION record, never a document — no-op for ideas/
-// projects (neither ever POSTs at its own document address);
+// projects (neither ever POSTs at its own document);
 // load-bearing once a family's create-shaped genesis pair
-// shares its document address (the flows family: POST
+// shares its (path, name) (the flows family: POST
 // 'flows' mints the create operation message pair at the
-// SAME uriId a subsequent PUT 'flows/:id' revisits).
+// SAME name a subsequent PUT 'flows/:id' revisits).
 // Defense-in-depth, not the deciding mechanism —
-// appendMessagePair's nowUtc() `at` already orders a
+// appendMessagePairOnce's nowUtc() `at` already orders a
 // synthesized document message pair strictly after its
 // sibling operation message pair.
 const DOCUMENT_METHODS: ReadonlySet<string> =
@@ -55,32 +55,33 @@ export function requestBodyOf(
 export interface DocumentMessagePair {
     readonly id: Id;
     readonly at: string;
-    readonly uriId: string;
+    readonly name: string;
     readonly method: string;
     readonly body: Record<string, unknown>;
     readonly requesterIdentityId: Id;
 }
 
-// Every PUT/DELETE pair at `uriCollection`, decoded once —
+// Every PUT/DELETE pair at `path`, decoded once —
 // ascending by the envelope (at, id), the SAME arrival order
-// headMessagePairIdAt (message-pair.ts) picks a single
-// head from. That shared mechanism is ordering ONLY:
-// headMessagePairIdAt filters by uri_id/uri_collection
+// the store's document head read (`messageStore(db).get`)
+// picks a single head from. That shared mechanism is
+// ordering ONLY: the store's document head read
+// (`messageStore(db).get`) filters by name/path
 // alone — every method, since it serves
 // Supersedes/Follows provenance (the LOCK head) — while
 // this function excludes every method but PUT/DELETE
 // (the DOCUMENT head — design decision 6).
-// POST/PATCH rows at the same address are not heads. Only
+// POST/PATCH rows at the same document are not heads. Only
 // successful writes are stored, so there is no status
 // filter. Method comes from the pair's `method` column.
 // DocumentMessagePair.at is the response stamp.
 export function documentMessagePairsAt(
     messagePairs: readonly MessagePairEntity[],
-    uriCollection: string,
+    path: string,
 ): readonly DocumentMessagePair[] {
     const out: DocumentMessagePair[] = [];
     for (const messagePair of messagePairs) {
-        if (messagePair.uri_collection !== uriCollection) {
+        if (messagePair.path !== path) {
             continue;
         }
         if (!DOCUMENT_METHODS.has(messagePair.method)) {
@@ -89,7 +90,7 @@ export function documentMessagePairsAt(
         out.push({
             id: messagePair.id,
             at: messagePair.response_at,
-            uriId: messagePair.uri_id,
+            name: messagePair.name,
             method: messagePair.method,
             body: requestBodyOf(messagePair.request),
             requesterIdentityId:
@@ -102,39 +103,38 @@ export function documentMessagePairsAt(
                 : compareIdentifiers(left.id, right.id));
 }
 
-// The head document per uri_id at a prefix. Family-agnostic and
+// The head document per name at a prefix. Family-agnostic and
 // pure over the fetched rows; a family's own reshaping (api/
 // derive-ideas.ts) turns each DerivedDocument into its own entity
 // shape.
 export interface DerivedDocument {
-    readonly uriId: string;
+    readonly name: string;
     readonly messagePairId: string; // head pair (== the
-                                    // advertisable
-                                    // Response-ID)
+                                    // advertisable ETag)
     readonly method: string;        // head method; DELETE
                                      // head == absent
     readonly body: Record<string, unknown>;
 }
 
-// Latest pair per uri_id at a prefix by the (at, id)
+// Latest pair per name at a prefix by the (at, id)
 // reduction; a DELETE head excludes the document.
 // Supersedes is NEVER walked (provenance-only — a DAG
 // under races; only the reduction decides currency).
 export function deriveDocumentsAt(
     messagePairs: readonly MessagePairEntity[],
-    uriCollection: string,
+    path: string,
 ): Map<string, DerivedDocument> {
     const documentMessagePairs = documentMessagePairsAt(
-        messagePairs, uriCollection,
+        messagePairs, path,
     );
     const heads = latestByKey(
-        documentMessagePairs, (messagePair) => messagePair.uriId,
+        documentMessagePairs, (messagePair) => messagePair.name,
     );
     const documents = new Map<string, DerivedDocument>();
-    for (const [uriId, head] of heads) {
+    for (const [name, head] of heads) {
         if (head.method === DELETE_METHOD) continue;
-        documents.set(uriId, {
-            uriId,
+        documents.set(name, {
+            name,
             messagePairId: head.id,
             method: head.method,
             body: head.body,
@@ -176,11 +176,11 @@ export interface DocumentLifecycleEvent {
 // state_event_id key. The tombstone signal itself lives in
 // deriveDocumentsAt's head-absence check, not in this lifecycle
 // walk. Author gate 9: records is the first trio family whose
-// :id address carries a live DELETE route, so a delete-then-
+// :id document carries a live DELETE route, so a delete-then-
 // recreate history (PUT, DELETE, PUT) is the first live case
 // that would otherwise crash here; behavior-preserving for
 // ideas/projects/flows, none of which has a DELETE at its own
-// document address.
+// document.
 export function documentLifecycleEvents(
     messagePairs: readonly DocumentMessagePair[],
 ): DocumentLifecycleEvent[] {

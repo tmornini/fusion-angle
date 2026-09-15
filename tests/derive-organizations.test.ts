@@ -14,6 +14,7 @@ import { EntityNotFoundError } from '../api/db.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     apiRequest,
+    pairIdOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import {
@@ -33,7 +34,7 @@ import {
 // Phase Final Task 2: organizations dual-write stripped. This
 // file no longer compares derive vs row-plane oracles — the
 // row plane is empty after a live PUT. Coverage re-homes to
-// wire-body / derive agreement and message-plane address proofs.
+// wire-body / derive agreement and message-plane document proofs.
 // Every pair is still built through the live PUT route.
 
 function req(
@@ -130,7 +131,7 @@ Deno.test('a second live PUT supersedes the first; derive sees the'
     const db = await freshDb();
     const organizationId = generateIdentifier();
     const first = await putOrganization(db, organizationId, 'First');
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     assert(firstId);
     const second = await putOrganization(db, organizationId, 'Second');
     assertStrictEquals(second.headers.get('Supersedes'), null);
@@ -147,7 +148,7 @@ Deno.test('a second live PUT supersedes the first; derive sees the'
     // Phase Final Stage B: organizations table retired.
 });
 
-// -- the un-nested address proof ---------------------------------
+// -- the un-nested document proof ---------------------------------
 
 Deno.test('the pair lives at the flat /organizations/ prefix, no'
 + ' organization segment — derive takes no org argument',
@@ -159,8 +160,8 @@ async () => {
     // seedAdminSchema forms 2 pairs (role-grants retired);
     // this PUT is the 3rd.
     assertStrictEquals(requests.length, 3);
-    assertStrictEquals(requests[2]!.uri_collection, '/organizations/');
-    assertStrictEquals(requests[2]!.uri_id, organizationId);
+    assertStrictEquals(requests[2]!.path, '/organizations/');
+    assertStrictEquals(requests[2]!.name, organizationId);
 
     const derived = await deriveOrganization(db, organizationId);
     assertStrictEquals(derived.id, organizationId);
@@ -202,7 +203,7 @@ async () => {
         await storedPutBodyText(db, '/organizations/', id),
     );
     const expected = organizationEntityOf({
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: 'PUT',
         body: fields,

@@ -201,8 +201,8 @@ async function latestSidecarStateFor(
     ]);
     const prefixes = new Set(
         requests
-            .filter((r) => /\/flows\/$/.test(r.uri_collection))
-            .map((r) => r.uri_collection),
+            .filter((r) => /\/flows\/$/.test(r.path))
+            .map((r) => r.path),
     );
     const events: {
         state: string;

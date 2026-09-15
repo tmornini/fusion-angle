@@ -1,5 +1,4 @@
 import type { DbAdapter } from './db.ts';
-import { MESSAGE_TABLES } from './db.ts';
 import {
     asWorkOrderFlowGraph,
 } from './validators.ts';
@@ -18,7 +17,7 @@ import {
     flowGraphBindingsFromMessagePairs,
 } from './derive-flows.ts';
 import { deriveDocumentsAt } from './derive-documents.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import {
     deriveInstanceCollection,
 } from './derive-record-instances.ts';
@@ -57,12 +56,7 @@ export interface AttributeReferrers {
 // work-orders collection prefix, and live node-attribute
 // bindings via flowGraphBindingsFromMessagePairs (graphDelta
 // attributeEvents + nodeFlowIds). RESTRICT is message-plane
-// only (`pairs` via derive helpers). An in-tx caller must
-// declare every table it touches — the transaction scope
-// is the declared set, and the memory backend rejects an
-// undeclared table on every test path.
-export const ATTRIBUTE_RESTRICT_TABLES =
-    MESSAGE_TABLES;
+// only (`pairs` via derive helpers).
 
 interface BoundGraph {
     readonly nodes: readonly {
@@ -112,11 +106,11 @@ export async function collectAttributeReferrers(
     // Organization-scoped WO document heads — the message-plane
     // successor of view.workOrders.getAll() for the frozen
     // graph walk. Prefix-indexed, never whole-plane.
-    const workOrdersPrefix = canonicalUriCollection(
+    const workOrdersPrefix = canonicalPath(
         boundOrganization, '/work-orders/',
     );
-    const woMessagePairs = await view.messagePairs.getAllWhere(
-        'uri_collection', workOrdersPrefix,
+    const woMessagePairs = await view.messagePairs.getCollectionPairs(
+        workOrdersPrefix,
     );
     const woHeads = deriveDocumentsAt(
         woMessagePairs, workOrdersPrefix,

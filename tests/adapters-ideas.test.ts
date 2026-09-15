@@ -58,7 +58,7 @@ function buildIdea(
 
 // Seeds an idea through the SAME document PUT the live route
 // uses (postIdeaCreation), so a message pair exists at this
-// idea's address — required for the flipped GET ideas / GET
+// idea's document — required for the flipped GET ideas / GET
 // organizations/:id/ideas/:id routes (Phase 2 Task 5) to derive it. Phase
 // Final
 // Task 2 stripped the ideas row half: every test that needs a

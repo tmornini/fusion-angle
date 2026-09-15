@@ -98,8 +98,8 @@ function fakeClient(): {
 
 const MESSAGE_PAIR_ROW = {
     id: 'UuPWIGbUyaAgmEgGDRfnvA',
-    uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-    uri_id: '42',
+    path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+    name: '42',
     requester_identity_id: 'WOTMsfERBVJEuTRTgrQptQ',
     method: 'PUT',
     request_at: '2026-01-01T00:00:00.000000Z',
@@ -113,10 +113,10 @@ const MESSAGE_PAIR_ROW = {
     operation_id: 'WvNiHVgksjrlfhPfdgfcyQ',
 };
 
-Deno.test('ensureTables runs compile-time SCHEMA', async () => {
+Deno.test('ensureTable runs compile-time SCHEMA', async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
-    await backend.ensureTables(['message_pairs']);
+    await backend.ensureTable();
     assertStrictEquals(fake.calls.length, 1);
     assertStrictEquals(fake.calls[0]!.text, POSTGRES_SCHEMA);
 });
@@ -128,7 +128,31 @@ Deno.test('schema declares collection indexes', () => {
     );
     assertMatch(
         POSTGRES_SCHEMA,
-        /ON message_pairs \(uri_collection, response_at, id\)/,
+        /ON message_pairs \(path, response_at, id\)/,
+    );
+});
+
+Deno.test('the columns are path and name; the document index'
++ ' names them', () => {
+    assertMatch(
+        POSTGRES_SCHEMA,
+        /\n    path text COLLATE "C" NOT NULL\n/,
+    );
+    assertMatch(
+        POSTGRES_SCHEMA,
+        /\n    name text COLLATE "C" NOT NULL,\n/,
+    );
+    assertMatch(
+        POSTGRES_SCHEMA,
+        /CREATE INDEX IF NOT EXISTS message_pairs_document\n/,
+    );
+    assertMatch(
+        POSTGRES_SCHEMA,
+        /ON message_pairs \(path, name, response_at, id\)/,
+    );
+    assertNotMatch(
+        POSTGRES_SCHEMA,
+        /uri_collection|uri_id|message_pairs_address/,
     );
 });
 
@@ -168,60 +192,59 @@ async () => {
     );
 });
 
-Deno.test('getWhere throws for uri_id', async () => {
+Deno.test('getCollectionPairs selects by path, ordered',
+async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
-    const err = await assertRejects(
-        () => backend.transaction(
-            ['message_pairs'],
-            'readonly',
-            (tx) => tx.getWhere(
-                'message_pairs', 'uri_id', '42',
+    await backend.transaction('readonly',
+        (tx) => tx.getCollectionPairs(
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        ),
+    );
+    const text = fake.calls[0]!.text;
+    assertMatch(text, /WHERE path = \$1/);
+    assertMatch(text, /ORDER BY response_at, id/);
+});
+
+Deno.test(
+    'getPairsByRequestHash selects by request_hash, ordered',
+    async () => {
+        const fake = fakeClient();
+        const backend = new PostgresBackend(fake.sql);
+        await backend.transaction('readonly',
+            (tx) => tx.getPairsByRequestHash('a'.repeat(64),
             ),
-        ),
-    ) as Error;
-    assertInstanceOf(err, Error);
-    assertStrictEquals(
-        err.message, 'getWhere does not accept uri_id',
-    );
-    assertStrictEquals(fake.calls.length, 0);
-});
+        );
+        const text = fake.calls[0]!.text;
+        assertMatch(text, /WHERE request_hash = \$1/);
+        assertMatch(text, /ORDER BY response_at, id/);
+    },
+);
 
-Deno.test('getWhere supports indexed single columns',
-async () => {
-    const fake = fakeClient();
-    const backend = new PostgresBackend(fake.sql);
-    await backend.transaction(
-        ['message_pairs'],
-        'readonly',
-        (tx) => tx.getWhere(
-            'message_pairs', 'uri_collection'
-                , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-        ),
-    );
-    const text = fake.calls[0]!.text;
-    assertMatch(text, /WHERE uri_collection = \$1/);
-    assertMatch(text, /ORDER BY response_at, id/);
-});
-
-Deno.test('getAddress uses collection and id, ordered',
-async () => {
-    const fake = fakeClient();
-    const backend = new PostgresBackend(fake.sql);
-    await backend.getAddress(
-        'message_pairs',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-        '42',
-    );
-    const text = fake.calls[0]!.text;
-    assertMatch(text, /WHERE uri_collection = \$1/);
-    assertMatch(text, /AND uri_id = \$2/);
-    assertMatch(text, /ORDER BY response_at, id/);
-    assertEquals(
-        fake.calls[0]!.values,
-        ['/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42'],
-    );
-});
+Deno.test(
+    'getDocumentHistory selects by path and name, ordered',
+    async () => {
+        const fake = fakeClient();
+        const backend = new PostgresBackend(fake.sql);
+        await backend.transaction('readonly',
+            (tx) => tx.getDocumentHistory(
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+                '42',
+            ),
+        );
+        const text = fake.calls[0]!.text;
+        assertMatch(text, /WHERE path = \$1/);
+        assertMatch(text, /AND name = \$2/);
+        assertMatch(text, /ORDER BY response_at, id/);
+        assertEquals(
+            fake.calls[0]!.values,
+            [
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+                '42',
+            ],
+        );
+    },
+);
 
 Deno.test('schema has no operation indexes', () => {
     assertNotMatch(
@@ -230,42 +253,18 @@ Deno.test('schema has no operation indexes', () => {
     );
 });
 
-Deno.test('getWhere throws for operation_id', async () => {
-    const fake = fakeClient();
-    const backend = new PostgresBackend(fake.sql);
-    const err = await assertRejects(
-        () => backend.transaction(
-            ['message_pairs'],
-            'readonly',
-            (tx) => tx.getWhere(
-                'message_pairs',
-                'operation_id',
-                'WvNiHVgksjrlfhPfdgfcyQ',
-            ),
-        ),
-    ) as Error;
-    assertInstanceOf(err, Error);
-    assertStrictEquals(
-        err.message, 'getWhere does not accept operation_id',
-    );
-});
-
 Deno.test('getWhereBody uses message_body containment',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
-    await backend.transaction(
-        ['message_pairs'],
-        'readonly',
-        (tx) => tx.getWhereBody(
-            'message_pairs',
-            '/authentication/authorize/',
+    await backend.transaction('readonly',
+        (tx) => tx.getWhereBody('/authentication/authorize/',
             { code: 'abc' },
         ),
     );
     const text = fake.calls[0]!.text;
     assertMatch(text, /FROM message_pairs/);
-    assertMatch(text, /uri_collection = \$1/);
+    assertMatch(text, /path = \$1/);
     assertMatch(
         text, /message_body\(response\) @>/,
     );
@@ -284,10 +283,8 @@ Deno.test('put writes BYTEA via Octets.fromLatin1',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
-    await backend.transaction(
-        ['message_pairs'],
-        'readwrite',
-        (tx) => tx.put('message_pairs', MESSAGE_PAIR_ROW),
+    await backend.transaction('readwrite',
+        (tx) => tx.append(MESSAGE_PAIR_ROW),
     );
     const values = fake.calls[0]!.values;
     const bytes = values.filter(
@@ -315,11 +312,8 @@ async () => {
         response: Buffer.from(bytes),
     }];
     const backend = new PostgresBackend(fake.sql);
-    const row = await backend.transaction(
-        ['message_pairs'],
-        'readonly',
-        (tx) => tx.get<typeof MESSAGE_PAIR_ROW>(
-            'message_pairs', MESSAGE_PAIR_ROW.id,
+    const row = await backend.transaction('readonly',
+        (tx) => tx.getById<typeof MESSAGE_PAIR_ROW>(MESSAGE_PAIR_ROW.id,
         ),
     );
     assertStrictEquals(row?.request, wire);
@@ -335,10 +329,8 @@ async () => {
     fake.failWith = { code: '40P01' };
     const backend = new PostgresBackend(fake.sql);
     const err = await assertRejects(
-        () => backend.transaction(
-            ['message_pairs'],
-            'readonly',
-            (tx) => tx.getAll('message_pairs'),
+        () => backend.transaction('readonly',
+            (tx) => tx.getAll(),
         ),
     ) as ApiError;
     assertInstanceOf(err, ApiError);

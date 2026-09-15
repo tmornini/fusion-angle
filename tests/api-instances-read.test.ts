@@ -3,7 +3,6 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     organizationToken,
@@ -14,7 +13,7 @@ import {
 } from './test-fixtures.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
     strongEtagOf,
 } from '../api/message-pair.ts';
 import {
@@ -218,9 +217,7 @@ async function appendInstanceMessagePair(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
     return messagePair.id;
 }
@@ -482,7 +479,7 @@ async () => {
         await adminDb();
     await putLiveType(db, adminToken);
     // Below-gate pair under org B: resolveGlobalOwner reads
-    // uri_collection org segment. Same instance id must not be
+    // path org segment. Same instance id must not be
     // live under org 1 (head miss → missedReadError probe).
     await seedOrganizationDocument(db, ORGANIZATION_B, 'Beta');
     await appendInstanceMessagePair(

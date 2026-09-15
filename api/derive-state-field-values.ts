@@ -19,9 +19,9 @@ import {
 // postWorkOrderTransitionOp (api/routes.ts) — ONE transition
 // OPERATION message pair (work-orders/:id/transition) whose
 // body carries the fold (fieldValues: [{id, fields}]) — no
-// per-value pair of its own. The STANDALONE leaf address
+// per-value pair of its own. The STANDALONE leaf document
 // (states/:id/field-values/:fvid) retired with the states
-// address; GET states/:id/field-values retired (states-URI
+// document; GET states/:id/field-values retired (states-URI
 // elimination C4) — product reads fold field values on
 // work-order history. This module keeps the single-source
 // fold for RESTRICT (deriveStateFieldValueReferrers). Seed
@@ -34,8 +34,8 @@ function matchingPrefixes(
 ): ReadonlySet<string> {
     const prefixes = new Set<string>();
     for (const messagePair of messagePairs) {
-        if (pattern.test(messagePair.uri_collection)) {
-            prefixes.add(messagePair.uri_collection);
+        if (pattern.test(messagePair.path)) {
+            prefixes.add(messagePair.path);
         }
     }
     return prefixes;
@@ -50,7 +50,7 @@ interface TransitionFieldValue {
 // DocumentMessagePair shape so head-reduction below shares latestByKey
 // with every other derive. `id`/`at` are the TRANSITION pair's
 // OWN envelope (every row it folds landed inside that ONE
-// atomic write, so they share one order-key); `uriId` is the
+// atomic write, so they share one order-key); `name` is the
 // field-value row's OWN id. `method: 'PUT'` — a transition only
 // ever CREATES a row (validateWorkOrderTransitionBody carries
 // no delete arm), never tombstones one.
@@ -75,7 +75,7 @@ function transitionFieldValueCandidates(
                 candidates.push({
                     id: transition.id,
                     at: transition.at,
-                    uriId: fieldValue.id,
+                    name: fieldValue.id,
                     method: 'PUT',
                     body: fieldValue.fields,
                     requesterIdentityId:
@@ -103,13 +103,13 @@ export function stateFieldValuesFrom(
         messagePairs,
     );
     const heads = latestByKey(
-        candidates, (messagePair) => messagePair.uriId,
+        candidates, (messagePair) => messagePair.name,
     );
     const rows: StateFieldValueEntity[] = [];
-    for (const [uriId, head] of heads) {
+    for (const [name, head] of heads) {
         if (head.method === 'DELETE') continue;
         rows.push({
-            id: uriId,
+            id: name,
             state_event_id:
                 pickString(head.body, 'state_event_id'),
             attribute_id: pickString(head.body, 'attribute_id'),
@@ -164,9 +164,9 @@ async function isVisibleStateEvent(
 // deviation PERSISTS BY DESIGN at the browser tier — it is not
 // a Phase Final residual for the SFV count. The transition
 // family (work-orders/:id/transition/) WOULD be servable via N
-// indexed pairs.getAllWhere ('uri_collection', ...)
+// indexed pairs.getAllWhere ('path', ...)
 // reads (api/db.ts's TABLE_INDEXES: both tables index
-// uri_collection — an EXACT-match index, one value per entity, not
+// path — an EXACT-match index, one value per entity, not
 // a family-wide constant), one per known work-order id, EXCEPT
 // enumerating those ids WITHOUT the EntityStore deleted-filter
 // would drop a since-deleted work order's field-value history

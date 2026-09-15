@@ -24,7 +24,7 @@ import {
 } from '../api/derive-flows.ts';
 import type { GuardedDbAdapter } from '../api/db.ts';
 import {
-    formWriteMessagePair, canonicalUriCollection,
+    formWriteMessagePair, canonicalPath,
     documentHeadAt,
 } from '../api/message-pair.ts';
 import {
@@ -123,10 +123,10 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 }
 
 // Postgres coordinateWrite 412s an unlatched PUT at a
-// locked address. Memory omits writeLocks, so the undo
+// locked document. Memory omits writeLocks, so the undo
 // route's synthesized document message pair never hit that gate
 // in ./test — garden did. This wrapper installs the same
-// latestPutDelete check so the pin fails here too.
+// getHead check so the pin fails here too.
 function withWriteGate(
     db: MemoryDbAdapter,
 ): MemoryDbAdapter {
@@ -137,30 +137,30 @@ function withWriteGate(
     ): GuardedDbAdapter => ({
         ...view,
         writeLocks: {
-            lockDedup: async () => {},
-            lockAddress: async () => {},
+            lockRequest: async () => {},
+            lockDocument: async () => {},
             lockHead: async () => {},
-            latestPutDelete: async (collection, uriId) => {
+            getHead: async (path, name) => {
                 const head = await documentHeadAt(
-                    view, collection, uriId,
+                    view, path, name,
                 );
                 return head ?? null;
             },
             notify: async () => {},
         },
-        transaction: (tables, fn) => view.transaction(
-            tables, (inner) => fn(wrapView(inner)),
+        transaction: (fn) => view.transaction(
+            (inner) => fn(wrapView(inner)),
         ),
-        readTransaction: (tables, fn) =>
+        readTransaction: (fn) =>
             view.readTransaction(
-                tables, (inner) => fn(wrapView(inner)),
+                (inner) => fn(wrapView(inner)),
             ),
     });
-    db.transaction = (tables, fn) => origTx(
-        tables, (view) => fn(wrapView(view)),
+    db.transaction = (fn) => origTx(
+        (view) => fn(wrapView(view)),
     );
-    db.readTransaction = (tables, fn) => origRead(
-        tables, (view) => fn(wrapView(view)),
+    db.readTransaction = (fn) => origRead(
+        (view) => fn(wrapView(view)),
     );
     return db;
 }
@@ -614,7 +614,7 @@ Deno.test(
         const actor = 'XXZruirZyAOoRpNxaDnpSA';
         // Phase Final Task 5: the store decorator is gone;
         // handlers and resolveFlowUndoTarget read the base
-        // adapter. Message-plane tenancy rides uri_collection.
+        // adapter. Message-plane tenancy rides path.
         await createFlow(db, token, flowId);
         await save(db, token, flowId, 'A', FLOWID_A);
 
@@ -623,7 +623,7 @@ Deno.test(
         // resolveFlowUndoTarget's own pre-tx read sees inside
         // the live route, at the instant a concurrent write
         // could still race it.
-        const undoUriPrefix = canonicalUriCollection(
+        const undoUriPrefix = canonicalPath(
             organization, '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + flowId + '/undo/',
         );
@@ -754,15 +754,14 @@ Deno.test(
         );
         assertStrictEquals(undone.status, 201);
 
-        const prefix = canonicalUriCollection('AjdvjuECVZEgZoFajaIEkg'
+        const prefix = canonicalPath('AjdvjuECVZEgZoFajaIEkg'
             , '/flows/');
-        const stored = await db.messagePairs.getAllWhere(
-            'uri_collection', prefix,
+        const stored = await db.messagePairs.getCollectionPairs(prefix,
         );
         const messagePairs = documentMessagePairsAt(
             stored, prefix,
         )
-            .filter((p) => p.uriId === flowId);
+            .filter((p) => p.name === flowId);
         const states: { state: string; at: string }[] = [];
         for (const messagePair of messagePairs) {
             const delta = messagePair.body['graphDelta'];

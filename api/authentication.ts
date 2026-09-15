@@ -1,6 +1,5 @@
 import {
     EntityNotFoundError,
-    MESSAGE_TABLES,
 } from './db.ts';
 import type {
     DbAdapter,
@@ -64,9 +63,9 @@ import {
     findFirstByKey,
 } from '../shared/ledger-reduction.ts';
 import {
-    appendMessagePair,
-    putMessagePair,
-    canonicalUriCollection,
+    appendMessagePairOnce,
+    appendMessagePairAlways,
+    canonicalPath,
     formAuthMessagePair,
     formTokenEventMessagePair,
     formWriteMessagePair,
@@ -436,12 +435,10 @@ async function issueTokenPair(
         jti: refreshJti, identity_id: identityId,
         action: 'issued', chain_id: chainId, at,
     }, operationId);
-    await adapter.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
-            await appendMessagePair(view, eventMessagePair);
+    await adapter.transaction(async (view) => {
+            await appendMessagePairOnce(view, eventMessagePair);
             if (messagePair !== undefined) {
-                await putMessagePair(view, messagePair);
+                await appendMessagePairAlways(view, messagePair);
             }
         },
     );
@@ -467,7 +464,7 @@ export async function tokenRevocationReason(
 ): Promise<string | null> {
     // FIRST read FLIPPED (Phase 13 Task 4): derived via
     // deriveTokenRevocationsFor — row-identical to the
-    // getAllWhere('identity_id', sub) read it replaces.
+    // getAllWhere on identity_id it replaces.
     const revs = await deriveTokenRevocationsFor(adapter, sub);
     const revokedThrough = revokedThroughSeconds(revs, sub);
     if (revokedThrough !== null && iat <= revokedThrough) {
@@ -475,7 +472,7 @@ export async function tokenRevocationReason(
     }
     // SECOND read FLIPPED (Phase 13 Task 6, gate 7 discharged):
     // derived via deriveIdentityTokenEventsForJti — row-identical
-    // to the getAllWhere('jti', jti) read it replaces, now that
+    // to the getAllWhere on jti it replaces, now that
     // every identity_tokens writer forms its own event pair
     // (Phase 13 Task 5). The gate check needs only THIS jti's
     // events: a chain-wide revoke writes a 'revoked' event per
@@ -527,7 +524,7 @@ async function readTokenChainFromLedger(
 }
 
 // Each append's event, paired with its OWN formed event pair —
-// formTokenEventMessagePair mints a fresh id per event and addresses the
+// formTokenEventMessagePair mints a fresh id per event and names the
 // pair by it (Phase 13 Task 5). Formed pre-tx — crypto,
 // hashing, and timers never run inside an open
 // transaction (AGENTS.md § Transaction bodies await only
@@ -668,9 +665,7 @@ export async function rotateRefreshJti(
             adapter, presentedJti, newJti, operationId,
         );
         try {
-            return await adapter.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            return await adapter.transaction(async (view) => {
                     const { rows } = await readTokenChainFromLedger(
                         view, presentedJti,
                     );
@@ -687,11 +682,11 @@ export async function rotateRefreshJti(
                         throw new TokenPlanDivergedError();
                     }
                     for (const write of provisional.writes) {
-                        await appendMessagePair(view, write.messagePair);
+                        await appendMessagePairOnce(view, write.messagePair);
                     }
                     if (provisional.plan.kind === 'rotate') {
                         if (messagePair !== undefined) {
-                            await putMessagePair(view, messagePair);
+                            await appendMessagePairAlways(view, messagePair);
                         }
                         return {
                             kind: 'rotate' as const,
@@ -770,9 +765,7 @@ export async function revokeTokenChain(
             adapter, jti, operationId,
         );
         try {
-            await adapter.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            await adapter.transaction(async (view) => {
                     const { chainId, identityId, rows } =
                         await readTokenChainFromLedger(
                             view, jti,
@@ -791,10 +784,10 @@ export async function revokeTokenChain(
                         throw new TokenPlanDivergedError();
                     }
                     for (const write of provisional.writes) {
-                        await appendMessagePair(view, write.messagePair);
+                        await appendMessagePairOnce(view, write.messagePair);
                     }
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                 },
             );
@@ -1083,26 +1076,24 @@ async function grantClientCredentials(
         responseBody: ticketBody,
         operationId: messagePair.operationId,
     });
-    const consumed = await adapter.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    const consumed = await adapter.transaction(async (view) => {
             const locks = view.writeLocks;
             if (locks !== undefined) {
-                await locks.lockAddress(
+                await locks.lockDocument(
                     '/authentication/assertion-jtis/',
                     verdict.jti,
                 );
             }
-            const existing = await messageStore(view).get(
+            const existing = await messageStore(view).getDocumentHead(
                 '/authentication/assertion-jtis/',
                 verdict.jti,
             );
-            if (existing !== undefined) {
+            if (existing !== null) {
                 return false;
             }
-            await putMessagePair(view, ticketMessagePair);
-            await appendMessagePair(view, eventMessagePair);
-            await putMessagePair(view, messagePair);
+            await appendMessagePairAlways(view, ticketMessagePair);
+            await appendMessagePairOnce(view, eventMessagePair);
+            await appendMessagePairAlways(view, messagePair);
             return true;
         },
     );
@@ -1122,7 +1113,7 @@ async function grantClientCredentials(
 // (AGENTS.md § Transaction bodies await only row ops). It
 // keys
 // the issued root's row id (and, by construction, that row's own
-// event pair's uri_id — formTokenEventMessagePair derives uriId from the
+// event pair's name — formTokenEventMessagePair derives name from the
 // id it is given). authorizeCodeIssuer matches the LIVE code
 // against the authorize response family's stored `code` field
 // (pairs are stored verbatim).
@@ -1133,12 +1124,12 @@ export async function deriveAuthorizationCodeId(
 }
 
 const AUTHORIZE_PREFIX =
-    canonicalUriCollection(undefined, '/authentication/authorize/');
+    canonicalPath(undefined, '/authentication/authorize/');
 const IDENTITY_TOKENS_FLAT_PREFIX =
-    canonicalUriCollection(undefined, '/identity-tokens/');
+    canonicalPath(undefined, '/identity-tokens/');
 
 function tokensEventPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined,
         '/identities/' + identityId + '/tokens/',
     );
@@ -1173,9 +1164,9 @@ interface AuthorizeCodeIssuer {
 
 // PRE-TX (i), gate 3: the code -> identity/client point-match
 // over the WHOLE '/authentication/authorize/' response family.
-// That address is operation-addressed (uriId always ''), so no
-// per-uriId head reduction applies here — deriveDocumentsAt's
-// latest-per-uriId would wrongly collapse every distinct code's
+// That path holds operation documents (name always ''), so no
+// per-name head reduction applies here — deriveDocumentsAt's
+// latest-per-name would wrongly collapse every distinct code's
 // pair down to a single latest one. Every stored pair at this
 // prefix is a genuine 2xx: authorizePassword forms a pair ONLY on
 // success (grant-first, pinned), so no status re-check is needed.
@@ -1187,7 +1178,7 @@ async function authorizeCodeIssuer(
     adapter: DbAdapter,
     code: string,
 ): Promise<AuthorizeCodeIssuer | null> {
-    const hits = await messageStore(adapter)
+    const hits = await adapter.messagePairs
         .getAllWhereBody(AUTHORIZE_PREFIX, { code });
     const messagePair = hits[0];
     if (messagePair === undefined) return null;
@@ -1221,7 +1212,7 @@ async function authorizeCodeIssuer(
 // transaction view in-tx. A genuine event already lives at
 // 'identities/<identityId>/tokens/<derivedId>' exactly when
 // this code has already minted a chain root — the pair append
-// at that KEYED address IS the spend marker (KEY-BY-ANCHOR),
+// at that KEYED document IS the spend marker (KEY-BY-ANCHOR),
 // replacing the retired authorization_codes 'consumed' row.
 // Dual-reads leftover /identity-tokens/<derivedId> so a
 // pre-nest spend still fails closed. Filtered to those two
@@ -1234,11 +1225,11 @@ export async function authorizationCodeSpent(
     derivedId: Id,
     identityId: Id,
 ): Promise<boolean> {
-    const nested = await dbOrView.messagePairs.getAllAtAddress(
+    const nested = await dbOrView.messagePairs.getDocumentHistory(
         tokensEventPrefixFor(identityId), derivedId,
     );
     if (nested.length > 0) return true;
-    const leftover = await dbOrView.messagePairs.getAllAtAddress(
+    const leftover = await dbOrView.messagePairs.getDocumentHistory(
         IDENTITY_TOKENS_FLAT_PREFIX, derivedId,
     );
     return leftover.length > 0;
@@ -1313,7 +1304,7 @@ async function grantAuthorizationCode(
     }
     const refreshJti = generateIdentifier();
     // KEY-BY-ANCHOR: the root row's id (and, by construction, its
-    // own event pair's uri_id) IS the derived id — see
+    // own event pair's name) IS the derived id — see
     // deriveAuthorizationCodeId's own comment for why that
     // collision is the spend guard itself.
     const rootId = derivedId;
@@ -1346,16 +1337,14 @@ async function grantAuthorizationCode(
         jti: refreshJti, identity_id: issuer.identityId,
         action: 'issued', chain_id: chainId, at,
     }, messagePair.operationId);
-    const consumed = await adapter.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    const consumed = await adapter.transaction(async (view) => {
             if (await authorizationCodeSpent(
                 view, derivedId, issuer.identityId,
             )) {
                 return false;
             }
-            await appendMessagePair(view, eventMessagePair);
-            await putMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, eventMessagePair);
+            await appendMessagePairAlways(view, messagePair);
             return true;
         },
     );
@@ -1509,7 +1498,7 @@ async function authorizePassword(
     // FLIPPED (Phase 13 Task 8): deriveIdentityPiiRows is the E13
     // full-scan derive (derive-identity-spine.ts) — a whole-
     // ledger scan is unavoidable here, exactly as the row-plane
-    // getAllWhere('email', ...) it replaces was: email carries no
+    // getAllWhere on email it replaces was: email carries no
     // dedicated index either plane, so both planes scan every
     // slot to find the match. identityByEmail (the reducer) is
     // BYTE-UNCHANGED — only the row source moves.
@@ -1580,13 +1569,11 @@ async function authorizePassword(
             operationId: messagePair.operationId,
         });
     }
-    await adapter.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await adapter.transaction(async (view) => {
             if (rehashMessagePair !== undefined) {
-                await appendMessagePair(view, rehashMessagePair);
+                await appendMessagePairOnce(view, rehashMessagePair);
             }
-            await putMessagePair(view, messagePair);
+            await appendMessagePairAlways(view, messagePair);
         },
     );
     return { ok: true, response, messagePairId: messagePair.id };

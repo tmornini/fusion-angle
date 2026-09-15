@@ -2,14 +2,12 @@ import {
     assert,
     assertEquals,
     assertMatch,
-    assertNotStrictEquals,
     assertStrictEquals,
 } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     organizationToken,
@@ -19,9 +17,8 @@ import {
 } from './test-fixtures.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
     IF_MATCH_HEADER,
-    strongEtagOf,
 } from '../api/message-pair.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
@@ -36,6 +33,7 @@ import {
 } from '../api/types.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
@@ -238,17 +236,11 @@ async () => {
         'PATCH', INSTANCE_DETAIL, memberToken, body,
     ));
     assertStrictEquals(res.status, 201);
-    const responseId = res.headers.get('Response-ID');
+    const responseId = pairIdOf(res);
     assert(
-        responseId !== null && responseId !== '',
-        'Response-ID present',
+        responseId !== null && isIdentifier(responseId),
+        'ETag present',
     );
-    const createEtag = res.headers.get('ETag');
-    assert(
-        createEtag !== null
-        && isIdentifier(createEtag.slice(1, -1)),
-    );
-    assertNotStrictEquals(createEtag, strongEtagOf(responseId!));
     const echo = await res.json() as {
         id: string;
         organization_id: string;
@@ -269,11 +261,7 @@ async () => {
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
     assert(head !== undefined);
-    assertNotStrictEquals(head.messagePairId, responseId);
-    assertStrictEquals(
-        createEtag,
-        strongEtagOf(head.messagePairId),
-    );
+    assertStrictEquals(responseId, head.messagePairId);
     assertEquals(head.values, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -501,7 +489,7 @@ async () => {
     assertStrictEquals(second.status, 428);
 });
 
-Deno.test('PATCH create at a tombstoned address → 409 spent',
+Deno.test('PATCH create at a tombstoned document → 409 spent',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -527,10 +515,8 @@ async () => {
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
-            await appendMessagePair(view, tombstone);
+    await db.transaction(async (view) => {
+            await appendMessagePairOnce(view, tombstone);
         },
     );
     const res = await handleRequest(db, req(
@@ -561,7 +547,7 @@ async () => {
         undefined, operationId,
     ));
     assertStrictEquals(first.status, 201);
-    const originalId = first.headers.get('Response-ID')!;
+    const originalId = pairIdOf(first)!;
     const originalEtag = first.headers.get('ETag');
     const originalBody = await first.json();
     const second = await handleRequest(db, req(
@@ -570,7 +556,7 @@ async () => {
     ));
     assertStrictEquals(second.status, 200);
     assertStrictEquals(
-        second.headers.get('Response-ID'),
+        pairIdOf(second),
         originalId,
     );
     assertStrictEquals(
@@ -578,16 +564,15 @@ async () => {
         originalEtag,
     );
     assertEquals(await second.json(), originalBody);
-    const responses = await db.messagePairs.getAllWhere(
-        'uri_collection',
+    const responses = await db.messagePairs.getCollectionPairs(
         '/organizations/' + ORGANIZATION
             + '/record-types/' + TYPE_ID
             + '/instances/',
     );
-    const atAddress = responses.filter(
-        (r) => r.uri_id === INSTANCE_ID,
+    const pairsAt = responses.filter(
+        (r) => r.name === INSTANCE_ID,
     );
-    assertStrictEquals(atAddress.length, 2);
+    assertStrictEquals(pairsAt.length, 2);
 });
 
 Deno.test('same-body instance PATCH with new Operation-ID'
@@ -609,9 +594,8 @@ async () => {
     const prefix = '/organizations/' + ORGANIZATION
         + '/record-types/' + TYPE_ID
         + '/instances/';
-    const before = (await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
-    )).filter((row) => row.uri_id === INSTANCE_ID);
+    const before = (await db.messagePairs.getCollectionPairs(prefix,
+    )).filter((row) => row.name === INSTANCE_ID);
     const second = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         {
@@ -620,9 +604,8 @@ async () => {
         },
     ));
     assertStrictEquals(second.status, 201);
-    const after = (await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
-    )).filter((row) => row.uri_id === INSTANCE_ID);
+    const after = (await db.messagePairs.getCollectionPairs(prefix,
+    )).filter((row) => row.name === INSTANCE_ID);
     assertStrictEquals(
         after.length,
         before.length + 2,
@@ -630,7 +613,7 @@ async () => {
     );
 });
 
-Deno.test('two creates racing one address → first 201, '
+Deno.test('two creates racing one document → first 201, '
 + 'second 428',
 async () => {
     const { db, adminToken, memberToken } =
@@ -655,17 +638,16 @@ async () => {
         [a.status, b.status].sort(),
         [201, 428],
     );
-    const responses = await db.messagePairs.getAllWhere(
-        'uri_collection',
+    const responses = await db.messagePairs.getCollectionPairs(
         '/organizations/' + ORGANIZATION
             + '/record-types/' + TYPE_ID
             + '/instances/',
     );
-    const atAddress = responses.filter(
-        (r) => r.uri_id === INSTANCE_ID,
+    const pairsAt = responses.filter(
+        (r) => r.name === INSTANCE_ID,
     );
     assertStrictEquals(
-        atAddress.length, 2,
+        pairsAt.length, 2,
         'winner writes wire PATCH + inner PUT',
     );
 });

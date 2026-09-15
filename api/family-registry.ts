@@ -1,6 +1,6 @@
 // The per-family registry: the single source of truth for a
 // family's cross-cutting properties — organization-nesting
-// tier, PUT concurrency class, and create-address body field —
+// tier, PUT concurrency class, and create-document body field —
 // that Phase 1 spread across parallel literal tables in
 // message-pair.ts (ORGANIZATION_NESTED_FIRST_SEGMENTS,
 // CREATE_BODY_ID_FIELDS). Ideas is the FIRST registered family
@@ -15,16 +15,15 @@
 // among others) wait for their own demand before a slot, a
 // registration, or a helper is added on their behalf.
 
-export type ConcurrencyClass =
-    'simple' | 'locked' | 'create-only';
+export type ConcurrencyClass = 'simple' | 'locked';
 
 export interface FamilyRegistration {
     readonly family: string;        // first path segment
-    readonly organizationNested: boolean; // address tier
+    readonly organizationNested: boolean; // path tier
     readonly concurrency: ConcurrencyClass; // REQUIRED —
         // no default; every PUT family declares its class
         // before it ships (spec: the two PUT classes)
-    readonly createBodyIdField: string; // genesis address
+    readonly createBodyIdField: string; // genesis document
 }
 
 export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
@@ -118,7 +117,7 @@ export function familyRegistration(
     );
 }
 
-// Org-nested record-types wire addresses (Task 2). Nested-
+// Org-nested record-types wire paths (Task 2). Nested-
 // primary; the path org is never authorization alone — the
 // gate's org-match arm compares it to the fenced token org.
 export const RECORD_TYPES_COLLECTION_PATTERN =

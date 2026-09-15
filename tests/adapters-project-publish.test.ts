@@ -112,7 +112,7 @@ Deno.test('postProjectApproval moves state to approved',
         // The objective and its baseline score are seeded the
         // SAME wire-reachable way (Phase 7 Task 7) — a raw
         // db.objectives.put/db.projectObjectiveBaselineScores.put
-        // leaves no pair at these addresses, and
+        // leaves no pair at these documents, and
         // validateProjectForApproval now reads them through the
         // flipped GET objectives / GET
         // organizations/:id/projects/:id/objective-

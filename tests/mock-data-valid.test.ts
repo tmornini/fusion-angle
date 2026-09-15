@@ -116,7 +116,7 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
     validateDocument: validateWorkOrderDocumentBody,
     documentOp: postWorkOrderDocumentOp,
     entityOf: (document, organization) => ({
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         ...document.body,
     }),
@@ -531,11 +531,9 @@ Deno.test(
         }
         const [agentRequests] =
             await Promise.all([
-                db.messagePairs.getAllWhere(
-                    'uri_collection', '/ai-agents/',
+                db.messagePairs.getCollectionPairs('/ai-agents/',
                 ),
-                db.messagePairs.getAllWhere(
-                    'uri_collection', '/ai-agents/',
+                db.messagePairs.getCollectionPairs('/ai-agents/',
                 ),
             ]);
         const agentIds = new Set(

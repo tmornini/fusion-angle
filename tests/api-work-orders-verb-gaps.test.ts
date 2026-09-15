@@ -147,7 +147,7 @@ async () => {
     assertStrictEquals(res.status, 405);
 });
 
-Deno.test('POST organizations/:id/work-orders/:id/release 404s (address'
+Deno.test('POST organizations/:id/work-orders/:id/release 404s (document'
 + ' retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -275,7 +275,7 @@ Deno.test('DELETE organizations/:id/flows/:id/work-orders 405s (no'
     assertStrictEquals(res.status, 405);
 });
 
-// The DELETE 405 for this SAME address is already pinned in
+// The DELETE 405 for this SAME document is already pinned in
 // api-flows-verb-gaps.test.ts ('DELETE
 // organizations/:id/flows/:id/work-orders/
 // :woid 405s') — left there rather than duplicated here, since

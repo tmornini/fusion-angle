@@ -10,7 +10,7 @@ import {
     pickString, pickNumber,
     validateIdeaSubmissionEntity,
 } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -29,7 +29,7 @@ import { liveHeadId, messageStore } from
 
 // Ideas' own reshaping of the generic message-plane reduction
 // (derive-documents.ts): the async fetching (one prefix scan per
-// derivation, per family address) plus the entity/lifecycle
+// derivation, per family document) plus the entity/lifecycle
 // knowledge only this family has. Read-only and additive — no
 // route, adapter, or seed row reads any of this yet (Task 5 wires
 // the route); tests/drift-ideas.test.ts is the proof of equality
@@ -38,14 +38,14 @@ import { liveHeadId, messageStore } from
 const IDEAS_TABLE = 'ideas';
 
 function ideasUriPrefix(organization: Id): string {
-    return canonicalUriCollection(organization, '/ideas/');
+    return canonicalPath(organization, '/ideas/');
 }
 
 function submissionsUriPrefix(
     organization: Id,
     ideaId: Id,
 ): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         organization, '/ideas/' + ideaId + '/submissions/',
     );
 }
@@ -67,7 +67,7 @@ export function ideaEntityOf(
 ): IdeaEntity {
     const body = document.body;
     return {
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         title: pickString(body, 'title'),
         position: pickNumber(body, 'position'),
@@ -98,8 +98,7 @@ async function fetchIdeaMessagePairs(
     readonly documents: Map<string, DerivedDocument>;
     readonly messagePairs: readonly DocumentMessagePair[];
 }> {
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return {
         documents: deriveDocumentsAt(messagePairs, prefix),
@@ -126,11 +125,11 @@ export async function deriveIdeas(
         new Map<Id, DocumentMessagePair[]>();
     for (const messagePair of messagePairs) {
         const list = messagePairsByIdeaId.get(
-            messagePair.uriId,
+            messagePair.name,
         );
         if (list === undefined) {
             messagePairsByIdeaId.set(
-                messagePair.uriId, [messagePair],
+                messagePair.name, [messagePair],
             );
         } else {
             list.push(messagePair);
@@ -181,7 +180,7 @@ export async function deriveIdea(
     const history = stateHistoryFrom(
         documentLifecycleEvents(
             messagePairs.filter((messagePair) =>
-                messagePair.uriId === ideaId),
+                messagePair.name === ideaId),
         ),
         ideaId,
     );
@@ -200,7 +199,7 @@ export function ideaSubmissionEntityOf(
     document: DerivedDocument,
 ): IdeaSubmissionEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateIdeaSubmissionEntity(
             withoutId(document.body),
         ),
@@ -213,8 +212,7 @@ export async function deriveIdeaSubmissions(
     ideaId: Id,
 ): Promise<IdeaSubmissionEntity[]> {
     const prefix = submissionsUriPrefix(organization, ideaId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const documents = deriveDocumentsAt(
         messagePairs, prefix,
@@ -243,7 +241,7 @@ export async function deriveIdeaStateHistory(
     return stateHistoryFrom(
         documentLifecycleEvents(
             messagePairs.filter((messagePair) =>
-                messagePair.uriId === ideaId),
+                messagePair.name === ideaId),
         ),
         ideaId,
     );

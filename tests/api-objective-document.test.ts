@@ -19,7 +19,6 @@ import { ValidationError } from '../api/types.ts';
 import type { ObjectiveEntity } from '../api/types.ts';
 import {
     EntityNotFoundError,
-    MESSAGE_TABLES,
 } from '../api/db.ts';
 import {
     validateObjectiveDocumentBody,
@@ -27,7 +26,7 @@ import {
 import { postObjectiveDocumentOp } from '../api/routes.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import {
     documentFamilyWiring,
@@ -41,7 +40,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 
 // Objectives are the FIFTH lifecycle-trio family (states-
-// address retirement): PUT
+// document retirement): PUT
 // /organizations/:id/objectives/:id carries the entity's
 // own field ({position}) PLUS the lifecycle trio
 // (state/state_at/state_event_id), exactly as ideas,
@@ -49,7 +48,7 @@ import { generateIdentifier } from
 // covenant (R2) and the genesis dilemma are RETIRED —
 // every objective now has an explicit genesis event
 // minted at create, and archive/reactivate ride this SAME
-// document address. The states/:id event-append path for
+// document. The states/:id event-append path for
 // objectives is dead.
 
 function req(
@@ -294,9 +293,7 @@ async function putDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
 }
 
@@ -318,13 +315,11 @@ async function deleteDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
 }
 
-Deno.test('a PUT chain at one objective address Supersedes-chains,'
+Deno.test('a PUT chain at one objective document Supersedes-chains,'
 + ' and documentGetHandler derives the LATEST head',
 async () => {
     const db = memoryDbAdapter();

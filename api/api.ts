@@ -8,7 +8,6 @@ import {
     foreignOrganizationMessage,
     MissingTableError,
     UniqueConstraintError,
-    MESSAGE_TABLES,
 } from './db.ts';
 import type { LatencySimulation } from './latency.ts';
 import {
@@ -17,14 +16,14 @@ import {
     nowUtc,
 } from './types.ts';
 import type { Id } from './types.ts';
-import { messageAddress } from './message-address.ts';
+import { pathAndNameOf } from './path-and-name.ts';
 import { pathSegmentsOf } from './path-segments.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
-    storedResponseFor,
-    createdEntityUriId,
-    canonicalUriCollection,
+    appendMessagePairOnce,
+    getPairByRequestHash,
+    createdEntityName,
+    canonicalPath,
     hoistedHeaderFields,
     sendWriteResponse,
     documentHeadAt,
@@ -316,12 +315,11 @@ async function revisionMessagePairIdForPatch(
         wireMessagePairId,
     );
     if (wireReq === undefined) return undefined;
-    const siblings = await db.messagePairs.getAllWhere(
-        'uri_collection', wireReq.uri_collection,
+    const siblings = await db.messagePairs.getCollectionPairs(wireReq.path,
     );
     const revision = siblings.find(
         (row) =>
-            row.uri_id === wireReq.uri_id
+            row.name === wireReq.name
             && row.request_at === wireReq.request_at
             && row.id !== wireMessagePairId,
     );
@@ -403,7 +401,7 @@ export async function handleRequest(
     // fenceRequest, which completes the vessel: the
     // organization, the live memberships, and the roles.
     // Surviving stores are global (message plane);
-    // message-plane tenancy rides uri_collection. effective stays
+    // message-plane tenancy rides path. effective stays
     // the unfenced base adapter.
     let effective: DbAdapter = adapter;
     // The acting member, sourced from the verified token and
@@ -674,14 +672,14 @@ export async function handleRequest(
     // the one UNCONDITIONAL write guard below runs after body-
     // parse regardless of bearerExempt, mirroring Region A above.
     // The states/:id ownership authorizer RETIRED with the route
-    // (states-address retirement Task 13); field-values leaf
+    // (states-document retirement Task 13); field-values leaf
     // write authorizer RETIRED with the leaf routes (Phase 15
     // Task 7).
     try {
         // WP8 self-only revocation guard. MEMBER_VERBS widens
         // PUT /identities/:id/token-revocations to the member
         // tier (Region A's route-policy check already cleared
-        // it). The path identity IS the address — compare it
+        // it). The path identity IS the document — compare it
         // to the actor. A member may revoke only its OWN
         // chain; an admin may name any identity. The 403 body
         // reuses authorizeRequest's OWN wording
@@ -760,10 +758,10 @@ export async function handleRequest(
             }
         }
         // The shadow-ledger pair: formed pre-tx (all crypto and
-        // address resolution happen before a transaction opens
+        // document resolution happen before a transaction opens
         // — see api/message-pair.ts), gated to routes wired in
         // MESSAGE_PAIR_WIRED_ROUTE_PATTERNS so no unwired route ever
-        // advertises a Response-ID it did not store. Runs
+        // advertises an ETag it did not store. Runs
         // INSIDE the try so a validation error raised while
         // precomputing the success body (below) is caught and
         // mapped to its usual HTTP status, exactly as if the
@@ -774,15 +772,15 @@ export async function handleRequest(
             // Nested attribute paths store under the type
             // attributes prefix directly (flat rewrite retired
             // Task 23).
-            const address = messageAddress(
+            const pathAndName = pathAndNameOf(
                 matched.segments, pathSegments,
             );
-            const canonicalPrefix = canonicalUriCollection(
-                organization, address.uriCollection,
+            const canonicalPrefix = canonicalPath(
+                organization, pathAndName.path,
             );
-            const uriId = createdEntityUriId(
+            const name = createdEntityName(
                 routePattern, body,
-            ) ?? address.uriId;
+            ) ?? pathAndName.name;
             // The locked/simple divide (spec §The two PUT classes): keyed by
             // the route's family registration THROUGH THE WIRING CONSULT —
             // never a blanket family-registry or
@@ -817,7 +815,7 @@ export async function handleRequest(
             // kinds (simple and locked).
             const livePut = isDocumentPut
                 ? await documentHeadMessagePairId(
-                    effective, canonicalPrefix, uriId,
+                    effective, canonicalPrefix, name,
                 )
                 : undefined;
             const advertised = livePut;
@@ -844,21 +842,21 @@ export async function handleRequest(
             const isLatchedOperation =
                 LATCHED_OPERATION_ROUTE_PATTERNS
                     .has(routePattern);
-            const latchAddress = isLatchedOperation
-                ? messageAddress(
+            const latchPathAndName = isLatchedOperation
+                ? pathAndNameOf(
                     matched.segments.slice(0, -1),
                     pathSegments.slice(0, -1),
                 )
                 : undefined;
-            const latchHead = latchAddress === undefined
+            const latchHead = latchPathAndName === undefined
                 ? undefined
                 : await documentHeadMessagePairId(
                     effective,
-                    canonicalUriCollection(
+                    canonicalPath(
                         organization,
-                        latchAddress.uriCollection,
+                        latchPathAndName.path,
                     ),
-                    latchAddress.uriId,
+                    latchPathAndName.name,
                 );
             const latchEcho = isLatchedOperation
                 ? request.headers.get(IF_MATCH_HEADER)
@@ -902,7 +900,7 @@ export async function handleRequest(
             // already-gone 204 no append; live PUT proceeds.
             if (method === 'DELETE') {
                 const head = await documentHeadAt(
-                    effective, canonicalPrefix, uriId,
+                    effective, canonicalPrefix, name,
                 );
                 if (head === undefined) {
                     return Response.json(
@@ -980,7 +978,7 @@ export async function handleRequest(
             // stale against the NEW head) replays instead of
             // 412ing.
             if (!REPLAY_EXEMPT_ROUTE_PATTERNS.has(routePattern)) {
-                const replay = await storedResponseFor(
+                const replay = await getPairByRequestHash(
                     effective, messagePair.requestHash,
                 );
                 if (replay !== undefined) {
@@ -1084,7 +1082,7 @@ export async function handleRequest(
             // + == head → echoMatchesHead, proceed;
             // none + absent → genesis; none + present → 412.
             // A 412 here returns BEFORE dispatch, and
-            // appendMessagePair only ever runs inside the op's
+            // appendMessagePairOnce only ever runs inside the op's
             // own tx, so NOTHING is stored.
             if (isLockedWrite) {
                 if (
@@ -1360,14 +1358,12 @@ export async function handleRequest(
                     );
                     if (octetsEqual(liveOctets, newOctets)) {
                         const raced =
-                            await effective.transaction(
-                                MESSAGE_TABLES,
-                                async (view) => {
+                            await effective.transaction(async (view) => {
                                     const latest =
                                         await documentHeadMessagePairId(
                                             view,
                                             canonicalPrefix,
-                                            uriId,
+                                            name,
                                         );
                                     return latest
                                         !== livePut;
@@ -1378,7 +1374,7 @@ export async function handleRequest(
                                 await documentHeadMessagePairId(
                                     effective,
                                     canonicalPrefix,
-                                    uriId,
+                                    name,
                                 );
                             if (
                                 nowLive !== undefined
@@ -1438,9 +1434,7 @@ export async function handleRequest(
                 && messagePair !== undefined
             ) {
                 const emptyMessagePair = messagePair;
-                await effective.transaction(
-                    MESSAGE_TABLES,
-                    async (view) => {
+                await effective.transaction(async (view) => {
                         const latchedId =
                             emptyMessagePair
                                 .latchedHeadMessagePairId;
@@ -1449,8 +1443,8 @@ export async function handleRequest(
                                 await documentHeadMessagePairId(
                                     view,
                                     emptyMessagePair
-                                        .uriCollection,
-                                    emptyMessagePair.uriId,
+                                        .path,
+                                    emptyMessagePair.name,
                                 );
                             if (latest !== latchedId) {
                                 throw new ApiError(
@@ -1461,12 +1455,12 @@ export async function handleRequest(
                                 );
                             }
                         }
-                        await appendMessagePair(
+                        await appendMessagePairOnce(
                             view, emptyMessagePair,
                         );
                     },
                 );
-                const stored = await storedResponseFor(
+                const stored = await getPairByRequestHash(
                     effective, emptyMessagePair.requestHash,
                 );
                 if (stored === undefined) {
@@ -1526,7 +1520,7 @@ export async function handleRequest(
                     organization,
                     roles,
                 );
-                // Response-ID attach (spec §The two PUT
+                // ETag attach (spec §The two PUT
                 // classes): a locked-family document GET
                 // carries the current head pair id as
                 // provenance — the C6 client save's baseline
@@ -1551,7 +1545,7 @@ export async function handleRequest(
                     && familyRegistration(readWiring.family)
                         ?.concurrency === 'locked'
                 ) {
-                    const prefix = canonicalUriCollection(
+                    const prefix = canonicalPath(
                         organization,
                         '/' + readWiring.family + '/',
                     );
@@ -1559,10 +1553,11 @@ export async function handleRequest(
                     // Task 8) — the SAME reduction the flipped GET
                     // above just ran to build `result`, not a
                     // second, divergent one
-                    // (headMessagePairIdAt's own
+                    // (the store's document head read
+                    // (`messageStore(db).getDocumentHead`) — the
                     // ANY-method LOCK head, still the write path's
                     // source above). Same value for a document-
-                    // class address (tests/api-flow-document.test.ts
+                    // class route (tests/api-flow-document.test.ts
                     // pins the equality); one mechanism now.
                     const headMessagePairId =
                         await documentHeadMessagePairId(
@@ -1573,12 +1568,7 @@ export async function handleRequest(
                         );
                     if (headMessagePairId !== undefined) {
                         return attachEtag(
-                            Response.json(result, {
-                                headers: {
-                                    'Response-ID':
-                                        headMessagePairId,
-                                },
-                            }),
+                            Response.json(result),
                             headMessagePairId,
                         );
                     }
@@ -1659,7 +1649,7 @@ export async function handleRequest(
                         ) ?? '',
                     );
                 if (messagePair !== undefined) {
-                    const stored = await storedResponseFor(
+                    const stored = await getPairByRequestHash(
                         effective, messagePair.requestHash,
                     );
                     if (stored === undefined) {
@@ -1745,7 +1735,7 @@ export async function handleRequest(
                         roles,
                     );
                 if (messagePair !== undefined) {
-                    const stored = await storedResponseFor(
+                    const stored = await getPairByRequestHash(
                         effective, messagePair.requestHash,
                     );
                     if (stored === undefined) {
@@ -1812,7 +1802,7 @@ export async function handleRequest(
                     roles,
                 );
                 if (messagePair !== undefined) {
-                    const stored = await storedResponseFor(
+                    const stored = await getPairByRequestHash(
                         effective, messagePair.requestHash,
                     );
                     if (stored === undefined) {
@@ -1908,7 +1898,7 @@ export async function handleRequest(
                     // the other grantTokenExchange caller, never
                     // reaches here — it is an internal facade
                     // hop, not a route dispatch). Auth pairs are
-                    // keyed by id (putMessagePair), not hash —
+                    // keyed by id (appendMessagePairAlways), not hash —
                     // two identical logins each land a row.
                     if (dispatched.messagePairId === undefined) {
                         throw new Error(
@@ -1992,7 +1982,7 @@ export async function handleRequest(
                     ) ?? '',
                 );
                 if (messagePair !== undefined) {
-                    const stored = await storedResponseFor(
+                    const stored = await getPairByRequestHash(
                         effective, messagePair.requestHash,
                     );
                     if (stored === undefined) {
@@ -2320,11 +2310,11 @@ async function streamStoredDocumentGet(
     if (wiring === undefined) return undefined;
     const organizationId = requireOrganization(organization);
     const id = entityIdParam(wiring, params);
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organizationId, '/' + wiring.family + '/',
     );
-    const stored = await messageStore(db).get(prefix, id);
-    if (stored === undefined) {
+    const stored = await messageStore(db).getDocumentHead(prefix, id);
+    if (stored === null) {
         throw await throwDocumentMiss(
             wiring, db, organizationId, id,
         );
@@ -2340,7 +2330,7 @@ async function streamStoredCollectionGet(
     const wiring = streamCollectionWiring(routePattern);
     if (wiring === undefined) return undefined;
     const organizationId = requireOrganization(organization);
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organizationId, '/' + wiring.family + '/',
     );
     const rows = await messageStore(db).getCollection(

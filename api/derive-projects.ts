@@ -2,7 +2,7 @@ import type { DbAdapter } from './db.ts';
 import { missedReadError } from './derive-states.ts';
 import type { Id, ProjectEntity, StateEntity } from './types.ts';
 import { pickString, pickNumber } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import {
     deriveDocumentsAt,
     documentMessagePairsAt,
@@ -19,7 +19,7 @@ import { liveHeadId, messageStore } from
 
 // Projects' own reshaping of the generic message-plane reduction
 // (derive-documents.ts): the async fetching (one prefix scan per
-// derivation, per family address) plus the entity/lifecycle
+// derivation, per family document) plus the entity/lifecycle
 // knowledge only this family has. Read-only and additive — no
 // route, adapter, or seed row reads any of this yet (Task 6 wires
 // the route); tests/drift-projects.test.ts is the proof of
@@ -32,7 +32,7 @@ import { liveHeadId, messageStore } from
 const PROJECTS_TABLE = 'projects';
 
 function projectsUriPrefix(organization: Id): string {
-    return canonicalUriCollection(organization, '/projects/');
+    return canonicalPath(organization, '/projects/');
 }
 
 // The derived entity: the head document's body minus the
@@ -52,7 +52,7 @@ export function projectEntityOf(
 ): ProjectEntity {
     const body = document.body;
     return {
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         title: pickString(body, 'title'),
         description: pickString(body, 'description'),
@@ -85,8 +85,7 @@ async function fetchProjectMessagePairs(
     readonly documents: Map<string, DerivedDocument>;
     readonly messagePairs: readonly DocumentMessagePair[];
 }> {
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return {
         documents: deriveDocumentsAt(messagePairs, prefix),
@@ -112,11 +111,11 @@ export async function deriveProjects(
         new Map<Id, DocumentMessagePair[]>();
     for (const messagePair of messagePairs) {
         const list = messagePairsByProjectId.get(
-            messagePair.uriId,
+            messagePair.name,
         );
         if (list === undefined) {
             messagePairsByProjectId.set(
-                messagePair.uriId, [messagePair],
+                messagePair.name, [messagePair],
             );
         } else {
             list.push(messagePair);
@@ -167,7 +166,7 @@ export async function deriveProject(
     const history = stateHistoryFrom(
         documentLifecycleEvents(
             messagePairs.filter((messagePair) =>
-                messagePair.uriId === projectId),
+                messagePair.name === projectId),
         ),
         projectId,
     );
@@ -198,7 +197,7 @@ export async function deriveProjectStateHistory(
     return stateHistoryFrom(
         documentLifecycleEvents(
             messagePairs.filter((messagePair) =>
-                messagePair.uriId === projectId),
+                messagePair.name === projectId),
         ),
         projectId,
     );

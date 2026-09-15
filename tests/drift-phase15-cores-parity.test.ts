@@ -11,7 +11,6 @@ import {
     EntityNotFoundError,
     type DbAdapter,
     TABLE_NAMES,
-    MESSAGE_TABLES,
 } from '../api/db.ts';
 import { nowUtc } from '../api/types.ts';
 import {
@@ -64,6 +63,7 @@ import {
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 
 const N_START = generateIdentifier();
@@ -154,11 +154,6 @@ function workOrderFlowGraph(
     };
 }
 
-// The claim gate's write-tx table list
-// (postWorkOrderClaimOp, routes.ts). Phase Final Task 2:
-// work_orders dropped (ROW half stripped).
-const CLAIM_TX_TABLES = MESSAGE_TABLES;
-
 const EMPTY_FLOW_ID = 'GgfDbXOJUvvaCekCTcvhuw';
 
 // -- workOrderDocumentHeadFor ------------------------------------
@@ -208,7 +203,6 @@ async () => {
         db, STARK_ORGANIZATION, workOrderId,
     );
     const inTx = await db.transaction(
-        [...CLAIM_TX_TABLES],
         (view) => workOrderDocumentHeadFor(
             view, STARK_ORGANIZATION, workOrderId,
         ),
@@ -223,7 +217,6 @@ async () => {
         db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
     );
     const inTxMissing = await db.transaction(
-        [...CLAIM_TX_TABLES],
         (view) => workOrderDocumentHeadFor(
             view, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
         ),
@@ -312,7 +305,6 @@ async () => {
         db, STARK_ORGANIZATION, workOrderId,
     );
     const inTx = await db.transaction(
-        [...CLAIM_TX_TABLES],
         (view) => workOrderDocumentHeadFor(
             view, STARK_ORGANIZATION, workOrderId,
         ),
@@ -358,7 +350,6 @@ async () => {
         db, STARK_ORGANIZATION, missingId,
     );
     const inMissing = await db.transaction(
-        [...CLAIM_TX_TABLES],
         (view) => workOrderDocumentHeadFor(
             view, STARK_ORGANIZATION, missingId,
         ),
@@ -431,14 +422,11 @@ Deno.test('stateEventVisibilityFor: tier (i) event-append pairs'
     }
     assertNotStrictEquals(foreignEventId, '');
 
-    const txTables = MESSAGE_TABLES;
-
     // Own → visible (tier i).
     const preOwn = await stateEventVisibilityFor(
         db, STARK_ORGANIZATION, ownEventId,
     );
     const inOwn = await db.transaction(
-        txTables,
         (view) => stateEventVisibilityFor(
             view, STARK_ORGANIZATION, ownEventId,
         ),
@@ -467,7 +455,6 @@ Deno.test('stateEventVisibilityFor: tier (i) event-append pairs'
         db, STARK_ORGANIZATION, GHOST_EVENT_NOWHERE,
     );
     const inOrphan = await db.transaction(
-        txTables,
         (view) => stateEventVisibilityFor(
             view, STARK_ORGANIZATION, GHOST_EVENT_NOWHERE,
         ),
@@ -533,11 +520,11 @@ Deno.test('stateEventVisibilityFor: tier (ii) op-born transition'
     // Op-born: no states/:id pair at transitionEventId;
     // lives only inside the transition op body.
     const byId = (await db.messagePairs.getAll()).filter(
-        (row) => row.uri_id === transitionEventId,
+        (row) => row.name === transitionEventId,
     );
     const statesTail = '/' + 'states' + '/';
     const statesHits = byId.filter((r) =>
-        r.uri_collection.endsWith(statesTail));
+        r.path.endsWith(statesTail));
     assertStrictEquals(statesHits.length, 0);
 
     assertStrictEquals(
@@ -621,12 +608,10 @@ Deno.test('flowGraphBindingsFromMessagePairs: seed attribute + member'
 + ' ledgers non-empty; pre-tx vs in-tx parity; nodeFlowIds'
 + ' cover every bound node', async () => {
     const db = await seededDb();
-    const txTables = MESSAGE_TABLES;
     const preTx = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
     );
     const inTx = await db.transaction(
-        txTables,
         (view) => flowGraphBindingsFromMessagePairs(
             view, STARK_ORGANIZATION,
         ),
@@ -1057,7 +1042,7 @@ Deno.test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
             + flowId, token),
     );
     assertStrictEquals(headGet.status, 200);
-    const headId = headGet.headers.get('Response-ID');
+    const headId = pairIdOf(headGet);
     assert(headId);
 
     const putRemove = await handleRequest(db, req(
@@ -1221,7 +1206,7 @@ Deno.test('residual pin: soft-deleted node drops from'
             + flowId, token),
     );
     assertStrictEquals(headGet.status, 200);
-    const headId = headGet.headers.get('Response-ID');
+    const headId = pairIdOf(headGet);
     assert(headId);
 
     // Soft-delete the bound node only — residual 'added'
@@ -1391,7 +1376,7 @@ async function transitionWithFieldValue(
 }
 
 // Wire-shape pin (C4): GET organizations/:id/work-orders/:id/history is
-// 200 / 404 by address (own → rows with field_values;
+// 200 / 404 by document (own → rows with field_values;
 // never written here → 404; absent → 404). Field values
 // fold inline; the retired GET states/:id/field-values
 // three-way force lives here.
@@ -1435,7 +1420,7 @@ Deno.test('work-order history GET: 200/404 two-way for'
         ownTe!.field_values.map((r) => r.id), [fieldValueId],
     );
 
-    // (foreign) Org two 404s — never written at this address.
+    // (foreign) Org two 404s — never written at this document.
     const foreign = await handleRequest(
         db,
         req(
@@ -1645,7 +1630,6 @@ async () => {
     const inTx = await db.transaction(
         // Stage B: roster +
         // organizations/AjdvjuECVZEgZoFajaIEkg/objectives/records retired.
-        MESSAGE_TABLES,
         (view) => collectAttributeReferrers(
             view,
             STARK_ORGANIZATION,
@@ -1785,7 +1769,6 @@ async () => {
     // Pre-tx vs in-tx parity (message plane only).
     const inTx = await db.transaction(
         // Stage B: roster + records/work_orders retired.
-        MESSAGE_TABLES,
         (view) => collectAttributeReferrers(
             view,
             STARK_ORGANIZATION,

@@ -45,7 +45,7 @@ function ctxFor(db: MemoryDbAdapter) {
 
 // Seed an objective document with a lifecycle trio — raw
 // PUT organizations/:id/objectives/:id requires state/state_at/state_event_id
-// after the states-address retirement gate (Task 1).
+// after the states-document retirement gate (Task 1).
 function objectiveDoc(
     position: number,
     state: 'active' | 'archived',

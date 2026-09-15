@@ -1,5 +1,4 @@
 import type { DbAdapter } from '../api/db.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { nowUtc, SYSTEM_MEMBER_ID, type Id } from '../api/types.ts';
 import {
     postIdentityDocumentOp,
@@ -10,7 +9,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
-    appendMessagePair,
+    appendMessagePairOnce,
     formWriteMessagePair,
     type MessagePair,
 } from '../api/message-pair.ts';
@@ -205,7 +204,7 @@ export async function seedIdentityPii(
 
 // One identities/:id/credentials/:cid document. `id` is the
 // owning identity; `cid` is the credential's own row id (the
-// storage key raw puts addressed as e.g. 'cred-' + id).
+// storage key raw puts keyed as e.g. 'cred-' + id).
 export async function seedIdentityCredential(
     db: DbAdapter,
     id: string,
@@ -294,10 +293,8 @@ export async function seedClientRegistration(
     const messagePair = await clientRegistrationDocumentMessagePair(
         id, fields, nowUtc(),
     );
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
-            await appendMessagePair(view, messagePair);
+    await db.transaction(async (view) => {
+            await appendMessagePairOnce(view, messagePair);
         },
     );
 }
@@ -324,10 +321,8 @@ export async function seedClientRegistrationTombstone(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
-            await appendMessagePair(view, messagePair);
+    await db.transaction(async (view) => {
+            await appendMessagePairOnce(view, messagePair);
         },
     );
 }

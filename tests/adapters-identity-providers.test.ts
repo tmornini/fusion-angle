@@ -9,7 +9,6 @@ import {
     validateIdentityProviderEntity,
 } from '../api/validators.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     createRequestContext,
@@ -26,7 +25,7 @@ import {
     identityProviderEntityOf,
 } from '../api/derive-identity-spine.ts';
 import {
-    appendMessagePair,
+    appendMessagePairOnce,
     formWriteMessagePair,
 } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
@@ -125,7 +124,7 @@ async () => {
         ),
     );
     const expected = identityProviderEntityOf({
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: 'PUT',
         body: goodRow,
@@ -218,17 +217,15 @@ async () => {
         organization: undefined,
         responseStatus: 200,
         responseBody: identityProviderEntityOf({
-            uriId: id,
+            name: id,
             messagePairId: id,
             method: 'PUT',
             body,
         }),
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
-            await appendMessagePair(view, messagePair);
+    await db.transaction(async (view) => {
+            await appendMessagePairOnce(view, messagePair);
         },
     );
     const rows = await deriveIdentityProvidersFor(db
@@ -263,17 +260,15 @@ async () => {
         organization: undefined,
         responseStatus: 200,
         responseBody: identityProviderEntityOf({
-            uriId: id,
+            name: id,
             messagePairId: id,
             method: 'PUT',
             body: flatBody,
         }),
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
-            await appendMessagePair(view, flatPair);
+    await db.transaction(async (view) => {
+            await appendMessagePairOnce(view, flatPair);
         },
     );
     await seedIdentityProvider(db, 'prBESZPjJDiuXCeZLmbiVw', id, {

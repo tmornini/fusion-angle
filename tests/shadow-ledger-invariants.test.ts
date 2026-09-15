@@ -258,7 +258,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     );
 
     // Idea state-change trio PUT (states/:id retired) — a
-    // second lifecycle stamp on the same document address.
+    // second lifecycle stamp on the same document.
     const stateAppend = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'hwpssRPdIjwzeMdYPAhqrw', org1Token, {
@@ -463,8 +463,8 @@ Deno.test('a seeded idea\'s create-pair request reproduces its'
     const idea = buildIdeas()[0]!;
     const requests = await db.messagePairs.getAll();
     const createRow = requests.find(
-        r => r.uri_id === idea.id
-            && r.uri_collection
+        r => r.name === idea.id
+            && r.path
                 === `/organizations/${STARK_ORGANIZATION}`
                     + '/ideas/',
     );

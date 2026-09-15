@@ -3,7 +3,6 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     organizationToken,
@@ -14,7 +13,7 @@ import {
 } from './test-fixtures.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
     strongEtagOf,
     IF_MATCH_HEADER,
 } from '../api/message-pair.ts';
@@ -222,9 +221,7 @@ async function appendInstancePair(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
     return messagePair.id;
 }

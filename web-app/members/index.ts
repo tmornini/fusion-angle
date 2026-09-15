@@ -306,7 +306,7 @@ function bindInviteMemberDialog(): void {
 // Show (message) or clear (null) the invite dialog's inline
 // field error, mirroring the auth form's field-error pattern:
 // the input flags `input-error` and the message lives in its own
-// element — kept open so the admin can correct the address.
+// element — kept open so the admin can correct the email.
 function setInviteEmailError(
     input: HTMLInputElement,
     message: string | null,

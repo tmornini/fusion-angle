@@ -37,7 +37,7 @@ import { compareIdentifiers } from
 // hit. The full-scan alternative (a single getAllWhere over every
 // memberships row) was REJECTED for this hot path: getAllWhere is
 // equality-only against ONE indexed column, and the message
-// ledger's own uri_collection index never carries identity_id — from
+// ledger's own path index never carries identity_id — from
 // Task 5 on, every facade hop grows the ledger further, so a scan
 // widening with the WHOLE ledger's history is the wrong shape for
 // a per-identity read that recurs on every fenced request.
@@ -99,8 +99,7 @@ import { compareIdentifiers } from
 // deriveMembershipsForIdentity filtered to one organization —
 // ADAPTER-SHAPED (`dbOrView: DbAdapter`, the SAME type an open
 // db.transaction view carries) so the invitation grant's own open
-// transaction (which already declares MESSAGE_TABLES
-// among its tables) can call it in-tx without opening a nested
+// transaction can call it in-tx without opening a nested
 // transaction of its own.
 //
 // Reads db.messagePairs (+ pickString/validate-
@@ -120,9 +119,9 @@ export function seatEntityOf(
         withoutId(document.body),
     );
     return {
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
-        identity_id: document.uriId,
+        identity_id: document.name,
         type: body.type,
         // The seat's own grant time (validated above), not
         // a ledger fact: GET .../members/:id/versions/
@@ -159,8 +158,8 @@ export async function deriveMembershipsForIdentity(
     const rows: MembershipEntity[] = [];
     for (const organization of organizations) {
         const seatPrefix = seatsPrefixFor(organization.id);
-        const seatMessagePairs = await db.messagePairs.getAllWhere(
-            'uri_collection', seatPrefix,
+        const seatMessagePairs = await db.messagePairs.getCollectionPairs(
+            seatPrefix,
         );
         const seat = deriveDocumentsAt(
             seatMessagePairs, seatPrefix,
@@ -187,8 +186,7 @@ export async function membershipExistsFor(
 ): Promise<boolean> {
     const seatPrefix = seatsPrefixFor(organization);
     const seatMessagePairs =
-        await dbOrView.messagePairs.getAllWhere(
-            'uri_collection', seatPrefix,
+        await dbOrView.messagePairs.getCollectionPairs(seatPrefix,
         );
     return deriveDocumentsAt(
         seatMessagePairs, seatPrefix,
@@ -200,8 +198,7 @@ export async function deriveOrganizationMemberSeats(
     organization: Id,
 ): Promise<MembershipEntity[]> {
     const prefix = seatsPrefixFor(organization);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const documents = deriveDocumentsAt(messagePairs, prefix);
     const rows: MembershipEntity[] = [];
@@ -217,8 +214,7 @@ export async function deriveOrganizationMemberSeat(
     identityId: Id,
 ): Promise<MembershipEntity> {
     const prefix = seatsPrefixFor(organization);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,

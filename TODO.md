@@ -19,15 +19,15 @@ skew tests folded into item 7.
    the structure and behavior of `message_pairs`
    (`api/schema-postgres.ts`) under the SQL the code
    actually issues (`api/backend-postgres.ts`: by id, by
-   collection, by address, by `request_hash`, body
-   containment, `latestPutDelete`, `lockHead` `FOR
+   collection, by document, by `request_hash`, body
+   containment, `getHead`, `lockHead` `FOR
    UPDATE`, the advisory locks, `pg_notify`, the upsert).
    `EXPLAIN ANALYZE` each against a ledger the size of a
    year of tenant writes, not the 1453-pair mock seed,
    and extend `tests/pg-explain.test.ts` (six plan pins
    today) until every statement has one. Name what each
    index buys and costs on the write path; whether
-   head-of-address (`livePutsOf` in
+   head-of-document (`livePutsOf` in
    `api/message-store.ts` folding `SELECT *` of a whole
    collection, 69 callers) belongs in SQL (`DISTINCT
    ON`) or stays in the process; the five whole-ledger
@@ -48,7 +48,7 @@ skew tests folded into item 7.
    boolean `schema_marker` is the whole migration story,
    so name how a DDL change reaches a tenant database
    that cannot be wiped; tenancy riding
-   `uri_collection`; growth (two wire messages per
+   `path`; growth (two wire messages per
    write, backup size, VACUUM on an insert-only table).
    Output: a dated report under `docs/superpowers/specs/`
    whose findings are the oracles items 2, 5, 8, 10, and
@@ -163,7 +163,7 @@ skew tests folded into item 7.
    objectives (`lifecycle: 'trio'` at `api/routes.ts:
    369, 381, 402, 495`) take the shape work-orders,
    identities, and ai-agents already have: lifecycle is
-   its own event pairs at an operation address, and the
+   its own event pairs at an operation path, and the
    absence of a row IS the absence of the event. Sites:
    the reduction (`api/derive-documents.ts:148-157`),
    the stamp (`api/document-family.ts:118`), every
@@ -211,7 +211,7 @@ skew tests folded into item 7.
 9. Chats — a conversation on any document at
    `/…/:collection/:id/chat/` with as little ceremony as
    the plane allows: a message is a POST pair at that
-   address, the chat is that address's history, and
+   document, the chat is that document's history, and
    derive is `getMessagePairs` filtered to POST — no new
    family shape unless the brainstorm finds one (edits,
    deletions, and attachments are its questions).
@@ -311,7 +311,7 @@ Off the critical path; each with its oracle.
 
 - An inner pair of a composed operation skipped while
   the top-level pair landed answers 201;
-  `appendMessagePair` returns void and the gate never
+  `appendMessagePairOnce` returns void and the gate never
   holds inner hashes (`api/message-pair.ts:686-701`).
   Oracle: a composed create whose inner hash collides
   with an earlier pair

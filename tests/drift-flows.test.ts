@@ -25,7 +25,7 @@ import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import { deriveDocumentsAt } from '../api/derive-documents.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
@@ -38,6 +38,7 @@ import { deriveProjectFlows } from
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 
 const SEED_FLOW_ORGANIZATION_TWO = seedIdentifier('seed-flow-org2');
@@ -246,7 +247,7 @@ async function headResponseId(
     const got = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
-    const id = got.headers.get('Response-ID');
+    const id = pairIdOf(got);
     assert(id
         , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
         + '' + flowId);
@@ -348,10 +349,10 @@ function assertWireEqualsDerived(
 async function derivedHeadMessagePairId(
     db: MemoryDbAdapter, organization: string, flowId: string,
 ): Promise<string> {
-    const prefix = canonicalUriCollection(organization, '/flows/');
+    const prefix = canonicalPath(organization, '/flows/');
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     const documents = deriveDocumentsAt(requests, prefix);
     const document = documents.get(flowId);
@@ -870,14 +871,14 @@ async () => {
     assertStrictEquals(created.status, 201);
 
     const requests = await db.messagePairs.getAll();
-    const atAddress = requests.filter(
-        (r) => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+    const pairsAt = requests.filter(
+        (r) => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === flowId,
+            && r.name === flowId,
     );
     // Both an operation (POST, 204) pair and a document (PUT)
-    // pair share the SAME uriId.
-    assertStrictEquals(atAddress.length, 2);
+    // pair share the SAME name.
+    assertStrictEquals(pairsAt.length, 2);
 
     // If the POST pair leaked into the document reduction it
     // would either throw (its body has no top-level
@@ -978,7 +979,7 @@ Deno.test('the lock-head terminal reaches exactly the derived '
         documentBody('Genesis', FLOW_DRIFT_LOCK_HEAD_GENESIS),
     ));
     assertStrictEquals(genesis.status, 201);
-    const genesisId = genesis.headers.get('Response-ID')!;
+    const genesisId = pairIdOf(genesis)!;
     let headId = genesisId;
 
     const saveCount = 4; // N >= 3 sequential saves beyond genesis
@@ -993,7 +994,7 @@ Deno.test('the lock-head terminal reaches exactly the derived '
         ));
         assertStrictEquals(saved.status, 201);
         assertStrictEquals(saved.headers.get('Follows'), null);
-        headId = saved.headers.get('Response-ID')!;
+        headId = pairIdOf(saved)!;
     }
 
     const headMessagePairId = await derivedHeadMessagePairId(
@@ -1133,12 +1134,12 @@ Deno.test('same-join-id retry: two different flow creates reusing '
     );
     assertStrictEquals(second.status, 201);
 
-    const joinPrefix = canonicalUriCollection(
+    const joinPrefix = canonicalPath(
         STARK_ORGANIZATION,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
             + '/flows/',
     );
-    const joinResponses = await db.messagePairs.getAllAtAddress(
+    const joinResponses = await db.messagePairs.getDocumentHistory(
         joinPrefix, sharedPfid,
     );
     assertStrictEquals(joinResponses.length, 2);

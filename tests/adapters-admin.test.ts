@@ -61,7 +61,7 @@ function buildIdea(
 
 // Seeds a project through the SAME document PUT the live route
 // uses (putProject), so a message pair exists at this project's
-// address — required for the flipped GET projects route
+// document — required for the flipped GET projects route
 // (Phase 3 Task 6), which getProjects (getOrganizationStats'
 // project count) reads, to derive it. A fixed historical
 // stateAt (matching the old seedProject idiom this replaces)
@@ -201,9 +201,9 @@ Deno.test(
         assertStrictEquals(stats.activePeopleCount, 2);
 
         // Transitions through later document-trio PUTs
-        // (latest by 'at' wins) — the states/:id address is
+        // (latest by 'at' wins) — the states/:id document is
         // retired; project/idea/member lifecycle rides each
-        // family's own document address.
+        // family's own document.
         const { organization_id: _projectOrganizationId, ...pFields } =
             buildProject(projectId);
         await putProject(ctx, projectId, {

@@ -72,7 +72,7 @@ function buildProject(
 
 // Seeds a project through the SAME document PUT the live route
 // uses (putProject), so a message pair exists at this project's
-// address — required for the flipped GET projects / GET
+// document — required for the flipped GET projects / GET
 // organizations/:id/projects/:id routes (Phase 3 Task 6) to derive it. A
 // fixed
 // historical stateAt (matching the old raw-postEvent idiom this

@@ -22,7 +22,7 @@ function objectiveFields() {
 
 // A first-revision body. member_id is a row column (who authored
 // the definition), supplied in the body. Genesis is a separate
-// lifecycle trio on the create body (states-address retirement).
+// lifecycle trio on the create body (states-document retirement).
 function revisionFields(id: string, name: string) {
     return {
         objective_id: id,

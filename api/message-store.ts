@@ -10,80 +10,53 @@ import { compareIdentifiers } from
     '../shared/identifier.ts';
 
 // Named reads over the message plane. One document
-// is getAllAtAddress (collection + uri_id). A
-// collection is getAllWhere('uri_collection').
+// is getDocumentHistory (path + name). A
+// collection is getCollectionPairs.
 // Body containment is getAllWhereBody. No
-// uri_id-only scan. Live document = latest PUT or
-// DELETE at (uri_collection, uri_id) by (at, id).
-// Head PUT → that pair. Head DELETE → none. POST/PATCH
-// are not heads.
+// name-only scan. The seam orders by
+// (response_at, id); the store never re-sorts rows.
+// Live document = latest PUT or DELETE at
+// (path, name) by (at, id). Head PUT →
+// that pair. Head DELETE → none. POST/PATCH are
+// not heads.
 
 const PUT_METHOD = 'PUT';
 const DELETE_METHOD = 'DELETE';
 
 export interface MessageStore {
-    get(
-        collection: string,
-        id: string,
-    ): Promise<MessagePairEntity | undefined>;
-    getMessagePairs(
-        collection: string,
-        id: string,
+    getDocumentHead(
+        path: string,
+        name: string,
+    ): Promise<MessagePairEntity | null>;
+    getDocumentHistory(
+        path: string,
+        name: string,
     ): Promise<readonly MessagePairEntity[]>;
-    getAllAt(
-        collection: string,
-    ): Promise<readonly MessagePairEntity[]>;
-    getAllWhereBody(
-        collection: string,
-        containment: Record<string, unknown>,
-    ): Promise<readonly MessagePairEntity[]>;
-    getCollection(
-        collection: string,
-    ): Promise<unknown[]>;
-    getCollectionFiltered(
-        collection: string,
-        filters: Readonly<Record<string, string>>,
-    ): Promise<unknown[]>;
+    getCollection(path: string): Promise<unknown[]>;
 }
 
 export function messageStore(db: DbAdapter): MessageStore {
     return {
-        async get(collection, id) {
+        async getDocumentHead(path, name) {
             return livePutOf(
-                await messagePairsAt(db, collection, id),
+                await db.messagePairs.getDocumentHistory(
+                    path, name,
+                ),
             );
         },
-        async getMessagePairs(collection, id) {
-            return messagePairsAt(db, collection, id);
+        async getDocumentHistory(path, name) {
+            return db.messagePairs.getDocumentHistory(
+                path, name,
+            );
         },
-        async getAllAt(collection) {
-            return messagePairsInCollection(db, collection);
-        },
-        async getAllWhereBody(collection, containment) {
-            return (await db.messagePairs.getAllWhereBody(
-                collection, containment,
-            )).slice().sort(compareMessagePair);
-        },
-        async getCollection(collection) {
+        async getCollection(path) {
             return entitiesOf(
                 livePutsOf(
-                    await messagePairsInCollection(
-                        db, collection,
+                    await db.messagePairs.getCollectionPairs(
+                        path,
                     ),
                 ),
             );
-        },
-        async getCollectionFiltered(collection, filters) {
-            const rows = entitiesOf(
-                livePutsOf(
-                    await messagePairsInCollection(
-                        db, collection,
-                    ),
-                ),
-            );
-            return rows.filter((row) => matchesFilters(
-                row, filters,
-            ));
         },
     };
 }
@@ -100,20 +73,6 @@ function jsonBodyOf(message: string): unknown | undefined {
     return JSON.parse(body.toText());
 }
 
-function matchesFilters(
-    entity: unknown,
-    filters: Readonly<Record<string, string>>,
-): boolean {
-    if (entity === null || typeof entity !== 'object') {
-        return false;
-    }
-    const record = entity as Record<string, unknown>;
-    for (const [key, value] of Object.entries(filters)) {
-        if (record[key] !== value) return false;
-    }
-    return true;
-}
-
 function compareMessagePair(
     a: MessagePairEntity, b: MessagePairEntity,
 ): number {
@@ -124,20 +83,20 @@ function compareMessagePair(
 
 function latestOf(
     messagePairs: readonly MessagePairEntity[],
-): MessagePairEntity | undefined {
-    if (messagePairs.length === 0) return undefined;
+): MessagePairEntity | null {
+    if (messagePairs.length === 0) return null;
     const rows = messagePairs.map((messagePair) => ({
         at: messagePair.response_at,
         id: messagePair.id,
         messagePair,
     }));
     return latestByKey(rows, () => 'head').get('head')
-        ?.messagePair;
+        ?.messagePair ?? null;
 }
 
 function livePutOf(
     messagePairs: readonly MessagePairEntity[],
-): MessagePairEntity | undefined {
+): MessagePairEntity | null {
     const head = latestOf(
         messagePairs.filter(
             (messagePair) => isDocumentMethod(
@@ -145,8 +104,8 @@ function livePutOf(
             ),
         ),
     );
-    if (head?.method !== PUT_METHOD) {
-        return undefined;
+    if (head === null || head.method !== PUT_METHOD) {
+        return null;
     }
     return head;
 }
@@ -165,7 +124,7 @@ function livePutsOf(
         messagePair,
     }));
     const heads = latestByKey(
-        rows, (row) => row.messagePair.uri_id,
+        rows, (row) => row.messagePair.name,
     );
     const live: MessagePairEntity[] = [];
     for (const row of heads.values()) {
@@ -173,6 +132,10 @@ function livePutsOf(
             live.push(row.messagePair);
         }
     }
+    // Heads sorted by the HEAD pair's (response_at, id).
+    // The seam's row order would yield each document's
+    // FIRST pair — a different order once documents
+    // interleave updates.
     return live.sort(compareMessagePair);
 }
 
@@ -200,29 +163,4 @@ export function liveHeadId(entity: unknown): string {
         throw new Error('live head has no id');
     }
     return entity.id;
-}
-
-async function messagePairsInCollection(
-    db: DbAdapter,
-    collection: string,
-): Promise<MessagePairEntity[]> {
-    const messagePairs = [
-        ...await db.messagePairs.getAllWhere(
-            'uri_collection', collection,
-        ),
-    ];
-    return messagePairs.sort(compareMessagePair);
-}
-
-async function messagePairsAt(
-    db: DbAdapter,
-    collection: string,
-    id: string,
-): Promise<MessagePairEntity[]> {
-    const messagePairs = [
-        ...await db.messagePairs.getAllAtAddress(
-            collection, id,
-        ),
-    ];
-    return messagePairs.sort(compareMessagePair);
 }

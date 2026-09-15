@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, ProjectFlowEntity } from './types.ts';
 import { validateProjectFlowEntity } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -11,7 +11,7 @@ import {
 
 // The project<->flow join's own reshaping of the generic
 // message-plane reduction (derive-documents.ts): one prefix
-// scan per project, at the join address the live route and the
+// scan per project, at the join document the live route and the
 // Phase 4 Task 5 create/seed writes both share — verified by
 // content against a stored :pfid pair (tests/api-flow-
 // document.test.ts's joinPrefix): /organizations/{org}/
@@ -21,13 +21,13 @@ import {
 // old plane's physical splice; parity, not a new mechanism).
 // Read-only and additive — no route reads this yet (Task 8
 // wires it); tests/drift-flows.test.ts proves equality against
-// project_flows.getAllWhere('project_id', ...).
+// project_flows.getAllWhere on project_id.
 
 function projectFlowsUriPrefix(
     organization: Id,
     projectId: Id,
 ): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         organization, '/projects/' + projectId + '/flows/',
     );
 }
@@ -39,7 +39,7 @@ export function projectFlowEntityOf(
     document: DerivedDocument,
 ): ProjectFlowEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateProjectFlowEntity(withoutId(document.body)),
     };
 }
@@ -54,8 +54,7 @@ export async function deriveProjectFlows(
     projectId: Id,
 ): Promise<ProjectFlowEntity[]> {
     const prefix = projectFlowsUriPrefix(organization, projectId);
-    const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const documents = deriveDocumentsAt(messagePairs, prefix);
     const rows: ProjectFlowEntity[] = [];

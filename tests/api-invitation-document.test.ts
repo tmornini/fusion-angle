@@ -158,18 +158,18 @@ async () => {
     // (Phase 15 gate 6), the organizations/:id document
     // (Stage B), and the grant's own 2 pairs.
     assertStrictEquals(requests.length, 6);
-    const atAddress = requests.filter(
-        r => r.uri_collection === '/invitations/'
-            && r.uri_id === INV_DOC_1,
+    const pairsAt = requests.filter(
+        r => r.path === '/invitations/'
+            && r.name === INV_DOC_1,
     );
-    assertStrictEquals(atAddress.length, 2);
-    // The document head: the ONE PUT/2xx pair at this address —
+    assertStrictEquals(pairsAt.length, 2);
+    // The document head: the ONE PUT/2xx pair at this document —
     // documentMessagePairsAt excludes the operation message pair's POST
     // method by construction (design decision 6), so a match
     // here IS the document.
     const documents = documentMessagePairsAt(
         requests, '/invitations/',
-    ).filter(messagePair => messagePair.uriId === INV_DOC_1);
+    ).filter(messagePair => messagePair.name === INV_DOC_1);
     assertStrictEquals(documents.length, 1);
     const wire = documents[0]!.body;
     assertEquals(
@@ -192,13 +192,13 @@ async () => {
     assertStrictEquals(second.status, 200);
     const requests = await db.messagePairs.getAll();
     const atDuplicateId = requests.filter(
-        r => r.uri_collection === '/invitations/'
-            && r.uri_id === INV_DOC_2B,
+        r => r.path === '/invitations/'
+            && r.name === INV_DOC_2B,
     );
     assertStrictEquals(atDuplicateId.length, 1);
     const atFreshId = requests.filter(
-        r => r.uri_collection === '/invitations/'
-            && r.uri_id === INV_DOC_2A,
+        r => r.path === '/invitations/'
+            && r.name === INV_DOC_2A,
     );
     assertStrictEquals(atFreshId.length, 2);
 });
@@ -251,7 +251,7 @@ async function accept(
 }
 
 Deno.test('a fresh accept appends its seat document at the'
-+ ' invitation-org members address', async () => {
++ ' invitation-org members document', async () => {
     const db = await freshDb();
     await grant(db, INV_DOC_3);
     const res = await accept(
@@ -263,7 +263,7 @@ Deno.test('a fresh accept appends its seat document at the'
     const documents = documentMessagePairsAt(
         requests, '/organizations/AjdvjuECVZEgZoFajaIEkg/members/',
     ).filter(
-        messagePair => messagePair.uriId === 'toccYYkLEABmlbpHJalgtQ',
+        messagePair => messagePair.name === 'toccYYkLEABmlbpHJalgtQ',
     );
     assertStrictEquals(documents.length, 1);
     assertEquals(documents[0]!.body, {
@@ -309,9 +309,9 @@ async () => {
     );
     assertStrictEquals(second.status, 204);
     const documents = (await db.messagePairs.getAll()).filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'members/'
-            && r.uri_id === 'toccYYkLEABmlbpHJalgtQ',
+            && r.name === 'toccYYkLEABmlbpHJalgtQ',
     );
     assertStrictEquals(documents.length, 1);
 });

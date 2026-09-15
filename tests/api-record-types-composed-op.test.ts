@@ -36,7 +36,7 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 // Nested composed POST .../record-types (Task 9): admin-only
 // create/edit bundle reusing flat postRecordWriteOp + nested
-// document/attribute addresses. RESTRICT edit rolls the whole
+// document/attribute documents. RESTRICT edit rolls the whole
 // batch back; forged organization_id loses to the path org.
 
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -219,7 +219,7 @@ async function seedFieldValueReferrer(
 }
 
 Deno.test('POST .../record-types kind create (admin) → 204; '
-+ 'document + attribute pairs at nested addresses; GETs '
++ 'document + attribute pairs at nested documents; GETs '
 + 'see them',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -268,22 +268,22 @@ async () => {
         typePrefix + TYPE_ID + '/attributes/';
 
     const opPair = requests.find(
-        r => r.uri_id === TYPE_ID
-            && r.uri_collection === typePrefix
+        r => r.name === TYPE_ID
+            && r.path === typePrefix
             && r.method === 'POST',
     );
     assert(opPair, 'operation message pair missing');
 
     const documentPair = requests.find(
-        r => r.uri_id === TYPE_ID
-            && r.uri_collection === typePrefix
+        r => r.name === TYPE_ID
+            && r.path === typePrefix
             && r.method === 'PUT',
     );
     assert(documentPair, 'document message pair missing');
 
     const attrPair = requests.find(
-        r => r.uri_id === ATTR_ID
-            && r.uri_collection === attrPrefix
+        r => r.name === ATTR_ID
+            && r.path === attrPrefix
             && r.method === 'PUT',
     );
     assert(attrPair, 'attribute pair missing');

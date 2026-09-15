@@ -9,16 +9,14 @@ import type { StorageBackend } from '../api/db.ts';
 // must not be weaker. A caller mutating a fetched row can
 // never rewrite committed state.
 
-interface Row { id: string; n: number; k: string }
+interface Row { id: string; n: number; path: string }
 
 async function seeded(
     backend: StorageBackend,
 ): Promise<StorageBackend> {
-    await backend.ensureTables(['t']);
-    await backend.transaction(
-        ['t'], 'readwrite',
-        tx => tx.put<Row>(
-            't', { id: 'a', n: 1, k: 'x' },
+    await backend.ensureTable();
+    await backend.transaction('readwrite',
+        tx => tx.append<Row>({ id: 'a', n: 1, path: '/x/' },
         ),
     );
     return backend;
@@ -27,9 +25,8 @@ async function seeded(
 function readBack(
     backend: StorageBackend,
 ): Promise<Row | null> {
-    return backend.transaction(
-        ['t'], 'readonly',
-        tx => tx.get<Row>('t', 'a'),
+    return backend.transaction('readonly',
+        tx => tx.getById<Row>('a'),
     );
 }
 
@@ -62,9 +59,8 @@ for (const tier of TIERS) {
             + ' reach committed state',
         async () => {
             const backend = await seeded(tier.make());
-            const rows = await backend.transaction(
-                ['t'], 'readonly',
-                tx => tx.getAll<Row>('t'),
+            const rows = await backend.transaction('readonly',
+                tx => tx.getAll<Row>(),
             );
             rows[0]!.n = 999;
             const again = await readBack(backend);
@@ -73,13 +69,13 @@ for (const tier of TIERS) {
     );
 
     Deno.test(
-        `${tier.name}: mutating a getWhere() row does`
-            + ' not reach committed state',
+        `${tier.name}: mutating a getCollectionPairs()`
+            + ' row does not reach committed state',
         async () => {
             const backend = await seeded(tier.make());
-            const rows = await backend.transaction(
-                ['t'], 'readonly',
-                tx => tx.getWhere<Row>('t', 'k', 'x'),
+            const rows = await backend.transaction('readonly',
+                tx => tx.getCollectionPairs<Row>('/x/',
+                ),
             );
             rows[0]!.n = 999;
             const again = await readBack(backend);
@@ -92,11 +88,10 @@ for (const tier of TIERS) {
             + ' does not survive the transaction',
         async () => {
             const backend = await seeded(tier.make());
-            await backend.transaction(
-                ['t'], 'readonly',
+            await backend.transaction('readonly',
                 async (tx) => {
                     const row =
-                        await tx.get<Row>('t', 'a');
+                        await tx.getById<Row>('a');
                     row!.n = 999;
                 },
             );

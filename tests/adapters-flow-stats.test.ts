@@ -63,7 +63,7 @@ function buildEdge(
 
 // Seed a flow through the SAME gate-driven create/document-PUT
 // idiom the live route uses (postFlowCreation + putFlow), so a
-// message pair exists at this flow's address — required for the
+// message pair exists at this flow's document — required for the
 // flipped GET organizations/:id/flows/:id route (Phase 4 Task 8), which
 // getFlowStats reads via getFlowGraph, to derive it.
 // postFlowCreation seeds a default start/complete graph; the
@@ -105,7 +105,7 @@ function daysAgo(d: number): string {
 // (postWorkOrderTransitionOp) — required for the flipped
 // history derive (Task 7), which
 // getTransitionEventsByWorkOrder reads, to derive it. A raw
-// db.states.put left no message pair at this address.
+// db.states.put left no message pair at this document.
 async function transitionWorkOrder(
     ctx: RequestContext,
     workOrderId: string,

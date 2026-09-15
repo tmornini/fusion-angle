@@ -63,7 +63,7 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
     validateDocument: validateRecordDocumentBody,
     documentOp: postRecordDocumentOp,
     entityOf: (document, organization, current) => ({
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         name: String(document.body['name'] ?? ''),
         description: String(
@@ -146,7 +146,7 @@ const OBJECTIVES_WIRING: DocumentFamilyWiring = {
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,
     entityOf: (document, organization, current) => ({
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
         state: current!.state,
@@ -175,11 +175,9 @@ async function liveIdentityIds(
     db: MemoryDbAdapter,
 ): Promise<string[]> {
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere(
-            'uri_collection', '/identities/',
+        db.messagePairs.getCollectionPairs('/identities/',
         ),
-        db.messagePairs.getAllWhere(
-            'uri_collection', '/identities/',
+        db.messagePairs.getCollectionPairs('/identities/',
         ),
     ]);
     return [...deriveDocumentsAt(requests, '/identities/').keys()];

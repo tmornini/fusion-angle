@@ -103,7 +103,7 @@ type FenceResult =
 // (write authorizer / resolveGlobalOwner) remain
 // message-plane reads. Phase Final Task 5 retired the
 // store decorator: handlers receive ctx.base;
-// message-plane tenancy rides uri_collection.
+// message-plane tenancy rides path.
 export async function fenceRequest(
     ctx: AuthenticatedContext,
 ): Promise<FenceResult> {

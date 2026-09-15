@@ -1,5 +1,5 @@
-import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import { TABLE_NAMES, MESSAGE_TABLES } from
+import { assert, assertStrictEquals } from '@std/assert';
+import { TABLE_NAMES } from
     '../api/db.ts';
 import {
     memoryDbAdapter,
@@ -17,14 +17,6 @@ Deno.test('TABLE_NAMES keeps the permanent survivors', () => {
             `TABLE_NAMES missing survivor ${name}`,
         );
     }
-});
-
-Deno.test('MESSAGE_TABLES is TABLE_NAMES', () => {
-    assertStrictEquals(MESSAGE_TABLES, TABLE_NAMES);
-    assertEquals(
-        [...MESSAGE_TABLES],
-        ['message_pairs'],
-    );
 });
 
 Deno.test(
@@ -79,9 +71,9 @@ Deno.test(
 Deno.test('MemoryDbAdapter exposes message stores', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await db.messagePairs.put('pair-1', {
-        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-        uri_id: '42',
+    await db.messagePairs.append('pair-1', {
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        name: '42',
         requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         method: 'PUT',
         request_at: '2026-01-01T00:00:00.000000Z',

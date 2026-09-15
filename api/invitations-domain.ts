@@ -1,5 +1,4 @@
 import type { DbAdapter } from './db.ts';
-import { MESSAGE_TABLES } from './db.ts';
 import {
     ValidationError,
     assertInvitationState,
@@ -23,8 +22,8 @@ import {
 } from './validators.ts';
 import {
     formWriteMessagePair,
-    storedResponseFor,
-    appendMessagePair,
+    getPairByRequestHash,
+    appendMessagePairOnce,
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
 import { formDocumentMessagePairFor } from './routes.ts';
@@ -471,7 +470,7 @@ async function grantInvitation(
         responseStatus: HTTP_OK, responseBody,
         operationId,
     });
-    const replay = await storedResponseFor(
+    const replay = await getPairByRequestHash(
         db, messagePair.requestHash);
     if (replay !== undefined) {
         return responseBody;
@@ -498,9 +497,7 @@ async function grantInvitation(
             operationId,
         })
         : undefined;
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             const outcome = await grantOutcomeFor(
                 view, organization, identityId);
             const agrees = outcome.kind === preOutcome.kind
@@ -515,9 +512,9 @@ async function grantInvitation(
                     + ' request',
                 );
             }
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
             if (document !== undefined) {
-                await appendMessagePair(view, document);
+                await appendMessagePairOnce(view, document);
             }
         },
     );
@@ -640,7 +637,7 @@ async function acceptInvitation(
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'acceptance');
-    const replay = await storedResponseFor(
+    const replay = await getPairByRequestHash(
         db, messagePair.requestHash);
     if (replay !== undefined) {
         return undefined;
@@ -665,9 +662,7 @@ async function acceptInvitation(
     );
     let conflict = false;
     let committed = false;
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             const state = await currentInvitationState(view, id);
             // Already accepted: no-op. Declined/revoked: 409.
             if (state === 'accepted') {
@@ -680,9 +675,9 @@ async function acceptInvitation(
             const already = await membershipExistsFor(
                 view, inv.organization_id, actor);
             if (!already) {
-                await appendMessagePair(view, seatDocument);
+                await appendMessagePairOnce(view, seatDocument);
             }
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
             committed = true;
         },
     );
@@ -739,16 +734,14 @@ async function declineInvitation(
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'decline');
-    const replay = await storedResponseFor(
+    const replay = await getPairByRequestHash(
         db, messagePair.requestHash);
     if (replay !== undefined) {
         return undefined;
     }
     let conflict = false;
     let committed = false;
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             const state = await currentInvitationState(view, id);
             // Already declined: no-op. Accepted/revoked: 409.
             if (state === 'declined') {
@@ -758,7 +751,7 @@ async function declineInvitation(
                 conflict = true;
                 return;
             }
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
             committed = true;
         },
     );
@@ -813,21 +806,19 @@ async function revokeInvitation(
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'revocation');
-    const replay = await storedResponseFor(
+    const replay = await getPairByRequestHash(
         db, messagePair.requestHash);
     if (replay !== undefined) {
         return undefined;
     }
     let conflict = false;
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             const state = await currentInvitationState(view, id);
             if (state !== 'pending') {
                 conflict = true;
                 return;
             }
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
         },
     );
     if (conflict) {
@@ -855,10 +846,10 @@ const INVITATIONS_STORAGE_PREFIX =
     '/invitations/';
 
 function invitationDocumentEntity(
-    document: { uriId: Id; body: Record<string, unknown> },
+    document: { name: Id; body: Record<string, unknown> },
 ): Record<string, unknown> {
     return {
-        id: document.uriId,
+        id: document.name,
         // The spread body's `at` is the invitation's own
         // grant time — validated at write time by
         // grantInvitation's validateTimestampField(body,

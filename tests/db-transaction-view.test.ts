@@ -4,8 +4,8 @@ import {
 import { memoryDbAdapter } from '../api/db-memory.ts';
 
 const aMessagePair = {
-    uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-    uri_id: '42',
+    path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+    name: '42',
     requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
     method: 'PUT',
     request_at: '2026-01-01T00:00:00.000000Z',
@@ -21,10 +21,8 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        await db.transaction(
-            ['message_pairs'],
-            async (view) => {
-                await view.messagePairs.put(
+        await db.transaction(async (view) => {
+                await view.messagePairs.append(
                     'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                 );
             },
@@ -42,10 +40,8 @@ Deno.test(
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await assertRejects(
-            () => db.transaction(
-                ['message_pairs'],
-                async (view) => {
-                    await view.messagePairs.put(
+            () => db.transaction(async (view) => {
+                    await view.messagePairs.append(
                     'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                 );
                     throw new Error('boom');
@@ -63,10 +59,8 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        const seen = await db.transaction(
-            ['message_pairs'],
-            async (view) => {
-                await view.messagePairs.put(
+        const seen = await db.transaction(async (view) => {
+                await view.messagePairs.append(
                     'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                 );
                 // Read back inside the same tx — the put is
@@ -84,13 +78,9 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        await db.transaction(
-            ['message_pairs'],
-            async (view) => {
-                await view.transaction(
-                    ['message_pairs'],
-                    async (inner) => {
-                        await inner.messagePairs.put(
+        await db.transaction(async (view) => {
+                await view.transaction(async (inner) => {
+                        await inner.messagePairs.append(
                             'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                         );
                     },
@@ -110,13 +100,9 @@ Deno.test(
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await assertRejects(
-            () => db.transaction(
-                ['message_pairs'],
-                async (view) => {
-                    await view.transaction(
-                        ['message_pairs'],
-                        async (inner) => {
-                            await inner.messagePairs.put(
+            () => db.transaction(async (view) => {
+                    await view.transaction(async (inner) => {
+                            await inner.messagePairs.append(
                                 'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                             );
                         },
@@ -133,33 +119,12 @@ Deno.test(
 );
 
 Deno.test(
-    'a nested out-of-scope table throws a clear error',
-    async () => {
-        const db = memoryDbAdapter();
-        await db.postSchemaCreation();
-        await assertRejects(
-            () => db.transaction(
-                ['message_pairs'],
-                async (view) => {
-                    await view.transaction(
-                        ['other'],
-                        async () => undefined,
-                    );
-                },
-            ),
-            Error, 'other',
-        );
-    },
-);
-
-Deno.test(
     'reads work through readTransaction',
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        await db.messagePairs.put('syWUUcdBSbBgMwBiCrgbDw', aMessagePair);
+        await db.messagePairs.append('syWUUcdBSbBgMwBiCrgbDw', aMessagePair);
         const seen = await db.readTransaction(
-            ['message_pairs'],
             (view) => view.messagePairs.getAll(),
         );
         assertStrictEquals(seen.length, 1);
@@ -173,9 +138,7 @@ Deno.test(
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await assertRejects(
-            () => db.readTransaction(
-                ['message_pairs'],
-                (view) => view.messagePairs.put(
+            () => db.readTransaction((view) => view.messagePairs.append(
                     'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                 ),
             ),
@@ -192,16 +155,13 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        const seen = await db.transaction(
-            ['message_pairs'],
-            async (view) => {
-                await view.messagePairs.put(
+        const seen = await db.transaction(async (view) => {
+                await view.messagePairs.append(
                     'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
                 );
                 // Nested read joins the open write tx so the
                 // uncommitted put is visible (read-your-writes).
                 return view.readTransaction(
-                    ['message_pairs'],
                     (inner) => inner.messagePairs.getAll(),
                 );
             },

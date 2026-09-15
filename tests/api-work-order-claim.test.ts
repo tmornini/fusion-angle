@@ -222,7 +222,7 @@ Deno.test(
     async () => {
         const db = await seededDb();
         // A live claim by 'other', released via the SAME
-        // DELETE organizations/:id/work-orders/:id/claim address the live
+        // DELETE organizations/:id/work-orders/:id/claim path the live
         // deleteWorkOrderClaim adapter uses (workbox's
         // "release claim" action) — never a raw row poke, so
         // the release is visible to the flipped gate's own

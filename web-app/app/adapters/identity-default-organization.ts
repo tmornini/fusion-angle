@@ -4,7 +4,7 @@ import {
     HTTP_NOT_FOUND,
 } from '../../../api/http-errors.ts';
 
-// Addressed by the caller's own id — the server authorizes an
+// Keyed by the caller's own id — the server authorizes an
 // identity's default organization by tree ownership. PUT
 // { organization_id } must name a live seat (else 400). GET
 // returns the SET document or null when never SET (404).

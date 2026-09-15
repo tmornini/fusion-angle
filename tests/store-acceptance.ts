@@ -1,14 +1,19 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import {
+    assert, assertEquals, assertStrictEquals,
+} from '@std/assert';
 import type { DbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    compareIdentifiers, generateIdentifier,
+} from '../shared/identifier.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import type { MessagePairEntity } from '../api/types.ts';
 
 // Parameterized store acceptance. ./test-postgres will
 // invoke this factory; the memory runner keeps ./validate
@@ -125,13 +130,36 @@ function flowDocument(
 async function messagePairsAt(
     db: DbAdapter,
     collection: string,
-    uriId: string,
+    name: string,
 ): Promise<number> {
-    const rows = await db.messagePairs.getAllWhere(
-        'uri_collection', collection,
+    const rows = await db.messagePairs.getCollectionPairs(collection,
     );
-    return rows.filter((row) => row.uri_id === uriId)
+    return rows.filter((row) => row.name === name)
         .length;
+}
+
+const ORDER_PATH = '/order-pin/';
+const ORDER_REQUESTER = 'XXZruirZyAOoRpNxaDnpSA';
+const ORDER_OPERATION = '0123456789ABCDEFGHIJKw';
+
+function orderRow(
+    name: string,
+    responseAt: string,
+    n: number,
+): Omit<MessagePairEntity, 'id'> {
+    return {
+        path: ORDER_PATH,
+        name: name,
+        requester_identity_id: ORDER_REQUESTER,
+        method: 'PUT',
+        request_at: responseAt,
+        request_hash: n.toString(16).padStart(64, '0'),
+        request: 'PUT ' + ORDER_PATH + name
+            + ' HTTP/1.1\r\n\r\n',
+        response_at: responseAt,
+        response: 'HTTP/1.1 200 OK\r\n\r\n',
+        operation_id: ORDER_OPERATION,
+    };
 }
 
 export function defineStoreAcceptance(
@@ -234,7 +262,7 @@ export function defineStoreAcceptance(
                 undefined, operationId),
         );
         assertStrictEquals(first.status, 201);
-        const firstId = first.headers.get('Response-ID');
+        const firstId = pairIdOf(first);
         const firstOp = first.headers.get('Operation-ID');
         const firstBytes = await first.text();
         const second = await handleRequest(
@@ -248,7 +276,7 @@ export function defineStoreAcceptance(
             second.headers.get('Operation-ID'), firstOp,
         );
         assertStrictEquals(
-            second.headers.get('Response-ID'), firstId,
+            pairIdOf(second), firstId,
         );
         assertStrictEquals(await second.text(), firstBytes);
         assertStrictEquals(
@@ -257,7 +285,21 @@ export function defineStoreAcceptance(
         );
     });
 
-    Deno.test(name + ': address miss is 404', async () => {
+    Deno.test(name + ': a write carries ETag and no'
+    + ' Response-ID', async () => {
+        const { db, token } = await ready();
+        const put = await handleRequest(db, req(
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'tWirePinAAAAAAAAAAAAAw', token,
+            ideaDocument('Wire', 'ev-sa-wire'),
+        ));
+        assertStrictEquals(put.status, 201);
+        assertStrictEquals(put.headers.get('Response-ID'), null);
+        const etag = put.headers.get('ETag');
+        assert(etag !== null && etag.startsWith('"'));
+    });
+
+    Deno.test(name + ': document miss is 404', async () => {
         const { db, token } = await ready();
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
@@ -316,5 +358,43 @@ export function defineStoreAcceptance(
             name: string;
         };
         assertStrictEquals(againBody.name, liveBody.name);
+    });
+
+    Deno.test(name + ': seam reads are (response_at, id)'
+    + ' order', async () => {
+        const { db } = await ready();
+        const sorted = [
+            generateIdentifier(),
+            generateIdentifier(),
+            generateIdentifier(),
+        ].sort(compareIdentifiers);
+        const first = sorted[0]!;
+        const second = sorted[1]!;
+        const third = sorted[2]!;
+        const early = '2026-01-01T00:00:00.000001Z';
+        const late = '2026-01-01T00:00:00.000002Z';
+        // Appended newest-first, so insertion order
+        // disagrees with the promised order on every row.
+        await db.messagePairs.append(
+            third, orderRow('doc', late, 3),
+        );
+        await db.messagePairs.append(
+            second, orderRow('doc', early, 2),
+        );
+        await db.messagePairs.append(
+            first, orderRow('doc', early, 1),
+        );
+        const history = await db.messagePairs
+            .getDocumentHistory(ORDER_PATH, 'doc');
+        assertEquals(
+            history.map((row) => row.id),
+            [first, second, third],
+        );
+        const collection = await db.messagePairs
+            .getCollectionPairs(ORDER_PATH);
+        assertEquals(
+            collection.map((row) => row.id),
+            [first, second, third],
+        );
     });
 }

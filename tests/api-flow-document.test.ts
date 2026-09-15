@@ -26,9 +26,7 @@ import {
     validateFlowDocumentBody,
 } from '../api/validators.ts';
 import {
-    headMessagePairIdAt,
-    canonicalUriCollection,
-    strongEtagOf,
+    canonicalPath,
 } from '../api/message-pair.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
@@ -36,7 +34,7 @@ import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
-    apiRequest, storedPutBodyText,
+    apiRequest, pairIdOf, storedPutBodyText,
 } from './http-fixtures.ts';
 import { messageStore } from '../api/message-store.ts';
 
@@ -150,7 +148,7 @@ async function createFlow(
 }
 
 // Task 5: create's own operation message pair (204, no
-// body) is no longer the address's head — its synthesized
+// body) is no longer the document's head — its synthesized
 // document message pair (appended after, so strictly later)
 // is. A save must echo THIS id, read fresh via GET, exactly
 // as the real client (buildFlowPutBody's ctx.GETWithEtag)
@@ -163,7 +161,7 @@ async function headResponseId(
     const got = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
     ));
-    const id = got.headers.get('Response-ID');
+    const id = pairIdOf(got);
     assert(id
         , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
         + '' + flowId);
@@ -328,15 +326,15 @@ Deno.test('postFlowDocumentOp with revivals posts the restored'
     assertStrictEquals(update.status, 201);
     // SIDECAR-KEEP (C3): pin graphDelta.deletions / revivals
     // on the flow document message pairs — no bulk states derive.
-    const prefix = canonicalUriCollection('AjdvjuECVZEgZoFajaIEkg', '/flows/'
+    const prefix = canonicalPath('AjdvjuECVZEgZoFajaIEkg', '/flows/'
         + '');
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     const messagePairs = documentMessagePairsAt(
         requests, prefix,
-    ).filter((p) => p.uriId === 'biDOZCyZATKcAVVOCbegTw');
+    ).filter((p) => p.name === 'biDOZCyZATKcAVVOCbegTw');
     const states: string[] = [];
     for (const messagePair of messagePairs) {
         const delta = messagePair.body['graphDelta'];
@@ -513,7 +511,7 @@ Deno.test('e2e: a byte-identical resend converges (one event, one'
         operationId,
     ));
     assertStrictEquals(first.status, 201);
-    const firstId = first.headers.get('Response-ID');
+    const firstId = pairIdOf(first);
     const eventsAfterFirst =
         await deriveFlowStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
             , 'bZXXOWeDHCowVkWMhrZGgg');
@@ -525,13 +523,10 @@ Deno.test('e2e: a byte-identical resend converges (one event, one'
         operationId,
     ));
     assertStrictEquals(second.status, 200);
-    assertStrictEquals(second.headers.get('Response-ID'), firstId);
+    assertStrictEquals(pairIdOf(second), firstId);
     const stored = await db.messagePairs.getById(firstId!);
     assert(stored !== undefined);
-    assertStrictEquals(
-        second.headers.get('ETag'),
-        strongEtagOf(stored.id),
-    );
+    assertStrictEquals(pairIdOf(second), stored.id);
     const eventsAfterSecond =
         await deriveFlowStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
             , 'bZXXOWeDHCowVkWMhrZGgg');
@@ -584,19 +579,19 @@ async () => {
 
 // Task 5: create's own 204 operation message pair and its
 // synthesized document message pair are now TWO rows at
-// organizations/:id/flows/:id's address — the GET-attached
+// organizations/:id/flows/:id's document — the GET-attached
 // head is the DOCUMENT message pair (appended strictly
 // later; a live PUT chains Follows/Supersedes off it), never
-// the create response's own operation Response-ID.
+// the create response's own operation pair id.
 Deno.test('e2e: GET organizations/:id/flows/:id carries'
-    + ' Response-ID == the head pair'
+    + ' ETag == the head pair'
 + ' id — create\'s own synthesized document message pair, never its'
 + ' operation response (Task 8: ledger-derived handler)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const created = await createFlow(db, token, 'bWdlaTZZcKRsLsGXiKQZkw');
-    const createdId = created.headers.get('Response-ID');
+    const createdId = pairIdOf(created);
     assert(createdId);
     const got = await handleRequest(
         db, req('GET'
@@ -604,36 +599,38 @@ async () => {
             + 'bWdlaTZZcKRsLsGXiKQZkw', token),
     );
     assertStrictEquals(got.status, 200);
-    const headId = got.headers.get('Response-ID');
+    const headId = pairIdOf(got);
     assert(headId);
     assertNotStrictEquals(headId, createdId);
-    const etag = await headEtag(db, token, 'bWdlaTZZcKRsLsGXiKQZkw');
     const stored = await db.messagePairs.getById(headId);
     assert(stored !== undefined);
-    assertStrictEquals(etag, strongEtagOf(stored.id));
+    assertStrictEquals(pairIdOf(got), stored.id);
     const requests = await db.messagePairs.getAll();
-    const atAddress = requests.filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+    const pairsAt = requests.filter(
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === 'bWdlaTZZcKRsLsGXiKQZkw',
+            && r.name === 'bWdlaTZZcKRsLsGXiKQZkw',
     );
-    assertStrictEquals(atAddress.length, 2);
-    assert(atAddress.some(r => r.id === headId));
+    assertStrictEquals(pairsAt.length, 2);
+    assert(pairsAt.some(r => r.id === headId));
 });
 
-// Task 8: the organizations/:id/flows/:id GET's Response-ID source switched
-// from
-// headMessagePairIdAt (message-pair.ts's ANY-method LOCK head) to
-// documentHeadMessagePairId (document-family.ts's DOCUMENT head — the
-// SAME deriveDocumentsAt reduction the GET already runs to build
-// the entity). Design decision 6 means only PUT ever writes at a
-// document address, so the two reductions agree for a live flow
-// — this proves the wire Response-ID equals headMessagePairIdAt's own,
-// independently computed value, not merely that the route
-// returns SOME header.
-Deno.test('e2e: the organizations/:id/flows/:id Response-ID'
-    + ' equals headMessagePairIdAt\'s own'
-+ ' reduction over the same address (documentHeadMessagePairId parity)',
+// Task 8: the organizations/:id/flows/:id GET's ETag
+// source switched from the store's document head read
+// (`messageStore(db).getDocumentHead`) (message-pair.ts's ANY-method
+// LOCK head) to documentHeadMessagePairId
+// (document-family.ts's DOCUMENT head — the SAME
+// deriveDocumentsAt reduction the GET already runs to
+// build the entity). Design decision 6 means only PUT
+// ever writes at a document, so the two
+// reductions agree for a live flow — this proves the
+// wire ETag equals the store's document head
+// read (`messageStore(db).getDocumentHead`)'s own, independently
+// computed value, not merely that the route returns
+// SOME header.
+Deno.test('e2e: the organizations/:id/flows/:id ETag'
+    + ' equals the store head read\'s own'
++ ' reduction over the same document (documentHeadMessagePairId parity)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -644,13 +641,12 @@ async () => {
             + 'biSFoHVEGnaArklDDblCXQ', token),
     );
     assertStrictEquals(got.status, 200);
-    const headId = got.headers.get('Response-ID');
+    const headId = pairIdOf(got);
     assert(headId);
-    const lockHead = await headMessagePairIdAt(
-        db,
-        canonicalUriCollection('AjdvjuECVZEgZoFajaIEkg', '/flows/'),
+    const lockHead = (await messageStore(db).getDocumentHead(
+        canonicalPath('AjdvjuECVZEgZoFajaIEkg', '/flows/'),
         'biSFoHVEGnaArklDDblCXQ',
-    );
+    ))?.id;
     assertStrictEquals(headId, lockHead);
 });
 
@@ -720,8 +716,8 @@ async () => {
 // --- Task 5: create + undo synthesized second pairs ---
 
 Deno.test('e2e: POST flows forms a document message pair at the flow\'s'
-+ ' own address and a join pair at the project_flows'
-+ ' address, all sharing the create\'s requestAt',
++ ' own document and a join pair at the project_flows'
++ ' document, all sharing the create\'s requestAt',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -737,16 +733,16 @@ async () => {
     const messagePairs = await db.messagePairs.getAll();
     assertStrictEquals(messagePairs.length, 5);
 
-    const flowAddress = messagePairs.filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+    const flowPairs = messagePairs.filter(
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === flowId,
+            && r.name === flowId,
     );
-    assertStrictEquals(flowAddress.length, 2);
-    const documentRow = flowAddress.find(
+    assertStrictEquals(flowPairs.length, 2);
+    const documentRow = flowPairs.find(
         r => decodeRequestMessage(r.request).method === 'PUT',
     );
-    assert(documentRow, 'no document message pair at the flow address');
+    assert(documentRow, 'no document message pair at the flow document');
     const decodedDocument =
         decodeRequestMessage(documentRow!.request);
     const expectedDocument = {
@@ -779,13 +775,13 @@ async () => {
     const joinPrefix =
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'qfhFObbtDfxUZwEGxySBoQ/flows/';
-    const joinAddress = messagePairs.filter(
-        r => r.uri_collection === joinPrefix
-            && r.uri_id === projectFlowId,
+    const joinPairs = messagePairs.filter(
+        r => r.path === joinPrefix
+            && r.name === projectFlowId,
     );
-    assertStrictEquals(joinAddress.length, 1);
+    assertStrictEquals(joinPairs.length, 1);
     const decodedJoin =
-        decodeRequestMessage(joinAddress[0]!.request);
+        decodeRequestMessage(joinPairs[0]!.request);
     assertStrictEquals(decodedJoin.method, 'PUT');
     assertEquals(decodedJoin.body, {
         project_id: 'qfhFObbtDfxUZwEGxySBoQ',
@@ -832,17 +828,17 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
     assertStrictEquals(first.status, 201);
 
     const requestsAfterFirst = await db.messagePairs.getAll();
-    const flowAddressAfterFirst = requestsAfterFirst.filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+    const flowPairsAfterFirst = requestsAfterFirst.filter(
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === flowId,
+            && r.name === flowId,
     );
-    const firstDocumentRequest = flowAddressAfterFirst.find(
+    const firstDocumentRequest = flowPairsAfterFirst.find(
         r => decodeRequestMessage(r.request).method === 'PUT',
     );
     assert(
         firstDocumentRequest,
-        'no document message pair at the flow address after create 1',
+        'no document message pair at the flow document after create 1',
     );
     const firstDocumentResponse = await db.messagePairs.getById(
         firstDocumentRequest!.id,
@@ -874,12 +870,12 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
     );
 
     const requestsAfterSecond = await db.messagePairs.getAll();
-    const flowAddressAfterSecond = requestsAfterSecond.filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+    const flowPairsAfterSecond = requestsAfterSecond.filter(
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === flowId,
+            && r.name === flowId,
     );
-    const documentRequests = flowAddressAfterSecond.filter(
+    const documentRequests = flowPairsAfterSecond.filter(
         r => decodeRequestMessage(r.request).method === 'PUT',
     );
     assertStrictEquals(documentRequests.length, 2);
@@ -888,7 +884,7 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
     );
     assert(
         secondDocumentRequest,
-        'no second document message pair at the flow address',
+        'no second document message pair at the flow document',
     );
     const secondDocumentResponse = await db.messagePairs.getById(
         secondDocumentRequest!.id,
@@ -999,9 +995,9 @@ Deno.test('e2e: POST organizations/:id/flows/:id/undo forms a'
 
     const responses = await db.messagePairs.getAll();
     const documentResponses = responses.filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === 'cvdqOxjRwvTEYzWTrFDNFw',
+            && r.name === 'cvdqOxjRwvTEYzWTrFDNFw',
     );
     const priorIds = new Set(
         responsesBeforeUndo.map((r) => r.id),
@@ -1198,9 +1194,9 @@ async () => {
 
     const responses = await db.messagePairs.getAll();
     const atFlow = responses.filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === 'biakjMJqdIlFhfVZBGhpKw',
+            && r.name === 'biakjMJqdIlFhfVZBGhpKw',
     );
     // Genesis create + Before Race + exactly one racer.
     assert(
@@ -1246,7 +1242,7 @@ async function documentMessagePairCount(
     flowId: string,
 ): Promise<number> {
     const messagePairs = await messageStore(db)
-        .getMessagePairs(FLOW_PREFIX, flowId);
+        .getDocumentHistory(FLOW_PREFIX, flowId);
     return messagePairs.filter((messagePair) =>
         messagePair.method === 'PUT'
         || messagePair.method === 'DELETE',
@@ -1258,7 +1254,7 @@ async function latestPutRequestBody(
     flowId: string,
 ): Promise<Record<string, unknown>> {
     const messagePairs = await messageStore(db)
-        .getMessagePairs(FLOW_PREFIX, flowId);
+        .getDocumentHistory(FLOW_PREFIX, flowId);
     const puts = messagePairs.filter((messagePair) =>
         messagePair.method === 'PUT',
     );
@@ -1287,7 +1283,7 @@ async function assertStoredPutOmitsUndoHistory(
     );
     const expected = flowStoredEntityOf(
         {
-            uriId: flowId,
+            name: flowId,
             messagePairId: flowId,
             method: 'PUT',
             body: requestBody,
@@ -1311,7 +1307,7 @@ async function assertStoredPutOmitsUndoHistory(
         wire,
         flowEntityOf(
             {
-                uriId: flowId,
+                name: flowId,
                 messagePairId: flowId,
                 method: 'PUT',
                 body: requestBody,
@@ -1323,7 +1319,7 @@ async function assertStoredPutOmitsUndoHistory(
 }
 
 // G2: stored PUT = flowEntityOf minus hasUndoHistory.
-// GET adds the stamp when this address has more than one
+// GET adds the stamp when this document has more than one
 // PUT or DELETE pair. Covers every G2 writer.
 Deno.test('hasUndoHistory is absent from the stored PUT and '
 + 'present on GET when COUNT(*) > 1',

@@ -97,7 +97,7 @@ function freshClaimBody() {
 }
 
 // DELETE organizations/:id/work-orders/:id/claim releases. DELETE head =
-// unclaimed. Never-written and unknown addresses 404.
+// unclaimed. Never-written and unknown documents 404.
 // A second DELETE is 204 (already-gone).
 
 Deno.test(

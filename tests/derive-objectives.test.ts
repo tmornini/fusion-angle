@@ -16,7 +16,7 @@ import { STARK_ORGANIZATION } from
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// Objectives' own state-history reduction (states-address
+// Objectives' own state-history reduction (states-document
 // retirement): unit-level trio walk + echo dedup, and the
 // family history route GET organizations/:id/objectives/:id/versions. Uses
 // seedAdminSchema (not postMockDataLoad) so the suite stays

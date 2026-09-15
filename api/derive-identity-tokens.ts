@@ -2,7 +2,7 @@ import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
 import type { Id, IdentityTokenEntity } from './types.ts';
 import { validateIdentityTokenEntity } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -23,7 +23,7 @@ import {
 // row-write appends its own event pair at
 // 'identities/<identityId>/tokens/<rowId>'
 // (api/message-pair.ts's formTokenEventMessagePair — the SAME
-// address/method/response shape a real PUT
+// document/method/response shape a real PUT
 // identities/:id/tokens/:tid would store) — issued roots
 // (grant, client-credentials, token-
 // exchange, the org-exchange hop), rotations, and revocations ALL
@@ -47,8 +47,8 @@ import {
 //
 // EVENT-APPEND, not document-class (api/routes.ts's own route
 // comment): every row id is a fresh generateIdentifier()
-// mint, so in practice no address is ever revisited — but
-// deriveDocumentsAt's latest-per-uriId head resolution still
+// mint, so in practice no document is ever revisited — but
+// deriveDocumentsAt's latest-per-name head resolution still
 // applies uniformly (the role_grants precedent), never assumed.
 //
 // deriveIdentityTokenEventsForJti is the by-jti fold this task
@@ -85,13 +85,13 @@ import {
 const IDENTITY_TOKENS_TABLE = 'identity_tokens';
 
 const IDENTITY_TOKENS_FLAT_PREFIX =
-    canonicalUriCollection(undefined, '/identity-tokens/');
+    canonicalPath(undefined, '/identity-tokens/');
 
-const TOKENS_ADDRESS_PATTERN =
+const TOKENS_PATH_PATTERN =
     /^\/identities\/([^/]+)\/tokens\/$/;
 
 function tokensPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined,
         '/identities/' + identityId + '/tokens/',
     );
@@ -102,11 +102,11 @@ export function identityTokenEntityOf(
 ): IdentityTokenEntity {
     return {
         ...validateIdentityTokenEntity(withoutId(document.body)),
-        id: document.uriId,
+        id: document.name,
     };
 }
 
-// Nested address is the source of truth — fill or overwrite
+// Nested document is the source of truth — fill or overwrite
 // the request body's identity_id from the path.
 function nestedTokenEntityOf(
     identityId: Id,
@@ -125,8 +125,8 @@ async function fetchTokenDocumentsAt(
     dbOrView: DbAdapter,
     prefix: string,
 ): Promise<Map<string, DerivedDocument>> {
-    const messagePairs = await dbOrView.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const messagePairs = await dbOrView.messagePairs.getCollectionPairs(
+        prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
@@ -196,23 +196,23 @@ export async function deriveIdentityTokens(
         messagePairs, IDENTITY_TOKENS_FLAT_PREFIX,
     );
     for (const document of flat.values()) {
-        byId.set(document.uriId, identityTokenEntityOf(document));
+        byId.set(document.name, identityTokenEntityOf(document));
     }
     const prefixes = new Set<string>();
     for (const messagePair of messagePairs) {
-        if (TOKENS_ADDRESS_PATTERN.test(messagePair.uri_collection)) {
-            prefixes.add(messagePair.uri_collection);
+        if (TOKENS_PATH_PATTERN.test(messagePair.path)) {
+            prefixes.add(messagePair.path);
         }
     }
     for (const prefix of prefixes) {
-        const match = TOKENS_ADDRESS_PATTERN.exec(prefix)!;
+        const match = TOKENS_PATH_PATTERN.exec(prefix)!;
         const identityId = match[1]!;
         const documents = deriveDocumentsAt(
             messagePairs, prefix,
         );
         for (const document of documents.values()) {
             byId.set(
-                document.uriId,
+                document.name,
                 nestedTokenEntityOf(identityId, document),
             );
         }

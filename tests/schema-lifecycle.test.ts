@@ -5,7 +5,6 @@ import { connectPostgres } from
     '../api/postgres-client.ts';
 import { PostgresBackend } from
     '../api/backend-postgres.ts';
-import { TABLE_NAMES } from '../api/db.ts';
 
 Deno.test(
     'postSchemaCreation/hasSchema/deleteSchema'
@@ -34,10 +33,10 @@ Deno.test(
     async () => {
         const adapter = memoryDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.messagePairs.put('u1', {
-            uri_collection:
+        await adapter.messagePairs.append('u1', {
+            path:
                 '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-            uri_id: '42',
+            name: '42',
             requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             method: 'PUT',
             request_at:
@@ -123,7 +122,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
-        await backend.ensureTables(TABLE_NAMES);
+        await backend.ensureTable();
     });
 
     Deno.test.afterAll(async () => {
@@ -151,7 +150,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                   AND table_name = 'message_pairs'
                   AND column_name IN (
                       'id', 'operation_id',
-                      'uri_id',
+                      'name',
                       'requester_identity_id'
                   )
             `;
@@ -164,7 +163,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             assertStrictEquals(
                 typeOf.get('operation_id'), 'uuid',
             );
-            assertStrictEquals(typeOf.get('uri_id'), 'text');
+            assertStrictEquals(typeOf.get('name'), 'text');
             assertStrictEquals(
                 typeOf.get('requester_identity_id'),
                 'text',

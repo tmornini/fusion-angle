@@ -19,7 +19,7 @@ import type {
 } from '../api/types.ts';
 import { nowUtc } from
     '../api/types.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {
     documentGetHandler,
@@ -71,6 +71,7 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -143,7 +144,7 @@ const RECORDS_TEST_WIRING: DocumentFamilyWiring = {
     entityOf: (document, organization, current) => {
         const body = document.body;
         return {
-            id: document.uriId,
+            id: document.name,
             organization_id: organization,
             name: pickString(body, 'name'),
             description: pickString(body, 'description'),
@@ -232,16 +233,16 @@ async function resolveAttributePath(
     db: DbAdapter, organization: Id, id: Id,
 ): Promise<string | null> {
     const hits = (await db.messagePairs.getAll()).filter(
-        (row) => row.uri_id === id,
+        (row) => row.name === id,
     );
     const needle = '/organizations/' + organization
         + '/record-types/';
     for (const hit of hits) {
         if (
-            hit.uri_collection.startsWith(needle)
-            && hit.uri_collection.endsWith('/attributes/')
+            hit.path.startsWith(needle)
+            && hit.path.endsWith('/attributes/')
         ) {
-            const typeId = hit.uri_collection
+            const typeId = hit.path
                 .slice(needle.length)
                 .split('/')[0];
             if (typeId !== undefined && typeId !== '') {
@@ -435,7 +436,7 @@ async () => {
     );
 
     // Nested path org = token org (TWO); foreign id was
-    // never written at this address → 404.
+    // never written at this document → 404.
     const expectedRecordMessage =
         'Not found: record_types/'
         + customerProfileRecordId;
@@ -462,7 +463,7 @@ async () => {
 
     const attributeId = 'CPJmMPXRaBIiNdGBofUPVg';
     // Nested GET probes the parent type first — miss at
-    // this org's record-types address → 404.
+    // this org's record-types document → 404.
     const expectedTypeMessage =
         'Not found: record_types/'
         + customerProfileRecordId;
@@ -927,7 +928,7 @@ async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const recordId = generateIdentifier();
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         STARK_ORGANIZATION, '/record-types/',
     );
 
@@ -949,11 +950,10 @@ async () => {
     assertStrictEquals(first.status, 201);
 
     const firstDocumentMessagePairs = documentMessagePairsAt(
-        await db.messagePairs.getAllWhere(
-            'uri_collection', prefix,
+        await db.messagePairs.getCollectionPairs(prefix,
         ),
         prefix,
-    ).filter((messagePair) => messagePair.uriId === recordId);
+    ).filter((messagePair) => messagePair.name === recordId);
     assertStrictEquals(firstDocumentMessagePairs.length, 1);
 
     const second = await handleRequest(db, req(
@@ -974,12 +974,12 @@ async () => {
     assertStrictEquals(second.status, 201);
 
     const allRequests =
-        await db.messagePairs.getAllWhere('uri_collection', prefix);
+        await db.messagePairs.getCollectionPairs(prefix);
     const allResponses =
-        await db.messagePairs.getAllWhere('uri_collection', prefix);
+        await db.messagePairs.getCollectionPairs(prefix);
     const secondDocumentMessagePairs = documentMessagePairsAt(
         allRequests, prefix,
-    ).filter((messagePair) => messagePair.uriId === recordId);
+    ).filter((messagePair) => messagePair.name === recordId);
     assertStrictEquals(secondDocumentMessagePairs.length, 2);
     const secondDocumentMessagePairId =
         secondDocumentMessagePairs[1]!.id;
@@ -1031,26 +1031,26 @@ async () => {
     ));
     assertStrictEquals(created.status, 201);
 
-    const recordsPrefix = canonicalUriCollection(
+    const recordsPrefix = canonicalPath(
         STARK_ORGANIZATION, '/record-types/',
     );
     const [recordRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', recordsPrefix),
-        db.messagePairs.getAllWhere('uri_collection', recordsPrefix),
+        db.messagePairs.getCollectionPairs(recordsPrefix),
+        db.messagePairs.getCollectionPairs(recordsPrefix),
     ]);
-    const atRecordAddress = recordRequests.filter(
-        (r) => r.uri_collection === recordsPrefix
-            && r.uri_id === recordId,
+    const atRecord = recordRequests.filter(
+        (r) => r.path === recordsPrefix
+            && r.name === recordId,
     );
-    assertStrictEquals(atRecordAddress.length, 2);
+    assertStrictEquals(atRecord.length, 2);
 
     const recordDocumentMessagePairs = documentMessagePairsAt(
         recordRequests, recordsPrefix,
-    ).filter((messagePair) => messagePair.uriId === recordId);
+    ).filter((messagePair) => messagePair.name === recordId);
     assertStrictEquals(recordDocumentMessagePairs.length, 1);
     assertStrictEquals(recordDocumentMessagePairs[0]!.method, 'PUT');
 
-    const postRow = atRecordAddress.find(
+    const postRow = atRecord.find(
         (r) => decodeRequestMessage(r.request).method === 'POST',
     )!;
     const createBodyKeys = new Set(
@@ -1071,17 +1071,15 @@ async () => {
         + '/record-types/' + recordId + '/attributes/';
     const [attributeRequests] =
         await Promise.all([
-            db.messagePairs.getAllWhere(
-                'uri_collection', attributesPrefix,
+            db.messagePairs.getCollectionPairs(attributesPrefix,
             ),
-            db.messagePairs.getAllWhere(
-                'uri_collection', attributesPrefix,
+            db.messagePairs.getCollectionPairs(attributesPrefix,
             ),
         ]);
     const attributeDocumentMessagePairs = documentMessagePairsAt(
         attributeRequests, attributesPrefix,
     ).filter((messagePair) =>
-        messagePair.uriId === attributeId);
+        messagePair.name === attributeId);
     assertStrictEquals(attributeDocumentMessagePairs.length, 1);
     assertStrictEquals(attributeDocumentMessagePairs[0]!.method, 'PUT');
 });
@@ -1220,7 +1218,7 @@ async () => {
                 + '/record-types/' + recordId, token,
     ));
     assertStrictEquals(deleted.status, 204);
-    const deleteResponseId = deleted.headers.get('Response-ID');
+    const deleteResponseId = pairIdOf(deleted);
     assert(deleteResponseId);
 
     const miss = await handleRequest(
@@ -1275,21 +1273,21 @@ async function transitionFieldValueCounts(
     organization: string,
     workOrderId: string,
 ): Promise<Map<string, number>> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organization,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/transition/',
     );
     const [requests, responses] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     const requestById = new Map(
         requests.map((request) => [request.id, request]),
     );
     const counts = new Map<string, number>();
     for (const response of responses) {
-        if (response.uri_collection !== prefix) continue;
+        if (response.path !== prefix) continue;
         const request = requestById.get(response.id);
         if (request === undefined) continue;
         const decoded = decodeRequestMessage(request.request);

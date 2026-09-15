@@ -215,20 +215,18 @@ async function deriveMembershipsAll(db: DbAdapter) {
             + organization.id + '/members/';
         const [seatRequests] =
             await Promise.all([
-                db.messagePairs.getAllWhere(
-                    'uri_collection', seatPrefix,
+                db.messagePairs.getCollectionPairs(seatPrefix,
                 ),
-                db.messagePairs.getAllWhere(
-                    'uri_collection', seatPrefix,
+                db.messagePairs.getCollectionPairs(seatPrefix,
                 ),
             ]);
         for (const document of deriveDocumentsAt(
             seatRequests, seatPrefix,
         ).values()) {
             rows.push({
-                id: document.uriId,
+                id: document.name,
                 organization_id: organization.id,
-                identity_id: document.uriId,
+                identity_id: document.name,
                 type: String(document.body['type']),
                 at: String(document.body['at']),
             });

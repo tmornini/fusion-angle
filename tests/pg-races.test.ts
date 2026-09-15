@@ -11,7 +11,6 @@ import {
     type PostgresTx,
 } from '../api/backend-postgres.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
-import { TABLE_NAMES } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -178,25 +177,23 @@ function flowDocument(
 async function messagePairsAt(
     db: DbAdapter,
     collection: string,
-    uriId: string,
+    name: string,
 ): Promise<number> {
-    const rows = await db.messagePairs.getAllWhere(
-        'uri_collection', collection,
+    const rows = await db.messagePairs.getCollectionPairs(collection,
     );
-    return rows.filter((row) => row.uri_id === uriId)
+    return rows.filter((row) => row.name === name)
         .length;
 }
 
 async function putHeadsAt(
     db: DbAdapter,
     collection: string,
-    uriId: string,
+    name: string,
 ): Promise<number> {
-    const rows = await db.messagePairs.getAllWhere(
-        'uri_collection', collection,
+    const rows = await db.messagePairs.getCollectionPairs(collection,
     );
     return rows.filter((row) =>
-        row.uri_id === uriId && row.method === 'PUT',
+        row.name === name && row.method === 'PUT',
     ).length;
 }
 
@@ -229,7 +226,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
-        await backend.ensureTables(TABLE_NAMES);
+        await backend.ensureTable();
         await seedAdminSchema(db);
         // Open the pool to its full width here: a
         // pooled connection starts a max_lifetime
@@ -261,8 +258,8 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const holder = connectPostgres(
             urlWithSearchPath(POSTGRES_URL, schema),
         );
-        const addressKey = Number(await advisoryKey(
-            'fusion.address.' + FLOW_PREFIX + id,
+        const documentLockKey = Number(await advisoryKey(
+            'fusion.document.' + FLOW_PREFIX + id,
         ));
         let raced: Promise<[Response, Response]>
             | undefined;
@@ -270,7 +267,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             await holder.begin(async (tx) => {
                 await tx.query`
                     SELECT pg_advisory_xact_lock(
-                        ${addressKey}
+                        ${documentLockKey}
                     )
                 `;
                 raced = Promise.all([
@@ -329,11 +326,10 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assertStrictEquals(live.status, 200);
         const etag = live.headers.get('ETag');
         assert(etag !== null && etag !== '');
-        const heads = await db.messagePairs.getAllWhere(
-            'uri_collection', FLOW_PREFIX,
+        const heads = await db.messagePairs.getCollectionPairs(FLOW_PREFIX,
         );
         const liveHead = heads
-            .filter((row) => row.uri_id === id)
+            .filter((row) => row.name === id)
             .toSorted((a, b) =>
                 a.response_at < b.response_at
                     ? 1
@@ -429,26 +425,30 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     async () => {
         const leftHeld = Promise.withResolvers<void>();
         const rightHeld = Promise.withResolvers<void>();
-        const left = backend.transaction(
-            ['message_pairs'],
-            'readonly',
+        const left = backend.transaction('readonly',
             async (tx) => {
                 const pg = tx as PostgresTx;
-                await pg.lock('fusion.test.deadlock.l');
+                await pg.lockDocument(
+                    '/fusion-test/deadlock/', 'l',
+                );
                 leftHeld.resolve();
                 await rightHeld.promise;
-                await pg.lock('fusion.test.deadlock.r');
+                await pg.lockDocument(
+                    '/fusion-test/deadlock/', 'r',
+                );
             },
         );
-        const right = backend.transaction(
-            ['message_pairs'],
-            'readonly',
+        const right = backend.transaction('readonly',
             async (tx) => {
                 const pg = tx as PostgresTx;
-                await pg.lock('fusion.test.deadlock.r');
+                await pg.lockDocument(
+                    '/fusion-test/deadlock/', 'r',
+                );
                 rightHeld.resolve();
                 await leftHeld.promise;
-                await pg.lock('fusion.test.deadlock.l');
+                await pg.lockDocument(
+                    '/fusion-test/deadlock/', 'l',
+                );
             },
         );
         const settled = await Promise.allSettled([
@@ -477,7 +477,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
         const tightSql = connectPostgres(tightUrl.href);
         const tight = new PostgresBackend(tightSql);
-        const label = 'fusion.test.timeout';
+        const label = 'fusion.document./fusion-test/timeout/x';
         try {
             await holder.begin(async (tx) => {
                 await tx.query`
@@ -488,12 +488,13 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                     )
                 `;
                 const error = await assertRejects(
-                    () => tight.transaction(
-                        ['message_pairs'],
-                        'readonly',
+                    () => tight.transaction('readonly',
                         (txn) => (
                             txn as PostgresTx
-                        ).lock(label),
+                        ).lockDocument(
+                            '/fusion-test/timeout/',
+                            'x',
+                        ),
                     ),
                 ) as ApiError;
                 assertInstanceOf(error, ApiError);

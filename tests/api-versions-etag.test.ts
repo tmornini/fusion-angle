@@ -314,7 +314,7 @@ async () => {
     assertStrictEquals(list.status, 200);
     const rows = await list.json() as unknown[];
     assert(rows.length >= 1);
-    const stored = await messageStore(db).get(
+    const stored = await messageStore(db).getDocumentHead(
         '/organizations/', ORGANIZATION_B,
     );
     assert(stored);
@@ -424,7 +424,7 @@ Deno.test(
         assertStrictEquals(list.status, 200);
         const rows = await list.json() as { at: string }[];
         assertStrictEquals(rows.length, 1);
-        const stored = await messageStore(db).get(
+        const stored = await messageStore(db).getDocumentHead(
             seatsPrefixFor(ORGANIZATION_A),
             'XXZruirZyAOoRpNxaDnpSA',
         );
@@ -460,7 +460,7 @@ Deno.test(
         assertStrictEquals(list.status, 200);
         const rows = await list.json() as { at: string }[];
         assertStrictEquals(rows.length, 1);
-        const stored = await messageStore(db).get(
+        const stored = await messageStore(db).getDocumentHead(
             '/invitations/', invitationId,
         );
         assert(stored);

@@ -75,46 +75,32 @@ export class UniqueConstraintError extends Error {
     }
 }
 
-export interface EntityPut<
-    T extends { id: string },
-> {
-    readonly id: string;
-    readonly fields: Omit<T, 'id'>;
-}
-
 export interface EntityStore<
     T extends { id: string },
 > {
     getAll(): Promise<T[]>;
-    // The keyed sub-collection read: the rows whose indexed
-    // `column` equals `key`. Concrete stores serve it over
-    // `Tx.getWhere`. Every store face honors the same read,
-    // so no caller re-acquires it by assertion.
-    getAllWhere(
-        column: string,
-        key: string,
-    ): Promise<T[]>;
-    getAllAtAddress(
-        collection: string,
-        uriId: string,
+    // The keyed sub-collection read: the literal `WHERE
+    // path = $1`: every pair of every document in the
+    // collection.
+    getCollectionPairs(path: string): Promise<T[]>;
+    getPairsByRequestHash(hash: string): Promise<T[]>;
+    getDocumentHistory(
+        path: string,
+        name: string,
     ): Promise<T[]>;
     getAllWhereBody(
-        collection: string,
+        path: string,
         containment: Record<string, unknown>,
     ): Promise<T[]>;
     getById(id: string): Promise<T>;
-    put(
+    append(
         id: string,
         fields: Omit<T, 'id'>,
     ): Promise<T>;
-    putMany(
-        entries: readonly EntityPut<T>[],
-        deleteIds: readonly string[],
-    ): Promise<void>;
 }
 
 // The storage-edge validator. Stores accept one at
-// construction and re-verify every `put` body through
+// construction and re-verify every `append` body through
 // it — the same telling-shape function used by the
 // HTTP route validator. Threaded into stores so the
 // gate sits at the storage edge, not only at the
@@ -129,73 +115,49 @@ export type TxMode = 'readonly' | 'readwrite';
 
 // The row-granular handle over one transaction. Postgres
 // fulfills it with a native transaction; the memory backend
-// simulates it (buffer touched tables, flush on success,
-// discard on throw).
-// `get` returns null for an absent row — absence is
+// simulates it (copy the table, adopt on success, discard
+// on throw).
+// `getById` returns null for an absent row — absence is
 // modeled at the call site, never via a sentinel.
 export interface Tx {
-    get<T extends { id: string }>(
-        table: string,
+    getById<T extends { id: string }>(
         id: string,
     ): Promise<T | null>;
-    getAll<T extends { id: string }>(
-        table: string,
+    getAll<T extends { id: string }>(): Promise<T[]>;
+    getCollectionPairs<T extends { id: string }>(
+        path: string,
     ): Promise<T[]>;
-    // The rows where `column` equals `key` — the indexed
-    // answer to `WHERE column = key`, served without
-    // scanning the table. `column` must carry a secondary
-    // index (TABLE_INDEXES); the native factory resolves it
-    // to `store.index(column)`. The matches keep each tier's
-    // own row order, so a reducer folds them exactly as
-    // it folds a full read.
-    getWhere<T extends { id: string }>(
-        table: string,
-        column: string,
-        key: string,
+    getPairsByRequestHash<T extends { id: string }>(
+        hash: string,
     ): Promise<T[]>;
-    getAddress<T extends { id: string }>(
-        table: string,
-        collection: string,
-        uriId: string,
+    getDocumentHistory<T extends { id: string }>(
+        path: string,
+        name: string,
     ): Promise<T[]>;
     getWhereBody<T extends { id: string }>(
-        table: string,
-        collection: string,
+        path: string,
         containment: Record<string, unknown>,
     ): Promise<T[]>;
-    put<T extends { id: string }>(
-        table: string,
+    append<T extends { id: string }>(
         row: T,
     ): Promise<void>;
-    delete(table: string, id: string): Promise<void>;
-    clear(table: string): Promise<void>;
     // Postgres write coordination. Other backends omit
     // these; callers treat absence as a no-op.
-    lock?(label: string): Promise<void>;
-    lockShared?(label: string): Promise<void>;
+    lockRequest?(hash: string): Promise<void>;
+    lockDocument?(path: string, name: string): Promise<void>;
     lockHead?(id: string): Promise<void>;
-    latestPutDelete?(
-        collection: string,
-        uriId: string,
-    ): Promise<{
+    getHead?(path: string, name: string): Promise<{
         readonly id: string;
         readonly method: string;
     } | null>;
     notify?(event: NotificationEvent): Promise<void>;
-    stampSchemaMarker?(): Promise<void>;
 }
 
 export interface WriteLocks {
-    lockDedup(hash: string): Promise<void>;
-    lockAddress(
-        collection: string,
-        uriId: string,
-    ): Promise<void>;
+    lockRequest(hash: string): Promise<void>;
+    lockDocument(path: string, name: string): Promise<void>;
     lockHead(id: string): Promise<void>;
-    latestPutDelete(
-        collection: string,
-        uriId: string,
-    ): Promise<{
+    getHead(path: string, name: string): Promise<{
         readonly id: string;
         readonly method: string;
     } | null>;
@@ -206,16 +168,13 @@ export interface WriteLocks {
 // to obtain rows; backends own persistence + encoding,
 // stores own semantics (tombstones, splices, singletons).
 // `transaction` is the primitive every row op crosses;
-// `ensureTables` is schema lifecycle, never a row op.
+// `ensureTable` is schema lifecycle, never a row op.
 export interface StorageBackend {
     transaction<R>(
-        tables: readonly string[],
         mode: TxMode,
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R>;
-    ensureTables(
-        tables: readonly string[],
-    ): Promise<void>;
+    ensureTable(): Promise<void>;
     // Schema lifecycle — each backend signals
     // 'schema exists' its own way: memory by table
     // existence, Postgres by the `schema_marker` row.
@@ -230,7 +189,6 @@ export interface StorageBackend {
 // `ambientRunner` — no AsyncLocalStorage, no ambient global,
 // just the runner the store was handed at construction.
 export type TxRunner = <R>(
-    tables: readonly string[],
     mode: TxMode,
     fn: (tx: Tx) => Promise<R>,
 ) => Promise<R>;
@@ -238,14 +196,13 @@ export type TxRunner = <R>(
 export const backendRunner = (
     backend: StorageBackend,
 ): TxRunner =>
-    (tables, mode, fn) =>
-        backend.transaction(tables, mode, fn);
+    (mode, fn) => backend.transaction(mode, fn);
 
-// Join the open tx: the declared tables/mode are the open
-// transaction's already, so this ignores them and runs `fn`
-// against the same handle.
+// Join the open tx: the open transaction's mode is
+// already fixed, so this ignores the declared mode and
+// runs `fn` against the same handle.
 export const ambientRunner = (tx: Tx): TxRunner =>
-    (_tables, _mode, fn) => fn(tx);
+    (_mode, fn) => fn(tx);
 
 // The store an adapter exposes, factored out of
 // DbAdapter so an adapter can build the whole bundle in one
@@ -263,12 +220,10 @@ export interface DbLifecycle {
     deleteSchema(): Promise<void>;
     hasSchema(): Promise<boolean>;
     postSchemaCreation(): Promise<void>;
-    // Make the named tables writable without declaring the
+    // Make the table writable without declaring the
     // schema present: the installer primitive for seeds,
     // not snapshot import.
-    ensureTables(
-        tables: readonly string[],
-    ): Promise<void>;
+    ensureTable(): Promise<void>;
     // The Decision 5 post hook: fired AFTER a write commits,
     // so cross-tab (and future cross-process) subscribers are
     // informed of state changes — never polled. Carried on the
@@ -284,9 +239,8 @@ export interface DbAdapter extends DbLifecycle, DbStores {
     // exposes the same stores bound to the open tx, so every
     // op joins it — GET-modify-PUT and multi-PUT commit
     // atomically. A nested view.transaction re-enters this
-    // same tx; its tables must be a subset of the outer set.
+    // same tx.
     transaction<R>(
-        tables: readonly string[],
         fn: (view: DbAdapter) => Promise<R>,
     ): Promise<R>;
     // Pure-read sibling of `transaction`; both backends
@@ -294,7 +248,6 @@ export interface DbAdapter extends DbLifecycle, DbStores {
     // joins whatever mode is open so read-your-writes
     // stays intact.
     readTransaction<R>(
-        tables: readonly string[],
         fn: (view: DbAdapter) => Promise<R>,
     ): Promise<R>;
 }
@@ -308,11 +261,9 @@ export interface GuardedDbAdapter
     extends DbLifecycle, DbStores
 {
     transaction<R>(
-        tables: readonly string[],
         fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R>;
     readTransaction<R>(
-        tables: readonly string[],
         fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R>;
 }
@@ -322,12 +273,6 @@ export interface GuardedDbAdapter
 export const TABLE_NAMES = [
     'message_pairs',
 ];
-
-// The message-plane transaction declaration. Every
-// `transaction` / `readTransaction` that touches
-// the message plane passes this instead of a
-// literal list. Equals TABLE_NAMES.
-export const MESSAGE_TABLES = TABLE_NAMES;
 
 // A secondary index is a plain column name, or the object
 // form declaring `unique: true`. No table declares the
@@ -353,34 +298,13 @@ export function uniqueColumns(
         .map((spec) => indexColumn(spec));
 }
 
-// The columns `getWhere` accepts per table — the
-// keyed-read allow-list both backends enforce
-// (`assertGetWhereColumn`). Postgres indexes are
+// Secondary indexes per table. Postgres indexes are
 // declared in `schema-postgres.ts`.
-// Tables absent here are read in full or by primary key: the
-// collection IS its rows.
+// Tables absent here are read in full or by primary key:
+// the collection IS its rows.
 export const TABLE_INDEXES:
     Record<string, readonly TableIndexSpec[]> = {
     message_pairs: [
-        'uri_collection', 'request_hash',
+        'path', 'request_hash',
     ],
 };
-
-export function assertGetWhereColumn(
-    table: string,
-    column: string,
-): void {
-    if (column === 'uri_id') {
-        throw new Error(
-            'getWhere does not accept uri_id',
-        );
-    }
-    const specs = TABLE_INDEXES[table];
-    if (specs === undefined) return;
-    const allowed = specs.map(indexColumn);
-    if (!allowed.includes(column)) {
-        throw new Error(
-            'getWhere does not accept ' + column,
-        );
-    }
-}

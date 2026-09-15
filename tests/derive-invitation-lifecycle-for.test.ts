@@ -20,8 +20,8 @@ import {
 
 // The Phase 14 Task 1 core: invitationLifecycleStatesFor is the
 // ENTITY-SCOPED sibling of deriveInvitationStates — INDEXED
-// getAllWhere reads (uri_id for the grant/document message pair,
-// uri_collection per op address) restricted to ONE known invitation
+// getAllWhere reads (name for the grant/document message pair,
+// path per op document) restricted to ONE known invitation
 // id, rather than the whole-collection + whole-ledger scans the
 // multi-invitation reader needs to DISCOVER every id. This file
 // proves it byte-identical to deriveInvitationStates's own

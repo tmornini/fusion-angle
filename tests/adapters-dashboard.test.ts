@@ -47,7 +47,7 @@ function buildIdea(
 
 // Seeds an idea through the SAME document PUT the live route
 // uses (postIdeaCreation), so a message pair exists at this
-// idea's address — required for the flipped GET ideas route
+// idea's document — required for the flipped GET ideas route
 // (Phase 2 Task 5), which getDashboardStats reads, to derive it.
 async function seedIdea(
     ctx: RequestContext,
@@ -83,7 +83,7 @@ function buildProject(
 
 // Seeds a project through the SAME document PUT the live route
 // uses (putProject), so a message pair exists at this project's
-// address — required for the flipped GET projects route
+// document — required for the flipped GET projects route
 // (Phase 3 Task 6), which getDashboardStats /
 // getDashboardGauges read, to derive it.
 async function seedProject(
@@ -102,7 +102,7 @@ async function seedProject(
 
 // Seeds a flow through the SAME document PUT the live route
 // uses (postFlowCreation), so a message pair exists at this
-// flow's address — required for the flipped GET flows route
+// flow's document — required for the flipped GET flows route
 // (Phase 4 Task 8), which getDashboardStats reads
 // UNCONDITIONALLY, to derive it.
 async function seedFlow(

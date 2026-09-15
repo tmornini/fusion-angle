@@ -193,11 +193,10 @@ async function countInstanceMessagePairs(
     const prefix = instancesUriPrefix(
         ORGANIZATION, TYPE_ID,
     );
-    const responses = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+    const responses = await db.messagePairs.getCollectionPairs(prefix,
     );
     return responses.filter(
-        (r) => r.uri_id === INSTANCE_ID,
+        (r) => r.name === INSTANCE_ID,
     ).length;
 }
 
@@ -208,13 +207,13 @@ async function countDeleteMessagePairs(
         ORGANIZATION, TYPE_ID,
     );
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getCollectionPairs(prefix),
+        db.messagePairs.getCollectionPairs(prefix),
     ]);
     return documentMessagePairsAt(
         requests, prefix,
     ).filter(
-        (messagePair) => messagePair.uriId === INSTANCE_ID
+        (messagePair) => messagePair.name === INSTANCE_ID
             && messagePair.method === 'DELETE',
     ).length;
 }
@@ -468,7 +467,7 @@ async () => {
         },
         operationId: generateIdentifier(),
     });
-    // Concurrent DELETE tombstones the address.
+    // Concurrent DELETE tombstones the document.
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));

@@ -25,7 +25,7 @@ import {
 } from './client-assertion-fixtures.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
 import {
-    putMessagePair, formAuthMessagePair, formWriteMessagePair,
+    appendMessagePairAlways, formAuthMessagePair, formWriteMessagePair,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
@@ -90,7 +90,7 @@ async function seedAuthorizationCodeMessagePair(
     const messagePair = await formAuthMessagePair(
         seed, requestBody, identityId, 200, { code },
     );
-    await putMessagePair(db, messagePair);
+    await appendMessagePairAlways(db, messagePair);
 }
 
 // Below-facade pair formation (the member-fixtures.ts idiom):
@@ -845,10 +845,10 @@ Deno.test('a second client_credentials grant with the same jti'
     assertStrictEquals(first.status, 201);
     const before = await db.messagePairs.getAll();
     const grantCount = before.filter((row) =>
-        row.uri_collection === '/authentication/token/',
+        row.path === '/authentication/token/',
     ).length;
     const eventCount = before.filter((row) =>
-        row.uri_collection === '/identities/uYaHKbNeVUcsFjuooOjMew/tokens/',
+        row.path === '/identities/uYaHKbNeVUcsFjuooOjMew/tokens/',
     ).length;
     const second = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
@@ -862,13 +862,13 @@ Deno.test('a second client_credentials grant with the same jti'
     const after = await db.messagePairs.getAll();
     assertStrictEquals(
         after.filter((row) =>
-            row.uri_collection === '/authentication/token/',
+            row.path === '/authentication/token/',
         ).length,
         grantCount,
     );
     assertStrictEquals(
         after.filter((row) =>
-            row.uri_collection ===
+            row.path ===
                 '/identities/uYaHKbNeVUcsFjuooOjMew/tokens/'
                 + '',
         ).length,
@@ -912,7 +912,7 @@ async () => {
         responseBody: { exp: now - 60 },
         operationId: generateIdentifier(),
     });
-    await putMessagePair(db, ticket);
+    await appendMessagePairAlways(db, ticket);
     const assertion = await signer.sign({
         iss: 'uYaHKbNeVUcsFjuooOjMew', sub: 'uYaHKbNeVUcsFjuooOjMew',
         aud: 'fusion-angle',
@@ -989,8 +989,8 @@ async () => {
     // requests.getAllWhere — the fault-injection point that
     // replaced the retired rawReadRow stub.
     (db.messagePairs as unknown as {
-        getAllWhere: () => Promise<never>;
-    }).getAllWhere = async () => {
+        getCollectionPairs: () => Promise<never>;
+    }).getCollectionPairs = async () => {
         throw new Error('store exploded');
     };
     const { result: res, calls } = await captureConsole(
