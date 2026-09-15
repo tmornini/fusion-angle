@@ -308,9 +308,8 @@ function preconditionDocument(
 }
 
 // The revision pair an instance PATCH wrote beside its wire
-// pair: same document, same request stamp, the other id.
-// operation_id is one per client context, not per request,
-// so it cannot be the key.
+// pair: same document, same operation, the other id. An
+// operation id names one write, so the join is an identity.
 async function revisionMessagePairIdForPatch(
     db: DbAdapter,
     wireMessagePairId: string,
@@ -323,7 +322,7 @@ async function revisionMessagePairIdForPatch(
     );
     const revision = siblings.find(
         (row) =>
-            row.request_at === wireReq.request_at
+            row.operation_id === wireReq.operation_id
             && row.id !== wireMessagePairId,
     );
     return revision?.id;
