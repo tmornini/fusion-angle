@@ -75,13 +75,6 @@ export class UniqueConstraintError extends Error {
     }
 }
 
-export interface EntityPut<
-    T extends { id: string },
-> {
-    readonly id: string;
-    readonly fields: Omit<T, 'id'>;
-}
-
 export interface EntityStore<
     T extends { id: string },
 > {
@@ -107,10 +100,6 @@ export interface EntityStore<
         id: string,
         fields: Omit<T, 'id'>,
     ): Promise<T>;
-    putMany(
-        entries: readonly EntityPut<T>[],
-        deleteIds: readonly string[],
-    ): Promise<void>;
 }
 
 // The storage-edge validator. Stores accept one at

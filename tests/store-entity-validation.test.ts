@@ -9,13 +9,6 @@ import { backendRunner } from '../api/db.ts';
 
 interface Thing { id: string; n: number }
 
-// A passthrough validator for tests exercising transaction
-// mechanics, not validation — every store now requires one
-// explicitly (no silent default).
-const pass = (
-    b: Record<string, unknown>,
-): Omit<Thing, 'id'> => b as unknown as Omit<Thing, 'id'>;
-
 async function primedBackend(): Promise<MemoryStorageBackend> {
     const backend = new MemoryStorageBackend();
     await backend.ensureTables(['things']);
@@ -64,27 +57,3 @@ Deno.test('HistoryEntityStore.put writes the validator output',
         const fetched = await store.getById('a');
         assertStrictEquals(fetched.n, 8);
     });
-
-Deno.test(
-    'HistoryEntityStore.putMany upserts every entry',
-    async () => {
-        const backend = await primedBackend();
-        const store = new HistoryEntityStore<Thing>(
-            'things', backendRunner(backend),
-            pass,
-        );
-        await store.putMany(
-            [
-                { id: 'a', fields: { n: 1 } },
-                { id: 'b', fields: { n: 2 } },
-            ],
-            [],
-        );
-        assertStrictEquals(
-            (await store.getById('a')).n, 1,
-        );
-        assertStrictEquals(
-            (await store.getById('b')).n, 2,
-        );
-    },
-);

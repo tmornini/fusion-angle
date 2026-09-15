@@ -1,7 +1,6 @@
 import {
     EntityNotFoundError,
     type EntityStore as EntityStoreInterface,
-    type EntityPut,
     type EntityValidator,
     type TxRunner,
 } from './db.ts';
@@ -107,34 +106,5 @@ export class HistoryEntityStore<
             tx => tx.put(this.#table, written),
         );
         return written;
-    }
-
-    async putMany(
-        entries: readonly EntityPut<T>[],
-        deleteIds: readonly string[],
-    ): Promise<void> {
-        // Validate every entry before opening the tx, so a
-        // bad row throws before any write — the whole batch
-        // is all-or-nothing.
-        const written = entries.map(entry => {
-            const { id: _id, ...body } =
-                entry.fields as unknown as
-                    Record<string, unknown>;
-            return {
-                ...this.#validate(body),
-                id: entry.id,
-            } as T;
-        });
-        await this.#run(
-            [this.#table], 'readwrite',
-            async (tx) => {
-                for (const id of deleteIds) {
-                    await tx.delete(this.#table, id);
-                }
-                for (const row of written) {
-                    await tx.put(this.#table, row);
-                }
-            },
-        );
     }
 }
