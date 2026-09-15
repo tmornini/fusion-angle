@@ -252,10 +252,11 @@ function makeRequestContext(
                 readonly (readonly [string, string])[],
         ) => {
             recordApiRequest('PUT', resource);
+            const headers = writeHeaders(headerFields);
             return run<T>(
                 tok => verbs.PUT<T>(
                     resource, body, tok,
-                    writeHeaders(headerFields), requestId,
+                    headers, requestId,
                 ));
         },
         PUTWithEtag: <T>(
@@ -265,13 +266,14 @@ function makeRequestContext(
                 readonly (readonly [string, string])[],
         ) => {
             recordApiRequest('PUT', resource);
+            const headers = writeHeaders(headerFields);
             return run<{
                 body: T;
                 etag: string | undefined;
             }>(
                 tok => verbs.PUTWithEtag<T>(
                     resource, body, tok,
-                    writeHeaders(headerFields), requestId,
+                    headers, requestId,
                 ),
             );
         },
@@ -282,10 +284,11 @@ function makeRequestContext(
                 readonly (readonly [string, string])[],
         ) => {
             recordApiRequest('PATCH', resource);
+            const headers = writeHeaders(headerFields);
             return run<T>(
                 tok => verbs.PATCH<T>(
                     resource, body, tok,
-                    writeHeaders(headerFields), requestId,
+                    headers, requestId,
                 ));
         },
         PATCHWithEtag: <T>(
@@ -295,22 +298,24 @@ function makeRequestContext(
                 readonly (readonly [string, string])[],
         ) => {
             recordApiRequest('PATCH', resource);
+            const headers = writeHeaders(headerFields);
             return run<{
                 body: T;
                 etag: string | undefined;
             }>(
                 tok => verbs.PATCHWithEtag<T>(
                     resource, body, tok,
-                    writeHeaders(headerFields), requestId,
+                    headers, requestId,
                 ),
             );
         },
         DELETE: (resource: string) => {
             recordApiRequest('DELETE', resource);
+            const headers = writeHeaders();
             return run<void>(
                 tok => verbs.DELETE(
                     resource, tok, requestId,
-                    writeHeaders(),
+                    headers,
                 ));
         },
         POST: <T>(
@@ -318,10 +323,11 @@ function makeRequestContext(
             body: Record<string, unknown>,
         ) => {
             recordApiRequest('POST', resource);
+            const headers = writeHeaders();
             return run<T>(
                 tok => verbs.POST<T>(
                     resource, body, tok,
-                    requestId, writeHeaders(),
+                    requestId, headers,
                 ));
         },
         POSTWithHeaders: <T>(
@@ -331,10 +337,11 @@ function makeRequestContext(
                 readonly (readonly [string, string])[],
         ) => {
             recordApiRequest('POST', resource);
+            const headers = writeHeaders(headerFields);
             return run<T>(
                 tok => verbs.POST<T>(
                     resource, body, tok,
-                    requestId, writeHeaders(headerFields),
+                    requestId, headers,
                 ));
         },
     };

@@ -113,7 +113,13 @@ tombstone.
 runs in-process on an empty database and stamps
 `schema_marker` last. Seed refuses a non-empty
 database. `./bin/postgres-wipe` is the public-schema
-reset (`POSTGRES_DROP_SCHEMA`) and does not seed.
+reset (`POSTGRES_DROP_SCHEMA`) and does not seed. The
+schema is `CREATE TABLE IF NOT EXISTS` and never alters
+a column, so the deploy that carries the `timestamptz`
+stamp columns lands only on a database that was wiped
+(`./bin/postgres-wipe`) and reseeded after it; an
+unwiped database keeps `text` columns and every pair
+read and write then fails.
 
 ## How we got here
 
