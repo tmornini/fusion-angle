@@ -5,7 +5,7 @@ file by shipping; `## Close protocol` is the exit.
 
 ## Critical product path
 
-Twelve items, in this order — each its own brainstorm →
+Eleven items, in this order — each its own brainstorm →
 spec → plan → ship cycle, implemented sequentially,
 ordered by benefit over cost: what a pilot tenant needs
 first, the process engine and its AI worker on that, two
@@ -15,44 +15,6 @@ former items left for `## Later work` (genericity, JSON
 parse/stringify, simulated latency, cachability) and the
 skew tests folded into item 7.
 
-1. The one table, examined — a report, not a change:
-   the structure and behavior of `message_pairs`
-   (`api/schema-postgres.ts`) under the SQL the code
-   actually issues (`api/backend-postgres.ts`: by id, by
-   collection, by document, by `request_hash`, body
-   containment, `getHead`, `lockHead` `FOR
-   UPDATE`, the advisory locks, `pg_notify`, the upsert).
-   `EXPLAIN ANALYZE` each against a ledger the size of a
-   year of tenant writes, not the 1453-pair mock seed,
-   and extend `tests/pg-explain.test.ts` (six plan pins
-   today) until every statement has one. Name what each
-   index buys and costs on the write path; whether
-   head-of-document (`livePutsOf` in
-   `api/message-store.ts` folding `SELECT *` of a whole
-   collection, 69 callers) belongs in SQL (`DISTINCT
-   ON`) or stays in the process; the five whole-ledger
-   `getAll()` folds (`api/derive-invitations.ts:70`
-   names the class; `api/derive-identity-tokens.ts:193`
-   runs on every chained token refresh;
-   `api/derive-identity-spine.ts:119`;
-   `api/derive-state-field-values.ts:187`;
-   `api/derive-states.ts:1441, 1970`) and the ledger
-   size at which each crosses the perception threshold;
-   integrity — `upsertRow`'s `ON CONFLICT (id) DO
-   UPDATE` lets the store rewrite a pair the doctrine
-   calls append-only (TEST-PLAN WB16/WB19, unpinned),
-   text-with-regex timestamps against
-   `timestamptz`, the 52-bit advisory key space, the
-   IMMUTABLE `message_body()` beneath the GIN index;
-   schema evolution — `CREATE … IF NOT EXISTS` plus a
-   boolean `schema_marker` is the whole migration story,
-   so name how a DDL change reaches a tenant database
-   that cannot be wiped; tenancy riding
-   `path`; growth (two wire messages per
-   write, backup size, VACUUM on an insert-only table).
-   Output: a dated report under `docs/superpowers/specs/`
-   whose findings are the oracles items 2, 5, 8, 10, and
-   12 design against.
 2. The authentication header out of the message; roles
    and views — `HOISTED_HEADER_NAMES`
    (`api/message-pair.ts:519-521`) stores
@@ -303,7 +265,8 @@ skew tests folded into item 7.
     standby and a rehearsed failover. Closes KNOWN seam
     "Single mint process" and retires ARCHITECTURE.md's
     "do not run two replicas". Consumes items 3, 5, 8,
-    and item 1's lock and growth findings.
+    and the examination report's lock and growth findings
+    (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`).
 
 ## Critical functionality path
 
@@ -329,6 +292,51 @@ Off the critical path; each with its oracle.
 
 ## Later work
 
+- One gate for the write. Ninety-six `appendMessagePairOnce`
+  sites and six `appendMessagePairAlways` sites, 73 of them in
+  `api/routes.ts`, because each handler owns its own storage
+  instead of returning its pairs for one place to store. A
+  handler returns `MessagePair[]`; the gate appends them once,
+  under one lock order, with one notification. Lands beside
+  items 7 and 10, which rewrite the largest handlers. Oracle:
+  one append site in `api/api.ts`, zero in `api/routes.ts`.
+- Every read is a collection or a document. The six
+  whole-ledger folds, `deriveIdentityTokens`,
+  `invitationOpStates`, `deriveIdentityPiiRows`,
+  `deriveStateFieldValueReferrers`, `deriveWorkOrderLifecycle`,
+  `deriveInvitationStates`, each take the exact-read shape the
+  examination report names for them, with the data-shape
+  decisions it names first, the token chain's path from a jti
+  among them. `getAll` and `selectAll` retire with the last
+  fold. Oracle: no caller of `getAll` in `api/`, and the
+  whole-ledger pin deleted.
+- The ledger sweep, built into `./bin/measure` the way
+  `./deploy` grew modes. A ledger mode that subsumes a
+  generator and a loader: the mock seed as the base, a modeled
+  year of growth on top, every model constant a CLI argument
+  (seats, working days, logins and refreshes and document
+  writes per seat-day, revision share, neighbor size); base
+  through `postMockDataLoad`, growth in batches of 1000 through
+  the seam's `append` with modeled stamps, formed by the real
+  pair formers. A decade sweep at 10k, 100k, and 1M pairs.
+  `EXPLAIN (ANALYZE, BUFFERS)` per statement with parameters
+  chosen by query, and the size at which any statement crosses
+  30 ms. Two hundred real writes through the gate per size;
+  per-index bytes, rebuild time, and the write sample with each
+  index dropped. A neighbor run at 100k this tenant and 900k
+  neighbor. Statistics discipline: snapshot
+  `pg_stat_user_tables`, then `VACUUM (ANALYZE)`, re-ANALYZE
+  after every rebuild, stats recorded per measurement. Local
+  compose Postgres 18 on tmpfs, Render v18; timings are lower
+  bounds. Loopback-only URL guard; a private schema per size;
+  JSON under `measurements/ledger/`. Oracle: committed JSON per
+  size and a report section per statement naming its 30 ms
+  crossing or "beyond 1M".
+- Growth: bytes per pair with two wire messages stored, heap
+  against index bytes, `pg_dump` size at 1M, and autovacuum's
+  insert-threshold behavior on the insert-only table. Oracle:
+  numbers in the sweep's JSON and a backup-size line item 5
+  can plan against.
 - `render.yaml` Blueprint as a second source of
   truth for the dashboard service. Oracle: a
   committed `render.yaml` that matches the live
@@ -1353,8 +1361,9 @@ Off the critical path; each with its oracle.
 
 ## Sequencing
 
-- 1 → 2, 5, 8, 10, 12 (the report's findings are their
-  oracles)
+- The examination report
+  (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`)
+  → 2, 5, 8, 10, 12 (its findings are their oracles)
 - 2 → 4, 5 (no credential is written or backed up in
   the clear)
 - 3 → 5 → 12 (the health probe, then per process)
