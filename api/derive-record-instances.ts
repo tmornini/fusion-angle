@@ -201,7 +201,7 @@ export async function deriveInstanceCollection(
     const rows: InstanceHead[] = [];
     for (const document of documents.values()) {
         rows.push({
-            id: document.uriId,
+            id: document.name,
             messagePairId: document.messagePairId,
             values: revisionValuesOf(document.body),
         });
@@ -220,7 +220,7 @@ export async function deriveInstanceRevisions(
     const messagePairs = (await fetchInstanceMessagePairs(
         db, organization, recordTypeId,
     )).filter((messagePair) =>
-        messagePair.uriId === instanceId);
+        messagePair.name === instanceId);
     if (messagePairs.length === 0) return [];
     const last = messagePairs[messagePairs.length - 1]!;
     if (last.method === DELETE_METHOD) return [];

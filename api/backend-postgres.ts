@@ -35,13 +35,13 @@ export interface PostgresTx extends Tx {
     getAddress<T extends { id: string }>(
         table: string,
         collection: string,
-        uriId: string,
+        name: string,
     ): Promise<T[]>;
     lock(label: string): Promise<void>;
     lockHead(id: string): Promise<void>;
     latestPutDelete(
         collection: string,
-        uriId: string,
+        name: string,
     ): Promise<{
         readonly id: string;
         readonly method: string;
@@ -164,11 +164,11 @@ function postgresTx(
         async getAddress<T extends { id: string }>(
             table: string,
             collection: string,
-            uriId: string,
+            documentName: string,
         ): Promise<T[]> {
             const name = assertMessageTable(table);
             const rows = await selectAddress(
-                sql, name, collection, uriId,
+                sql, name, collection, documentName,
             );
             return rows.map((row) => entityOf<T>(row));
         },
@@ -207,7 +207,7 @@ function postgresTx(
         },
         async latestPutDelete(
             collection: string,
-            uriId: string,
+            name: string,
         ): Promise<{
             readonly id: string;
             readonly method: string;
@@ -219,7 +219,7 @@ function postgresTx(
                 SELECT id, method
                 FROM message_pairs
                 WHERE path = ${collection}
-                  AND name = ${uriId}
+                  AND name = ${name}
                   AND method IN ('PUT', 'DELETE')
                 ORDER BY response_at DESC, id DESC
                 LIMIT 1
@@ -404,12 +404,12 @@ async function selectAddress(
     sql: SqlClient,
     _table: 'message_pairs',
     collection: string,
-    uriId: string,
+    name: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
         SELECT * FROM message_pairs
         WHERE path = ${collection}
-          AND name = ${uriId}
+          AND name = ${name}
         ORDER BY response_at, id
     `;
 }
@@ -438,7 +438,7 @@ async function upsertRow(
         textField(row, 'id'),
     );
     const collection = textField(row, 'path');
-    const uriId = textField(row, 'name');
+    const name = textField(row, 'name');
     const requester = textField(
         row, 'requester_identity_id',
     );
@@ -459,7 +459,7 @@ async function upsertRow(
             response_at, response,
             operation_id
         ) VALUES (
-            ${id}, ${collection}, ${uriId},
+            ${id}, ${collection}, ${name},
             ${requester}, ${method},
             ${requestAt}, ${requestHash}, ${request},
             ${responseAt}, ${response},

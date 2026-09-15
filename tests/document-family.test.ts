@@ -267,7 +267,7 @@ async function testDocumentOp(
             if (messagePair !== undefined) {
                 const latchedId = messagePair.latchedHeadMessagePairId;
                 const latest = (await messageStore(view).get(
-                    messagePair.path, messagePair.uriId,
+                    messagePair.path, messagePair.name,
                 ))?.id;
                 if (
                     latchedId !== undefined
@@ -288,11 +288,11 @@ async function testDocumentOp(
 }
 
 function testEntityOf(
-    document: { uriId: string; body: Record<string, unknown> },
+    document: { name: string; body: Record<string, unknown> },
     organization: Id,
 ): object {
     return {
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         ...document.body,
     };
@@ -829,11 +829,11 @@ const STATELESS_FAMILY = 'stateless-test-docs';
 const STATELESS_TABLE = 'stateless_storage_table';
 
 function statelessEntityOf(
-    document: { uriId: string; body: Record<string, unknown> },
+    document: { name: string; body: Record<string, unknown> },
     organization: Id,
 ): object {
     return {
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         ...document.body,
     };

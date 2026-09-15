@@ -14,7 +14,7 @@ import { missedReadError } from './derive-states.ts';
 // from message pairs at /flows/:id/tags/:name. Structurally
 // mirrors deriveFlowRecord (derive-flow-records.ts), re-nested
 // one level deeper under a SPECIFIC tag name rather than a
-// generated join id: the address's own uriId IS the tag's
+// generated join id: the document's own name IS the tag's
 // user-authored name (validateFlowTagName, api/validators.ts).
 // No collection GET exists (no route, no derivation) — Step 0
 // scoped this task to the single PUT/GET/DELETE leaf only
@@ -38,7 +38,7 @@ export function flowTagEntityOf(
     document: DerivedDocument,
 ): FlowTagEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         flow_id: flowId,
         ...validateFlowTagEntity(withoutId(document.body)),
     };
@@ -49,7 +49,7 @@ export function flowTagEntityOf(
 // name/flow_id; absent or a DELETE head throws
 // EntityNotFoundError(FLOW_TAGS_TABLE, name) — deriveDocumentsAt's
 // own DELETE-head exclusion already collapses both cases into
-// "no document at this uriId", exactly like every sibling nested
+// "no document at this name", exactly like every sibling nested
 // family (deriveFlowRecord, deriveIdentityPii).
 export async function deriveFlowTag(
     db: DbAdapter,

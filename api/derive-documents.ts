@@ -26,7 +26,7 @@ const DELETE_METHOD = 'DELETE';
 // load-bearing once a family's create-shaped genesis pair
 // shares its document address (the flows family: POST
 // 'flows' mints the create operation message pair at the
-// SAME uriId a subsequent PUT 'flows/:id' revisits).
+// SAME name a subsequent PUT 'flows/:id' revisits).
 // Defense-in-depth, not the deciding mechanism —
 // appendMessagePair's nowUtc() `at` already orders a
 // synthesized document message pair strictly after its
@@ -55,7 +55,7 @@ export function requestBodyOf(
 export interface DocumentMessagePair {
     readonly id: Id;
     readonly at: string;
-    readonly uriId: string;
+    readonly name: string;
     readonly method: string;
     readonly body: Record<string, unknown>;
     readonly requesterIdentityId: Id;
@@ -90,7 +90,7 @@ export function documentMessagePairsAt(
         out.push({
             id: messagePair.id,
             at: messagePair.response_at,
-            uriId: messagePair.name,
+            name: messagePair.name,
             method: messagePair.method,
             body: requestBodyOf(messagePair.request),
             requesterIdentityId:
@@ -108,7 +108,7 @@ export function documentMessagePairsAt(
 // derive-ideas.ts) turns each DerivedDocument into its own entity
 // shape.
 export interface DerivedDocument {
-    readonly uriId: string;
+    readonly name: string;
     readonly messagePairId: string; // head pair (== the
                                     // advertisable
                                     // Response-ID)
@@ -129,13 +129,13 @@ export function deriveDocumentsAt(
         messagePairs, path,
     );
     const heads = latestByKey(
-        documentMessagePairs, (messagePair) => messagePair.uriId,
+        documentMessagePairs, (messagePair) => messagePair.name,
     );
     const documents = new Map<string, DerivedDocument>();
-    for (const [uriId, head] of heads) {
+    for (const [name, head] of heads) {
         if (head.method === DELETE_METHOD) continue;
-        documents.set(uriId, {
-            uriId,
+        documents.set(name, {
+            name,
             messagePairId: head.id,
             method: head.method,
             body: head.body,

@@ -8,7 +8,7 @@
 // the spec's two-table key).
 export interface PathAndName {
     readonly path: string;
-    readonly uriId: string;
+    readonly name: string;
 }
 
 export function pathAndNameOf(
@@ -26,7 +26,7 @@ export function pathAndNameOf(
     const prefixSegments = idTailed
         ? pathSegments.slice(0, -1)
         : pathSegments;
-    const uriId = idTailed
+    const name = idTailed
         ? pathSegments[pathSegments.length - 1]!
         : '';
     // A slashed collection is ['family', '']; the empty
@@ -36,6 +36,6 @@ export function pathAndNameOf(
     );
     return {
         path: '/' + prefix.join('/') + '/',
-        uriId,
+        name,
     };
 }

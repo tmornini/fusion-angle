@@ -125,7 +125,7 @@ async () => {
         ),
     );
     const expected = identityProviderEntityOf({
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: 'PUT',
         body: goodRow,
@@ -218,7 +218,7 @@ async () => {
         organization: undefined,
         responseStatus: 200,
         responseBody: identityProviderEntityOf({
-            uriId: id,
+            name: id,
             messagePairId: id,
             method: 'PUT',
             body,
@@ -263,7 +263,7 @@ async () => {
         organization: undefined,
         responseStatus: 200,
         responseBody: identityProviderEntityOf({
-            uriId: id,
+            name: id,
             messagePairId: id,
             method: 'PUT',
             body: flatBody,

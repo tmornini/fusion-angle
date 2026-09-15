@@ -751,7 +751,7 @@ async () => {
     ]);
     const aiDocumentMessagePairs = documentMessagePairsAt(
         aiRequests, aiPrefix,
-    ).filter((messagePair) => messagePair.uriId === aiId);
+    ).filter((messagePair) => messagePair.name === aiId);
     assertStrictEquals(aiDocumentMessagePairs.length, 1);
     assertStrictEquals(aiDocumentMessagePairs[0]!.method, 'PUT');
 
@@ -775,7 +775,7 @@ async () => {
     ]);
     const humanDocumentMessagePairs = documentMessagePairsAt(
         humanRequests, humanPrefix,
-    ).filter((messagePair) => messagePair.uriId === humanId);
+    ).filter((messagePair) => messagePair.name === humanId);
     assertStrictEquals(humanDocumentMessagePairs.length, 1);
     assertStrictEquals(humanDocumentMessagePairs[0]!.method, 'PUT');
 });

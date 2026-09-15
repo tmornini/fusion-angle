@@ -140,9 +140,9 @@ function withWriteGate(
             lockDedup: async () => {},
             lockAddress: async () => {},
             lockHead: async () => {},
-            latestPutDelete: async (collection, uriId) => {
+            latestPutDelete: async (collection, name) => {
                 const head = await documentHeadAt(
-                    view, collection, uriId,
+                    view, collection, name,
                 );
                 return head ?? null;
             },
@@ -762,7 +762,7 @@ Deno.test(
         const messagePairs = documentMessagePairsAt(
             stored, prefix,
         )
-            .filter((p) => p.uriId === flowId);
+            .filter((p) => p.name === flowId);
         const states: { state: string; at: string }[] = [];
         for (const messagePair of messagePairs) {
             const delta = messagePair.body['graphDelta'];

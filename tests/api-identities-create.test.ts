@@ -251,7 +251,7 @@ async () => {
         stored,
         identityDocumentEntityOf(
             {
-                uriId: id,
+                name: id,
                 messagePairId: id,
                 method: 'PUT',
                 body: { kind: 'person' },

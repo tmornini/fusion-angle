@@ -26,7 +26,7 @@ const IDEA_N = 1;
 const AUTH_N = 9;
 const AUTH_OTHER_START = 10;
 const AUTH_OTHER_COUNT = 199;
-const VERSION_URI_ID = 'AjdvjuECVZEgZoFajaIEkg';
+const VERSION_NAME = 'AjdvjuECVZEgZoFajaIEkg';
 const VERSION_N = 500;
 const VERSION_EXTRA_START = 501;
 const VERSION_EXTRA_COUNT = 80;
@@ -124,7 +124,7 @@ async function putMessagePair(
     tx: Tx,
     n: number,
     collection: string,
-    uriId: string,
+    name: string,
     message: string,
     method: string,
 ): Promise<void> {
@@ -133,7 +133,7 @@ async function putMessagePair(
     await tx.put('message_pairs', {
         id,
         path: collection,
-        name: uriId,
+        name: name,
         requester_identity_id: REQUESTER,
         method,
         request_at: at,
@@ -207,9 +207,9 @@ async function seedRows(
                 tx,
                 VERSION_N,
                 VERSION_COLLECTION,
-                VERSION_URI_ID,
+                VERSION_NAME,
                 putWire(
-                    VERSION_COLLECTION + VERSION_URI_ID,
+                    VERSION_COLLECTION + VERSION_NAME,
                     '',
                 ),
                 'PUT',
@@ -220,9 +220,9 @@ async function seedRows(
                     tx,
                     n,
                     VERSION_COLLECTION,
-                    VERSION_URI_ID,
+                    VERSION_NAME,
                     putWire(
-                        VERSION_COLLECTION + VERSION_URI_ID,
+                        VERSION_COLLECTION + VERSION_NAME,
                         '',
                     ),
                     'PUT',
@@ -356,7 +356,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             EXPLAIN
             SELECT * FROM message_pairs
             WHERE path = ${VERSION_COLLECTION}
-              AND name = ${VERSION_URI_ID}
+              AND name = ${VERSION_NAME}
             ORDER BY response_at, id
         `;
         assertIndexPlan(
@@ -392,7 +392,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             SELECT id, method
             FROM message_pairs
             WHERE path = ${VERSION_COLLECTION}
-              AND name = ${VERSION_URI_ID}
+              AND name = ${VERSION_NAME}
               AND method IN ('PUT', 'DELETE')
             ORDER BY response_at DESC, id DESC
             LIMIT 1

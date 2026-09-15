@@ -54,7 +54,7 @@ const WORKORDERID_FV2 = generateIdentifier();
 // the SAME pure replay core (replayWorkOrderOperations, private
 // to api/derive-states.ts) over INDEXED reads scoped to ONE
 // known (organization, workOrderId) pair — name for the
-// create/document message pairs (they share ONE uriId at the work-orders
+// create/document message pairs (they share ONE name at the work-orders
 // collection path), path for the claim/transition
 // sub-resource addresses, and the organization's own states/:id
 // prefix (filtered locally to this entity) for gate 5a's rows —

@@ -53,7 +53,7 @@ export interface MessagePair {
     // timestamps belong to the message's creator.
     readonly requestAt: string;
     readonly path: string;
-    readonly uriId: string;
+    readonly name: string;
     readonly requesterIdentityId: Id;
     readonly requestMessage: string;   // serializeWire
     readonly requestHash: string;
@@ -218,10 +218,10 @@ export async function formWriteMessagePair(
     const path = canonicalPath(
         input.organization, pathAndName.path,
     );
-    const createdId = createdEntityUriId(
+    const createdId = createdEntityName(
         input.routePattern, input.body,
     );
-    const uriId = createdId ?? pathAndName.uriId;
+    const name = createdId ?? pathAndName.name;
     const headerFields = headerFieldsWithOperationId(
         input.headerFields, input.operationId,
     );
@@ -245,7 +245,7 @@ export async function formWriteMessagePair(
         id,
         requestAt: input.requestAt,
         path,
-        uriId,
+        name,
         requesterIdentityId: input.requesterIdentityId,
         requestMessage,
         requestHash: await requestMessageHash(requestMessage),
@@ -267,7 +267,7 @@ export async function formWriteMessagePair(
 }
 
 // Complete an AuthMessagePairSeed into a MessagePair for a grant's own
-// response: operation-addressed (uriId '', global plane — see
+// response: an operation document (name '', global plane — see
 // canonicalPath with organization undefined), never a
 // head-read. The two /authentication/* routes are the only
 // callers; each grant calls this pre-tx, once its own domain
@@ -365,10 +365,10 @@ export async function formTokenEventMessagePair(
 export async function documentHeadAt(
     db: DbAdapter,
     path: string,
-    uriId: string,
+    name: string,
 ): Promise<{ id: string; method: string } | undefined> {
     const messagePairs = await messageStore(db).getMessagePairs(
-        path, uriId,
+        path, name,
     );
     let head: {
         at: string;
@@ -691,7 +691,7 @@ async function writeMessagePairRows(
 ): Promise<void> {
     await view.messagePairs.put(messagePair.id, {
         path: messagePair.path,
-        name: messagePair.uriId,
+        name: messagePair.name,
         requester_identity_id:
             messagePair.requesterIdentityId,
         method: messagePair.method,
@@ -719,20 +719,20 @@ async function coordinateWrite(
     const gated = isGatedPath(messagePair.path);
     if (gated) {
         await locks.lockAddress(
-            messagePair.path, messagePair.uriId,
+            messagePair.path, messagePair.name,
         );
     }
     const latched = messagePair.latchedHeadMessagePairId;
     if (latched !== undefined) {
         await locks.lockHead(latched);
         const latest = await locks.latestPutDelete(
-            messagePair.path, messagePair.uriId,
+            messagePair.path, messagePair.name,
         );
         if (latest === null || latest.id !== latched) {
             throw new ApiError(
                 'If-Match does not match the current'
                 + ' document at '
-                + messagePair.path + messagePair.uriId,
+                + messagePair.path + messagePair.name,
                 HTTP_PRECONDITION_FAILED,
             );
         }
@@ -740,13 +740,13 @@ async function coordinateWrite(
     }
     if (!gated) return;
     const latest = await locks.latestPutDelete(
-        messagePair.path, messagePair.uriId,
+        messagePair.path, messagePair.name,
     );
     if (latest !== null && latest.method === 'PUT') {
         throw new ApiError(
             'If-Match does not match the current'
             + ' document at '
-            + messagePair.path + messagePair.uriId,
+            + messagePair.path + messagePair.name,
             HTTP_PRECONDITION_FAILED,
         );
     }
@@ -807,7 +807,7 @@ function isGatedPath(collection: string): boolean {
 const CREATE_BODY_ID_FIELDS: Record<string, string> = {
     // Not gate-dispatched (the invitations side channel forms
     // its own pair directly in invitations-domain.ts) but reuses
-    // this SAME override table so createdEntityUriId serves both
+    // this SAME override table so createdEntityName serves both
     // callers with one voice.
     'invitations': 'invitationId',
     // Nested composed POST (Task 9): pattern is not a bare
@@ -818,7 +818,7 @@ const CREATE_BODY_ID_FIELDS: Record<string, string> = {
     [RECORD_TYPES_COLLECTION_PATTERN]: 'id',
 };
 
-export function createdEntityUriId(
+export function createdEntityName(
     routePattern: string,
     body: Record<string, unknown> | undefined,
 ): string | undefined {
@@ -826,7 +826,7 @@ export function createdEntityUriId(
     // collection-POST create route whose pattern IS the family
     // name. Ideas registered this slot in Task 1 for its own
     // POST /ideas, which Phase 2 Task 3 (R1) retired — genesis
-    // folded into the document-class PUT ideas/:id, whose uriId
+    // folded into the document-class PUT ideas/:id, whose name
     // pathAndNameOf already derives from the path segment, so
     // this lookup never fires for ideas today. Projects (second
     // family) registers the same inert slot: it has NO bare
@@ -977,12 +977,12 @@ export const REPLAY_EXEMPT_ROUTE_PATTERNS: Set<string> =
     ]);
 
 // The head-read class, PER ROUTE PATTERN — never inferred from
-// a request's own uriId. A document address is revisited
+// a request's own name. A document is revisited
 // (create then update, or repeated PUT) and takes a pre-tx
-// head-read; an operation address (uriId always '') and an
+// head-read; an operation document (name always '') and an
 // event-append address (a fresh, client-minted id every write,
 // e.g. states/:id) never head-read, even though an event-
-// append uriId is never ''. Grown family by family alongside
+// append name is never ''. Grown family by family alongside
 // MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.
 export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
     new Set([

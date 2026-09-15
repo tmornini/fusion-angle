@@ -74,19 +74,19 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 async function pairsAt(
     db: MemoryDbAdapter,
     prefix: string,
-    uriId: string,
+    name: string,
 ): Promise<number> {
     const rows = await db.messagePairs.getAllWhere(
         'path', prefix,
     );
-    return rows.filter((row) => row.name === uriId)
+    return rows.filter((row) => row.name === name)
         .length;
 }
 
 async function storedResponseAt(
     db: MemoryDbAdapter,
     prefix: string,
-    uriId: string,
+    name: string,
 ): Promise<{
     readonly requestId: string;
     readonly method: string;
@@ -95,7 +95,7 @@ async function storedResponseAt(
 }> {
     const requests = (await db.messagePairs.getAllWhere(
         'path', prefix,
-    )).filter((row) => row.name === uriId);
+    )).filter((row) => row.name === name);
     const last = requests[requests.length - 1];
     assert(last !== undefined, 'no stored request');
     const stored = await db.messagePairs.getById(last.id);

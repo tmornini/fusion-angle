@@ -113,7 +113,7 @@ const OBJECTIVES_TEST_WIRING: DocumentFamilyWiring = {
     // Mirror routes.ts objectiveDocumentEntityOf: stamp trio
     // from lifecycle-current (required on trio path).
     entityOf: (document, organization, current) => ({
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
         state: current!.state,
@@ -910,7 +910,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     }
     const documentMessagePairsAfter = documentMessagePairsAt(
         afterRequests, objectivesPrefix,
-    ).filter((messagePair) => messagePair.uriId === objectiveId);
+    ).filter((messagePair) => messagePair.name === objectiveId);
     // create doc + reposition + archive + reactivate +
     // duplicate create's document = 5
     assertStrictEquals(documentMessagePairsAfter.length, 5);
@@ -978,7 +978,7 @@ Deno.test('the create-op POST pair is not read as a document message pair —'
 
     const documentMessagePairs = documentMessagePairsAt(
         requests, prefix,
-    ).filter((messagePair) => messagePair.uriId === objectiveId);
+    ).filter((messagePair) => messagePair.name === objectiveId);
     assertStrictEquals(documentMessagePairs.length, 1);
     assertStrictEquals(documentMessagePairs[0]!.method, 'PUT');
 

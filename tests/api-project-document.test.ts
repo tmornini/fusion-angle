@@ -258,7 +258,7 @@ Deno.test('stored PUT body equals projectEntityOf of the same'
     );
     const expected = projectEntityOf(
         {
-            uriId: id,
+            name: id,
             messagePairId: id,
             method: 'PUT',
             body,

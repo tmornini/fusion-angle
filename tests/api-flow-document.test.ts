@@ -335,7 +335,7 @@ Deno.test('postFlowDocumentOp with revivals posts the restored'
     ]);
     const messagePairs = documentMessagePairsAt(
         requests, prefix,
-    ).filter((p) => p.uriId === 'biDOZCyZATKcAVVOCbegTw');
+    ).filter((p) => p.name === 'biDOZCyZATKcAVVOCbegTw');
     const states: string[] = [];
     for (const messagePair of messagePairs) {
         const delta = messagePair.body['graphDelta'];
@@ -1288,7 +1288,7 @@ async function assertStoredPutOmitsUndoHistory(
     );
     const expected = flowStoredEntityOf(
         {
-            uriId: flowId,
+            name: flowId,
             messagePairId: flowId,
             method: 'PUT',
             body: requestBody,
@@ -1312,7 +1312,7 @@ async function assertStoredPutOmitsUndoHistory(
         wire,
         flowEntityOf(
             {
-                uriId: flowId,
+                name: flowId,
                 messagePairId: flowId,
                 method: 'PUT',
                 body: requestBody,

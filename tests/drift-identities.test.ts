@@ -159,7 +159,7 @@ const IDENTITIES_TEST_WIRING: DocumentFamilyWiring = {
     validateDocument: validateIdentityDocumentBody,
     documentOp: postIdentityDocumentOp,
     entityOf: (document, _organization) => ({
-        id: document.uriId,
+        id: document.name,
         ...document.body,
     }),
 };

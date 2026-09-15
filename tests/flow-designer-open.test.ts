@@ -152,7 +152,7 @@ async function flowDocumentPairCount(
         stored, prefix,
     ).filter(
         (messagePair) =>
-            messagePair.uriId === flowId,
+            messagePair.name === flowId,
     ).length;
 }
 

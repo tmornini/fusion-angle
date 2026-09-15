@@ -129,12 +129,12 @@ async function createFlow(
 }
 
 function storedDoc(
-    uriId: string,
+    name: string,
     body: Record<string, unknown>,
 ) {
     return {
-        uriId,
-        messagePairId: uriId,
+        name,
+        messagePairId: name,
         method: 'PUT',
         body,
     };

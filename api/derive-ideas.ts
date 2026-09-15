@@ -67,7 +67,7 @@ export function ideaEntityOf(
 ): IdeaEntity {
     const body = document.body;
     return {
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         title: pickString(body, 'title'),
         position: pickNumber(body, 'position'),
@@ -126,11 +126,11 @@ export async function deriveIdeas(
         new Map<Id, DocumentMessagePair[]>();
     for (const messagePair of messagePairs) {
         const list = messagePairsByIdeaId.get(
-            messagePair.uriId,
+            messagePair.name,
         );
         if (list === undefined) {
             messagePairsByIdeaId.set(
-                messagePair.uriId, [messagePair],
+                messagePair.name, [messagePair],
             );
         } else {
             list.push(messagePair);
@@ -181,7 +181,7 @@ export async function deriveIdea(
     const history = stateHistoryFrom(
         documentLifecycleEvents(
             messagePairs.filter((messagePair) =>
-                messagePair.uriId === ideaId),
+                messagePair.name === ideaId),
         ),
         ideaId,
     );
@@ -200,7 +200,7 @@ export function ideaSubmissionEntityOf(
     document: DerivedDocument,
 ): IdeaSubmissionEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateIdeaSubmissionEntity(
             withoutId(document.body),
         ),
@@ -243,7 +243,7 @@ export async function deriveIdeaStateHistory(
     return stateHistoryFrom(
         documentLifecycleEvents(
             messagePairs.filter((messagePair) =>
-                messagePair.uriId === ideaId),
+                messagePair.name === ideaId),
         ),
         ideaId,
     );

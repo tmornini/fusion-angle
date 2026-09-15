@@ -227,7 +227,7 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     // + pii + credential (2) + authorize + token + token-event
     // + pbkdf2-to-scrypt rehash (4) = 8.
     assertStrictEquals(requests.length, 8);
-    // The AUTH hops stay operation-addressed (uriId ''); the
+    // The AUTH hops stay operation documents (name ''); the
     // token grant's row event pair rides its OWN row's address
     // instead, so it alone carries a non-empty name in this
     // slice. Indices 4–5 are authorize + token.

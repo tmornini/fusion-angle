@@ -87,7 +87,7 @@ async function putPair(
     });
 }
 
-async function idsAtAddress(
+async function idsAtDocument(
     adapter: DbAdapter,
 ): Promise<string[]> {
     const rows = await adapter.messagePairs.getAllAtAddress(
@@ -167,10 +167,10 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 await putPair(postgres, id);
                 await putPair(memory, id);
             }
-            const pgIds = await idsAtAddress(
+            const pgIds = await idsAtDocument(
                 postgres,
             );
-            const memIds = await idsAtAddress(
+            const memIds = await idsAtDocument(
                 memory,
             );
             assertEquals(pgIds, identifierOrder);

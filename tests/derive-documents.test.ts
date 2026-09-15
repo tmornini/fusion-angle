@@ -39,7 +39,7 @@ async function storedMessagePairAt(
     return {
         id: messagePair.id,
         path: messagePair.path,
-        name: messagePair.uriId,
+        name: messagePair.name,
         requester_identity_id: messagePair.requesterIdentityId,
         method: messagePair.method,
         request_at: AT,

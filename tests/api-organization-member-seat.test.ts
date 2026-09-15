@@ -105,7 +105,7 @@ Deno.test('accept writes the seat at the invitation'
     ]);
     const seats = documentMessagePairsAt(
         requests, prefix,
-    ).filter((messagePair) => messagePair.uriId === SARAH_ID
+    ).filter((messagePair) => messagePair.name === SARAH_ID
         && messagePair.method === 'PUT');
     assertStrictEquals(seats.length, 1);
     assertEquals(seats[0]!.body, {

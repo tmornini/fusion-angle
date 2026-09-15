@@ -855,10 +855,10 @@ const INVITATIONS_STORAGE_PREFIX =
     '/invitations/';
 
 function invitationDocumentEntity(
-    document: { uriId: Id; body: Record<string, unknown> },
+    document: { name: Id; body: Record<string, unknown> },
 ): Record<string, unknown> {
     return {
-        id: document.uriId,
+        id: document.name,
         // The spread body's `at` is the invitation's own
         // grant time — validated at write time by
         // grantInvitation's validateTimestampField(body,

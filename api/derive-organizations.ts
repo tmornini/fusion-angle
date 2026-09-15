@@ -76,7 +76,7 @@ export function organizationEntityOf(
 ): OrganizationEntity {
     return {
         ...validateOrganizationEntity(withoutId(document.body)),
-        id: document.uriId,
+        id: document.name,
     };
 }
 

@@ -9,13 +9,13 @@ Deno.test('an id route splits prefix and id', () => {
         ['ideas', '42'],
     );
     assertStrictEquals(a.path, '/ideas/');
-    assertStrictEquals(a.uriId, '42');
+    assertStrictEquals(a.name, '42');
 });
 
 Deno.test('a collection route has the empty id', () => {
     const a = pathAndNameOf(['ideas'], ['ideas']);
     assertStrictEquals(a.path, '/ideas/');
-    assertStrictEquals(a.uriId, '');
+    assertStrictEquals(a.name, '');
 });
 
 Deno.test('a nested id route keeps the parent in the prefix',
@@ -25,7 +25,7 @@ Deno.test('a nested id route keeps the parent in the prefix',
         ['ideas', '42', 'submissions', '7'],
     );
     assertStrictEquals(a.path, '/ideas/42/submissions/');
-    assertStrictEquals(a.uriId, '7');
+    assertStrictEquals(a.name, '7');
 });
 
 Deno.test('an operation route is collection-shaped', () => {
@@ -35,7 +35,7 @@ Deno.test('an operation route is collection-shaped', () => {
         ['ideas', '42', 'conversion'],
     );
     assertStrictEquals(a.path, '/ideas/42/conversion/');
-    assertStrictEquals(a.uriId, '');
+    assertStrictEquals(a.name, '');
 });
 
 Deno.test('pathAndNameOf names path', () => {
@@ -43,5 +43,5 @@ Deno.test('pathAndNameOf names path', () => {
         ['ideas', ':id'], ['ideas', '42'],
     );
     assertStrictEquals(addr.path, '/ideas/');
-    assertStrictEquals(addr.uriId, '42');
+    assertStrictEquals(addr.name, '42');
 });

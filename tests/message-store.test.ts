@@ -27,7 +27,7 @@ async function writePair(
     db: MemoryDbAdapter,
     input: {
         readonly method: string;
-        readonly uriId: string;
+        readonly name: string;
         readonly responseBody?: unknown;
     },
 ): Promise<{ id: string }> {
@@ -35,12 +35,12 @@ async function writePair(
     const messagePair = await formWriteMessagePair({
         method: input.method,
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + input.uriId,
+            + input.name,
         routePattern: 'organizations/:id/ideas/:id',
         routeSegments: ['ideas', ':id'],
-        pathSegments: ['ideas', input.uriId],
+        pathSegments: ['ideas', input.name],
         headerFields: [],
-        body: { title: input.uriId },
+        body: { title: input.name },
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: nextRequestAt(),
         organization: 'AjdvjuECVZEgZoFajaIEkg',
@@ -70,12 +70,12 @@ async () => {
     const db = await freshDb();
     const put = await writePair(db, {
         method: 'PUT',
-        uriId: 'XufQcWIKhZshfJYOVNeUSw',
+        name: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { n: 1 },
     });
     await writePair(db, {
         method: 'POST',
-        uriId: 'XufQcWIKhZshfJYOVNeUSw',
+        name: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { n: 2 },
     });
     const got = await messageStore(db).get(
@@ -89,12 +89,12 @@ async () => {
     const db = await freshDb();
     await writePair(db, {
         method: 'PUT',
-        uriId: 'XufQcWIKhZshfJYOVNeUSw',
+        name: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { n: 1 },
     });
     await writePair(db, {
         method: 'DELETE',
-        uriId: 'XufQcWIKhZshfJYOVNeUSw',
+        name: 'XufQcWIKhZshfJYOVNeUSw',
     });
     const got = await messageStore(db).get(
         COLLECTION, 'XufQcWIKhZshfJYOVNeUSw',
@@ -107,12 +107,12 @@ async () => {
     const db = await freshDb();
     await writePair(db, {
         method: 'PUT',
-        uriId: 'doc-a',
+        name: 'doc-a',
         responseBody: { name: 'a' },
     });
     await writePair(db, {
         method: 'PUT',
-        uriId: 'doc-b',
+        name: 'doc-b',
         responseBody: { name: 'b' },
     });
     const rows = await messageStore(db).getCollection(
@@ -129,12 +129,12 @@ async () => {
     const db = await freshDb();
     await writePair(db, {
         method: 'PUT',
-        uriId: 'XufQcWIKhZshfJYOVNeUSw',
+        name: 'XufQcWIKhZshfJYOVNeUSw',
         responseBody: { code: 'abc', n: 1 },
     });
     await writePair(db, {
         method: 'PUT',
-        uriId: 'YHvbnJSZHECuziaHXcsKpw',
+        name: 'YHvbnJSZHECuziaHXcsKpw',
         responseBody: { code: 'zzz', n: 2 },
     });
     const hits = await db.messagePairs.getAllWhereBody(

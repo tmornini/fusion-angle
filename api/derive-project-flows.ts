@@ -39,7 +39,7 @@ export function projectFlowEntityOf(
     document: DerivedDocument,
 ): ProjectFlowEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateProjectFlowEntity(withoutId(document.body)),
     };
 }

@@ -143,7 +143,7 @@ const RECORDS_TEST_WIRING: DocumentFamilyWiring = {
     entityOf: (document, organization, current) => {
         const body = document.body;
         return {
-            id: document.uriId,
+            id: document.name,
             organization_id: organization,
             name: pickString(body, 'name'),
             description: pickString(body, 'description'),
@@ -953,7 +953,7 @@ async () => {
             'path', prefix,
         ),
         prefix,
-    ).filter((messagePair) => messagePair.uriId === recordId);
+    ).filter((messagePair) => messagePair.name === recordId);
     assertStrictEquals(firstDocumentMessagePairs.length, 1);
 
     const second = await handleRequest(db, req(
@@ -979,7 +979,7 @@ async () => {
         await db.messagePairs.getAllWhere('path', prefix);
     const secondDocumentMessagePairs = documentMessagePairsAt(
         allRequests, prefix,
-    ).filter((messagePair) => messagePair.uriId === recordId);
+    ).filter((messagePair) => messagePair.name === recordId);
     assertStrictEquals(secondDocumentMessagePairs.length, 2);
     const secondDocumentMessagePairId =
         secondDocumentMessagePairs[1]!.id;
@@ -1046,7 +1046,7 @@ async () => {
 
     const recordDocumentMessagePairs = documentMessagePairsAt(
         recordRequests, recordsPrefix,
-    ).filter((messagePair) => messagePair.uriId === recordId);
+    ).filter((messagePair) => messagePair.name === recordId);
     assertStrictEquals(recordDocumentMessagePairs.length, 1);
     assertStrictEquals(recordDocumentMessagePairs[0]!.method, 'PUT');
 
@@ -1081,7 +1081,7 @@ async () => {
     const attributeDocumentMessagePairs = documentMessagePairsAt(
         attributeRequests, attributesPrefix,
     ).filter((messagePair) =>
-        messagePair.uriId === attributeId);
+        messagePair.name === attributeId);
     assertStrictEquals(attributeDocumentMessagePairs.length, 1);
     assertStrictEquals(attributeDocumentMessagePairs[0]!.method, 'PUT');
 });

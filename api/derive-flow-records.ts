@@ -53,7 +53,7 @@ export function flowRecordEntityOf(
     document: DerivedDocument,
 ): FlowRecordEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateFlowRecordEntity(withoutId(document.body)),
     };
 }
@@ -95,7 +95,7 @@ export async function deriveFlowRecords(
 // under this flow/organization) or a DELETE head throws
 // EntityNotFoundError('flow_records', id) — deriveDocumentsAt's
 // own DELETE-head exclusion already collapses both cases into
-// "no document at this uriId".
+// "no document at this name".
 export async function deriveFlowRecord(
     db: DbAdapter,
     organization: Id,

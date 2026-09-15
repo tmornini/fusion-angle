@@ -50,7 +50,7 @@ interface TransitionFieldValue {
 // DocumentMessagePair shape so head-reduction below shares latestByKey
 // with every other derive. `id`/`at` are the TRANSITION pair's
 // OWN envelope (every row it folds landed inside that ONE
-// atomic write, so they share one order-key); `uriId` is the
+// atomic write, so they share one order-key); `name` is the
 // field-value row's OWN id. `method: 'PUT'` — a transition only
 // ever CREATES a row (validateWorkOrderTransitionBody carries
 // no delete arm), never tombstones one.
@@ -75,7 +75,7 @@ function transitionFieldValueCandidates(
                 candidates.push({
                     id: transition.id,
                     at: transition.at,
-                    uriId: fieldValue.id,
+                    name: fieldValue.id,
                     method: 'PUT',
                     body: fieldValue.fields,
                     requesterIdentityId:
@@ -103,13 +103,13 @@ export function stateFieldValuesFrom(
         messagePairs,
     );
     const heads = latestByKey(
-        candidates, (messagePair) => messagePair.uriId,
+        candidates, (messagePair) => messagePair.name,
     );
     const rows: StateFieldValueEntity[] = [];
-    for (const [uriId, head] of heads) {
+    for (const [name, head] of heads) {
         if (head.method === 'DELETE') continue;
         rows.push({
-            id: uriId,
+            id: name,
             state_event_id:
                 pickString(head.body, 'state_event_id'),
             attribute_id: pickString(head.body, 'attribute_id'),

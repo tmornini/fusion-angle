@@ -23,7 +23,7 @@ import {
     formWriteMessagePair,
     appendMessagePair,
     storedResponseFor,
-    createdEntityUriId,
+    createdEntityName,
     canonicalPath,
     hoistedHeaderFields,
     sendWriteResponse,
@@ -780,9 +780,9 @@ export async function handleRequest(
             const canonicalPrefix = canonicalPath(
                 organization, pathAndName.path,
             );
-            const uriId = createdEntityUriId(
+            const name = createdEntityName(
                 routePattern, body,
-            ) ?? pathAndName.uriId;
+            ) ?? pathAndName.name;
             // The locked/simple divide (spec §The two PUT classes): keyed by
             // the route's family registration THROUGH THE WIRING CONSULT —
             // never a blanket family-registry or
@@ -817,7 +817,7 @@ export async function handleRequest(
             // kinds (simple and locked).
             const livePut = isDocumentPut
                 ? await documentHeadMessagePairId(
-                    effective, canonicalPrefix, uriId,
+                    effective, canonicalPrefix, name,
                 )
                 : undefined;
             const advertised = livePut;
@@ -858,7 +858,7 @@ export async function handleRequest(
                         organization,
                         latchAddress.path,
                     ),
-                    latchAddress.uriId,
+                    latchAddress.name,
                 );
             const latchEcho = isLatchedOperation
                 ? request.headers.get(IF_MATCH_HEADER)
@@ -902,7 +902,7 @@ export async function handleRequest(
             // already-gone 204 no append; live PUT proceeds.
             if (method === 'DELETE') {
                 const head = await documentHeadAt(
-                    effective, canonicalPrefix, uriId,
+                    effective, canonicalPrefix, name,
                 );
                 if (head === undefined) {
                     return Response.json(
@@ -1367,7 +1367,7 @@ export async function handleRequest(
                                         await documentHeadMessagePairId(
                                             view,
                                             canonicalPrefix,
-                                            uriId,
+                                            name,
                                         );
                                     return latest
                                         !== livePut;
@@ -1378,7 +1378,7 @@ export async function handleRequest(
                                 await documentHeadMessagePairId(
                                     effective,
                                     canonicalPrefix,
-                                    uriId,
+                                    name,
                                 );
                             if (
                                 nowLive !== undefined
@@ -1450,7 +1450,7 @@ export async function handleRequest(
                                     view,
                                     emptyMessagePair
                                         .path,
-                                    emptyMessagePair.uriId,
+                                    emptyMessagePair.name,
                                 );
                             if (latest !== latchedId) {
                                 throw new ApiError(

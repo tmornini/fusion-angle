@@ -199,7 +199,7 @@ async function membershipsFor(
         for (const document of deriveDocumentsAt(
             seatRequests, seatPrefix,
         ).values()) {
-            if (document.uriId === identityId) {
+            if (document.name === identityId) {
                 ids.push(organization.id);
             }
         }

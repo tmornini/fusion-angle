@@ -1100,7 +1100,7 @@ async () => {
     ]);
     const messagePairs = documentMessagePairsAt(
         requests, prefix,
-    ).filter((p) => p.uriId === flowId);
+    ).filter((p) => p.name === flowId);
     const states: { state: string; at: string }[] = [];
     for (const messagePair of messagePairs) {
         const delta = messagePair.body['graphDelta'];

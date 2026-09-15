@@ -193,10 +193,10 @@ function writeLocksOf(tx: Tx): WriteLocks | undefined {
     return {
         lockDedup: (hash) =>
             lock('fusion.dedup.' + hash),
-        lockAddress: (collection, uriId) =>
+        lockAddress: (collection, name) =>
             lock(
                 'fusion.address.' + collection
-                + uriId,
+                + name,
             ),
         lockHead,
         latestPutDelete,

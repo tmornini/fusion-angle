@@ -1122,7 +1122,7 @@ async function grantClientCredentials(
 // (AGENTS.md § Transaction bodies await only row ops). It
 // keys
 // the issued root's row id (and, by construction, that row's own
-// event pair's name — formTokenEventMessagePair derives uriId from the
+// event pair's name — formTokenEventMessagePair derives name from the
 // id it is given). authorizeCodeIssuer matches the LIVE code
 // against the authorize response family's stored `code` field
 // (pairs are stored verbatim).
@@ -1173,9 +1173,9 @@ interface AuthorizeCodeIssuer {
 
 // PRE-TX (i), gate 3: the code -> identity/client point-match
 // over the WHOLE '/authentication/authorize/' response family.
-// That address is operation-addressed (uriId always ''), so no
-// per-uriId head reduction applies here — deriveDocumentsAt's
-// latest-per-uriId would wrongly collapse every distinct code's
+// That path holds operation documents (name always ''), so no
+// per-name head reduction applies here — deriveDocumentsAt's
+// latest-per-name would wrongly collapse every distinct code's
 // pair down to a single latest one. Every stored pair at this
 // prefix is a genuine 2xx: authorizePassword forms a pair ONLY on
 // success (grant-first, pinned), so no status re-check is needed.

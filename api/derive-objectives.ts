@@ -35,7 +35,7 @@ export async function deriveObjectiveStateHistory(
     const messagePairs = documentMessagePairsAt(
         stored, prefix,
     ).filter((messagePair) =>
-        messagePair.uriId === objectiveId);
+        messagePair.name === objectiveId);
     return stateHistoryFrom(
         documentLifecycleEvents(messagePairs),
         objectiveId,

@@ -408,11 +408,11 @@ function responseBodyOf(
 
 function ownerFromAddress(
     path: string,
-    uriId: Id,
+    name: Id,
     message: string,
 ): Id | null {
     if (path === ORGANIZATIONS_ADDRESS_PREFIX) {
-        return uriId;
+        return name;
     }
     const nested = ORGANIZATION_NESTED_URI_PREFIX.exec(
         path,
@@ -674,7 +674,7 @@ async function organizationHasOpBornEvent(
                 continue;
             }
             const owner = await resolveOwningOrganization(
-                dbOrView, messagePair.uriId, organization,
+                dbOrView, messagePair.name, organization,
             );
             if (
                 owner === null
@@ -826,8 +826,8 @@ export async function stateEventVisibilityFor(
 // and PUT/DELETE 'work-orders/:id' (document) share this ONE
 // prefix per organization (family-registry.ts: work-orders is
 // organizationNested), partitioned apart by METHOD alone
-// (tests/drift-work-orders.test.ts case 8) — the create's uriId is
-// the body's OWN minted id, the SAME id a later PUT's uriId names.
+// (tests/drift-work-orders.test.ts case 8) — the create's name is
+// the body's OWN minted id, the SAME id a later PUT's name names.
 const WORK_ORDERS_COLLECTION_PATTERN =
     /^\/organizations\/[^/]+\/work-orders\/$/;
 
@@ -862,7 +862,7 @@ const WORK_ORDER_RELEASE_PATTERN =
 interface OperationMessagePair {
     readonly id: Id;
     readonly at: string;
-    readonly uriId: Id;
+    readonly name: Id;
     readonly body: Record<string, unknown>;
     readonly requesterIdentityId: Id;
 }
@@ -940,7 +940,7 @@ export function operationMessagePairsAt(
         out.push({
             id: messagePair.id,
             at: messagePair.response_at,
-            uriId: messagePair.name,
+            name: messagePair.name,
             body: decoded.body,
             requesterIdentityId:
                 messagePair.requester_identity_id,
@@ -958,7 +958,7 @@ function documentDeletesAsOperations(
         out.push({
             id: messagePair.id,
             at: messagePair.at,
-            uriId: messagePair.uriId,
+            name: messagePair.name,
             body: messagePair.body,
             requesterIdentityId:
                 messagePair.requesterIdentityId,
@@ -1314,10 +1314,10 @@ function workOrderLifecycleFromPlane(
         ));
     }
     const createMessagePairsByWorkOrder = Map.groupBy(
-        createMessagePairs, (messagePair) => messagePair.uriId,
+        createMessagePairs, (messagePair) => messagePair.name,
     );
     const entityMessagePairsByWorkOrder = Map.groupBy(
-        entityMessagePairs, (messagePair) => messagePair.uriId,
+        entityMessagePairs, (messagePair) => messagePair.name,
     );
 
     const organizationRoot = organization === undefined
@@ -1457,7 +1457,7 @@ export async function deriveWorkOrderLifecycle(
 //   * create + document message pairs: address read at the
 //     work-orders prefix + this workOrderId (both
 //     a create's response and its later document PUT/DELETE
-//     share ONE uriId — drift-work-orders.test.ts case 8);
+//     share ONE name — drift-work-orders.test.ts case 8);
 //   * claim/release/transition: path at each sub-
 //     resource's own per-id address (WORK_ORDER_CLAIM_PATTERN/
 //     WORK_ORDER_RELEASE_PATTERN/
@@ -1582,7 +1582,7 @@ function fieldValuesByTransitionEvent(
                 candidates.push({
                     id: transition.id,
                     at: transition.at,
-                    uriId: fieldValue.id,
+                    name: fieldValue.id,
                     method: 'PUT',
                     body: fieldValue.fields,
                     requesterIdentityId:
@@ -1629,17 +1629,17 @@ function fieldValuesByTransitionEvent(
         }
     }
     const heads = latestByKey(
-        candidates, (messagePair) => messagePair.uriId,
+        candidates, (messagePair) => messagePair.name,
     );
     const byEvent = new Map<Id, TransitionFieldValueEntity[]>();
-    for (const [uriId, head] of heads) {
+    for (const [name, head] of heads) {
         if (head.method === 'DELETE') continue;
         const stateEventId = pickString(
             head.body, 'state_event_id',
         );
         const list = byEvent.get(stateEventId) ?? [];
         list.push({
-            id: uriId,
+            id: name,
             attribute_id: pickString(
                 head.body, 'attribute_id',
             ),
@@ -1973,19 +1973,19 @@ export async function deriveInvitationStates(
             const documentIds = new Set(
                 documentMessagePairsAt(
                     stored, INVITATIONS_PREFIX,
-                ).map((messagePair) => messagePair.uriId),
+                ).map((messagePair) => messagePair.name),
             );
             for (const messagePair of operationMessagePairsAt(
                 stored, INVITATIONS_PREFIX,
             )) {
-                if (!documentIds.has(messagePair.uriId)) {
+                if (!documentIds.has(messagePair.name)) {
                     continue;
                 }
                 rows.push({
                     id: pickString(
                         messagePair.body, 'grantEventId',
                     ),
-                    entity_id: messagePair.uriId,
+                    entity_id: messagePair.name,
                     state: 'pending',
                     member_id: messagePair.requesterIdentityId,
                     at: pickString(messagePair.body, 'grantAt'),
@@ -2029,7 +2029,7 @@ export async function deriveInvitationStates(
 // 14 Task 1): the SAME grant + op-address reduction, restricted
 // to ONE known invitation id via INDEXED reads —
 // address read at the invitations prefix + this id
-// (grant + document share ONE uriId) and
+// (grant + document share ONE name) and
 // path for each of the three op documents —
 // rather than the whole-collection scan
 // (documentIds discovery) and the whole-ledger pairs.getAll()
@@ -2057,7 +2057,7 @@ export async function invitationLifecycleStatesFor(
         );
     const hasDocument = documentMessagePairsAt(
         collectionMessagePairs, INVITATIONS_PREFIX,
-    ).some((messagePair) => messagePair.uriId === id);
+    ).some((messagePair) => messagePair.name === id);
     if (hasDocument) {
         for (const messagePair of operationMessagePairsAt(
             collectionMessagePairs, INVITATIONS_PREFIX,
@@ -2066,7 +2066,7 @@ export async function invitationLifecycleStatesFor(
                 id: pickString(
                     messagePair.body, 'grantEventId',
                 ),
-                entity_id: messagePair.uriId,
+                entity_id: messagePair.name,
                 state: 'pending',
                 member_id: messagePair.requesterIdentityId,
                 at: pickString(messagePair.body, 'grantAt'),

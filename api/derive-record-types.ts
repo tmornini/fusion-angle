@@ -48,7 +48,7 @@ export function recordTypeEntityOf(
 ): RecordTypeWireRow {
     const body = document.body;
     return {
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         name: pickString(body, 'name'),
         description: pickString(body, 'description'),
@@ -85,10 +85,10 @@ export async function deriveRecordTypeCollection(
     const messagePairsById =
         new Map<Id, DocumentMessagePair[]>();
     for (const messagePair of messagePairs) {
-        const list = messagePairsById.get(messagePair.uriId);
+        const list = messagePairsById.get(messagePair.name);
         if (list === undefined) {
             messagePairsById.set(
-                messagePair.uriId, [messagePair],
+                messagePair.name, [messagePair],
             );
         } else {
             list.push(messagePair);
@@ -139,7 +139,7 @@ export async function deriveRecordTypeEntity(
     const history = stateHistoryFrom(
         documentLifecycleEvents(
             messagePairs.filter((messagePair) =>
-                messagePair.uriId === id),
+                messagePair.name === id),
         ),
         id,
     );
@@ -168,7 +168,7 @@ export async function deriveRecordTypeStateHistory(
     return stateHistoryFrom(
         documentLifecycleEvents(
             messagePairs.filter((messagePair) =>
-                messagePair.uriId === id),
+                messagePair.name === id),
         ),
         id,
     );

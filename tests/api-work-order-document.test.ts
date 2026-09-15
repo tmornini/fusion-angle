@@ -325,12 +325,12 @@ function decodeRequestMessage(message: string): {
 function documentRowAt(
     messagePairs: readonly MessagePairEntity[],
     prefix: string,
-    uriId: string,
+    name: string,
     excludeId?: string,
 ): MessagePairEntity | undefined {
     return messagePairs.find(
         r => r.path === prefix
-            && r.name === uriId
+            && r.name === name
             && r.id !== excludeId
             && decodeRequestMessage(r.request).method
                 === 'PUT',

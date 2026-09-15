@@ -876,7 +876,7 @@ async () => {
             && r.name === flowId,
     );
     // Both an operation (POST, 204) pair and a document (PUT)
-    // pair share the SAME uriId.
+    // pair share the SAME name.
     assertStrictEquals(atAddress.length, 2);
 
     // If the POST pair leaked into the document reduction it

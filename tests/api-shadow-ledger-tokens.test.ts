@@ -156,7 +156,7 @@ Deno.test('two PUTs to DIFFERENT identity-tokens/:id ids each'
 Deno.test('a second PUT to the SAME identity-tokens/:id id forms'
 + ' its OWN genesis pair — no Supersedes, this address never'
 + ' chains — and the DERIVED read reflects the LATEST pair at'
-+ ' that address (deriveDocumentsAt\'s latest-per-uriId head'
++ ' that document (deriveDocumentsAt\'s latest-per-name head'
 + ' resolution, never a ledger guard)', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
@@ -218,7 +218,7 @@ Deno.test('PUT identities/:id/token-revocations/:rid appends its'
 // of silently replaying the first success.
 
 Deno.test('a rotation appends its pair at an operation address:'
-+ ' uriId stays empty, and the wire {jti} equals the pair\'s'
++ ' name stays empty, and the wire {jti} equals the pair\'s'
 + ' own stored response body', async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
@@ -297,7 +297,7 @@ async () => {
 // ── identity-tokens/:jti/revocation — operation address ──
 
 Deno.test('a revocation appends its pair at an operation address:'
-+ ' uriId stays empty', async () => {
++ ' name stays empty', async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
         'POST', tokenOpPath('revocation'),

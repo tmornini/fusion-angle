@@ -285,7 +285,7 @@ Deno.test('leg 4: PUT /organizations/:id then wire + derive agree'
         ),
     );
     const expected = organizationEntityOf({
-        uriId: STARK_ORGANIZATION,
+        name: STARK_ORGANIZATION,
         messagePairId: STARK_ORGANIZATION,
         method: 'PUT',
         body: updatedFields,

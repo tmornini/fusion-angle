@@ -45,7 +45,7 @@ export function flowWorkOrderEntityOf(
     document: DerivedDocument,
 ): FlowWorkOrderEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateFlowWorkOrderEntity(
             withoutId(document.body),
         ),

@@ -214,7 +214,7 @@ async function countDeleteMessagePairs(
     return documentMessagePairsAt(
         requests, prefix,
     ).filter(
-        (messagePair) => messagePair.uriId === INSTANCE_ID
+        (messagePair) => messagePair.name === INSTANCE_ID
             && messagePair.method === 'DELETE',
     ).length;
 }

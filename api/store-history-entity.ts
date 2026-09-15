@@ -52,12 +52,12 @@ export class HistoryEntityStore<
 
     async getAllAtAddress(
         collection: string,
-        uriId: string,
+        name: string,
     ): Promise<T[]> {
         return this.#run(
             [this.#table], 'readonly',
             tx => tx.getAddress<T>(
-                this.#table, collection, uriId,
+                this.#table, collection, name,
             ),
         );
     }

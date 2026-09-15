@@ -97,7 +97,7 @@ export function flowEntityOf(
 ): FlowWithGraph {
     const body = document.body;
     return {
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         name: pickString(body, 'name'),
         is_locked: pickBoolean(body, 'is_locked'),
@@ -160,11 +160,11 @@ export async function deriveFlows(
         new Map<Id, DocumentMessagePair[]>();
     for (const messagePair of messagePairs) {
         const list = messagePairsByFlowId.get(
-            messagePair.uriId,
+            messagePair.name,
         );
         if (list === undefined) {
             messagePairsByFlowId.set(
-                messagePair.uriId, [messagePair],
+                messagePair.name, [messagePair],
             );
         } else {
             list.push(messagePair);
@@ -210,7 +210,7 @@ export async function deriveFlow(
         );
     }
     const ownMessagePairs = messagePairs.filter(
-        (messagePair) => messagePair.uriId === flowId,
+        (messagePair) => messagePair.name === flowId,
     );
     const history = stateHistoryFrom(
         documentLifecycleEvents(ownMessagePairs),
@@ -231,7 +231,7 @@ export async function deriveFlow(
 // own `messagePair.path` — already flow-specific,
 // since `undo` is a literal final route segment, so
 // pathAndNameOf folds the real id into the PREFIX rather
-// than a separate uriId), walks this flow's flows/:id
+// than a separate name), walks this flow's flows/:id
 // document-pair history and replays it as a stack with a
 // pointer: a GENUINE pair (no correlated undo call)
 // truncates any abandoned branch to `[0..pointer]` then
@@ -276,7 +276,7 @@ export async function resolveFlowUndoTarget(
     const messagePairs = documentMessagePairsAt(
         stored, prefix,
     ).filter(
-        (messagePair) => messagePair.uriId === flowId,
+        (messagePair) => messagePair.name === flowId,
     );
     const current = messagePairs.at(-1);
     if (current === undefined) return undefined;
@@ -343,7 +343,7 @@ export async function deriveFlowStateHistory(
     return stateHistoryFrom(
         documentLifecycleEvents(
             messagePairs.filter(
-                (messagePair) => messagePair.uriId === flowId,
+                (messagePair) => messagePair.name === flowId,
             ),
         ),
         flowId,

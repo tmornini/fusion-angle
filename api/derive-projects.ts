@@ -52,7 +52,7 @@ export function projectEntityOf(
 ): ProjectEntity {
     const body = document.body;
     return {
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         title: pickString(body, 'title'),
         description: pickString(body, 'description'),
@@ -112,11 +112,11 @@ export async function deriveProjects(
         new Map<Id, DocumentMessagePair[]>();
     for (const messagePair of messagePairs) {
         const list = messagePairsByProjectId.get(
-            messagePair.uriId,
+            messagePair.name,
         );
         if (list === undefined) {
             messagePairsByProjectId.set(
-                messagePair.uriId, [messagePair],
+                messagePair.name, [messagePair],
             );
         } else {
             list.push(messagePair);
@@ -167,7 +167,7 @@ export async function deriveProject(
     const history = stateHistoryFrom(
         documentLifecycleEvents(
             messagePairs.filter((messagePair) =>
-                messagePair.uriId === projectId),
+                messagePair.name === projectId),
         ),
         projectId,
     );
@@ -198,7 +198,7 @@ export async function deriveProjectStateHistory(
     return stateHistoryFrom(
         documentLifecycleEvents(
             messagePairs.filter((messagePair) =>
-                messagePair.uriId === projectId),
+                messagePair.name === projectId),
         ),
         projectId,
     );

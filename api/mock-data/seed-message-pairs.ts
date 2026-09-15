@@ -1393,7 +1393,7 @@ interface MockDataInvocation {
     readonly idParams?: readonly Id[];
     // An operation-shaped POST at an id-carrying pattern
     // (work-orders/:id/transition): idParams fill the :id
-    // slots for the path (uriId stays '' — pathAndNameOf
+    // slots for the path (name stays '' — pathAndNameOf
     // keys on the LAST segment), but the method is POST and
     // the response is the op's own {status: 204} spec.
     readonly op?: true;
@@ -2056,16 +2056,16 @@ export function buildMockDataInvocations():
 }
 
 // Bare collection-POST creates (no `:id` segment) keep the
-// bare pattern — pathAndNameOf derives the empty uriId and
-// createdEntityUriId (message-pair.ts's CREATE_BODY_ID_FIELDS)
+// bare pattern — pathAndNameOf derives the empty name and
+// createdEntityName (message-pair.ts's CREATE_BODY_ID_FIELDS)
 // overrides it to the created entity's own id. Document-class
 // genesis PUTs (ideas/:id, ideas/:id/submissions/:sid, …)
 // carry idParams and the id-tailed address is built directly
-// — pathAndNameOf derives the real uriId from the path
+// — pathAndNameOf derives the real name from the path
 // segment itself. Operation-shaped POSTs at id-carrying
 // patterns (work-orders/:id/transition, op: true) also carry
 // idParams for the ADDRESS, but form as POST with {status:
-// 204} — uriId stays '' because pathAndNameOf keys on the
+// 204} — name stays '' because pathAndNameOf keys on the
 // LAST segment.
 export async function formSeedMessagePair(
     inv: MockDataInvocation, requestAt: string,
@@ -2170,7 +2170,7 @@ function documentSeedResponse(
 // The default-organization side channel's own pair former:
 // mirrors identityDefaultOrganizationRequest's formWriteMessagePair
 // (api/organization-requests.ts) — a singleton document at
-// /identities/:id/default-organization/ (uriId '').
+// /identities/:id/default-organization/ (name '').
 export async function formDefaultOrganizationSeedMessagePair(
     identityId: Id,
     organizationId: Id,

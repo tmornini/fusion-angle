@@ -129,12 +129,12 @@ function flowDocument(
 async function messagePairsAt(
     db: DbAdapter,
     collection: string,
-    uriId: string,
+    name: string,
 ): Promise<number> {
     const rows = await db.messagePairs.getAllWhere(
         'path', collection,
     );
-    return rows.filter((row) => row.name === uriId)
+    return rows.filter((row) => row.name === name)
         .length;
 }
 

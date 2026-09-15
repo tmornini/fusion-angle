@@ -428,7 +428,7 @@ Deno.test('stored PUT body equals piiEntityOf', async () => {
         ),
     );
     const expected = piiEntityOf(id, {
-        uriId: '',
+        name: '',
         messagePairId: id,
         method: 'PUT',
         body: fields,

@@ -48,7 +48,7 @@ import {
 // EVENT-APPEND, not document-class (api/routes.ts's own route
 // comment): every row id is a fresh generateIdentifier()
 // mint, so in practice no address is ever revisited — but
-// deriveDocumentsAt's latest-per-uriId head resolution still
+// deriveDocumentsAt's latest-per-name head resolution still
 // applies uniformly (the role_grants precedent), never assumed.
 //
 // deriveIdentityTokenEventsForJti is the by-jti fold this task
@@ -102,7 +102,7 @@ export function identityTokenEntityOf(
 ): IdentityTokenEntity {
     return {
         ...validateIdentityTokenEntity(withoutId(document.body)),
-        id: document.uriId,
+        id: document.name,
     };
 }
 
@@ -196,7 +196,7 @@ export async function deriveIdentityTokens(
         messagePairs, IDENTITY_TOKENS_FLAT_PREFIX,
     );
     for (const document of flat.values()) {
-        byId.set(document.uriId, identityTokenEntityOf(document));
+        byId.set(document.name, identityTokenEntityOf(document));
     }
     const prefixes = new Set<string>();
     for (const messagePair of messagePairs) {
@@ -212,7 +212,7 @@ export async function deriveIdentityTokens(
         );
         for (const document of documents.values()) {
             byId.set(
-                document.uriId,
+                document.name,
                 nestedTokenEntityOf(identityId, document),
             );
         }

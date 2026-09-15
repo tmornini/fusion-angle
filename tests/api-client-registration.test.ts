@@ -206,7 +206,7 @@ async () => {
         ),
     );
     const expected = registrationEntityOf(id, {
-        uriId: '',
+        name: '',
         messagePairId: id,
         method: 'PUT',
         body: { ...REGISTRATION },

@@ -427,7 +427,7 @@ Deno.test('stored PUT body equals recordTypeEntityOf of the'
     );
     const expected = recordTypeEntityOf(
         {
-            uriId: id,
+            name: id,
             messagePairId: id,
             method: 'PUT',
             body,

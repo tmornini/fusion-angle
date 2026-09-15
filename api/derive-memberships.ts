@@ -120,9 +120,9 @@ export function seatEntityOf(
         withoutId(document.body),
     );
     return {
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
-        identity_id: document.uriId,
+        identity_id: document.name,
         type: body.type,
         // The seat's own grant time (validated above), not
         // a ledger fact: GET .../members/:id/versions/

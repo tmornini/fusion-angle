@@ -209,7 +209,7 @@ async () => {
         ),
     );
     const expected = identityTokenEntityOf({
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: 'PUT',
         body: fields,
@@ -239,7 +239,7 @@ Deno.test('formTokenEventMessagePair stored body equals '
         storedMessageBodyText(messagePair.responseMessage),
     );
     const expected = identityTokenEntityOf({
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: 'PUT',
         body: event,
@@ -635,7 +635,7 @@ async () => {
         organization: undefined,
         responseStatus: 200,
         responseBody: identityTokenEntityOf({
-            uriId: id,
+            name: id,
             messagePairId: id,
             method: 'PUT',
             body: fields,

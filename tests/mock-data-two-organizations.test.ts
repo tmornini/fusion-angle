@@ -63,7 +63,7 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
     validateDocument: validateRecordDocumentBody,
     documentOp: postRecordDocumentOp,
     entityOf: (document, organization, current) => ({
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         name: String(document.body['name'] ?? ''),
         description: String(
@@ -146,7 +146,7 @@ const OBJECTIVES_WIRING: DocumentFamilyWiring = {
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,
     entityOf: (document, organization, current) => ({
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
         state: current!.state,

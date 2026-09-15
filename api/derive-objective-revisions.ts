@@ -63,7 +63,7 @@ export function objectiveRevisionEntityOf(
     document: DerivedDocument,
 ): ObjectiveRevisionEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateObjectiveRevisionEntity(
             withoutId(document.body),
         ),

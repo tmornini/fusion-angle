@@ -202,7 +202,7 @@ async () => {
         await storedPutBodyText(db, '/organizations/', id),
     );
     const expected = organizationEntityOf({
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: 'PUT',
         body: fields,

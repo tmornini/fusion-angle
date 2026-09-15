@@ -360,7 +360,7 @@ async () => {
     );
     const expected = ideaEntityOf(
         {
-            uriId: id,
+            name: id,
             messagePairId: id,
             method: 'PUT',
             body,

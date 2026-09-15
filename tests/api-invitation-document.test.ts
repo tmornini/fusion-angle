@@ -169,7 +169,7 @@ async () => {
     // here IS the document.
     const documents = documentMessagePairsAt(
         requests, '/invitations/',
-    ).filter(messagePair => messagePair.uriId === INV_DOC_1);
+    ).filter(messagePair => messagePair.name === INV_DOC_1);
     assertStrictEquals(documents.length, 1);
     const wire = documents[0]!.body;
     assertEquals(
@@ -263,7 +263,7 @@ Deno.test('a fresh accept appends its seat document at the'
     const documents = documentMessagePairsAt(
         requests, '/organizations/AjdvjuECVZEgZoFajaIEkg/members/',
     ).filter(
-        messagePair => messagePair.uriId === 'toccYYkLEABmlbpHJalgtQ',
+        messagePair => messagePair.name === 'toccYYkLEABmlbpHJalgtQ',
     );
     assertStrictEquals(documents.length, 1);
     assertEquals(documents[0]!.body, {

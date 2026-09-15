@@ -259,7 +259,7 @@ async function derivedDocumentEntity(
     if (wiring.lifecycle === 'trio') {
         const messagePairs = documentMessagePairsAt(
             stored, prefix,
-        ).filter((messagePair) => messagePair.uriId === id);
+        ).filter((messagePair) => messagePair.name === id);
         const history = stateHistoryFrom(
             documentLifecycleEvents(messagePairs), id,
         );
@@ -427,7 +427,7 @@ export async function storedRevisionDocument(
         return undefined;
     }
     return {
-        uriId: id,
+        name: id,
         messagePairId: found.id,
         method: found.method,
         body: requestBodyOf(found.request),
@@ -445,13 +445,13 @@ export async function versionSnapshotsAt(
     );
     const messagePairs = documentMessagePairsAt(
         stored, prefix,
-    ).filter((messagePair) => messagePair.uriId === id);
+    ).filter((messagePair) => messagePair.name === id);
     const snapshots: Record<string, unknown>[] = [];
     for (const messagePair of messagePairs.toReversed()) {
         if (messagePair.method !== PUT_METHOD) continue;
         snapshots.push({
             ...toEntity({
-                uriId: id,
+                name: id,
                 messagePairId: messagePair.id,
                 method: messagePair.method,
                 body: messagePair.body,
@@ -480,7 +480,7 @@ async function documentStateHistoryAt(
         documentLifecycleEvents(
             documentMessagePairsAt(
                 stored, prefix,
-            ).filter((messagePair) => messagePair.uriId === id),
+            ).filter((messagePair) => messagePair.name === id),
         ),
         id,
     );
@@ -509,7 +509,7 @@ async function serveDocumentRevision(
     }
     const body = requestBodyOf(found.request);
     const document: DerivedDocument = {
-        uriId: id,
+        name: id,
         messagePairId: found.id,
         method: found.method,
         body,
@@ -649,11 +649,11 @@ export function documentCollectionGetHandler(
                 stored, prefix,
             )) {
                 const list = messagePairsById.get(
-                    messagePair.uriId,
+                    messagePair.name,
                 );
                 if (list === undefined) {
                     messagePairsById.set(
-                        messagePair.uriId, [messagePair],
+                        messagePair.name, [messagePair],
                     );
                 } else {
                     list.push(messagePair);
@@ -769,7 +769,7 @@ function trioDocumentFromBody(
     body: Record<string, unknown>,
 ): DerivedDocument {
     return {
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: PUT_METHOD,
         body,
@@ -795,7 +795,7 @@ export async function streamedTrioEntityOf(
     const incoming: DocumentMessagePair = {
         id: INCOMING_MESSAGE_PAIR_ID,
         at: INCOMING_MESSAGE_PAIR_AT,
-        uriId: id,
+        name: id,
         method: PUT_METHOD,
         body: raw,
         requesterIdentityId: actor,

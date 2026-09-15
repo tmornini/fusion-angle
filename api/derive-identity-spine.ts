@@ -36,7 +36,7 @@ import {
 //
 // E13 FULL-SCAN NAMED CLASS (derive-invitations.ts's own named
 // class): '/pii' forms ONE distinct prefix PER IDENTITY
-// ('/identities/<id>/pii/', uriId '' — a singleton document at a
+// ('/identities/<id>/pii/', name '' — a singleton document at a
 // collection-style address, message-address.ts), so no index can
 // serve "every request whose path has this shape" for an
 // arbitrary id. deriveIdentityPiiRows reads db.messagePairs
@@ -192,7 +192,7 @@ function credentialEntityOf(
 ): IdentityCredentialEntity {
     const body = document.body;
     return {
-        id: document.uriId,
+        id: document.name,
         identity_id: pickString(body, 'identity_id'),
         kind: pickString(body, 'kind') as IdentityCredentialKind,
         status:
@@ -214,7 +214,7 @@ async function fetchCredentialDocuments(
 }
 
 // id-lex ordered. Pairs at the exact credentials prefix;
-// latest-per-uriId (deriveDocumentsAt) — a re-PUT of the same cid
+// latest-per-name (deriveDocumentsAt) — a re-PUT of the same cid
 // overwrites, matching the row plane's own put() semantics.
 export async function deriveCredentialsFor(
     db: DbAdapter,
@@ -262,7 +262,7 @@ export function identityProviderEntityOf(
     document: DerivedDocument,
 ): IdentityProviderEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateIdentityProviderEntity(
             withoutId(document.body),
         ),
@@ -368,7 +368,7 @@ export function tokenRevocationEntityOf(
     document: DerivedDocument,
 ): IdentityTokenRevocationEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         ...validateIdentityTokenRevocationEntity(
             withoutId(document.body),
         ),
@@ -436,7 +436,7 @@ export async function deriveTokenRevocation(
 // ---- client_registration — the clients-table replacement: a ----
 // ---- singleton document at the identity's own nested address ---
 // ---- (the /pii single-slot shape: literal last segment, ------
-// ---- uriId ''), Supersedes-chained like /credentials. NOT a ---
+// ---- name ''), Supersedes-chained like /credentials. NOT a ---
 // ---- delete zone — a DELETE head is a deregistration ----------
 // ---- tombstone, not an erasure — so a prefix getAllWhere -----
 // ---- read shape suffices (the module header's torn-read -------

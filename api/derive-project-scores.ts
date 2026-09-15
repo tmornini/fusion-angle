@@ -63,7 +63,7 @@ export function scoreEntityOf(document: DerivedDocument): {
 } {
     const body = withoutId(document.body);
     return {
-        id: document.uriId,
+        id: document.name,
         project_id: pickString(body, 'project_id'),
         objective_id: pickString(body, 'objective_id'),
         score: pickNumber(body, 'score'),

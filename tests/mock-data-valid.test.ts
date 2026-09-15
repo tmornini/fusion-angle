@@ -116,7 +116,7 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
     validateDocument: validateWorkOrderDocumentBody,
     documentOp: postWorkOrderDocumentOp,
     entityOf: (document, organization) => ({
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         ...document.body,
     }),

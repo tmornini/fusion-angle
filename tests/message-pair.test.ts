@@ -121,7 +121,7 @@ async () => {
         messagePair.path,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
-    assertStrictEquals(messagePair.uriId, '42');
+    assertStrictEquals(messagePair.name, '42');
     assertStrictEquals(
         messagePair.requestHash,
         await requestMessageHash(messagePair.requestMessage),

@@ -89,7 +89,7 @@ export interface EntityStore<
     ): Promise<T[]>;
     getAllAtAddress(
         collection: string,
-        uriId: string,
+        name: string,
     ): Promise<T[]>;
     getAllWhereBody(
         collection: string,
@@ -145,7 +145,7 @@ export interface Tx {
     getAddress<T extends { id: string }>(
         table: string,
         collection: string,
-        uriId: string,
+        name: string,
     ): Promise<T[]>;
     getWhereBody<T extends { id: string }>(
         table: string,
@@ -162,7 +162,7 @@ export interface Tx {
     lockHead?(id: string): Promise<void>;
     latestPutDelete?(
         collection: string,
-        uriId: string,
+        name: string,
     ): Promise<{
         readonly id: string;
         readonly method: string;
@@ -174,12 +174,12 @@ export interface WriteLocks {
     lockDedup(hash: string): Promise<void>;
     lockAddress(
         collection: string,
-        uriId: string,
+        name: string,
     ): Promise<void>;
     lockHead(id: string): Promise<void>;
     latestPutDelete(
         collection: string,
-        uriId: string,
+        name: string,
     ): Promise<{
         readonly id: string;
         readonly method: string;

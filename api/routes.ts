@@ -426,7 +426,7 @@ function workOrderDocumentEntityOf(
     _current?: { readonly state: string },
 ): object {
     return {
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         ...document.body,
     };
@@ -468,7 +468,7 @@ function objectiveDocumentEntityOf(
     current: { readonly state: string },
 ): ObjectiveEntity {
     return {
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
         state: current.state,
@@ -510,7 +510,7 @@ export function identityDocumentEntityOf(
     _current?: { readonly state: string },
 ): object {
     return {
-        id: document.uriId,
+        id: document.name,
         ...document.body,
     };
 }
@@ -546,7 +546,7 @@ export function aiAgentDocumentEntityOf(
     _current?: { readonly state: string },
 ): object {
     return {
-        id: document.uriId,
+        id: document.name,
         ...document.body,
     };
 }
@@ -1322,7 +1322,7 @@ export async function postIdeaSubmissionOp(
     messagePair?: MessagePair,
 ): Promise<IdeaSubmissionEntity> {
     const entity = ideaSubmissionEntityOf({
-        uriId: sid,
+        name: sid,
         messagePairId: sid,
         method: 'PUT',
         body: withoutId(body),
@@ -1376,8 +1376,8 @@ export function flowCreateDocumentBody(
 
 // The three pairs a live POST /flows forms (Task 5): the gate's
 // own operation message pair (204, at the flows/:id address per Task 1's
-// createdEntityUriId override — POST 'flows' and PUT 'flows/:id'
-// collapse onto the SAME (path, uriId), see derive-
+// createdEntityName override — POST 'flows' and PUT 'flows/:id'
+// collapse onto the SAME (path, name), see derive-
 // documents.ts's DOCUMENT_METHODS filter for why the two never
 // collide as documents), plus the document and join pairs the
 // route pre-forms below. All three share ONE requestAt (the
@@ -1477,7 +1477,7 @@ export async function postFlowDocumentOp(
             // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
             if (messagePair !== undefined) {
                 const latest = (await messageStore(view).get(
-                    messagePair.path, messagePair.uriId,
+                    messagePair.path, messagePair.name,
                 ))?.id;
                 if (
                     latchedId !== undefined
@@ -1593,7 +1593,7 @@ export async function postFlowUndoOp(
         async (view) => {
             const latest = (await messageStore(view).get(
                 documentMessagePair.path,
-                documentMessagePair.uriId,
+                documentMessagePair.name,
             ))?.id;
             // The CLIENT's pin, not this walk's own read:
             // the gate proved it matched the head before
@@ -1620,7 +1620,7 @@ export async function postFlowUndoOp(
 // gate's own operation message pair (204, at the objectives/:id address
 // per the create-body-id-field override — POST 'objectives' and
 // PUT 'objectives/:id' collapse onto the SAME (path,
-// uriId), the flows/records precedent), the synthesized document
+// name), the flows/records precedent), the synthesized document
 // message pair (objectives/:id), and the synthesized revision pair
 // (objectives/:id/revisions/:rid) the route pre-forms below. All
 // three share ONE requestAt (the create's own origination) yet
@@ -1844,7 +1844,7 @@ function workOrderCreateDocumentBody(
 // the gate's own operation message pair (204, at the work-orders/:id
 // address per the registry's createBodyIdField — POST
 // 'work-orders' and PUT 'work-orders/:id' collapse onto the
-// SAME (path, uriId), exactly as flows/:id did for its
+// SAME (path, name), exactly as flows/:id did for its
 // own create), plus the document and join pairs the route
 // pre-forms below. All three share ONE requestAt (the
 // create's own origination) yet strictly-later RESPONSE `at`
@@ -2376,7 +2376,7 @@ export async function postWorkOrderTransitionOp(
             // id.
             const latest = (await messageStore(view).get(
                 revisionMessagePair.path,
-                revisionMessagePair.uriId,
+                revisionMessagePair.name,
             ))?.id;
             if (latest !== latchedMessagePairId) {
                 throw new ApiError(
@@ -2526,7 +2526,7 @@ export async function postFlowWorkOrderDocumentOp(
     messagePair?: MessagePair,
 ): Promise<FlowWorkOrderEntity> {
     const entity = flowWorkOrderEntityOf({
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
@@ -2560,7 +2560,7 @@ export async function postFlowRecordDocumentOp(
     messagePair?: MessagePair,
 ): Promise<FlowRecordEntity> {
     const entity = flowRecordEntityOf({
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
@@ -2595,7 +2595,7 @@ export async function postFlowRecordDocumentOp(
 
 // Flow tag document write — the codebase's FIRST message-plane-ONLY
 // write (Phase 14 Task 9): no table, no row, no dual-write. The
-// pair alone carries everything (path/uriId encode the
+// pair alone carries everything (path/name encode the
 // address; the stored request's method distinguishes a PUT tag
 // from a DELETE tombstone), so this op needs neither `id`
 // nor `body` — the
@@ -2637,7 +2637,7 @@ export async function postBaselineScoreDocumentOp(
     ProjectObjectiveBaselineScoreEntity
 > {
     const entity = scoreEntityOf({
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
@@ -2666,7 +2666,7 @@ export async function postActualScoreDocumentOp(
     messagePair?: MessagePair,
 ): Promise<ProjectObjectiveActualScoreEntity> {
     const entity = scoreEntityOf({
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
@@ -2802,7 +2802,7 @@ export async function postIdentityPiiDocumentOp(
     messagePair?: MessagePair,
 ): Promise<IdentityPiiEntity> {
     const entity = piiEntityOf(id, {
-        uriId: '',
+        name: '',
         messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
@@ -2909,7 +2909,7 @@ export async function postClientRegistrationDocumentOp(
     messagePair?: MessagePair,
 ): Promise<ClientRegistrationEntity> {
     const entity = registrationEntityOf(id, {
-        uriId: '',
+        name: '',
         messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
@@ -2974,7 +2974,7 @@ export async function postIdentityProviderDocumentOp(
     }
     const stamped = { ...raw, identity_id: identityId };
     const entity = identityProviderEntityOf({
-        uriId: id,
+        name: id,
         messagePairId: id,
         method: 'PUT',
         body: stamped,
@@ -3046,7 +3046,7 @@ export const WRITE_RESPONSE_SPECS:
         status: HTTP_OK,
         successBody: (params, body) =>
             ideaSubmissionEntityOf({
-                uriId: param(params, 2),
+                name: param(params, 2),
                 messagePairId: param(params, 2),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
@@ -3061,7 +3061,7 @@ export const WRITE_RESPONSE_SPECS:
         status: HTTP_OK,
         successBody: (params, body) =>
             projectFlowEntityOf({
-                uriId: param(params, 2),
+                name: param(params, 2),
                 messagePairId: param(params, 2),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
@@ -3101,7 +3101,7 @@ export const WRITE_RESPONSE_SPECS:
         status: HTTP_OK,
         successBody: (params, body) =>
             flowWorkOrderEntityOf({
-                uriId: param(params, 2),
+                name: param(params, 2),
                 messagePairId: param(params, 2),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
@@ -3125,7 +3125,7 @@ export const WRITE_RESPONSE_SPECS:
                 const organization = param(params, 0);
                 return recordTypeEntityOf(
                     {
-                        uriId: id,
+                        name: id,
                         messagePairId: id,
                         method: 'PUT',
                         body: raw,
@@ -3187,14 +3187,14 @@ export const WRITE_RESPONSE_SPECS:
         status: HTTP_OK,
         successBody: (params, body) =>
             flowRecordEntityOf({
-                uriId: param(params, 2),
+                name: param(params, 2),
                 messagePairId: param(params, 2),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
             }),
     },
     // The ONE validation site for a tag PUT (Phase 14 Task 9):
-    // the tag NAME (param 2, the address's own uriId) through
+    // the tag NAME (param 2, the document's own name) through
     // validateFlowTagName; the body through flowTagEntityOf.
     // Both run pre-tx while the pair is formed, so a
     // malformed name or body throws BEFORE anything is stored
@@ -3205,7 +3205,7 @@ export const WRITE_RESPONSE_SPECS:
         status: HTTP_OK,
         successBody: (params, body) =>
             flowTagEntityOf(param(params, 1), {
-                uriId: validateFlowTagName(param(params, 2)),
+                name: validateFlowTagName(param(params, 2)),
                 messagePairId: param(params, 2),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
@@ -3224,7 +3224,7 @@ export const WRITE_RESPONSE_SPECS:
         status: HTTP_OK,
         successBody: (params, body) =>
             objectiveRevisionEntityOf({
-                uriId: param(params, 2),
+                name: param(params, 2),
                 messagePairId: param(params, 2),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
@@ -3237,7 +3237,7 @@ export const WRITE_RESPONSE_SPECS:
             const raw = withoutId(body ?? {});
             validateBaselineScoreEntity(raw);
             return scoreEntityOf({
-                uriId: param(params, 2),
+                name: param(params, 2),
                 messagePairId: param(params, 2),
                 method: 'PUT',
                 body: raw,
@@ -3251,7 +3251,7 @@ export const WRITE_RESPONSE_SPECS:
             const raw = withoutId(body ?? {});
             validateActualScoreEntity(raw);
             return scoreEntityOf({
-                uriId: param(params, 2),
+                name: param(params, 2),
                 messagePairId: param(params, 2),
                 method: 'PUT',
                 body: raw,
@@ -3271,7 +3271,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) => piiEntityOf(
             param(params, 0),
             {
-                uriId: '',
+                name: '',
                 messagePairId: param(params, 0),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
@@ -3297,7 +3297,7 @@ export const WRITE_RESPONSE_SPECS:
         status: HTTP_OK,
         successBody: (params, body) =>
             registrationEntityOf(param(params, 0), {
-                uriId: '',
+                name: '',
                 messagePairId: param(params, 0),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
@@ -3335,7 +3335,7 @@ export const WRITE_RESPONSE_SPECS:
         status: HTTP_OK,
         successBody: (params, body) =>
             identityTokenEntityOf({
-                uriId: param(params, 1),
+                name: param(params, 1),
                 messagePairId: param(params, 1),
                 method: 'PUT',
                 body: {
@@ -3351,7 +3351,7 @@ export const WRITE_RESPONSE_SPECS:
         status: HTTP_OK,
         successBody: (params, body) =>
             tokenRevocationEntityOf({
-                uriId: param(params, 1),
+                name: param(params, 1),
                 messagePairId: param(params, 1),
                 method: 'PUT',
                 body: {
@@ -3381,7 +3381,7 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id': {
         status: HTTP_OK,
         successBody: (params, body) => organizationEntityOf({
-            uriId: param(params, 0),
+            name: param(params, 0),
             messagePairId: param(params, 0),
             method: 'PUT',
             body: withoutId(body ?? {}),
@@ -3393,7 +3393,7 @@ export const WRITE_RESPONSE_SPECS:
         status: HTTP_OK,
         successBody: (params, body) =>
             identityProviderEntityOf({
-                uriId: param(params, 1),
+                name: param(params, 1),
                 messagePairId: param(params, 1),
                 method: 'PUT',
                 body: {
@@ -3850,7 +3850,7 @@ export async function postInstancePatchOp(
             // id.
             const latest = (await messageStore(view).get(
                 revisionMessagePair.path,
-                revisionMessagePair.uriId,
+                revisionMessagePair.name,
             ))?.id;
             if (latest !== latchedMessagePairId) {
                 throw new ApiError(
@@ -4016,7 +4016,7 @@ export const routes: Route[] = [
     // PUT/DELETE each append a message pair in the same
     // transaction as the write. DELETE is a marked tombstone.
     // The pattern's last segment ('pii') is not a :param, so
-    // pathAndNameOf yields uriId '' (a singleton document at
+    // pathAndNameOf yields name '' (a singleton document at
     // a collection-style address). GET is FLIPPED (Phase 10
     // Task 8): derived via deriveIdentityPii — wire-identical
     // to the hand-written db.identityPii.getById dispatch it
@@ -4243,7 +4243,7 @@ export const routes: Route[] = [
                 ...raw, identity_id: identityId,
             };
             const entity = tokenRevocationEntityOf({
-                uriId: id,
+                name: id,
                 messagePairId: id,
                 method: 'PUT',
                 body: stamped,
@@ -4296,7 +4296,7 @@ export const routes: Route[] = [
                 ...raw, identity_id: identityId,
             };
             const entity = identityTokenEntityOf({
-                uriId: id,
+                name: id,
                 messagePairId: id,
                 method: 'PUT',
                 body: stamped,
@@ -4321,7 +4321,7 @@ export const routes: Route[] = [
     // TOCTOU). A live jti returns its successor; a
     // known-but-not-live jti is reuse — the whole chain's
     // revocation has already landed atomically — then 409.
-    // Operation-addressed (uriId ''); REPLAY_EXEMPT_ROUTE_
+    // Operation document (name ''); REPLAY_EXEMPT_ROUTE_
     // PATTERNS-wired (message-pair.ts) — the gate never serves
     // a stored response for a byte-identical resend of this
     // route, so this handler always re-enters and re-checks
@@ -4794,7 +4794,7 @@ export const routes: Route[] = [
         put: (db, p, body, _actor, messagePair) => {
             const pfid = param(p, 2);
             const entity = projectFlowEntityOf({
-                uriId: pfid,
+                name: pfid,
                 messagePairId: pfid,
                 method: 'PUT',
                 body: withoutId(body),
@@ -5227,7 +5227,7 @@ export const routes: Route[] = [
             );
             return recordTypeEntityOf(
                 {
-                    uriId: id,
+                    name: id,
                     messagePairId: found.id,
                     method: found.method,
                     body,
@@ -5564,7 +5564,7 @@ export const routes: Route[] = [
     // organizations/:id/flows/:id — this tags address never
     // equals that entity pattern, so it never rides that arm
     // no matter what family-registry.ts declares for 'flows'. The
-    // tag NAME (param 2) is the address's own uriId — the FIRST
+    // tag NAME (param 2) is the document's own name — the FIRST
     // user-authored address segment in this codebase
     // (validateFlowTagName, api/validators.ts), validated ONLY at
     // the write gate below (WRITE_RESPONSE_SPECS), never re-checked
@@ -5616,7 +5616,7 @@ export const routes: Route[] = [
         put: (db, p, body, _actor, messagePair) => {
             const id = param(p, 0);
             const entity = organizationEntityOf({
-                uriId: id,
+                name: id,
                 messagePairId: id,
                 method: 'PUT',
                 body: withoutId(body),
@@ -5927,7 +5927,7 @@ export const routes: Route[] = [
         put: (db, p, body, _actor, messagePair) => {
             const id = param(p, 2);
             const entity = objectiveRevisionEntityOf({
-                uriId: id,
+                name: id,
                 messagePairId: id,
                 method: 'PUT',
                 body: withoutId(body),

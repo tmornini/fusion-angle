@@ -226,9 +226,9 @@ async function deriveMembershipsAll(db: DbAdapter) {
             seatRequests, seatPrefix,
         ).values()) {
             rows.push({
-                id: document.uriId,
+                id: document.name,
                 organization_id: organization.id,
-                identity_id: document.uriId,
+                identity_id: document.name,
                 type: String(document.body['type']),
                 at: String(document.body['at']),
             });

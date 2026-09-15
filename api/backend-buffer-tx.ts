@@ -110,7 +110,7 @@ export function bufferTx(
         async getAddress<T extends { id: string }>(
             table: string,
             collection: string,
-            uriId: string,
+            name: string,
         ): Promise<T[]> {
             return scoped(table)
                 .filter((row) => {
@@ -118,7 +118,7 @@ export function bufferTx(
                         Record<string, unknown>;
                     return rec['path']
                         === collection
-                        && rec['name'] === uriId;
+                        && rec['name'] === name;
                 })
                 .sort(byResponseAtThenId)
                 .map((row) => ({ ...row })) as T[];

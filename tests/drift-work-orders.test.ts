@@ -228,7 +228,7 @@ const WORK_ORDERS_TEST_WIRING: DocumentFamilyWiring = {
     validateDocument: validateWorkOrderDocumentBody,
     documentOp: postWorkOrderDocumentOp,
     entityOf: (document, organization) => ({
-        id: document.uriId,
+        id: document.name,
         organization_id: organization,
         ...document.body,
     }),
@@ -950,12 +950,12 @@ async () => {
             && r.name === workOrderId,
     );
     // Both an operation (POST, 204) pair and a document (PUT)
-    // pair share the SAME uriId.
+    // pair share the SAME name.
     assertStrictEquals(atAddress.length, 2);
 
     const documentMessagePairs = documentMessagePairsAt(
         requests, prefix,
-    ).filter((messagePair) => messagePair.uriId === workOrderId);
+    ).filter((messagePair) => messagePair.name === workOrderId);
     assertStrictEquals(documentMessagePairs.length, 1);
     assertStrictEquals(documentMessagePairs[0]!.method, 'PUT');
 
@@ -1019,7 +1019,7 @@ function decodeRequestMessage(message: string): {
 interface AnyMessagePair {
     readonly id: string;
     readonly at: string;
-    readonly uriId: string;
+    readonly name: string;
     readonly method: string;
     readonly body: Record<string, unknown>;
     readonly requesterIdentityId: string;
@@ -1049,7 +1049,7 @@ function allMessagePairsAt(
         messagePairs.push({
             id: row.id,
             at: row.response_at,
-            uriId: row.name,
+            name: row.name,
             method: decoded.method,
             body: decoded.body,
             requesterIdentityId: row.requester_identity_id,
@@ -1294,7 +1294,7 @@ async function replayWorkOrderStates(
     ]);
     const allWoMessagePairs = allMessagePairsAt(woRequests, woPrefix);
     const createMessagePair = allWoMessagePairs.find(
-        (p) => p.method === 'POST' && p.uriId === workOrderId,
+        (p) => p.method === 'POST' && p.name === workOrderId,
     );
     if (createMessagePair === undefined) {
         throw new Error(
@@ -1303,7 +1303,7 @@ async function replayWorkOrderStates(
     }
     const entityMessagePairs = documentMessagePairsAt(
         woRequests, woPrefix,
-    ).filter((messagePair) => messagePair.uriId === workOrderId);
+    ).filter((messagePair) => messagePair.name === workOrderId);
 
     const claimPrefix = canonicalPath(
         organization,
