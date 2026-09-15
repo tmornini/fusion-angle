@@ -17,6 +17,24 @@ export function extractErrorMessage(
     return fallback ?? String(err);
 }
 
+// Navigation abort is teardown, not a fault. Name,
+// not message: "Failed to fetch" is a live TypeError
+// until pagehide latches.
+export function isAbortFault(err: unknown): boolean {
+    return typeof err === 'object'
+        && err !== null
+        && 'name' in err
+        && err.name === 'AbortError';
+}
+
+export function shouldSurfaceFault(
+    err: unknown,
+    pageUnloading: boolean,
+): boolean {
+    if (pageUnloading) return false;
+    return !isAbortFault(err);
+}
+
 // One voice for a failed gesture: log the fault bound to the
 // request's trace id, then toast the gesture's name with the
 // fault's message. `message` names the WHOLE gesture ('Failed
@@ -37,21 +55,39 @@ export function reportFault(
 // The surfacing floor under every fault no caller handles:
 // uncaught errors and unhandled rejections log AND toast, so a
 // failed fire-and-forget handler degrades visibly instead of
-// vanishing to the console while the UI proceeds.
+// vanishing to the console while the UI proceeds. Aborted
+// fetches and pagehide teardown do not toast.
 export function initErrorSurfacing(): void {
+    let unloading = false;
+    window.addEventListener('pagehide', () => {
+        unloading = true;
+    });
+    window.addEventListener('pageshow', () => {
+        unloading = false;
+    });
     window.addEventListener('error', (event) => {
         const fault = event.error ?? event.message;
+        if (!shouldSurfaceFault(fault, unloading)) {
+            return;
+        }
         log.error('uncaught error', 'core', fault);
         showToast(extractErrorMessage(fault), 'error');
     });
     window.addEventListener(
         'unhandledrejection',
         (event) => {
+            if (!shouldSurfaceFault(
+                event.reason, unloading,
+            )) {
+                return;
+            }
             log.error(
-                'unhandled rejection', 'core', event.reason,
+                'unhandled rejection', 'core',
+                event.reason,
             );
             showToast(
-                extractErrorMessage(event.reason), 'error',
+                extractErrorMessage(event.reason),
+                'error',
             );
         },
     );
