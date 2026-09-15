@@ -2448,6 +2448,13 @@ renaming it to `etag` changes the stored `response` bytes of
 every new pair (never `request_hash`, which is over the request
 wire alone), so it stayed when `Response-ID` left the wire."
 
+The two streaming findings (document GET rebuilds the
+response instead of streaming the column; collection GET
+parses N bodies to rebuild one array) are already in the
+spec's list, recorded at planning. Read them before Task 23:
+if streaming is ever restored, the stored `response-id` line
+reaches the wire and Deviation 4 flips.
+
 Update the spec's `Status` line to "executed" and, in the
 Sequence, note Deviations 2, 3, and 6 in one line each so
 the spec and the branch agree.

@@ -265,6 +265,32 @@ handed to the other spec's report:
 - Operation pairs store `name = ''`.
 - The two advisory locks are constraints in disguise.
 - The collection GET reads its collection twice.
+- Document GET does not stream the `response` column.
+  `streamGetFromStored` (`api/message-pair.ts`) parses the
+  stored wire, mints `Date`, `Response-ID`, and
+  `Content-Type` afresh, forces status 200, and decodes then
+  re-encodes the body; no stored status line or header line
+  reaches the wire. `flows`, `work-orders`, and `members`
+  never reach even that path: their GETs re-derive the body
+  from the ledger and answer `Response.json`. The design
+  streams the stored message with only `Date` replaced.
+  Restoring it is a behavior change, and it decides the
+  stored `response-id` line's fate: either it becomes an
+  `etag` line at write time or it leaves storage and `ETag`
+  is minted from the `id` column, as `attachEtag` does now.
+- Collection GET parses N stored bodies to rebuild one
+  array. `getCollection` runs `parseWire` and `JSON.parse`
+  on every live head (`entitiesOf`), and the stream
+  collection GET stringifies the array again
+  (`Response.json` in `api/api.ts`). The design writes `[`,
+  each head's stored body octets joined by `,`, then `]`,
+  minting only the envelope; every element is a live PUT,
+  so every element has a body. The four derive families
+  that call `getCollection` parse each body only to read
+  `id` (`liveHeadId`), which is the row's `name` for a
+  document-class family; over `getCollectionHeadPairs(path)`
+  they read `.name`, the stream GET concatenates `.response`
+  bodies, and `entitiesOf` has no caller.
 
 ## Environment notes for the executor
 
