@@ -12,7 +12,6 @@ import {
 } from '../api/db-memory.ts';
 import {
     EntityNotFoundError,
-    MESSAGE_TABLES,
 } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type { Id } from '../api/types.ts';
@@ -261,9 +260,7 @@ async function testDocumentOp(
     _actor: Id,
     messagePair?: MessagePair,
 ): Promise<unknown> {
-    return db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.transaction(async (view) => {
             if (messagePair !== undefined) {
                 const latchedId = messagePair.latchedHeadMessagePairId;
                 const latest = (await messageStore(view).get(
@@ -686,9 +683,7 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, genesis),
+    await db.transaction((view) => appendMessagePair(view, genesis),
     );
     // Two writers both observed the SAME head (genesis.id)
     // before either committed — the race the pre-check alone
@@ -866,9 +861,7 @@ async function putStatelessDocumentMessagePair(
         responseBody: { id, ...body },
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePair(view, messagePair),
     );
 }
 
@@ -888,9 +881,7 @@ async function deleteStatelessDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePair(view, messagePair),
     );
 }
 

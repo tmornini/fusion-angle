@@ -2,7 +2,6 @@ import type { DbAdapter } from './db.ts';
 import {
     EntityNotFoundError,
     ForeignOrganizationError,
-    MESSAGE_TABLES,
 } from './db.ts';
 import type {
     Id, MessagePairEntity, StateEntity,
@@ -1429,9 +1428,7 @@ function workOrderLifecycleFromPlane(
 export async function deriveWorkOrderLifecycle(
     db: DbAdapter,
 ): Promise<StateEntity[]> {
-    return db.readTransaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.readTransaction(async (view) => {
             const messagePairs = await view.messagePairs.getAll();
             return [
                 ...workOrderLifecycleFromPlane(
@@ -1955,9 +1952,7 @@ const INVITATION_OP_FIELDS: Readonly<
 export async function deriveInvitationStates(
     db: DbAdapter,
 ): Promise<StateEntity[]> {
-    return db.readTransaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.readTransaction(async (view) => {
             const stored = await view.messagePairs.getAll();
             const rows: StateEntity[] = [];
 

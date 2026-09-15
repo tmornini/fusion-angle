@@ -1,5 +1,4 @@
 import type { DbAdapter } from './db.ts';
-import { MESSAGE_TABLES } from './db.ts';
 import {
     asWorkOrderFlowGraph,
 } from './validators.ts';
@@ -57,12 +56,7 @@ export interface AttributeReferrers {
 // work-orders collection prefix, and live node-attribute
 // bindings via flowGraphBindingsFromMessagePairs (graphDelta
 // attributeEvents + nodeFlowIds). RESTRICT is message-plane
-// only (`pairs` via derive helpers). An in-tx caller must
-// declare every table it touches — the transaction scope
-// is the declared set, and the memory backend rejects an
-// undeclared table on every test path.
-export const ATTRIBUTE_RESTRICT_TABLES =
-    MESSAGE_TABLES;
+// only (`pairs` via derive helpers).
 
 interface BoundGraph {
     readonly nodes: readonly {

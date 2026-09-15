@@ -11,7 +11,6 @@ import {
     type PostgresTx,
 } from '../api/backend-postgres.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
-import { TABLE_NAMES } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -227,7 +226,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
-        await backend.ensureTables(TABLE_NAMES);
+        await backend.ensureTable();
         await seedAdminSchema(db);
         // Open the pool to its full width here: a
         // pooled connection starts a max_lifetime
@@ -426,9 +425,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     async () => {
         const leftHeld = Promise.withResolvers<void>();
         const rightHeld = Promise.withResolvers<void>();
-        const left = backend.transaction(
-            ['message_pairs'],
-            'readonly',
+        const left = backend.transaction('readonly',
             async (tx) => {
                 const pg = tx as PostgresTx;
                 await pg.lock('fusion.test.deadlock.l');
@@ -437,9 +434,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 await pg.lock('fusion.test.deadlock.r');
             },
         );
-        const right = backend.transaction(
-            ['message_pairs'],
-            'readonly',
+        const right = backend.transaction('readonly',
             async (tx) => {
                 const pg = tx as PostgresTx;
                 await pg.lock('fusion.test.deadlock.r');
@@ -485,9 +480,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                     )
                 `;
                 const error = await assertRejects(
-                    () => tight.transaction(
-                        ['message_pairs'],
-                        'readonly',
+                    () => tight.transaction('readonly',
                         (txn) => (
                             txn as PostgresTx
                         ).lock(label),

@@ -1,6 +1,5 @@
 import { assert, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { requestMessageHash } from '../api/message-form.ts';
 import {
     formWriteMessagePair,
@@ -166,9 +165,7 @@ Deno.test('append then head-read round-trips', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const messagePair = await formWriteMessagePair({ ...INPUT });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePair(view, messagePair),
     );
     assertStrictEquals(
         (await messageStore(db).get(
@@ -192,9 +189,7 @@ Deno.test('a same-hash re-append writes nothing', async () => {
     await db.postSchemaCreation();
     const messagePair = await formWriteMessagePair({ ...INPUT });
     const replay = { ...messagePair, id: 'other-uuidAAAAAAAAAAAAw' };
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             await appendMessagePair(view, messagePair);
             await appendMessagePair(view, replay);
         },

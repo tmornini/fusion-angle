@@ -8,8 +8,8 @@ import {
 // History tables hold immutable point-in-time facts. Their
 // only valid removal is hard splice (eviction for cap
 // enforcement, schema reset, etc.) — never a tombstone.
-// A history store never consults a lifecycle log: it
-// declares only its own table on every tx.
+// A history store never consults a lifecycle log. `#table`
+// names the entity for EntityNotFoundError only.
 export class HistoryEntityStore<
     T extends { id: string },
 > implements EntityStoreInterface<T>
@@ -30,26 +30,22 @@ export class HistoryEntityStore<
 
     async getAll(): Promise<T[]> {
         return this.#run(
-            [this.#table], 'readonly',
-            tx => tx.getAll<T>(this.#table),
+            'readonly',
+            tx => tx.getAll<T>(),
         );
     }
 
     async getCollectionPairs(path: string): Promise<T[]> {
         return this.#run(
-            [this.#table], 'readonly',
-            tx => tx.getCollectionPairs<T>(
-                this.#table, path,
-            ),
+            'readonly',
+            tx => tx.getCollectionPairs<T>(path),
         );
     }
 
     async getPairsByRequestHash(hash: string): Promise<T[]> {
         return this.#run(
-            [this.#table], 'readonly',
-            tx => tx.getPairsByRequestHash<T>(
-                this.#table, hash,
-            ),
+            'readonly',
+            tx => tx.getPairsByRequestHash<T>(hash),
         );
     }
 
@@ -58,10 +54,8 @@ export class HistoryEntityStore<
         name: string,
     ): Promise<T[]> {
         return this.#run(
-            [this.#table], 'readonly',
-            tx => tx.getDocumentHistory<T>(
-                this.#table, path, name,
-            ),
+            'readonly',
+            tx => tx.getDocumentHistory<T>(path, name),
         );
     }
 
@@ -70,20 +64,16 @@ export class HistoryEntityStore<
         containment: Record<string, unknown>,
     ): Promise<T[]> {
         return this.#run(
-            [this.#table], 'readonly',
-            tx => tx.getWhereBody<T>(
-                this.#table, path, containment,
-            ),
+            'readonly',
+            tx => tx.getWhereBody<T>(path, containment),
         );
     }
 
     async getById(id: string): Promise<T> {
         return this.#run(
-            [this.#table], 'readonly',
+            'readonly',
             async (tx) => {
-                const row = await tx.getById<T>(
-                    this.#table, id,
-                );
+                const row = await tx.getById<T>(id);
                 if (!row) {
                     throw new EntityNotFoundError(
                         this.#table, id,
@@ -105,8 +95,8 @@ export class HistoryEntityStore<
             id,
         } as T;
         await this.#run(
-            [this.#table], 'readwrite',
-            tx => tx.append(this.#table, written),
+            'readwrite',
+            tx => tx.append(written),
         );
         return written;
     }

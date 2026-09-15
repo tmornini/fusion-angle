@@ -1,5 +1,4 @@
 import type { DbAdapter } from './db.ts';
-import { MESSAGE_TABLES } from './db.ts';
 import {
     ValidationError,
     assertInvitationState,
@@ -498,9 +497,7 @@ async function grantInvitation(
             operationId,
         })
         : undefined;
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             const outcome = await grantOutcomeFor(
                 view, organization, identityId);
             const agrees = outcome.kind === preOutcome.kind
@@ -665,9 +662,7 @@ async function acceptInvitation(
     );
     let conflict = false;
     let committed = false;
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             const state = await currentInvitationState(view, id);
             // Already accepted: no-op. Declined/revoked: 409.
             if (state === 'accepted') {
@@ -746,9 +741,7 @@ async function declineInvitation(
     }
     let conflict = false;
     let committed = false;
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             const state = await currentInvitationState(view, id);
             // Already declined: no-op. Accepted/revoked: 409.
             if (state === 'declined') {
@@ -819,9 +812,7 @@ async function revokeInvitation(
         return undefined;
     }
     let conflict = false;
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             const state = await currentInvitationState(view, id);
             if (state !== 'pending') {
                 conflict = true;

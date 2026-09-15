@@ -38,14 +38,14 @@ function byResponseAtThenId(
     );
 }
 
-// Builds a row-granular Tx handle over a pre-loaded buffer
-// of the touched tables. The buffer IS the unit of
-// atomicity: every op mutates only the buffer, so a backend
-// commits by flushing the dirty set and rolls back by
-// discarding it. The memory backend fills and drains this
-// buffer; Postgres does not use it. The
-// NOT-NULL gate runs at `append` time, so a bad row throws
-// inside `fn` and the whole transaction rolls back.
+// Builds a row-granular Tx handle over a pre-loaded copy
+// of the table. The buffer IS the unit of atomicity: every
+// op mutates only the buffer, so a backend commits by
+// adopting it and rolls back by discarding it. The memory
+// backend fills and drains this buffer; Postgres does not
+// use it. The NOT-NULL gate runs at `append` time, so a
+// bad row throws inside `fn` and the whole transaction
+// rolls back.
 //
 // Reads hand out copies, never the buffered or committed
 // row objects — the seam's value semantics: Postgres
@@ -53,20 +53,9 @@ function byResponseAtThenId(
 // must not be weaker. A caller mutating a fetched row can
 // never rewrite committed state.
 export function bufferTx(
-    buffer: Map<string, { id: string }[]>,
+    buffer: { id: string }[],
     mode: TxMode,
-    dirty: Set<string>,
 ): Tx {
-    const scoped = (table: string): { id: string }[] => {
-        const rows = buffer.get(table);
-        if (rows === undefined) {
-            throw new Error(
-                `Table "${table}" is not in the`
-                + ' transaction scope.',
-            );
-        }
-        return rows;
-    };
     const assertWritable = (): void => {
         if (mode === 'readonly') {
             throw new Error(
@@ -76,28 +65,24 @@ export function bufferTx(
     };
     return {
         async getById<T extends { id: string }>(
-            table: string,
             id: string,
         ): Promise<T | null> {
-            const row = scoped(table).find(
+            const row = buffer.find(
                 r => r.id === id,
             );
             return row === undefined
                 ? null
                 : { ...row } as T;
         },
-        async getAll<T extends { id: string }>(
-            table: string,
-        ): Promise<T[]> {
-            return scoped(table).map(
+        async getAll<T extends { id: string }>(): Promise<T[]> {
+            return buffer.map(
                 row => ({ ...row }),
             ) as T[];
         },
         async getCollectionPairs<T extends { id: string }>(
-            table: string,
             path: string,
         ): Promise<T[]> {
-            return scoped(table)
+            return buffer
                 .filter(row => (
                     row as Record<string, unknown>
                 )['path'] === path)
@@ -105,10 +90,9 @@ export function bufferTx(
                 .map(row => ({ ...row })) as T[];
         },
         async getPairsByRequestHash<T extends { id: string }>(
-            table: string,
             hash: string,
         ): Promise<T[]> {
-            return scoped(table)
+            return buffer
                 .filter(row => (
                     row as Record<string, unknown>
                 )['request_hash'] === hash)
@@ -116,11 +100,10 @@ export function bufferTx(
                 .map(row => ({ ...row })) as T[];
         },
         async getDocumentHistory<T extends { id: string }>(
-            table: string,
             path: string,
             name: string,
         ): Promise<T[]> {
-            return scoped(table)
+            return buffer
                 .filter((row) => {
                     const rec = row as
                         Record<string, unknown>;
@@ -132,11 +115,10 @@ export function bufferTx(
                 .map((row) => ({ ...row })) as T[];
         },
         async getWhereBody<T extends { id: string }>(
-            table: string,
             path: string,
             containment: Record<string, unknown>,
         ): Promise<T[]> {
-            return scoped(table)
+            return buffer
                 .filter((row) => {
                     const rec = row as
                         Record<string, unknown>;
@@ -162,20 +144,22 @@ export function bufferTx(
                 .map((row) => ({ ...row })) as T[];
         },
         async append<T extends { id: string }>(
-            table: string,
             row: T,
         ): Promise<void> {
             assertWritable();
-            const rows = scoped(table);
             // Scan BEFORE serializeRecord/splice: absence
             // is unindexed, so a row lacking the column
             // never collides (genesis rows coexist).
-            for (const column of uniqueColumns(table)) {
+            for (
+                const column of uniqueColumns(
+                    'message_pairs',
+                )
+            ) {
                 const value = (
                     row as Record<string, unknown>
                 )[column];
                 if (value === undefined) continue;
-                const collision = rows.find(
+                const collision = buffer.find(
                     (existing) =>
                         existing.id !== row.id
                         && (
@@ -186,26 +170,25 @@ export function bufferTx(
                 );
                 if (collision !== undefined) {
                     throw new UniqueConstraintError(
-                        table, column,
+                        'message_pairs', column,
                     );
                 }
             }
             const written = {
                 ...serializeRecord(
                     row as Record<string, unknown>,
-                    table,
+                    'message_pairs',
                 ),
                 id: row.id,
             } as { id: string };
-            const idx = rows.findIndex(
+            const idx = buffer.findIndex(
                 r => r.id === row.id,
             );
             if (idx >= 0) {
-                rows[idx] = written;
+                buffer[idx] = written;
             } else {
-                rows.push(written);
+                buffer.push(written);
             }
-            dirty.add(table);
         },
     };
 }

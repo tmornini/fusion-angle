@@ -10,7 +10,7 @@ import { PostgresBackend } from
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import { memoryDbAdapter } from
     '../api/db-memory.ts';
-import { TABLE_NAMES, type DbAdapter } from
+import type { DbAdapter } from
     '../api/db.ts';
 import {
     compareIdentifiers,
@@ -116,7 +116,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
-        await backend.ensureTables(TABLE_NAMES);
+        await backend.ensureTable();
     });
 
     Deno.test.afterAll(async () => {

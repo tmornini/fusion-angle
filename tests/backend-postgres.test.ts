@@ -113,10 +113,10 @@ const MESSAGE_PAIR_ROW = {
     operation_id: 'WvNiHVgksjrlfhPfdgfcyQ',
 };
 
-Deno.test('ensureTables runs compile-time SCHEMA', async () => {
+Deno.test('ensureTable runs compile-time SCHEMA', async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
-    await backend.ensureTables(['message_pairs']);
+    await backend.ensureTable();
     assertStrictEquals(fake.calls.length, 1);
     assertStrictEquals(fake.calls[0]!.text, POSTGRES_SCHEMA);
 });
@@ -196,11 +196,8 @@ Deno.test('getCollectionPairs selects by path, ordered',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
-    await backend.transaction(
-        ['message_pairs'],
-        'readonly',
+    await backend.transaction('readonly',
         (tx) => tx.getCollectionPairs(
-            'message_pairs',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         ),
     );
@@ -214,12 +211,8 @@ Deno.test(
     async () => {
         const fake = fakeClient();
         const backend = new PostgresBackend(fake.sql);
-        await backend.transaction(
-            ['message_pairs'],
-            'readonly',
-            (tx) => tx.getPairsByRequestHash(
-                'message_pairs',
-                'a'.repeat(64),
+        await backend.transaction('readonly',
+            (tx) => tx.getPairsByRequestHash('a'.repeat(64),
             ),
         );
         const text = fake.calls[0]!.text;
@@ -233,11 +226,8 @@ Deno.test(
     async () => {
         const fake = fakeClient();
         const backend = new PostgresBackend(fake.sql);
-        await backend.transaction(
-            ['message_pairs'],
-            'readonly',
+        await backend.transaction('readonly',
             (tx) => tx.getDocumentHistory(
-                'message_pairs',
                 '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
                 '42',
             ),
@@ -267,12 +257,8 @@ Deno.test('getWhereBody uses message_body containment',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
-    await backend.transaction(
-        ['message_pairs'],
-        'readonly',
-        (tx) => tx.getWhereBody(
-            'message_pairs',
-            '/authentication/authorize/',
+    await backend.transaction('readonly',
+        (tx) => tx.getWhereBody('/authentication/authorize/',
             { code: 'abc' },
         ),
     );
@@ -297,10 +283,8 @@ Deno.test('put writes BYTEA via Octets.fromLatin1',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
-    await backend.transaction(
-        ['message_pairs'],
-        'readwrite',
-        (tx) => tx.append('message_pairs', MESSAGE_PAIR_ROW),
+    await backend.transaction('readwrite',
+        (tx) => tx.append(MESSAGE_PAIR_ROW),
     );
     const values = fake.calls[0]!.values;
     const bytes = values.filter(
@@ -328,11 +312,8 @@ async () => {
         response: Buffer.from(bytes),
     }];
     const backend = new PostgresBackend(fake.sql);
-    const row = await backend.transaction(
-        ['message_pairs'],
-        'readonly',
-        (tx) => tx.getById<typeof MESSAGE_PAIR_ROW>(
-            'message_pairs', MESSAGE_PAIR_ROW.id,
+    const row = await backend.transaction('readonly',
+        (tx) => tx.getById<typeof MESSAGE_PAIR_ROW>(MESSAGE_PAIR_ROW.id,
         ),
     );
     assertStrictEquals(row?.request, wire);
@@ -348,10 +329,8 @@ async () => {
     fake.failWith = { code: '40P01' };
     const backend = new PostgresBackend(fake.sql);
     const err = await assertRejects(
-        () => backend.transaction(
-            ['message_pairs'],
-            'readonly',
-            (tx) => tx.getAll('message_pairs'),
+        () => backend.transaction('readonly',
+            (tx) => tx.getAll(),
         ),
     ) as ApiError;
     assertInstanceOf(err, ApiError);

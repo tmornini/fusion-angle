@@ -29,7 +29,6 @@ import type { SqlClient } from
 import { PostgresBackend } from
     '../api/backend-postgres.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
-import { TABLE_NAMES } from '../api/db.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { testHashPassword } from './mock-seed.ts';
 
@@ -200,7 +199,7 @@ Deno.test('postgres-seed refuses leftover pairs before DDL',
     const legacy = src.indexOf(
         'assertNoLegacyMessageTables',
     );
-    const ensure = src.indexOf('ensureTables');
+    const ensure = src.indexOf('ensureTable');
     assert(legacy >= 0);
     assert(ensure >= 0);
     assert(legacy < ensure);
@@ -357,7 +356,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
-        await adapter.ensureTables(TABLE_NAMES);
+        await adapter.ensureTable();
     });
 
     Deno.test.afterAll(async () => {

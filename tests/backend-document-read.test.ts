@@ -49,20 +49,18 @@ Deno.test(
     'getDocumentHistory is path+name, ordered by at,id',
 async () => {
     const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['t']);
-    await backend.transaction(
-        ['t'], 'readwrite',
+    await backend.ensureTable();
+    await backend.transaction('readwrite',
         async (tx) => {
             for (const row of ROWS) {
-                await tx.append('t', row);
+                await tx.append(row);
             }
         },
     );
-    const got = await backend.transaction(
-        ['t'], 'readonly',
+    const got = await backend.transaction('readonly',
         (tx) => tx.getDocumentHistory<Row>(
-            't', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                , 'AjdvjuECVZEgZoFajaIEkg',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+            'AjdvjuECVZEgZoFajaIEkg',
         ),
     );
     assertEquals(
@@ -75,7 +73,7 @@ Deno.test(
     'getDocumentHistory delegates to Tx.getDocumentHistory',
 async () => {
     const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['message_pairs']);
+    await backend.ensureTable();
     const store = new HistoryEntityStore<Row>(
         'message_pairs',
         backendRunner(backend),
@@ -121,25 +119,24 @@ function jsonWire(body: unknown): string {
 Deno.test('getWhereBody is collection + JSON containment',
 async () => {
     const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['message_pairs']);
-    await backend.transaction(
-        ['message_pairs'], 'readwrite',
+    await backend.ensureTable();
+    await backend.transaction('readwrite',
         async (tx) => {
-            await tx.append('message_pairs', {
+            await tx.append({
                 id: 'hit',
                 path: '/authentication/authorize/',
                 name: '',
                 response_at: '2026-01-01T00:00:00.000001Z',
                 response: jsonWire({ code: 'abc' }),
             });
-            await tx.append('message_pairs', {
+            await tx.append({
                 id: 'miss',
                 path: '/authentication/authorize/',
                 name: '',
                 response_at: '2026-01-01T00:00:00.000002Z',
                 response: jsonWire({ code: 'zzz' }),
             });
-            await tx.append('message_pairs', {
+            await tx.append({
                 id: 'other',
                 path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                     + '',
@@ -149,11 +146,8 @@ async () => {
             });
         },
     );
-    const got = await backend.transaction(
-        ['message_pairs'], 'readonly',
-        (tx) => tx.getWhereBody(
-            'message_pairs',
-            '/authentication/authorize/',
+    const got = await backend.transaction('readonly',
+        (tx) => tx.getWhereBody('/authentication/authorize/',
             { code: 'abc' },
         ),
     );

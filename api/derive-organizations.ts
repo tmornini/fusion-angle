@@ -1,7 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import {
     EntityNotFoundError,
-    MESSAGE_TABLES,
 } from './db.ts';
 import type { Id, OrganizationEntity } from './types.ts';
 import { validateOrganizationEntity } from './validators.ts';
@@ -52,9 +51,9 @@ import {
 // pair the live PUT legitimately formed.
 //
 // ONE shared readonly tx per call (Efficiency): db.messagePairs
-// read inside the SAME db.readTransaction(
-// MESSAGE_TABLES, ...) rather than an independent
-// getAllWhere that would open its own transaction. One
+// read inside the SAME db.readTransaction(...) rather
+// than an independent getAllWhere that would open its
+// own transaction. One
 // physical transaction per derivation, mirroring
 // api/derive-identity-spine.ts's own closure — there it
 // also closes a torn-read hazard; organizations/:id is
@@ -85,9 +84,7 @@ export function organizationEntityOf(
 export async function deriveOrganizations(
     db: DbAdapter,
 ): Promise<OrganizationEntity[]> {
-    return db.readTransaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.readTransaction(async (view) => {
             const messagePairs = await view.messagePairs.getCollectionPairs(
                 ORGANIZATIONS_PREFIX,
             );
@@ -111,9 +108,7 @@ export async function deriveOrganization(
     db: DbAdapter,
     id: Id,
 ): Promise<OrganizationEntity> {
-    return db.readTransaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.readTransaction(async (view) => {
             const messagePairs = await view.messagePairs.getCollectionPairs(
                 ORGANIZATIONS_PREFIX,
             );

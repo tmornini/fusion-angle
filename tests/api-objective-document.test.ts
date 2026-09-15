@@ -19,7 +19,6 @@ import { ValidationError } from '../api/types.ts';
 import type { ObjectiveEntity } from '../api/types.ts';
 import {
     EntityNotFoundError,
-    MESSAGE_TABLES,
 } from '../api/db.ts';
 import {
     validateObjectiveDocumentBody,
@@ -294,9 +293,7 @@ async function putDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePair(view, messagePair),
     );
 }
 
@@ -318,9 +315,7 @@ async function deleteDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePair(view, messagePair),
     );
 }
 

@@ -1,7 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import {
     EntityNotFoundError,
-    MESSAGE_TABLES,
 } from './db.ts';
 import type {
     Id,
@@ -58,7 +57,7 @@ import {
 // id, so deriveDocumentsAt's match fails and a LIVE
 // identity spuriously 404s. Both pii derives below close
 // this by reading db.messagePairs inside ONE shared
-// readonly db.readTransaction(MESSAGE_TABLES, ...) —
+// readonly db.readTransaction(...) —
 // greenfield code, closed at zero cost. Other facets in
 // this module are not this concurrent-append race, so
 // none of the other reads need this — a prefix getAllWhere
@@ -113,9 +112,7 @@ export function piiEntityOf(
 export async function deriveIdentityPiiRows(
     db: DbAdapter,
 ): Promise<IdentityPiiEntity[]> {
-    return db.readTransaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.readTransaction(async (view) => {
             const messagePairs = await view.messagePairs.getAll();
             const prefixes = new Set<string>();
             for (const messagePair of messagePairs) {
@@ -153,9 +150,7 @@ export async function deriveIdentityPii(
     id: Id,
 ): Promise<IdentityPiiEntity> {
     const prefix = piiPrefixFor(id);
-    return db.readTransaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.readTransaction(async (view) => {
             const messagePairs =
                 await view.messagePairs.getCollectionPairs(prefix,
                 );

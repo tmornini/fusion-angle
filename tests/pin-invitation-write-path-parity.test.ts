@@ -1,6 +1,5 @@
 import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     pendingInvitationFor,
@@ -80,10 +79,6 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 // transaction over (api/invitations-domain.ts). Phase Final
 // Task 2: invitations + memberships ROW halves stripped;
 // states stays until states-trace.
-const GRANT_TX_TABLES = MESSAGE_TABLES;
-const ACCEPT_TX_TABLES = MESSAGE_TABLES;
-const DECLINE_OR_REVOKE_TX_TABLES = MESSAGE_TABLES;
-
 async function assertPendingWritePathParity(
     db: MemoryDbAdapter,
     organization: string,
@@ -92,7 +87,6 @@ async function assertPendingWritePathParity(
     const preTx = await pendingInvitationFor(
         db, organization, identityId);
     const inTx = await db.transaction(
-        GRANT_TX_TABLES,
         (view) => pendingInvitationFor(
             view, organization, identityId),
     );
@@ -187,11 +181,10 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
     }
 
     async function assertStateWritePathParity(
-        id: string, tables: readonly string[],
+        id: string,
     ): Promise<string | null> {
         const preTx = await currentInvitationState(db, id);
         const inTx = await db.transaction(
-            tables,
             (view) => currentInvitationState(view, id),
         );
         assertStrictEquals(inTx, preTx);
@@ -205,7 +198,7 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
     );
     assertStrictEquals(
         await assertStateWritePathParity(
-            INV_PARITY_WRITE_PENDING, ACCEPT_TX_TABLES,
+            INV_PARITY_WRITE_PENDING,
         ),
         'pending',
     );
@@ -232,7 +225,7 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
     assertStrictEquals(accept.status, 204);
     assertStrictEquals(
         await assertStateWritePathParity(
-            'iOhteLyCdhnLqTaeGYCoYQ', ACCEPT_TX_TABLES,
+            'iOhteLyCdhnLqTaeGYCoYQ',
         ),
         'accepted',
     );
@@ -260,7 +253,6 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
     assertStrictEquals(
         await assertStateWritePathParity(
             'iPxNOWCigMcIYgqchAefWA',
-            DECLINE_OR_REVOKE_TX_TABLES,
         ),
         'declined',
     );
@@ -284,7 +276,6 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
     assertStrictEquals(
         await assertStateWritePathParity(
             'iZisVMKVGRGkyLzjwyTjow',
-            DECLINE_OR_REVOKE_TX_TABLES,
         ),
         'revoked',
     );
@@ -292,7 +283,7 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
     // A never-granted id, same parity.
     assertStrictEquals(
         await assertStateWritePathParity(
-            NO_SUCH_INVITATION, ACCEPT_TX_TABLES,
+            NO_SUCH_INVITATION,
         ),
         null,
     );
@@ -306,7 +297,6 @@ async function assertMembershipExistsWritePathParity(
     const preTx = await membershipExistsFor(
         db, organization, identityId);
     const inTx = await db.transaction(
-        ACCEPT_TX_TABLES,
         (view) => membershipExistsFor(
             view, organization, identityId),
     );

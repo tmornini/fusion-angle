@@ -1,6 +1,5 @@
 import {
     EntityNotFoundError,
-    MESSAGE_TABLES,
 } from './db.ts';
 import type {
     DbAdapter,
@@ -436,9 +435,7 @@ async function issueTokenPair(
         jti: refreshJti, identity_id: identityId,
         action: 'issued', chain_id: chainId, at,
     }, operationId);
-    await adapter.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await adapter.transaction(async (view) => {
             await appendMessagePair(view, eventMessagePair);
             if (messagePair !== undefined) {
                 await putMessagePair(view, messagePair);
@@ -668,9 +665,7 @@ export async function rotateRefreshJti(
             adapter, presentedJti, newJti, operationId,
         );
         try {
-            return await adapter.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            return await adapter.transaction(async (view) => {
                     const { rows } = await readTokenChainFromLedger(
                         view, presentedJti,
                     );
@@ -770,9 +765,7 @@ export async function revokeTokenChain(
             adapter, jti, operationId,
         );
         try {
-            await adapter.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            await adapter.transaction(async (view) => {
                     const { chainId, identityId, rows } =
                         await readTokenChainFromLedger(
                             view, jti,
@@ -1083,9 +1076,7 @@ async function grantClientCredentials(
         responseBody: ticketBody,
         operationId: messagePair.operationId,
     });
-    const consumed = await adapter.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    const consumed = await adapter.transaction(async (view) => {
             const locks = view.writeLocks;
             if (locks !== undefined) {
                 await locks.lockAddress(
@@ -1346,9 +1337,7 @@ async function grantAuthorizationCode(
         jti: refreshJti, identity_id: issuer.identityId,
         action: 'issued', chain_id: chainId, at,
     }, messagePair.operationId);
-    const consumed = await adapter.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    const consumed = await adapter.transaction(async (view) => {
             if (await authorizationCodeSpent(
                 view, derivedId, issuer.identityId,
             )) {
@@ -1580,9 +1569,7 @@ async function authorizePassword(
             operationId: messagePair.operationId,
         });
     }
-    await adapter.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await adapter.transaction(async (view) => {
             if (rehashMessagePair !== undefined) {
                 await appendMessagePair(view, rehashMessagePair);
             }

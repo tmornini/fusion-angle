@@ -3,7 +3,6 @@ import { connectPostgres } from
 import { PostgresBackend } from
     '../api/backend-postgres.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
-import { TABLE_NAMES } from '../api/db.ts';
 import { defineStoreAcceptance } from
     './store-acceptance.ts';
 
@@ -79,7 +78,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         // Fresh tables each case. hasSchema after
         // deleteSchema throws (loud miss) — do not probe.
         await backend.deleteSchema();
-        await backend.ensureTables(TABLE_NAMES);
+        await backend.ensureTable();
         return new BackedDbAdapter(
             backend,
             async () => {},

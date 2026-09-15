@@ -1,5 +1,4 @@
 import type { DbAdapter } from '../api/db.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import {
     nowUtc, SYSTEM_MEMBER_ID, type Id,
     type OrganizationEntity,
@@ -98,7 +97,6 @@ export async function seedOrganizationDocument(
     });
     await db.transaction(
         // Phase Final Task 2: organizations ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
             await appendMessagePair(view, messagePair);
         },

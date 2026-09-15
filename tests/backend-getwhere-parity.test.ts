@@ -30,12 +30,11 @@ async function seed(
     backend: StorageBackend,
     rows: Row[],
 ): Promise<void> {
-    await backend.ensureTables(['t']);
-    await backend.transaction(
-        ['t'], 'readwrite',
+    await backend.ensureTable();
+    await backend.transaction('readwrite',
         async (tx) => {
             for (const row of rows) {
-                await tx.append<Row>('t', row);
+                await tx.append<Row>(row);
             }
         },
     );
@@ -45,9 +44,8 @@ function byIndex(
     backend: StorageBackend,
     key: string,
 ): Promise<Row[]> {
-    return backend.transaction(
-        ['t'], 'readonly',
-        tx => tx.getCollectionPairs<Row>('t', key),
+    return backend.transaction('readonly',
+        tx => tx.getCollectionPairs<Row>(key),
     );
 }
 
@@ -55,10 +53,9 @@ function byScan(
     backend: StorageBackend,
     key: string,
 ): Promise<Row[]> {
-    return backend.transaction(
-        ['t'], 'readonly',
+    return backend.transaction('readonly',
         async (tx) => {
-            const all = await tx.getAll<Row>('t');
+            const all = await tx.getAll<Row>();
             return all.filter(r => r.path === key);
         },
     );

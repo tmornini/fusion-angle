@@ -32,7 +32,6 @@ export const POSTGRES_DROP_SCHEMA =
 
 export interface PostgresTx extends Tx {
     getDocumentHistory<T extends { id: string }>(
-        table: string,
         path: string,
         name: string,
     ): Promise<T[]>;
@@ -56,13 +55,9 @@ export class PostgresBackend implements StorageBackend {
     }
 
     async transaction<R>(
-        tables: readonly string[],
         mode: TxMode,
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R> {
-        for (const table of tables) {
-            assertMessageTable(table);
-        }
         try {
             return await this.#sql.begin(
                 (sql) => fn(postgresTx(sql, mode)),
@@ -72,9 +67,7 @@ export class PostgresBackend implements StorageBackend {
         }
     }
 
-    async ensureTables(
-        _tables: readonly string[],
-    ): Promise<void> {
+    async ensureTable(): Promise<void> {
         try {
             await this.#sql.unsafe(POSTGRES_SCHEMA);
         } catch (error) {
@@ -131,76 +124,61 @@ function postgresTx(
     };
     return {
         async getById<T extends { id: string }>(
-            table: string,
             id: string,
         ): Promise<T | null> {
-            const name = assertMessageTable(table);
-            const rows = await selectPairById(sql, name, id);
+            const rows = await selectPairById(sql, id);
             const row = rows[0];
             return row === undefined
                 ? null
                 : entityOf<T>(row);
         },
-        async getAll<T extends { id: string }>(
-            table: string,
-        ): Promise<T[]> {
-            const name = assertMessageTable(table);
-            const rows = await selectAll(sql, name);
+        async getAll<T extends { id: string }>(): Promise<T[]> {
+            const rows = await selectAll(sql);
             return rows.map((row) => entityOf<T>(row));
         },
         async getCollectionPairs<T extends { id: string }>(
-            table: string,
             path: string,
         ): Promise<T[]> {
-            const name = assertMessageTable(table);
             const rows = await selectCollectionPairs(
-                sql, name, path,
+                sql, path,
             );
             return rows.map((row) => entityOf<T>(row));
         },
         async getPairsByRequestHash<T extends { id: string }>(
-            table: string,
             hash: string,
         ): Promise<T[]> {
-            const name = assertMessageTable(table);
             const rows = await selectPairsByRequestHash(
-                sql, name, hash,
+                sql, hash,
             );
             return rows.map((row) => entityOf<T>(row));
         },
         async getDocumentHistory<T extends { id: string }>(
-            table: string,
             path: string,
             name: string,
         ): Promise<T[]> {
-            const known = assertMessageTable(table);
             const rows = await selectDocumentHistory(
-                sql, known, path, name,
+                sql, path, name,
             );
             return rows.map((row) => entityOf<T>(row));
         },
         async getWhereBody<T extends { id: string }>(
-            table: string,
             path: string,
             containment: Record<string, unknown>,
         ): Promise<T[]> {
-            const name = assertMessageTable(table);
             const rows = await selectWhereBody(
-                sql, name, path, containment,
+                sql, path, containment,
             );
             return rows.map((row) => entityOf<T>(row));
         },
         async append<T extends { id: string }>(
-            table: string,
             row: T,
         ): Promise<void> {
             assertWritable();
-            const name = assertMessageTable(table);
             const written = serializeRecord(
                 row as Record<string, unknown>,
-                name,
+                'message_pairs',
             );
-            await upsertRow(sql, name, written);
+            await upsertRow(sql, written);
         },
         async lock(label: string): Promise<void> {
             await advisoryLock(sql, label);
@@ -262,15 +240,6 @@ async function advisoryLock(
     await sql.query`
         SELECT pg_advisory_xact_lock(${key})
     `;
-}
-
-function assertMessageTable(
-    table: string,
-): 'message_pairs' {
-    if (table === 'message_pairs') {
-        return table;
-    }
-    throw new Error('unknown table: ' + table);
 }
 
 function uuidTextOfIdentifier(id: string): string {
@@ -356,7 +325,6 @@ function textField(
 
 async function selectPairById(
     sql: SqlClient,
-    _table: 'message_pairs',
     id: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
@@ -367,7 +335,6 @@ async function selectPairById(
 
 async function selectAll(
     sql: SqlClient,
-    _table: 'message_pairs',
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
         SELECT * FROM message_pairs
@@ -377,7 +344,6 @@ async function selectAll(
 
 async function selectCollectionPairs(
     sql: SqlClient,
-    _table: 'message_pairs',
     path: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
@@ -389,7 +355,6 @@ async function selectCollectionPairs(
 
 async function selectPairsByRequestHash(
     sql: SqlClient,
-    _table: 'message_pairs',
     hash: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
@@ -401,7 +366,6 @@ async function selectPairsByRequestHash(
 
 async function selectDocumentHistory(
     sql: SqlClient,
-    _table: 'message_pairs',
     path: string,
     name: string,
 ): Promise<Record<string, unknown>[]> {
@@ -415,7 +379,6 @@ async function selectDocumentHistory(
 
 async function selectWhereBody(
     sql: SqlClient,
-    _table: 'message_pairs',
     path: string,
     containment: Record<string, unknown>,
 ): Promise<Record<string, unknown>[]> {
@@ -430,7 +393,6 @@ async function selectWhereBody(
 
 async function upsertRow(
     sql: SqlClient,
-    _table: 'message_pairs',
     row: Record<string, unknown>,
 ): Promise<void> {
     const id = uuidTextOfIdentifier(

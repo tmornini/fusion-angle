@@ -3,7 +3,7 @@ import { connectPostgres } from
     '../api/postgres-client.ts';
 import { PostgresBackend } from
     '../api/backend-postgres.ts';
-import { TABLE_NAMES, type Tx } from '../api/db.ts';
+import type { Tx } from '../api/db.ts';
 import { serializeWire } from
     '../shared/http-message/wire-codec.ts';
 import { Octets } from
@@ -130,7 +130,7 @@ async function putMessagePair(
 ): Promise<void> {
     const id = id22(n);
     const at = atStamp(n);
-    await tx.append('message_pairs', {
+    await tx.append({
         id,
         path: collection,
         name: name,
@@ -152,7 +152,7 @@ async function putAuthorize(
 ): Promise<void> {
     const id = id22(n);
     const at = atStamp(n);
-    await tx.append('message_pairs', {
+    await tx.append({
         id,
         path: AUTH_COLLECTION,
         name: '',
@@ -172,9 +172,7 @@ async function putAuthorize(
 async function seedRows(
     backend: PostgresBackend,
 ): Promise<void> {
-    await backend.transaction(
-        TABLE_NAMES,
-        'readwrite',
+    await backend.transaction('readwrite',
         async (tx) => {
             await putAuthorize(
                 tx,
@@ -287,7 +285,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
-        await backend.ensureTables(TABLE_NAMES);
+        await backend.ensureTable();
         await seedRows(backend);
         await sql.query`ANALYZE message_pairs`;
     });

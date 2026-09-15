@@ -9,7 +9,6 @@ import {
     validateIdentityProviderEntity,
 } from '../api/validators.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     createRequestContext,
@@ -225,9 +224,7 @@ async () => {
         }),
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             await appendMessagePair(view, messagePair);
         },
     );
@@ -270,9 +267,7 @@ async () => {
         }),
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             await appendMessagePair(view, flatPair);
         },
     );

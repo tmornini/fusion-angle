@@ -5,7 +5,6 @@ import { connectPostgres } from
     '../api/postgres-client.ts';
 import { PostgresBackend } from
     '../api/backend-postgres.ts';
-import { TABLE_NAMES } from '../api/db.ts';
 
 Deno.test(
     'postSchemaCreation/hasSchema/deleteSchema'
@@ -123,7 +122,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
-        await backend.ensureTables(TABLE_NAMES);
+        await backend.ensureTable();
     });
 
     Deno.test.afterAll(async () => {

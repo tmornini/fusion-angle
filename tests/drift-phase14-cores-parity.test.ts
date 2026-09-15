@@ -1,6 +1,5 @@
 import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import { nowUtc } from '../api/types.ts';
 import { invitationOpStateFor } from '../api/derive-invitations.ts';
@@ -120,10 +119,8 @@ Deno.test('invitationOpStateFor: byte-identical pre-tx (the plain'
 
     // Phase Final Task 2: memberships ROW half stripped from
     // acceptInvitation's tx list.
-    const acceptTxTables = MESSAGE_TABLES;
     const preTx = await invitationOpStateFor(db, id);
     const inTx = await db.transaction(
-        acceptTxTables,
         (view) => invitationOpStateFor(view, id),
     );
     assertStrictEquals(inTx, preTx);
@@ -134,7 +131,6 @@ Deno.test('invitationOpStateFor: byte-identical pre-tx (the plain'
         db, NO_SUCH_INVITATION,
     );
     const inTxMissing = await db.transaction(
-        acceptTxTables,
         (view) =>
             invitationOpStateFor(view, NO_SUCH_INVITATION),
     );
@@ -163,10 +159,8 @@ Deno.test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
     ));
     assertStrictEquals(revoke.status, 204);
 
-    const revokeTxTables = MESSAGE_TABLES;
     const preTx = await invitationLifecycleStatesFor(db, id);
     const inTx = await db.transaction(
-        revokeTxTables,
         (view) => invitationLifecycleStatesFor(view, id),
     );
     assertEquals(inTx, preTx);
@@ -176,7 +170,6 @@ Deno.test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
         db, NO_SUCH_INVITATION,
     );
     const inTxMissing = await db.transaction(
-        revokeTxTables,
         (view) =>
             invitationLifecycleStatesFor(
                 view, NO_SUCH_INVITATION,
@@ -264,12 +257,10 @@ Deno.test('workOrderLifecycleStatesFor: byte-identical pre-tx (the'
     assertStrictEquals(created.status, 201);
 
     // Phase Final Task 2: work_orders dropped from claim tx.
-    const claimTxTables = MESSAGE_TABLES;
     const preTx = await workOrderLifecycleStatesFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
     const inTx = await db.transaction(
-        claimTxTables,
         (view) => workOrderLifecycleStatesFor(
             view, STARK_ORGANIZATION, workOrderId,
         ),
@@ -281,7 +272,6 @@ Deno.test('workOrderLifecycleStatesFor: byte-identical pre-tx (the'
         db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
     );
     const inTxMissing = await db.transaction(
-        claimTxTables,
         (view) => workOrderLifecycleStatesFor(
             view, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
         ),
@@ -328,12 +318,10 @@ Deno.test('workOrderClaimHistoryFor: byte-identical pre-tx (the'
     assertStrictEquals(created.status, 201);
 
     // Phase Final Task 2: work_orders dropped from claim tx.
-    const claimTxTables = MESSAGE_TABLES;
     const preTx = await workOrderClaimHistoryFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
     const inTx = await db.transaction(
-        claimTxTables,
         (view) => workOrderClaimHistoryFor(
             view, STARK_ORGANIZATION, workOrderId,
         ),
@@ -345,7 +333,6 @@ Deno.test('workOrderClaimHistoryFor: byte-identical pre-tx (the'
         db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
     );
     const inTxMissing = await db.transaction(
-        claimTxTables,
         (view) => workOrderClaimHistoryFor(
             view, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
         ),

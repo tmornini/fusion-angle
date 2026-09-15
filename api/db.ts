@@ -115,38 +115,30 @@ export type TxMode = 'readonly' | 'readwrite';
 
 // The row-granular handle over one transaction. Postgres
 // fulfills it with a native transaction; the memory backend
-// simulates it (buffer touched tables, flush on success,
-// discard on throw).
+// simulates it (copy the table, adopt on success, discard
+// on throw).
 // `getById` returns null for an absent row — absence is
 // modeled at the call site, never via a sentinel.
 export interface Tx {
     getById<T extends { id: string }>(
-        table: string,
         id: string,
     ): Promise<T | null>;
-    getAll<T extends { id: string }>(
-        table: string,
-    ): Promise<T[]>;
+    getAll<T extends { id: string }>(): Promise<T[]>;
     getCollectionPairs<T extends { id: string }>(
-        table: string,
         path: string,
     ): Promise<T[]>;
     getPairsByRequestHash<T extends { id: string }>(
-        table: string,
         hash: string,
     ): Promise<T[]>;
     getDocumentHistory<T extends { id: string }>(
-        table: string,
         path: string,
         name: string,
     ): Promise<T[]>;
     getWhereBody<T extends { id: string }>(
-        table: string,
         path: string,
         containment: Record<string, unknown>,
     ): Promise<T[]>;
     append<T extends { id: string }>(
-        table: string,
         row: T,
     ): Promise<void>;
     // Postgres write coordination. Other backends omit
@@ -184,16 +176,13 @@ export interface WriteLocks {
 // to obtain rows; backends own persistence + encoding,
 // stores own semantics (tombstones, splices, singletons).
 // `transaction` is the primitive every row op crosses;
-// `ensureTables` is schema lifecycle, never a row op.
+// `ensureTable` is schema lifecycle, never a row op.
 export interface StorageBackend {
     transaction<R>(
-        tables: readonly string[],
         mode: TxMode,
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R>;
-    ensureTables(
-        tables: readonly string[],
-    ): Promise<void>;
+    ensureTable(): Promise<void>;
     // Schema lifecycle — each backend signals
     // 'schema exists' its own way: memory by table
     // existence, Postgres by the `schema_marker` row.
@@ -208,7 +197,6 @@ export interface StorageBackend {
 // `ambientRunner` — no AsyncLocalStorage, no ambient global,
 // just the runner the store was handed at construction.
 export type TxRunner = <R>(
-    tables: readonly string[],
     mode: TxMode,
     fn: (tx: Tx) => Promise<R>,
 ) => Promise<R>;
@@ -216,14 +204,13 @@ export type TxRunner = <R>(
 export const backendRunner = (
     backend: StorageBackend,
 ): TxRunner =>
-    (tables, mode, fn) =>
-        backend.transaction(tables, mode, fn);
+    (mode, fn) => backend.transaction(mode, fn);
 
-// Join the open tx: the declared tables/mode are the open
-// transaction's already, so this ignores them and runs `fn`
-// against the same handle.
+// Join the open tx: the open transaction's mode is
+// already fixed, so this ignores the declared mode and
+// runs `fn` against the same handle.
 export const ambientRunner = (tx: Tx): TxRunner =>
-    (_tables, _mode, fn) => fn(tx);
+    (_mode, fn) => fn(tx);
 
 // The store an adapter exposes, factored out of
 // DbAdapter so an adapter can build the whole bundle in one
@@ -241,12 +228,10 @@ export interface DbLifecycle {
     deleteSchema(): Promise<void>;
     hasSchema(): Promise<boolean>;
     postSchemaCreation(): Promise<void>;
-    // Make the named tables writable without declaring the
+    // Make the table writable without declaring the
     // schema present: the installer primitive for seeds,
     // not snapshot import.
-    ensureTables(
-        tables: readonly string[],
-    ): Promise<void>;
+    ensureTable(): Promise<void>;
     // The Decision 5 post hook: fired AFTER a write commits,
     // so cross-tab (and future cross-process) subscribers are
     // informed of state changes — never polled. Carried on the
@@ -262,9 +247,8 @@ export interface DbAdapter extends DbLifecycle, DbStores {
     // exposes the same stores bound to the open tx, so every
     // op joins it — GET-modify-PUT and multi-PUT commit
     // atomically. A nested view.transaction re-enters this
-    // same tx; its tables must be a subset of the outer set.
+    // same tx.
     transaction<R>(
-        tables: readonly string[],
         fn: (view: DbAdapter) => Promise<R>,
     ): Promise<R>;
     // Pure-read sibling of `transaction`; both backends
@@ -272,7 +256,6 @@ export interface DbAdapter extends DbLifecycle, DbStores {
     // joins whatever mode is open so read-your-writes
     // stays intact.
     readTransaction<R>(
-        tables: readonly string[],
         fn: (view: DbAdapter) => Promise<R>,
     ): Promise<R>;
 }
@@ -286,11 +269,9 @@ export interface GuardedDbAdapter
     extends DbLifecycle, DbStores
 {
     transaction<R>(
-        tables: readonly string[],
         fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R>;
     readTransaction<R>(
-        tables: readonly string[],
         fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R>;
 }
@@ -300,12 +281,6 @@ export interface GuardedDbAdapter
 export const TABLE_NAMES = [
     'message_pairs',
 ];
-
-// The message-plane transaction declaration. Every
-// `transaction` / `readTransaction` that touches
-// the message plane passes this instead of a
-// literal list. Equals TABLE_NAMES.
-export const MESSAGE_TABLES = TABLE_NAMES;
 
 // A secondary index is a plain column name, or the object
 // form declaring `unique: true`. No table declares the

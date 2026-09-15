@@ -3,7 +3,6 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -50,9 +49,7 @@ async function writePair(
             : input.responseBody,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        (view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePair(view, messagePair),
     );
     return {
         id: messagePair.id,

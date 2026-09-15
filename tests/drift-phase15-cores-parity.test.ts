@@ -11,7 +11,6 @@ import {
     EntityNotFoundError,
     type DbAdapter,
     TABLE_NAMES,
-    MESSAGE_TABLES,
 } from '../api/db.ts';
 import { nowUtc } from '../api/types.ts';
 import {
@@ -154,11 +153,6 @@ function workOrderFlowGraph(
     };
 }
 
-// The claim gate's write-tx table list
-// (postWorkOrderClaimOp, routes.ts). Phase Final Task 2:
-// work_orders dropped (ROW half stripped).
-const CLAIM_TX_TABLES = MESSAGE_TABLES;
-
 const EMPTY_FLOW_ID = 'GgfDbXOJUvvaCekCTcvhuw';
 
 // -- workOrderDocumentHeadFor ------------------------------------
@@ -208,7 +202,6 @@ async () => {
         db, STARK_ORGANIZATION, workOrderId,
     );
     const inTx = await db.transaction(
-        [...CLAIM_TX_TABLES],
         (view) => workOrderDocumentHeadFor(
             view, STARK_ORGANIZATION, workOrderId,
         ),
@@ -223,7 +216,6 @@ async () => {
         db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
     );
     const inTxMissing = await db.transaction(
-        [...CLAIM_TX_TABLES],
         (view) => workOrderDocumentHeadFor(
             view, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
         ),
@@ -312,7 +304,6 @@ async () => {
         db, STARK_ORGANIZATION, workOrderId,
     );
     const inTx = await db.transaction(
-        [...CLAIM_TX_TABLES],
         (view) => workOrderDocumentHeadFor(
             view, STARK_ORGANIZATION, workOrderId,
         ),
@@ -358,7 +349,6 @@ async () => {
         db, STARK_ORGANIZATION, missingId,
     );
     const inMissing = await db.transaction(
-        [...CLAIM_TX_TABLES],
         (view) => workOrderDocumentHeadFor(
             view, STARK_ORGANIZATION, missingId,
         ),
@@ -431,14 +421,11 @@ Deno.test('stateEventVisibilityFor: tier (i) event-append pairs'
     }
     assertNotStrictEquals(foreignEventId, '');
 
-    const txTables = MESSAGE_TABLES;
-
     // Own → visible (tier i).
     const preOwn = await stateEventVisibilityFor(
         db, STARK_ORGANIZATION, ownEventId,
     );
     const inOwn = await db.transaction(
-        txTables,
         (view) => stateEventVisibilityFor(
             view, STARK_ORGANIZATION, ownEventId,
         ),
@@ -467,7 +454,6 @@ Deno.test('stateEventVisibilityFor: tier (i) event-append pairs'
         db, STARK_ORGANIZATION, GHOST_EVENT_NOWHERE,
     );
     const inOrphan = await db.transaction(
-        txTables,
         (view) => stateEventVisibilityFor(
             view, STARK_ORGANIZATION, GHOST_EVENT_NOWHERE,
         ),
@@ -621,12 +607,10 @@ Deno.test('flowGraphBindingsFromMessagePairs: seed attribute + member'
 + ' ledgers non-empty; pre-tx vs in-tx parity; nodeFlowIds'
 + ' cover every bound node', async () => {
     const db = await seededDb();
-    const txTables = MESSAGE_TABLES;
     const preTx = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
     );
     const inTx = await db.transaction(
-        txTables,
         (view) => flowGraphBindingsFromMessagePairs(
             view, STARK_ORGANIZATION,
         ),
@@ -1645,7 +1629,6 @@ async () => {
     const inTx = await db.transaction(
         // Stage B: roster +
         // organizations/AjdvjuECVZEgZoFajaIEkg/objectives/records retired.
-        MESSAGE_TABLES,
         (view) => collectAttributeReferrers(
             view,
             STARK_ORGANIZATION,
@@ -1785,7 +1768,6 @@ async () => {
     // Pre-tx vs in-tx parity (message plane only).
     const inTx = await db.transaction(
         // Stage B: roster + records/work_orders retired.
-        MESSAGE_TABLES,
         (view) => collectAttributeReferrers(
             view,
             STARK_ORGANIZATION,

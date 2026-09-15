@@ -1,7 +1,6 @@
 import {
     EntityNotFoundError,
     ForeignOrganizationError,
-    MESSAGE_TABLES,
 } from './db.ts';
 import type {
     DbAdapter,
@@ -1071,9 +1070,7 @@ export async function postRecordWriteOp(
     // State event + RESTRICT + pairs commit as one
     // transaction. Attribute bodies live only on the
     // message plane (attributePuts/attributeDeletes).
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             // Phase Final Task 2: states ROW half stripped —
             // document/attribute pairs alone carry truth.
             if (removedIds.length > 0) {
@@ -1176,9 +1173,7 @@ export async function postIdeaDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<IdeaEntity, 'id'>;
-    return db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.transaction(async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
             }
@@ -1215,7 +1210,6 @@ export async function postProjectDocumentOp(
     return db.transaction(
         // Phase Final Task 2: projects ROW half stripped;
         // states ROW half stripped (message plane only).
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -1255,7 +1249,6 @@ export async function postRecordDocumentOp(
     return db.transaction(
         // Phase Final Task 2: records ROW half stripped;
         // states ROW half stripped (message plane only).
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -1291,7 +1284,6 @@ export async function postRecordAttributeDocumentOp(
     return db.transaction(
         // Phase Final Task 2: record_attributes ROW half
         // stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -1326,9 +1318,7 @@ export async function postIdeaSubmissionOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    return db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.transaction(async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
             }
@@ -1407,9 +1397,7 @@ export async function postFlowCreationOp(
     messagePairs?: FlowCreationMessagePairs,
 ): Promise<void> {
     validateFlowCreateBody(body);
-    return db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.transaction(async (view) => {
             // Three pairs or none (Atomicity): the operation
             // message pair (the gate's own), the synthesized
             // document message pair, and the synthesized join
@@ -1469,7 +1457,6 @@ export async function postFlowDocumentOp(
     return db.transaction(
         // Phase Final Task 2: flows + graph ROW halves
         // stripped; states ROW half stripped (message plane only).
-        MESSAGE_TABLES,
         async (view) => {
             // Revival states events dual-write until the
             // states-trace strip; pair body also carries
@@ -1522,9 +1509,7 @@ export async function postFlowUndoOp(
         // document message pair, no domain writes — a genuine no-op a
         // LATER resolution walk correctly ignores (it carries no
         // correlated document message pair to displace anything).
-        return db.transaction(
-            MESSAGE_TABLES,
-            async (view) => {
+        return db.transaction(async (view) => {
                 await appendMessagePair(view, messagePair);
             },
         );
@@ -1588,7 +1573,6 @@ export async function postFlowUndoOp(
     });
     return db.transaction(
         // Phase Final Task 2: flows + graph ROW halves stripped.
-        MESSAGE_TABLES,
         async (view) => {
             const latest = (await messageStore(view).get(
                 documentMessagePair.path,
@@ -1694,7 +1678,6 @@ export async function postObjectiveCreationOp(
     return db.transaction(
         // Phase Final Task 2: objectives +
         // objective_revisions ROW halves stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePairs !== undefined) {
                 await appendMessagePair(view, messagePairs.operation);
@@ -1732,7 +1715,6 @@ export async function postObjectiveDocumentOp(
     } as unknown as Omit<ObjectiveEntity, 'id'>;
     return db.transaction(
         // Phase Final Task 2: objectives ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -1800,7 +1782,6 @@ export async function postIdentityCreationOp(
     return db.transaction(
         // Phase Final Task 2: identities + identity_credentials
         // ROW halves stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePairs !== undefined) {
                 await appendMessagePair(view, messagePairs.operation);
@@ -1877,7 +1858,6 @@ export async function postWorkOrderCreationOp(
     return db.transaction(
         // Phase Final Task 2: work_orders + flow_work_orders
         // ROW halves stripped.
-        MESSAGE_TABLES,
         async (view) => {
             // Four pairs or none (Atomicity): operation,
             // document, join, and the genesis claim
@@ -1934,7 +1914,6 @@ export async function postWorkOrderClaimOp(
 ): Promise<void> {
     return db.transaction(
         // Phase Final Task 2: work_orders ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
             validateWorkOrderClaimBody(body);
             const wo = await workOrderDocumentHeadFor(
@@ -2008,9 +1987,7 @@ export async function deleteWorkOrderClaimOp(
     _organization: Id,
     messagePair?: MessagePair,
 ): Promise<void> {
-    return db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.transaction(async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
             }
@@ -2166,9 +2143,7 @@ export async function postWorkOrderTransitionOp(
         // Below-facade tier (seed): no gate, no fence —
         // validate + append, the WO-create precedent.
         // Historical seed moves are not re-gated (W10).
-        return db.transaction(
-            MESSAGE_TABLES,
-            async (view) => {
+        return db.transaction(async (view) => {
                 if (messagePair !== undefined) {
                     await appendMessagePair(view, messagePair);
                 }
@@ -2208,9 +2183,7 @@ export async function postWorkOrderTransitionOp(
             wo.flow_graph,
             { set: [], clear: [] },
         );
-        return db.transaction(
-            MESSAGE_TABLES,
-            async (view) => {
+        return db.transaction(async (view) => {
                 if (messagePair !== undefined) {
                     await appendMessagePair(view, messagePair);
                 }
@@ -2358,9 +2331,7 @@ export async function postWorkOrderTransitionOp(
         }],
     });
     const latchedMessagePairId = head.messagePairId;
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             const liveWo =
                 await workOrderDocumentHeadFor(
                     view, organization, workOrderId,
@@ -2407,9 +2378,7 @@ export async function postWorkOrderBindingOp(
     organization: Id,
     messagePair?: MessagePair,
 ): Promise<void> {
-    return db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.transaction(async (view) => {
             const wo = await workOrderDocumentHeadFor(
                 view, organization, workOrderId,
             );
@@ -2501,7 +2470,6 @@ export async function postWorkOrderDocumentOp(
     } as unknown as Omit<WorkOrderEntity, 'id'>;
     return db.transaction(
         // Phase Final Task 2: work_orders ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -2532,7 +2500,6 @@ export async function postFlowWorkOrderDocumentOp(
     });
     return db.transaction(
         // Phase Final Task 2: flow_work_orders ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -2567,7 +2534,6 @@ export async function postFlowRecordDocumentOp(
     const recordsPrefix = recordTypesUriPrefix(organization);
     return db.transaction(
         // Phase Final Task 2: flow_records ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
             // Record miss is EntityNotFoundError (404) —
             // never missedReadError (would 403 foreign and
@@ -2607,9 +2573,7 @@ export async function postFlowTagDocumentOp(
     db: DbAdapter,
     messagePair?: MessagePair,
 ): Promise<void> {
-    return db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.transaction(async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
             }
@@ -2641,9 +2605,7 @@ export async function postBaselineScoreDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    return db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.transaction(async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
             }
@@ -2670,9 +2632,7 @@ export async function postActualScoreDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    return db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.transaction(async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
             }
@@ -2699,7 +2659,6 @@ export async function postMembershipDocumentOp(
         Omit<MembershipEntity, 'id'>;
     return db.transaction(
         // Phase Final Task 2: memberships ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -2725,7 +2684,6 @@ export async function postMemberDocumentOp(
         Omit<MemberEntity, 'id'>;
     return db.transaction(
         // Phase Final Task 2: members ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -2751,7 +2709,6 @@ export async function postAiMemberDocumentOp(
         Omit<AIMemberEntity, 'id'>;
     return db.transaction(
         // Phase Final Task 2: ai_members ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -2778,7 +2735,6 @@ export async function postHumanMemberDocumentOp(
         Omit<HumanMemberEntity, 'id'>;
     return db.transaction(
         // Phase Final Task 2: human_members ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -2808,7 +2764,6 @@ export async function postIdentityPiiDocumentOp(
     });
     return db.transaction(
         // Phase Final Task 2: identity_pii ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -2834,7 +2789,6 @@ export async function postIdentityDocumentOp(
         IdentityEntityFields;
     return db.transaction(
         // Phase Final Task 2: identities ROW half stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -2856,9 +2810,7 @@ export async function postAiAgentDocumentOp(
 ): Promise<Omit<AIAgentEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<AIAgentEntity, 'id'>;
-    return db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.transaction(async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
             }
@@ -2883,7 +2835,6 @@ export async function postIdentityCredentialDocumentOp(
     return db.transaction(
         // Phase Final Task 2: identity_credentials ROW half
         // stripped.
-        MESSAGE_TABLES,
         async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
@@ -2913,9 +2864,7 @@ export async function postClientRegistrationDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    return db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.transaction(async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
             }
@@ -2978,9 +2927,7 @@ export async function postIdentityProviderDocumentOp(
         method: 'PUT',
         body: stamped,
     });
-    return db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    return db.transaction(async (view) => {
             if (messagePair !== undefined) {
                 await appendMessagePair(view, messagePair);
             }
@@ -3563,9 +3510,7 @@ export async function postInstanceDeleteOp(
             db, instanceId, org, 'record_instances',
         );
     }
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             // R9: re-probe spent inside the append tx so a
             // concurrent writer cannot leave us appending a
             // tombstone onto a virgin document, and so a
@@ -3723,9 +3668,7 @@ async function postInstanceCreateOp(
         headerFields: [],
     });
     const prefix = instancesUriPrefix(org, typeId);
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             const latest = await documentHeadAt(
                 view, prefix, instanceId,
             );
@@ -3842,9 +3785,7 @@ export async function postInstancePatchOp(
         }],
     });
     const latchedMessagePairId = head.messagePairId;
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             // R9: lock head must still be the latched pair
             // id.
             const latest = (await messageStore(view).get(
@@ -4055,9 +3996,7 @@ export const routes: Route[] = [
                 db, param(p, 0), body, actor, messagePair,
             ),
         delete: (db, _p, _actor, messagePair) => {
-            return db.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
                         await appendMessagePair(
                             view, messagePair,
@@ -4202,9 +4141,7 @@ export const routes: Route[] = [
         },
         delete: async (db, p, _actor, messagePair) => {
             await requireServiceIdentity(db, param(p, 0));
-            return db.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
                         await appendMessagePair(view, messagePair);
                     }
@@ -4247,9 +4184,7 @@ export const routes: Route[] = [
                 method: 'PUT',
                 body: stamped,
             });
-            return db.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
                         await appendMessagePair(view, messagePair);
                     }
@@ -4300,9 +4235,7 @@ export const routes: Route[] = [
                 method: 'PUT',
                 body: stamped,
             });
-            return db.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
                         await appendMessagePair(view, messagePair);
                     }
@@ -4580,9 +4513,7 @@ export const routes: Route[] = [
             // halves stripped; only states events + pairs remain
             // (states row half strips with the states-trace
             // group).
-            return db.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
                         await appendMessagePair(view, messagePair);
                     }
@@ -4798,9 +4729,7 @@ export const routes: Route[] = [
                 method: 'PUT',
                 body: withoutId(body),
             });
-            return db.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
                         await appendMessagePair(view, messagePair);
                     }
@@ -4809,9 +4738,7 @@ export const routes: Route[] = [
             );
         },
         delete: (db, _p, _actor, messagePair) => {
-            return db.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
                         await appendMessagePair(view, messagePair);
                     }
@@ -5162,9 +5089,7 @@ export const routes: Route[] = [
                 param(params, 0),
             );
             const id = param(params, 1);
-            await db.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            await db.transaction(async (view) => {
                     const refs =
                         await collectRecordTypeReferrers(
                             view, organization, id,
@@ -5293,9 +5218,7 @@ export const routes: Route[] = [
             const typeId = param(p, 1);
             await requireRecordTypeExists(db, org, typeId);
             validateAttributeDocument(withoutId(body));
-            return db.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
                         await appendMessagePair(view, messagePair);
                     }
@@ -5323,9 +5246,7 @@ export const routes: Route[] = [
                     db, attrId, org, 'record_attributes',
                 );
             }
-            return db.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            return db.transaction(async (view) => {
                     await deleteRecordAttributeSafe(
                         view, org, attrId, typeId,
                     );
@@ -5539,9 +5460,7 @@ export const routes: Route[] = [
         // Phase Final Task 2: flow_records ROW half stripped —
         // DELETE is a pure message-plane tombstone append.
         delete: (db, _p, _actor, messagePair) => {
-            return db.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
                         await appendMessagePair(view, messagePair);
                     }
@@ -5623,7 +5542,6 @@ export const routes: Route[] = [
             return db.transaction(
                 // Phase Final Task 2: organizations ROW half
                 // stripped.
-                MESSAGE_TABLES,
                 async (view) => {
                     if (messagePair !== undefined) {
                         await appendMessagePair(view, messagePair);
@@ -5725,9 +5643,7 @@ export const routes: Route[] = [
             const fenced = requireOrganization(organization);
             const identityId = param(p, 1);
             let lastAdmin = false;
-            await db.transaction(
-                MESSAGE_TABLES,
-                async (view) => {
+            await db.transaction(async (view) => {
                     const admins = (
                         await deriveOrganizationMemberSeats(
                             view, fenced,
@@ -5934,7 +5850,6 @@ export const routes: Route[] = [
             return db.transaction(
                 // Phase Final Task 2: objective_revisions ROW
                 // half stripped.
-                MESSAGE_TABLES,
                 async (view) => {
                     if (messagePair !== undefined) {
                         await appendMessagePair(view, messagePair);

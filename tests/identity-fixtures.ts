@@ -1,5 +1,4 @@
 import type { DbAdapter } from '../api/db.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import { nowUtc, SYSTEM_MEMBER_ID, type Id } from '../api/types.ts';
 import {
     postIdentityDocumentOp,
@@ -294,9 +293,7 @@ export async function seedClientRegistration(
     const messagePair = await clientRegistrationDocumentMessagePair(
         id, fields, nowUtc(),
     );
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             await appendMessagePair(view, messagePair);
         },
     );
@@ -324,9 +321,7 @@ export async function seedClientRegistrationTombstone(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             await appendMessagePair(view, messagePair);
         },
     );

@@ -5,7 +5,6 @@
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import { PostgresBackend } from
     '../api/backend-postgres.ts';
-import { TABLE_NAMES } from '../api/db.ts';
 import {
     connectPostgres,
     type SqlClient,
@@ -85,7 +84,7 @@ export async function seedMain(
                 async () => {},
                 () => {},
             );
-            await adapter.ensureTables(TABLE_NAMES);
+            await adapter.ensureTable();
             await seedPostgres(
                 sql, adapter, parsed.mode, {
                     hashPassword: serialPasswordHasher(),

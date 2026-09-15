@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import { TABLE_NAMES, MESSAGE_TABLES } from './db.ts';
+
 import {
     postIdeaDocumentOp,
     postIdeaSubmissionOp,
@@ -178,13 +178,8 @@ export interface SeededCredentials {
 // pass-2 split (formSeedCredentialMessagePairs, seed-message-pairs.ts),
 // since a credential's body embeds the post-hash secret computed
 // HERE, after formMockDataMessagePairs / formBootstrapMessagePair
-// already ran. The write transaction opens
-// MESSAGE_TABLES — the bare
-// ['identity_credentials'] set from before this task would trip
-// postIdentityCredentialDocumentOp's OWN nested
-// MESSAGE_TABLES transaction
-// on the nested-subset guard (api/db-backed.ts's #assertSubset:
-// message-plane stores not in the outer declared set).
+// already ran. The write transaction is one table; a nested
+// view.transaction re-enters the same tx.
 //
 // Phase Final Task 1(d): recipients are the in-memory
 // person/PII list (buildMembers / bootstrap PII body) — never
@@ -287,9 +282,7 @@ export async function seedHumanCredentials(
     // the identity_credentials ROW half).
     // postIdentityCredential DocumentOp is the SAME op
     // every live PUT identities/:id/credentials/:cid rides.
-    await adapter.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await adapter.transaction(async (view) => {
             await Promise.all([
                 ...planned.map(cred =>
                     postIdentityCredentialDocumentOp(
@@ -361,9 +354,8 @@ export async function postMockDataLoad(
     // cannot run inside the tx. The schema marker stamps LAST,
     // so a failed seed leaves hasSchema() false: the datastore
     // reads as empty and the seed can be retried cleanly.
-    await adapter.ensureTables(TABLE_NAMES);
+    await adapter.ensureTable();
     await adapter.transaction(
-        TABLE_NAMES,
         (view) => postMockDataLoadIn(view, messagePairs),
     );
     // Task 1(d): same buildMembers (+ the unaffiliated
@@ -1151,10 +1143,8 @@ export async function postBootstrap(
     // hashing is ALSO async crypto and cannot run inside the tx.
     // The schema marker stamps LAST so a failed bootstrap leaves
     // the anonymous plane open for retry.
-    await adapter.ensureTables(TABLE_NAMES);
-    await adapter.transaction(
-        TABLE_NAMES,
-        (view) => postBootstrapIn(
+    await adapter.ensureTable();
+    await adapter.transaction((view) => postBootstrapIn(
             view, identityMessagePair, seatMessagePair, piiMessagePair,
             systemIdentityMessagePair,
             defaultOrganizationMessagePair, organizationMessagePair,

@@ -11,7 +11,7 @@ interface Thing { id: string; n: number }
 
 async function primedBackend(): Promise<MemoryStorageBackend> {
     const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['things']);
+    await backend.ensureTable();
     return backend;
 }
 

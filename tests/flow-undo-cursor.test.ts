@@ -148,19 +148,19 @@ function withWriteGate(
             },
             notify: async () => {},
         },
-        transaction: (tables, fn) => view.transaction(
-            tables, (inner) => fn(wrapView(inner)),
+        transaction: (fn) => view.transaction(
+            (inner) => fn(wrapView(inner)),
         ),
-        readTransaction: (tables, fn) =>
+        readTransaction: (fn) =>
             view.readTransaction(
-                tables, (inner) => fn(wrapView(inner)),
+                (inner) => fn(wrapView(inner)),
             ),
     });
-    db.transaction = (tables, fn) => origTx(
-        tables, (view) => fn(wrapView(view)),
+    db.transaction = (fn) => origTx(
+        (view) => fn(wrapView(view)),
     );
-    db.readTransaction = (tables, fn) => origRead(
-        tables, (view) => fn(wrapView(view)),
+    db.readTransaction = (fn) => origRead(
+        (view) => fn(wrapView(view)),
     );
     return db;
 }

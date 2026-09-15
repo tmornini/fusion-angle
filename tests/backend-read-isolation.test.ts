@@ -14,11 +14,9 @@ interface Row { id: string; n: number; path: string }
 async function seeded(
     backend: StorageBackend,
 ): Promise<StorageBackend> {
-    await backend.ensureTables(['t']);
-    await backend.transaction(
-        ['t'], 'readwrite',
-        tx => tx.append<Row>(
-            't', { id: 'a', n: 1, path: '/x/' },
+    await backend.ensureTable();
+    await backend.transaction('readwrite',
+        tx => tx.append<Row>({ id: 'a', n: 1, path: '/x/' },
         ),
     );
     return backend;
@@ -27,9 +25,8 @@ async function seeded(
 function readBack(
     backend: StorageBackend,
 ): Promise<Row | null> {
-    return backend.transaction(
-        ['t'], 'readonly',
-        tx => tx.getById<Row>('t', 'a'),
+    return backend.transaction('readonly',
+        tx => tx.getById<Row>('a'),
     );
 }
 
@@ -62,9 +59,8 @@ for (const tier of TIERS) {
             + ' reach committed state',
         async () => {
             const backend = await seeded(tier.make());
-            const rows = await backend.transaction(
-                ['t'], 'readonly',
-                tx => tx.getAll<Row>('t'),
+            const rows = await backend.transaction('readonly',
+                tx => tx.getAll<Row>(),
             );
             rows[0]!.n = 999;
             const again = await readBack(backend);
@@ -77,10 +73,8 @@ for (const tier of TIERS) {
             + ' row does not reach committed state',
         async () => {
             const backend = await seeded(tier.make());
-            const rows = await backend.transaction(
-                ['t'], 'readonly',
-                tx => tx.getCollectionPairs<Row>(
-                    't', '/x/',
+            const rows = await backend.transaction('readonly',
+                tx => tx.getCollectionPairs<Row>('/x/',
                 ),
             );
             rows[0]!.n = 999;
@@ -94,11 +88,10 @@ for (const tier of TIERS) {
             + ' does not survive the transaction',
         async () => {
             const backend = await seeded(tier.make());
-            await backend.transaction(
-                ['t'], 'readonly',
+            await backend.transaction('readonly',
                 async (tx) => {
                     const row =
-                        await tx.getById<Row>('t', 'a');
+                        await tx.getById<Row>('a');
                     row!.n = 999;
                 },
             );

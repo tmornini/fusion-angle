@@ -5,7 +5,6 @@ import {
 } from '../api/db-memory.ts';
 import { handleRequest, PUT } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
-import { MESSAGE_TABLES } from '../api/db.ts';
 import {
     base64UrlDecode,
     bytesToBase64Url,
@@ -378,12 +377,9 @@ Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
         action: 'rotated', chain_id: CHAIN_TX, at: AT2,
     }, DEV_TOKEN);
 
-    const tokenTxTables = MESSAGE_TABLES;
-
     const preTx =
         await deriveIdentityTokenEventsForJti(db, JTI_TX);
     const inTx = await db.transaction(
-        tokenTxTables,
         (view) =>
             deriveIdentityTokenEventsForJti(view, JTI_TX),
     );
@@ -393,7 +389,6 @@ Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
     const preTxMissing =
         await deriveIdentityTokenEventsForJti(db, GHOST_JTI);
     const inTxMissing = await db.transaction(
-        tokenTxTables,
         (view) =>
             deriveIdentityTokenEventsForJti(view, GHOST_JTI),
     );
@@ -521,13 +516,10 @@ Deno.test('authorizationCodeSpent: byte-identical pre-tx (the plain'
     const { code } = await authorizeRes.json() as { code: string };
     const derivedId = await deriveAuthorizationCodeId(code);
 
-    const grantTxTables = MESSAGE_TABLES;
-
     const preTxBefore = await authorizationCodeSpent(
         db, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
     );
     const inTxBefore = await db.transaction(
-        grantTxTables,
         (view) => authorizationCodeSpent(
             view, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
         ),
@@ -546,7 +538,6 @@ Deno.test('authorizationCodeSpent: byte-identical pre-tx (the plain'
         db, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
     );
     const inTxAfter = await db.transaction(
-        grantTxTables,
         (view) => authorizationCodeSpent(
             view, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
         ),
@@ -642,9 +633,7 @@ async () => {
         }),
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        MESSAGE_TABLES,
-        async (view) => {
+    await db.transaction(async (view) => {
             await appendMessagePair(view, flatPair);
         },
     );
