@@ -211,14 +211,6 @@ function postgresTx(
             );
             await upsertRow(sql, name, written);
         },
-        async delete(
-            table: string,
-            id: string,
-        ): Promise<void> {
-            assertWritable();
-            const name = assertMessageTable(table);
-            await deleteById(sql, name, id);
-        },
         async clear(table: string): Promise<void> {
             assertWritable();
             const name = assertMessageTable(table);
@@ -472,17 +464,6 @@ async function selectWhereBody(
           AND message_body(response) @>
               ${containment}::jsonb
         ORDER BY response_at, id
-    `;
-}
-
-async function deleteById(
-    sql: SqlClient,
-    _table: 'message_pairs',
-    id: string,
-): Promise<void> {
-    await sql.query`
-        DELETE FROM message_pairs
-        WHERE id = ${uuidTextOfIdentifier(id)}
     `;
 }
 

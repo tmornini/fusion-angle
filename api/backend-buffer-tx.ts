@@ -205,18 +205,6 @@ export function bufferTx(
             }
             dirty.add(table);
         },
-        async delete(
-            table: string,
-            id: string,
-        ): Promise<void> {
-            assertWritable();
-            const rows = scoped(table);
-            const idx = rows.findIndex(r => r.id === id);
-            if (idx >= 0) {
-                rows.splice(idx, 1);
-                dirty.add(table);
-            }
-        },
         async clear(table: string): Promise<void> {
             assertWritable();
             scoped(table);

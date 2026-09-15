@@ -239,27 +239,6 @@ Deno.test(
 );
 
 Deno.test(
-    'delete removes a row within the tx',
-    async () => {
-        const backend = new MemoryStorageBackend();
-        await backend.ensureTables(['t']);
-        await backend.transaction(
-            ['t'], 'readwrite',
-            tx => tx.put<Row>('t', { id: 'a', n: 1 }),
-        );
-        await backend.transaction(
-            ['t'], 'readwrite',
-            tx => tx.delete('t', 'a'),
-        );
-        const rows = await backend.transaction(
-            ['t'], 'readonly',
-            tx => tx.getAll<Row>('t'),
-        );
-        assertEquals(rows, []);
-    },
-);
-
-Deno.test(
     'concurrent transactions on one table both persist',
     async () => {
         const backend = new MemoryStorageBackend();
