@@ -132,9 +132,9 @@ async function messagePairsAt(
     uriId: string,
 ): Promise<number> {
     const rows = await db.messagePairs.getAllWhere(
-        'uri_collection', collection,
+        'path', collection,
     );
-    return rows.filter((row) => row.uri_id === uriId)
+    return rows.filter((row) => row.name === uriId)
         .length;
 }
 
@@ -148,8 +148,8 @@ function orderRow(
     n: number,
 ): Omit<MessagePairEntity, 'id'> {
     return {
-        uri_collection: ORDER_PATH,
-        uri_id: name,
+        path: ORDER_PATH,
+        name: name,
         requester_identity_id: ORDER_REQUESTER,
         method: 'PUT',
         request_at: responseAt,
@@ -377,7 +377,7 @@ export function defineStoreAcceptance(
             [first, second, third],
         );
         const collection = await db.messagePairs
-            .getAllWhere('uri_collection', ORDER_PATH);
+            .getAllWhere('path', ORDER_PATH);
         assertEquals(
             collection.map((row) => row.id),
             [first, second, third],

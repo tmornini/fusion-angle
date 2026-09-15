@@ -38,7 +38,7 @@ import {
 // class): '/pii' forms ONE distinct prefix PER IDENTITY
 // ('/identities/<id>/pii/', uriId '' — a singleton document at a
 // collection-style address, message-address.ts), so no index can
-// serve "every request whose uri_collection has this shape" for an
+// serve "every request whose path has this shape" for an
 // arbitrary id. deriveIdentityPiiRows reads db.messagePairs
 // IN FULL (ONE shared tx) and matches PII_ADDRESS_PATTERN — the
 // segment-boundary rule verified against derive-invitations.ts's
@@ -121,10 +121,10 @@ export async function deriveIdentityPiiRows(
             for (const messagePair of messagePairs) {
                 if (
                     PII_ADDRESS_PATTERN.test(
-                        messagePair.uri_collection,
+                        messagePair.path,
                     )
                 ) {
-                    prefixes.add(messagePair.uri_collection);
+                    prefixes.add(messagePair.path);
                 }
             }
             const rows: IdentityPiiEntity[] = [];
@@ -158,7 +158,7 @@ export async function deriveIdentityPii(
         async (view) => {
             const messagePairs =
                 await view.messagePairs.getAllWhere(
-                    'uri_collection', prefix,
+                    'path', prefix,
                 );
             const document = deriveDocumentsAt(
                 messagePairs, prefix,
@@ -208,7 +208,7 @@ async function fetchCredentialDocuments(
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = credentialsPrefixFor(identityId);
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
@@ -289,7 +289,7 @@ async function fetchProviderDocumentsAt(
     prefix: string,
 ): Promise<Map<string, DerivedDocument>> {
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
@@ -396,7 +396,7 @@ async function fetchRevocationDocumentsFor(
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = tokenRevocationsPrefixFor(identityId);
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
@@ -474,7 +474,7 @@ export async function deriveClientRegistration(
 ): Promise<ClientRegistrationEntity> {
     const prefix = registrationPrefixFor(identityId);
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,
@@ -500,7 +500,7 @@ export async function deriveIdentityKind(
         undefined, '/identities/',
     );
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,

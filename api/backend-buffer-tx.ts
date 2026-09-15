@@ -116,9 +116,9 @@ export function bufferTx(
                 .filter((row) => {
                     const rec = row as
                         Record<string, unknown>;
-                    return rec['uri_collection']
+                    return rec['path']
                         === collection
-                        && rec['uri_id'] === uriId;
+                        && rec['name'] === uriId;
                 })
                 .sort(byResponseAtThenId)
                 .map((row) => ({ ...row })) as T[];
@@ -133,7 +133,7 @@ export function bufferTx(
                     const rec = row as
                         Record<string, unknown>;
                     if (
-                        rec['uri_collection']
+                        rec['path']
                         !== collection
                     ) {
                         return false;

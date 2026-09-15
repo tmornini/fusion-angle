@@ -124,9 +124,9 @@ Deno.test('PUT identity-tokens/:id appends its pair at the entity'
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
     assertStrictEquals(requests.length, 3);
-    assertStrictEquals(requests[2]!.uri_collection
+    assertStrictEquals(requests[2]!.path
         , '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/');
-    assertStrictEquals(requests[2]!.uri_id, 'vNIIMoezHOyoUeTsbqSzCA');
+    assertStrictEquals(requests[2]!.name, 'vNIIMoezHOyoUeTsbqSzCA');
     const domainRow = await deriveIdentityToken(
         db, 'XXZruirZyAOoRpNxaDnpSA', 'vNIIMoezHOyoUeTsbqSzCA',
     );
@@ -198,10 +198,10 @@ Deno.test('PUT identities/:id/token-revocations/:rid appends its'
     const requests = await db.messagePairs.getAll();
     assertStrictEquals(requests.length, 3);
     assertStrictEquals(
-        requests[2]!.uri_collection,
+        requests[2]!.path,
         '/identities/XXZruirZyAOoRpNxaDnpSA/token-revocations/',
     );
-    assertStrictEquals(requests[2]!.uri_id, 'sVWUntTCtQYFCpONjkzAKg');
+    assertStrictEquals(requests[2]!.name, 'sVWUntTCtQYFCpONjkzAKg');
     // Phase Final Task 2: identity_token_revocations ROW half
     // stripped — oracle is the message plane.
     const domainRow = await deriveTokenRevocation(
@@ -230,11 +230,11 @@ Deno.test('a rotation appends its pair at an operation address:'
     assertNotStrictEquals(wireBody.jti, ROOT_JTI);
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
-        r => r.uri_collection
+        r => r.path
             === tokenOpPath('rotation', '/'),
     );
     assert(row);
-    assertStrictEquals(row!.uri_id, '');
+    assertStrictEquals(row!.name, '');
 
     const stored = await db.messagePairs.getById(row!.id);
     const storedBody = await responseFromStored(stored).json();
@@ -306,11 +306,11 @@ Deno.test('a revocation appends its pair at an operation address:'
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
-        r => r.uri_collection
+        r => r.path
             === tokenOpPath('revocation', '/'),
     );
     assert(row);
-    assertStrictEquals(row!.uri_id, '');
+    assertStrictEquals(row!.name, '');
     const rows = await deriveIdentityTokens(db);
     assertStrictEquals(latestActionForJti(rows, ROOT_JTI), 'revoked');
 });
@@ -327,7 +327,7 @@ async () => {
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
-        r => r.uri_collection
+        r => r.path
             === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
                 + UNKNOWN_JTI + '/revocation/',
     );
@@ -358,7 +358,7 @@ async () => {
     const requests = await db.messagePairs.getAll();
 
     const rows = requests.filter(
-        r => r.uri_collection
+        r => r.path
             === tokenOpPath('revocation', '/'),
     );
     assertStrictEquals(rows.length, 2);
@@ -447,10 +447,10 @@ async function assertRootEventMessagePair(
     const root = rows[0]!;
     const requests = await db.messagePairs.getAll();
     const eventRequest = requests.find(
-        r => r.uri_collection
+        r => r.path
             === '/identities/' + root.identity_id
                 + '/tokens/'
-            && r.uri_id === root.id,
+            && r.name === root.id,
     );
     assert(eventRequest, 'no event pair for the issued root');
     // requesterIdentityId is the event's OWN identity_id (the
@@ -518,16 +518,16 @@ async () => {
     await assertRootEventMessagePair(db);
     // KEY-BY-ANCHOR (Phase 13 Task 7, gate 3): the issued root's
     // row id is now the code's OWN sha256 digest, not a fresh
-    // mint — the same value the SAME address's event pair uri_id
-    // carries (assertRootEventMessagePair's own uri_id match above).
+    // mint — the same value the SAME document's event pair name
+    // carries (assertRootEventMessagePair's own name match above).
     const [root] = await deriveIdentityTokens(db);
     assertStrictEquals(root!.id, await sha256Hex(AUTH_CODE));
     const requests = await db.messagePairs.getAll();
     const operationMessagePair = requests.find(
-        r => r.uri_collection === '/authentication/token/',
+        r => r.path === '/authentication/token/',
     );
     assert(operationMessagePair);
-    assertStrictEquals(operationMessagePair!.uri_id, '');
+    assertStrictEquals(operationMessagePair!.name, '');
     // 3 bootstrap + the seeded authorize pair (Phase 13 Task 7:
     // the pre-tx lookup now needs a real authorize pair, not a
     // raw authorizationCodes row alone) + the root's own event
@@ -590,8 +590,8 @@ async function assertEventMessagePairForRow(
     );
     const requests = await db.messagePairs.getAll();
     const eventRequest = requests.find(
-        r => r.uri_collection === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-            && r.uri_id === rowId,
+        r => r.path === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
+            && r.name === rowId,
     );
     assert(eventRequest, 'no event pair for row ' + rowId);
     // requesterIdentityId is the event's OWN identity_id — same
@@ -631,11 +631,11 @@ Deno.test('a rotation\'s ROTATE branch appends an event pair for'
     await assertEventMessagePairForRow(db, issued!.id);
     const requests = await db.messagePairs.getAll();
     const operationMessagePair = requests.find(
-        r => r.uri_collection
+        r => r.path
             === tokenOpPath('rotation', '/'),
     );
     assert(operationMessagePair);
-    assertStrictEquals(operationMessagePair!.uri_id, '');
+    assertStrictEquals(operationMessagePair!.name, '');
 });
 
 Deno.test('a rotation\'s REPLAY branch appends an event pair for'
@@ -769,7 +769,7 @@ async () => {
     const requests = await db.messagePairs.getAll();
     assertStrictEquals(
         requests.filter(
-            r => r.uri_collection === '/authentication/token/',
+            r => r.path === '/authentication/token/',
         ).length, 0,
     );
 });

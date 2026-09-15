@@ -181,9 +181,9 @@ async function messagePairsAt(
     uriId: string,
 ): Promise<number> {
     const rows = await db.messagePairs.getAllWhere(
-        'uri_collection', collection,
+        'path', collection,
     );
-    return rows.filter((row) => row.uri_id === uriId)
+    return rows.filter((row) => row.name === uriId)
         .length;
 }
 
@@ -193,10 +193,10 @@ async function putHeadsAt(
     uriId: string,
 ): Promise<number> {
     const rows = await db.messagePairs.getAllWhere(
-        'uri_collection', collection,
+        'path', collection,
     );
     return rows.filter((row) =>
-        row.uri_id === uriId && row.method === 'PUT',
+        row.name === uriId && row.method === 'PUT',
     ).length;
 }
 
@@ -330,10 +330,10 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const etag = live.headers.get('ETag');
         assert(etag !== null && etag !== '');
         const heads = await db.messagePairs.getAllWhere(
-            'uri_collection', FLOW_PREFIX,
+            'path', FLOW_PREFIX,
         );
         const liveHead = heads
-            .filter((row) => row.uri_id === id)
+            .filter((row) => row.name === id)
             .toSorted((a, b) =>
                 a.response_at < b.response_at
                     ? 1

@@ -82,7 +82,7 @@ async function noStoredAuthorizeResponse(
     db: MemoryDbAdapter,
 ): Promise<boolean> {
     const responses = await db.messagePairs.getAllWhere(
-        'uri_collection',
+        'path',
         canonicalUriCollection(undefined, '/authentication/authorize/'),
     );
     return responses.length === 0;

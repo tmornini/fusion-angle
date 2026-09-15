@@ -190,10 +190,10 @@ async function membershipsFor(
         const [seatRequests] =
             await Promise.all([
                 db.messagePairs.getAllWhere(
-                    'uri_collection', seatPrefix,
+                    'path', seatPrefix,
                 ),
                 db.messagePairs.getAllWhere(
-                    'uri_collection', seatPrefix,
+                    'path', seatPrefix,
                 ),
             ]);
         for (const document of deriveDocumentsAt(

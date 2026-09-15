@@ -99,9 +99,9 @@ Deno.test('accept writes the seat at the invitation'
     const prefix = seatsPrefix(ORGANIZATION_TWO);
     const [requests] = await Promise.all([
         db.messagePairs.getAllWhere(
-            'uri_collection', prefix),
+            'path', prefix),
         db.messagePairs.getAllWhere(
-            'uri_collection', prefix),
+            'path', prefix),
     ]);
     const seats = documentMessagePairsAt(
         requests, prefix,
@@ -113,7 +113,7 @@ Deno.test('accept writes the seat at the invitation'
         at: '2026-06-05T00:00:01.000000Z',
     });
     const written = requests.find(
-        (row) => row.uri_id === SARAH_ID,
+        (row) => row.name === SARAH_ID,
     );
     assert(written);
     assertStrictEquals(

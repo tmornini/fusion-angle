@@ -350,8 +350,8 @@ async function derivedHeadMessagePairId(
 ): Promise<string> {
     const prefix = canonicalUriCollection(organization, '/flows/');
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getAllWhere('path', prefix),
     ]);
     const documents = deriveDocumentsAt(requests, prefix);
     const document = documents.get(flowId);
@@ -871,9 +871,9 @@ async () => {
 
     const requests = await db.messagePairs.getAll();
     const atAddress = requests.filter(
-        (r) => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        (r) => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === flowId,
+            && r.name === flowId,
     );
     // Both an operation (POST, 204) pair and a document (PUT)
     // pair share the SAME uriId.

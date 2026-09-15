@@ -105,10 +105,10 @@ async function instancePairCount(
         ORGANIZATION, TYPE_ID,
     );
     const responses = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     return responses.filter(
-        (r) => r.uri_id === INSTANCE_ID,
+        (r) => r.name === INSTANCE_ID,
     ).length;
 }
 

@@ -98,8 +98,8 @@ function fakeClient(): {
 
 const MESSAGE_PAIR_ROW = {
     id: 'UuPWIGbUyaAgmEgGDRfnvA',
-    uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-    uri_id: '42',
+    path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+    name: '42',
     requester_identity_id: 'WOTMsfERBVJEuTRTgrQptQ',
     method: 'PUT',
     request_at: '2026-01-01T00:00:00.000000Z',
@@ -128,7 +128,31 @@ Deno.test('schema declares collection indexes', () => {
     );
     assertMatch(
         POSTGRES_SCHEMA,
-        /ON message_pairs \(uri_collection, response_at, id\)/,
+        /ON message_pairs \(path, response_at, id\)/,
+    );
+});
+
+Deno.test('the columns are path and name; the document index'
++ ' names them', () => {
+    assertMatch(
+        POSTGRES_SCHEMA,
+        /\n    path text COLLATE "C" NOT NULL\n/,
+    );
+    assertMatch(
+        POSTGRES_SCHEMA,
+        /\n    name text COLLATE "C" NOT NULL,\n/,
+    );
+    assertMatch(
+        POSTGRES_SCHEMA,
+        /CREATE INDEX IF NOT EXISTS message_pairs_document\n/,
+    );
+    assertMatch(
+        POSTGRES_SCHEMA,
+        /ON message_pairs \(path, name, response_at, id\)/,
+    );
+    assertNotMatch(
+        POSTGRES_SCHEMA,
+        /uri_collection|uri_id|message_pairs_address/,
     );
 });
 
@@ -168,7 +192,7 @@ async () => {
     );
 });
 
-Deno.test('getWhere throws for uri_id', async () => {
+Deno.test('getWhere throws for name', async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     const err = await assertRejects(
@@ -176,13 +200,13 @@ Deno.test('getWhere throws for uri_id', async () => {
             ['message_pairs'],
             'readonly',
             (tx) => tx.getWhere(
-                'message_pairs', 'uri_id', '42',
+                'message_pairs', 'name', '42',
             ),
         ),
     ) as Error;
     assertInstanceOf(err, Error);
     assertStrictEquals(
-        err.message, 'getWhere does not accept uri_id',
+        err.message, 'getWhere does not accept name',
     );
     assertStrictEquals(fake.calls.length, 0);
 });
@@ -195,12 +219,12 @@ async () => {
         ['message_pairs'],
         'readonly',
         (tx) => tx.getWhere(
-            'message_pairs', 'uri_collection'
+            'message_pairs', 'path'
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         ),
     );
     const text = fake.calls[0]!.text;
-    assertMatch(text, /WHERE uri_collection = \$1/);
+    assertMatch(text, /WHERE path = \$1/);
     assertMatch(text, /ORDER BY response_at, id/);
 });
 
@@ -218,8 +242,8 @@ async () => {
         ),
     );
     const text = fake.calls[0]!.text;
-    assertMatch(text, /WHERE uri_collection = \$1/);
-    assertMatch(text, /AND uri_id = \$2/);
+    assertMatch(text, /WHERE path = \$1/);
+    assertMatch(text, /AND name = \$2/);
     assertMatch(text, /ORDER BY response_at, id/);
     assertEquals(
         fake.calls[0]!.values,
@@ -269,7 +293,7 @@ async () => {
     );
     const text = fake.calls[0]!.text;
     assertMatch(text, /FROM message_pairs/);
-    assertMatch(text, /uri_collection = \$1/);
+    assertMatch(text, /path = \$1/);
     assertMatch(
         text, /message_body\(response\) @>/,
     );

@@ -23,7 +23,7 @@ import {
 // derivation — so this nested sub-resource needs its own bespoke
 // module, exactly as flow_records did (research finding 10:
 // param() throws on '', and documentMessagePairsAt
-// matches uri_collection by EQUALITY, so a revision pair
+// matches path by EQUALITY, so a revision pair
 // at .../objectives/{id}/
 // revisions/ can never leak into the objectives-collection
 // derivation, or vice versa).
@@ -88,7 +88,7 @@ export async function deriveObjectiveRevisions(
         organization, objectiveId,
     );
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const documents = deriveDocumentsAt(
         messagePairs, prefix,

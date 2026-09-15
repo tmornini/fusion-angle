@@ -20,7 +20,7 @@ import {
 // api/invitations-domain.ts's formInvitationOperationMessagePair).
 //
 // E13 FULL-SCAN NAMED CLASS: no index can serve "every pair
-// whose uri_collection has the shape /invitations/<id>/<op>/"
+// whose path has the shape /invitations/<id>/<op>/"
 // for an arbitrary id, so invitationOpStates below reads
 // db.messagePairs.getAll() — ONE full table scan, regardless of how
 // many invitations exist. Grown alongside every future
@@ -69,7 +69,7 @@ async function invitationOpStates(
     const states = new Map<Id, InvitationState>();
     for (const messagePair of await db.messagePairs.getAll()) {
         const match = OP_ADDRESS_PATTERN.exec(
-            messagePair.uri_collection,
+            messagePair.path,
         );
         if (match === null) continue;
         const state = OP_STATES[match[2]!];
@@ -82,7 +82,7 @@ async function invitationOpStates(
 // ENTITY-SCOPED sibling of invitationOpStates above (Phase 14
 // Task 1): the SAME OP_STATES mutual-exclusivity covenant,
 // restricted to ONE known invitation id via three INDEXED
-// getAllWhere('uri_collection', ...) reads (one per op kind) rather
+// getAllWhere('path', ...) reads (one per op kind) rather
 // than the whole-ledger db.messagePairs.getAll() invitationOpStates
 // needs to DISCOVER every invitation's own op prefix out of an
 // unknown set of ids. dbOrView-shaped and opens no nested
@@ -103,7 +103,7 @@ export async function invitationOpStateFor(
             undefined, '/invitations/' + id + '/' + op + '/',
         );
         const rows = await dbOrView.messagePairs.getAllWhere(
-            'uri_collection', prefix,
+            'path', prefix,
         );
         if (rows.length > 0) return OP_STATES[op];
     }
@@ -117,7 +117,7 @@ export async function deriveInvitations(
     db: DbAdapter,
 ): Promise<DerivedInvitationRow[]> {
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', INVITATIONS_PREFIX,
+        'path', INVITATIONS_PREFIX,
     );
     const documents = deriveDocumentsAt(
         messagePairs, INVITATIONS_PREFIX,

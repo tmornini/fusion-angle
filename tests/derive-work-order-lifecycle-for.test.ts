@@ -53,9 +53,9 @@ const WORKORDERID_FV2 = generateIdentifier();
 // ENTITY-SCOPED sibling of deriveWorkOrderLifecycle — it reuses
 // the SAME pure replay core (replayWorkOrderOperations, private
 // to api/derive-states.ts) over INDEXED reads scoped to ONE
-// known (organization, workOrderId) pair — uri_id for the
+// known (organization, workOrderId) pair — name for the
 // create/document message pairs (they share ONE uriId at the work-orders
-// collection address), uri_collection for the claim/transition
+// collection path), path for the claim/transition
 // sub-resource addresses, and the organization's own states/:id
 // prefix (filtered locally to this entity) for gate 5a's rows —
 // rather than the whole-org scan deriveWorkOrderLifecycle needs

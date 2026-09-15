@@ -40,7 +40,7 @@ interface Table {
 
 const INDEX_FILL: Record<string, string> = {
     pk: 'hsl(217 45% 15%)',
-    address: 'hsl(217 36% 46%)',
+    document: 'hsl(217 36% 46%)',
     collection: 'hsl(173 42% 32%)',
     replay: 'hsl(32 70% 42%)',
     body: 'hsl(350 48% 44%)',

@@ -160,13 +160,13 @@ async () => {
         { ...REGISTRATION }, DEV_TOKEN);
     const prefix = '/identities/uWzjNIEeEtVWqZoJMLeYpw/registration/';
     const afterPut = (await db.messagePairs.getAll()).filter(
-        (row) => row.uri_collection === prefix,
+        (row) => row.path === prefix,
     );
     assertStrictEquals(afterPut.length, 1);
     await DELETE(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
         DEV_TOKEN);
     const afterDel = (await db.messagePairs.getAll()).filter(
-        (row) => row.uri_collection === prefix,
+        (row) => row.path === prefix,
     );
     // G5: DELETE appends a tombstone; it does not replace
     // the prior pair the way /pii does.

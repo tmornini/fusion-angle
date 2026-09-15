@@ -64,7 +64,7 @@ export async function deriveFlowWorkOrders(
 ): Promise<FlowWorkOrderEntity[]> {
     const prefix = flowWorkOrdersUriPrefix(organization, flowId);
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const documents = deriveDocumentsAt(messagePairs, prefix);
     const rows: FlowWorkOrderEntity[] = [];

@@ -2352,7 +2352,7 @@ const MESSAGE_HASH = /^[0-9a-f]{64}$/;
 const HTTP_METHOD = /^[A-Z]+$/;
 
 const MESSAGE_PAIR_BODY_KEYS: readonly string[] = [
-    'uri_collection', 'uri_id',
+    'path', 'name',
     'requester_identity_id', 'method',
     'request_at', 'request_hash', 'request',
     'response_at', 'response',
@@ -2365,13 +2365,10 @@ export function validateMessagePairEntity(
     assertOnlyKeys(
         body, MESSAGE_PAIR_BODY_KEYS, 'MessagePairEntity',
     );
-    const uriCollection = pickString(
-        body, 'uri_collection',
-    );
-    if (!uriCollection.endsWith('/')) {
+    const path = pickString(body, 'path');
+    if (!path.endsWith('/')) {
         throw new ValidationError(
-            'MessagePairEntity.uri_collection must end'
-            + ' with "/"',
+            'MessagePairEntity.path must end with "/"',
         );
     }
     const requestHash = pickString(
@@ -2393,8 +2390,8 @@ export function validateMessagePairEntity(
         body, 'operation_id',
     );
     return {
-        uri_collection: uriCollection,
-        uri_id: pickString(body, 'uri_id'),
+        path,
+        name: pickString(body, 'name'),
         requester_identity_id: pickIdentifier(
             body, 'requester_identity_id',
         ),

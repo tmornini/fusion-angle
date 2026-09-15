@@ -176,10 +176,10 @@ async function liveIdentityIds(
 ): Promise<string[]> {
     const [requests] = await Promise.all([
         db.messagePairs.getAllWhere(
-            'uri_collection', '/identities/',
+            'path', '/identities/',
         ),
         db.messagePairs.getAllWhere(
-            'uri_collection', '/identities/',
+            'path', '/identities/',
         ),
     ]);
     return [...deriveDocumentsAt(requests, '/identities/').keys()];

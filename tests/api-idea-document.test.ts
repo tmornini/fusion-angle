@@ -184,8 +184,8 @@ async () => {
     assert(firstEtag !== null && firstEtag !== '');
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
     const before = (await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
-    )).filter((row) => row.uri_id === 'tmPPRaXkMetWxTSisIPFLA');
+        'path', prefix,
+    )).filter((row) => row.name === 'tmPPRaXkMetWxTSisIPFLA');
     assertStrictEquals(before.length, 1);
     // Different hoisted header → different request hash,
     // so this is same-body, not replay.
@@ -206,8 +206,8 @@ async () => {
     assertStrictEquals(second.status, 200);
     assertStrictEquals(second.headers.get('ETag'), firstEtag);
     const after = (await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
-    )).filter((row) => row.uri_id === 'tmPPRaXkMetWxTSisIPFLA');
+        'path', prefix,
+    )).filter((row) => row.name === 'tmPPRaXkMetWxTSisIPFLA');
     assertStrictEquals(after.length, 1);
 });
 

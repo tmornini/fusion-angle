@@ -17,12 +17,12 @@ const KEYED_READS: ReadonlyArray<{
     column: string;
 }> = [
     { table: 'message_pairs', column: 'request_hash' },
-    { table: 'message_pairs', column: 'uri_collection' },
+    { table: 'message_pairs', column: 'path' },
 ];
 
-Deno.test('no caller getAllWhere uri_id', async () => {
+Deno.test('no caller getAllWhere name', async () => {
     assertStrictEquals(
-        KEYED_READS.some((r) => r.column === 'uri_id'),
+        KEYED_READS.some((r) => r.column === 'name'),
         false,
     );
 });

@@ -1095,8 +1095,8 @@ async () => {
         STARK_ORGANIZATION, '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',
     );
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getAllWhere('path', prefix),
     ]);
     const messagePairs = documentMessagePairsAt(
         requests, prefix,

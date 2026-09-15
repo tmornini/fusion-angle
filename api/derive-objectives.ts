@@ -30,7 +30,7 @@ export async function deriveObjectiveStateHistory(
 ): Promise<StateEntity[]> {
     const prefix = objectivesUriPrefix(organization);
     const stored = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const messagePairs = documentMessagePairsAt(
         stored, prefix,

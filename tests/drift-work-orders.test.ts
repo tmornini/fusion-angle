@@ -642,10 +642,10 @@ async () => {
     // round-tripped response — two independently re-encoded
     // values, not the same in-memory literal.
     const storedCreatePostRow = (await db.messagePairs.getAllWhere(
-        'uri_collection',
+        'path',
         canonicalUriCollection(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
-        (r) => r.uri_id === workOrderId
+        (r) => r.name === workOrderId
             && decodeRequestMessage(r.request).method === 'POST',
     )!;
     const storedCreateFlowGraph = (
@@ -942,12 +942,12 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
     );
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getAllWhere('path', prefix),
     ]);
     const atAddress = requests.filter(
-        (r) => r.uri_collection === prefix
-            && r.uri_id === workOrderId,
+        (r) => r.path === prefix
+            && r.name === workOrderId,
     );
     // Both an operation (POST, 204) pair and a document (PUT)
     // pair share the SAME uriId.
@@ -1042,14 +1042,14 @@ function allMessagePairsAt(
 ): AnyMessagePair[] {
     const messagePairs: AnyMessagePair[] = [];
     for (const row of rows) {
-        if (row.uri_collection !== uriCollection) {
+        if (row.path !== uriCollection) {
             continue;
         }
         const decoded = decodeRequestMessage(row.request);
         messagePairs.push({
             id: row.id,
             at: row.response_at,
-            uriId: row.uri_id,
+            uriId: row.name,
             method: decoded.method,
             body: decoded.body,
             requesterIdentityId: row.requester_identity_id,
@@ -1289,8 +1289,8 @@ async function replayWorkOrderStates(
         organization, '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
     );
     const [woRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', woPrefix),
-        db.messagePairs.getAllWhere('uri_collection', woPrefix),
+        db.messagePairs.getAllWhere('path', woPrefix),
+        db.messagePairs.getAllWhere('path', woPrefix),
     ]);
     const allWoMessagePairs = allMessagePairsAt(woRequests, woPrefix);
     const createMessagePair = allWoMessagePairs.find(
@@ -1311,8 +1311,8 @@ async function replayWorkOrderStates(
             + '/claim/',
     );
     const [claimRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', claimPrefix),
-        db.messagePairs.getAllWhere('uri_collection', claimPrefix),
+        db.messagePairs.getAllWhere('path', claimPrefix),
+        db.messagePairs.getAllWhere('path', claimPrefix),
     ]);
     const claimMessagePairs = allMessagePairsAt(
         claimRequests, claimPrefix,
@@ -1331,10 +1331,10 @@ async function replayWorkOrderStates(
     const [releaseRequests] =
         await Promise.all([
             db.messagePairs.getAllWhere(
-                'uri_collection', releasePrefix,
+                'path', releasePrefix,
             ),
             db.messagePairs.getAllWhere(
-                'uri_collection', releasePrefix,
+                'path', releasePrefix,
             ),
         ]);
     const releaseMessagePairs = [
@@ -1352,8 +1352,8 @@ async function replayWorkOrderStates(
     const [
         transitionRequests,
     ] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', transitionPrefix),
-        db.messagePairs.getAllWhere('uri_collection', transitionPrefix),
+        db.messagePairs.getAllWhere('path', transitionPrefix),
+        db.messagePairs.getAllWhere('path', transitionPrefix),
     ]);
     const transitionMessagePairs = allMessagePairsAt(
         transitionRequests, transitionPrefix,
@@ -1494,10 +1494,10 @@ async () => {
     // literal — so a canonical-JSON regression that mangled
     // either differently would be caught.
     const storedCreatePostRow = (await db.messagePairs.getAllWhere(
-        'uri_collection',
+        'path',
         canonicalUriCollection(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
-        (r) => r.uri_id === workOrderId
+        (r) => r.name === workOrderId
             && decodeRequestMessage(r.request).method === 'POST',
     )!;
     const storedCreateFlowGraph = (

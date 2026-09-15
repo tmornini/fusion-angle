@@ -268,22 +268,22 @@ async () => {
         typePrefix + TYPE_ID + '/attributes/';
 
     const opPair = requests.find(
-        r => r.uri_id === TYPE_ID
-            && r.uri_collection === typePrefix
+        r => r.name === TYPE_ID
+            && r.path === typePrefix
             && r.method === 'POST',
     );
     assert(opPair, 'operation message pair missing');
 
     const documentPair = requests.find(
-        r => r.uri_id === TYPE_ID
-            && r.uri_collection === typePrefix
+        r => r.name === TYPE_ID
+            && r.path === typePrefix
             && r.method === 'PUT',
     );
     assert(documentPair, 'document message pair missing');
 
     const attrPair = requests.find(
-        r => r.uri_id === ATTR_ID
-            && r.uri_collection === attrPrefix
+        r => r.name === ATTR_ID
+            && r.path === attrPrefix
             && r.method === 'PUT',
     );
     assert(attrPair, 'attribute pair missing');

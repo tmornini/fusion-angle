@@ -141,5 +141,5 @@ async () => {
         COLLECTION, { code: 'abc' },
     );
     assertStrictEquals(hits.length, 1);
-    assertStrictEquals(hits[0]!.uri_id, 'XufQcWIKhZshfJYOVNeUSw');
+    assertStrictEquals(hits[0]!.name, 'XufQcWIKhZshfJYOVNeUSw');
 });

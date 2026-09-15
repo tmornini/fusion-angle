@@ -779,10 +779,10 @@ async () => {
         const messagePairs = await db.messagePairs.getAll();
         const atPath = messagePairs.filter(
             (row) =>
-                row.uri_collection
+                row.path
                     === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + TEST_FAMILY + '/'
-                && row.uri_id === 'YRLOudHOEHboXTwRDwLUTg',
+                && row.name === 'YRLOudHOEHboXTwRDwLUTg',
         );
         assertStrictEquals(atPath.length, 2);
         // Genesis + exactly one winner write landed; the

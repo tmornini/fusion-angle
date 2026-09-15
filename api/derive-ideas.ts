@@ -99,7 +99,7 @@ async function fetchIdeaMessagePairs(
     readonly messagePairs: readonly DocumentMessagePair[];
 }> {
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     return {
         documents: deriveDocumentsAt(messagePairs, prefix),
@@ -214,7 +214,7 @@ export async function deriveIdeaSubmissions(
 ): Promise<IdeaSubmissionEntity[]> {
     const prefix = submissionsUriPrefix(organization, ideaId);
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const documents = deriveDocumentsAt(
         messagePairs, prefix,

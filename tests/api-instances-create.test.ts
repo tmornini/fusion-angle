@@ -579,13 +579,13 @@ async () => {
     );
     assertEquals(await second.json(), originalBody);
     const responses = await db.messagePairs.getAllWhere(
-        'uri_collection',
+        'path',
         '/organizations/' + ORGANIZATION
             + '/record-types/' + TYPE_ID
             + '/instances/',
     );
     const atAddress = responses.filter(
-        (r) => r.uri_id === INSTANCE_ID,
+        (r) => r.name === INSTANCE_ID,
     );
     assertStrictEquals(atAddress.length, 2);
 });
@@ -610,8 +610,8 @@ async () => {
         + '/record-types/' + TYPE_ID
         + '/instances/';
     const before = (await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
-    )).filter((row) => row.uri_id === INSTANCE_ID);
+        'path', prefix,
+    )).filter((row) => row.name === INSTANCE_ID);
     const second = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         {
@@ -621,8 +621,8 @@ async () => {
     ));
     assertStrictEquals(second.status, 201);
     const after = (await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
-    )).filter((row) => row.uri_id === INSTANCE_ID);
+        'path', prefix,
+    )).filter((row) => row.name === INSTANCE_ID);
     assertStrictEquals(
         after.length,
         before.length + 2,
@@ -656,13 +656,13 @@ async () => {
         [201, 428],
     );
     const responses = await db.messagePairs.getAllWhere(
-        'uri_collection',
+        'path',
         '/organizations/' + ORGANIZATION
             + '/record-types/' + TYPE_ID
             + '/instances/',
     );
     const atAddress = responses.filter(
-        (r) => r.uri_id === INSTANCE_ID,
+        (r) => r.name === INSTANCE_ID,
     );
     assertStrictEquals(
         atAddress.length, 2,

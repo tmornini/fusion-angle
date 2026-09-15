@@ -690,8 +690,8 @@ async function writeMessagePairRows(
     messagePair: MessagePair,
 ): Promise<void> {
     await view.messagePairs.put(messagePair.id, {
-        uri_collection: messagePair.uriCollection,
-        uri_id: messagePair.uriId,
+        path: messagePair.uriCollection,
+        name: messagePair.uriId,
         requester_identity_id:
             messagePair.requesterIdentityId,
         method: messagePair.method,
@@ -813,7 +813,7 @@ const CREATE_BODY_ID_FIELDS: Record<string, string> = {
     // Nested composed POST (Task 9): pattern is not a bare
     // family name, so the registry consult never fires — body
     // `id` collapses the operation message pair onto the
-    // type's uri_id (same supersession collapse the retired
+    // type's name (same supersession collapse the retired
     // flat POST /records used).
     [RECORD_TYPES_COLLECTION_PATTERN]: 'id',
 };
@@ -1025,7 +1025,7 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         'organizations/:id',
         // Nested record-types collection POST (Task 9): same
         // head-read class as flat `records` so op + document
-        // share the supersession chain at the type uri_id.
+        // share the supersession chain at the type name.
         RECORD_TYPES_COLLECTION_PATTERN,
         // Nested record-types detail (Task 3): simple class —
         // no If-Match required on types.

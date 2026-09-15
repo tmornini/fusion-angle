@@ -746,8 +746,8 @@ async () => {
         undefined, '/ai-agents/',
     );
     const [aiRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', aiPrefix),
-        db.messagePairs.getAllWhere('uri_collection', aiPrefix),
+        db.messagePairs.getAllWhere('path', aiPrefix),
+        db.messagePairs.getAllWhere('path', aiPrefix),
     ]);
     const aiDocumentMessagePairs = documentMessagePairsAt(
         aiRequests, aiPrefix,
@@ -770,8 +770,8 @@ async () => {
         undefined, '/identities/',
     );
     const [humanRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', humanPrefix),
-        db.messagePairs.getAllWhere('uri_collection', humanPrefix),
+        db.messagePairs.getAllWhere('path', humanPrefix),
+        db.messagePairs.getAllWhere('path', humanPrefix),
     ]);
     const humanDocumentMessagePairs = documentMessagePairsAt(
         humanRequests, humanPrefix,

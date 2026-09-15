@@ -353,7 +353,7 @@ async function seedChain(
     // Seeded through the wire (NAMED re-pin: the READ-side
     // message-plane fence, api/derive-states.ts's
     // resolveOwningOrganization, resolves an org-nested entity's
-    // owner ONLY from a genuine response row at its own uri_id —
+    // owner ONLY from a genuine response row at its own name —
     // a raw db.ideas.put leaves none, so 'i'+s's own 'se'+s
     // state event would resolve as a visible ORPHAN, not a
     // fenced-hidden foreign row, once the bulk lifecycle

@@ -77,9 +77,9 @@ async function pairsAt(
     uriId: string,
 ): Promise<number> {
     const rows = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
-    return rows.filter((row) => row.uri_id === uriId)
+    return rows.filter((row) => row.name === uriId)
         .length;
 }
 
@@ -94,8 +94,8 @@ async function storedResponseAt(
     readonly hasOperationId: boolean;
 }> {
     const requests = (await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
-    )).filter((row) => row.uri_id === uriId);
+        'path', prefix,
+    )).filter((row) => row.name === uriId);
     const last = requests[requests.length - 1];
     assert(last !== undefined, 'no stored request');
     const stored = await db.messagePairs.getById(last.id);

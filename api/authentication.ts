@@ -1122,7 +1122,7 @@ async function grantClientCredentials(
 // (AGENTS.md § Transaction bodies await only row ops). It
 // keys
 // the issued root's row id (and, by construction, that row's own
-// event pair's uri_id — formTokenEventMessagePair derives uriId from the
+// event pair's name — formTokenEventMessagePair derives uriId from the
 // id it is given). authorizeCodeIssuer matches the LIVE code
 // against the authorize response family's stored `code` field
 // (pairs are stored verbatim).
@@ -1313,7 +1313,7 @@ async function grantAuthorizationCode(
     }
     const refreshJti = generateIdentifier();
     // KEY-BY-ANCHOR: the root row's id (and, by construction, its
-    // own event pair's uri_id) IS the derived id — see
+    // own event pair's name) IS the derived id — see
     // deriveAuthorizationCodeId's own comment for why that
     // collision is the spend guard itself.
     const rootId = derivedId;

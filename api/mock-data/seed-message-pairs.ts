@@ -2207,7 +2207,7 @@ export async function formDefaultOrganizationSeedMessagePair(
 // The seeded pending invitation's own pair former:
 // mirrors grantInvitation's fresh outcome
 // (api/invitations-domain.ts) — the operation message
-// pair at the flat 'invitations' collection (uri_id
+// pair at the flat 'invitations' collection (name
 // resolves from the body's invitationId via
 // CREATE_BODY_ID_FIELDS, api/message-pair.ts) and the
 // document message pair at invitations/:id, both HTTP_OK

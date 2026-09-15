@@ -10,13 +10,13 @@ import { compareIdentifiers } from
     '../shared/identifier.ts';
 
 // Named reads over the message plane. One document
-// is getAllAtAddress (collection + uri_id). A
-// collection is getAllWhere('uri_collection').
+// is getAllAtAddress (collection + name). A
+// collection is getAllWhere('path').
 // Body containment is getAllWhereBody. No
-// uri_id-only scan. The seam orders by
+// name-only scan. The seam orders by
 // (response_at, id); the store never re-sorts rows.
 // Live document = latest PUT or DELETE at
-// (uri_collection, uri_id) by (at, id). Head PUT →
+// (path, name) by (at, id). Head PUT →
 // that pair. Head DELETE → none. POST/PATCH are
 // not heads.
 
@@ -122,7 +122,7 @@ function livePutsOf(
         messagePair,
     }));
     const heads = latestByKey(
-        rows, (row) => row.messagePair.uri_id,
+        rows, (row) => row.messagePair.name,
     );
     const live: MessagePairEntity[] = [];
     for (const row of heads.values()) {
@@ -168,7 +168,7 @@ async function messagePairsInCollection(
     collection: string,
 ): Promise<readonly MessagePairEntity[]> {
     return db.messagePairs.getAllWhere(
-        'uri_collection', collection,
+        'path', collection,
     );
 }
 

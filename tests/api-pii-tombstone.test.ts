@@ -88,7 +88,7 @@ async function pairsAtPii(
 ) {
     const messagePairs = await db.messagePairs.getAll();
     return messagePairs.filter(
-        r => r.uri_collection === piiCollection(id),
+        r => r.path === piiCollection(id),
     );
 }
 

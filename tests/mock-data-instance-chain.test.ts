@@ -143,7 +143,7 @@ async () => {
         '/organizations/' + STARK_ORGANIZATION
         + '/work-orders/' + WO01_ID + '/binding/';
     const requests = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     assertStrictEquals(requests.length, 1);
     const model = parseWire(requests[0]!.request);
@@ -183,7 +183,7 @@ async () => {
         '/organizations/' + STARK_ORGANIZATION
         + '/work-orders/' + otherWoId + '/transition/';
     const otherReqs = await db.messagePairs.getAllWhere(
-        'uri_collection', otherPrefix,
+        'path', otherPrefix,
     );
     assert(otherReqs.length > 0);
     for (const request of otherReqs) {
@@ -215,17 +215,17 @@ async () => {
         STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
     );
     const [requests, responses] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getAllWhere('path', prefix),
     ]);
     const byId = new Map(
         responses
-            .filter((r) => r.uri_id === SEED_INSTANCE_ID)
+            .filter((r) => r.name === SEED_INSTANCE_ID)
             .map((r) => [r.id, r]),
     );
     const requestById = new Map(
         requests
-            .filter((r) => r.uri_id === SEED_INSTANCE_ID)
+            .filter((r) => r.name === SEED_INSTANCE_ID)
             .map((r) => [r.id, r]),
     );
     assertStrictEquals(byId.size, 3);

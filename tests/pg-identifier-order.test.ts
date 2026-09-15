@@ -66,10 +66,10 @@ async function putPair(
     id: string,
 ): Promise<void> {
     await adapter.messagePairs.put(id, {
-        uri_collection:
+        path:
             '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/',
-        uri_id: '42',
+        name: '42',
         requester_identity_id:
             'XXZruirZyAOoRpNxaDnpSA',
         method: 'PUT',

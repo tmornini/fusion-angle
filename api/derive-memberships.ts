@@ -37,7 +37,7 @@ import { compareIdentifiers } from
 // hit. The full-scan alternative (a single getAllWhere over every
 // memberships row) was REJECTED for this hot path: getAllWhere is
 // equality-only against ONE indexed column, and the message
-// ledger's own uri_collection index never carries identity_id — from
+// ledger's own path index never carries identity_id — from
 // Task 5 on, every facade hop grows the ledger further, so a scan
 // widening with the WHOLE ledger's history is the wrong shape for
 // a per-identity read that recurs on every fenced request.
@@ -160,7 +160,7 @@ export async function deriveMembershipsForIdentity(
     for (const organization of organizations) {
         const seatPrefix = seatsPrefixFor(organization.id);
         const seatMessagePairs = await db.messagePairs.getAllWhere(
-            'uri_collection', seatPrefix,
+            'path', seatPrefix,
         );
         const seat = deriveDocumentsAt(
             seatMessagePairs, seatPrefix,
@@ -188,7 +188,7 @@ export async function membershipExistsFor(
     const seatPrefix = seatsPrefixFor(organization);
     const seatMessagePairs =
         await dbOrView.messagePairs.getAllWhere(
-            'uri_collection', seatPrefix,
+            'path', seatPrefix,
         );
     return deriveDocumentsAt(
         seatMessagePairs, seatPrefix,
@@ -201,7 +201,7 @@ export async function deriveOrganizationMemberSeats(
 ): Promise<MembershipEntity[]> {
     const prefix = seatsPrefixFor(organization);
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const documents = deriveDocumentsAt(messagePairs, prefix);
     const rows: MembershipEntity[] = [];
@@ -218,7 +218,7 @@ export async function deriveOrganizationMemberSeat(
 ): Promise<MembershipEntity> {
     const prefix = seatsPrefixFor(organization);
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,

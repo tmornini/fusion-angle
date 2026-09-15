@@ -4,11 +4,11 @@
 export const POSTGRES_MESSAGE_PAIRS_TABLE =
     String.raw`CREATE TABLE IF NOT EXISTS message_pairs (
     id uuid PRIMARY KEY,
-    uri_collection text COLLATE "C" NOT NULL
+    path text COLLATE "C" NOT NULL
         CONSTRAINT message_pairs_collection_chk
-        CHECK (left(uri_collection, 1) = '/'
-           AND right(uri_collection, 1) = '/'),
-    uri_id text COLLATE "C" NOT NULL,
+        CHECK (left(path, 1) = '/'
+           AND right(path, 1) = '/'),
+    name text COLLATE "C" NOT NULL,
     requester_identity_id text COLLATE "C" NOT NULL,
     method text COLLATE "C" NOT NULL
         CONSTRAINT message_pairs_method_chk
@@ -52,10 +52,10 @@ RETURN CASE
 END;`;
 
 export const POSTGRES_INDEXES =
-    String.raw`CREATE INDEX IF NOT EXISTS message_pairs_address
-    ON message_pairs (uri_collection, uri_id, response_at, id);
+    String.raw`CREATE INDEX IF NOT EXISTS message_pairs_document
+    ON message_pairs (path, name, response_at, id);
 CREATE INDEX IF NOT EXISTS message_pairs_collection
-    ON message_pairs (uri_collection, response_at, id);
+    ON message_pairs (path, response_at, id);
 CREATE INDEX IF NOT EXISTS message_pairs_replay
     ON message_pairs (request_hash);
 CREATE INDEX IF NOT EXISTS message_pairs_body

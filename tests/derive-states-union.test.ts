@@ -684,7 +684,7 @@ async () => {
     // Graph sidecars on the flow document message pairs (C3).
     const prefix = canonicalUriCollection(fx.organizationA, '/flows/');
     const stored = await fx.db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const sidecarIds: string[] = [];
     for (const messagePair of documentMessagePairsAt(

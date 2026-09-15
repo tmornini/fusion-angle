@@ -347,7 +347,7 @@ export function uniqueColumns(
 export const TABLE_INDEXES:
     Record<string, readonly TableIndexSpec[]> = {
     message_pairs: [
-        'uri_collection', 'request_hash',
+        'path', 'request_hash',
     ],
 };
 
@@ -355,9 +355,9 @@ export function assertGetWhereColumn(
     table: string,
     column: string,
 ): void {
-    if (column === 'uri_id') {
+    if (column === 'name') {
         throw new Error(
-            'getWhere does not accept uri_id',
+            'getWhere does not accept name',
         );
     }
     const specs = TABLE_INDEXES[table];

@@ -845,10 +845,10 @@ Deno.test('a second client_credentials grant with the same jti'
     assertStrictEquals(first.status, 201);
     const before = await db.messagePairs.getAll();
     const grantCount = before.filter((row) =>
-        row.uri_collection === '/authentication/token/',
+        row.path === '/authentication/token/',
     ).length;
     const eventCount = before.filter((row) =>
-        row.uri_collection === '/identities/uYaHKbNeVUcsFjuooOjMew/tokens/',
+        row.path === '/identities/uYaHKbNeVUcsFjuooOjMew/tokens/',
     ).length;
     const second = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
@@ -862,13 +862,13 @@ Deno.test('a second client_credentials grant with the same jti'
     const after = await db.messagePairs.getAll();
     assertStrictEquals(
         after.filter((row) =>
-            row.uri_collection === '/authentication/token/',
+            row.path === '/authentication/token/',
         ).length,
         grantCount,
     );
     assertStrictEquals(
         after.filter((row) =>
-            row.uri_collection ===
+            row.path ===
                 '/identities/uYaHKbNeVUcsFjuooOjMew/tokens/'
                 + '',
         ).length,

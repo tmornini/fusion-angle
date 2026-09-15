@@ -20,14 +20,14 @@ function defaultOrganizationPrefix(identityId: Id): string {
 // The current SET document, or empty when never written.
 // Head-reduced (deriveDocumentsAt): a later PUT at the same
 // address is the document. TARGETED read: one identity-keyed
-// prefix via the uri_collection index.
+// prefix via the path index.
 export async function deriveDefaultOrganization(
     db: DbAdapter,
     identityId: Id,
 ): Promise<IdentityDefaultOrganizationEntity[]> {
     const prefix = defaultOrganizationPrefix(identityId);
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const document = deriveDocumentsAt(
         messagePairs, prefix,

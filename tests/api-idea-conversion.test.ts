@@ -251,16 +251,16 @@ Deno.test(
 
         const atProjectAddress = allRequests.filter(
             (r) =>
-                r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+                r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'projects/'
-                && r.uri_id === 'psZcIMMgiSomMHzDxcUnYQ',
+                && r.name === 'psZcIMMgiSomMHzDxcUnYQ',
         );
         assertStrictEquals(atProjectAddress.length, 1);
         const responsesAtProjectAddress = allResponses.filter(
             (r) =>
-                r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+                r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'projects/'
-                && r.uri_id === 'psZcIMMgiSomMHzDxcUnYQ',
+                && r.name === 'psZcIMMgiSomMHzDxcUnYQ',
         );
         assertStrictEquals(responsesAtProjectAddress.length, 1);
 
@@ -283,16 +283,16 @@ Deno.test(
         // gVvtDIaqhnkXZQcxZeSuiw's address.
         const atIdeaAddress = allRequests.filter(
             (r) =>
-                r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+                r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'ideas/'
-                && r.uri_id === 'gVvtDIaqhnkXZQcxZeSuiw',
+                && r.name === 'gVvtDIaqhnkXZQcxZeSuiw',
         );
         assertStrictEquals(atIdeaAddress.length, 2);
         const responsesAtIdeaAddress = allResponses.filter(
             (r) =>
-                r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+                r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'ideas/'
-                && r.uri_id === 'gVvtDIaqhnkXZQcxZeSuiw',
+                && r.name === 'gVvtDIaqhnkXZQcxZeSuiw',
         );
         assertStrictEquals(responsesAtIdeaAddress.length, 2);
 
@@ -333,15 +333,15 @@ Deno.test(
         for (const { id, fields } of baselineCases) {
             const atBaselineAddress = allRequests.filter(
                 (r) =>
-                    r.uri_collection === baselinesPrefix
-                    && r.uri_id === id,
+                    r.path === baselinesPrefix
+                    && r.name === id,
             );
             assertStrictEquals(atBaselineAddress.length, 1);
             const responsesAtBaselineAddress = allResponses
                 .filter(
                     (r) =>
-                        r.uri_collection === baselinesPrefix
-                        && r.uri_id === id,
+                        r.path === baselinesPrefix
+                        && r.name === id,
                 );
             assertStrictEquals(responsesAtBaselineAddress.length, 1);
 

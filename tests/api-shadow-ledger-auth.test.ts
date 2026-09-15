@@ -171,12 +171,12 @@ async () => {
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
     const authFlowRows = [...requests, ...responses].filter(
-        row => row.uri_collection === '/authentication/authorize/'
-            || row.uri_collection === '/authentication/token/',
+        row => row.path === '/authentication/authorize/'
+            || row.path === '/authentication/token/',
     );
     assertStrictEquals(authFlowRows.length, 4);
     const authorizeRequest = requests.find(
-        r => r.uri_collection === '/authentication/authorize/');
+        r => r.path === '/authentication/authorize/');
     assert(authorizeRequest);
     assert(
         authorizeRequest!.request.includes(PASSWORD),
@@ -187,21 +187,21 @@ async () => {
         'authorize request missing live email',
     );
     const authorizeResponse = responses.find(
-        r => r.uri_collection === '/authentication/authorize/');
+        r => r.path === '/authentication/authorize/');
     assert(authorizeResponse);
     assert(
         authorizeResponse!.response.includes(code),
         'authorize response missing live code',
     );
     const tokenRequest = requests.find(
-        r => r.uri_collection === '/authentication/token/');
+        r => r.path === '/authentication/token/');
     assert(tokenRequest);
     assert(
         tokenRequest!.request.includes(code),
         'token request missing live code',
     );
     const tokenResponse = responses.find(
-        r => r.uri_collection === '/authentication/token/');
+        r => r.path === '/authentication/token/');
     assert(tokenResponse);
     assert(
         tokenResponse!.response.includes(access_token),
@@ -229,42 +229,42 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     assertStrictEquals(requests.length, 8);
     // The AUTH hops stay operation-addressed (uriId ''); the
     // token grant's row event pair rides its OWN row's address
-    // instead, so it alone carries a non-empty uri_id in this
+    // instead, so it alone carries a non-empty name in this
     // slice. Indices 4–5 are authorize + token.
     const authHops = requests.slice(4).filter(
-        row => row.uri_collection === '/authentication/authorize/'
-            || row.uri_collection === '/authentication/token/',
+        row => row.path === '/authentication/authorize/'
+            || row.path === '/authentication/token/',
     );
     assertStrictEquals(authHops.length, 2);
     for (const row of authHops) {
-        assertStrictEquals(row.uri_id, '');
+        assertStrictEquals(row.name, '');
     }
     const tokenEventRequest = requests.slice(4).find(
-        row => row.uri_collection
+        row => row.path
             === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/',
     );
     assert(tokenEventRequest);
-    assertNotStrictEquals(tokenEventRequest!.uri_id, '');
-    // uri_id mirrors the SAME partition the requests loop above
+    assertNotStrictEquals(tokenEventRequest!.name, '');
+    // name mirrors the SAME partition the requests loop above
     // pins: the two AUTH hops stay operation-addressed, the token
     // grant's row event response carries its OWN row's (non-
-    // empty) uri_id — a request/response pair shares one `id`
-    // AND one (uri_collection, uri_id) address (appendMessagePair),
+    // empty) name — a request/response pair shares one `id`
+    // AND one (path, name) document (appendMessagePair),
     // so this is the identical classification, re-applied.
     const responseAuthHops = responses.slice(4).filter(
-        row => row.uri_collection === '/authentication/authorize/'
-            || row.uri_collection === '/authentication/token/',
+        row => row.path === '/authentication/authorize/'
+            || row.path === '/authentication/token/',
     );
     assertStrictEquals(responseAuthHops.length, 2);
     for (const row of responseAuthHops) {
-        assertStrictEquals(row.uri_id, '');
+        assertStrictEquals(row.name, '');
     }
     const tokenEventResponse = responses.slice(4).find(
-        row => row.uri_collection
+        row => row.path
             === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/',
     );
     assert(tokenEventResponse);
-    assertNotStrictEquals(tokenEventResponse!.uri_id, '');
+    assertNotStrictEquals(tokenEventResponse!.name, '');
     // Response rows carry no predecessor columns.
     for (const row of responses.slice(5)) {
         assertStrictEquals('supersedes' in row, false);
@@ -388,7 +388,7 @@ async () => {
     // issued successor — Phase 13 Task 5).
     assertStrictEquals(requests.length, 11);
     const refreshRequest = requests.find(
-        r => r.uri_collection === '/authentication/token/'
+        r => r.path === '/authentication/token/'
             && r.request.includes(first.refresh_token),
     );
     assert(refreshRequest);
@@ -433,7 +433,7 @@ Deno.test('a token-exchange grant stores its own pair with live'
     // pair.
     assertStrictEquals(requests.length, 6);
     const exchangeRequest = requests.find(
-        r => r.uri_collection === '/authentication/token/'
+        r => r.path === '/authentication/token/'
             && r.request.includes(subjectToken),
     );
     assert(exchangeRequest);
@@ -520,7 +520,7 @@ Deno.test('a client_credentials grant stores its own pair with live'
     // and its operation message pair.
     assertStrictEquals(requests.length, 7);
     const credRequest = requests.find(
-        r => r.uri_collection === '/authentication/token/'
+        r => r.path === '/authentication/token/'
             && r.request.includes(assertion),
     );
     assert(credRequest);
@@ -590,7 +590,7 @@ Deno.test('an Authorization header sent alongside the token grant is'
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
-        r => r.uri_collection === '/authentication/token/');
+        r => r.path === '/authentication/token/');
     assert(row);
     assert(
         row!.request.includes('some-stale-caller-token'));
@@ -611,8 +611,8 @@ Deno.test('a reused (already-rotated-away) refresh token grant is a'
     const before = (await db.messagePairs.getAll()).length;
     const operationMessagePairsBefore =
         (await db.messagePairs.getAll()).filter(
-        r => r.uri_collection === '/authentication/token/'
-            && r.uri_id === '',
+        r => r.path === '/authentication/token/'
+            && r.name === '',
     ).length;
     // Same reasoning as the double-spent-code test above: a
     // distinguishing header keeps this reuse attempt from
@@ -627,8 +627,8 @@ Deno.test('a reused (already-rotated-away) refresh token grant is a'
     const requests = await db.messagePairs.getAll();
 
     const operationMessagePairsAfter = requests.filter(
-        r => r.uri_collection === '/authentication/token/'
-            && r.uri_id === '',
+        r => r.path === '/authentication/token/'
+            && r.name === '',
     ).length;
     assertStrictEquals(
         operationMessagePairsAfter,

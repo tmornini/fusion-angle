@@ -631,7 +631,7 @@ export function documentCollectionGetHandler(
         const store = messageStore(db);
         const live = await store.getCollection(prefix);
         const stored = await db.messagePairs.getAllWhere(
-            'uri_collection', prefix,
+            'path', prefix,
         );
         const documents = deriveDocumentsAt(
             stored, prefix,

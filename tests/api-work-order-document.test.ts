@@ -329,8 +329,8 @@ function documentRowAt(
     excludeId?: string,
 ): MessagePairEntity | undefined {
     return messagePairs.find(
-        r => r.uri_collection === prefix
-            && r.uri_id === uriId
+        r => r.path === prefix
+            && r.name === uriId
             && r.id !== excludeId
             && decodeRequestMessage(r.request).method
                 === 'PUT',

@@ -317,11 +317,11 @@ async function revisionMessagePairIdForPatch(
     );
     if (wireReq === undefined) return undefined;
     const siblings = await db.messagePairs.getAllWhere(
-        'uri_collection', wireReq.uri_collection,
+        'path', wireReq.path,
     );
     const revision = siblings.find(
         (row) =>
-            row.uri_id === wireReq.uri_id
+            row.name === wireReq.name
             && row.request_at === wireReq.request_at
             && row.id !== wireMessagePairId,
     );
@@ -403,7 +403,7 @@ export async function handleRequest(
     // fenceRequest, which completes the vessel: the
     // organization, the live memberships, and the roles.
     // Surviving stores are global (message plane);
-    // message-plane tenancy rides uri_collection. effective stays
+    // message-plane tenancy rides path. effective stays
     // the unfenced base adapter.
     let effective: DbAdapter = adapter;
     // The acting member, sourced from the verified token and

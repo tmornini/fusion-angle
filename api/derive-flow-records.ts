@@ -65,7 +65,7 @@ async function fetchFlowRecordDocuments(
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = flowRecordsUriPrefix(organization, flowId);
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }

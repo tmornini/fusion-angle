@@ -110,7 +110,7 @@ async function organizationIds(
 
 // The invitation's own organization_id — carried in the STORED
 // REQUEST body (derive-invitations.ts's own precedent), never the
-// uri_collection (the invitations address is flat, unlike every
+// path (the invitations path is flat, unlike every
 // org-nested family above). Address read of this id at the
 // invitations collection — the same head fold, reused rather
 // than reimplemented.
@@ -175,7 +175,7 @@ async function resolveFlowGraphOwner(
     for (const organization of ordered) {
         const prefix = canonicalUriCollection(organization, '/flows/');
         const stored = await db.messagePairs.getAllWhere(
-            'uri_collection', prefix,
+            'path', prefix,
         );
         for (const messagePair of documentMessagePairsAt(
             stored, prefix,
@@ -448,7 +448,7 @@ export async function resolveGlobalOwner(
         if (atAddress.length === 0) return null;
         for (const messagePair of atAddress) {
             const owner = ownerFromAddress(
-                messagePair.uri_collection,
+                messagePair.path,
                 entityId,
                 messagePair.response,
             );
@@ -592,7 +592,7 @@ async function organizationHasOpBornEvent(
             organization, '/' + family + '/',
         );
         const stored = await dbOrView.messagePairs.getAllWhere(
-            'uri_collection', prefix,
+            'path', prefix,
         );
         for (const messagePair of documentMessagePairsAt(
             stored, prefix,
@@ -614,16 +614,16 @@ async function organizationHasOpBornEvent(
     // Discover work-order ids from the collection pairs
     // already readable via the work-orders family scan above
     // — re-read that one prefix for the id set, then probe
-    // each sub-resource with an indexed uri_collection read.
+    // each sub-resource with an indexed path read.
     const workOrdersPrefix = canonicalUriCollection(
         organization, '/work-orders/',
     );
     const workOrderMessagePairs =
         await dbOrView.messagePairs.getAllWhere(
-            'uri_collection', workOrdersPrefix,
+            'path', workOrdersPrefix,
         );
     const workOrderIds = new Set<Id>(
-        workOrderMessagePairs.map((row) => row.uri_id),
+        workOrderMessagePairs.map((row) => row.name),
     );
     for (const workOrderId of workOrderIds) {
         for (const sub of [
@@ -636,7 +636,7 @@ async function organizationHasOpBornEvent(
             );
             const stored =
                 await dbOrView.messagePairs.getAllWhere(
-                    'uri_collection', prefix,
+                    'path', prefix,
                 );
             for (const messagePair of operationMessagePairsAt(
                 stored, prefix,
@@ -665,7 +665,7 @@ async function organizationHasOpBornEvent(
         canonicalUriCollection(undefined, '/human-members/'),
     ]) {
         const stored = await dbOrView.messagePairs.getAllWhere(
-            'uri_collection', prefix,
+            'path', prefix,
         );
         for (const messagePair of operationMessagePairsAt(
             stored, prefix,
@@ -689,7 +689,7 @@ async function organizationHasOpBornEvent(
     // grant body; answering ops nest under invitations/:id/.
     {
         const stored = await dbOrView.messagePairs.getAllWhere(
-            'uri_collection', INVITATIONS_PREFIX,
+            'path', INVITATIONS_PREFIX,
         );
         for (const messagePair of operationMessagePairsAt(
             stored, INVITATIONS_PREFIX,
@@ -705,7 +705,7 @@ async function organizationHasOpBornEvent(
             }
         }
         const invitationIds = new Set<Id>(
-            stored.map((row) => row.uri_id),
+            stored.map((row) => row.name),
         );
         for (const invitationId of invitationIds) {
             for (const sub of [
@@ -718,7 +718,7 @@ async function organizationHasOpBornEvent(
                 );
                 const operationMessagePairs =
                     await dbOrView.messagePairs.getAllWhere(
-                        'uri_collection', prefix,
+                        'path', prefix,
                     );
                 for (const messagePair of operationMessagePairsAt(
                     operationMessagePairs, prefix,
@@ -930,7 +930,7 @@ export function operationMessagePairsAt(
 ): OperationMessagePair[] {
     const out: OperationMessagePair[] = [];
     for (const messagePair of messagePairs) {
-        if (messagePair.uri_collection !== uriCollection) {
+        if (messagePair.path !== uriCollection) {
             continue;
         }
         const decoded = decodeRequestOperation(
@@ -940,7 +940,7 @@ export function operationMessagePairsAt(
         out.push({
             id: messagePair.id,
             at: messagePair.response_at,
-            uriId: messagePair.uri_id,
+            uriId: messagePair.name,
             body: decoded.body,
             requesterIdentityId:
                 messagePair.requester_identity_id,
@@ -1273,7 +1273,7 @@ function replayWorkOrderOperations(
 
 // Prefix-filtered pure core of the operation-message-pair reader (gate 5d).
 // When `organization` is set, only that org's work-orders
-// uri_collection family is considered (collection + claim/release/
+// path family is considered (collection + claim/release/
 // transition); when undefined, every org — the whole-plane
 // scan deriveWorkOrderLifecycle needs. Returns ASC events and
 // the transition pairs consumed so bulk history can fold
@@ -1295,10 +1295,10 @@ function workOrderLifecycleFromPlane(
     } else {
         for (const messagePair of messagePairs) {
             if (WORK_ORDERS_COLLECTION_PATTERN.test(
-                messagePair.uri_collection,
+                messagePair.path,
             )) {
                 collectionPrefixes.add(
-                    messagePair.uri_collection,
+                    messagePair.path,
                 );
             }
         }
@@ -1330,38 +1330,38 @@ function workOrderLifecycleFromPlane(
     for (const messagePair of messagePairs) {
         if (
             organizationRoot !== null
-            && !messagePair.uri_collection.startsWith(
+            && !messagePair.path.startsWith(
                 organizationRoot,
             )
         ) {
             continue;
         }
         const claimMatch = WORK_ORDER_CLAIM_PATTERN.exec(
-            messagePair.uri_collection,
+            messagePair.path,
         );
         if (claimMatch !== null) {
             claimPrefixByWorkOrder.set(
-                claimMatch[1]!, messagePair.uri_collection,
+                claimMatch[1]!, messagePair.path,
             );
         }
         const releaseMatch =
             WORK_ORDER_RELEASE_PATTERN.exec(
-                messagePair.uri_collection,
+                messagePair.path,
             );
         if (releaseMatch !== null) {
             releasePrefixByWorkOrder.set(
                 releaseMatch[1]!,
-                messagePair.uri_collection,
+                messagePair.path,
             );
         }
         const transitionMatch =
             WORK_ORDER_TRANSITION_PATTERN.exec(
-                messagePair.uri_collection,
+                messagePair.path,
             );
         if (transitionMatch !== null) {
             transitionPrefixByWorkOrder.set(
                 transitionMatch[1]!,
-                messagePair.uri_collection,
+                messagePair.path,
             );
         }
     }
@@ -1458,7 +1458,7 @@ export async function deriveWorkOrderLifecycle(
 //     work-orders prefix + this workOrderId (both
 //     a create's response and its later document PUT/DELETE
 //     share ONE uriId — drift-work-orders.test.ts case 8);
-//   * claim/release/transition: uri_collection at each sub-
+//   * claim/release/transition: path at each sub-
 //     resource's own per-id address (WORK_ORDER_CLAIM_PATTERN/
 //     WORK_ORDER_RELEASE_PATTERN/
 //     WORK_ORDER_TRANSITION_PATTERN's own shape, constructed
@@ -1501,7 +1501,7 @@ async function workOrderClaimSourcesFor(
         '/work-orders/' + workOrderId + '/claim/',
     );
     const claimStored = await dbOrView.messagePairs.getAllWhere(
-        'uri_collection', claimPrefix,
+        'path', claimPrefix,
     );
     const claimMessagePairs = operationMessagePairsAt(
         claimStored, claimPrefix, POST_OR_PUT,
@@ -1515,7 +1515,7 @@ async function workOrderClaimSourcesFor(
         '/work-orders/' + workOrderId + '/release/',
     );
     const releaseStored = await dbOrView.messagePairs.getAllWhere(
-        'uri_collection', releasePrefix,
+        'path', releasePrefix,
     );
     const releaseMessagePairs = [
         ...operationMessagePairsAt(
@@ -1530,7 +1530,7 @@ async function workOrderClaimSourcesFor(
     );
     const transitionStored =
         await dbOrView.messagePairs.getAllWhere(
-            'uri_collection', transitionPrefix,
+            'path', transitionPrefix,
         );
     const transitionMessagePairs = operationMessagePairsAt(
         transitionStored, transitionPrefix,
@@ -1703,7 +1703,7 @@ export async function workOrderHistoryFor(
         '/work-orders/' + workOrderId + '/transition/',
     );
     const transitionStored = await db.messagePairs.getAllWhere(
-        'uri_collection', transitionPrefix,
+        'path', transitionPrefix,
     );
     const transitionMessagePairs = operationMessagePairsAt(
         transitionStored, transitionPrefix,
@@ -1751,7 +1751,7 @@ export async function workOrderBindingFor(
         '/work-orders/' + workOrderId + '/binding/',
     );
     const stored = await dbOrView.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const messagePairs = operationMessagePairsAt(
         stored, prefix, POST_OR_PUT,
@@ -1789,7 +1789,7 @@ export async function workOrderClaimDocumentFor(
         '/work-orders/' + workOrderId + '/claim/',
     );
     const fetched = await dbOrView.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const messagePairs = documentMessagePairsAt(
         fetched, prefix,
@@ -1995,9 +1995,9 @@ export async function deriveInvitationStates(
             const opPrefixes = new Set<string>();
             for (const messagePair of stored) {
                 if (INVITATION_OP_ADDRESS_PATTERN.test(
-                    messagePair.uri_collection,
+                    messagePair.path,
                 )) {
-                    opPrefixes.add(messagePair.uri_collection);
+                    opPrefixes.add(messagePair.path);
                 }
             }
             for (const prefix of opPrefixes) {
@@ -2030,7 +2030,7 @@ export async function deriveInvitationStates(
 // to ONE known invitation id via INDEXED reads —
 // address read at the invitations prefix + this id
 // (grant + document share ONE uriId) and
-// uri_collection for each of the three op addresses —
+// path for each of the three op documents —
 // rather than the whole-collection scan
 // (documentIds discovery) and the whole-ledger pairs.getAll()
 // (op-prefix discovery) the multi-invitation reader above needs
@@ -2081,7 +2081,7 @@ export async function invitationLifecycleStatesFor(
             undefined, '/invitations/' + id + '/' + op + '/',
         );
         const operationMessagePairs = await dbOrView.messagePairs.getAllWhere(
-            'uri_collection', prefix,
+            'path', prefix,
         );
         const fields = INVITATION_OP_FIELDS[op]!;
         const earliest = operationMessagePairsAt(

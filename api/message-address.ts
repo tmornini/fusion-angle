@@ -1,10 +1,10 @@
 // Resolves a matched route into the message plane's
-// (uri_collection, uri_id) address. The route pattern — not
+// (path, name). The route pattern — not
 // string inspection — decides whether the last segment is
 // an individual id: exactly when the pattern's final
 // segment is a :param. The prefix always keeps its trailing
 // slash; a collection or operation target stores the empty
-// uri_id (a structural key, not an absence sentinel — see
+// name (a structural key, not an absence sentinel — see
 // the spec's two-table key).
 export interface MessageAddress {
     readonly uriCollection: string;

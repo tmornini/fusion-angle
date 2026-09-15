@@ -89,7 +89,7 @@ export async function deriveOrganizations(
         MESSAGE_TABLES,
         async (view) => {
             const messagePairs = await view.messagePairs.getAllWhere(
-                'uri_collection', ORGANIZATIONS_PREFIX,
+                'path', ORGANIZATIONS_PREFIX,
             );
             const documents = deriveDocumentsAt(
                 messagePairs, ORGANIZATIONS_PREFIX,
@@ -115,7 +115,7 @@ export async function deriveOrganization(
         MESSAGE_TABLES,
         async (view) => {
             const messagePairs = await view.messagePairs.getAllWhere(
-                'uri_collection', ORGANIZATIONS_PREFIX,
+                'path', ORGANIZATIONS_PREFIX,
             );
             const document = deriveDocumentsAt(
                 messagePairs, ORGANIZATIONS_PREFIX,

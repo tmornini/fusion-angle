@@ -16,39 +16,39 @@ import { Octets } from
 
 interface Row {
     id: string;
-    uri_collection: string;
-    uri_id: string;
+    path: string;
+    name: string;
     response_at: string;
 }
 
 const ROWS: Row[] = [
     {
         id: 'b',
-        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-        uri_id: 'AjdvjuECVZEgZoFajaIEkg',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        name: 'AjdvjuECVZEgZoFajaIEkg',
         response_at: '2026-01-01T00:00:00.000002Z',
     },
     {
         id: 'a',
-        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-        uri_id: 'AjdvjuECVZEgZoFajaIEkg',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        name: 'AjdvjuECVZEgZoFajaIEkg',
         response_at: '2026-01-01T00:00:00.000001Z',
     },
     {
         id: 'c',
-        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-        uri_id: 'BBjWJsjYIDkTRKIIPrzWRw',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        name: 'BBjWJsjYIDkTRKIIPrzWRw',
         response_at: '2026-01-01T00:00:00.000001Z',
     },
     {
         id: 'd',
-        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',
-        uri_id: 'AjdvjuECVZEgZoFajaIEkg',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',
+        name: 'AjdvjuECVZEgZoFajaIEkg',
         response_at: '2026-01-01T00:00:00.000001Z',
     },
 ];
 
-Deno.test('getAddress is collection+uri_id, ordered by at,id',
+Deno.test('getAddress is collection+name, ordered by at,id',
 async () => {
     const backend = new MemoryStorageBackend();
     await backend.ensureTables(['t']);
@@ -83,13 +83,13 @@ async () => {
         (body) => body as Omit<Row, 'id'>,
     );
     await store.put('a', {
-        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-        uri_id: 'AjdvjuECVZEgZoFajaIEkg',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        name: 'AjdvjuECVZEgZoFajaIEkg',
         response_at: '2026-01-01T00:00:00.000001Z',
     });
     await store.put('c', {
-        uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-        uri_id: 'BBjWJsjYIDkTRKIIPrzWRw',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        name: 'BBjWJsjYIDkTRKIIPrzWRw',
         response_at: '2026-01-01T00:00:00.000001Z',
     });
     const got = await store.getAllAtAddress(
@@ -128,23 +128,23 @@ async () => {
         async (tx) => {
             await tx.put('message_pairs', {
                 id: 'hit',
-                uri_collection: '/authentication/authorize/',
-                uri_id: '',
+                path: '/authentication/authorize/',
+                name: '',
                 response_at: '2026-01-01T00:00:00.000001Z',
                 response: jsonWire({ code: 'abc' }),
             });
             await tx.put('message_pairs', {
                 id: 'miss',
-                uri_collection: '/authentication/authorize/',
-                uri_id: '',
+                path: '/authentication/authorize/',
+                name: '',
                 response_at: '2026-01-01T00:00:00.000002Z',
                 response: jsonWire({ code: 'zzz' }),
             });
             await tx.put('message_pairs', {
                 id: 'other',
-                uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                     + '',
-                uri_id: 'AjdvjuECVZEgZoFajaIEkg',
+                name: 'AjdvjuECVZEgZoFajaIEkg',
                 response_at: '2026-01-01T00:00:00.000001Z',
                 response: jsonWire({ code: 'abc' }),
             });
@@ -161,7 +161,7 @@ async () => {
     assertEquals(got.map((row) => row.id), ['hit']);
 });
 
-Deno.test('memory getWhere refuses uri_id', async () => {
+Deno.test('memory getWhere refuses name', async () => {
     const backend = new MemoryStorageBackend();
     await backend.ensureTables(['message_pairs']);
     const err = await assertRejects(
@@ -169,13 +169,13 @@ Deno.test('memory getWhere refuses uri_id', async () => {
             ['message_pairs'],
             'readonly',
             (tx) => tx.getWhere(
-                'message_pairs', 'uri_id', 'AjdvjuECVZEgZoFajaIEkg',
+                'message_pairs', 'name', 'AjdvjuECVZEgZoFajaIEkg',
             ),
         ),
     ) as Error;
     assertInstanceOf(err, Error);
     assertStrictEquals(
-        err.message, 'getWhere does not accept uri_id',
+        err.message, 'getWhere does not accept name',
     );
 });
 

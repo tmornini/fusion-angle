@@ -950,8 +950,8 @@ export interface ProjectObjectiveActualScoreEntity {
 // machinery, never a second truth.
 export interface MessagePairEntity {
     id: Id;
-    uri_collection: string;
-    uri_id: string;
+    path: string;
+    name: string;
     requester_identity_id: Id;
     method: string;
     request_at: string;

@@ -614,7 +614,7 @@ Deno.test(
         const actor = 'XXZruirZyAOoRpNxaDnpSA';
         // Phase Final Task 5: the store decorator is gone;
         // handlers and resolveFlowUndoTarget read the base
-        // adapter. Message-plane tenancy rides uri_collection.
+        // adapter. Message-plane tenancy rides path.
         await createFlow(db, token, flowId);
         await save(db, token, flowId, 'A', FLOWID_A);
 
@@ -757,7 +757,7 @@ Deno.test(
         const prefix = canonicalUriCollection('AjdvjuECVZEgZoFajaIEkg'
             , '/flows/');
         const stored = await db.messagePairs.getAllWhere(
-            'uri_collection', prefix,
+            'path', prefix,
         );
         const messagePairs = documentMessagePairsAt(
             stored, prefix,

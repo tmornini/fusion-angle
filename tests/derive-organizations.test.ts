@@ -159,8 +159,8 @@ async () => {
     // seedAdminSchema forms 2 pairs (role-grants retired);
     // this PUT is the 3rd.
     assertStrictEquals(requests.length, 3);
-    assertStrictEquals(requests[2]!.uri_collection, '/organizations/');
-    assertStrictEquals(requests[2]!.uri_id, organizationId);
+    assertStrictEquals(requests[2]!.path, '/organizations/');
+    assertStrictEquals(requests[2]!.name, organizationId);
 
     const derived = await deriveOrganization(db, organizationId);
     assertStrictEquals(derived.id, organizationId);

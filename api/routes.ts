@@ -765,7 +765,7 @@ function ownerOrganizationViaMembershipPairPlane(
 // own operation message pair, the synthesized document message pair (at the
 // record's own records/:id address — the SAME address the
 // operation message pair shares, since records' createBodyIdField
-// override collapses the two onto one uri_id, the flows
+// override collapses the two onto one name, the flows
 // precedent), one synthesized attribute-PUT pair per
 // attributes[] entry, and one synthesized attribute-DELETE pair
 // per removedAttributeIds entry (edit only — removedAttributeIds
@@ -1009,7 +1009,7 @@ export async function loadAttributeSchemaById(
         organization, recordTypeId,
     );
     const messagePairs = await db.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     const documents = deriveDocumentsAt(
         messagePairs, prefix,
@@ -3525,7 +3525,7 @@ export async function formDocumentMessagePairFor(
 
 // Instance DELETE tombstone append (Task 18 / R4 / R9).
 // Spent address = any prior response at the instance
-// uri_id (live head OR existing tombstone). Virgin
+// name (live head OR existing tombstone). Virgin
 // address → missedReadError (R2). Spent → append the
 // gate-formed DELETE pair in one tx (R4 tombstone-wins
 // is ledger-complete — every non-replay DELETE appends,
@@ -3620,7 +3620,7 @@ async function inFlightPlacementBlockersFor(
         organization, '/work-orders/',
     );
     const woMessagePairs = await view.messagePairs.getAllWhere(
-        'uri_collection', workOrdersPrefix,
+        'path', workOrdersPrefix,
     );
     const woHeads = deriveDocumentsAt(
         woMessagePairs, workOrdersPrefix,
@@ -4458,7 +4458,7 @@ export const routes: Route[] = [
     // /ideas/:id/conversion is member-permitted.
     //
     // Phase 3 Task 4: the operation message pair above lives at the
-    // ideas-family OPERATION address (uri_id '') — a projects-
+    // ideas-family OPERATION document (name '') — a projects-
     // prefix scan finds no pair for a conversion-born project
     // without a SECOND pair at the project's OWN document
     // address. Synthesized below, BYTE-INDISTINGUISHABLE from a
@@ -5057,7 +5057,7 @@ export const routes: Route[] = [
     // lifecycle + inline field_values fold, (at, id) DESC.
     // Miss posture lives inside workOrderHistoryFor (empty →
     // missedReadError). No api.ts pre-dispatch guard — the
-    // derive reads only this org's uri_collection addresses.
+    // derive reads only this org's paths.
     // Member-tier GET via matchesOnSegmentBoundary on
     // '/work-orders'.
     route('organizations/:id/work-orders/:id/history', {
@@ -5248,7 +5248,7 @@ export const routes: Route[] = [
             await requireRecordTypeExists(db, org, typeId);
             const prefix = attributesUriPrefix(org, typeId);
             const messagePairs = await db.messagePairs.getAllWhere(
-                'uri_collection', prefix,
+                'path', prefix,
             );
             const documents = deriveDocumentsAt(
                 messagePairs, prefix,
@@ -5275,7 +5275,7 @@ export const routes: Route[] = [
             await requireRecordTypeExists(db, org, typeId);
             const prefix = attributesUriPrefix(org, typeId);
             const messagePairs = await db.messagePairs.getAllWhere(
-                'uri_collection', prefix,
+                'path', prefix,
             );
             const document = deriveDocumentsAt(
                 messagePairs, prefix,
@@ -5315,7 +5315,7 @@ export const routes: Route[] = [
             }
             const prefix = attributesUriPrefix(org, typeId);
             const messagePairs = await db.messagePairs.getAllWhere(
-                'uri_collection', prefix,
+                'path', prefix,
             );
             if (!deriveDocumentsAt(
                 messagePairs, prefix,

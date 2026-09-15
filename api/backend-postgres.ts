@@ -218,8 +218,8 @@ function postgresTx(
             }>`
                 SELECT id, method
                 FROM message_pairs
-                WHERE uri_collection = ${collection}
-                  AND uri_id = ${uriId}
+                WHERE path = ${collection}
+                  AND name = ${uriId}
                   AND method IN ('PUT', 'DELETE')
                 ORDER BY response_at DESC, id DESC
                 LIMIT 1
@@ -381,10 +381,10 @@ async function selectWhere(
     column: string,
     key: string,
 ): Promise<Record<string, unknown>[]> {
-    if (column === 'uri_collection') {
+    if (column === 'path') {
         return sql.query`
             SELECT * FROM message_pairs
-            WHERE uri_collection = ${key}
+            WHERE path = ${key}
             ORDER BY response_at, id
         `;
     }
@@ -408,8 +408,8 @@ async function selectAddress(
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
         SELECT * FROM message_pairs
-        WHERE uri_collection = ${collection}
-          AND uri_id = ${uriId}
+        WHERE path = ${collection}
+          AND name = ${uriId}
         ORDER BY response_at, id
     `;
 }
@@ -422,7 +422,7 @@ async function selectWhereBody(
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
         SELECT * FROM message_pairs
-        WHERE uri_collection = ${collection}
+        WHERE path = ${collection}
           AND message_body(response) @>
               ${containment}::jsonb
         ORDER BY response_at, id
@@ -437,8 +437,8 @@ async function upsertRow(
     const id = uuidTextOfIdentifier(
         textField(row, 'id'),
     );
-    const collection = textField(row, 'uri_collection');
-    const uriId = textField(row, 'uri_id');
+    const collection = textField(row, 'path');
+    const uriId = textField(row, 'name');
     const requester = textField(
         row, 'requester_identity_id',
     );
@@ -453,7 +453,7 @@ async function upsertRow(
     );
     await sql.query`
         INSERT INTO message_pairs (
-            id, uri_collection, uri_id,
+            id, path, name,
             requester_identity_id, method,
             request_at, request_hash, request,
             response_at, response,
@@ -466,8 +466,8 @@ async function upsertRow(
             ${operationId}
         )
         ON CONFLICT (id) DO UPDATE SET
-            uri_collection = EXCLUDED.uri_collection,
-            uri_id = EXCLUDED.uri_id,
+            path = EXCLUDED.path,
+            name = EXCLUDED.name,
             requester_identity_id =
                 EXCLUDED.requester_identity_id,
             method = EXCLUDED.method,

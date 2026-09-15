@@ -232,16 +232,16 @@ async function resolveAttributePath(
     db: DbAdapter, organization: Id, id: Id,
 ): Promise<string | null> {
     const hits = (await db.messagePairs.getAll()).filter(
-        (row) => row.uri_id === id,
+        (row) => row.name === id,
     );
     const needle = '/organizations/' + organization
         + '/record-types/';
     for (const hit of hits) {
         if (
-            hit.uri_collection.startsWith(needle)
-            && hit.uri_collection.endsWith('/attributes/')
+            hit.path.startsWith(needle)
+            && hit.path.endsWith('/attributes/')
         ) {
-            const typeId = hit.uri_collection
+            const typeId = hit.path
                 .slice(needle.length)
                 .split('/')[0];
             if (typeId !== undefined && typeId !== '') {
@@ -950,7 +950,7 @@ async () => {
 
     const firstDocumentMessagePairs = documentMessagePairsAt(
         await db.messagePairs.getAllWhere(
-            'uri_collection', prefix,
+            'path', prefix,
         ),
         prefix,
     ).filter((messagePair) => messagePair.uriId === recordId);
@@ -974,9 +974,9 @@ async () => {
     assertStrictEquals(second.status, 201);
 
     const allRequests =
-        await db.messagePairs.getAllWhere('uri_collection', prefix);
+        await db.messagePairs.getAllWhere('path', prefix);
     const allResponses =
-        await db.messagePairs.getAllWhere('uri_collection', prefix);
+        await db.messagePairs.getAllWhere('path', prefix);
     const secondDocumentMessagePairs = documentMessagePairsAt(
         allRequests, prefix,
     ).filter((messagePair) => messagePair.uriId === recordId);
@@ -1035,12 +1035,12 @@ async () => {
         STARK_ORGANIZATION, '/record-types/',
     );
     const [recordRequests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', recordsPrefix),
-        db.messagePairs.getAllWhere('uri_collection', recordsPrefix),
+        db.messagePairs.getAllWhere('path', recordsPrefix),
+        db.messagePairs.getAllWhere('path', recordsPrefix),
     ]);
     const atRecordAddress = recordRequests.filter(
-        (r) => r.uri_collection === recordsPrefix
-            && r.uri_id === recordId,
+        (r) => r.path === recordsPrefix
+            && r.name === recordId,
     );
     assertStrictEquals(atRecordAddress.length, 2);
 
@@ -1072,10 +1072,10 @@ async () => {
     const [attributeRequests] =
         await Promise.all([
             db.messagePairs.getAllWhere(
-                'uri_collection', attributesPrefix,
+                'path', attributesPrefix,
             ),
             db.messagePairs.getAllWhere(
-                'uri_collection', attributesPrefix,
+                'path', attributesPrefix,
             ),
         ]);
     const attributeDocumentMessagePairs = documentMessagePairsAt(
@@ -1281,15 +1281,15 @@ async function transitionFieldValueCounts(
             + '/transition/',
     );
     const [requests, responses] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getAllWhere('path', prefix),
     ]);
     const requestById = new Map(
         requests.map((request) => [request.id, request]),
     );
     const counts = new Map<string, number>();
     for (const response of responses) {
-        if (response.uri_collection !== prefix) continue;
+        if (response.path !== prefix) continue;
         const request = requestById.get(response.id);
         if (request === undefined) continue;
         const decoded = decodeRequestMessage(request.request);

@@ -4,8 +4,8 @@ import {
 import { memoryDbAdapter } from '../api/db-memory.ts';
 
 const aMessagePair = {
-    uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-    uri_id: '42',
+    path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+    name: '42',
     requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
     method: 'PUT',
     request_at: '2026-01-01T00:00:00.000000Z',

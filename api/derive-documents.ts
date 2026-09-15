@@ -66,7 +66,7 @@ export interface DocumentMessagePair {
 // the store's document head read (`messageStore(db).get`)
 // picks a single head from. That shared mechanism is
 // ordering ONLY: the store's document head read
-// (`messageStore(db).get`) filters by uri_id/uri_collection
+// (`messageStore(db).get`) filters by name/path
 // alone — every method, since it serves
 // Supersedes/Follows provenance (the LOCK head) — while
 // this function excludes every method but PUT/DELETE
@@ -81,7 +81,7 @@ export function documentMessagePairsAt(
 ): readonly DocumentMessagePair[] {
     const out: DocumentMessagePair[] = [];
     for (const messagePair of messagePairs) {
-        if (messagePair.uri_collection !== uriCollection) {
+        if (messagePair.path !== uriCollection) {
             continue;
         }
         if (!DOCUMENT_METHODS.has(messagePair.method)) {
@@ -90,7 +90,7 @@ export function documentMessagePairsAt(
         out.push({
             id: messagePair.id,
             at: messagePair.response_at,
-            uriId: messagePair.uri_id,
+            uriId: messagePair.name,
             method: messagePair.method,
             body: requestBodyOf(messagePair.request),
             requesterIdentityId:
@@ -103,7 +103,7 @@ export function documentMessagePairsAt(
                 : compareIdentifiers(left.id, right.id));
 }
 
-// The head document per uri_id at a prefix. Family-agnostic and
+// The head document per name at a prefix. Family-agnostic and
 // pure over the fetched rows; a family's own reshaping (api/
 // derive-ideas.ts) turns each DerivedDocument into its own entity
 // shape.
@@ -117,7 +117,7 @@ export interface DerivedDocument {
     readonly body: Record<string, unknown>;
 }
 
-// Latest pair per uri_id at a prefix by the (at, id)
+// Latest pair per name at a prefix by the (at, id)
 // reduction; a DELETE head excludes the document.
 // Supersedes is NEVER walked (provenance-only — a DAG
 // under races; only the reduction decides currency).

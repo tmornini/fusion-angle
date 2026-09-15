@@ -35,9 +35,9 @@ Deno.test(
         const adapter = memoryDbAdapter();
         await adapter.postSchemaCreation();
         await adapter.messagePairs.put('u1', {
-            uri_collection:
+            path:
                 '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-            uri_id: '42',
+            name: '42',
             requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             method: 'PUT',
             request_at:
@@ -151,7 +151,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                   AND table_name = 'message_pairs'
                   AND column_name IN (
                       'id', 'operation_id',
-                      'uri_id',
+                      'name',
                       'requester_identity_id'
                   )
             `;
@@ -164,7 +164,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             assertStrictEquals(
                 typeOf.get('operation_id'), 'uuid',
             );
-            assertStrictEquals(typeOf.get('uri_id'), 'text');
+            assertStrictEquals(typeOf.get('name'), 'text');
             assertStrictEquals(
                 typeOf.get('requester_identity_id'),
                 'text',

@@ -126,7 +126,7 @@ async function fetchTokenDocumentsAt(
     prefix: string,
 ): Promise<Map<string, DerivedDocument>> {
     const messagePairs = await dbOrView.messagePairs.getAllWhere(
-        'uri_collection', prefix,
+        'path', prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
 }
@@ -200,8 +200,8 @@ export async function deriveIdentityTokens(
     }
     const prefixes = new Set<string>();
     for (const messagePair of messagePairs) {
-        if (TOKENS_ADDRESS_PATTERN.test(messagePair.uri_collection)) {
-            prefixes.add(messagePair.uri_collection);
+        if (TOKENS_ADDRESS_PATTERN.test(messagePair.path)) {
+            prefixes.add(messagePair.path);
         }
     }
     for (const prefix of prefixes) {

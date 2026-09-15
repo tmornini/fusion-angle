@@ -533,11 +533,11 @@ Deno.test('stateEventVisibilityFor: tier (ii) op-born transition'
     // Op-born: no states/:id pair at transitionEventId;
     // lives only inside the transition op body.
     const byId = (await db.messagePairs.getAll()).filter(
-        (row) => row.uri_id === transitionEventId,
+        (row) => row.name === transitionEventId,
     );
     const statesTail = '/' + 'states' + '/';
     const statesHits = byId.filter((r) =>
-        r.uri_collection.endsWith(statesTail));
+        r.path.endsWith(statesTail));
     assertStrictEquals(statesHits.length, 0);
 
     assertStrictEquals(

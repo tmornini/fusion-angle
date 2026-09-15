@@ -132,8 +132,8 @@ async function putMessagePair(
     const at = atStamp(n);
     await tx.put('message_pairs', {
         id,
-        uri_collection: collection,
-        uri_id: uriId,
+        path: collection,
+        name: uriId,
         requester_identity_id: REQUESTER,
         method,
         request_at: at,
@@ -154,8 +154,8 @@ async function putAuthorize(
     const at = atStamp(n);
     await tx.put('message_pairs', {
         id,
-        uri_collection: AUTH_COLLECTION,
-        uri_id: '',
+        path: AUTH_COLLECTION,
+        name: '',
         requester_identity_id: REQUESTER,
         method: 'GET',
         request_at: at,
@@ -198,8 +198,9 @@ async function seedRows(
                     'PUT',
                 );
             }
-            // Fat address (81 pairs at one uri_id):
-            // address ORDER BY prefers message_pairs_address.
+            // Fat document (81 pairs at one name):
+            // document ORDER BY prefers
+            // message_pairs_document.
             // Keep /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/ small for the
             // collection pin.
             await putMessagePair(
@@ -324,7 +325,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         >`
             EXPLAIN
             SELECT * FROM message_pairs
-            WHERE uri_collection = ${IDEA_COLLECTION}
+            WHERE path = ${IDEA_COLLECTION}
             ORDER BY response_at, id
         `;
         assertIndexPlan(
@@ -347,19 +348,20 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
     });
 
-    Deno.test('address uses address index', async () => {
+    Deno.test('document read uses the document index',
+    async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
             SELECT * FROM message_pairs
-            WHERE uri_collection = ${VERSION_COLLECTION}
-              AND uri_id = ${VERSION_URI_ID}
+            WHERE path = ${VERSION_COLLECTION}
+              AND name = ${VERSION_URI_ID}
             ORDER BY response_at, id
         `;
         assertIndexPlan(
             explainText(plans),
-            ['message_pairs_address'],
+            ['message_pairs_document'],
         );
     });
 
@@ -370,7 +372,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         >`
             EXPLAIN
             SELECT * FROM message_pairs
-            WHERE uri_collection = ${AUTH_COLLECTION}
+            WHERE path = ${AUTH_COLLECTION}
               AND message_body(response) @>
                   ${AUTH_CONTAINMENT}::jsonb
             ORDER BY response_at, id
@@ -381,7 +383,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
     });
 
-    Deno.test('latestPutDelete uses address and pkey',
+    Deno.test('latestPutDelete uses document and pkey',
     async () => {
         const plans = await sql.query<
             Record<string, unknown>
@@ -389,8 +391,8 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             EXPLAIN
             SELECT id, method
             FROM message_pairs
-            WHERE uri_collection = ${VERSION_COLLECTION}
-              AND uri_id = ${VERSION_URI_ID}
+            WHERE path = ${VERSION_COLLECTION}
+              AND name = ${VERSION_URI_ID}
               AND method IN ('PUT', 'DELETE')
             ORDER BY response_at DESC, id DESC
             LIMIT 1
@@ -398,6 +400,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const text = explainText(plans);
         assertNotMatch(text, /requests_pkey/);
         assertNotMatch(text, /Join/);
-        assertIndexPlan(text, ['message_pairs_address']);
+        assertIndexPlan(text, ['message_pairs_document']);
     });
 }

@@ -330,8 +330,8 @@ Deno.test('postFlowDocumentOp with revivals posts the restored'
     const prefix = canonicalUriCollection('AjdvjuECVZEgZoFajaIEkg', '/flows/'
         + '');
     const [requests] = await Promise.all([
-        db.messagePairs.getAllWhere('uri_collection', prefix),
-        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('path', prefix),
+        db.messagePairs.getAllWhere('path', prefix),
     ]);
     const messagePairs = documentMessagePairsAt(
         requests, prefix,
@@ -612,9 +612,9 @@ async () => {
     assertStrictEquals(etag, strongEtagOf(stored.id));
     const requests = await db.messagePairs.getAll();
     const atAddress = requests.filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === 'bWdlaTZZcKRsLsGXiKQZkw',
+            && r.name === 'bWdlaTZZcKRsLsGXiKQZkw',
     );
     assertStrictEquals(atAddress.length, 2);
     assert(atAddress.some(r => r.id === headId));
@@ -739,9 +739,9 @@ async () => {
     assertStrictEquals(messagePairs.length, 5);
 
     const flowAddress = messagePairs.filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === flowId,
+            && r.name === flowId,
     );
     assertStrictEquals(flowAddress.length, 2);
     const documentRow = flowAddress.find(
@@ -781,8 +781,8 @@ async () => {
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'qfhFObbtDfxUZwEGxySBoQ/flows/';
     const joinAddress = messagePairs.filter(
-        r => r.uri_collection === joinPrefix
-            && r.uri_id === projectFlowId,
+        r => r.path === joinPrefix
+            && r.name === projectFlowId,
     );
     assertStrictEquals(joinAddress.length, 1);
     const decodedJoin =
@@ -834,9 +834,9 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
 
     const requestsAfterFirst = await db.messagePairs.getAll();
     const flowAddressAfterFirst = requestsAfterFirst.filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === flowId,
+            && r.name === flowId,
     );
     const firstDocumentRequest = flowAddressAfterFirst.find(
         r => decodeRequestMessage(r.request).method === 'PUT',
@@ -876,9 +876,9 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
 
     const requestsAfterSecond = await db.messagePairs.getAll();
     const flowAddressAfterSecond = requestsAfterSecond.filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === flowId,
+            && r.name === flowId,
     );
     const documentRequests = flowAddressAfterSecond.filter(
         r => decodeRequestMessage(r.request).method === 'PUT',
@@ -1000,9 +1000,9 @@ Deno.test('e2e: POST organizations/:id/flows/:id/undo forms a'
 
     const responses = await db.messagePairs.getAll();
     const documentResponses = responses.filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === 'cvdqOxjRwvTEYzWTrFDNFw',
+            && r.name === 'cvdqOxjRwvTEYzWTrFDNFw',
     );
     const priorIds = new Set(
         responsesBeforeUndo.map((r) => r.id),
@@ -1199,9 +1199,9 @@ async () => {
 
     const responses = await db.messagePairs.getAll();
     const atFlow = responses.filter(
-        r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
-            && r.uri_id === 'biakjMJqdIlFhfVZBGhpKw',
+            && r.name === 'biakjMJqdIlFhfVZBGhpKw',
     );
     // Genesis create + Before Race + exactly one racer.
     assert(
