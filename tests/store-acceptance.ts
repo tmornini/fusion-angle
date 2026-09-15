@@ -3,6 +3,7 @@ import {
 } from '@std/assert';
 import type { DbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
+import { messageStore } from '../api/message-store.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
@@ -160,6 +161,34 @@ function orderRow(
         response: 'HTTP/1.1 200 OK\r\n\r\n',
         operation_id: ORDER_OPERATION,
     };
+}
+
+const HEAD_PATH = '/head-pin/';
+
+function pairRow(
+    path: string,
+    name: string,
+    method: string,
+    responseAt: string,
+    n: number,
+): Omit<MessagePairEntity, 'id'> {
+    return {
+        path,
+        name,
+        requester_identity_id: ORDER_REQUESTER,
+        method,
+        request_at: responseAt,
+        request_hash: n.toString(16).padStart(64, '0'),
+        request: method + ' ' + path + name
+            + ' HTTP/1.1\r\n\r\n',
+        response_at: responseAt,
+        response: 'HTTP/1.1 200 OK\r\n\r\n',
+        operation_id: ORDER_OPERATION,
+    };
+}
+
+function stamp(k: number): string {
+    return '2026-01-01T00:00:00.00000' + String(k) + 'Z';
 }
 
 export function defineStoreAcceptance(
@@ -395,6 +424,101 @@ export function defineStoreAcceptance(
         assertEquals(
             collection.map((row) => row.id),
             [first, second, third],
+        );
+    });
+
+    Deno.test(name + ': collection head pairs are the live'
+    + ' PUT heads in (response_at, id) order', async () => {
+        const { db } = await ready();
+        const revised1 = generateIdentifier();
+        const revised2 = generateIdentifier();
+        const deleted1 = generateIdentifier();
+        const deleted2 = generateIdentifier();
+        const posted1 = generateIdentifier();
+        const posted2 = generateIdentifier();
+        const posted3 = generateIdentifier();
+        const untouched = generateIdentifier();
+        const rows: [string, string, string, number][] = [
+            [revised1, 'revised', 'PUT', 1],
+            [deleted1, 'deleted', 'PUT', 2],
+            [revised2, 'revised', 'PUT', 3],
+            [deleted2, 'deleted', 'DELETE', 4],
+            [posted1, 'posted', 'PUT', 5],
+            [posted2, 'posted', 'POST', 6],
+            [posted3, 'posted', 'PATCH', 7],
+            [untouched, 'untouched', 'PUT', 8],
+        ];
+        for (const [id, docName, method, k] of rows) {
+            await db.messagePairs.append(
+                id, pairRow(HEAD_PATH, docName, method, stamp(k), k),
+            );
+        }
+        const heads = await db.messagePairs
+            .getCollectionHeadPairs(HEAD_PATH);
+        assertEquals(
+            heads.map((row) => row.id),
+            [revised2, posted1, untouched],
+        );
+        assertEquals(
+            heads.map((row) => row.name),
+            ['revised', 'posted', 'untouched'],
+        );
+        assert(heads.every((row) => row.method === 'PUT'));
+    });
+
+    Deno.test(name + ': head pair is the latest PUT or'
+    + ' DELETE; POST and PATCH never displace it', async () => {
+        const { db } = await ready();
+        const put1 = generateIdentifier();
+        const put2 = generateIdentifier();
+        const post = generateIdentifier();
+        const patch = generateIdentifier();
+        const del = generateIdentifier();
+        await db.messagePairs.append(
+            put1, pairRow(HEAD_PATH, 'doc', 'PUT', stamp(1), 1),
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getHeadPair(HEAD_PATH, 'doc'))
+                ?.id,
+            put1,
+        );
+        await db.messagePairs.append(
+            put2, pairRow(HEAD_PATH, 'doc', 'PUT', stamp(2), 2),
+        );
+        await db.messagePairs.append(
+            post, pairRow(HEAD_PATH, 'doc', 'POST', stamp(3), 3),
+        );
+        await db.messagePairs.append(
+            patch, pairRow(HEAD_PATH, 'doc', 'PATCH', stamp(4), 4),
+        );
+        const afterOps = await db.messagePairs.getHeadPair(
+            HEAD_PATH, 'doc',
+        );
+        assertStrictEquals(afterOps?.id, put2);
+        assertStrictEquals(afterOps?.method, 'PUT');
+        assertEquals(
+            await db.messagePairs.getHead(HEAD_PATH, 'doc'),
+            { id: put2, method: 'PUT' },
+        );
+        await db.messagePairs.append(
+            del, pairRow(HEAD_PATH, 'doc', 'DELETE', stamp(5), 5),
+        );
+        const afterDelete = await db.messagePairs.getHeadPair(
+            HEAD_PATH, 'doc',
+        );
+        assertStrictEquals(afterDelete?.id, del);
+        assertStrictEquals(afterDelete?.method, 'DELETE');
+        assertStrictEquals(
+            await messageStore(db).getDocumentHead(HEAD_PATH, 'doc'),
+            null,
+        );
+        assertStrictEquals(
+            await db.messagePairs.getHeadPair(HEAD_PATH, 'nothing'),
+            null,
+        );
+        assertStrictEquals(
+            await db.messagePairs.getHead(HEAD_PATH, 'nothing'),
+            null,
         );
     });
 }

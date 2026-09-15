@@ -410,8 +410,15 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 body, undefined, op,
             )),
         ]);
-        assertStrictEquals(left.status, 201);
-        assertStrictEquals(right.status, 201);
+        const statuses = [left.status, right.status];
+        assertStrictEquals(
+            statuses.filter((s) => s === 201).length,
+            1,
+        );
+        assertStrictEquals(
+            statuses.filter((s) => s === 200).length,
+            1,
+        );
         assertStrictEquals(
             await messagePairsAt(
                 db, IDEA_PREFIX, 'rZrIDSkakoKzerGHZzJnJw',
