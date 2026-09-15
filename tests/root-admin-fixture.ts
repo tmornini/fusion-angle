@@ -11,7 +11,7 @@ import { ORGANIZATION_MEMBER_DETAIL_PATTERN } from
     '../api/family-registry.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
     type MessagePair,
 } from '../api/message-pair.ts';
 import { deriveOrganizations } from '../api/derive-organizations.ts';
@@ -98,7 +98,7 @@ export async function seedOrganizationDocument(
     await db.transaction(
         // Phase Final Task 2: organizations ROW half stripped.
         async (view) => {
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
         },
     );
 }

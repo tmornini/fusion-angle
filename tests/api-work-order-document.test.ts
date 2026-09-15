@@ -252,7 +252,7 @@ function req(
 // pair's hash covers ONLY {display_id, flow_graph, position}
 // (workOrderCreateDocumentBody's own three picked keys), so
 // two creates sharing that sub-body would collide on
-// appendMessagePair's concurrent-retry guard and the second
+// appendMessagePairOnce's concurrent-retry guard and the second
 // pair would never land, an artifact of the test fixture, not
 // the create op.
 function workOrderCreateBody(

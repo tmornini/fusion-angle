@@ -36,7 +36,7 @@ import {
 import {
     formTokenEventMessagePair,
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
 import {
@@ -634,7 +634,7 @@ async () => {
         operationId: generateIdentifier(),
     });
     await db.transaction(async (view) => {
-            await appendMessagePair(view, flatPair);
+            await appendMessagePairOnce(view, flatPair);
         },
     );
     const res = await handleRequest(

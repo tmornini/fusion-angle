@@ -1914,7 +1914,7 @@ export async function workOrderDocumentHeadFor(
 // is the domain gate's own covenant (derive-invitations.ts's
 // header), so at most one op kind ever succeeds per invitation,
 // but THAT kind can still accumulate repeat pairs. Since
-// appendMessagePair mints each pair's response `at` synchronously
+// appendMessagePairOnce mints each pair's response `at` synchronously
 // inside its own (serialized) transaction, the group's
 // chronologically EARLIEST (at, id) pair is always the one that
 // found the invitation still 'pending' and genuinely posted the

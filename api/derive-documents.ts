@@ -28,7 +28,7 @@ const DELETE_METHOD = 'DELETE';
 // 'flows' mints the create operation message pair at the
 // SAME name a subsequent PUT 'flows/:id' revisits).
 // Defense-in-depth, not the deciding mechanism —
-// appendMessagePair's nowUtc() `at` already orders a
+// appendMessagePairOnce's nowUtc() `at` already orders a
 // synthesized document message pair strictly after its
 // sibling operation message pair.
 const DOCUMENT_METHODS: ReadonlySet<string> =

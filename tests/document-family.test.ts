@@ -18,7 +18,7 @@ import type { Id } from '../api/types.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
     IF_MATCH_HEADER,
     strongEtagOf,
 } from '../api/message-pair.ts';
@@ -252,7 +252,7 @@ const CHILD_PATTERN = TEST_FAMILY + '/:id/child';
 // The synthetic family's decompose op stores NOTHING but the
 // pair itself — the locked-arm gate machinery under test lives
 // entirely in api.ts/message-pair.ts, upstream of this op, so
-// the op only needs to prove appendMessagePair ran.
+// the op only needs to prove appendMessagePairOnce ran.
 async function testDocumentOp(
     db: DbAdapter,
     id: Id,
@@ -277,7 +277,7 @@ async function testDocumentOp(
                         HTTP_PRECONDITION_FAILED,
                     );
                 }
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return { id, ...body };
         },
@@ -683,7 +683,7 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePair(view, genesis),
+    await db.transaction((view) => appendMessagePairOnce(view, genesis),
     );
     // Two writers both observed the SAME head (genesis.id)
     // before either committed — the race the pre-check alone
@@ -730,7 +730,7 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
 
 // The e2e sibling of the storage-level race above: TWO PUTs
 // echoing the SAME valid head, launched together through
-// handleRequest itself — never formWriteMessagePair/appendMessagePair
+// handleRequest itself — never formWriteMessagePair/appendMessagePairOnce
 // directly — so the in-tx head re-read's 412 is what's under
 // test. On the memory backend, the global transaction
 // serializer (store-serializer.ts) processes the store's
@@ -861,7 +861,7 @@ async function putStatelessDocumentMessagePair(
         responseBody: { id, ...body },
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
 }
 
@@ -881,7 +881,7 @@ async function deleteStatelessDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
 }
 

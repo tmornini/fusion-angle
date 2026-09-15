@@ -242,7 +242,7 @@ export async function deriveFlow(
 // never a discarded future — see the PINNED Step 0 trace,
 // .superpowers/sdd/phase14-task-8-report.md). Correlation is
 // by the STORED REQUEST `at` (never the response `at` —
-// appendMessagePair mints each pair's own response `at`
+// appendMessagePairOnce mints each pair's own response `at`
 // independently via nowUtc(), so two pairs written in the
 // SAME transaction do not share it; the request `at` DOES,
 // since both the operation message pair and its synthesized

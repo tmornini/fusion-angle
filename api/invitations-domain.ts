@@ -22,8 +22,8 @@ import {
 } from './validators.ts';
 import {
     formWriteMessagePair,
-    storedResponseFor,
-    appendMessagePair,
+    getPairByRequestHash,
+    appendMessagePairOnce,
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
 import { formDocumentMessagePairFor } from './routes.ts';
@@ -470,7 +470,7 @@ async function grantInvitation(
         responseStatus: HTTP_OK, responseBody,
         operationId,
     });
-    const replay = await storedResponseFor(
+    const replay = await getPairByRequestHash(
         db, messagePair.requestHash);
     if (replay !== undefined) {
         return responseBody;
@@ -512,9 +512,9 @@ async function grantInvitation(
                     + ' request',
                 );
             }
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
             if (document !== undefined) {
-                await appendMessagePair(view, document);
+                await appendMessagePairOnce(view, document);
             }
         },
     );
@@ -637,7 +637,7 @@ async function acceptInvitation(
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'acceptance');
-    const replay = await storedResponseFor(
+    const replay = await getPairByRequestHash(
         db, messagePair.requestHash);
     if (replay !== undefined) {
         return undefined;
@@ -675,9 +675,9 @@ async function acceptInvitation(
             const already = await membershipExistsFor(
                 view, inv.organization_id, actor);
             if (!already) {
-                await appendMessagePair(view, seatDocument);
+                await appendMessagePairOnce(view, seatDocument);
             }
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
             committed = true;
         },
     );
@@ -734,7 +734,7 @@ async function declineInvitation(
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'decline');
-    const replay = await storedResponseFor(
+    const replay = await getPairByRequestHash(
         db, messagePair.requestHash);
     if (replay !== undefined) {
         return undefined;
@@ -751,7 +751,7 @@ async function declineInvitation(
                 conflict = true;
                 return;
             }
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
             committed = true;
         },
     );
@@ -806,7 +806,7 @@ async function revokeInvitation(
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'revocation');
-    const replay = await storedResponseFor(
+    const replay = await getPairByRequestHash(
         db, messagePair.requestHash);
     if (replay !== undefined) {
         return undefined;
@@ -818,7 +818,7 @@ async function revokeInvitation(
                 conflict = true;
                 return;
             }
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
         },
     );
     if (conflict) {

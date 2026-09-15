@@ -63,8 +63,8 @@ import {
     findFirstByKey,
 } from '../shared/ledger-reduction.ts';
 import {
-    appendMessagePair,
-    putMessagePair,
+    appendMessagePairOnce,
+    appendMessagePairAlways,
     canonicalPath,
     formAuthMessagePair,
     formTokenEventMessagePair,
@@ -436,9 +436,9 @@ async function issueTokenPair(
         action: 'issued', chain_id: chainId, at,
     }, operationId);
     await adapter.transaction(async (view) => {
-            await appendMessagePair(view, eventMessagePair);
+            await appendMessagePairOnce(view, eventMessagePair);
             if (messagePair !== undefined) {
-                await putMessagePair(view, messagePair);
+                await appendMessagePairAlways(view, messagePair);
             }
         },
     );
@@ -682,11 +682,11 @@ export async function rotateRefreshJti(
                         throw new TokenPlanDivergedError();
                     }
                     for (const write of provisional.writes) {
-                        await appendMessagePair(view, write.messagePair);
+                        await appendMessagePairOnce(view, write.messagePair);
                     }
                     if (provisional.plan.kind === 'rotate') {
                         if (messagePair !== undefined) {
-                            await putMessagePair(view, messagePair);
+                            await appendMessagePairAlways(view, messagePair);
                         }
                         return {
                             kind: 'rotate' as const,
@@ -784,10 +784,10 @@ export async function revokeTokenChain(
                         throw new TokenPlanDivergedError();
                     }
                     for (const write of provisional.writes) {
-                        await appendMessagePair(view, write.messagePair);
+                        await appendMessagePairOnce(view, write.messagePair);
                     }
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                 },
             );
@@ -1091,9 +1091,9 @@ async function grantClientCredentials(
             if (existing !== null) {
                 return false;
             }
-            await putMessagePair(view, ticketMessagePair);
-            await appendMessagePair(view, eventMessagePair);
-            await putMessagePair(view, messagePair);
+            await appendMessagePairAlways(view, ticketMessagePair);
+            await appendMessagePairOnce(view, eventMessagePair);
+            await appendMessagePairAlways(view, messagePair);
             return true;
         },
     );
@@ -1343,8 +1343,8 @@ async function grantAuthorizationCode(
             )) {
                 return false;
             }
-            await appendMessagePair(view, eventMessagePair);
-            await putMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, eventMessagePair);
+            await appendMessagePairAlways(view, messagePair);
             return true;
         },
     );
@@ -1571,9 +1571,9 @@ async function authorizePassword(
     }
     await adapter.transaction(async (view) => {
             if (rehashMessagePair !== undefined) {
-                await appendMessagePair(view, rehashMessagePair);
+                await appendMessagePairOnce(view, rehashMessagePair);
             }
-            await putMessagePair(view, messagePair);
+            await appendMessagePairAlways(view, messagePair);
         },
     );
     return { ok: true, response, messagePairId: messagePair.id };

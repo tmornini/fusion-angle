@@ -34,7 +34,7 @@ import { generateSecret } from
     '../shared/secret.ts';
 import { hashPassword } from '../shared/password-hash.ts';
 import type { MessagePair } from './message-pair.ts';
-import { appendMessagePair } from './message-pair.ts';
+import { appendMessagePairOnce } from './message-pair.ts';
 import {
     humanMemberPoolsByOrganization,
     pickHumanMember,
@@ -409,7 +409,7 @@ async function postMockDataLoadIn(
                             ),
                         ),
                     )),
-                appendMessagePair(
+                appendMessagePairOnce(
                     adapter,
                     requireMessagePair(
                         messagePairs,
@@ -482,7 +482,7 @@ async function postMockDataLoadIn(
         (async () => {
             // Live grant order: operation, then document
             // (grantInvitation, invitations-domain.ts).
-            await appendMessagePair(
+            await appendMessagePairOnce(
                 adapter,
                 requireMessagePair(
                     messagePairs,
@@ -492,7 +492,7 @@ async function postMockDataLoadIn(
                     ),
                 ),
             );
-            await appendMessagePair(
+            await appendMessagePairOnce(
                 adapter,
                 requireMessagePair(
                     messagePairs,
@@ -541,7 +541,7 @@ async function postMockDataLoadIn(
         // Phase Final Task 2: organizations ROW half stripped —
         // message-plane only (organizationSeedBody still
         // shapes the pair body in seed-message-pairs.ts).
-        appendMessagePair(
+        appendMessagePairOnce(
             adapter,
             requireMessagePair(
                 messagePairs,
@@ -550,7 +550,7 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        appendMessagePair(
+        appendMessagePairOnce(
             adapter,
             requireMessagePair(
                 messagePairs,
@@ -896,7 +896,7 @@ async function postMockDataLoadIn(
                 SEED_INSTANCE_ID + '-complete',
             ),
         ].map((key) =>
-            appendMessagePair(
+            appendMessagePairOnce(
                 adapter, requireMessagePair(messagePairs, key),
             ),
         ),
@@ -1202,12 +1202,12 @@ export async function postBootstrapIn(
             SYSTEM_MEMBER_ID,
             seatMessagePair,
         ),
-        appendMessagePair(adapter, defaultOrganizationMessagePair),
+        appendMessagePairOnce(adapter, defaultOrganizationMessagePair),
         postIdentityPiiDocumentOp(
             adapter, 'XXZruirZyAOoRpNxaDnpSA'
                 , bootstrapCurrentMemberPiiBody(),
             SYSTEM_MEMBER_ID, piiMessagePair,
         ),
-        appendMessagePair(adapter, organizationMessagePair),
+        appendMessagePairOnce(adapter, organizationMessagePair),
     ]);
 }

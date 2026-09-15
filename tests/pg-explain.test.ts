@@ -120,7 +120,7 @@ function jsonWire(body: unknown): string {
     });
 }
 
-async function putMessagePair(
+async function appendRow(
     tx: Tx,
     n: number,
     collection: string,
@@ -184,7 +184,7 @@ async function seedRows(
                 await putAuthorize(tx, n, 'c' + String(n));
             }
             for (let n = 1; n <= 4; n++) {
-                await putMessagePair(
+                await appendRow(
                     tx,
                     n,
                     IDEA_COLLECTION,
@@ -201,7 +201,7 @@ async function seedRows(
             // message_pairs_document.
             // Keep /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/ small for the
             // collection pin.
-            await putMessagePair(
+            await appendRow(
                 tx,
                 VERSION_N,
                 VERSION_COLLECTION,
@@ -214,7 +214,7 @@ async function seedRows(
             );
             for (let i = 0; i < VERSION_EXTRA_COUNT; i++) {
                 const n = VERSION_EXTRA_START + i;
-                await putMessagePair(
+                await appendRow(
                     tx,
                     n,
                     VERSION_COLLECTION,
@@ -228,7 +228,7 @@ async function seedRows(
             }
             for (let i = 0; i < FILLER_COUNT; i++) {
                 const n = FILLER_START + i;
-                await putMessagePair(
+                await appendRow(
                     tx,
                     n,
                     FILLER_COLLECTION,

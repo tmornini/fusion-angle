@@ -15,7 +15,7 @@ const AT = '2026-01-01T00:00:00.000000Z';
 // A stored pair for a given method, built through the SAME
 // formWriteMessagePair every live write uses — never
 // hand-assembled JSON — so the fixture's message shape stays
-// truthful to what appendMessagePair actually persists.
+// truthful to what appendMessagePairOnce actually persists.
 async function storedMessagePairAt(
     method: string,
     status: number,

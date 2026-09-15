@@ -6,7 +6,7 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
-    appendMessagePair,
+    appendMessagePairOnce,
     formWriteMessagePair,
 } from '../api/message-pair.ts';
 import { messageStore } from '../api/message-store.ts';
@@ -49,7 +49,7 @@ async function writePair(
             : input.responseBody,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
     return {
         id: messagePair.id,

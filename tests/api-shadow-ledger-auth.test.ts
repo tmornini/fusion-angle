@@ -249,7 +249,7 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     // pins: the two AUTH hops stay operation-path, the token
     // grant's row event response carries its OWN row's (non-
     // empty) name — a request/response pair shares one `id`
-    // AND one (path, name) document (appendMessagePair),
+    // AND one (path, name) document (appendMessagePairOnce),
     // so this is the identical classification, re-applied.
     const responseAuthHops = responses.slice(4).filter(
         row => row.path === '/authentication/authorize/'
@@ -313,7 +313,7 @@ async () => {
     const before = (await db.messagePairs.getAll()).length;
     // A distinguishing header keeps this replay from being
     // byte-identical to the original exchange — otherwise
-    // appendMessagePair's same-hash dedup (message-pair.ts)
+    // appendMessagePairOnce's same-hash dedup (message-pair.ts)
     // would mask a regression that mistakenly appended a pair
     // on a failing branch: the row counts below would stay
     // flat whether or not a stray append fired.

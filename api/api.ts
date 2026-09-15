@@ -20,8 +20,8 @@ import { pathAndNameOf } from './path-and-name.ts';
 import { pathSegmentsOf } from './path-segments.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
-    storedResponseFor,
+    appendMessagePairOnce,
+    getPairByRequestHash,
     createdEntityName,
     canonicalPath,
     hoistedHeaderFields,
@@ -978,7 +978,7 @@ export async function handleRequest(
             // stale against the NEW head) replays instead of
             // 412ing.
             if (!REPLAY_EXEMPT_ROUTE_PATTERNS.has(routePattern)) {
-                const replay = await storedResponseFor(
+                const replay = await getPairByRequestHash(
                     effective, messagePair.requestHash,
                 );
                 if (replay !== undefined) {
@@ -1082,7 +1082,7 @@ export async function handleRequest(
             // + == head → echoMatchesHead, proceed;
             // none + absent → genesis; none + present → 412.
             // A 412 here returns BEFORE dispatch, and
-            // appendMessagePair only ever runs inside the op's
+            // appendMessagePairOnce only ever runs inside the op's
             // own tx, so NOTHING is stored.
             if (isLockedWrite) {
                 if (
@@ -1455,12 +1455,12 @@ export async function handleRequest(
                                 );
                             }
                         }
-                        await appendMessagePair(
+                        await appendMessagePairOnce(
                             view, emptyMessagePair,
                         );
                     },
                 );
-                const stored = await storedResponseFor(
+                const stored = await getPairByRequestHash(
                     effective, emptyMessagePair.requestHash,
                 );
                 if (stored === undefined) {
@@ -1654,7 +1654,7 @@ export async function handleRequest(
                         ) ?? '',
                     );
                 if (messagePair !== undefined) {
-                    const stored = await storedResponseFor(
+                    const stored = await getPairByRequestHash(
                         effective, messagePair.requestHash,
                     );
                     if (stored === undefined) {
@@ -1740,7 +1740,7 @@ export async function handleRequest(
                         roles,
                     );
                 if (messagePair !== undefined) {
-                    const stored = await storedResponseFor(
+                    const stored = await getPairByRequestHash(
                         effective, messagePair.requestHash,
                     );
                     if (stored === undefined) {
@@ -1807,7 +1807,7 @@ export async function handleRequest(
                     roles,
                 );
                 if (messagePair !== undefined) {
-                    const stored = await storedResponseFor(
+                    const stored = await getPairByRequestHash(
                         effective, messagePair.requestHash,
                     );
                     if (stored === undefined) {
@@ -1903,7 +1903,7 @@ export async function handleRequest(
                     // the other grantTokenExchange caller, never
                     // reaches here — it is an internal facade
                     // hop, not a route dispatch). Auth pairs are
-                    // keyed by id (putMessagePair), not hash —
+                    // keyed by id (appendMessagePairAlways), not hash —
                     // two identical logins each land a row.
                     if (dispatched.messagePairId === undefined) {
                         throw new Error(
@@ -1987,7 +1987,7 @@ export async function handleRequest(
                     ) ?? '',
                 );
                 if (messagePair !== undefined) {
-                    const stored = await storedResponseFor(
+                    const stored = await getPairByRequestHash(
                         effective, messagePair.requestHash,
                     );
                     if (stored === undefined) {

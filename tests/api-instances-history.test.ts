@@ -13,7 +13,7 @@ import {
 } from './test-fixtures.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
     strongEtagOf,
     IF_MATCH_HEADER,
 } from '../api/message-pair.ts';
@@ -221,7 +221,7 @@ async function appendInstancePair(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
     return messagePair.id;
 }

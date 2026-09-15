@@ -25,7 +25,7 @@ import {
 } from '../api/routes.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
     IF_MATCH_HEADER,
     strongEtagOf,
     parseIfMatch,
@@ -240,7 +240,7 @@ async function appendInstanceMessagePair(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
     return messagePair.id;
 }

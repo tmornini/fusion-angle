@@ -3,8 +3,8 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import { requestMessageHash } from '../api/message-form.ts';
 import {
     formWriteMessagePair,
-    storedResponseFor,
-    appendMessagePair,
+    getPairByRequestHash,
+    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import { messageStore } from '../api/message-store.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
@@ -165,7 +165,7 @@ Deno.test('append then head-read round-trips', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const messagePair = await formWriteMessagePair({ ...INPUT });
-    await db.transaction((view) => appendMessagePair(view, messagePair),
+    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
     );
     assertStrictEquals(
         (await messageStore(db).getDocumentHead(
@@ -174,7 +174,7 @@ Deno.test('append then head-read round-trips', async () => {
         messagePair.id,
     );
     const stored =
-        await storedResponseFor(db, messagePair.requestHash);
+        await getPairByRequestHash(db, messagePair.requestHash);
     assertStrictEquals(stored?.id, messagePair.id);
     // Early request, late response: the request row keeps
     // the arrival stamp verbatim; response_at was minted
@@ -190,8 +190,8 @@ Deno.test('a same-hash re-append writes nothing', async () => {
     const messagePair = await formWriteMessagePair({ ...INPUT });
     const replay = { ...messagePair, id: 'other-uuidAAAAAAAAAAAAw' };
     await db.transaction(async (view) => {
-            await appendMessagePair(view, messagePair);
-            await appendMessagePair(view, replay);
+            await appendMessagePairOnce(view, messagePair);
+            await appendMessagePairOnce(view, replay);
         },
     );
     assertStrictEquals((await db.messagePairs.getAll()).length, 1);

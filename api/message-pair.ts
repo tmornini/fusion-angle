@@ -48,7 +48,7 @@ export interface MessagePair {
     // column — the column name stays `at` on BOTH tables
     // (author: "at" is the perfect name); requestAt is
     // in-memory plumbing only. The response row's `at` is NOT
-    // carried here — it is minted inside appendMessagePair, as
+    // carried here — it is minted inside appendMessagePairOnce, as
     // late as a same-tx write permits. Envelope only (S1): body
     // timestamps belong to the message's creator.
     readonly requestAt: string;
@@ -395,11 +395,10 @@ export async function documentHeadAt(
     return { id: head.id, method: head.method };
 }
 
-// Pre-tx idempotency fast-path: the stored response message
-// for a byte-identical resend, or undefined. ALSO the post-
-// dispatch source of every wire response header — the stored
-// row is the one truth the wire renders.
-export async function storedResponseFor(
+// The oldest stored pair for this request hash, or
+// undefined — the idempotency fast path and the
+// post-dispatch source of every wire header.
+export async function getPairByRequestHash(
     db: DbAdapter,
     requestHash: string,
 ): Promise<MessagePairEntity | undefined> {
@@ -636,7 +635,7 @@ export async function storedMessagePairResponse(
     opName: string,
     method: string,
 ): Promise<Response> {
-    const stored = await storedResponseFor(adapter, requestHash);
+    const stored = await getPairByRequestHash(adapter, requestHash);
     if (stored === undefined) {
         throw new Error(
             opName + ' stored no pair for a wired write',
@@ -645,12 +644,9 @@ export async function storedMessagePairResponse(
     return sendWriteResponse(stored, method, true);
 }
 
-// In-tx put by pair id (row ops only, no crypto): one pairs
-// put keyed by messagePair.id. Idempotent by id — a second put of
-// the same pair overwrites the same slot. Auth grant pairs
-// use this path so two byte-identical logins each land
-// (their ids differ); hash-keyed appendMessagePair would
-// drop the second.
+// In-tx append keyed by pair id: a byte-identical request
+// lands again. Auth grant pairs use this path so two
+// identical logins each land (their ids differ).
 // The view parameter is DbAdapter, NOT GuardedDbAdapter: route
 // handlers receive DbAdapter and their transaction callbacks are
 // typed (view: DbAdapter) — the fence spends the guard before
@@ -658,7 +654,7 @@ export async function storedMessagePairResponse(
 // contract; GuardedDbAdapter widens cleanly to DbAdapter, so the
 // invitations/auth call sites (which hold ctx.base) work
 // unchanged.
-export async function putMessagePair(
+export async function appendMessagePairAlways(
     view: DbAdapter,
     messagePair: MessagePair,
 ): Promise<void> {
@@ -667,11 +663,10 @@ export async function putMessagePair(
     await notifyWrite(view, messagePair);
 }
 
-// In-tx append (row ops only, no crypto): skips silently if a
-// pair with the same request_hash is already stored (the
-// concurrent-retry guard); otherwise one pairs put via
-// writeMessagePairRows.
-export async function appendMessagePair(
+// In-tx append (row ops only, no crypto): a byte-identical
+// request lands once — skips silently if a pair with the
+// same request_hash is already stored.
+export async function appendMessagePairOnce(
     view: DbAdapter,
     messagePair: MessagePair,
 ): Promise<void> {
@@ -946,7 +941,7 @@ export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
 
 // Route patterns wired for pair STORAGE (MESSAGE_PAIR_WIRED_
 // ROUTE_PATTERNS above) whose gate dispatch must NEVER take the
-// pre-tx idempotency fast path (storedResponseFor in api.ts) —
+// pre-tx idempotency fast path (getPairByRequestHash in api.ts) —
 // a byte-identical resend still re-enters the handler instead
 // of returning the first call's cached response. Membership
 // here is a promise: the route's OWN domain guard already
@@ -963,7 +958,7 @@ export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
 // hands back stale/revoked tokens AND bypasses the rotation
 // reuse-detection and code double-spend guards, which only
 // fire when the handler re-runs. Auth pairs are also keyed by
-// id (putMessagePair), not hash, so two identical logins each
+// id (appendMessagePairAlways), not hash, so two identical logins each
 // land — message_hash is no longer per-call-unique on these
 // routes. Grown family by family; never remove a pattern
 // without re-deriving why its domain guard still makes the

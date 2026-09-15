@@ -18,7 +18,7 @@ import {
 } from './test-fixtures.ts';
 import {
     formWriteMessagePair,
-    appendMessagePair,
+    appendMessagePairOnce,
     IF_MATCH_HEADER,
     strongEtagOf,
 } from '../api/message-pair.ts';
@@ -527,7 +527,7 @@ async () => {
         operationId: generateIdentifier(),
     });
     await db.transaction(async (view) => {
-            await appendMessagePair(view, tombstone);
+            await appendMessagePairOnce(view, tombstone);
         },
     );
     const res = await handleRequest(db, req(

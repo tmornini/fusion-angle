@@ -3551,7 +3551,7 @@ export function validateFlowCreateBody(
 // an empty body would make every undo POST for the same flow
 // canonically byte-identical (same method/path/headers),
 // colliding on the gate's pre-tx idempotency fast path
-// (storedResponseFor) and silently replaying the FIRST call's
+// (getPairByRequestHash) and silently replaying the FIRST call's
 // cached 204 for every later undo. `eventId`/`at` are the SAME
 // state-trio convention every other document write already
 // uses to keep each attempt's stored request unique — S1 (body

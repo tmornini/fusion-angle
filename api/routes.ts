@@ -90,7 +90,7 @@ import {
     asObject,
 } from './validators.ts';
 import {
-    appendMessagePair,
+    appendMessagePairOnce,
     canonicalPath,
     documentHeadAt,
     formWriteMessagePair,
@@ -771,7 +771,7 @@ function ownerOrganizationViaMembershipPairPlane(
 // does not exist on RecordWriteCreateBody, so a create's
 // attributeDeletes is always empty). All pairs share ONE
 // requestAt (the write's own origination) yet strictly-later
-// RESPONSE `at` stamps (appendMessagePair's nowUtc() is
+// RESPONSE `at` stamps (appendMessagePairOnce's nowUtc() is
 // monotonic), so the document message pair — appended after the
 // operation message pair — becomes the document's head; a duplicate
 // create's Supersedes therefore resolves against the prior
@@ -1107,13 +1107,13 @@ export async function postRecordWriteOp(
             // monotonicity) and the document message pair becomes the
             // shared document's head.
             if (messagePairs !== undefined) {
-                await appendMessagePair(view, messagePairs.operation);
-                await appendMessagePair(view, messagePairs.document);
+                await appendMessagePairOnce(view, messagePairs.operation);
+                await appendMessagePairOnce(view, messagePairs.document);
                 for (const p of messagePairs.attributePuts) {
-                    await appendMessagePair(view, p);
+                    await appendMessagePairOnce(view, p);
                 }
                 for (const p of messagePairs.attributeDeletes) {
-                    await appendMessagePair(view, p);
+                    await appendMessagePairOnce(view, p);
                 }
             }
         },
@@ -1175,7 +1175,7 @@ export async function postIdeaDocumentOp(
     } as unknown as Omit<IdeaEntity, 'id'>;
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return { id, ...entity };
         },
@@ -1212,7 +1212,7 @@ export async function postProjectDocumentOp(
         // states ROW half stripped (message plane only).
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return { id, ...entity };
         },
@@ -1251,7 +1251,7 @@ export async function postRecordDocumentOp(
         // states ROW half stripped (message plane only).
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return { id, ...entity };
         },
@@ -1286,7 +1286,7 @@ export async function postRecordAttributeDocumentOp(
         // stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return { id, ...entity };
         },
@@ -1320,7 +1320,7 @@ export async function postIdeaSubmissionOp(
     });
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -1371,7 +1371,7 @@ export function flowCreateDocumentBody(
 // collide as documents), plus the document and join pairs the
 // route pre-forms below. All three share ONE requestAt (the
 // create's own origination) yet strictly-later RESPONSE `at`
-// stamps (appendMessagePair's nowUtc() is monotonic), so the
+// stamps (appendMessagePairOnce's nowUtc() is monotonic), so the
 // document message pair — appended after the
 // operation message pair — becomes the document's head.
 export interface FlowCreationMessagePairs {
@@ -1405,9 +1405,9 @@ export async function postFlowCreationOp(
             // document message pair's response `at` strictly
             // follows the operation message pair's.
             if (messagePairs !== undefined) {
-                await appendMessagePair(view, messagePairs.operation);
-                await appendMessagePair(view, messagePairs.document);
-                await appendMessagePair(view, messagePairs.join);
+                await appendMessagePairOnce(view, messagePairs.operation);
+                await appendMessagePairOnce(view, messagePairs.document);
+                await appendMessagePairOnce(view, messagePairs.join);
             }
         },
     );
@@ -1475,7 +1475,7 @@ export async function postFlowDocumentOp(
                         HTTP_PRECONDITION_FAILED,
                     );
                 }
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return { id, ...entity };
         },
@@ -1510,7 +1510,7 @@ export async function postFlowUndoOp(
         // LATER resolution walk correctly ignores (it carries no
         // correlated document message pair to displace anything).
         return db.transaction(async (view) => {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             },
         );
     }
@@ -1593,8 +1593,8 @@ export async function postFlowUndoOp(
                     HTTP_PRECONDITION_FAILED,
                 );
             }
-            await appendMessagePair(view, messagePair);
-            await appendMessagePair(view, documentMessagePair);
+            await appendMessagePairOnce(view, messagePair);
+            await appendMessagePairOnce(view, documentMessagePair);
         },
     );
 }
@@ -1607,7 +1607,7 @@ export async function postFlowUndoOp(
 // message pair (objectives/:id), and the synthesized revision pair
 // (objectives/:id/revisions/:rid) the route pre-forms below. All
 // three share ONE requestAt (the create's own origination) yet
-// strictly-later RESPONSE `at` stamps (appendMessagePair's
+// strictly-later RESPONSE `at` stamps (appendMessagePairOnce's
 // nowUtc() is monotonic), so the document message pair — appended after
 // the operation message pair — becomes the shared document's head; the
 // revision pair lives at its OWN distinct document (a fresh
@@ -1680,9 +1680,9 @@ export async function postObjectiveCreationOp(
         // objective_revisions ROW halves stripped.
         async (view) => {
             if (messagePairs !== undefined) {
-                await appendMessagePair(view, messagePairs.operation);
-                await appendMessagePair(view, messagePairs.document);
-                await appendMessagePair(view, messagePairs.revision);
+                await appendMessagePairOnce(view, messagePairs.operation);
+                await appendMessagePairOnce(view, messagePairs.document);
+                await appendMessagePairOnce(view, messagePairs.revision);
             }
         },
     );
@@ -1717,7 +1717,7 @@ export async function postObjectiveDocumentOp(
         // Phase Final Task 2: objectives ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return { id, ...entity };
         },
@@ -1784,12 +1784,12 @@ export async function postIdentityCreationOp(
         // ROW halves stripped.
         async (view) => {
             if (messagePairs !== undefined) {
-                await appendMessagePair(view, messagePairs.operation);
-                await appendMessagePair(
+                await appendMessagePairOnce(view, messagePairs.operation);
+                await appendMessagePairOnce(
                     view, messagePairs.identityDocument,
                 );
                 if (messagePairs.kind === 'service') {
-                    await appendMessagePair(
+                    await appendMessagePairOnce(
                         view, messagePairs.credentialDocument,
                     );
                 }
@@ -1828,7 +1828,7 @@ function workOrderCreateDocumentBody(
 // own create), plus the document and join pairs the route
 // pre-forms below. All three share ONE requestAt (the
 // create's own origination) yet strictly-later RESPONSE `at`
-// stamps (appendMessagePair's nowUtc() is monotonic), so the
+// stamps (appendMessagePairOnce's nowUtc() is monotonic), so the
 // document message pair — appended after the
 // operation message pair — becomes the document's head.
 export interface WorkOrderCreationMessagePairs {
@@ -1864,10 +1864,10 @@ export async function postWorkOrderCreationOp(
             // document so DELETE /claim can release the
             // creation-time claim.
             if (messagePairs !== undefined) {
-                await appendMessagePair(view, messagePairs.operation);
-                await appendMessagePair(view, messagePairs.document);
-                await appendMessagePair(view, messagePairs.join);
-                await appendMessagePair(view, messagePairs.claim);
+                await appendMessagePairOnce(view, messagePairs.operation);
+                await appendMessagePairOnce(view, messagePairs.document);
+                await appendMessagePairOnce(view, messagePairs.join);
+                await appendMessagePairOnce(view, messagePairs.claim);
             }
         },
     );
@@ -1951,7 +1951,7 @@ export async function postWorkOrderClaimOp(
             if (priorLive) {
                 if (prior.member_id === actor) {
                     if (messagePair !== undefined) {
-                        await appendMessagePair(
+                        await appendMessagePairOnce(
                             view, messagePair,
                         );
                     }
@@ -1968,7 +1968,7 @@ export async function postWorkOrderClaimOp(
             // operation message pair body
             // (workOrderClaimHistoryFor reads them back).
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
         },
     );
@@ -1989,7 +1989,7 @@ export async function deleteWorkOrderClaimOp(
 ): Promise<void> {
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
         },
     );
@@ -2145,7 +2145,7 @@ export async function postWorkOrderTransitionOp(
         // Historical seed moves are not re-gated (W10).
         return db.transaction(async (view) => {
                 if (messagePair !== undefined) {
-                    await appendMessagePair(view, messagePair);
+                    await appendMessagePairOnce(view, messagePair);
                 }
             },
         );
@@ -2185,7 +2185,7 @@ export async function postWorkOrderTransitionOp(
         );
         return db.transaction(async (view) => {
                 if (messagePair !== undefined) {
-                    await appendMessagePair(view, messagePair);
+                    await appendMessagePairOnce(view, messagePair);
                 }
             },
         );
@@ -2355,8 +2355,8 @@ export async function postWorkOrderTransitionOp(
                     HTTP_PRECONDITION_FAILED,
                 );
             }
-            await appendMessagePair(view, messagePair);
-            await appendMessagePair(view, revisionMessagePair);
+            await appendMessagePairOnce(view, messagePair);
+            await appendMessagePairOnce(view, revisionMessagePair);
         },
     );
 }
@@ -2435,7 +2435,7 @@ export async function postWorkOrderBindingOp(
                 );
             }
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
         },
     );
@@ -2472,7 +2472,7 @@ export async function postWorkOrderDocumentOp(
         // Phase Final Task 2: work_orders ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2502,7 +2502,7 @@ export async function postFlowWorkOrderDocumentOp(
         // Phase Final Task 2: flow_work_orders ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2551,7 +2551,7 @@ export async function postFlowRecordDocumentOp(
                 );
             }
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2575,7 +2575,7 @@ export async function postFlowTagDocumentOp(
 ): Promise<void> {
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
         },
     );
@@ -2607,7 +2607,7 @@ export async function postBaselineScoreDocumentOp(
     });
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2634,7 +2634,7 @@ export async function postActualScoreDocumentOp(
     });
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2661,7 +2661,7 @@ export async function postMembershipDocumentOp(
         // Phase Final Task 2: memberships ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2686,7 +2686,7 @@ export async function postMemberDocumentOp(
         // Phase Final Task 2: members ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2711,7 +2711,7 @@ export async function postAiMemberDocumentOp(
         // Phase Final Task 2: ai_members ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2737,7 +2737,7 @@ export async function postHumanMemberDocumentOp(
         // Phase Final Task 2: human_members ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2766,7 +2766,7 @@ export async function postIdentityPiiDocumentOp(
         // Phase Final Task 2: identity_pii ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2791,7 +2791,7 @@ export async function postIdentityDocumentOp(
         // Phase Final Task 2: identities ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2812,7 +2812,7 @@ export async function postAiAgentDocumentOp(
         Omit<AIAgentEntity, 'id'>;
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2837,7 +2837,7 @@ export async function postIdentityCredentialDocumentOp(
         // stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2846,7 +2846,7 @@ export async function postIdentityCredentialDocumentOp(
 
 // Client-registration document write (clients elimination) —
 // pure message-plane write, the postIdentityCredentialDocumentOp
-// shape: Supersedes-chained appendMessagePair. `messagePair`
+// shape: Supersedes-chained appendMessagePairOnce. `messagePair`
 // is optional so a below-facade caller keeps compiling; the
 // live route always supplies one. WRITE_RESPONSE_SPECS
 // successBody forms the wire bytes via registrationEntityOf
@@ -2866,7 +2866,7 @@ export async function postClientRegistrationDocumentOp(
     });
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -2929,7 +2929,7 @@ export async function postIdentityProviderDocumentOp(
     });
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePair(view, messagePair);
+                await appendMessagePairOnce(view, messagePair);
             }
             return entity;
         },
@@ -3413,7 +3413,7 @@ export interface DocumentMessagePairFormInput {
 // import graph stays acyclic; routes.ts already imports
 // formWriteMessagePair FROM message-pair.ts, so the dependency runs
 // one way only). Builds the pair PRE-TX only — the in-tx
-// appendMessagePair calls stay at each op's own transaction.
+// appendMessagePairOnce calls stay at each op's own transaction.
 // db is the chain-walk for G1 trio stored PUT bodies
 // (resolveStreamedTrioWriteBody). Other families still
 // use successBody alone.
@@ -3541,7 +3541,7 @@ export async function postInstanceDeleteOp(
                     HTTP_CONFLICT,
                 );
             }
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
         },
     );
 }
@@ -3686,8 +3686,8 @@ async function postInstanceCreateOp(
                     HTTP_PRECONDITION_REQUIRED,
                 );
             }
-            await appendMessagePair(view, messagePair);
-            await appendMessagePair(view, revisionMessagePair);
+            await appendMessagePairOnce(view, messagePair);
+            await appendMessagePairOnce(view, revisionMessagePair);
         },
     );
 }
@@ -3799,8 +3799,8 @@ export async function postInstancePatchOp(
                     HTTP_PRECONDITION_FAILED,
                 );
             }
-            await appendMessagePair(view, messagePair);
-            await appendMessagePair(view, revisionMessagePair);
+            await appendMessagePairOnce(view, messagePair);
+            await appendMessagePairOnce(view, revisionMessagePair);
         },
     );
 }
@@ -3998,7 +3998,7 @@ export const routes: Route[] = [
         delete: (db, _p, _actor, messagePair) => {
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePair(
+                        await appendMessagePairOnce(
                             view, messagePair,
                         );
                     }
@@ -4143,7 +4143,7 @@ export const routes: Route[] = [
             await requireServiceIdentity(db, param(p, 0));
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                 },
             );
@@ -4186,7 +4186,7 @@ export const routes: Route[] = [
             });
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                     return entity;
                 },
@@ -4237,7 +4237,7 @@ export const routes: Route[] = [
             });
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                     return entity;
                 },
@@ -4515,20 +4515,20 @@ export const routes: Route[] = [
             // group).
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                     if (projectMessagePair !== undefined) {
-                        await appendMessagePair(
+                        await appendMessagePairOnce(
                             view, projectMessagePair,
                         );
                     }
                     if (ideaMessagePair !== undefined) {
-                        await appendMessagePair(
+                        await appendMessagePairOnce(
                             view, ideaMessagePair,
                         );
                     }
                     for (const baselineMessagePair of baselineMessagePairs) {
-                        await appendMessagePair(
+                        await appendMessagePairOnce(
                             view, baselineMessagePair,
                         );
                     }
@@ -4731,7 +4731,7 @@ export const routes: Route[] = [
             });
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                     return entity;
                 },
@@ -4740,7 +4740,7 @@ export const routes: Route[] = [
         delete: (db, _p, _actor, messagePair) => {
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                 },
             );
@@ -5101,7 +5101,7 @@ export const routes: Route[] = [
                         );
                     }
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                 },
             );
@@ -5220,7 +5220,7 @@ export const routes: Route[] = [
             validateAttributeDocument(withoutId(body));
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                 },
             );
@@ -5250,7 +5250,7 @@ export const routes: Route[] = [
                     await deleteRecordAttributeSafe(
                         view, org, attrId, typeId,
                     );
-                    await appendMessagePair(view, messagePair);
+                    await appendMessagePairOnce(view, messagePair);
                 },
             );
         },
@@ -5462,7 +5462,7 @@ export const routes: Route[] = [
         delete: (db, _p, _actor, messagePair) => {
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                 },
             );
@@ -5544,7 +5544,7 @@ export const routes: Route[] = [
                 // stripped.
                 async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                     return entity;
                 },
@@ -5657,7 +5657,7 @@ export const routes: Route[] = [
                         return;
                     }
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                 },
             );
@@ -5852,7 +5852,7 @@ export const routes: Route[] = [
                 // half stripped.
                 async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePair(view, messagePair);
+                        await appendMessagePairOnce(view, messagePair);
                     }
                     return entity;
                 },

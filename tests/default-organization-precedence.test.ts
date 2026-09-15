@@ -5,7 +5,7 @@ import {
 } from '../api/db-memory.ts';
 import { identityDefaultOrganization } from '../api/authentication.ts';
 import {
-    formWriteMessagePair, appendMessagePair,
+    formWriteMessagePair, appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
@@ -80,7 +80,7 @@ async function seedDefaultOrganizationEvent(
         operationId: generateIdentifier(),
     });
     await db.transaction(async (view) => {
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
         },
     );
 }
@@ -207,7 +207,7 @@ Deno.test(
             operationId: generateIdentifier(),
         });
         await db.transaction(async (view) => {
-                await appendMessagePair(view, tombstone);
+                await appendMessagePairOnce(view, tombstone);
             },
         );
         assertStrictEquals(

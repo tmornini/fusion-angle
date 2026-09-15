@@ -185,7 +185,7 @@ Deno.test('every seed op body carries a unique entity id, so no'
         requests.map(r => r.request_hash),
     );
     // A collision would silently drop a pair via
-    // appendMessagePair's same-hash dedup skip.
+    // appendMessagePairOnce's same-hash dedup skip.
     assertStrictEquals(distinctHashes.size, requests.length);
 });
 

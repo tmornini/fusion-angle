@@ -9,7 +9,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
-    appendMessagePair,
+    appendMessagePairOnce,
     formWriteMessagePair,
     type MessagePair,
 } from '../api/message-pair.ts';
@@ -294,7 +294,7 @@ export async function seedClientRegistration(
         id, fields, nowUtc(),
     );
     await db.transaction(async (view) => {
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
         },
     );
 }
@@ -322,7 +322,7 @@ export async function seedClientRegistrationTombstone(
         operationId: generateIdentifier(),
     });
     await db.transaction(async (view) => {
-            await appendMessagePair(view, messagePair);
+            await appendMessagePairOnce(view, messagePair);
         },
     );
 }
