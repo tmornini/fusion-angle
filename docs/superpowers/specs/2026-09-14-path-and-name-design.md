@@ -1,7 +1,7 @@
 # Path and name: the ledger's vocabulary
 
 - Date: 2026-09-14
-- Status: awaiting review, pre-plan
+- Status: executed
 - Worktree: `.worktrees/2026-09-14-path-and-name`
 - Base: master at `2b68e4c2`
 - Ships: one vocabulary for the ledger's read and write chain,
@@ -229,6 +229,11 @@ DDL commit and at the end.
 9. `Response-ID` to `ETag`.
 10. Docs and the SVG.
 
+Deviation 2: the order promise lands before the store
+removals of `getAllAt` and `getAllWhereBody`.
+Deviation 3: `livePutsOf` keeps its sort.
+Deviation 6: the camelCase rename is per token, not per layer.
+
 Render: the DDL change means a wipe and reseed by the operator
 after the deploy that carries it. Production holds mock data.
 
@@ -291,6 +296,12 @@ handed to the other spec's report:
   document-class family; over `getCollectionHeadPairs(path)`
   they read `.name`, the stream GET concatenates `.response`
   bodies, and `entitiesOf` has no caller.
+- The stored response wire carries a
+  `response-id` header line (`RESPONSE_ID_FIELD` in
+  `api/message-pair.ts`) that never reaches the HTTP wire;
+  renaming it to `etag` changes the stored `response` bytes of
+  every new pair (never `request_hash`, which is over the request
+  wire alone), so it stayed when `Response-ID` left the wire.
 
 ## Environment notes for the executor
 
