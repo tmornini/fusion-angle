@@ -196,7 +196,7 @@ function postgresTx(
                 row as Record<string, unknown>,
                 'message_pairs',
             );
-            return upsertRow(sql, written);
+            return insertPair(sql, written);
         },
         async lockRequest(hash: string): Promise<void> {
             await advisoryLock(sql, 'fusion.dedup.' + hash);
@@ -458,14 +458,14 @@ async function selectWhereBody(
     `;
 }
 
-async function upsertRow(
+async function insertPair(
     sql: SqlClient,
     row: Record<string, unknown>,
 ): Promise<boolean> {
     const id = uuidTextOfIdentifier(
         textField(row, 'id'),
     );
-    const collection = textField(row, 'path');
+    const path = textField(row, 'path');
     const name = textField(row, 'name');
     const requester = textField(
         row, 'requester_identity_id',
@@ -487,7 +487,7 @@ async function upsertRow(
             response_at, response,
             operation_id
         ) VALUES (
-            ${id}, ${collection}, ${name},
+            ${id}, ${path}, ${name},
             ${requester}, ${method},
             ${requestAt}, ${requestHash}, ${request},
             ${responseAt}, ${response},
