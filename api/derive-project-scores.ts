@@ -5,7 +5,7 @@ import type {
     ProjectObjectiveActualScoreEntity,
 } from './types.ts';
 import { pickString, pickNumber } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -46,7 +46,7 @@ function scoresUriPrefix(
     projectId: Id,
     segment: string,
 ): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         organization, '/projects/' + projectId + '/' + segment + '/',
     );
 }

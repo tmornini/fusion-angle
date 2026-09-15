@@ -15,7 +15,7 @@ import {
     pickString, pickNumber, asObject,
     asWorkOrderFlowGraph,
 } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import {
     documentMessagePairsAt,
     deriveDocumentsAt,
@@ -77,14 +77,14 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 // exactly (ideas, projects, flows, records, objectives,
 // work-orders); invitations is handled separately below (its
 // address is flat, never organization-nested — message-pair.ts's
-// canonicalUriCollection / family-registry.ts has no entry for it).
+// canonicalPath / family-registry.ts has no entry for it).
 const ORGANIZATION_NESTED_ENTITY_FAMILIES = [
     'ideas', 'projects', 'flows',
     'work-orders', 'record-types', 'objectives',
 ] as const;
 
 const INVITATIONS_PREFIX =
-    canonicalUriCollection(undefined, '/invitations/');
+    canonicalPath(undefined, '/invitations/');
 
 // organizations is the tenant root (global plane, never itself
 // organization-nested — derive-organizations.ts). An
@@ -92,7 +92,7 @@ const INVITATIONS_PREFIX =
 // 1, Author gate 3 — the ONE new resolveOwningOrganization
 // leg).
 const ORGANIZATIONS_ADDRESS_PREFIX =
-    canonicalUriCollection(undefined, '/organizations/');
+    canonicalPath(undefined, '/organizations/');
 
 // ALL-orgs, server-side ownership resolution — distinct from
 // getIdentityOrganizations, which filters to the path
@@ -173,7 +173,7 @@ async function resolveFlowGraphOwner(
         ...organizations.filter((o) => o !== boundOrganization),
     ];
     for (const organization of ordered) {
-        const prefix = canonicalUriCollection(organization, '/flows/');
+        const prefix = canonicalPath(organization, '/flows/');
         const stored = await db.messagePairs.getAllWhere(
             'path', prefix,
         );
@@ -275,7 +275,7 @@ async function computeOwningOrganization(
         for (
             const family of ORGANIZATION_NESTED_ENTITY_FAMILIES
         ) {
-            const prefix = canonicalUriCollection(
+            const prefix = canonicalPath(
                 organization, '/' + family + '/',
             );
             const rows =
@@ -347,7 +347,7 @@ export async function resolveOwningOrganization(
 // 404. 403 only when this address has a live PUT the
 // caller may not have.
 const ROLE_GRANTS_URI_PREFIX =
-    canonicalUriCollection(undefined, '/role-grants/');
+    canonicalPath(undefined, '/role-grants/');
 
 // Organization-nested document prefixes:
 // /organizations/{id}/...
@@ -391,7 +391,7 @@ function ownerProbeCollection(
     }
     const family = OWNER_PROBE_FAMILY[table];
     if (family === undefined) return undefined;
-    return canonicalUriCollection(
+    return canonicalPath(
         organization, '/' + family + '/',
     );
 }
@@ -407,20 +407,20 @@ function responseBodyOf(
 }
 
 function ownerFromAddress(
-    uriCollection: string,
+    path: string,
     uriId: Id,
     message: string,
 ): Id | null {
-    if (uriCollection === ORGANIZATIONS_ADDRESS_PREFIX) {
+    if (path === ORGANIZATIONS_ADDRESS_PREFIX) {
         return uriId;
     }
     const nested = ORGANIZATION_NESTED_URI_PREFIX.exec(
-        uriCollection,
+        path,
     );
     if (nested !== null) return nested[1]!;
     if (
-        uriCollection === ROLE_GRANTS_URI_PREFIX
-        || uriCollection === INVITATIONS_PREFIX
+        path === ROLE_GRANTS_URI_PREFIX
+        || path === INVITATIONS_PREFIX
     ) {
         const body = responseBodyOf(message);
         const organizationId = body['organization_id'];
@@ -588,7 +588,7 @@ async function organizationHasOpBornEvent(
     for (
         const family of ORGANIZATION_NESTED_ENTITY_FAMILIES
     ) {
-        const prefix = canonicalUriCollection(
+        const prefix = canonicalPath(
             organization, '/' + family + '/',
         );
         const stored = await dbOrView.messagePairs.getAllWhere(
@@ -615,7 +615,7 @@ async function organizationHasOpBornEvent(
     // already readable via the work-orders family scan above
     // — re-read that one prefix for the id set, then probe
     // each sub-resource with an indexed path read.
-    const workOrdersPrefix = canonicalUriCollection(
+    const workOrdersPrefix = canonicalPath(
         organization, '/work-orders/',
     );
     const workOrderMessagePairs =
@@ -629,7 +629,7 @@ async function organizationHasOpBornEvent(
         for (const sub of [
             'claim', 'transition', 'release',
         ] as const) {
-            const prefix = canonicalUriCollection(
+            const prefix = canonicalPath(
                 organization,
                 '/work-orders/' + workOrderId
                     + '/' + sub + '/',
@@ -661,8 +661,8 @@ async function organizationHasOpBornEvent(
     // membership boolean alone would mis-orphan unowned
     // genesis events (create never mints a membership).
     for (const prefix of [
-        canonicalUriCollection(undefined, '/ai-members/'),
-        canonicalUriCollection(undefined, '/human-members/'),
+        canonicalPath(undefined, '/ai-members/'),
+        canonicalPath(undefined, '/human-members/'),
     ]) {
         const stored = await dbOrView.messagePairs.getAllWhere(
             'path', prefix,
@@ -711,7 +711,7 @@ async function organizationHasOpBornEvent(
             for (const sub of [
                 'acceptance', 'decline', 'revocation',
             ] as const) {
-                const prefix = canonicalUriCollection(
+                const prefix = canonicalPath(
                     undefined,
                     '/invitations/' + invitationId
                         + '/' + sub + '/',
@@ -906,7 +906,7 @@ function atIdCompare(
             : compareIdentifiers(a.id, b.id);
 }
 
-// Every successful (2xx) POST pair at `uriCollection`, (at, id)
+// Every successful (2xx) POST pair at `path`, (at, id)
 // ascending. REUSED below by source (f)
 // (deriveInvitationStates) — a flat, non-work-order
 // collection's own 2xx POST pairs, the exact shape this
@@ -925,12 +925,12 @@ const POST_OR_PUT: ReadonlySet<string> = new Set([
 
 export function operationMessagePairsAt(
     messagePairs: readonly MessagePairEntity[],
-    uriCollection: string,
+    path: string,
     methods: ReadonlySet<string> = POST_ONLY,
 ): OperationMessagePair[] {
     const out: OperationMessagePair[] = [];
     for (const messagePair of messagePairs) {
-        if (messagePair.path !== uriCollection) {
+        if (messagePair.path !== path) {
             continue;
         }
         const decoded = decodeRequestOperation(
@@ -1290,7 +1290,7 @@ function workOrderLifecycleFromPlane(
     const collectionPrefixes = new Set<string>();
     if (organization !== undefined) {
         collectionPrefixes.add(
-            canonicalUriCollection(organization, '/work-orders/'),
+            canonicalPath(organization, '/work-orders/'),
         );
     } else {
         for (const messagePair of messagePairs) {
@@ -1482,7 +1482,7 @@ async function workOrderClaimSourcesFor(
     organization: Id,
     workOrderId: Id,
 ): Promise<WorkOrderClaimSources> {
-    const collectionPrefix = canonicalUriCollection(
+    const collectionPrefix = canonicalPath(
         organization, '/work-orders/',
     );
     const collectionMessagePairs =
@@ -1496,7 +1496,7 @@ async function workOrderClaimSourcesFor(
         collectionMessagePairs, collectionPrefix,
     );
 
-    const claimPrefix = canonicalUriCollection(
+    const claimPrefix = canonicalPath(
         organization,
         '/work-orders/' + workOrderId + '/claim/',
     );
@@ -1510,7 +1510,7 @@ async function workOrderClaimSourcesFor(
         documentMessagePairsAt(claimStored, claimPrefix),
     );
 
-    const releasePrefix = canonicalUriCollection(
+    const releasePrefix = canonicalPath(
         organization,
         '/work-orders/' + workOrderId + '/release/',
     );
@@ -1524,7 +1524,7 @@ async function workOrderClaimSourcesFor(
         ...releaseDeletes,
     ];
 
-    const transitionPrefix = canonicalUriCollection(
+    const transitionPrefix = canonicalPath(
         organization,
         '/work-orders/' + workOrderId + '/transition/',
     );
@@ -1698,7 +1698,7 @@ export async function workOrderHistoryFor(
         );
     }
 
-    const transitionPrefix = canonicalUriCollection(
+    const transitionPrefix = canonicalPath(
         organization,
         '/work-orders/' + workOrderId + '/transition/',
     );
@@ -1746,7 +1746,7 @@ export async function workOrderBindingFor(
 ): Promise<
     { instanceId: Id; recordTypeId: Id } | null
 > {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organization,
         '/work-orders/' + workOrderId + '/binding/',
     );
@@ -1784,7 +1784,7 @@ export async function workOrderClaimDocumentFor(
     organization: Id,
     workOrderId: Id,
 ): Promise<WorkOrderClaimDocument | null> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organization,
         '/work-orders/' + workOrderId + '/claim/',
     );
@@ -1857,7 +1857,7 @@ export async function workOrderDocumentHeadFor(
     organization: Id,
     workOrderId: Id,
 ): Promise<WorkOrderEntity | null> {
-    const collectionPrefix = canonicalUriCollection(
+    const collectionPrefix = canonicalPath(
         organization, '/work-orders/',
     );
     const collectionMessagePairs =
@@ -2077,7 +2077,7 @@ export async function invitationLifecycleStatesFor(
     for (const op of [
         'acceptance', 'decline', 'revocation',
     ] as const) {
-        const prefix = canonicalUriCollection(
+        const prefix = canonicalPath(
             undefined, '/invitations/' + id + '/' + op + '/',
         );
         const operationMessagePairs = await dbOrView.messagePairs.getAllWhere(

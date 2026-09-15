@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, InvitationState } from './types.ts';
 import { pickString } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import {
     deriveDocumentsAt,
     byIdAscending,
@@ -33,7 +33,7 @@ import {
 // succeed; a conflict appends nothing), never re-derived here —
 // an id can accumulate repeat pairs of only ONE op kind.
 
-const INVITATIONS_PREFIX = canonicalUriCollection(
+const INVITATIONS_PREFIX = canonicalPath(
     undefined, '/invitations/',
 );
 
@@ -99,7 +99,7 @@ export async function invitationOpStateFor(
     id: Id,
 ): Promise<InvitationState | undefined> {
     for (const op of INVITATION_OP_KINDS) {
-        const prefix = canonicalUriCollection(
+        const prefix = canonicalPath(
             undefined, '/invitations/' + id + '/' + op + '/',
         );
         const rows = await dbOrView.messagePairs.getAllWhere(

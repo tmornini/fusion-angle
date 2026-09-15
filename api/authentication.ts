@@ -66,7 +66,7 @@ import {
 import {
     appendMessagePair,
     putMessagePair,
-    canonicalUriCollection,
+    canonicalPath,
     formAuthMessagePair,
     formTokenEventMessagePair,
     formWriteMessagePair,
@@ -1133,12 +1133,12 @@ export async function deriveAuthorizationCodeId(
 }
 
 const AUTHORIZE_PREFIX =
-    canonicalUriCollection(undefined, '/authentication/authorize/');
+    canonicalPath(undefined, '/authentication/authorize/');
 const IDENTITY_TOKENS_FLAT_PREFIX =
-    canonicalUriCollection(undefined, '/identity-tokens/');
+    canonicalPath(undefined, '/identity-tokens/');
 
 function tokensEventPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined,
         '/identities/' + identityId + '/tokens/',
     );

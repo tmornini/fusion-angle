@@ -19,7 +19,7 @@ import type {
     ObjectiveEntity,
     ObjectiveRevisionEntity,
 } from '../api/types.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {
     documentGetHandler,
@@ -864,7 +864,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     // ride PUT /organizations/:id/objectives/:id after states-address
     // retirement).
     const revisionId3 = OBJECTIVEID_REV_3;
-    const objectivesPrefix = canonicalUriCollection(
+    const objectivesPrefix = canonicalPath(
         STARK_ORGANIZATION
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
     );
@@ -962,7 +962,7 @@ Deno.test('the create-op POST pair is not read as a document message pair —'
     ));
     assertStrictEquals(created.status, 201);
 
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         STARK_ORGANIZATION
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
     );

@@ -10,7 +10,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { GET, handleRequest } from '../api/api.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import {
     setPasswordHasher,
     setScryptDerive,
@@ -83,7 +83,7 @@ async function noStoredAuthorizeResponse(
 ): Promise<boolean> {
     const responses = await db.messagePairs.getAllWhere(
         'path',
-        canonicalUriCollection(undefined, '/authentication/authorize/'),
+        canonicalPath(undefined, '/authentication/authorize/'),
     );
     return responses.length === 0;
 }

@@ -10,7 +10,7 @@ import {
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
 import {
-    canonicalUriCollection,
+    canonicalPath,
 } from '../api/message-pair.ts';
 import {
     DEV_TOKEN,
@@ -141,7 +141,7 @@ async function flowDocumentPairCount(
     db: MemoryDbAdapter,
     flowId: string,
 ): Promise<number> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         undefined,
         '/organizations/' + ORGANIZATION
             + '/flows/',

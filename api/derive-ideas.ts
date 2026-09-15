@@ -10,7 +10,7 @@ import {
     pickString, pickNumber,
     validateIdeaSubmissionEntity,
 } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -38,14 +38,14 @@ import { liveHeadId, messageStore } from
 const IDEAS_TABLE = 'ideas';
 
 function ideasUriPrefix(organization: Id): string {
-    return canonicalUriCollection(organization, '/ideas/');
+    return canonicalPath(organization, '/ideas/');
 }
 
 function submissionsUriPrefix(
     organization: Id,
     ideaId: Id,
 ): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         organization, '/ideas/' + ideaId + '/submissions/',
     );
 }

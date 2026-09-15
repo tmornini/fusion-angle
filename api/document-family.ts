@@ -8,7 +8,7 @@ import {
     validateRecordDocumentBody,
 } from './validators.ts';
 import type { MessagePair } from './message-pair.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import {
     familyRegistration,
     RECORD_TYPE_DETAIL_PATTERN,
@@ -197,7 +197,7 @@ export async function liveGlobalDocumentIds(
     db: DbAdapter,
     family: string,
 ): Promise<Set<string>> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         undefined, '/' + family + '/',
     );
     const live = await messageStore(db).getCollection(
@@ -242,7 +242,7 @@ async function derivedDocumentEntity(
     organization: Id,
     id: Id,
 ): Promise<unknown> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organization, '/' + wiring.family + '/',
     );
     const stored = await messageStore(db).getMessagePairs(
@@ -326,11 +326,11 @@ export function documentGetHandler(
 // virgin address is undefined.
 export async function documentHeadMessagePairId(
     db: DbAdapter,
-    uriCollection: string,
+    path: string,
     id: Id,
 ): Promise<string | undefined> {
     const stored = await messageStore(db).get(
-        uriCollection, id,
+        path, id,
     );
     return stored?.id;
 }
@@ -470,7 +470,7 @@ async function documentStateHistoryAt(
     organization: Id,
     id: Id,
 ): Promise<StateEntity[]> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organization, '/' + wiring.family + '/',
     );
     const stored = await messageStore(db).getMessagePairs(
@@ -493,7 +493,7 @@ async function serveDocumentRevision(
     id: Id,
     etag: string,
 ): Promise<unknown> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organization, '/' + wiring.family + '/',
     );
     const found = await lookupStoredRevision(
@@ -566,7 +566,7 @@ export function documentVersionListHandler(
     return async (db, params, _actor, organization) => {
         const org = requireOrganization(organization);
         const id = entityIdParam(wiring, params);
-        const prefix = canonicalUriCollection(
+        const prefix = canonicalPath(
             org, '/' + wiring.family + '/',
         );
         const snapshots = await versionSnapshotsAt(
@@ -625,7 +625,7 @@ export function documentCollectionGetHandler(
         const organizationId = requireOrganization(
             organization,
         );
-        const prefix = canonicalUriCollection(
+        const prefix = canonicalPath(
             organizationId, '/' + wiring.family + '/',
         );
         const store = messageStore(db);
@@ -819,7 +819,7 @@ async function streamedTrioWriteBody(
 ): Promise<unknown> {
     const raw = withoutId(body);
     wiring.validateDocument(raw);
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organization,
         '/' + wiring.family + '/',
     );
@@ -878,13 +878,13 @@ export async function resolveStreamedTrioWriteBody(
 
 // The registration-first consult (Phase 8 Task 3, the first
 // global-plane families: identities/ai-agents,
-// organizationNested:false) — mirrors canonicalUriCollection's own
+// organizationNested:false) — mirrors canonicalPath's own
 // registration-first pattern (message-pair.ts): a family's
 // registration decides whether organization_id belongs on the
 // wire response AT ALL, never a blanket stamp. One clause
 // overstates the mirror: their UNREGISTERED-family fallbacks
 // point opposite ways — this consult defaults to STAMPING
-// organization_id, while canonicalUriCollection defaults per its
+// organization_id, while canonicalPath defaults per its
 // own tier rule instead (dead code today — every wired family
 // is registered). For the eight org-nested families registered
 // before this task, the stamp below was a no-op — their

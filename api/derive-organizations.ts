@@ -5,7 +5,7 @@ import {
 } from './db.ts';
 import type { Id, OrganizationEntity } from './types.ts';
 import { validateOrganizationEntity } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -22,7 +22,7 @@ import {
 //
 // GLOBAL plane, like members/ai-members/human-members/
 // identities: organizations IS the tenant root, so it is never
-// itself organization-nested — canonicalUriCollection(undefined,
+// itself organization-nested — canonicalPath(undefined,
 // '/organizations/') resolves the SAME flat prefix whether or
 // not the family is registered (ORGANIZATION_NESTED_FIRST_
 // SEGMENTS's fallback in message-pair.ts and the eventual
@@ -69,7 +69,7 @@ import {
 const ORGANIZATIONS_TABLE = 'organizations';
 
 const ORGANIZATIONS_PREFIX =
-    canonicalUriCollection(undefined, '/organizations/');
+    canonicalPath(undefined, '/organizations/');
 
 export function organizationEntityOf(
     document: DerivedDocument,

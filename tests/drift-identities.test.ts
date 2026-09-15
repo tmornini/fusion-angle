@@ -165,7 +165,7 @@ const IDENTITIES_TEST_WIRING: DocumentFamilyWiring = {
 };
 
 // identities is GLOBAL plane (family-registry.ts:
-// organizationNested:false) — canonicalUriCollection ignores whatever
+// organizationNested:false) — canonicalPath ignores whatever
 // organization value a caller passes for this family, so this
 // fixed placeholder is never load-bearing; requireOrganization
 // (document-family.ts) merely demands a defined value to dispatch

@@ -24,7 +24,7 @@ import {
 } from '../api/derive-flows.ts';
 import type { GuardedDbAdapter } from '../api/db.ts';
 import {
-    formWriteMessagePair, canonicalUriCollection,
+    formWriteMessagePair, canonicalPath,
     documentHeadAt,
 } from '../api/message-pair.ts';
 import {
@@ -623,7 +623,7 @@ Deno.test(
         // resolveFlowUndoTarget's own pre-tx read sees inside
         // the live route, at the instant a concurrent write
         // could still race it.
-        const undoUriPrefix = canonicalUriCollection(
+        const undoUriPrefix = canonicalPath(
             organization, '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + flowId + '/undo/',
         );
@@ -754,7 +754,7 @@ Deno.test(
         );
         assertStrictEquals(undone.status, 201);
 
-        const prefix = canonicalUriCollection('AjdvjuECVZEgZoFajaIEkg'
+        const prefix = canonicalPath('AjdvjuECVZEgZoFajaIEkg'
             , '/flows/');
         const stored = await db.messagePairs.getAllWhere(
             'path', prefix,

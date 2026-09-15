@@ -19,7 +19,7 @@ import type {
 } from '../api/types.ts';
 import { nowUtc } from
     '../api/types.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {
     documentGetHandler,
@@ -927,7 +927,7 @@ async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const recordId = generateIdentifier();
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         STARK_ORGANIZATION, '/record-types/',
     );
 
@@ -1031,7 +1031,7 @@ async () => {
     ));
     assertStrictEquals(created.status, 201);
 
-    const recordsPrefix = canonicalUriCollection(
+    const recordsPrefix = canonicalPath(
         STARK_ORGANIZATION, '/record-types/',
     );
     const [recordRequests] = await Promise.all([
@@ -1275,7 +1275,7 @@ async function transitionFieldValueCounts(
     organization: string,
     workOrderId: string,
 ): Promise<Map<string, number>> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organization,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/transition/',

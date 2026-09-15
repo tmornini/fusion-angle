@@ -18,7 +18,7 @@ import {
     flowGraphBindingsFromMessagePairs,
 } from './derive-flows.ts';
 import { deriveDocumentsAt } from './derive-documents.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import {
     deriveInstanceCollection,
 } from './derive-record-instances.ts';
@@ -112,7 +112,7 @@ export async function collectAttributeReferrers(
     // Organization-scoped WO document heads — the message-plane
     // successor of view.workOrders.getAll() for the frozen
     // graph walk. Prefix-indexed, never whole-plane.
-    const workOrdersPrefix = canonicalUriCollection(
+    const workOrdersPrefix = canonicalPath(
         boundOrganization, '/work-orders/',
     );
     const woMessagePairs = await view.messagePairs.getAllWhere(

@@ -61,7 +61,7 @@ export interface DocumentMessagePair {
     readonly requesterIdentityId: Id;
 }
 
-// Every PUT/DELETE pair at `uriCollection`, decoded once —
+// Every PUT/DELETE pair at `path`, decoded once —
 // ascending by the envelope (at, id), the SAME arrival order
 // the store's document head read (`messageStore(db).get`)
 // picks a single head from. That shared mechanism is
@@ -77,11 +77,11 @@ export interface DocumentMessagePair {
 // DocumentMessagePair.at is the response stamp.
 export function documentMessagePairsAt(
     messagePairs: readonly MessagePairEntity[],
-    uriCollection: string,
+    path: string,
 ): readonly DocumentMessagePair[] {
     const out: DocumentMessagePair[] = [];
     for (const messagePair of messagePairs) {
-        if (messagePair.path !== uriCollection) {
+        if (messagePair.path !== path) {
             continue;
         }
         if (!DOCUMENT_METHODS.has(messagePair.method)) {
@@ -123,10 +123,10 @@ export interface DerivedDocument {
 // under races; only the reduction decides currency).
 export function deriveDocumentsAt(
     messagePairs: readonly MessagePairEntity[],
-    uriCollection: string,
+    path: string,
 ): Map<string, DerivedDocument> {
     const documentMessagePairs = documentMessagePairsAt(
-        messagePairs, uriCollection,
+        messagePairs, path,
     );
     const heads = latestByKey(
         documentMessagePairs, (messagePair) => messagePair.uriId,

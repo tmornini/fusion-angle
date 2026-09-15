@@ -267,7 +267,7 @@ async function testDocumentOp(
             if (messagePair !== undefined) {
                 const latchedId = messagePair.latchedHeadMessagePairId;
                 const latest = (await messageStore(view).get(
-                    messagePair.uriCollection, messagePair.uriId,
+                    messagePair.path, messagePair.uriId,
                 ))?.id;
                 if (
                     latchedId !== undefined

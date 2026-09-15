@@ -2,7 +2,7 @@ import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
 import type { Id, IdentityTokenEntity } from './types.ts';
 import { validateIdentityTokenEntity } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -85,13 +85,13 @@ import {
 const IDENTITY_TOKENS_TABLE = 'identity_tokens';
 
 const IDENTITY_TOKENS_FLAT_PREFIX =
-    canonicalUriCollection(undefined, '/identity-tokens/');
+    canonicalPath(undefined, '/identity-tokens/');
 
 const TOKENS_ADDRESS_PATTERN =
     /^\/identities\/([^/]+)\/tokens\/$/;
 
 function tokensPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined,
         '/identities/' + identityId + '/tokens/',
     );

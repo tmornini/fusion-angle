@@ -1,6 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, StateEntity } from './types.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import {
     documentMessagePairsAt,
     documentLifecycleEvents,
@@ -15,7 +15,7 @@ import {
 // never rebuilt here (the derive-ideas.ts shape).
 
 function objectivesUriPrefix(organization: Id): string {
-    return canonicalUriCollection(organization, '/objectives/');
+    return canonicalPath(organization, '/objectives/');
 }
 
 // One row per pair whose state_event_id is NEW — the document

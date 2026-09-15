@@ -8,7 +8,7 @@ import {
     generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
-import { messageAddress } from './path-and-name.ts';
+import { pathAndNameOf } from './path-and-name.ts';
 import { messageStore } from './message-store.ts';
 import {
     buildRequestModel,
@@ -52,7 +52,7 @@ export interface MessagePair {
     // late as a same-tx write permits. Envelope only (S1): body
     // timestamps belong to the message's creator.
     readonly requestAt: string;
-    readonly uriCollection: string;
+    readonly path: string;
     readonly uriId: string;
     readonly requesterIdentityId: Id;
     readonly requestMessage: string;   // serializeWire
@@ -107,7 +107,7 @@ export interface WriteMessagePairInput {
     // The VERIFIED fence organization for organization-owned
     // families; undefined for the global plane. Decides the
     // canonical organization-nested prefix — see
-    // canonicalUriCollection.
+    // canonicalPath.
     readonly organization: Id | undefined;
     readonly responseStatus: number;
     readonly responseBody: unknown | undefined;
@@ -135,7 +135,7 @@ const ORGANIZATION_NESTED_FIRST_SEGMENTS: ReadonlySet<string> =
 // ONE prefix voice. A registered family's organizationNested
 // slot decides first; the literal set above is the fallback
 // for every not-yet-registered first segment.
-export function canonicalUriCollection(
+export function canonicalPath(
     organization: Id | undefined,
     flatPrefix: string,
 ): string {
@@ -212,16 +212,16 @@ export async function formWriteMessagePair(
         );
     }
     const id = generateIdentifier();
-    const address = messageAddress(
+    const pathAndName = pathAndNameOf(
         input.routeSegments, input.pathSegments,
     );
-    const uriCollection = canonicalUriCollection(
-        input.organization, address.uriCollection,
+    const path = canonicalPath(
+        input.organization, pathAndName.path,
     );
     const createdId = createdEntityUriId(
         input.routePattern, input.body,
     );
-    const uriId = createdId ?? address.uriId;
+    const uriId = createdId ?? pathAndName.uriId;
     const headerFields = headerFieldsWithOperationId(
         input.headerFields, input.operationId,
     );
@@ -244,7 +244,7 @@ export async function formWriteMessagePair(
     return {
         id,
         requestAt: input.requestAt,
-        uriCollection,
+        path,
         uriId,
         requesterIdentityId: input.requesterIdentityId,
         requestMessage,
@@ -268,7 +268,7 @@ export async function formWriteMessagePair(
 
 // Complete an AuthMessagePairSeed into a MessagePair for a grant's own
 // response: operation-addressed (uriId '', global plane — see
-// canonicalUriCollection with organization undefined), never a
+// canonicalPath with organization undefined), never a
 // head-read. The two /authentication/* routes are the only
 // callers; each grant calls this pre-tx, once its own domain
 // read has resolved the requester identity and its response
@@ -364,11 +364,11 @@ export async function formTokenEventMessagePair(
 // DELETE head is a gone document, not a miss.
 export async function documentHeadAt(
     db: DbAdapter,
-    uriCollection: string,
+    path: string,
     uriId: string,
 ): Promise<{ id: string; method: string } | undefined> {
     const messagePairs = await messageStore(db).getMessagePairs(
-        uriCollection, uriId,
+        path, uriId,
     );
     let head: {
         at: string;
@@ -690,7 +690,7 @@ async function writeMessagePairRows(
     messagePair: MessagePair,
 ): Promise<void> {
     await view.messagePairs.put(messagePair.id, {
-        path: messagePair.uriCollection,
+        path: messagePair.path,
         name: messagePair.uriId,
         requester_identity_id:
             messagePair.requesterIdentityId,
@@ -716,23 +716,23 @@ async function coordinateWrite(
     if (hashDeduped) {
         await locks.lockDedup(messagePair.requestHash);
     }
-    const gated = isGatedAddress(messagePair.uriCollection);
+    const gated = isGatedPath(messagePair.path);
     if (gated) {
         await locks.lockAddress(
-            messagePair.uriCollection, messagePair.uriId,
+            messagePair.path, messagePair.uriId,
         );
     }
     const latched = messagePair.latchedHeadMessagePairId;
     if (latched !== undefined) {
         await locks.lockHead(latched);
         const latest = await locks.latestPutDelete(
-            messagePair.uriCollection, messagePair.uriId,
+            messagePair.path, messagePair.uriId,
         );
         if (latest === null || latest.id !== latched) {
             throw new ApiError(
                 'If-Match does not match the current'
                 + ' document at '
-                + messagePair.uriCollection + messagePair.uriId,
+                + messagePair.path + messagePair.uriId,
                 HTTP_PRECONDITION_FAILED,
             );
         }
@@ -740,13 +740,13 @@ async function coordinateWrite(
     }
     if (!gated) return;
     const latest = await locks.latestPutDelete(
-        messagePair.uriCollection, messagePair.uriId,
+        messagePair.path, messagePair.uriId,
     );
     if (latest !== null && latest.method === 'PUT') {
         throw new ApiError(
             'If-Match does not match the current'
             + ' document at '
-            + messagePair.uriCollection + messagePair.uriId,
+            + messagePair.path + messagePair.uriId,
             HTTP_PRECONDITION_FAILED,
         );
     }
@@ -764,7 +764,7 @@ async function notifyWrite(
 function eventForMessagePair(
     messagePair: MessagePair,
 ): NotificationEvent {
-    const parts = messagePair.uriCollection
+    const parts = messagePair.path
         .split('/')
         .filter((part) => part !== '');
     const organizationIds =
@@ -779,7 +779,7 @@ function eventForMessagePair(
     };
 }
 
-function isGatedAddress(collection: string): boolean {
+function isGatedPath(collection: string): boolean {
     const parts = collection
         .split('/')
         .filter((part) => part !== '');
@@ -827,7 +827,7 @@ export function createdEntityUriId(
     // name. Ideas registered this slot in Task 1 for its own
     // POST /ideas, which Phase 2 Task 3 (R1) retired — genesis
     // folded into the document-class PUT ideas/:id, whose uriId
-    // messageAddress already derives from the path segment, so
+    // pathAndNameOf already derives from the path segment, so
     // this lookup never fires for ideas today. Projects (second
     // family) registers the same inert slot: it has NO bare
     // collection POST at all, so the registry consult here never

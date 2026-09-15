@@ -17,14 +17,14 @@ import {
     nowUtc,
 } from './types.ts';
 import type { Id } from './types.ts';
-import { messageAddress } from './path-and-name.ts';
+import { pathAndNameOf } from './path-and-name.ts';
 import { pathSegmentsOf } from './path-segments.ts';
 import {
     formWriteMessagePair,
     appendMessagePair,
     storedResponseFor,
     createdEntityUriId,
-    canonicalUriCollection,
+    canonicalPath,
     hoistedHeaderFields,
     sendWriteResponse,
     documentHeadAt,
@@ -774,15 +774,15 @@ export async function handleRequest(
             // Nested attribute paths store under the type
             // attributes prefix directly (flat rewrite retired
             // Task 23).
-            const address = messageAddress(
+            const pathAndName = pathAndNameOf(
                 matched.segments, pathSegments,
             );
-            const canonicalPrefix = canonicalUriCollection(
-                organization, address.uriCollection,
+            const canonicalPrefix = canonicalPath(
+                organization, pathAndName.path,
             );
             const uriId = createdEntityUriId(
                 routePattern, body,
-            ) ?? address.uriId;
+            ) ?? pathAndName.uriId;
             // The locked/simple divide (spec §The two PUT classes): keyed by
             // the route's family registration THROUGH THE WIRING CONSULT —
             // never a blanket family-registry or
@@ -845,7 +845,7 @@ export async function handleRequest(
                 LATCHED_OPERATION_ROUTE_PATTERNS
                     .has(routePattern);
             const latchAddress = isLatchedOperation
-                ? messageAddress(
+                ? pathAndNameOf(
                     matched.segments.slice(0, -1),
                     pathSegments.slice(0, -1),
                 )
@@ -854,9 +854,9 @@ export async function handleRequest(
                 ? undefined
                 : await documentHeadMessagePairId(
                     effective,
-                    canonicalUriCollection(
+                    canonicalPath(
                         organization,
-                        latchAddress.uriCollection,
+                        latchAddress.path,
                     ),
                     latchAddress.uriId,
                 );
@@ -1449,7 +1449,7 @@ export async function handleRequest(
                                 await documentHeadMessagePairId(
                                     view,
                                     emptyMessagePair
-                                        .uriCollection,
+                                        .path,
                                     emptyMessagePair.uriId,
                                 );
                             if (latest !== latchedId) {
@@ -1551,7 +1551,7 @@ export async function handleRequest(
                     && familyRegistration(readWiring.family)
                         ?.concurrency === 'locked'
                 ) {
-                    const prefix = canonicalUriCollection(
+                    const prefix = canonicalPath(
                         organization,
                         '/' + readWiring.family + '/',
                     );
@@ -2321,7 +2321,7 @@ async function streamStoredDocumentGet(
     if (wiring === undefined) return undefined;
     const organizationId = requireOrganization(organization);
     const id = entityIdParam(wiring, params);
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organizationId, '/' + wiring.family + '/',
     );
     const stored = await messageStore(db).get(prefix, id);
@@ -2341,7 +2341,7 @@ async function streamStoredCollectionGet(
     const wiring = streamCollectionWiring(routePattern);
     if (wiring === undefined) return undefined;
     const organizationId = requireOrganization(organization);
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         organizationId, '/' + wiring.family + '/',
     );
     const rows = await messageStore(db).getCollection(

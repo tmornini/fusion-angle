@@ -6,15 +6,15 @@
 // slash; a collection or operation target stores the empty
 // name (a structural key, not an absence sentinel — see
 // the spec's two-table key).
-export interface MessageAddress {
-    readonly uriCollection: string;
+export interface PathAndName {
+    readonly path: string;
     readonly uriId: string;
 }
 
-export function messageAddress(
+export function pathAndNameOf(
     routeSegments: readonly string[],
     pathSegments: readonly string[],
-): MessageAddress {
+): PathAndName {
     if (routeSegments.length !== pathSegments.length) {
         throw new Error(
             'route and path segment counts differ',
@@ -35,7 +35,7 @@ export function messageAddress(
         (seg) => seg !== '',
     );
     return {
-        uriCollection: '/' + prefix.join('/') + '/',
+        path: '/' + prefix.join('/') + '/',
         uriId,
     };
 }

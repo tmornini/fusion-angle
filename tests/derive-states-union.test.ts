@@ -27,7 +27,7 @@ import {
 } from '../api/derive-documents.ts';
 import {
     formWriteMessagePair,
-    canonicalUriCollection,
+    canonicalPath,
 } from '../api/message-pair.ts';
 import {
     postMembershipDocumentOp,
@@ -682,7 +682,7 @@ async () => {
         [...fx.workOrderEventIds],
     );
     // Graph sidecars on the flow document message pairs (C3).
-    const prefix = canonicalUriCollection(fx.organizationA, '/flows/');
+    const prefix = canonicalPath(fx.organizationA, '/flows/');
     const stored = await fx.db.messagePairs.getAllWhere(
         'path', prefix,
     );

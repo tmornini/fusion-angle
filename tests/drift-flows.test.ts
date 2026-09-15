@@ -25,7 +25,7 @@ import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import { deriveDocumentsAt } from '../api/derive-documents.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
@@ -348,7 +348,7 @@ function assertWireEqualsDerived(
 async function derivedHeadMessagePairId(
     db: MemoryDbAdapter, organization: string, flowId: string,
 ): Promise<string> {
-    const prefix = canonicalUriCollection(organization, '/flows/');
+    const prefix = canonicalPath(organization, '/flows/');
     const [requests] = await Promise.all([
         db.messagePairs.getAllWhere('path', prefix),
         db.messagePairs.getAllWhere('path', prefix),
@@ -1133,7 +1133,7 @@ Deno.test('same-join-id retry: two different flow creates reusing '
     );
     assertStrictEquals(second.status, 201);
 
-    const joinPrefix = canonicalUriCollection(
+    const joinPrefix = canonicalPath(
         STARK_ORGANIZATION,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
             + '/flows/',

@@ -21,7 +21,7 @@ import {
     MS_PER_SECOND, nowUtc,
     setClockForTest, resetClock,
 } from '../api/types.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import {
     documentMessagePairsAt,
     type DocumentMessagePair,
@@ -643,7 +643,7 @@ async () => {
     // values, not the same in-memory literal.
     const storedCreatePostRow = (await db.messagePairs.getAllWhere(
         'path',
-        canonicalUriCollection(STARK_ORGANIZATION, '/work-orders/'),
+        canonicalPath(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
         (r) => r.name === workOrderId
             && decodeRequestMessage(r.request).method === 'POST',
@@ -937,7 +937,7 @@ async () => {
     ));
     assertStrictEquals(created.status, 201);
 
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         STARK_ORGANIZATION
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
     );
@@ -1038,11 +1038,11 @@ function atIdCompare(
 
 function allMessagePairsAt(
     rows: readonly MessagePairEntity[],
-    uriCollection: string,
+    path: string,
 ): AnyMessagePair[] {
     const messagePairs: AnyMessagePair[] = [];
     for (const row of rows) {
-        if (row.path !== uriCollection) {
+        if (row.path !== path) {
             continue;
         }
         const decoded = decodeRequestMessage(row.request);
@@ -1285,7 +1285,7 @@ async function replayWorkOrderStates(
     organization: string,
     workOrderId: string,
 ): Promise<ReplayResult> {
-    const woPrefix = canonicalUriCollection(
+    const woPrefix = canonicalPath(
         organization, '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
     );
     const [woRequests] = await Promise.all([
@@ -1305,7 +1305,7 @@ async function replayWorkOrderStates(
         woRequests, woPrefix,
     ).filter((messagePair) => messagePair.uriId === workOrderId);
 
-    const claimPrefix = canonicalUriCollection(
+    const claimPrefix = canonicalPath(
         organization,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/claim/',
@@ -1323,7 +1323,7 @@ async function replayWorkOrderStates(
         claimRequests, claimPrefix,
     ).filter((p) => p.method === 'DELETE');
 
-    const releasePrefix = canonicalUriCollection(
+    const releasePrefix = canonicalPath(
         organization,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/release/',
@@ -1344,7 +1344,7 @@ async function replayWorkOrderStates(
         ...claimDeletes,
     ];
 
-    const transitionPrefix = canonicalUriCollection(
+    const transitionPrefix = canonicalPath(
         organization,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/transition/',
@@ -1495,7 +1495,7 @@ async () => {
     // either differently would be caught.
     const storedCreatePostRow = (await db.messagePairs.getAllWhere(
         'path',
-        canonicalUriCollection(STARK_ORGANIZATION, '/work-orders/'),
+        canonicalPath(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
         (r) => r.name === workOrderId
             && decodeRequestMessage(r.request).method === 'POST',
@@ -1740,7 +1740,7 @@ Deno.test('same-join-id retry: two different work-order creates '
     ));
     assertStrictEquals(second.status, 201);
 
-    const joinPrefix = canonicalUriCollection(
+    const joinPrefix = canonicalPath(
         STARK_ORGANIZATION,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
             + '/work-orders/',

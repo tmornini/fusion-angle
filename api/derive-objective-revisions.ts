@@ -2,7 +2,7 @@ import type { DbAdapter } from './db.ts';
 import type { Id, ObjectiveRevisionEntity } from './types.ts';
 import { validateObjectiveRevisionEntity } from
     './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -51,7 +51,7 @@ function objectiveRevisionsUriPrefix(
     organization: Id,
     objectiveId: Id,
 ): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         organization,
         '/objectives/' + objectiveId + '/revisions/',
     );

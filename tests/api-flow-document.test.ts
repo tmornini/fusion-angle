@@ -26,7 +26,7 @@ import {
     validateFlowDocumentBody,
 } from '../api/validators.ts';
 import {
-    canonicalUriCollection,
+    canonicalPath,
     strongEtagOf,
 } from '../api/message-pair.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -327,7 +327,7 @@ Deno.test('postFlowDocumentOp with revivals posts the restored'
     assertStrictEquals(update.status, 201);
     // SIDECAR-KEEP (C3): pin graphDelta.deletions / revivals
     // on the flow document message pairs — no bulk states derive.
-    const prefix = canonicalUriCollection('AjdvjuECVZEgZoFajaIEkg', '/flows/'
+    const prefix = canonicalPath('AjdvjuECVZEgZoFajaIEkg', '/flows/'
         + '');
     const [requests] = await Promise.all([
         db.messagePairs.getAllWhere('path', prefix),
@@ -649,7 +649,7 @@ async () => {
     const headId = got.headers.get('Response-ID');
     assert(headId);
     const lockHead = (await messageStore(db).get(
-        canonicalUriCollection('AjdvjuECVZEgZoFajaIEkg', '/flows/'),
+        canonicalPath('AjdvjuECVZEgZoFajaIEkg', '/flows/'),
         'biSFoHVEGnaArklDDblCXQ',
     ))?.id;
     assertStrictEquals(headId, lockHead);

@@ -20,7 +20,7 @@ import {
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
 import {
-    canonicalUriCollection,
+    canonicalPath,
 } from '../api/message-pair.ts';
 import { deriveIdeaStateHistory } from
     '../api/derive-ideas.ts';
@@ -1091,7 +1091,7 @@ async () => {
     ));
     assertStrictEquals(undone.status, 201);
 
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         STARK_ORGANIZATION, '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',
     );
     const [requests] = await Promise.all([

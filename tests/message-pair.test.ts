@@ -32,7 +32,7 @@ Deno.test('an org-owned pair stores at the org-nested prefix',
 async () => {
     const messagePair = await formWriteMessagePair({ ...INPUT });
     assertStrictEquals(
-        messagePair.uriCollection,
+        messagePair.path,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
 });
@@ -49,7 +49,7 @@ async () => {
         operationId: generateIdentifier(),
     });
     assertStrictEquals(
-        messagePair.uriCollection, '/identities/ada/pii/',
+        messagePair.path, '/identities/ada/pii/',
     );
 });
 
@@ -83,7 +83,7 @@ async () => {
         operationId: generateIdentifier(),
     });
     assertStrictEquals(
-        messagePair.uriCollection,
+        messagePair.path,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
         + typeId + '/attributes/',
     );
@@ -109,7 +109,7 @@ async () => {
         operationId: generateIdentifier(),
     });
     assertStrictEquals(
-        messagePair.uriCollection,
+        messagePair.path,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/',
     );
 });
@@ -118,7 +118,7 @@ Deno.test('a formed pair binds request and response by one id',
 async () => {
     const messagePair = await formWriteMessagePair({ ...INPUT });
     assertStrictEquals(
-        messagePair.uriCollection,
+        messagePair.path,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
     assertStrictEquals(messagePair.uriId, '42');

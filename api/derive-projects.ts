@@ -2,7 +2,7 @@ import type { DbAdapter } from './db.ts';
 import { missedReadError } from './derive-states.ts';
 import type { Id, ProjectEntity, StateEntity } from './types.ts';
 import { pickString, pickNumber } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import {
     deriveDocumentsAt,
     documentMessagePairsAt,
@@ -32,7 +32,7 @@ import { liveHeadId, messageStore } from
 const PROJECTS_TABLE = 'projects';
 
 function projectsUriPrefix(organization: Id): string {
-    return canonicalUriCollection(organization, '/projects/');
+    return canonicalPath(organization, '/projects/');
 }
 
 // The derived entity: the head document's body minus the

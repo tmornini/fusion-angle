@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, ProjectFlowEntity } from './types.ts';
 import { validateProjectFlowEntity } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -27,7 +27,7 @@ function projectFlowsUriPrefix(
     organization: Id,
     projectId: Id,
 ): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         organization, '/projects/' + projectId + '/flows/',
     );
 }

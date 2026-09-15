@@ -9,7 +9,7 @@ import {
     validateFlowNodeAttributeEntity,
     validateFlowNodeMemberEntity,
 } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { normalizedStoredGraph } from
     './flow-graph-relations.ts';
 import {
@@ -68,7 +68,7 @@ import { liveHeadId, messageStore } from
 const FLOWS_TABLE = 'flows';
 
 function flowsUriPrefix(organization: Id): string {
-    return canonicalUriCollection(organization, '/flows/');
+    return canonicalPath(organization, '/flows/');
 }
 
 // The derived entity: the head document's body minus the
@@ -228,9 +228,9 @@ export async function deriveFlow(
 
 // Undo-as-replay's own resolution (Phase 14 Task 8): given this
 // flow's OWN undo-operation-pair address prefix (the route's
-// own `messagePair.uriCollection` — already flow-specific,
+// own `messagePair.path` — already flow-specific,
 // since `undo` is a literal final route segment, so
-// messageAddress folds the real id into the PREFIX rather
+// pathAndNameOf folds the real id into the PREFIX rather
 // than a separate uriId), walks this flow's flows/:id
 // document-pair history and replays it as a stack with a
 // pointer: a GENUINE pair (no correlated undo call)

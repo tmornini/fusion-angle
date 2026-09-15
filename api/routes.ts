@@ -92,7 +92,7 @@ import {
 } from './validators.ts';
 import {
     appendMessagePair,
-    canonicalUriCollection,
+    canonicalPath,
     documentHeadAt,
     formWriteMessagePair,
     messagePairResponseBody,
@@ -1377,7 +1377,7 @@ export function flowCreateDocumentBody(
 // The three pairs a live POST /flows forms (Task 5): the gate's
 // own operation message pair (204, at the flows/:id address per Task 1's
 // createdEntityUriId override — POST 'flows' and PUT 'flows/:id'
-// collapse onto the SAME (uriCollection, uriId), see derive-
+// collapse onto the SAME (path, uriId), see derive-
 // documents.ts's DOCUMENT_METHODS filter for why the two never
 // collide as documents), plus the document and join pairs the
 // route pre-forms below. All three share ONE requestAt (the
@@ -1477,7 +1477,7 @@ export async function postFlowDocumentOp(
             // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
             if (messagePair !== undefined) {
                 const latest = (await messageStore(view).get(
-                    messagePair.uriCollection, messagePair.uriId,
+                    messagePair.path, messagePair.uriId,
                 ))?.id;
                 if (
                     latchedId !== undefined
@@ -1592,7 +1592,7 @@ export async function postFlowUndoOp(
         MESSAGE_TABLES,
         async (view) => {
             const latest = (await messageStore(view).get(
-                documentMessagePair.uriCollection,
+                documentMessagePair.path,
                 documentMessagePair.uriId,
             ))?.id;
             // The CLIENT's pin, not this walk's own read:
@@ -1619,7 +1619,7 @@ export async function postFlowUndoOp(
 // The three pairs a live POST /objectives forms (Task 3): the
 // gate's own operation message pair (204, at the objectives/:id address
 // per the create-body-id-field override — POST 'objectives' and
-// PUT 'objectives/:id' collapse onto the SAME (uriCollection,
+// PUT 'objectives/:id' collapse onto the SAME (path,
 // uriId), the flows/records precedent), the synthesized document
 // message pair (objectives/:id), and the synthesized revision pair
 // (objectives/:id/revisions/:rid) the route pre-forms below. All
@@ -1844,7 +1844,7 @@ function workOrderCreateDocumentBody(
 // the gate's own operation message pair (204, at the work-orders/:id
 // address per the registry's createBodyIdField — POST
 // 'work-orders' and PUT 'work-orders/:id' collapse onto the
-// SAME (uriCollection, uriId), exactly as flows/:id did for its
+// SAME (path, uriId), exactly as flows/:id did for its
 // own create), plus the document and join pairs the route
 // pre-forms below. All three share ONE requestAt (the
 // create's own origination) yet strictly-later RESPONSE `at`
@@ -2375,7 +2375,7 @@ export async function postWorkOrderTransitionOp(
             // R9: lock head must still be the latched pair
             // id.
             const latest = (await messageStore(view).get(
-                revisionMessagePair.uriCollection,
+                revisionMessagePair.path,
                 revisionMessagePair.uriId,
             ))?.id;
             if (latest !== latchedMessagePairId) {
@@ -2595,7 +2595,7 @@ export async function postFlowRecordDocumentOp(
 
 // Flow tag document write — the codebase's FIRST message-plane-ONLY
 // write (Phase 14 Task 9): no table, no row, no dual-write. The
-// pair alone carries everything (uriCollection/uriId encode the
+// pair alone carries everything (path/uriId encode the
 // address; the stored request's method distinguishes a PUT tag
 // from a DELETE tombstone), so this op needs neither `id`
 // nor `body` — the
@@ -3616,7 +3616,7 @@ async function inFlightPlacementBlockersFor(
     organization: Id,
     instanceId: Id,
 ): Promise<string[]> {
-    const workOrdersPrefix = canonicalUriCollection(
+    const workOrdersPrefix = canonicalPath(
         organization, '/work-orders/',
     );
     const woMessagePairs = await view.messagePairs.getAllWhere(
@@ -3849,7 +3849,7 @@ export async function postInstancePatchOp(
             // R9: lock head must still be the latched pair
             // id.
             const latest = (await messageStore(view).get(
-                revisionMessagePair.uriCollection,
+                revisionMessagePair.path,
                 revisionMessagePair.uriId,
             ))?.id;
             if (latest !== latchedMessagePairId) {
@@ -4016,7 +4016,7 @@ export const routes: Route[] = [
     // PUT/DELETE each append a message pair in the same
     // transaction as the write. DELETE is a marked tombstone.
     // The pattern's last segment ('pii') is not a :param, so
-    // messageAddress yields uriId '' (a singleton document at
+    // pathAndNameOf yields uriId '' (a singleton document at
     // a collection-style address). GET is FLIPPED (Phase 10
     // Task 8): derived via deriveIdentityPii — wire-identical
     // to the hand-written db.identityPii.getById dispatch it
@@ -4754,7 +4754,7 @@ export const routes: Route[] = [
                 return undefined;
             }
             const resolution = await resolveFlowUndoTarget(
-                db, organization, id, messagePair.uriCollection,
+                db, organization, id, messagePair.path,
             );
             if (resolution === undefined) {
                 throw await missedReadError(
@@ -5637,7 +5637,7 @@ export const routes: Route[] = [
     route('organizations/:id/versions/', {
         get: async (db, p) => {
             const id = param(p, 0);
-            const prefix = canonicalUriCollection(
+            const prefix = canonicalPath(
                 undefined, '/organizations/',
             );
             const rows = await versionSnapshotsAt(
@@ -5657,7 +5657,7 @@ export const routes: Route[] = [
             const etag = param(p, p.length - 1);
             const document = await storedRevisionDocument(
                 db,
-                canonicalUriCollection(
+                canonicalPath(
                     undefined, '/organizations/',
                 ),
                 id,

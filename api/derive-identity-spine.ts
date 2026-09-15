@@ -21,7 +21,7 @@ import {
     validateIdentityProviderEntity,
     validateIdentityTokenRevocationEntity,
 } from './validators.ts';
-import { canonicalUriCollection } from './message-pair.ts';
+import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -87,7 +87,7 @@ import {
 const PII_ADDRESS_PATTERN = /^\/identities\/([^/]+)\/pii\/$/;
 
 function piiPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined, '/identities/' + identityId + '/pii/',
     );
 }
@@ -178,7 +178,7 @@ export async function deriveIdentityPii(
 // ---- (api/derive-project-scores.ts) ------------------------------
 
 function credentialsPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined,
         '/identities/' + identityId + '/credentials/',
     );
@@ -249,10 +249,10 @@ export async function deriveCredential(
 // ---- the old flat prefix so leftover seed pairs still derive.
 
 const IDENTITY_PROVIDERS_PREFIX =
-    canonicalUriCollection(undefined, '/identity-providers/');
+    canonicalPath(undefined, '/identity-providers/');
 
 function providersPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined,
         '/identities/' + identityId + '/providers/',
     );
@@ -358,7 +358,7 @@ export async function deriveIdentityProvider(
 // ---- reader.
 
 function tokenRevocationsPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined,
         '/identities/' + identityId + '/token-revocations/',
     );
@@ -443,7 +443,7 @@ export async function deriveTokenRevocation(
 // ---- closure stays pii-only) -------------------------------------
 
 function registrationPrefixFor(identityId: Id): string {
-    return canonicalUriCollection(
+    return canonicalPath(
         undefined,
         '/identities/' + identityId + '/registration/',
     );
@@ -496,7 +496,7 @@ export async function deriveIdentityKind(
     db: DbAdapter,
     identityId: Id,
 ): Promise<IdentityKind | undefined> {
-    const prefix = canonicalUriCollection(
+    const prefix = canonicalPath(
         undefined, '/identities/',
     );
     const messagePairs = await db.messagePairs.getAllWhere(

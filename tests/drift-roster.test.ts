@@ -15,7 +15,7 @@ import type {
 } from '../api/types.ts';
 import { nowUtc } from
     '../api/types.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {
     deriveOrganizationMemberSeat,
@@ -742,7 +742,7 @@ async () => {
     ));
     assertStrictEquals(aiCreated.status, 201);
 
-    const aiPrefix = canonicalUriCollection(
+    const aiPrefix = canonicalPath(
         undefined, '/ai-agents/',
     );
     const [aiRequests] = await Promise.all([
@@ -766,7 +766,7 @@ async () => {
     ));
     assertStrictEquals(humanCreated.status, 201);
 
-    const humanPrefix = canonicalUriCollection(
+    const humanPrefix = canonicalPath(
         undefined, '/identities/',
     );
     const [humanRequests] = await Promise.all([
