@@ -87,9 +87,6 @@ const IDENTITY_TOKENS_TABLE = 'identity_tokens';
 const IDENTITY_TOKENS_FLAT_PREFIX =
     canonicalPath(undefined, '/identity-tokens/');
 
-const TOKENS_PATH_PATTERN =
-    /^\/identities\/([^/]+)\/tokens\/$/;
-
 function tokensPrefixFor(identityId: Id): string {
     return canonicalPath(
         undefined,
@@ -184,56 +181,19 @@ export async function deriveIdentityToken(
     throw new EntityNotFoundError(IDENTITY_TOKENS_TABLE, tid);
 }
 
-// Internal global fold — leftover flat plus every nested
-// /identities/:id/tokens/ prefix. Used by rotation/revocation
-// chain lookup, never exposed as an HTTP list.
-export async function deriveIdentityTokens(
-    db: DbAdapter,
-): Promise<IdentityTokenEntity[]> {
-    const messagePairs = await db.messagePairs.getAll();
-    const byId = new Map<string, IdentityTokenEntity>();
-    const flat = deriveDocumentsAt(
-        messagePairs, IDENTITY_TOKENS_FLAT_PREFIX,
-    );
-    for (const document of flat.values()) {
-        byId.set(document.name, identityTokenEntityOf(document));
-    }
-    const prefixes = new Set<string>();
-    for (const messagePair of messagePairs) {
-        if (TOKENS_PATH_PATTERN.test(messagePair.path)) {
-            prefixes.add(messagePair.path);
-        }
-    }
-    for (const prefix of prefixes) {
-        const match = TOKENS_PATH_PATTERN.exec(prefix)!;
-        const identityId = match[1]!;
-        const documents = deriveDocumentsAt(
-            messagePairs, prefix,
-        );
-        for (const document of documents.values()) {
-            byId.set(
-                document.name,
-                nestedTokenEntityOf(identityId, document),
-            );
-        }
-    }
-    return [...byId.values()].sort(byIdAscending);
-}
-
-// Every LIVE event naming `jti`, id-lex ordered — the by-jti
-// fold tokenRevocationReason's SECOND read (isTokenRevoked)
-// folds over, and the PRE-TX provisional leg of
-// rotateRefreshJti/revokeTokenChain's own chain lookup.
-// Optional identityId scopes the fold (nested prefix + leftover
-// flat for that identity) so the Bearer-gate hot path does not
-// full-scan. A jti that has never appeared returns [].
+// Every LIVE event naming `jti` in ONE identity's own
+// collection, id-lex ordered — the by-jti fold
+// tokenRevocationReason's SECOND read (isTokenRevoked)
+// folds over. A jti that has never appeared in this
+// identity's collection returns []. Never the plane: the
+// Bearer gate hot path reads one collection.
 export async function deriveIdentityTokenEventsForJti(
     dbOrView: DbAdapter,
     jti: string,
-    identityId?: Id,
+    identityId: Id,
 ): Promise<IdentityTokenEntity[]> {
-    const rows = identityId === undefined
-        ? await deriveIdentityTokens(dbOrView)
-        : await deriveIdentityTokensFor(dbOrView, identityId);
+    const rows = await deriveIdentityTokensFor(
+        dbOrView, identityId,
+    );
     return rows.filter((row) => row.jti === jti);
 }

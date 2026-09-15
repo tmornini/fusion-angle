@@ -134,7 +134,6 @@ import {
     HTTP_OK,
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
-    HTTP_FORBIDDEN,
     HTTP_CONFLICT,
     HTTP_PRECONDITION_FAILED,
     HTTP_PRECONDITION_REQUIRED,
@@ -271,10 +270,8 @@ import {
 import {
     deriveIdentityTokensFor,
     deriveIdentityToken,
-    deriveIdentityTokenEventsForJti,
     identityTokenEntityOf,
 } from './derive-identity-tokens.ts';
-import { identityForJti } from './identity-tokens.ts';
 import {
     param,
     requireOrganization,
@@ -4244,8 +4241,10 @@ export const routes: Route[] = [
             );
         },
     }),
-    // Rotate a refresh jti. Path identity must match the
-    // jti's ledger identity or 403. The ledger read, the
+    // Rotate a refresh jti. The path identity's own tokens
+    // collection is the only ledger this reads: a jti outside
+    // it is unknown — 409, the same status as reuse (spec
+    // 2026-09-15 § 1). The ledger read, the
     // rotation plan, and its appends ride ONE transaction
     // (rotateRefreshJti — the same body the refresh grant
     // runs), so two concurrent rotations of one chain
@@ -4271,25 +4270,13 @@ export const routes: Route[] = [
         post: async (db, p, _body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const presented = param(p, 1);
-            const owner = identityForJti(
-                await deriveIdentityTokenEventsForJti(
-                    db, presented,
-                ),
-                presented,
-            );
-            if (owner !== null && owner !== identityId) {
-                throw new ApiError(
-                    'token does not belong to this identity',
-                    HTTP_FORBIDDEN,
-                );
-            }
             const newJti = messagePair === undefined
                 ? generateIdentifier()
                 : (messagePairResponseBody(messagePair)?.['jti'] as
                     string | undefined)
                     ?? generateIdentifier();
             const outcome = await rotateRefreshJti(
-                db, presented, newJti, messagePair,
+                db, identityId, presented, newJti, messagePair,
             );
             if (outcome.kind === 'rotate') {
                 return { jti: outcome.newJti };
@@ -4302,28 +4289,17 @@ export const routes: Route[] = [
         },
     }),
     // Revoke the whole chain a jti belongs to (log out one
-    // session). Path identity must match the jti's ledger
-    // identity or 403. Read and appends ride one transaction;
-    // an unknown jti is an idempotent no-op that still
-    // appends its pair (revokeTokenChain guards both exit
-    // paths).
+    // session). A jti outside the path identity's own
+    // collection is unknown: an idempotent no-op that still
+    // appends its pair. Read and appends ride one
+    // transaction (revokeTokenChain guards both exit paths).
     route('identities/:id/tokens/:jti/revocation', {
         post: async (db, p, _body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const presented = param(p, 1);
-            const owner = identityForJti(
-                await deriveIdentityTokenEventsForJti(
-                    db, presented,
-                ),
-                presented,
+            await revokeTokenChain(
+                db, identityId, presented, messagePair,
             );
-            if (owner !== null && owner !== identityId) {
-                throw new ApiError(
-                    'token does not belong to this identity',
-                    HTTP_FORBIDDEN,
-                );
-            }
-            await revokeTokenChain(db, presented, messagePair);
         },
     }),
     // Nested provider events (credentials shape). Dual-read

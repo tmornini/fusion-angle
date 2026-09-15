@@ -42,7 +42,6 @@ import {
     planRotation,
     isTokenRevoked,
     chainIdForJti,
-    identityForJti,
     revocationAppends,
     jtiSetsEqual,
 } from './identity-tokens.ts';
@@ -86,7 +85,7 @@ import {
     deriveTokenRevocationsFor,
 } from './derive-identity-spine.ts';
 import {
-    deriveIdentityTokens,
+    deriveIdentityTokensFor,
     deriveIdentityTokenEventsForJti,
 } from './derive-identity-tokens.ts';
 import {
@@ -490,37 +489,35 @@ export async function tokenRevocationReason(
 
 // The two-step narrow shared by rotation and revocation, run
 // BOTH pre-tx (the provisional read) and in-tx (the
-// authoritative re-read): find the presented jti's chain, then
-// read the WHOLE chain — planRotation's replay path (and an
-// explicit revocation) act on every jti the chain has ever held,
-// so a jti-only read would under-revoke. Ledger-derived (Phase 13
-// Task 6, gate 7 discharged; Task 9a re-anchors BOTH call sites'
-// former row-plane reads here) — sourced from
-// deriveIdentityTokenEventsForJti/deriveIdentityTokens rather than
-// the identity_tokens EntityStore. `db` is the plain adapter for
-// planRotationAttempt/planRevocationAttempt's own PRE-TX
-// provisional read below, and an open transaction view (adapter-
-// shaped) for rotateRefreshJti/revokeTokenChain's own IN-TX
-// re-read. Two independent family scans (one per derivation call)
-// mirror an EntityStore's own two independent getAllWhere calls —
-// the SAME shape, never worse.
+// authoritative re-read): ONE collection read of the
+// identity's own tokens (deriveIdentityTokensFor — the
+// nested prefix plus, until Auth 1b, the leftover flat
+// prefix filtered to this identity), folded in memory first
+// for the presented jti's chain_id, then for every row of
+// that chain — planRotation's replay path and an explicit
+// revocation act on every jti the chain has ever held, so a
+// jti-only fold would under-revoke. A jti absent from this
+// identity's collection is unknown: chainId null, rows
+// empty. The refresh grant already verified the JWT
+// (claims.sub); the rotation and revocation routes carry the
+// identity on their path. Never the whole plane (spec
+// 2026-09-15 exact-read folds § 1).
 async function readTokenChainFromLedger(
     db: DbAdapter,
+    identityId: Id,
     jti: string,
 ): Promise<{
     readonly chainId: string | null;
-    readonly identityId: Id | null;
     readonly rows: readonly IdentityTokenEntity[];
 }> {
-    const byJti = await deriveIdentityTokenEventsForJti(db, jti);
-    const chainId = chainIdForJti(byJti, jti);
-    const identityId = identityForJti(byJti, jti);
+    const collection = await deriveIdentityTokensFor(
+        db, identityId,
+    );
+    const chainId = chainIdForJti(collection, jti);
     const rows = chainId === null
-        ? byJti
-        : (await deriveIdentityTokens(db)).filter(
-            (row) => row.chain_id === chainId,
-        );
-    return { chainId, identityId, rows };
+        ? []
+        : collection.filter((row) => row.chain_id === chainId);
+    return { chainId, rows };
 }
 
 // Each append's event, paired with its OWN formed event pair —
@@ -600,6 +597,7 @@ export type RotationOutcome =
 // genuinely fresh per attempt.
 async function planRotationAttempt(
     adapter: DbAdapter,
+    identityId: Id,
     presentedJti: string,
     newJti: string,
     operationId: string,
@@ -608,7 +606,7 @@ async function planRotationAttempt(
     readonly writes: readonly TokenEventWrite[];
 }> {
     const { rows } = await readTokenChainFromLedger(
-        adapter, presentedJti,
+        adapter, identityId, presentedJti,
     );
     const plan = planRotation(rows, presentedJti, newJti, nowUtc());
     const appends = plan.kind === 'unknown' ? [] : plan.appends;
@@ -650,6 +648,7 @@ async function planRotationAttempt(
 // → abort the transaction and retry with a wholly fresh attempt.
 export async function rotateRefreshJti(
     adapter: DbAdapter,
+    identityId: Id,
     presentedJti: string,
     newJti: string,
     messagePair?: MessagePair,
@@ -662,12 +661,13 @@ export async function rotateRefreshJti(
         attempt++
     ) {
         const provisional = await planRotationAttempt(
-            adapter, presentedJti, newJti, operationId,
+            adapter, identityId, presentedJti, newJti,
+            operationId,
         );
         try {
             return await adapter.transaction(async (view) => {
                     const { rows } = await readTokenChainFromLedger(
-                        view, presentedJti,
+                        view, identityId, presentedJti,
                     );
                     const freshPlan = planRotation(
                         rows, presentedJti, newJti, nowUtc(),
@@ -706,19 +706,21 @@ export async function rotateRefreshJti(
 // One revocation attempt's PRE-TX groundwork: the provisional
 // read — FLIPPED onto readTokenChainFromLedger (Phase 13 Task 6)
 // — + revocationAppends' plan (bytes unchanged) + a pre-minted
-// row id and event pair per append. An unknown jti (no chain, no
-// identity) plans zero appends — the SAME no-op shape
-// revokeTokenChain has always handed an unknown jti.
+// row id and event pair per append. An unknown jti (no chain in
+// this identity's collection) plans zero appends — the SAME
+// no-op shape revokeTokenChain has always handed an unknown jti.
 async function planRevocationAttempt(
     adapter: DbAdapter,
+    identityId: Id,
     jti: string,
     operationId: string,
 ): Promise<{
     readonly writes: readonly TokenEventWrite[];
 }> {
-    const { chainId, identityId, rows } =
-        await readTokenChainFromLedger(adapter, jti);
-    const appends = chainId === null || identityId === null
+    const { chainId, rows } = await readTokenChainFromLedger(
+        adapter, identityId, jti,
+    );
+    const appends = chainId === null
         ? []
         : revocationAppends(rows, chainId, identityId, nowUtc());
     return {
@@ -751,6 +753,7 @@ async function planRevocationAttempt(
 // above) — never a silent, incomplete success.
 export async function revokeTokenChain(
     adapter: DbAdapter,
+    identityId: Id,
     jti: string,
     messagePair?: MessagePair,
 ): Promise<void> {
@@ -762,16 +765,16 @@ export async function revokeTokenChain(
         attempt++
     ) {
         const provisional = await planRevocationAttempt(
-            adapter, jti, operationId,
+            adapter, identityId, jti, operationId,
         );
         try {
             await adapter.transaction(async (view) => {
-                    const { chainId, identityId, rows } =
+                    const { chainId, rows } =
                         await readTokenChainFromLedger(
-                            view, jti,
+                            view, identityId, jti,
                         );
                     const freshAppends =
-                        chainId === null || identityId === null
+                        chainId === null
                             ? []
                             : revocationAppends(
                                 rows, chainId, identityId,
@@ -854,8 +857,8 @@ async function grantRefresh(
         seed, body, verified.claims.sub, HTTP_OK, response,
     );
     const outcome = await rotateRefreshJti(
-        adapter, verified.claims.jti, newJti,
-        messagePair,
+        adapter, verified.claims.sub, verified.claims.jti,
+        newJti, messagePair,
     );
     if (outcome.kind === 'rotate') {
         return {

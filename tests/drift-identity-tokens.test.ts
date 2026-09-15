@@ -377,20 +377,24 @@ Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
         action: 'rotated', chain_id: CHAIN_TX, at: AT2,
     }, DEV_TOKEN);
 
-    const preTx =
-        await deriveIdentityTokenEventsForJti(db, JTI_TX);
+    const preTx = await deriveIdentityTokenEventsForJti(
+        db, JTI_TX, 'XXZruirZyAOoRpNxaDnpSA',
+    );
     const inTx = await db.transaction(
-        (view) =>
-            deriveIdentityTokenEventsForJti(view, JTI_TX),
+        (view) => deriveIdentityTokenEventsForJti(
+            view, JTI_TX, 'XXZruirZyAOoRpNxaDnpSA',
+        ),
     );
     assertEquals(inTx, preTx);
     assertStrictEquals(preTx.length, 2);
 
-    const preTxMissing =
-        await deriveIdentityTokenEventsForJti(db, GHOST_JTI);
+    const preTxMissing = await deriveIdentityTokenEventsForJti(
+        db, GHOST_JTI, 'XXZruirZyAOoRpNxaDnpSA',
+    );
     const inTxMissing = await db.transaction(
-        (view) =>
-            deriveIdentityTokenEventsForJti(view, GHOST_JTI),
+        (view) => deriveIdentityTokenEventsForJti(
+            view, GHOST_JTI, 'XXZruirZyAOoRpNxaDnpSA',
+        ),
     );
     assertEquals(inTxMissing, preTxMissing);
     assertEquals(preTxMissing, []);

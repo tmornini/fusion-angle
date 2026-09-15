@@ -19,7 +19,7 @@ import {
     latestActionForJti,
 } from '../api/identity-tokens.ts';
 import {
-    deriveIdentityTokens,
+    deriveIdentityTokensFor,
 } from '../api/derive-identity-tokens.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -69,7 +69,9 @@ Deno.test(
         const { jti: next } = await rotate(db, ROOT_JTI);
         assertNotStrictEquals(next, ROOT_JTI);
         // issued(root) + rotated(root) + issued(next) = 3
-        const rows = await deriveIdentityTokens(db);
+        const rows = await deriveIdentityTokensFor(
+            db, 'XXZruirZyAOoRpNxaDnpSA',
+        );
         assertStrictEquals(rows.length, 3);
         assertStrictEquals(
             latestActionForJti(rows, ROOT_JTI), 'rotated');
@@ -89,7 +91,9 @@ Deno.test(
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);
-        const rows = await deriveIdentityTokens(db);
+        const rows = await deriveIdentityTokensFor(
+            db, 'XXZruirZyAOoRpNxaDnpSA',
+        );
         assertStrictEquals(
             latestActionForJti(rows, ROOT_JTI), 'revoked');
         assertStrictEquals(
@@ -106,7 +110,9 @@ Deno.test(
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);
-        const rows = await deriveIdentityTokens(db);
+        const rows = await deriveIdentityTokensFor(
+            db, 'XXZruirZyAOoRpNxaDnpSA',
+        );
         assertStrictEquals(rows.length, 1);
     },
 );
@@ -121,7 +127,9 @@ Deno.test(
             {},
             DEV_TOKEN,
         );
-        const rows = await deriveIdentityTokens(db);
+        const rows = await deriveIdentityTokensFor(
+            db, 'XXZruirZyAOoRpNxaDnpSA',
+        );
         assertStrictEquals(
             latestActionForJti(rows, ROOT_JTI), 'revoked');
         assertStrictEquals(
@@ -139,7 +147,64 @@ Deno.test(
             {},
             DEV_TOKEN,
         );
-        const rows = await deriveIdentityTokens(db);
+        const rows = await deriveIdentityTokensFor(
+            db, 'XXZruirZyAOoRpNxaDnpSA',
+        );
         assertStrictEquals(rows.length, 1);
+    },
+);
+
+// Spec § 1 "Unknown": a jti outside THIS identity's own
+// tokens collection is unknown to this identity — the
+// chain lookup reads one collection, never the plane, so a
+// chain another identity owns is not seen, not 403'd. Same
+// security (you cannot rotate or revoke a chain you do not
+// own), the unknown status. DEV_TOKEN is the root admin, so
+// the gate admits the foreign path and the handler decides.
+const OTHER_IDENTITY = 'toccYYkLEABmlbpHJalgtQ';
+
+Deno.test(
+    'rotating another identity\'s jti is unknown: 409, and'
+        + ' the owning chain stays live',
+    async () => {
+        const db = await seededDb();
+        const err = await assertRejects(
+            () => POST(
+                db,
+                `identities/${OTHER_IDENTITY}/tokens/`
+                    + `${ROOT_JTI}/rotation`,
+                {},
+                DEV_TOKEN,
+            ),
+        ) as RequestError;
+        assertInstanceOf(err, RequestError);
+        assertStrictEquals(err.status, 409);
+        const rows = await deriveIdentityTokensFor(
+            db, 'XXZruirZyAOoRpNxaDnpSA',
+        );
+        assertStrictEquals(rows.length, 1);
+        assertStrictEquals(
+            latestActionForJti(rows, ROOT_JTI), 'issued');
+    },
+);
+
+Deno.test(
+    'revoking another identity\'s jti is a 2xx no-op that'
+        + ' leaves the owning chain live',
+    async () => {
+        const db = await seededDb();
+        await POST(
+            db,
+            `identities/${OTHER_IDENTITY}/tokens/`
+                + `${ROOT_JTI}/revocation`,
+            {},
+            DEV_TOKEN,
+        );
+        const rows = await deriveIdentityTokensFor(
+            db, 'XXZruirZyAOoRpNxaDnpSA',
+        );
+        assertStrictEquals(rows.length, 1);
+        assertStrictEquals(
+            latestActionForJti(rows, ROOT_JTI), 'issued');
     },
 );

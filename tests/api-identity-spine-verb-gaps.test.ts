@@ -817,7 +817,11 @@ Deno.test('POST /identity-tokens/:jti/revocation is retired'
     assertStrictEquals(res.status, 404);
 });
 
-Deno.test('POST rotation 403s when path identity is not the'
+// Spec 2026-09-15 exact-read folds § 1: the chain lookup reads
+// the path identity's OWN tokens collection, so a jti another
+// identity owns is unknown to it — 409, the same status as
+// reuse. Same security, the unknown status.
+Deno.test('POST rotation 409s when path identity is not the'
 + ' jti owner', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -838,7 +842,7 @@ Deno.test('POST rotation 403s when path identity is not the'
             + 'rotation',
         token, {},
     ));
-    assertStrictEquals(res.status, 403);
+    assertStrictEquals(res.status, 409);
 });
 
 Deno.test('GET /identities/:id/tokens/:tid 404s for an absent'

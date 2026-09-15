@@ -39,7 +39,7 @@ import {
 } from '../api/types.ts';
 import {
     deriveIdentityToken,
-    deriveIdentityTokens,
+    deriveIdentityTokensFor,
 } from '../api/derive-identity-tokens.ts';
 import { deriveTokenRevocation } from
     '../api/derive-identity-spine.ts';
@@ -240,7 +240,7 @@ Deno.test('a rotation appends its pair at an operation path:'
     const stored = await db.messagePairs.getById(row!.id);
     const storedBody = await responseFromStored(stored).json();
     assertEquals(storedBody, wireBody);
-    const rows = await deriveIdentityTokens(db);
+    const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     assertStrictEquals(
         latestActionForJti(rows, wireBody.jti), 'issued');
 });
@@ -267,7 +267,7 @@ async () => {
         DEV_TOKEN, {},
     ));
     assertStrictEquals(second.status, 409);
-    const rows = await deriveIdentityTokens(db);
+    const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     assertStrictEquals(latestActionForJti(rows, ROOT_JTI), 'revoked');
     const requests = await db.messagePairs.getAll();
 
@@ -312,7 +312,7 @@ Deno.test('a revocation appends its pair at an operation path:'
     );
     assert(row);
     assertStrictEquals(row!.name, '');
-    const rows = await deriveIdentityTokens(db);
+    const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     assertStrictEquals(latestActionForJti(rows, ROOT_JTI), 'revoked');
 });
 
@@ -335,7 +335,7 @@ async () => {
     assert(row);
     // The domain ledger stays untouched by the no-op — only
     // the shadow pair records that the request happened.
-    const rows = await deriveIdentityTokens(db);
+    const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     assertStrictEquals(rows.length, 1);
 });
 
@@ -442,8 +442,9 @@ function postToken(
 // the derived event itself.
 async function assertRootEventMessagePair(
     db: MemoryDbAdapter,
+    identityId: string,
 ): Promise<void> {
-    const rows = await deriveIdentityTokens(db);
+    const rows = await deriveIdentityTokensFor(db, identityId);
     assertStrictEquals(rows.length, 1);
     const root = rows[0]!;
     const requests = await db.messagePairs.getAll();
@@ -516,12 +517,12 @@ async () => {
         client_id: 'web',
     });
     assertStrictEquals(res.status, 201);
-    await assertRootEventMessagePair(db);
+    await assertRootEventMessagePair(db, CURRENT_ID);
     // KEY-BY-ANCHOR (Phase 13 Task 7, gate 3): the issued root's
     // row id is now the code's OWN sha256 digest, not a fresh
     // mint — the same value the SAME document's event pair name
     // carries (assertRootEventMessagePair's own name match above).
-    const [root] = await deriveIdentityTokens(db);
+    const [root] = await deriveIdentityTokensFor(db, CURRENT_ID);
     assertStrictEquals(root!.id, await sha256Hex(AUTH_CODE));
     const requests = await db.messagePairs.getAll();
     const operationMessagePair = requests.find(
@@ -546,7 +547,7 @@ Deno.test('a token-exchange grant (a real /authentication/token'
         subject_token: subject, actor_token: subject,
     });
     assertStrictEquals(res.status, 201);
-    await assertRootEventMessagePair(db);
+    await assertRootEventMessagePair(db, CURRENT_ID);
 });
 
 Deno.test('a client_credentials grant appends its root\'s own'
@@ -570,7 +571,7 @@ Deno.test('a client_credentials grant appends its root\'s own'
         client_id: CLIENT_ID, client_assertion: assertion,
     });
     assertStrictEquals(res.status, 201);
-    await assertRootEventMessagePair(db);
+    await assertRootEventMessagePair(db, CLIENT_ID);
 });
 
 // ── synthesized event pairs: rotation and revocation (Phase 13
@@ -619,7 +620,7 @@ Deno.test('a rotation\'s ROTATE branch appends an event pair for'
     ));
     assertStrictEquals(res.status, 201);
     const { jti: newJti } = await res.json() as { jti: string };
-    const rows = await deriveIdentityTokens(db);
+    const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     const retired = rows.find(
         r => r.jti === ROOT_JTI && r.action === 'rotated',
     );
@@ -653,7 +654,7 @@ Deno.test('a rotation\'s REPLAY branch appends an event pair for'
         DEV_TOKEN, {},
     ));
     assertStrictEquals(replay.status, 409);
-    const rows = await deriveIdentityTokens(db);
+    const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     const revokedRoot = rows.find(
         r => r.jti === ROOT_JTI && r.action === 'revoked',
     );
@@ -675,7 +676,7 @@ async () => {
         DEV_TOKEN, {},
     ));
     assertStrictEquals(res.status, 201);
-    const rows = await deriveIdentityTokens(db);
+    const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     const revoked = rows.find(
         r => r.jti === ROOT_JTI && r.action === 'revoked',
     );
@@ -697,7 +698,7 @@ Deno.test('revoking an unknown jti appends NO event pair — only its'
     // +1: only the operation message pair — no row written, so
     // no event pair to match it.
     assertStrictEquals(requests.length, before + 1);
-    const rows = await deriveIdentityTokens(db);
+    const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     assertStrictEquals(rows.length, 1);   // the seeded root, untouched
 });
 
@@ -706,7 +707,7 @@ Deno.test('two concurrent rotations of one jti: exactly one'
 + ' branch (chain revoked + 409) — today\'s exact outcome, now'
 + ' with pairs (the retry loop\'s divergence path)', async () => {
     const db = await seededDb();
-    const before = await deriveIdentityTokens(db);
+    const before = await deriveIdentityTokensFor(db, CURRENT_ID);
     const beforeIds = new Set(before.map(r => r.id));
     const [a, b] = await Promise.all([
         handleRequest(db, req(
@@ -722,7 +723,7 @@ Deno.test('two concurrent rotations of one jti: exactly one'
     const winner = a.status === 201 ? a : b;
     const { jti: successorJti } =
         await winner.json() as { jti: string };
-    const rows = await deriveIdentityTokens(db);
+    const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     // The whole chain ends up dead: the seeded root AND the
     // winner's own successor both revoked — the loser's replay
     // branch revoked everything the chain has ever held.
@@ -755,13 +756,13 @@ async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const flatToken = await devToken('XXZruirZyAOoRpNxaDnpSA');
-    const before = await deriveIdentityTokens(db);
+    const before = await deriveIdentityTokensFor(db, CURRENT_ID);
     const beforeIds = new Set(before.map(r => r.id));
     const exchanged = await exchangeBearerForOrganization(
         db, flatToken, 'AjdvjuECVZEgZoFajaIEkg',
     );
     assertStrictEquals(exchanged.ok, true);
-    const after = await deriveIdentityTokens(db);
+    const after = await deriveIdentityTokensFor(db, CURRENT_ID);
     const newRows = after.filter(r => !beforeIds.has(r.id));
     assertStrictEquals(newRows.length, 1);
     await assertEventMessagePairForRow(db, newRows[0]!.id);
@@ -817,7 +818,7 @@ Deno.test('revokeTokenChain racing a concurrent rotateRefreshJti on'
     // — this holds regardless of which side of the race wins.
     assertStrictEquals(revoke.status, 201);
     assert([201, 409].includes(rotate.status));
-    const rows = await deriveIdentityTokens(db);
+    const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     const chainId = rows.find(r => r.jti === ROOT_JTI)!.chain_id;
     const everyJti = new Set(
         rows.filter(r => r.chain_id === chainId).map(r => r.jti),
@@ -876,7 +877,8 @@ Deno.test('rotateRefreshJti propagates a non-divergence transaction'
     const faulting = adapterWithFaultingTransaction(db, fault);
     await assertRejects(
         () => rotateRefreshJti(
-            faulting.adapter, ROOT_JTI, generateIdentifier(),
+            faulting.adapter, CURRENT_ID, ROOT_JTI,
+            generateIdentifier(),
         ),
         Error,
         'store exploded',
@@ -891,7 +893,9 @@ Deno.test('revokeTokenChain propagates a non-divergence transaction'
     const fault = new Error('store exploded');
     const faulting = adapterWithFaultingTransaction(db, fault);
     await assertRejects(
-        () => revokeTokenChain(faulting.adapter, ROOT_JTI),
+        () => revokeTokenChain(
+            faulting.adapter, CURRENT_ID, ROOT_JTI,
+        ),
         Error,
         'store exploded',
     );
