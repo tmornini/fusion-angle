@@ -1,4 +1,8 @@
-import { assert, assertNotMatch } from '@std/assert';
+import {
+    assert,
+    assertMatch,
+    assertNotMatch,
+} from '@std/assert';
 import { connectPostgres } from
     '../api/postgres-client.ts';
 import { PostgresBackend } from
@@ -399,5 +403,44 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assertNotMatch(text, /requests_pkey/);
         assertNotMatch(text, /Join/);
         assertIndexPlan(text, ['message_pairs_document']);
+        assertMatch(text, /Limit/);
+        assertMatch(
+            text,
+            /Index Scan Backward using message_pairs_document/,
+        );
+        assertNotMatch(text, /Sort/);
     });
+
+    Deno.test(
+        'the whole ledger is the one seq scan, sorted',
+        async () => {
+            const plans = await sql.query<
+                Record<string, unknown>
+            >`
+                EXPLAIN
+                SELECT * FROM message_pairs
+                ORDER BY response_at, id
+            `;
+            const text = explainText(plans);
+            assertMatch(text, /Sort/);
+            assertMatch(text, /Seq Scan on message_pairs/);
+        },
+    );
+
+    Deno.test(
+        'the head lock rows the primary key',
+        async () => {
+            const plans = await sql.query<
+                Record<string, unknown>
+            >`
+                EXPLAIN
+                SELECT id FROM message_pairs
+                WHERE id = ${uuidTextOfIdentifier(ideaId)}
+                FOR UPDATE
+            `;
+            const text = explainText(plans);
+            assertMatch(text, /LockRows/);
+            assertIndexPlan(text, ['message_pairs_pkey']);
+        },
+    );
 }
