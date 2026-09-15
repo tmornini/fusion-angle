@@ -47,7 +47,6 @@ export interface PostgresTx extends Tx {
         readonly method: string;
     } | null>;
     notify(event: NotificationEvent): Promise<void>;
-    stampSchemaMarker(): Promise<void>;
 }
 
 export class PostgresBackend implements StorageBackend {
@@ -257,13 +256,6 @@ function postgresTx(
                     ${FUSION_EVENTS_CHANNEL},
                     ${payload}
                 )
-            `;
-        },
-        async stampSchemaMarker(): Promise<void> {
-            await sql.query`
-                INSERT INTO schema_marker ("only")
-                VALUES (true)
-                ON CONFLICT DO NOTHING
             `;
         },
     };

@@ -168,7 +168,6 @@ export interface Tx {
         readonly method: string;
     } | null>;
     notify?(event: NotificationEvent): Promise<void>;
-    stampSchemaMarker?(): Promise<void>;
 }
 
 export interface WriteLocks {
