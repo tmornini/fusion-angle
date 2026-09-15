@@ -130,7 +130,7 @@ async function putMessagePair(
 ): Promise<void> {
     const id = id22(n);
     const at = atStamp(n);
-    await tx.put('message_pairs', {
+    await tx.append('message_pairs', {
         id,
         path: collection,
         name: name,
@@ -152,7 +152,7 @@ async function putAuthorize(
 ): Promise<void> {
     const id = id22(n);
     const at = atStamp(n);
-    await tx.put('message_pairs', {
+    await tx.append('message_pairs', {
         id,
         path: AUTH_COLLECTION,
         name: '',

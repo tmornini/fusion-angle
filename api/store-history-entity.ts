@@ -38,15 +38,17 @@ export class HistoryEntityStore<
     async getCollectionPairs(path: string): Promise<T[]> {
         return this.#run(
             [this.#table], 'readonly',
-            tx => tx.getWhere<T>(this.#table, 'path', path),
+            tx => tx.getCollectionPairs<T>(
+                this.#table, path,
+            ),
         );
     }
 
     async getPairsByRequestHash(hash: string): Promise<T[]> {
         return this.#run(
             [this.#table], 'readonly',
-            tx => tx.getWhere<T>(
-                this.#table, 'request_hash', hash,
+            tx => tx.getPairsByRequestHash<T>(
+                this.#table, hash,
             ),
         );
     }
@@ -57,7 +59,9 @@ export class HistoryEntityStore<
     ): Promise<T[]> {
         return this.#run(
             [this.#table], 'readonly',
-            tx => tx.getAddress<T>(this.#table, path, name),
+            tx => tx.getDocumentHistory<T>(
+                this.#table, path, name,
+            ),
         );
     }
 
@@ -77,7 +81,7 @@ export class HistoryEntityStore<
         return this.#run(
             [this.#table], 'readonly',
             async (tx) => {
-                const row = await tx.get<T>(
+                const row = await tx.getById<T>(
                     this.#table, id,
                 );
                 if (!row) {
@@ -102,7 +106,7 @@ export class HistoryEntityStore<
         } as T;
         await this.#run(
             [this.#table], 'readwrite',
-            tx => tx.put(this.#table, written),
+            tx => tx.append(this.#table, written),
         );
         return written;
     }

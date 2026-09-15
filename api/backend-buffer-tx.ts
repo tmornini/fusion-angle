@@ -3,7 +3,6 @@ import {
 } from './storage-serialize.ts';
 import {
     UniqueConstraintError,
-    assertGetWhereColumn,
     uniqueColumns,
     type Tx,
     type TxMode,
@@ -45,7 +44,7 @@ function byResponseAtThenId(
 // commits by flushing the dirty set and rolls back by
 // discarding it. The memory backend fills and drains this
 // buffer; Postgres does not use it. The
-// NOT-NULL gate runs at `put` time, so a bad row throws
+// NOT-NULL gate runs at `append` time, so a bad row throws
 // inside `fn` and the whole transaction rolls back.
 //
 // Reads hand out copies, never the buffered or committed
@@ -76,7 +75,7 @@ export function bufferTx(
         }
     };
     return {
-        async get<T extends { id: string }>(
+        async getById<T extends { id: string }>(
             table: string,
             id: string,
         ): Promise<T | null> {
@@ -94,22 +93,31 @@ export function bufferTx(
                 row => ({ ...row }),
             ) as T[];
         },
-        async getWhere<T extends { id: string }>(
+        async getCollectionPairs<T extends { id: string }>(
             table: string,
-            column: string,
-            key: string,
+            path: string,
         ): Promise<T[]> {
-            assertGetWhereColumn(table, column);
             return scoped(table)
                 .filter(row => (
                     row as Record<string, unknown>
-                )[column] === key)
+                )['path'] === path)
                 .sort(byResponseAtThenId)
                 .map(row => ({ ...row })) as T[];
         },
-        async getAddress<T extends { id: string }>(
+        async getPairsByRequestHash<T extends { id: string }>(
             table: string,
-            collection: string,
+            hash: string,
+        ): Promise<T[]> {
+            return scoped(table)
+                .filter(row => (
+                    row as Record<string, unknown>
+                )['request_hash'] === hash)
+                .sort(byResponseAtThenId)
+                .map(row => ({ ...row })) as T[];
+        },
+        async getDocumentHistory<T extends { id: string }>(
+            table: string,
+            path: string,
             name: string,
         ): Promise<T[]> {
             return scoped(table)
@@ -117,7 +125,7 @@ export function bufferTx(
                     const rec = row as
                         Record<string, unknown>;
                     return rec['path']
-                        === collection
+                        === path
                         && rec['name'] === name;
                 })
                 .sort(byResponseAtThenId)
@@ -125,7 +133,7 @@ export function bufferTx(
         },
         async getWhereBody<T extends { id: string }>(
             table: string,
-            collection: string,
+            path: string,
             containment: Record<string, unknown>,
         ): Promise<T[]> {
             return scoped(table)
@@ -134,7 +142,7 @@ export function bufferTx(
                         Record<string, unknown>;
                     if (
                         rec['path']
-                        !== collection
+                        !== path
                     ) {
                         return false;
                     }
@@ -153,7 +161,7 @@ export function bufferTx(
                 .sort(byResponseAtThenId)
                 .map((row) => ({ ...row })) as T[];
         },
-        async put<T extends { id: string }>(
+        async append<T extends { id: string }>(
             table: string,
             row: T,
         ): Promise<void> {

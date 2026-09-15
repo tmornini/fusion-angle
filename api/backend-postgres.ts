@@ -3,7 +3,6 @@
 // then FOR UPDATE. Notify is in-transaction.
 
 import {
-    assertGetWhereColumn,
     type StorageBackend,
     type Tx,
     type TxMode,
@@ -32,9 +31,9 @@ export const POSTGRES_DROP_SCHEMA =
     + 'GRANT ALL ON SCHEMA public TO public;';
 
 export interface PostgresTx extends Tx {
-    getAddress<T extends { id: string }>(
+    getDocumentHistory<T extends { id: string }>(
         table: string,
-        collection: string,
+        path: string,
         name: string,
     ): Promise<T[]>;
     lock(label: string): Promise<void>;
@@ -131,12 +130,12 @@ function postgresTx(
         }
     };
     return {
-        async get<T extends { id: string }>(
+        async getById<T extends { id: string }>(
             table: string,
             id: string,
         ): Promise<T | null> {
             const name = assertMessageTable(table);
-            const rows = await selectById(sql, name, id);
+            const rows = await selectPairById(sql, name, id);
             const row = rows[0];
             return row === undefined
                 ? null
@@ -149,41 +148,49 @@ function postgresTx(
             const rows = await selectAll(sql, name);
             return rows.map((row) => entityOf<T>(row));
         },
-        async getWhere<T extends { id: string }>(
+        async getCollectionPairs<T extends { id: string }>(
             table: string,
-            column: string,
-            key: string,
+            path: string,
         ): Promise<T[]> {
             const name = assertMessageTable(table);
-            assertIndexedColumn(name, column);
-            const rows = await selectWhere(
-                sql, name, column, key,
+            const rows = await selectCollectionPairs(
+                sql, name, path,
             );
             return rows.map((row) => entityOf<T>(row));
         },
-        async getAddress<T extends { id: string }>(
+        async getPairsByRequestHash<T extends { id: string }>(
             table: string,
-            collection: string,
-            documentName: string,
+            hash: string,
         ): Promise<T[]> {
             const name = assertMessageTable(table);
-            const rows = await selectAddress(
-                sql, name, collection, documentName,
+            const rows = await selectPairsByRequestHash(
+                sql, name, hash,
+            );
+            return rows.map((row) => entityOf<T>(row));
+        },
+        async getDocumentHistory<T extends { id: string }>(
+            table: string,
+            path: string,
+            name: string,
+        ): Promise<T[]> {
+            const known = assertMessageTable(table);
+            const rows = await selectDocumentHistory(
+                sql, known, path, name,
             );
             return rows.map((row) => entityOf<T>(row));
         },
         async getWhereBody<T extends { id: string }>(
             table: string,
-            collection: string,
+            path: string,
             containment: Record<string, unknown>,
         ): Promise<T[]> {
             const name = assertMessageTable(table);
             const rows = await selectWhereBody(
-                sql, name, collection, containment,
+                sql, name, path, containment,
             );
             return rows.map((row) => entityOf<T>(row));
         },
-        async put<T extends { id: string }>(
+        async append<T extends { id: string }>(
             table: string,
             row: T,
         ): Promise<void> {
@@ -264,13 +271,6 @@ function assertMessageTable(
         return table;
     }
     throw new Error('unknown table: ' + table);
-}
-
-function assertIndexedColumn(
-    table: 'message_pairs',
-    column: string,
-): void {
-    assertGetWhereColumn(table, column);
 }
 
 function uuidTextOfIdentifier(id: string): string {
@@ -354,7 +354,7 @@ function textField(
     return value;
 }
 
-async function selectById(
+async function selectPairById(
     sql: SqlClient,
     _table: 'message_pairs',
     id: string,
@@ -375,40 +375,39 @@ async function selectAll(
     `;
 }
 
-async function selectWhere(
+async function selectCollectionPairs(
     sql: SqlClient,
     _table: 'message_pairs',
-    column: string,
-    key: string,
+    path: string,
 ): Promise<Record<string, unknown>[]> {
-    if (column === 'path') {
-        return sql.query`
-            SELECT * FROM message_pairs
-            WHERE path = ${key}
-            ORDER BY response_at, id
-        `;
-    }
-    if (column === 'request_hash') {
-        return sql.query`
-            SELECT * FROM message_pairs
-            WHERE request_hash = ${key}
-            ORDER BY response_at, id
-        `;
-    }
-    throw new Error(
-        'getWhere does not accept ' + column,
-    );
+    return sql.query`
+        SELECT * FROM message_pairs
+        WHERE path = ${path}
+        ORDER BY response_at, id
+    `;
 }
 
-async function selectAddress(
+async function selectPairsByRequestHash(
     sql: SqlClient,
     _table: 'message_pairs',
-    collection: string,
+    hash: string,
+): Promise<Record<string, unknown>[]> {
+    return sql.query`
+        SELECT * FROM message_pairs
+        WHERE request_hash = ${hash}
+        ORDER BY response_at, id
+    `;
+}
+
+async function selectDocumentHistory(
+    sql: SqlClient,
+    _table: 'message_pairs',
+    path: string,
     name: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
         SELECT * FROM message_pairs
-        WHERE path = ${collection}
+        WHERE path = ${path}
           AND name = ${name}
         ORDER BY response_at, id
     `;
@@ -417,12 +416,12 @@ async function selectAddress(
 async function selectWhereBody(
     sql: SqlClient,
     _table: 'message_pairs',
-    collection: string,
+    path: string,
     containment: Record<string, unknown>,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
         SELECT * FROM message_pairs
-        WHERE path = ${collection}
+        WHERE path = ${path}
           AND message_body(response) @>
               ${containment}::jsonb
         ORDER BY response_at, id

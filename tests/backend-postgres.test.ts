@@ -192,89 +192,74 @@ async () => {
     );
 });
 
-Deno.test('getWhere throws for name', async () => {
-    const fake = fakeClient();
-    const backend = new PostgresBackend(fake.sql);
-    const err = await assertRejects(
-        () => backend.transaction(
-            ['message_pairs'],
-            'readonly',
-            (tx) => tx.getWhere(
-                'message_pairs', 'name', '42',
-            ),
-        ),
-    ) as Error;
-    assertInstanceOf(err, Error);
-    assertStrictEquals(
-        err.message, 'getWhere does not accept name',
-    );
-    assertStrictEquals(fake.calls.length, 0);
-});
-
-Deno.test('getWhere supports indexed single columns',
+Deno.test('getCollectionPairs selects by path, ordered',
 async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     await backend.transaction(
         ['message_pairs'],
         'readonly',
-        (tx) => tx.getWhere(
-            'message_pairs', 'path'
-                , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-        ),
-    );
-    const text = fake.calls[0]!.text;
-    assertMatch(text, /WHERE path = \$1/);
-    assertMatch(text, /ORDER BY response_at, id/);
-});
-
-Deno.test('getAddress uses path and name, ordered',
-async () => {
-    const fake = fakeClient();
-    const backend = new PostgresBackend(fake.sql);
-    await backend.transaction(
-        ['message_pairs'],
-        'readonly',
-        (tx) => tx.getAddress(
+        (tx) => tx.getCollectionPairs(
             'message_pairs',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-            '42',
         ),
     );
     const text = fake.calls[0]!.text;
     assertMatch(text, /WHERE path = \$1/);
-    assertMatch(text, /AND name = \$2/);
     assertMatch(text, /ORDER BY response_at, id/);
-    assertEquals(
-        fake.calls[0]!.values,
-        ['/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42'],
-    );
 });
+
+Deno.test(
+    'getPairsByRequestHash selects by request_hash, ordered',
+    async () => {
+        const fake = fakeClient();
+        const backend = new PostgresBackend(fake.sql);
+        await backend.transaction(
+            ['message_pairs'],
+            'readonly',
+            (tx) => tx.getPairsByRequestHash(
+                'message_pairs',
+                'a'.repeat(64),
+            ),
+        );
+        const text = fake.calls[0]!.text;
+        assertMatch(text, /WHERE request_hash = \$1/);
+        assertMatch(text, /ORDER BY response_at, id/);
+    },
+);
+
+Deno.test(
+    'getDocumentHistory selects by path and name, ordered',
+    async () => {
+        const fake = fakeClient();
+        const backend = new PostgresBackend(fake.sql);
+        await backend.transaction(
+            ['message_pairs'],
+            'readonly',
+            (tx) => tx.getDocumentHistory(
+                'message_pairs',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+                '42',
+            ),
+        );
+        const text = fake.calls[0]!.text;
+        assertMatch(text, /WHERE path = \$1/);
+        assertMatch(text, /AND name = \$2/);
+        assertMatch(text, /ORDER BY response_at, id/);
+        assertEquals(
+            fake.calls[0]!.values,
+            [
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+                '42',
+            ],
+        );
+    },
+);
 
 Deno.test('schema has no operation indexes', () => {
     assertNotMatch(
         POSTGRES_SCHEMA,
         /CREATE INDEX.*operation/,
-    );
-});
-
-Deno.test('getWhere throws for operation_id', async () => {
-    const fake = fakeClient();
-    const backend = new PostgresBackend(fake.sql);
-    const err = await assertRejects(
-        () => backend.transaction(
-            ['message_pairs'],
-            'readonly',
-            (tx) => tx.getWhere(
-                'message_pairs',
-                'operation_id',
-                'WvNiHVgksjrlfhPfdgfcyQ',
-            ),
-        ),
-    ) as Error;
-    assertInstanceOf(err, Error);
-    assertStrictEquals(
-        err.message, 'getWhere does not accept operation_id',
     );
 });
 
@@ -315,7 +300,7 @@ async () => {
     await backend.transaction(
         ['message_pairs'],
         'readwrite',
-        (tx) => tx.put('message_pairs', MESSAGE_PAIR_ROW),
+        (tx) => tx.append('message_pairs', MESSAGE_PAIR_ROW),
     );
     const values = fake.calls[0]!.values;
     const bytes = values.filter(
@@ -346,7 +331,7 @@ async () => {
     const row = await backend.transaction(
         ['message_pairs'],
         'readonly',
-        (tx) => tx.get<typeof MESSAGE_PAIR_ROW>(
+        (tx) => tx.getById<typeof MESSAGE_PAIR_ROW>(
             'message_pairs', MESSAGE_PAIR_ROW.id,
         ),
     );

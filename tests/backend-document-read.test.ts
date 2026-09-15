@@ -1,8 +1,5 @@
 import {
     assertEquals,
-    assertInstanceOf,
-    assertRejects,
-    assertStrictEquals,
 } from '@std/assert';
 import { MemoryStorageBackend }
     from '../api/backend-memory.ts';
@@ -48,7 +45,8 @@ const ROWS: Row[] = [
     },
 ];
 
-Deno.test('getAddress is path+name, ordered by at,id',
+Deno.test(
+    'getDocumentHistory is path+name, ordered by at,id',
 async () => {
     const backend = new MemoryStorageBackend();
     await backend.ensureTables(['t']);
@@ -56,13 +54,13 @@ async () => {
         ['t'], 'readwrite',
         async (tx) => {
             for (const row of ROWS) {
-                await tx.put('t', row);
+                await tx.append('t', row);
             }
         },
     );
     const got = await backend.transaction(
         ['t'], 'readonly',
-        (tx) => tx.getAddress<Row>(
+        (tx) => tx.getDocumentHistory<Row>(
             't', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 , 'AjdvjuECVZEgZoFajaIEkg',
         ),
@@ -73,7 +71,8 @@ async () => {
     );
 });
 
-Deno.test('getDocumentHistory delegates to Tx.getAddress',
+Deno.test(
+    'getDocumentHistory delegates to Tx.getDocumentHistory',
 async () => {
     const backend = new MemoryStorageBackend();
     await backend.ensureTables(['message_pairs']);
@@ -126,21 +125,21 @@ async () => {
     await backend.transaction(
         ['message_pairs'], 'readwrite',
         async (tx) => {
-            await tx.put('message_pairs', {
+            await tx.append('message_pairs', {
                 id: 'hit',
                 path: '/authentication/authorize/',
                 name: '',
                 response_at: '2026-01-01T00:00:00.000001Z',
                 response: jsonWire({ code: 'abc' }),
             });
-            await tx.put('message_pairs', {
+            await tx.append('message_pairs', {
                 id: 'miss',
                 path: '/authentication/authorize/',
                 name: '',
                 response_at: '2026-01-01T00:00:00.000002Z',
                 response: jsonWire({ code: 'zzz' }),
             });
-            await tx.put('message_pairs', {
+            await tx.append('message_pairs', {
                 id: 'other',
                 path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                     + '',
@@ -159,41 +158,4 @@ async () => {
         ),
     );
     assertEquals(got.map((row) => row.id), ['hit']);
-});
-
-Deno.test('memory getWhere refuses name', async () => {
-    const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['message_pairs']);
-    const err = await assertRejects(
-        () => backend.transaction(
-            ['message_pairs'],
-            'readonly',
-            (tx) => tx.getWhere(
-                'message_pairs', 'name', 'AjdvjuECVZEgZoFajaIEkg',
-            ),
-        ),
-    ) as Error;
-    assertInstanceOf(err, Error);
-    assertStrictEquals(
-        err.message, 'getWhere does not accept name',
-    );
-});
-
-Deno.test('memory getWhere refuses operation_id',
-async () => {
-    const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['message_pairs']);
-    const err = await assertRejects(
-        () => backend.transaction(
-            ['message_pairs'],
-            'readonly',
-            (tx) => tx.getWhere(
-                'message_pairs', 'operation_id', 'x',
-            ),
-        ),
-    ) as Error;
-    assertInstanceOf(err, Error);
-    assertStrictEquals(
-        err.message, 'getWhere does not accept operation_id',
-    );
 });

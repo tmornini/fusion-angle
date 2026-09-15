@@ -117,39 +117,35 @@ export type TxMode = 'readonly' | 'readwrite';
 // fulfills it with a native transaction; the memory backend
 // simulates it (buffer touched tables, flush on success,
 // discard on throw).
-// `get` returns null for an absent row — absence is
+// `getById` returns null for an absent row — absence is
 // modeled at the call site, never via a sentinel.
 export interface Tx {
-    get<T extends { id: string }>(
+    getById<T extends { id: string }>(
         table: string,
         id: string,
     ): Promise<T | null>;
     getAll<T extends { id: string }>(
         table: string,
     ): Promise<T[]>;
-    // The rows where `column` equals `key` — the indexed
-    // answer to `WHERE column = key`, served without
-    // scanning the table. `column` must carry a secondary
-    // index (TABLE_INDEXES); the native factory resolves it
-    // to `store.index(column)`. The matches keep each tier's
-    // own row order, so a reducer folds them exactly as
-    // it folds a full read.
-    getWhere<T extends { id: string }>(
+    getCollectionPairs<T extends { id: string }>(
         table: string,
-        column: string,
-        key: string,
+        path: string,
     ): Promise<T[]>;
-    getAddress<T extends { id: string }>(
+    getPairsByRequestHash<T extends { id: string }>(
         table: string,
-        collection: string,
+        hash: string,
+    ): Promise<T[]>;
+    getDocumentHistory<T extends { id: string }>(
+        table: string,
+        path: string,
         name: string,
     ): Promise<T[]>;
     getWhereBody<T extends { id: string }>(
         table: string,
-        collection: string,
+        path: string,
         containment: Record<string, unknown>,
     ): Promise<T[]>;
-    put<T extends { id: string }>(
+    append<T extends { id: string }>(
         table: string,
         row: T,
     ): Promise<void>;
@@ -158,7 +154,7 @@ export interface Tx {
     lock?(label: string): Promise<void>;
     lockHead?(id: string): Promise<void>;
     latestPutDelete?(
-        collection: string,
+        path: string,
         name: string,
     ): Promise<{
         readonly id: string;
@@ -335,34 +331,13 @@ export function uniqueColumns(
         .map((spec) => indexColumn(spec));
 }
 
-// The columns `getWhere` accepts per table — the
-// keyed-read allow-list both backends enforce
-// (`assertGetWhereColumn`). Postgres indexes are
+// Secondary indexes per table. Postgres indexes are
 // declared in `schema-postgres.ts`.
-// Tables absent here are read in full or by primary key: the
-// collection IS its rows.
+// Tables absent here are read in full or by primary key:
+// the collection IS its rows.
 export const TABLE_INDEXES:
     Record<string, readonly TableIndexSpec[]> = {
     message_pairs: [
         'path', 'request_hash',
     ],
 };
-
-export function assertGetWhereColumn(
-    table: string,
-    column: string,
-): void {
-    if (column === 'name') {
-        throw new Error(
-            'getWhere does not accept name',
-        );
-    }
-    const specs = TABLE_INDEXES[table];
-    if (specs === undefined) return;
-    const allowed = specs.map(indexColumn);
-    if (!allowed.includes(column)) {
-        throw new Error(
-            'getWhere does not accept ' + column,
-        );
-    }
-}

@@ -137,7 +137,7 @@ Deno.test('missing table is loud 500, not recovery', () => {
 });
 
 Deno.test('plain errors pass through', () => {
-    const err = new Error('getWhere does not accept name');
+    const err = new Error('plain error');
     assertStrictEquals(mapPostgresError(err), err);
 });
 

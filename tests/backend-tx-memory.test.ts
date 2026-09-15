@@ -29,7 +29,7 @@ Deno.test(
         await backend.ensureTables(['t']);
         await backend.transaction(
             ['t'], 'readwrite',
-            tx => tx.put<Row>('t', { id: 'a', n: 1 }),
+            tx => tx.append<Row>('t', { id: 'a', n: 1 }),
         );
         await backend.ensureTables(['t']);
         const rows = await backend.transaction(
@@ -62,11 +62,11 @@ Deno.test(
         await backend.ensureTables(['t']);
         await backend.transaction(
             ['t'], 'readwrite',
-            tx => tx.put<Row>('t', { id: 'a', n: 7 }),
+            tx => tx.append<Row>('t', { id: 'a', n: 7 }),
         );
         const got = await backend.transaction(
             ['t'], 'readonly',
-            tx => tx.get<Row>('t', 'a'),
+            tx => tx.getById<Row>('t', 'a'),
         );
         assertStrictEquals(got!.n, 7);
     },
@@ -79,7 +79,7 @@ Deno.test(
         await backend.ensureTables(['t']);
         const got = await backend.transaction(
             ['t'], 'readonly',
-            tx => tx.get<Row>('t', 'nope'),
+            tx => tx.getById<Row>('t', 'nope'),
         );
         assertStrictEquals(got, null);
     },
@@ -93,9 +93,9 @@ Deno.test(
         await backend.transaction(
             ['a', 'b'], 'readwrite',
             async (tx) => {
-                await tx.put<Row>('a', { id: 'AjdvjuECVZEgZoFajaIEkg'
+                await tx.append<Row>('a', { id: 'AjdvjuECVZEgZoFajaIEkg'
                     , n: 1 });
-                await tx.put<Row>('b', { id: 'BBjWJsjYIDkTRKIIPrzWRw'
+                await tx.append<Row>('b', { id: 'BBjWJsjYIDkTRKIIPrzWRw'
                     , n: 2 });
             },
         );
@@ -120,10 +120,10 @@ Deno.test(
             () => backend.transaction(
                 ['a', 'b'], 'readwrite',
                 async (tx) => {
-                    await tx.put<Row>(
+                    await tx.append<Row>(
                         'a', { id: 'AjdvjuECVZEgZoFajaIEkg', n: 1 },
                     );
-                    await tx.put<Row>(
+                    await tx.append<Row>(
                         'b', { id: 'BBjWJsjYIDkTRKIIPrzWRw', n: 2 },
                     );
                     throw new Error('boom');
@@ -152,7 +152,7 @@ Deno.test(
         await assertRejects(
             () => backend.transaction(
                 ['t'], 'readwrite',
-                tx => tx.put(
+                tx => tx.append(
                     't',
                     { id: 'a', x: null } as {
                         id: string;
@@ -178,7 +178,7 @@ Deno.test(
         await assertRejects(
             () => backend.transaction(
                 ['t'], 'readonly',
-                tx => tx.put<Row>('t', { id: 'a', n: 1 }),
+                tx => tx.append<Row>('t', { id: 'a', n: 1 }),
             ),
             Error,
             'readonly',
@@ -195,7 +195,7 @@ Deno.test(
             ['t'], 'readwrite',
             async (tx) => {
                 const rows = await tx.getAll<Row>('t');
-                await tx.put<Row>('t', {
+                await tx.append<Row>('t', {
                     id: `r${rows.length}`,
                     n: rows.length,
                 });

@@ -14,11 +14,11 @@ Deno.test(
         const run = backendRunner(backend);
         await run(
             ['t'], 'readwrite',
-            tx => tx.put<Row>('t', { id: 'a', n: 1 }),
+            tx => tx.append<Row>('t', { id: 'a', n: 1 }),
         );
         const got = await run(
             ['t'], 'readonly',
-            tx => tx.get<Row>('t', 'a'),
+            tx => tx.getById<Row>('t', 'a'),
         );
         assertStrictEquals(got!.n, 1);
     },
@@ -40,7 +40,7 @@ Deno.test(
                     ['ignored'], 'readonly',
                     (inner) => {
                         assertStrictEquals(inner, outer);
-                        return inner.put<Row>('t', {
+                        return inner.append<Row>('t', {
                             id: 'a', n: 9,
                         });
                     },
@@ -49,7 +49,7 @@ Deno.test(
         );
         const got = await backend.transaction(
             ['t'], 'readonly',
-            tx => tx.get<Row>('t', 'a'),
+            tx => tx.getById<Row>('t', 'a'),
         );
         assertStrictEquals(got!.n, 9);
     },
