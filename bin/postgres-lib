@@ -23,8 +23,10 @@ assert_render_cli() {
         const text = Deno.readTextFileSync(
             Deno.args[0],
         );
+        // The CLI writes expires_at as epoch
+        // seconds; older sessions wrote RFC-3339.
         const match = text.match(
-            /expires_at:\s*"?([0-9T:.\-]+Z)/,
+            /expires_at:\s*"?([0-9T:.\-]+Z|[0-9]+)/,
         );
         if (!match) {
             Deno.stderr.writeSync(enc.encode(
@@ -32,7 +34,10 @@ assert_render_cli() {
             ));
             Deno.exit(1);
         }
-        const exp = Date.parse(match[1]);
+        const MS_PER_SEC = 1000;
+        const exp = /^[0-9]+$/.test(match[1])
+            ? Number(match[1]) * MS_PER_SEC
+            : Date.parse(match[1]);
         if (!Number.isFinite(exp)
             || Date.now() >= exp) {
             Deno.stderr.writeSync(enc.encode(
