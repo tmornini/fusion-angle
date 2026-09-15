@@ -25,8 +25,11 @@ import type { NotificationEvent } from '../api/notifications.ts';
 import {
     validateInvitationEntity,
 } from '../api/validators.ts';
-import { UnauthorizedError } from
-    '../api/http-errors.ts';
+import {
+    HTTP_CONFLICT,
+    RequestError,
+    UnauthorizedError,
+} from '../api/http-errors.ts';
 import {
     createRequestContext,
     type RequestContext,
@@ -559,11 +562,13 @@ Deno.test('accept after revoke is rejected, no membership',
     await postInvitationRevocation(tony, inv.id);
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
-    await assertRejects(
+    const err = await assertRejects(
         () => postInvitationAcceptance(
             toccYYkLEABmlbpHJalgtQ, inv.id,
             'BBjWJsjYIDkTRKIIPrzWRw',
-        ));
+        )) as RequestError;
+    assertInstanceOf(err, RequestError);
+    assertStrictEquals(err.status, HTTP_CONFLICT);
     const wayne = (await deriveMembershipsAll(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ'
             && m.organization_id === 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -581,11 +586,13 @@ Deno.test('accept after decline is rejected',
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
     await postInvitationDecline(toccYYkLEABmlbpHJalgtQ, inv.id);
-    await assertRejects(
+    const err = await assertRejects(
         () => postInvitationAcceptance(
             toccYYkLEABmlbpHJalgtQ, inv.id,
             'BBjWJsjYIDkTRKIIPrzWRw',
-        ));
+        )) as RequestError;
+    assertInstanceOf(err, RequestError);
+    assertStrictEquals(err.status, HTTP_CONFLICT);
 }));
 
 Deno.test('decline after accept is rejected',
@@ -602,10 +609,12 @@ Deno.test('decline after accept is rejected',
         toccYYkLEABmlbpHJalgtQ, inv.id,
         'BBjWJsjYIDkTRKIIPrzWRw',
     );
-    await assertRejects(
+    const err = await assertRejects(
         () => postInvitationDecline(
             toccYYkLEABmlbpHJalgtQ, inv.id,
-        ));
+        )) as RequestError;
+    assertInstanceOf(err, RequestError);
+    assertStrictEquals(err.status, HTTP_CONFLICT);
 }));
 
 Deno.test('granting the same email twice is idempotent',

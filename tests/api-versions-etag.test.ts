@@ -19,7 +19,6 @@ import {
 import { seedOrganizationDocument } from
     './test-fixtures.ts';
 import {
-    seedIdentityPii,
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -220,10 +219,6 @@ async function seedInviteeWorld(): Promise<DbAdapter> {
         phone: '', bio: '',
     });
     await seedPersonIdentity(db, DAVE, {
-        name: 'Dave', email: 'dave@x.com',
-        phone: '', bio: '',
-    });
-    await seedIdentityPii(db, DAVE, {
         name: 'Dave', email: 'dave@x.com',
         phone: '', bio: '',
     });

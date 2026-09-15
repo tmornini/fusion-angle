@@ -52,6 +52,8 @@ const JTI_W3 = generateIdentifier();
 const CHAIN_W3 = generateIdentifier();
 const JTI_W1 = generateIdentifier();
 const CHAIN_W = generateIdentifier();
+const JTI_W2 = generateIdentifier();
+const CHAIN_W2 = generateIdentifier();
 const JTI_TX = generateIdentifier();
 const CHAIN_TX = generateIdentifier();
 const GHOST_JTI = generateIdentifier();
@@ -264,13 +266,12 @@ Deno.test('GET /identities/:id/tokens + /:jti are wire'
 + ' 404 body',
 async () => {
     const db = await freshDb();
-    // Inserted in NON-lex order (the w3 jti, then the w1 jti) so
-    // the memory backend's own insertion order and the
-    // derivation's byIdAscending order genuinely diverge — a
-    // test that inserted in lex order already would pass by
-    // ACCIDENT of insertion order, never by the property it
-    // claims to prove. The third PUT revisits the w1 jti's OWN
-    // document, so the collection returns its 'rotated' HEAD.
+    // THREE distinct jti documents, so byIdAscending genuinely
+    // ORDERS the collection: with two names, insertion order is
+    // already the sorted order half the time, and the test would
+    // pass by coin flip rather than by the property it claims to
+    // prove. The last PUT revisits the w1 jti's OWN document, so
+    // the collection returns its 'rotated' HEAD.
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
         + JTI_W3, {
         jti: JTI_W3, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
@@ -280,6 +281,11 @@ async () => {
         + JTI_W1, {
         jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_W, at: AT,
+    }, DEV_TOKEN);
+    await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
+        + JTI_W2, {
+        jti: JTI_W2, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
+        action: 'issued', chain_id: CHAIN_W2, at: AT,
     }, DEV_TOKEN);
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
         + JTI_W1, {
@@ -296,6 +302,11 @@ async () => {
             jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'rotated', chain_id: CHAIN_W, at: AT2,
             id: JTI_W1,
+        },
+        {
+            jti: JTI_W2, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
+            action: 'issued', chain_id: CHAIN_W2, at: AT,
+            id: JTI_W2,
         },
         {
             jti: JTI_W3, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
