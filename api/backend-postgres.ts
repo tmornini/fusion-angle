@@ -338,12 +338,28 @@ function textField(
     return value;
 }
 
+// Every pair read names its columns so the two stamps come
+// back as the six-digit zulu text the gate minted: the
+// columns are timestamptz, the seam speaks RFC-3339. The
+// list is written per statement — the SqlClient seam carries
+// no fragments — and ORDER BY qualifies the native column,
+// because a bare name binds to the alias.
+
 async function selectPairById(
     sql: SqlClient,
     id: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM message_pairs
+        SELECT id, path, name, requester_identity_id, method,
+            to_char(request_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS request_at,
+            request_hash, request,
+            to_char(response_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS response_at,
+            response, operation_id
+        FROM message_pairs
         WHERE id = ${uuidTextOfIdentifier(id)}
     `;
 }
@@ -352,8 +368,17 @@ async function selectAll(
     sql: SqlClient,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM message_pairs
-        ORDER BY response_at, id
+        SELECT id, path, name, requester_identity_id, method,
+            to_char(request_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS request_at,
+            request_hash, request,
+            to_char(response_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS response_at,
+            response, operation_id
+        FROM message_pairs
+        ORDER BY message_pairs.response_at, message_pairs.id
     `;
 }
 
@@ -362,9 +387,18 @@ async function selectCollectionPairs(
     path: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM message_pairs
+        SELECT id, path, name, requester_identity_id, method,
+            to_char(request_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS request_at,
+            request_hash, request,
+            to_char(response_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS response_at,
+            response, operation_id
+        FROM message_pairs
         WHERE path = ${path}
-        ORDER BY response_at, id
+        ORDER BY message_pairs.response_at, message_pairs.id
     `;
 }
 
@@ -373,9 +407,18 @@ async function selectPairsByRequestHash(
     hash: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM message_pairs
+        SELECT id, path, name, requester_identity_id, method,
+            to_char(request_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS request_at,
+            request_hash, request,
+            to_char(response_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS response_at,
+            response, operation_id
+        FROM message_pairs
         WHERE request_hash = ${hash}
-        ORDER BY response_at, id
+        ORDER BY message_pairs.response_at, message_pairs.id
     `;
 }
 
@@ -385,10 +428,19 @@ async function selectDocumentHistory(
     name: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM message_pairs
+        SELECT id, path, name, requester_identity_id, method,
+            to_char(request_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS request_at,
+            request_hash, request,
+            to_char(response_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS response_at,
+            response, operation_id
+        FROM message_pairs
         WHERE path = ${path}
           AND name = ${name}
-        ORDER BY response_at, id
+        ORDER BY message_pairs.response_at, message_pairs.id
     `;
 }
 
@@ -415,24 +467,44 @@ async function selectHeadPair(
     name: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM message_pairs
+        SELECT id, path, name, requester_identity_id, method,
+            to_char(request_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS request_at,
+            request_hash, request,
+            to_char(response_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS response_at,
+            response, operation_id
+        FROM message_pairs
         WHERE path = ${path}
           AND name = ${name}
           AND method IN ('PUT', 'DELETE')
-        ORDER BY response_at DESC, id DESC
+        ORDER BY message_pairs.response_at DESC,
+            message_pairs.id DESC
         LIMIT 1
     `;
 }
 
 // DISTINCT ON takes the first row per name straight off
 // the document index read backward; the outer sort orders
-// the heads, a small set.
+// the heads, a small set. The inner query keeps its native
+// columns (no aliases); the outer list formats the stamps.
 async function selectCollectionHeadPairs(
     sql: SqlClient,
     path: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM (
+        SELECT id, path, name, requester_identity_id, method,
+            to_char(request_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS request_at,
+            request_hash, request,
+            to_char(response_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS response_at,
+            response, operation_id
+        FROM (
             SELECT DISTINCT ON (name) *
             FROM message_pairs
             WHERE path = ${path}
@@ -440,7 +512,7 @@ async function selectCollectionHeadPairs(
             ORDER BY name DESC, response_at DESC, id DESC
         ) heads
         WHERE method = 'PUT'
-        ORDER BY response_at, id
+        ORDER BY heads.response_at, heads.id
     `;
 }
 
@@ -450,11 +522,20 @@ async function selectWhereBody(
     containment: Record<string, unknown>,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM message_pairs
+        SELECT id, path, name, requester_identity_id, method,
+            to_char(request_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS request_at,
+            request_hash, request,
+            to_char(response_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                AS response_at,
+            response, operation_id
+        FROM message_pairs
         WHERE path = ${path}
           AND message_body(response) @>
               ${containment}::jsonb
-        ORDER BY response_at, id
+        ORDER BY message_pairs.response_at, message_pairs.id
     `;
 }
 
@@ -479,6 +560,14 @@ async function insertPair(
     const operationId = uuidTextOfIdentifier(
         textField(row, 'operation_id'),
     );
+    // ::text before ::timestamptz, measured: npm:postgres
+    // infers a bound parameter's wire type from the cast (or
+    // the destination column) and round-trips a bare
+    // ${x}::timestamptz through its own encoder, which drops
+    // sub-millisecond digits. Landing the parameter as text
+    // first keeps the driver out of the way; Postgres itself
+    // then parses the full six-digit microsecond text at
+    // full resolution, server-side.
     const inserted = await sql.query<{ id: string }>`
         INSERT INTO message_pairs (
             id, path, name,
@@ -489,8 +578,9 @@ async function insertPair(
         ) VALUES (
             ${id}, ${path}, ${name},
             ${requester}, ${method},
-            ${requestAt}, ${requestHash}, ${request},
-            ${responseAt}, ${response},
+            ${requestAt}::text::timestamptz, ${requestHash},
+            ${request},
+            ${responseAt}::text::timestamptz, ${response},
             ${operationId}
         )
         ON CONFLICT (id) DO NOTHING

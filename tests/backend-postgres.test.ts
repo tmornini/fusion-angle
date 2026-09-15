@@ -203,7 +203,10 @@ async () => {
     );
     const text = fake.calls[0]!.text;
     assertMatch(text, /WHERE path = \$1/);
-    assertMatch(text, /ORDER BY response_at, id/);
+    assertMatch(
+        text,
+        /ORDER BY message_pairs\.response_at, message_pairs\.id/,
+    );
 });
 
 Deno.test(
@@ -217,7 +220,10 @@ Deno.test(
         );
         const text = fake.calls[0]!.text;
         assertMatch(text, /WHERE request_hash = \$1/);
-        assertMatch(text, /ORDER BY response_at, id/);
+        assertMatch(text, new RegExp(
+            'ORDER BY message_pairs\\.response_at, '
+            + 'message_pairs\\.id',
+        ));
     },
 );
 
@@ -235,7 +241,10 @@ Deno.test(
         const text = fake.calls[0]!.text;
         assertMatch(text, /WHERE path = \$1/);
         assertMatch(text, /AND name = \$2/);
-        assertMatch(text, /ORDER BY response_at, id/);
+        assertMatch(text, new RegExp(
+            'ORDER BY message_pairs\\.response_at, '
+            + 'message_pairs\\.id',
+        ));
         assertEquals(
             fake.calls[0]!.values,
             [
@@ -268,7 +277,10 @@ async () => {
     assertMatch(
         text, /message_body\(response\) @>/,
     );
-    assertMatch(text, /ORDER BY response_at, id/);
+    assertMatch(text, new RegExp(
+        'ORDER BY message_pairs\\.response_at, '
+        + 'message_pairs\\.id',
+    ));
     assertEquals(
         fake.calls[0]!.values[0],
         '/authentication/authorize/',
@@ -344,3 +356,62 @@ Deno.test('POSTGRES_SCHEMA has no CREATE VIEW', () => {
         /CREATE\s+VIEW/i,
     );
 });
+
+const ZULU_REQUEST_AT = new RegExp(
+    'to_char\\(request_at AT TIME ZONE \'UTC\','
+    + '\\s*\'YYYY-MM-DD"T"HH24:MI:SS\\.US"Z"\'\\)'
+    + '\\s*AS request_at',
+);
+const ZULU_RESPONSE_AT = new RegExp(
+    'to_char\\(response_at AT TIME ZONE \'UTC\','
+    + '\\s*\'YYYY-MM-DD"T"HH24:MI:SS\\.US"Z"\'\\)'
+    + '\\s*AS response_at',
+);
+
+Deno.test(
+    'every pair read formats both stamps as zulu text',
+    async () => {
+        const fake = fakeClient();
+        const backend = new PostgresBackend(fake.sql);
+        const path = MESSAGE_PAIR_ROW.path;
+        await backend.transaction('readonly', async (tx) => {
+            await tx.getById(MESSAGE_PAIR_ROW.id);
+            await tx.getAll();
+            await tx.getCollectionPairs(path);
+            await tx.getPairsByRequestHash(
+                MESSAGE_PAIR_ROW.request_hash,
+            );
+            await tx.getDocumentHistory(
+                path, MESSAGE_PAIR_ROW.name,
+            );
+            await tx.getWhereBody(path, { code: 'abc' });
+            await tx.getHeadPair(path, MESSAGE_PAIR_ROW.name);
+            await tx.getCollectionHeadPairs(path);
+        });
+        assertStrictEquals(fake.calls.length, 8);
+        for (const call of fake.calls) {
+            assertMatch(call.text, ZULU_REQUEST_AT);
+            assertMatch(call.text, ZULU_RESPONSE_AT);
+        }
+    },
+);
+
+Deno.test(
+    'append casts both stamps to timestamptz',
+    async () => {
+        const fake = fakeClient();
+        const backend = new PostgresBackend(fake.sql);
+        await backend.transaction(
+            'readwrite',
+            (tx) => tx.append(MESSAGE_PAIR_ROW),
+        );
+        const text = fake.calls[0]!.text;
+        // ::text::timestamptz, not a bare ::timestamptz:
+        // measured against real Postgres, npm:postgres
+        // truncates a bound ${x}::timestamptz parameter to
+        // millisecond precision; the ::text hop keeps the
+        // driver from touching it (see insertPair).
+        assertMatch(text, /\$6::text::timestamptz/);
+        assertMatch(text, /\$9::text::timestamptz/);
+    },
+);
