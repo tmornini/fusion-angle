@@ -159,7 +159,6 @@ export interface Tx {
     // Postgres write coordination. Other backends omit
     // these; callers treat absence as a no-op.
     lock?(label: string): Promise<void>;
-    lockShared?(label: string): Promise<void>;
     lockHead?(id: string): Promise<void>;
     latestPutDelete?(
         collection: string,

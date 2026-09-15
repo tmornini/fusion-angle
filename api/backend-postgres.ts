@@ -38,7 +38,6 @@ export interface PostgresTx extends Tx {
         uriId: string,
     ): Promise<T[]>;
     lock(label: string): Promise<void>;
-    lockShared(label: string): Promise<void>;
     lockHead(id: string): Promise<void>;
     latestPutDelete(
         collection: string,
@@ -212,10 +211,7 @@ function postgresTx(
             await upsertRow(sql, name, written);
         },
         async lock(label: string): Promise<void> {
-            await advisoryLock(sql, label, false);
-        },
-        async lockShared(label: string): Promise<void> {
-            await advisoryLock(sql, label, true);
+            await advisoryLock(sql, label);
         },
         async lockHead(id: string): Promise<void> {
             await sql.query`
@@ -276,15 +272,8 @@ function postgresTx(
 async function advisoryLock(
     sql: SqlClient,
     label: string,
-    shared: boolean,
 ): Promise<void> {
     const key = Number(await advisoryKey(label));
-    if (shared) {
-        await sql.query`
-            SELECT pg_advisory_xact_lock_shared(${key})
-        `;
-        return;
-    }
     await sql.query`
         SELECT pg_advisory_xact_lock(${key})
     `;
