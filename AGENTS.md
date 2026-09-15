@@ -385,8 +385,7 @@ as a `--preload`, not an import.
 Every `transaction(…)` body awaits ONLY row ops —
 validators, crypto, hash, `serializeWire`, and scrypt
 run OUTSIDE the tx. Sync compute between row ops is
-fine. Nested `view.transaction` re-enters the same
-tx; its tables must be a subset of the outer set.
+fine. Nested `view.transaction` re-enters the same tx.
 A transaction holds its pooled connection and its
 advisory locks for its whole body; the memory backend
 serializes whole transactions, so a long body stalls

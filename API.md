@@ -122,7 +122,7 @@ Status ladder:
 ## Compositions worth knowing
 
 Six interiors. Each is store primitives in one
-`db.transaction(MESSAGE_TABLES)`, not nested HTTP.
+`db.transaction(fn)`, not nested HTTP.
 
 **Idea conversion.**
 `POST organizations/:id/ideas/:id/conversion` in
@@ -169,7 +169,7 @@ without S256 is 400; redeem verifies S256.
 
 POSTs do not re-enter `handleRequest`. One client call
 is one transaction: they compose store primitives
-inside `db.transaction(MESSAGE_TABLES)` (`api/db.ts`).
+inside `db.transaction(fn)` (`api/db.ts`).
 Atomicity is the platform primitive, not a simulated
 HTTP nest. Validators, crypto, hash, and
 `serializeWire` run outside the tx. See `AGENTS.md

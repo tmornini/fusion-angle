@@ -180,8 +180,8 @@ convention is five rules, not a framework:
 callable both pre-tx (passed `db`) and from within an
 already-open write-gate transaction (passed `view`);
 (b) a core never opens its own nested transaction;
-(c) a core reads only the stores its caller listed in
-`transaction(...)`;
+(c) a core reads the one table through the view its
+caller handed in `transaction(fn)`;
 (d) write-gate reads are entity-scoped (`getDocumentHistory`,
 `getCollectionPairs`), never a whole-plane `getAll()` of
 `message_pairs` on a hot path;
