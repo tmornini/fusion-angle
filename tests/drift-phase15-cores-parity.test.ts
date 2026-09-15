@@ -1,7 +1,6 @@
 import {
     assert,
     assertEquals,
-    assertNotStrictEquals,
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
@@ -9,7 +8,6 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
-    type DbAdapter,
     TABLE_NAMES,
 } from '../api/db.ts';
 import { nowUtc } from '../api/types.ts';
@@ -17,16 +15,11 @@ import {
     workOrderDocumentHeadFor,
     workOrderClaimHistoryFor,
     workOrderHistoryFor,
-    stateEventVisibilityFor,
     resolveOwningOrganization,
-    workOrderLifecycleStatesFor,
 } from '../api/derive-states.ts';
-import { canonicalPath } from '../api/message-pair.ts';
-import { deriveDocumentsAt } from '../api/derive-documents.ts';
 import {
     appendLegacyTransition,
 } from './legacy-transition-fixture.ts';
-import { buildIdeas } from '../api/mock-data/ideas.ts';
 import {
     flowGraphBindingsFromMessagePairs,
     deriveFlows,
@@ -37,7 +30,7 @@ import {
 import { latestByKey } from
     '../shared/ledger-reduction.ts';
 import type {
-    GraphEdge, WorkOrderEntity, StateEntity,
+    GraphEdge, WorkOrderEntity,
 } from '../api/types.ts';
 import {
     collectAttributeReferrers,
@@ -53,7 +46,6 @@ import {
 } from '../api/validators.ts';
 import {
     deriveIdeas,
-    deriveIdeaStateHistory,
 } from '../api/derive-ideas.ts';
 import { deriveProjects } from
     '../api/derive-projects.ts';
@@ -73,7 +65,6 @@ import {
 const N_START = generateIdentifier();
 const N_FINISH = generateIdentifier();
 const NO_SUCH_CLAIM_GRAPH_WO = generateIdentifier();
-const GHOST_EVENT_NOWHERE = generateIdentifier();
 const GHOST_NOWHERE_P15_FENCE = generateIdentifier();
 const P15_FNA_ADD = generateIdentifier();
 const P15_FNA_RM = generateIdentifier();
@@ -87,7 +78,6 @@ const WORKORDERID_FWO = generateIdentifier();
 const WORKORDERID_EV1 = generateIdentifier();
 const WORKORDERID_EV2 = generateIdentifier();
 const WORKORDERID_EV3 = generateIdentifier();
-const WORKORDERID_TE1 = generateIdentifier();
 const FLOWID_EV_RM = generateIdentifier();
 const FLOWID_EV_DEL = generateIdentifier();
 const WORKORDERID_TE = generateIdentifier();
@@ -124,33 +114,6 @@ function req(
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
-}
-
-// Every seeded work order's lifecycle across both seeded
-// organizations, by the entity-scoped derive (the bulk fold
-// is gone — spec 2026-09-15 § 5): one collection read per
-// organization lists the ids, then one scoped read each.
-async function seededWorkOrderLifecycle(
-    db: MemoryDbAdapter,
-): Promise<StateEntity[]> {
-    const rows: StateEntity[] = [];
-    for (const organization of [
-        STARK_ORGANIZATION, ORGANIZATION_TWO,
-    ]) {
-        const prefix = canonicalPath(
-            organization, '/work-orders/',
-        );
-        const heads = deriveDocumentsAt(
-            await db.messagePairs.getCollectionPairs(prefix),
-            prefix,
-        );
-        for (const workOrderId of heads.keys()) {
-            rows.push(...await workOrderLifecycleStatesFor(
-                db, organization, workOrderId,
-            ));
-        }
-    }
-    return rows;
 }
 
 function workOrderFlowGraph(
@@ -401,177 +364,6 @@ async () => {
     );
 });
 
-// -- stateEventVisibilityFor -------------------------------------
-
-// Phase Final Task 2: states ROW half stripped — the old
-// rawHasRow/fenced-getById three-way is retired. Callers that
-// still need a visibility label use stateEventVisibilityFor
-// on the message plane (the production source of truth).
-async function pairPlaneVisibility(
-    db: DbAdapter,
-    organization: string,
-    eventId: string,
-): Promise<'orphan' | 'visible' | 'hidden'> {
-    return stateEventVisibilityFor(
-        db, organization, eventId,
-    );
-}
-
-Deno.test('stateEventVisibilityFor: tier (i) event-append pairs'
-+ ' match the row-plane three-way (own / foreign / orphan);'
-+ ' pre-tx vs in-tx parity', async () => {
-    const db = await seededDb();
-    // C3: bulk deriveStates retired — sample event ids from
-    // surviving family lifecycle derives.
-    const sampleRows = [
-        ...await seededWorkOrderLifecycle(db),
-        ...await deriveIdeaStateHistory(
-            db, STARK_ORGANIZATION, buildIdeas()[0]!.id,
-        ),
-    ];
-    let ownEventId = '';
-    for (const row of sampleRows) {
-        const v = await pairPlaneVisibility(
-            db, STARK_ORGANIZATION, row.id,
-        );
-        if (v === 'visible') {
-            ownEventId = row.id;
-            break;
-        }
-    }
-    assertNotStrictEquals(ownEventId, '');
-
-    let foreignEventId = '';
-    for (const row of sampleRows) {
-        const v = await pairPlaneVisibility(
-            db, ORGANIZATION_TWO, row.id,
-        );
-        if (v === 'hidden') {
-            foreignEventId = row.id;
-            break;
-        }
-    }
-    assertNotStrictEquals(foreignEventId, '');
-
-    // Own → visible (tier i).
-    const preOwn = await stateEventVisibilityFor(
-        db, STARK_ORGANIZATION, ownEventId,
-    );
-    const inOwn = await db.transaction(
-        (view) => stateEventVisibilityFor(
-            view, STARK_ORGANIZATION, ownEventId,
-        ),
-    );
-    assertStrictEquals(preOwn, 'visible');
-    assertStrictEquals(inOwn, preOwn);
-    assertStrictEquals(
-        await pairPlaneVisibility(db, STARK_ORGANIZATION, ownEventId),
-        'visible',
-    );
-
-    // Foreign → hidden (tier i, cross-org by construction).
-    // foreignEventId is hidden TO org two — so its owner is
-    // not org two. Ask as org two.
-    const preForeign = await stateEventVisibilityFor(
-        db, ORGANIZATION_TWO, foreignEventId,
-    );
-    assertStrictEquals(preForeign, 'hidden');
-    assertStrictEquals(
-        await pairPlaneVisibility(db, ORGANIZATION_TWO, foreignEventId),
-        'hidden',
-    );
-
-    // Nowhere → orphan.
-    const preOrphan = await stateEventVisibilityFor(
-        db, STARK_ORGANIZATION, GHOST_EVENT_NOWHERE,
-    );
-    const inOrphan = await db.transaction(
-        (view) => stateEventVisibilityFor(
-            view, STARK_ORGANIZATION, GHOST_EVENT_NOWHERE,
-        ),
-    );
-    assertStrictEquals(preOrphan, 'orphan');
-    assertStrictEquals(inOrphan, 'orphan');
-    assertStrictEquals(
-        await pairPlaneVisibility(
-            db, STARK_ORGANIZATION, GHOST_EVENT_NOWHERE,
-        ),
-        'orphan',
-    );
-});
-
-Deno.test('stateEventVisibilityFor: tier (ii) op-born transition'
-+ ' event is visible to the owning org and hidden to a'
-+ ' foreign org (tier iii)', async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const workOrderId = generateIdentifier();
-    const graph = workOrderFlowGraph(8 * 60 * 60);
-    const transitionEventId = WORKORDERID_TE1;
-
-    const created = await handleRequest(db, req(
-        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token, {
-            id: workOrderId,
-            workOrder: {
-                display_id: 'vis-' + workOrderId,
-                flow_graph: graph,
-                position: 1,
-            },
-            flowWorkOrderId: WORKORDERID_FWO,
-            flowWorkOrder: {
-                flow_id: EMPTY_FLOW_ID,
-                work_order_id: workOrderId,
-                at: nowUtc(),
-            },
-            stateEventIds: [
-                WORKORDERID_EV1,
-                WORKORDERID_EV2,
-                WORKORDERID_EV3,
-            ],
-            stateEventAts: [nowUtc(), nowUtc(), nowUtc()],
-            states: [N_START, N_FINISH, 'claimed'],
-        },
-    ));
-    assertStrictEquals(created.status, 201);
-
-    const transitioned = await handleRequest(db, req(
-        'POST',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
-            + '/transition',
-        token,
-        {
-            transitionEventId,
-            targetState: N_FINISH,
-            release: null,
-            transitionAt: nowUtc(),
-        },
-    ));
-    assertStrictEquals(transitioned.status, 201);
-
-    // Op-born: no states/:id pair at transitionEventId;
-    // lives only inside the transition op body.
-    const byId = (await db.messagePairs.getAll()).filter(
-        (row) => row.name === transitionEventId,
-    );
-    const statesTail = '/' + 'states' + '/';
-    const statesHits = byId.filter((r) =>
-        r.path.endsWith(statesTail));
-    assertStrictEquals(statesHits.length, 0);
-
-    assertStrictEquals(
-        await stateEventVisibilityFor(
-            db, STARK_ORGANIZATION, transitionEventId,
-        ),
-        'visible',
-    );
-    assertStrictEquals(
-        await stateEventVisibilityFor(
-            db, ORGANIZATION_TWO, transitionEventId,
-        ),
-        'hidden',
-    );
-});
-
 Deno.test('resolveOwningOrganization: identity without a seat'
 + ' is unowned; seated identity is own-org / foreign-hidden',
 async () => {
@@ -761,45 +553,6 @@ async () => {
         );
     }
     // Phase Final Stage B: work_orders table retired.
-});
-
-Deno.test('residual pin: stateEventVisibilityFor matches the'
-+ ' row-plane three-way over a sample of seed events for'
-+ ' both organizations', async () => {
-    const db = await seededDb();
-    // C3: sample from surviving lifecycle derives (bulk
-    // deriveStates retired).
-    const allStates = await seededWorkOrderLifecycle(db);
-    assert(
-        allStates.length >= 7,
-        'need enough WO lifecycle rows for sampling',
-    );
-    const sampleIds = [
-        allStates[0]!.id,
-        allStates[Math.floor(allStates.length / 2)]!.id,
-        allStates[allStates.length - 1]!.id,
-        allStates[1]!.id,
-        allStates[2]!.id,
-        allStates[3]!.id,
-        allStates[4]!.id,
-    ];
-    for (const organization of [
-        STARK_ORGANIZATION, ORGANIZATION_TWO,
-    ]) {
-        for (const eventId of sampleIds) {
-            const derived = await stateEventVisibilityFor(
-                db, organization, eventId,
-            );
-            // Phase Final Task 2: message-plane only (row oracle
-            // retired with the states dual-write strip).
-            assert(
-                derived === 'visible'
-                || derived === 'hidden'
-                || derived === 'orphan',
-                organization + '/' + eventId,
-            );
-        }
-    }
 });
 
 Deno.test('residual pin: organizations self-as-owner —'
@@ -1490,7 +1243,6 @@ Deno.test('work-order history GET: 200/404 two-way for'
 
 // Derive-path (C4): workOrderHistoryFor throws on foreign
 // miss (404) and absent (404); own still returns folded rows.
-// stateEventVisibilityFor still drives RESTRICT visibility.
 Deno.test('workOrderHistoryFor visibility: own field_values,'
 + ' foreign rejects, absent rejects',
 async () => {
@@ -1504,18 +1256,6 @@ async () => {
     );
 
     // Own → history returns the transition fold.
-    assertStrictEquals(
-        await pairPlaneVisibility(
-            db, STARK_ORGANIZATION, transitionEventId,
-        ),
-        'visible',
-    );
-    assertStrictEquals(
-        await stateEventVisibilityFor(
-            db, STARK_ORGANIZATION, transitionEventId,
-        ),
-        'visible',
-    );
     const ownHistory = await workOrderHistoryFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
@@ -1527,18 +1267,6 @@ async () => {
     assertStrictEquals(ownTe!.field_values[0]!.id, fieldValueId);
 
     // Foreign → work-order ownership rejects.
-    assertStrictEquals(
-        await pairPlaneVisibility(
-            db, ORGANIZATION_TWO, transitionEventId,
-        ),
-        'hidden',
-    );
-    assertStrictEquals(
-        await stateEventVisibilityFor(
-            db, ORGANIZATION_TWO, transitionEventId,
-        ),
-        'hidden',
-    );
     await assertRejects(
         () => workOrderHistoryFor(
             db, ORGANIZATION_TWO, workOrderId,
@@ -1547,18 +1275,6 @@ async () => {
     );
 
     // Absent work order → EntityNotFoundError.
-    assertStrictEquals(
-        await pairPlaneVisibility(
-            db, STARK_ORGANIZATION, GHOST_P15_VIS,
-        ),
-        'orphan',
-    );
-    assertStrictEquals(
-        await stateEventVisibilityFor(
-            db, STARK_ORGANIZATION, GHOST_P15_VIS,
-        ),
-        'orphan',
-    );
     await assertRejects(
         () => workOrderHistoryFor(
             db, STARK_ORGANIZATION, GHOST_P15_VIS,

@@ -1052,8 +1052,8 @@ export async function postRecordWriteOp(
     payload: Record<string, unknown>,
     _actor: Id,
     messagePairs?: RecordWriteMessagePairs,
-    // Verified token organization for the RESTRICT SFV
-    // visibility probe (stateEventVisibilityFor). Optional so
+    // Verified token organization scoping the RESTRICT
+    // referrer sweep (collectAttributeReferrers). Optional so
     // the below-facade seed path (creates only; never removes
     // referenced attributes) keeps compiling; the live route
     // always supplies it when removals can fire.
