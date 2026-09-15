@@ -902,7 +902,7 @@ export async function handleRequest(
                 const head = await documentHeadAt(
                     effective, canonicalPrefix, name,
                 );
-                if (head === undefined) {
+                if (head === null) {
                     return Response.json(
                         { error: 'Not found: ' + pathname },
                         { status: HTTP_NOT_FOUND },

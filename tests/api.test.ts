@@ -274,22 +274,24 @@ Deno.test(
         const db = await freshDb();
         // GET ideas is flipped (Phase 2 Task 5): it derives from
         // the message ledger, never db.ideas, so the fault must
-        // be forced from the store the derivation actually reads.
-        // Task 8 (Phase 11): the fence's own
-        // default-organization fallback
+        // be forced from the store the derivation actually reads
+        // — the collection GET reads the heads through
+        // getCollectionHeadPairs. Task 8 (Phase 11): the fence's
+        // own default-organization fallback
         // ALSO derives from db.messagePairs now
         // (identityDefaultOrganization / deriveDefaultOrganization)
         // — so the fault is targeted at the ideas prefix alone,
         // letting the fence's own read through to the real
         // implementation unaffected.
-        const original = db.messagePairs.getCollectionPairs.bind(
-            db.messagePairs,
-        );
+        const original =
+            db.messagePairs.getCollectionHeadPairs.bind(
+                db.messagePairs,
+            );
         (db.messagePairs as unknown as {
-            getCollectionPairs: (
+            getCollectionHeadPairs: (
                 path: string,
             ) => ReturnType<typeof original>;
-        }).getCollectionPairs = async (path) => {
+        }).getCollectionHeadPairs = async (path) => {
             if (path === '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/') {
                 throw new Error('secret fault detail');
             }

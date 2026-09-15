@@ -4,12 +4,10 @@ import type {
 } from './types.ts';
 import { nowUtc } from './types.ts';
 import {
-    compareIdentifiers,
     generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
 import { pathAndNameOf } from './path-and-name.ts';
-import { messageStore } from './message-store.ts';
 import {
     buildRequestModel,
     buildResponseModel,
@@ -360,39 +358,17 @@ export async function formTokenEventMessagePair(
     });
 }
 
-// Latest PUT or DELETE at the document. Virgin is undefined.
-// DELETE head is a gone document, not a miss.
+// The head of a document: its latest PUT or DELETE, or
+// null. A DELETE head is a gone document, not a miss.
 export async function documentHeadAt(
     db: DbAdapter,
     path: string,
     name: string,
-): Promise<{ id: string; method: string } | undefined> {
-    const messagePairs = await messageStore(db).getDocumentHistory(
-        path, name,
-    );
-    let head: {
-        at: string;
-        id: string;
-        method: string;
-    } | undefined;
-    for (const messagePair of messagePairs) {
-        const method = messagePair.method;
-        if (method !== 'PUT' && method !== 'DELETE') {
-            continue;
-        }
-        const at = messagePair.response_at;
-        const id = messagePair.id;
-        if (
-            head === undefined
-            || at > head.at
-            || (at === head.at
-                && compareIdentifiers(id, head.id) > 0)
-        ) {
-            head = { at, id, method };
-        }
-    }
-    if (head === undefined) return undefined;
-    return { id: head.id, method: head.method };
+): Promise<{
+    readonly id: string;
+    readonly method: string;
+} | null> {
+    return db.messagePairs.getHead(path, name);
 }
 
 // The oldest stored pair for this request hash, or

@@ -140,12 +140,8 @@ function withWriteGate(
             lockRequest: async () => {},
             lockDocument: async () => {},
             lockHead: async () => {},
-            getHead: async (path, name) => {
-                const head = await documentHeadAt(
-                    view, path, name,
-                );
-                return head ?? null;
-            },
+            getHead: (path, name) =>
+                documentHeadAt(view, path, name),
             notify: async () => {},
         },
         transaction: (fn) => view.transaction(
