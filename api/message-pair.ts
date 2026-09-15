@@ -8,7 +8,7 @@ import {
     generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
-import { messageAddress } from './message-address.ts';
+import { messageAddress } from './path-and-name.ts';
 import { messageStore } from './message-store.ts';
 import {
     buildRequestModel,

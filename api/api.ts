@@ -17,7 +17,7 @@ import {
     nowUtc,
 } from './types.ts';
 import type { Id } from './types.ts';
-import { messageAddress } from './message-address.ts';
+import { messageAddress } from './path-and-name.ts';
 import { pathSegmentsOf } from './path-segments.ts';
 import {
     formWriteMessagePair,

@@ -1,7 +1,7 @@
 import { assertStrictEquals } from '@std/assert';
 import {
     messageAddress,
-} from '../api/message-address.ts';
+} from '../api/path-and-name.ts';
 
 Deno.test('an id route splits prefix and id', () => {
     const a = messageAddress(
