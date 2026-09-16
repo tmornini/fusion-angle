@@ -18,7 +18,7 @@ export type SeedRecordAttribute =
 
 // The seeded Records and their stable ids. The id consts are
 // shared with the record attributes, flow-record bindings, and
-// record state events, so they are exported. Fixed data; the
+// record genesis rows, so they are exported. Fixed data; the
 // composition root assigns organization_id at write time.
 export const customerProfileRecordId =
     'sJxkGGTrPegHqFbQAkXnjw';

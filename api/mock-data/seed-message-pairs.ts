@@ -652,8 +652,8 @@ export function humanMemberPiiSeedBody(
 }
 
 // The genesis case of the document PUT ideas/:id (Decision 7,
-// Phase 2 Task 3): the flat entity fields plus the lifecycle
-// trio, no `id` (a route param, not a body field) and no
+// Phase 2 Task 3): the flat entity fields plus state, no `id`
+// (a route param, not a body field) and no
 // `idea`/`initialState*` wrapper. organization_id rides along
 // as the validator's tolerated-but-ignored extra — load-bearing
 // here since the seed drives postIdeaDocumentOp below the org
@@ -684,8 +684,8 @@ export function ideaSubmissionSeedBody(
 }
 
 // The genesis case of the document PUT projects/:id (mirrors
-// ideaSeedBody exactly): the flat entity fields plus the
-// lifecycle trio, no `id` (a route param, not a body field).
+// ideaSeedBody exactly): the flat entity fields plus state,
+// no `id` (a route param, not a body field).
 // organization_id rides along as the validator's tolerated-but-
 // ignored extra — load-bearing here since the seed drives
 // postProjectDocumentOp below the org fence (no scoping wrapper
@@ -1793,7 +1793,7 @@ export function buildMockDataInvocations():
     // Phase 6 Task 5: the flow_records seed gap closed — one
     // join pair per seeded flow-record binding, mirroring the
     // flow-work-order joins' shape above. The requesting
-    // identity is the bound RECORD's own state-event member —
+    // identity is the bound RECORD's own genesis memberId —
     // the same identity that seeded the record itself (verified
     // by content: every recordGenesis row above is authored
     // by SYSTEM_MEMBER_ID), not a second, independently-picked
