@@ -138,7 +138,7 @@ export type ObjectiveState =
     typeof OBJECTIVE_STATES[number];
 
 // The invitation lifecycle, derived from the invitation
-// document's own head (never a states log —
+// document's own PUT history (never a states log —
 // deriveInvitationStates, derive-states.ts). Grant (admin)
 // PUTs 'pending'; the invitee PUTs 'accepted' (which writes
 // the membership) or 'declined'; the admin PUTs 'revoked' to
@@ -1320,16 +1320,15 @@ export interface MembershipEntity {
     at: string;
 }
 
-// An invitation binding an identity to an organization, awaiting
-// the holder's answer. Immutable like a membership, but its
-// lifecycle is derived from its own document head
-// (INVITATION_STATES, deriveInvitationStates) — never a states
-// log. The org is the inviting admin's; the identity is the
-// invitee. An ACCEPTED invitation writes the real membership —
-// the invitation itself never grants reach. Global-spine (not
-// org-fenced), because the invitee must read an invitation to an
-// org they are not yet in; the invitation routes fence by the
-// caller's identity (invitee) or admin role (inviter).
+// An invitation binding an identity to an organization, awaiting the holder's
+// answer. Immutable like a membership, but its lifecycle is derived from the
+// invitation document's own PUT history (INVITATION_STATES,
+// deriveInvitationStates) — never a states log. The org is the inviting
+// admin's; the identity is the invitee. An ACCEPTED invitation writes the
+// real membership — the invitation itself never grants reach. Global-spine
+// (not org-fenced), because the invitee must read an invitation to an org
+// they are not yet in; the invitation routes fence by the caller's identity
+// (invitee) or admin role (inviter).
 export interface InvitationEntity {
     id: Id;
     organization_id: Id;

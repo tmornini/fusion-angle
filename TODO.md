@@ -1523,7 +1523,7 @@ Off the critical path; each with its oracle.
   Oracle: `./test-browser` green on two machines
 - `schema-svg.ts`'s `parseStores` still carries a dead
   `StateStore`-matching branch
-  (`web-app/app/schema-svg.ts:157-162`): it can never
+  (`web-app/app/schema-svg.ts:156-162`): it can never
   match now that `DbStores` holds only `messagePairs`,
   so it has drawn nothing since that field left.
   Oracle: `./test schema` green with the dead branch
@@ -1531,11 +1531,11 @@ Off the critical path; each with its oracle.
 - `/members/` parents on the document plane are still
   resolved by a full-history reduction,
   `resolveViaMembershipPairPlane`
-  (`api/derive-states.ts:221-244`), which walks
+  (`api/derive-states.ts:225-248`), which walks
   `getDocumentHistory` and reduces it through
   `deriveDocumentsAt` rather than reading the head
   alone; a C4 tombstone comment at
-  `api/derive-states.ts:1871-1872` still narrates a
+  `api/derive-states.ts:1382-1383` still narrates a
   retired `/members/` document-trio history. Oracle:
   the parent resolves from the head body alone.
 - Collection reads in `api/document-family.ts:575` and
