@@ -13,7 +13,7 @@ processes last. A "Merged:" clause names bullets absorbed
 from `## Later work`; they keep their oracles. Four
 former items left for `## Later work` (genericity, JSON
 parse/stringify, simulated latency, cachability) and the
-skew tests folded into item 7.
+skew tests, which went with item 7's trio.
 
 2. The authentication header out of the message; roles
    and views — `HOISTED_HEADER_NAMES`
@@ -130,40 +130,19 @@ skew tests folded into item 7.
    roster's absent profile with the read. Authored on
    the `2026-09-04-critical-functionality-path` branch;
    this is its master copy.
-7. Lifecycle out of the document body — fold `state` /
-   `state_at` / `state_event_id` (Decision 7's trio) out
-   of every document PUT so ideas, projects, flows, and
-   objectives (`lifecycle: 'trio'` at `api/routes.ts:
-   365, 377, 398, 491`) take the shape work-orders,
-   identities, and ai-agents already have: lifecycle is
-   its own event pairs at an operation path, and the
-   absence of a row IS the absence of the event. Sites:
-   the reduction (`api/derive-documents.ts:146-154`),
-   the stamp (`api/document-family.ts:123`), every
-   derive (`api/derive-ideas.ts:54, 83`,
-   `api/derive-projects.ts:39, 70`,
-   `api/derive-flows.ts:75`), the seeds
-   (`api/mock-data/seed-message-pairs.ts` trio omit-keys
-   at 717-718, 757-758, 789-790, 1212-1213; remaining
-   `state_at` / `state_event_id` stamp at 947-948), the
-   validators' trio-key gates, and the wire — decide
-   whether GET still presents `state`, derived, so the
-   pages do not change. Eighty files
-   name the trio, fifty-eight of them tests. Precedes
-   item 10, so the flow rewrite lands on the stateless
-   shape once. Merged: no lifecycle transition table at
-   any gate; the genesis-wins-under-skew tests — five
-   suites name a clock-skew case their fixtures never
-   build (`tests/drift-ideas.test.ts` 'GET idea trio is
-   lifecycle-current under clock skew' and its siblings
-   in drift-objectives, drift-projects, drift-records,
-   and derive-projects; `_stateAt` / `_stateEventId`
-   carry the unused-argument prefix), so they pass for
-   the wrong reason. With the trio gone the server
-   stamps every `at`, skew cannot exist, and the tests
-   go with the trio or rename to the arrival-order
-   covenant they keep — never the other exit, teaching
-   the PUT path to trust a caller's clock.
+7. Lifecycle out of the document body — closed the other
+   way by `docs/superpowers/specs/2026-09-15-retire-the-trio-design.md`:
+   state stays in the document body, PUT stores it, GET
+   reads it from the head, and ideas, projects,
+   objectives, and record-types have no lifecycle event
+   pairs. What closed: the server-side history walk over
+   those four families, the `'trio'` discriminant, the
+   two create-body event keys, the seed's per-entity
+   state rows, the client's four `*StateDetail`
+   wrappers, and the clock-skew and authorship-on-resend
+   tests whose fixtures never built the skew they named.
+   Flows keep their event walk and their three body
+   fields until item 10 rewrites them.
 8. The bell reaches the browser — every write already
    `pg_notify`s `fusion_events` with a scoped
    `NotificationEvent` (`api/notifications.ts`;
@@ -1538,6 +1517,23 @@ Off the critical path; each with its oracle.
   `./test-browser` has run green on one machine
   (2026-08-28). Restore it if two machines disagree.
   Oracle: `./test-browser` green on two machines
+- `schema-svg.ts`'s `parseStores` still carries a dead
+  `StateStore`-matching branch
+  (`web-app/app/schema-svg.ts:156-162`): it can never
+  match now that `DbStores` holds only `messagePairs`,
+  so it has drawn nothing since that field left.
+  Oracle: `./test schema` green with the dead branch
+  gone, and `SCHEMA.svg` byte-identical.
+- `/members/` parents on the document plane are still
+  resolved by a full-history reduction,
+  `resolveViaMembershipPairPlane`
+  (`api/derive-states.ts:222-245`), which walks
+  `getDocumentHistory` and reduces it through
+  `deriveDocumentsAt` rather than reading the head
+  alone; a C4 tombstone comment at
+  `api/derive-states.ts:1872-1873` still narrates a
+  retired `/members/` document-trio history. Oracle:
+  the parent resolves from the head body alone.
 
 ## Sequencing
 
@@ -1549,8 +1545,8 @@ Off the critical path; each with its oracle.
 - 3 → 5 → 12 (the health probe, then per process)
 - 6 → 10, 11 (the designer roster and AI seats read the
   profile)
-- 7 → 10 (the flow rewrite lands on the stateless shape
-  once)
+- 7 closed; 10 retires flows' event walk with the
+  rewrite
 - 8 → 9 → 10 → 11 (the bell, then chats, then
   processes, then the worker)
 - Items 2, 5, 8, and 12, and the later-work XSS
