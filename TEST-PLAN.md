@@ -6518,10 +6518,19 @@ NPS", and "Improve employee morale" are not.
   `fusion-angle:data` + `subscribeProjectScoreChanges`);
   the three arc-gauge cards refresh only on full page
   load.
-  Pin: exploratory — `subscribeProjectScoreChanges` /
-       `notifyProjectScoreChange` in
-       web-app/app/adapters/project-scoring.ts carry no
-       CLI or browser test
+  The box paints each objective's MEAN over approved
+  projects' latest actuals and adds one sparkline dot
+  per save; read the dot count or the mean, never the
+  score just saved.
+  Pin: tests/adapters-project-scoring.test.ts 'a new
+       actual on a newly approved project moves the
+       objective aggregate and its trendline (K29)'
+       (decides the mean and the trend point);
+       tests/browser/dashboard-objectives.test.ts 'a
+       Save in another same-jar tab adds a point to
+       the dashboard Objectives box without a reload
+       (K29)' (decides the cross-tab repaint);
+       exploratory — the ~1 second
 
 ### K30 + K7 — Project history modal & temporal name resolution
 

@@ -1,6 +1,8 @@
 import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
-import type { Id, MembershipEntity } from './types.ts';
+import type {
+    Id, MembershipEntity, FormerSeatEntity,
+} from './types.ts';
 import {
     validateSeatDocumentBody,
 } from './validators.ts';
@@ -8,10 +10,12 @@ import { deriveOrganizations } from './derive-organizations.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
+    documentMessagePairsAt,
     type DerivedDocument,
 } from './derive-documents.ts';
 import { compareIdentifiers } from
     '../shared/identifier.ts';
+import { latestByKey } from '../shared/ledger-reduction.ts';
 
 // The membership ledger's own reduction — Phase 13 Task 2, the
 // auth/authz/session spine's membership derivation. NOTHING reads
@@ -137,9 +141,11 @@ export function seatEntityOf(
     };
 }
 
-function byAtThenIdAscending(
-    a: MembershipEntity, b: MembershipEntity,
-): number {
+const DELETE_METHOD = 'DELETE';
+
+function byAtThenIdAscending<
+    T extends { at: string; id: string },
+>(a: T, b: T): number {
     return a.at < b.at ? -1
         : a.at > b.at ? 1
             : compareIdentifiers(a.id, b.id);
@@ -225,4 +231,36 @@ export async function deriveOrganizationMemberSeat(
         );
     }
     return seatEntityOf(document, organization);
+}
+
+// Every seat at `organization` whose head pair is a DELETE:
+// the identities that once held a seat here and hold none
+// now. deriveDocumentsAt drops these heads on purpose (a
+// removal is a hard DELETE, never a states-log event); this
+// is the one reader that wants them. A re-seated identity
+// has a PUT head again and leaves the list. Ascending by
+// (at, id) — removal chronology, `at` being the DELETE
+// pair's own arrival.
+export async function deriveOrganizationFormerSeats(
+    db: DbAdapter,
+    organization: Id,
+): Promise<FormerSeatEntity[]> {
+    const prefix = seatsPrefixFor(organization);
+    const messagePairs =
+        await db.messagePairs.getCollectionPairs(prefix);
+    const heads = latestByKey(
+        documentMessagePairsAt(messagePairs, prefix),
+        (messagePair) => messagePair.name,
+    );
+    const rows: FormerSeatEntity[] = [];
+    for (const [name, head] of heads) {
+        if (head.method !== DELETE_METHOD) continue;
+        rows.push({
+            id: name,
+            organization_id: organization,
+            identity_id: name,
+            at: head.at,
+        });
+    }
+    return rows.sort(byAtThenIdAscending);
 }

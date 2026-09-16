@@ -195,3 +195,21 @@ Deno.test('PUT /identity-token-revocations/:rid is retired'
     ));
     assertStrictEquals(res.status, 404);
 });
+
+// Every member's name resolver reads the former seats
+// beside the live roster — the member tier must offer
+// the GET, or a non-admin 403s on every page that names
+// an author.
+Deno.test('a member reads the former-members list',
+async () => {
+    const db = await memberDb();
+    const token = await devToken(MEMBER);
+    const former = await handleRequest(
+        db, req(
+            'GET',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/former-members/',
+            token,
+        ),
+    );
+    assertStrictEquals(former.status, 200);
+});

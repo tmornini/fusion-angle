@@ -3,10 +3,12 @@ import type {
     Member,
     MembershipEntity,
     AIAgentEntity,
+    FormerSeatEntity,
 } from '../../../api/types.ts';
 import {
     HumanMember,
     SystemMember,
+    FormerMember,
     SYSTEM_MEMBER_ID,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
@@ -126,13 +128,33 @@ export async function fillHumanMemberProfile(
     }));
 }
 
+// The seats the ledger has DELETEd for this organization —
+// resolved beside the live roster so an author who has
+// left still names. A flat session with no organization
+// has no former seats to read.
+async function getFormerMembers(
+    ctx: RequestContext,
+): Promise<FormerMember[]> {
+    const organization = ctx.identity.organization
+        ?? ctx.identity.organizations?.[0];
+    if (organization === undefined) return [];
+    const seats = await ctx.GET<FormerSeatEntity[]>(
+        'organizations/' + organization
+            + '/former-members/',
+    );
+    return seats.map(seat => new FormerMember(seat));
+}
+
 export async function getMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, Member>> {
-    const members = await getMembers(ctx);
+    const [members, former] = await Promise.all([
+        getMembers(ctx),
+        getFormerMembers(ctx),
+    ]);
     const system = getSystemMembers();
     return new Map(
-        [...members, ...system].map(
+        [...members, ...former, ...system].map(
             member => [member.idForLink(), member],
         ),
     );

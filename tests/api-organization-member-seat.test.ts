@@ -16,8 +16,9 @@ import {
     postMembershipDocumentOp,
 } from '../api/routes.ts';
 import { formWriteMessagePair } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from
-    '../api/types.ts';
+import {
+    nowUtc, SYSTEM_MEMBER_ID, type FormerSeatEntity,
+} from '../api/types.ts';
 import { organizationToken, devToken } from
     './token-fixtures.ts';
 import {
@@ -353,4 +354,69 @@ async () => {
         admin,
     ));
     assertStrictEquals(last.status, 409);
+});
+
+// A removed seat is a DELETE head at the seats prefix. The
+// former-members read lists exactly those heads, with the
+// DELETE pair's own arrival as `at`; a re-seat (PUT after
+// DELETE) makes the head a PUT again and drops the row.
+Deno.test('former-members lists a removed seat and drops it'
++ ' again on re-seat', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const admin = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
+    const leaver = generateIdentifier();
+    await seedSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', leaver, 'member',
+    );
+    const former = '/organizations/AjdvjuECVZEgZoFajaIEkg'
+        + '/former-members/';
+    const seat = '/organizations/AjdvjuECVZEgZoFajaIEkg'
+        + '/members/' + leaver;
+    const before = await handleRequest(db, req(
+        'GET', former, admin,
+    ));
+    assertStrictEquals(before.status, 200);
+    assertEquals(await before.json(), []);
+    const removed = await handleRequest(db, req(
+        'DELETE', seat, admin,
+    ));
+    assertStrictEquals(removed.status, 204);
+    const after = await handleRequest(db, req(
+        'GET', former, admin,
+    ));
+    assertStrictEquals(after.status, 200);
+    const rows = await after.json() as FormerSeatEntity[];
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.id, leaver);
+    assertStrictEquals(rows[0]!.identity_id, leaver);
+    assertStrictEquals(
+        rows[0]!.organization_id, 'AjdvjuECVZEgZoFajaIEkg',
+    );
+    // The removal moment is the DELETE pair's arrival,
+    // never seedSeat's 2020 grant time.
+    assert(rows[0]!.at > '2020-01-02');
+    const reseated = await handleRequest(db, req(
+        'PUT', seat, admin, { type: 'member', at: AT },
+    ));
+    assertStrictEquals(reseated.status, 201);
+    const again = await handleRequest(db, req(
+        'GET', former, admin,
+    ));
+    assertEquals(await again.json(), []);
+});
+
+Deno.test('former-members is fenced to the token organization',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const admin = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
+    const foreign = await handleRequest(db, req(
+        'GET',
+        '/organizations/' + ORGANIZATION_TWO + '/former-members/',
+        admin,
+    ));
+    assertStrictEquals(foreign.status, 403);
 });

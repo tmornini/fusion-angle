@@ -40,6 +40,7 @@ import {
 '../web-app/app/presenters/workbox-inbox.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
+    FORMER_MEMBER_NAME,
     nowUtc,
 } from '../api/types.ts';
 import type {
@@ -58,6 +59,8 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { deleteHumanMemberSeat } from
+    '../web-app/app/adapters/members.ts';
 
 const N_START = generateIdentifier();
 const N_MIDDLE = generateIdentifier();
@@ -559,5 +562,70 @@ Deno.test(
             new Map(), memberMap, 'active',
         );
         assertStrictEquals(items.length, 2);
+    },
+);
+
+// WB3: a work order's transitioner and claimant are names
+// resolved through the member map. A member who created a
+// work order and then left must read as a former member,
+// never take the Archive tab down as an unknown id.
+Deno.test(
+    'buildInboxItems names a creator who left'
+    + ' Former member (WB3)',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedHumanMember(
+            db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
+        );
+        const leaverId = generateIdentifier();
+        await seedHumanMember(db, leaverId, 'Lisa Leaver');
+        const flowId = generateIdentifier();
+        await seedFlow(db, flowId, {
+            nodes: [
+                buildNode(N_START, 'Start', {
+                    isCreate: true,
+                }),
+                buildNode(N_MIDDLE, 'Doing work', {
+                    memberIds: [leaverId],
+                }),
+                buildNode(N_FINISH, 'Done', {
+                    isArchive: true,
+                }),
+            ],
+            edges: [
+                buildEdge(
+                    generateIdentifier(), N_START, N_MIDDLE,
+                ),
+                buildEdge(E2, N_MIDDLE, N_FINISH),
+            ],
+        });
+        const leaverCtx = createRequestContext(
+            db, await organizationToken(leaverId),
+        );
+        await postWorkOrderCreation(leaverCtx, {
+            workOrderId: generateIdentifier(),
+            flowLinkId: generateIdentifier(),
+            flowId,
+        });
+        const admin = createRequestContext(
+            db, await organizationToken(),
+        );
+        await deleteHumanMemberSeat(admin, leaverId);
+        const {
+            workOrders, transitionsByWo,
+            activeClaimsByWo, memberMap,
+        } = await collectTables(db);
+        const items = buildInboxItems(
+            workOrders, transitionsByWo,
+            activeClaimsByWo, memberMap, 'active',
+        );
+        assertStrictEquals(items.length, 1);
+        assertStrictEquals(
+            items[0]!.transitionerName, FORMER_MEMBER_NAME,
+        );
+        assertStrictEquals(
+            items[0]!.claimedByName, FORMER_MEMBER_NAME,
+        );
     },
 );

@@ -1315,9 +1315,6 @@ Off the critical path; each with its oracle.
     tick's visual distinctness from the baseline area
     (K28) — Layer 1 in `gauge.ts`, or a DESIGN-SYSTEM CSS
     check
-  - `subscribeProjectScoreChanges` /
-    `notifyProjectScoreChange` (K29) — Layer 2, a two-tab
-    BroadcastChannel test
   - The production temporal-name resolver (K7, K30) — an
     inline, unexported closure in
     `web-app/projects/detail.ts` that the presenter's

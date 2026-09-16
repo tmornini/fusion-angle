@@ -271,6 +271,24 @@ Deno.test(
     },
 );
 
+// D1: the list card is the only ideas/ paint of the
+// submitter. After B28 the adapter names Former member;
+// if the card drops the name, the page looks fine and
+// the walk's author is invisible.
+Deno.test(
+    'IdeaPresenter.buildCard paints the submitter name (D1)',
+    () => {
+        const presenter = new IdeaPresenter(
+            makeIdea(), 'Ada Lovelace',
+            '2026-01-15T10:00:00.000000Z',
+        );
+        assert(
+            presenter.buildCard(true).toString()
+                .includes('Ada Lovelace'),
+        );
+    },
+);
+
 Deno.test(
     'IdeaPresenter.buildCard shows the grip handle'
     + ' only when showGrip is true',

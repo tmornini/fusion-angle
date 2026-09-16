@@ -172,6 +172,7 @@ import {
     INSTANCE_VERSION_PATTERN,
     ORGANIZATION_MEMBERS_COLLECTION_PATTERN,
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
+    ORGANIZATION_FORMER_MEMBERS_COLLECTION_PATTERN,
 } from './family-registry.ts';
 import {
     deriveDocumentsAt,
@@ -237,6 +238,7 @@ import {
 import {
     deriveOrganizationMemberSeats,
     deriveOrganizationMemberSeat,
+    deriveOrganizationFormerSeats,
     seatsPrefixFor,
     seatEntityOf,
 } from './derive-memberships.ts';
@@ -5547,6 +5549,18 @@ export const routes: Route[] = [
             get: getInvitationVersionOnOrganizationNest,
         },
     ),
+    // The seats the ledger has DELETEd — the organization's
+    // former members. The name resolver reads it beside the
+    // live roster to tell "left" from "never existed".
+    // Same prefix as the roster, opposite head method;
+    // fenced by the path organization like every
+    // organizations/ route.
+    route(ORGANIZATION_FORMER_MEMBERS_COLLECTION_PATTERN, {
+        get: (db, _p, _actor, organization) =>
+            deriveOrganizationFormerSeats(
+                db, requireOrganization(organization),
+            ),
+    }),
     route(ORGANIZATION_MEMBERS_COLLECTION_PATTERN, {
         get: (db, _p, _actor, organization) =>
             deriveOrganizationMemberSeats(
