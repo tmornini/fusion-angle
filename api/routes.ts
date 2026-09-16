@@ -288,7 +288,6 @@ import {
     lookupStoredRevision,
     documentWriteResponseSpec,
     registerDocumentFamilyWiring,
-    resolveStreamedTrioWriteBody,
     liveGlobalDocumentIds,
     type DocumentFamilyWiring,
 } from './document-family.ts';
@@ -851,7 +850,7 @@ async function formRecordWriteMessagePairs(
     // rather than silently minting an invalid synthesized
     // pair.
     validateRecordDocumentBody(documentBody);
-    const document = await formDocumentMessagePairFor(db, {
+    const document = await formDocumentMessagePairFor({
         routePattern: documentRoutePattern,
         params: [...documentParams],
         body: documentBody,
@@ -889,7 +888,7 @@ async function formRecordWriteMessagePairs(
                             ],
                         },
                 );
-            return formDocumentMessagePairFor(db, {
+            return formDocumentMessagePairFor({
                 routePattern:
                     ATTRIBUTE_DETAIL_PATTERN,
                 params: [
@@ -912,7 +911,7 @@ async function formRecordWriteMessagePairs(
             // here for the synthesized removal pair) —
             // SPEC-LESS, so an explicit response override
             // skips WRITE_RESPONSE_SPECS entirely.
-            return formDocumentMessagePairFor(db, {
+            return formDocumentMessagePairFor({
                 routePattern: ATTRIBUTE_DETAIL_PATTERN,
                 params: [
                     organization, b.id, id,
@@ -1538,7 +1537,7 @@ export async function postFlowUndoOp(
         revivals,
     };
     validateFlowDocumentBody(documentBody);
-    const documentMessagePair = await formDocumentMessagePairFor(db, {
+    const documentMessagePair = await formDocumentMessagePairFor({
         routePattern: 'organizations/:id/flows/:id',
         params: [organization, id],
         body: documentBody,
@@ -2289,7 +2288,7 @@ export async function postWorkOrderTransitionOp(
             clear: validated.clear,
         },
     );
-    const revisionMessagePair = await formDocumentMessagePairFor(db, {
+    const revisionMessagePair = await formDocumentMessagePairFor({
         routePattern: INSTANCE_DETAIL_PATTERN,
         params: [org, typeId, instanceId],
         method: 'PUT',
@@ -2958,8 +2957,9 @@ export const WRITE_RESPONSE_SPECS:
     // absorbs the hand-written successBody: it validates the
     // full wire document (entity + trio) through the wiring's
     // OWN validator. G1 trio families emit wiring.entityOf
-    // (id first, trio last — the GET derive). Live writes
-    // chain-walk current via resolveStreamedTrioWriteBody.
+    // (id first, trio last — the GET derive), live writes
+    // included: entityOf runs over the incoming body and
+    // yields the same object GET derives from the head.
     'organizations/:id/ideas/:id':
         documentWriteResponseSpec(IDEAS_WIRING),
     'organizations/:id/ideas/:id/conversion': {
@@ -3391,11 +3391,7 @@ export interface DocumentMessagePairFormInput {
 // formWriteMessagePair FROM message-pair.ts, so the dependency runs
 // one way only). Builds the pair PRE-TX only — the in-tx
 // appendMessagePairOnce calls stay at each op's own transaction.
-// db is the chain-walk for G1 trio stored PUT bodies
-// (resolveStreamedTrioWriteBody). Other families still
-// use successBody alone.
 export async function formDocumentMessagePairFor(
-    _db: DbAdapter,
     input: DocumentMessagePairFormInput,
 ): Promise<MessagePair> {
     const routeSegments = input.routePattern.split('/');
@@ -3413,13 +3409,7 @@ export async function formDocumentMessagePairFor(
     } else {
         const spec = resolveWriteResponseSpec(input.routePattern);
         responseStatus = spec.status;
-        const streamed = resolveStreamedTrioWriteBody(
-            input.routePattern,
-            [...input.params],
-            input.body,
-            input.organization,
-        );
-        responseBody = streamed ?? spec.successBody?.(
+        responseBody = spec.successBody?.(
             [...input.params], input.body,
             input.requesterIdentityId, input.organization,
         );
@@ -3627,7 +3617,7 @@ async function postInstanceCreateOp(
     const mergedValues = mergeInstanceValues(
         [], { set: validated.set },
     );
-    const revisionMessagePair = await formDocumentMessagePairFor(db, {
+    const revisionMessagePair = await formDocumentMessagePairFor({
         routePattern: INSTANCE_DETAIL_PATTERN,
         params: [org, typeId, instanceId],
         method: 'PUT',
@@ -3741,7 +3731,7 @@ export async function postInstancePatchOp(
     // Revision: If-Match target is the in-tx latch.
     // Wire is operation-plane; ghost-replay closed via
     // headerFields: [] on the synthetic revision.
-    const revisionMessagePair = await formDocumentMessagePairFor(db, {
+    const revisionMessagePair = await formDocumentMessagePairFor({
         routePattern: INSTANCE_DETAIL_PATTERN,
         params: [org, typeId, instanceId],
         method: 'PUT',
@@ -3815,8 +3805,8 @@ export const routes: Route[] = [
                 messagePair !== undefined && organization !== undefined
             ) {
                 const b = validateIdentityCreateBody(body);
-                const identityDocument = await formDocumentMessagePairFor(
-                    db, {
+                const identityDocument =
+                    await formDocumentMessagePairFor({
                         routePattern: 'identities/:id',
                         params: [b.id],
                         body: identityDocumentBodyOf(b.kind),
@@ -3824,8 +3814,7 @@ export const routes: Route[] = [
                         requestAt: messagePair.requestAt,
                         operationId: messagePair.operationId,
                         organization,
-                    },
-                );
+                    });
                 if (b.kind === 'service') {
                     const { id: credId, ...fields } =
                         b.credential as {
@@ -3841,7 +3830,7 @@ export const routes: Route[] = [
                         );
                     }
                     const credentialDocument =
-                        await formDocumentMessagePairFor(db, {
+                        await formDocumentMessagePairFor({
                             routePattern:
                                 'identities/:id/credentials/:cid',
                             params: [b.id, credId],
@@ -4409,7 +4398,7 @@ export const routes: Route[] = [
                 messagePair !== undefined
                 && organization !== undefined
             ) {
-                projectMessagePair = await formDocumentMessagePairFor(db, {
+                projectMessagePair = await formDocumentMessagePairFor({
                     routePattern:
                         'organizations/:id/projects/:id',
                     params: [organization, b.projectId],
@@ -4425,7 +4414,7 @@ export const routes: Route[] = [
                 // that prior pair, so this one records Supersedes,
                 // unlike the project pair above (a fresh document,
                 // genesis).
-                ideaMessagePair = await formDocumentMessagePairFor(db, {
+                ideaMessagePair = await formDocumentMessagePairFor({
                     routePattern:
                         'organizations/:id/ideas/:id',
                     params: [organization, ideaId],
@@ -4450,7 +4439,7 @@ export const routes: Route[] = [
                 // below is what runs validateBaselineScoreEntity.
                 for (const baseline of b.baselines) {
                     baselineMessagePairs.push(
-                        await formDocumentMessagePairFor(db, {
+                        await formDocumentMessagePairFor({
                             routePattern:
                                 'organizations/:id/projects/:id'
                                 + '/objective-baseline-scores'
@@ -4551,7 +4540,7 @@ export const routes: Route[] = [
                     db, documentBody.graph as
                         Record<string, unknown>,
                 );
-                const document = await formDocumentMessagePairFor(db, {
+                const document = await formDocumentMessagePairFor({
                     routePattern:
                         'organizations/:id/flows/:id',
                     params: [organization, b.id],
@@ -4576,7 +4565,7 @@ export const routes: Route[] = [
                 // decision — no duplicate-create carve-out at this
                 // document through this task; pinned by the same-
                 // join-id retry test in tests/drift-flows.test.ts).
-                const join = await formDocumentMessagePairFor(db, {
+                const join = await formDocumentMessagePairFor({
                     routePattern:
                         'organizations/:id/projects/:id'
                         + '/flows/:pfid',
@@ -4761,7 +4750,7 @@ export const routes: Route[] = [
                 const documentBody =
                     workOrderCreateDocumentBody(b);
                 validateWorkOrderDocumentBody(documentBody);
-                const document = await formDocumentMessagePairFor(db, {
+                const document = await formDocumentMessagePairFor({
                     routePattern:
                         'organizations/:id/work-orders/:id',
                     params: [organization, b.id],
@@ -4787,7 +4776,7 @@ export const routes: Route[] = [
                 // out at this document through this task; pinned
                 // by the same-join-id retry test in
                 // tests/drift-work-orders.test.ts).
-                const join = await formDocumentMessagePairFor(db, {
+                const join = await formDocumentMessagePairFor({
                     routePattern:
                         'organizations/:id/flows/:id'
                         + '/work-orders/:woid',
@@ -4806,7 +4795,7 @@ export const routes: Route[] = [
                     'workOrder.flow_graph',
                 );
                 const claimAt = b.stateEventAts[2]!;
-                const claim = await formDocumentMessagePairFor(db, {
+                const claim = await formDocumentMessagePairFor({
                     routePattern:
                         'organizations/:id/work-orders/:id'
                         + '/claim',
@@ -5718,7 +5707,7 @@ export const routes: Route[] = [
                 const b = validateObjectiveCreateBody(body);
                 const documentBody = objectiveDocumentBodyOf(b);
                 validateObjectiveDocumentBody(documentBody);
-                const document = await formDocumentMessagePairFor(db, {
+                const document = await formDocumentMessagePairFor({
                     routePattern:
                         'organizations/:id/objectives/:id',
                     params: [organization, b.id],
@@ -5730,7 +5719,7 @@ export const routes: Route[] = [
                 });
                 const revisionBody = objectiveRevisionBodyOf(b);
                 validateObjectiveRevisionEntity(revisionBody);
-                const revision = await formDocumentMessagePairFor(db, {
+                const revision = await formDocumentMessagePairFor({
                     routePattern:
                         'organizations/:id/objectives/:id'
                         + '/revisions/:rid',

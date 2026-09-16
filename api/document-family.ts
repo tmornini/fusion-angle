@@ -3,15 +3,9 @@ import { EntityNotFoundError } from './db.ts';
 import type {
     Id, MessagePairEntity, StateEntity,
 } from './types.ts';
-import {
-    validateRecordDocumentBody,
-} from './validators.ts';
 import type { MessagePair } from './message-pair.ts';
 import { canonicalPath } from './message-pair.ts';
-import {
-    familyRegistration,
-    RECORD_TYPE_DETAIL_PATTERN,
-} from './family-registry.ts';
+import { familyRegistration } from './family-registry.ts';
 import { missedReadError } from './derive-states.ts';
 import {
     documentMessagePairsAt,
@@ -31,7 +25,6 @@ import type {
 import { HTTP_OK } from './http-errors.ts';
 import { liveHeadId, messageStore } from
     './message-store.ts';
-import { recordTypeEntityOf } from './derive-record-types.ts';
 import { flowStoredEntityOf } from './derive-flows.ts';
 
 // param/requireOrganization/withoutId live HERE, not in
@@ -662,65 +655,6 @@ function trioDocumentFromBody(
     };
 }
 
-export function streamedTrioEntityOf(
-    id: Id,
-    body: Record<string, unknown>,
-    organization: Id,
-    entityOf: DocumentFamilyWiring['entityOf'],
-): unknown {
-    return entityOf(
-        trioDocumentFromBody(id, withoutId(body)),
-        organization,
-    );
-}
-
-function streamedTrioWriteBody(
-    wiring: DocumentFamilyWiring,
-    id: Id,
-    body: Record<string, unknown>,
-    organization: Id,
-): unknown {
-    const raw = withoutId(body);
-    wiring.validateDocument(raw);
-    return streamedTrioEntityOf(
-        id, raw, organization, wiring.entityOf,
-    );
-}
-
-// Live G1 write body. Undefined means the caller uses
-// successBody.
-export function resolveStreamedTrioWriteBody(
-    routePattern: string,
-    params: string[],
-    body: Record<string, unknown> | undefined,
-    organization: Id | undefined,
-): unknown | undefined {
-    if (body === undefined) return undefined;
-    if (routePattern === RECORD_TYPE_DETAIL_PATTERN) {
-        const organizationId = param(params, 0);
-        const id = param(params, 1);
-        validateRecordDocumentBody(withoutId(body));
-        return streamedTrioEntityOf(
-            id, body, organizationId, recordTypeEntityOf,
-        );
-    }
-    const family = idFamilyOf(routePattern);
-    if (
-        family === undefined
-        || !STREAM_TRIO_FAMILIES.has(family)
-    ) {
-        return undefined;
-    }
-    const wiring = documentFamilyWiring(family);
-    if (wiring === undefined) return undefined;
-    return streamedTrioWriteBody(
-        wiring,
-        entityIdParam(wiring, params),
-        body,
-        organization ?? '',
-    );
-}
-
 // The registration-first consult (Phase 8 Task 3, the first
 // global-plane families: identities/ai-agents,
 // organizationNested:false) — mirrors canonicalPath's own
@@ -744,8 +678,9 @@ export function resolveStreamedTrioWriteBody(
 // of spreading over it.
 //
 // G1 trio families emit wiring.entityOf (id first, trio last
-// as GET does) instead of the entity-only echo. Live writes
-// prefer resolveStreamedTrioWriteBody (chain-current trio).
+// as GET does) instead of the entity-only echo — live writes
+// included, over the incoming body, the same object GET
+// derives from the head.
 // G2 flows emit flowEntityOf minus hasUndoHistory.
 // G3 stateless families emit wiring.entityOf (GET derive).
 export function documentWriteResponseSpec(
