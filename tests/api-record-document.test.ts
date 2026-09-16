@@ -24,10 +24,9 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// Task 2 (Decision 7's trio fold, the fifth family): PUT
+// Task 2 (Decision 7's state fold, the fifth family): PUT
 // records/:id becomes a document PUT — the entity's own fields
-// plus the lifecycle trio (state, state_at, state_event_id),
-// decomposed at postRecordDocumentOp exactly as
+// plus state, decomposed at postRecordDocumentOp exactly as
 // postIdeaDocumentOp already decomposes ideas'. Cases 1, 2, and
 // 4 exercise postRecordDocumentOp/the validator/the shared
 // derive-documents.ts walk directly, below-gate, ahead of the

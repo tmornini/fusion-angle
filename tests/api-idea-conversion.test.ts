@@ -103,8 +103,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
         state: 'approved',
     }, DEV_TOKEN);
     // Phase Final Stage B: objectives table retired — seed
-    // through the live document PUT with the lifecycle trio
-    // (states-document retirement) so the message plane owns it.
+    // through the live document PUT (states-document
+    // retirement) so the message plane owns it.
     await PUT(db,
         'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + OBJ_1, {

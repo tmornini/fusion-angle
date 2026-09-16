@@ -29,7 +29,7 @@ import {
 } from '../shared/identifier.ts';
 
 // GET <family>/:id/versions/ — Phase A3 of states-URI
-// elimination. Per trio family (ideas, projects, records,
+// elimination. Per family (ideas, projects, records,
 // flows, objectives): document-PUT lifecycle → 200 DESC
 // current-first; foreign miss at this document → 404;
 // absent → 404. Shared handler builder wraps

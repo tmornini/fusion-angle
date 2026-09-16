@@ -39,11 +39,10 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// Objectives are the FIFTH lifecycle-trio family (states-
-// document retirement): PUT
+// Objectives are the FIFTH family (states-document
+// retirement): PUT
 // /organizations/:id/objectives/:id carries the entity's
-// own field ({position}) PLUS the lifecycle trio
-// (state/state_at/state_event_id), exactly as ideas,
+// own field ({position}) PLUS state, exactly as ideas,
 // projects, records, and flows do. The absence-as-active
 // covenant (R2) and the genesis dilemma are RETIRED —
 // every objective now has an explicit genesis event
@@ -148,7 +147,7 @@ Deno.test('validateObjectiveDocumentBody rejects a state outside'
     );
 });
 
-// -- 1b. PUT organizations/:id/objectives/:id wire trio
+// -- 1b. PUT organizations/:id/objectives/:id wire state
 // ------------------------
 
 Deno.test('PUT organizations/:id/objectives/:id accepts state and'

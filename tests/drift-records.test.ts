@@ -780,7 +780,7 @@ async () => {
     );
     await assertRecordWire();
 
-    // Step 4: echoed-trio PUT — no new states row.
+    // Step 4: echoed PUT — no new states row.
     const beforeStatesCount =
         0 /* states table retired */;
     const echoed = await handleRequest(db, req(

@@ -40,7 +40,8 @@ async function getCollection(
 // is absent from documentCollectionGetHandler's list — that
 // tests/drift-projects.test.ts's wire-level GET does not exercise
 // (the live wire streams the stored PUT and never reaches this
-// handler; a trio-deleted head stays a live PUT head there).
+// handler; a head whose state is `deleted` stays a live PUT
+// head there).
 
 const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 

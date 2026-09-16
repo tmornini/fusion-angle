@@ -35,7 +35,7 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 
 // Nested record-types WRITE surface (Task 3): admin PUT
-// (simple class, trio document), admin DELETE with type
+// (simple class, state document), admin DELETE with type
 // RESTRICT, write authorizer, and byte-identical DELETE
 // replay. Composed POST create-with-attributes is Task 9.
 

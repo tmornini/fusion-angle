@@ -37,9 +37,9 @@ function messagePairJsonOf(message: string): {
 
 // Phase 2 Task 2 (Decision 7 state-in-entity): PUT
 // /organizations/:id/ideas/:id
-// takes the FULL document — entity fields plus the state trio.
-// G1: stored PUT body is ideaEntityOf of the same chain
-// (trio included). GET streams that stored body.
+// takes the FULL document — entity fields plus state.
+// G1: stored PUT body is ideaEntityOf of the same chain.
+// GET streams that stored body.
 
 function req(
     method: string,

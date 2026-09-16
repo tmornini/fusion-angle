@@ -74,8 +74,8 @@ const OBJ_DRIFT_M = generateIdentifier();
 // craftsmanship: byIdAscending must diverge from insertion
 // order; never function-vs-function only).
 //
-// Objectives are the FIFTH lifecycle-trio family (states-
-// document retirement). Absence-as-active (R2) is RETIRED —
+// Objectives are the FIFTH family (states-document
+// retirement). Absence-as-active (R2) is RETIRED —
 // every objective carries an explicit genesis event; archive/
 // reactivate ride PUT /organizations/:id/objectives/:id.
 // OBJECTIVES_TEST_WIRING
@@ -594,7 +594,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
         assertStrictEquals(revs.length, 1);
     }
 
-    // Position PUT echoes the genesis trio (putObjectivePosition
+    // Position PUT echoes the genesis state (putObjectivePosition
     // shape) — same state_event_id so echo-dedup mints no event.
     const reposition = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
@@ -661,8 +661,8 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     }
 
     // ARCHIVE via PUT /organizations/:id/objectives/:id with the archived
-    // lifecycle trio — objective STAYS in the collection
-    // (trio families exclude only 'deleted'; archived is a
+    // state — objective STAYS in the collection
+    // (state families exclude only 'deleted'; archived is a
     // live objective state).
     const archived = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
@@ -1002,7 +1002,7 @@ async () => {
         ),
     ));
 
-    // Position body carries the echoed genesis trio — required
+    // Position body carries the echoed genesis state — required
     // by the document gate after states-document retirement.
     const positionBody = {
         position: 99,

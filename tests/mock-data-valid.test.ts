@@ -238,7 +238,7 @@ async () => {
             'ideas empty in org ' + organization,
         );
         for (const idea of ideas) {
-            // GET stamps lifecycle trio; validateIdeaEntity is
+            // GET stamps lifecycle state; validateIdeaEntity is
             // entity-fields only — strip the stamp before gate.
             const {
                 state: _s,
@@ -294,7 +294,7 @@ async () => {
             'projects empty in org ' + organization,
         );
         for (const project of projects) {
-            // GET stamps lifecycle trio; validateProjectEntity
+            // GET stamps lifecycle state; validateProjectEntity
             // is entity-fields only — strip the stamp before
             // gate.
             const {

@@ -34,9 +34,6 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// PUT body entity fields only — seed/put supply the lifecycle
-// trio (state/stateAt/stateEventId). GET ProjectEntity carries
-// the stamped trio (Phase A); list/detail read it from the row.
 function buildProject(
     _id: string,
     title: string,
@@ -207,8 +204,9 @@ Deno.test(
         assertStrictEquals(
             projects[0]?.titleText(), 'Keep',
         );
-        // Collection GET streams live PUT heads, including
-        // a trio-deleted document. getProjects filters it.
+        // Collection GET streams live PUT heads, including a
+        // head whose state is `deleted`. getProjects filters
+        // it out.
         const rows = await getProjectEntities(ctx);
         assertStrictEquals(rows.length, 2);
     },

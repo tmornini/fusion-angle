@@ -232,12 +232,13 @@ Deno.test(
         await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'approved');
         await seedProject(ctx, 'prBESZPjJDiuXCeZLmbiVw', 'approved');
         // NAMED re-pin (Phase 3 Task 6, Step 2b): physical row
-        // removal has no ledger analogue — the flipped GET
-        // derives visibility from the lifecycle trio, not a raw
-        // db.projects.delete row removal — so the tombstone must
-        // land as a state-'deleted' document PUT like any other
-        // transition (mirrors drift-projects.test.ts's lifecycle
-        // case).
+        // removal has no ledger analogue (not a raw
+        // db.projects.delete row removal) — state rides the
+        // document body; a head whose state is `deleted` is a
+        // tombstone — so the tombstone must land as a
+        // state-'deleted' document PUT like any other
+        // transition (mirrors drift-projects.test.ts's
+        // lifecycle case).
         // Phase Final Task 2: projects row half stripped.
         const {
             id: _id, organization_id: _org, ...fields

@@ -97,8 +97,8 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 }
 
 // -- (a) documentWriteResponseSpec's successBody, pinned
-// against FIXED expected literals. G1 trio families emit
-// wiring.entityOf (id first, trio last). Pinned to literals —
+// against FIXED expected literals. G1 families emit
+// wiring.entityOf (id first, state last). Pinned to literals —
 // the shape of a document PUT's successBody. -------
 
 Deno.test('documentWriteResponseSpec produces the ideas'

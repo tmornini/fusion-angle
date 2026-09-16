@@ -71,7 +71,7 @@ async function projectIdsByState(
     ctx: RequestContext,
     wanted: ProjectState,
 ): Promise<Id[]> {
-    // Lifecycle state rides the project GET row trio.
+    // Lifecycle state rides the project GET row.
     const rows = await getProjectEntities(ctx);
     return rows
         .filter(p => p.state === wanted)
@@ -86,7 +86,7 @@ async () => {
     // getObjectives is org-scoped to the token's org (Stark).
     assertStrictEquals(rows.length, OBJECTIVE_SEEDS.length);
     for (const r of rows) {
-        // GET stamps lifecycle trio; validateObjectiveEntity
+        // GET stamps lifecycle state; validateObjectiveEntity
         // is entity-fields only — strip the stamp before gate.
         const {
             id: _id,
@@ -134,8 +134,8 @@ Deno.test('postMockDataLoad seeds one revision per objective',
     });
 
 // All five objective seeds mint genesis state 'active' via
-// the create-body trio (states-document retirement) — none
-// are archived. GET objectives stamps that trio on rows.
+// the create body (states-document retirement) — none
+// are archived. GET objectives stamps that state on rows.
 Deno.test('postMockDataLoad seeds zero archived objectives',
     async () => {
         const db = await sharedMockDb();

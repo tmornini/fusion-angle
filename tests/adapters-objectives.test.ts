@@ -211,9 +211,8 @@ Deno.test('getArchivedObjectiveIds returns a Set', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const ctx = ctxFor(db);
-    // Seed archived via the document PUT carrying the
-    // lifecycle trio — GET objectives stamps state on
-    // the row (states-URI elimination B6).
+    // Seed archived via the document PUT — GET objectives
+    // stamps state on the row (states-URI elimination B6).
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg',
@@ -326,7 +325,6 @@ Deno.test(
         assertStrictEquals(objectives[0]!.position, 1);
         assertStrictEquals(objectives[0]!.organization_id
             , 'AjdvjuECVZEgZoFajaIEkg');
-        // GET stamps lifecycle-current genesis trio.
         assertStrictEquals(objectives[0]!.state, 'active');
 
         const revisions =

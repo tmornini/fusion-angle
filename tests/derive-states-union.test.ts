@@ -446,7 +446,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     const tokenA = await adminToken(adminA, organizationA);
     const tokenB = await adminToken(adminB, organizationB);
 
-    // (a-idea) an idea's own embedded genesis trio, in org A —
+    // (a-idea) an idea's own embedded genesis state, in org A —
     // plus a FOREIGN idea in org B (never included in A's own
     // union).
     const ideaId = generateIdentifier();
@@ -465,10 +465,10 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     ));
     assertStrictEquals(foreignIdeaRes.status, 201);
 
-    // (a-objective) an objectives document trio — the
+    // (a-objective) an objectives document — the
     // states/:id orphan leg's replacement in the five-source
     // union proof (objectives join ideas, projects,
-    // records, flows on the document-trio source).
+    // records, flows on the document source).
     const objectiveId = generateIdentifier();
     const objectiveRes = await handleRequest(db, req(
         'PUT', '/organizations/' + organizationA + '/objectives/'
@@ -479,7 +479,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     ));
     assertStrictEquals(objectiveRes.status, 201);
 
-    // (b) an AI member's document-trio genesis — membered into
+    // (b) an AI agent's document genesis — membered into
     // org A so the fence resolves it there rather than as an
     // orphan (members are GLOBAL plane; ownership rides the
     // membership message plane).

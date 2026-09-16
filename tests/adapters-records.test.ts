@@ -47,7 +47,6 @@ Deno.test(
         const stored = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
         assertStrictEquals(stored.id, 'rbfHGatkwQzGZJVXKJEeyw');
         assertStrictEquals(stored.name, 'Customer');
-        // Lifecycle-current trio is stamped on the GET row.
         assertStrictEquals(stored.state, 'active');
     },
 );
@@ -151,7 +150,7 @@ Deno.test(
             initialState: 'active',
         });
         // Echo the create's own known head from the GET row
-        // trio — never a fresh mint (RecordChangeEdit).
+        // — never a fresh mint (RecordChangeEdit).
         const head = await getRecordModel(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
         await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'edit',
@@ -248,7 +247,7 @@ Deno.test(
             ctx, before, 'archived',
         );
         const after = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
-        // Entity content fields unchanged; GET trio advances
+        // Entity content fields unchanged; GET state advances
         // to the transition event (lifecycle-current stamp).
         assertStrictEquals(after.name, before.name);
         assertStrictEquals(after.description, 'orig');

@@ -414,9 +414,9 @@ async function seedChain(
     ));
     assertStrictEquals(flowWrite.status, 201);
     // Phase Final Task 2: objectives row half stripped — seed
-    // through the live document PUT with the lifecycle trio
-    // (states-document retirement) so the message plane owns it
-    // (nested revisions/scores re-pins already ride pairs).
+    // through the live document PUT (states-document
+    // retirement) so the message plane owns it (nested
+    // revisions/scores re-pins already ride pairs).
     await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization

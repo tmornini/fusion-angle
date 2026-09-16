@@ -478,7 +478,7 @@ async () => {
 
 // Fence legs on the message plane. Orphan states/:id writes
 // retired with the document — the own/foreign/deleted legs
-// ride document trios.
+// ride documents.
 Deno.test('case 3: the fence\'s legs — own-org history visible,'
 + ' foreign history 404 (miss at this document), and a'
 + ' DELETED foreign entity still names its owner',

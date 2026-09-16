@@ -59,7 +59,7 @@ Deno.test(
         assertStrictEquals(
             objective.organization_id, 'AjdvjuECVZEgZoFajaIEkg',
         );
-        // GET streams the stored PUT (G1: trio included).
+        // GET streams the stored PUT (G1).
         assertStrictEquals(objective.state, 'active');
         // The leaf revision route is PUT-only; read the nested
         // per-objective collection and find the revision the

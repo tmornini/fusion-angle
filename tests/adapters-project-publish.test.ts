@@ -143,8 +143,8 @@ Deno.test('postProjectApproval throws when not ready',
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
-        // A SYNTHESIZED trio (this fixture never carried one) —
-        // the state itself is irrelevant to this test.
+        // A synthesized state (this fixture never carried
+        // one) — the state itself is irrelevant to this test.
         await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
             ...SAMPLE_PROJECT_BODY,
             state: 'under_review',

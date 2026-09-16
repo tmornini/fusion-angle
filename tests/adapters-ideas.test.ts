@@ -33,9 +33,6 @@ import { seededMockDb } from './mock-seed.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// PUT/create body: no lifecycle trio — postIdeaCreation mints
-// state/stateAt/stateEventId. GET IdeaEntity carries the
-// stamped trio (Phase A); list/detail read it from the row.
 function buildIdea(
     _id: string, title: string,
 ): Omit<
@@ -414,9 +411,9 @@ Deno.test('deleted ideas are filtered from getIdeas', async () => {
         '2026-04-01T00:00:00.000000Z',
     );
     // A transition to 'deleted' (ideas has no DELETE route) —
-    // the flipped GET ideas derives visibility from the
-    // lifecycle trio, so the deletion must land as a document
-    // PUT like any other transition.
+    // state rides the document body; a head whose state is
+    // `deleted` is a tombstone, so the deletion must land as
+    // a document PUT like any other transition.
     await postIdeaStateChange(
         ctx, await getIdeaEntity(ctx, 'fxysGbBPBsnCwJNJsyZnkA'), 'deleted',
     );

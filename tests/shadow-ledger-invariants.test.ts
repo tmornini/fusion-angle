@@ -116,7 +116,7 @@ function ideaFields(title: string) {
 
 // PUT /organizations/:id/ideas/:id now takes the FULL document (Decision 7):
 // the
-// entity fields plus the state trio. One fixed trio per idea
+// entity fields plus state. A fixed state per idea
 // id keeps both PUTs below a same-state edit.
 function ideaPutBody(_ideaId: string, title: string) {
     return {
@@ -135,7 +135,7 @@ function recordFields(name: string, organization: string) {
 }
 
 // PUT /records/:id now takes the FULL document (Decision 7):
-// the entity fields plus the state trio. A fixed trio keeps
+// the entity fields plus state. A fixed state keeps
 // this PUT below a same-state edit.
 function recordPutBody(
     _recordId: string, name: string, organization: string,
@@ -244,7 +244,7 @@ function createRecordBody(
 // A mock-data seed (EXPECTED_MESSAGE_PAIR_COUNT pre-formed
 // pairs, see mock-data-pairs.test.ts) plus one live-write
 // batch layered on top via handleRequest: one document PUT
-// (Supersedes minted, ideas), one idea state-change trio PUT
+// (Supersedes minted, ideas), one idea state-change PUT
 // (states/:id retired),
 // one FAILED write (work-order claim conflict 409), one create
 // POST (records — Phase 6 Task 4's own bundle: operation +
@@ -281,7 +281,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
         secondIdea.headers.get('Supersedes'), null,
     );
 
-    // Idea state-change trio PUT (states/:id retired) — a
+    // Idea state-change PUT (states/:id retired) — a
     // second lifecycle stamp on the same document.
     const stateAppend = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'

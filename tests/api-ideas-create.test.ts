@@ -138,7 +138,7 @@ Deno.test(
 
 // R6: the create's partial-failure atomicity pin becomes a
 // retry-convergence pin (the tx is still atomic — proven above
-// by the rollback case). E6: the id and the trio are minted
+// by the rollback case). E6: the id and state are minted
 // ONCE by the caller; a byte-identical resend of the SAME
 // genesis PUT must hit the idempotency fold — one idea, one
 // genesis event, one stored pair — never a second row or a
