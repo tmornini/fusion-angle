@@ -312,7 +312,7 @@ second browser stays stale until navigation.
 
 The message-plane body stores `attribute_id` as a
 record-attribute document id, never a table named
-`attributes`. See `api/derive-state-field-values.ts`.
+`attributes`. See `api/derive-record-instances.ts`.
 
 ### `noUncheckedIndexedAccess`
 

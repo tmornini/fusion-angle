@@ -1,89 +1,89 @@
 {
     "api-documentation": {
-        "readyMs": 172
+        "readyMs": 97
     },
     "auth": {
-        "readyMs": 154
+        "readyMs": 88
     },
     "billing": {
-        "readyMs": 191
+        "readyMs": 101
     },
     "dashboard": {
-        "readyMs": 251
+        "readyMs": 124
     },
     "design-system": {
-        "readyMs": 239
+        "readyMs": 102
     },
     "flow-detail": {
-        "readyMs": 257
+        "readyMs": 111
     },
     "flow-stats": {
-        "readyMs": 520
+        "readyMs": 364
     },
     "flows": {
-        "readyMs": 270
+        "readyMs": 114
     },
     "idea-convert": {
-        "readyMs": 274
+        "readyMs": 118
     },
     "idea-create": {
-        "readyMs": 280
+        "readyMs": 115
     },
     "idea-detail": {
-        "readyMs": 293
+        "readyMs": 123
     },
     "ideas": {
-        "readyMs": 305
+        "readyMs": 130
     },
     "identities": {
-        "readyMs": 316
+        "readyMs": 135
     },
     "identity-detail": {
-        "readyMs": 325
+        "readyMs": 128
     },
     "identity-providers": {
-        "readyMs": 336
+        "readyMs": 131
     },
     "identity-tokens": {
-        "readyMs": 344
+        "readyMs": 135
     },
     "invitations": {
-        "readyMs": 395
+        "readyMs": 141
     },
     "landing": {
-        "readyMs": 314
+        "readyMs": 137
     },
     "member-detail": {
-        "readyMs": 374
+        "readyMs": 152
     },
     "members": {
-        "readyMs": 396
+        "readyMs": 161
     },
     "not-found": {
-        "readyMs": 348
+        "readyMs": 148
     },
     "organization": {
-        "readyMs": 517
+        "readyMs": 176
     },
     "project-detail": {
-        "readyMs": 451
+        "readyMs": 172
     },
     "projects": {
-        "readyMs": 460
+        "readyMs": 181
     },
     "record-create": {
-        "readyMs": 462
+        "readyMs": 172
     },
     "record-detail": {
-        "readyMs": 579
+        "readyMs": 328
     },
     "records": {
-        "readyMs": 481
+        "readyMs": 200
     },
     "workbox": {
-        "readyMs": 897
+        "readyMs": 589
     },
     "workbox-detail": {
-        "readyMs": 503
+        "readyMs": 241
     }
 }
