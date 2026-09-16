@@ -266,7 +266,7 @@ Deno.test('statsForPage trims extremes on readyMs', () => {
     const s = statsForPage(runs);
     assertStrictEquals(s.readyMs.min, 3);
     assertStrictEquals(s.readyMs.max, 18);
-    // 3..18 (16 values, even): (10+11)/BBjWJsjYIDkTRKIIPrzWRw = 10.5
+    // 3..18 (16 values, even): (10+11)/2 = 10.5
     assertStrictEquals(s.readyMs.median, 10.5);
 });
 
