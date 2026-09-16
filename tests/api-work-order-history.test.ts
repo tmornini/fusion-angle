@@ -25,6 +25,8 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     postWorkOrderTransitionOp,
 } from '../api/routes.ts';
+import { workOrderHistoryFor } from
+    '../api/derive-states.ts';
 import {
     formWriteMessagePair,
 } from '../api/message-pair.ts';
@@ -288,6 +290,22 @@ Deno.test(
                 'history must be (at, id) DESC',
             );
         }
+    },
+);
+
+// Covenant: concurrent prefix reads must not reorder
+// events. Two consecutive derives on one db equal.
+Deno.test(
+    'workOrderHistoryFor is identical on two consecutive reads',
+    async () => {
+        const db = await seededChainDb();
+        const first = await workOrderHistoryFor(
+            db, STARK_ORGANIZATION, WORK_ORDER_ID,
+        );
+        const second = await workOrderHistoryFor(
+            db, STARK_ORGANIZATION, WORK_ORDER_ID,
+        );
+        assertEquals(first, second);
     },
 );
 
