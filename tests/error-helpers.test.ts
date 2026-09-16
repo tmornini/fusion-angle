@@ -1,4 +1,4 @@
-import { assertStrictEquals } from '@std/assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     extractErrorMessage as apiExtract,
 } from '../shared/error-helpers.ts';
@@ -6,7 +6,13 @@ import {
     extractErrorMessage as webExtract,
     isAbortFault,
     shouldSurfaceFault,
+    reportFault,
+    initErrorSurfacing,
 } from '../web-app/app/error-helpers.ts';
+import type { RequestContext } from
+    '../web-app/app/adapters/shared.ts';
+import { captureConsole } from
+    './fixtures/console-capture.ts';
 
 const layers = [
     ['api', apiExtract] as const,
@@ -89,5 +95,150 @@ Deno.test(
         assertStrictEquals(
             shouldSurfaceFault(boom, true), false,
         );
+    },
+);
+
+type WindowListener = (event: Event) => void;
+
+function installFaultDom(): {
+    messages: string[];
+    dispatch: (type: string) => void;
+    restore: () => void;
+} {
+    const messages: string[] = [];
+    const g = globalThis as Record<string, unknown>;
+    const previousTimeout = g.setTimeout;
+    const previousDocument = g.document;
+    const previousWindow = g.window;
+    g.setTimeout = () => 0;
+    const listeners = new Map<string, WindowListener[]>();
+    g.window = {
+        addEventListener(
+            type: string,
+            fn: WindowListener,
+        ): void {
+            const list = listeners.get(type) ?? [];
+            list.push(fn);
+            listeners.set(type, list);
+        },
+        dispatchEvent(event: Event): boolean {
+            for (const fn of listeners.get(event.type)
+                ?? []) {
+                fn(event);
+            }
+            return true;
+        },
+    };
+    function el(tag: string): Record<string, unknown> {
+        const node: Record<string, unknown> = {
+            tagName: tag.toUpperCase(),
+            className: '',
+            id: '',
+            children: [] as unknown[],
+            lastElementChild: null,
+            style: {},
+            textContent: '',
+            classList: { add: () => {} },
+            setAttribute: () => {},
+            addEventListener: () => {},
+            querySelector: () => null,
+            prepend(child: unknown) {
+                (node.children as unknown[]).unshift(
+                    child,
+                );
+            },
+            appendChild(child: unknown) {
+                (node.children as unknown[]).push(child);
+                const c = child as {
+                    className?: string;
+                    textContent?: string;
+                };
+                if (
+                    c.className === 'toast-message'
+                    && typeof c.textContent === 'string'
+                ) {
+                    messages.push(c.textContent);
+                }
+                node.lastElementChild = child;
+                return child;
+            },
+            remove() {},
+        };
+        return node;
+    }
+    let container: Record<string, unknown> | null = null;
+    g.document = {
+        getElementById: (id: string) =>
+            id === 'toast-container' ? container : null,
+        createElement: (tag: string) => el(tag),
+        body: {
+            appendChild(child: Record<string, unknown>) {
+                container = child;
+                return child;
+            },
+        },
+    };
+    return {
+        messages,
+        dispatch: (type: string) => {
+            const win = g.window as {
+                dispatchEvent: (e: Event) => boolean;
+            };
+            win.dispatchEvent(new Event(type));
+        },
+        restore: () => {
+            g.setTimeout = previousTimeout;
+            g.document = previousDocument;
+            g.window = previousWindow;
+        },
+    };
+}
+
+const faultCtx = {
+    requestId: 'rid',
+} as unknown as RequestContext;
+
+Deno.test(
+    'reportFault toasts Failed to fetch while live',
+    async () => {
+        const { messages, restore } = installFaultDom();
+        try {
+            initErrorSurfacing();
+            await captureConsole('error', () => {
+                reportFault(
+                    faultCtx,
+                    'Work order detail refresh failed',
+                    new TypeError('Failed to fetch'),
+                );
+            });
+            assert(
+                messages.some((t) => t.includes(
+                    'Work order detail refresh failed',
+                )),
+            );
+        } finally {
+            restore();
+        }
+    },
+);
+
+Deno.test(
+    'reportFault skips Failed to fetch after pagehide',
+    () => {
+        const { messages, dispatch, restore } =
+            installFaultDom();
+        try {
+            initErrorSurfacing();
+            dispatch('pagehide');
+            reportFault(
+                faultCtx,
+                'Work order detail refresh failed',
+                new TypeError('Failed to fetch'),
+            );
+            assertStrictEquals(messages.length, 0);
+        } finally {
+            dispatch('pageshow');
+            restore();
+        }
     },
 );
