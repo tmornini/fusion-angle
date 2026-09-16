@@ -774,11 +774,11 @@ export interface RecordWriteMessagePairs {
 // for this
 // SAME write: the entity fields (organization_id excluded, like
 // every genuine client PUT — validateRecordDocumentBody's own
-// comment) plus the lifecycle trio. Create maps the trio from
-// initialState*; edit carries the body's own echoed trio
-// verbatim (never re-derived), so a synthesized document message pair
-// is byte-indistinguishable from what a live PUT would have
-// stored for the identical write.
+// comment) plus `state`, mapped from initialState on create
+// and echoed verbatim (never re-derived) on edit, so a
+// synthesized document message pair is byte-indistinguishable
+// from what a live PUT would have stored for the identical
+// write.
 export function recordDocumentBodyOf(
     writeBody: RecordWriteBody,
 ): Record<string, unknown> {
@@ -843,12 +843,8 @@ async function formRecordWriteMessagePairs(
     documentParams: readonly string[],
 ): Promise<RecordWriteMessagePairs> {
     const documentBody = recordDocumentBodyOf(b);
-    // Belt-and-suspenders (the flows precedent): a create's
-    // initialStateEventId carries no non-empty check of its
-    // own (R2's byte-pinned birth names), so an empty value
-    // must still 400 here — at the document trio's own gate —
-    // rather than silently minting an invalid synthesized
-    // pair.
+    // The document gate the synthesized pair passes, as a
+    // live PUT would.
     validateRecordDocumentBody(documentBody);
     const document = await formDocumentMessagePairFor({
         routePattern: documentRoutePattern,

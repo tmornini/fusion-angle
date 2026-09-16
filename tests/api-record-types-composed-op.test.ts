@@ -120,8 +120,6 @@ function createBody(
             },
         ],
         initialState: 'active',
-        initialStateEventId: generateIdentifier(),
-        initialStateAt: AT,
     };
 }
 

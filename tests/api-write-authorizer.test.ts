@@ -179,9 +179,7 @@ async () => {
                 position: 1,
             },
             attributes: [],
-            initialStateEventId: generateIdentifier(),
             initialState: 'active',
-            initialStateAt: '2026-01-01T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(created.status, 201);

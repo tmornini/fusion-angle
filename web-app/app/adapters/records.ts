@@ -17,12 +17,6 @@ import {
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
-import {
-    nowUtc,
-} from '../../../api/types.ts';
-import {
-    generateIdentifier,
-} from '../../../shared/identifier.ts';
 import { getFlowEntities } from './flows.ts';
 
 // The flow↔record bindings across EVERY flow the caller's org
@@ -258,16 +252,12 @@ export async function postRecordChange(
         ...a, organization_id: organization,
     }));
     if (change.kind === 'create') {
-        const initialStateEventId =
-            generateIdentifier();
         await ctx.POST(recordTypesPath(ctx), {
             kind: 'create',
             id,
             record,
             attributes,
             initialState: change.initialState,
-            initialStateEventId,
-            initialStateAt: nowUtc(),
         });
     } else {
         await ctx.POST(recordTypesPath(ctx), {

@@ -3102,8 +3102,6 @@ export interface RecordWriteCreateBody {
         RecordEntityFields & { organization_id: string };
     readonly attributes: readonly RecordAttributeEntity[];
     readonly initialState: RecordState;
-    readonly initialStateEventId: string;
-    readonly initialStateAt: string;
 }
 
 export interface RecordWriteEditBody {
@@ -3126,10 +3124,9 @@ const RECORD_WRITE_CREATE_KEYS:
     readonly string[] = [
     'kind', 'id', 'record',
     'attributes', 'initialState',
-    'initialStateEventId', 'initialStateAt',
 ];
 
-// The trio keys sit BEFORE removedAttributeIds (order is
+// `state` sits BEFORE removedAttributeIds (order is
 // load-bearing: assertOnlyKeys reports the first missing
 // required key it finds).
 const RECORD_WRITE_EDIT_KEYS:
@@ -3192,18 +3189,9 @@ export function validateRecordWriteBody(
             pickString(body, 'initialState'),
             'RecordWriteCreateBody.initialState',
         );
-        const initialStateEventId = pickIdentifier(
-            body, 'initialStateEventId',
-        );
-        const initialStateAt = validateTimestampField(
-            body, 'initialStateAt',
-            'RecordWriteCreateBody',
-        );
         return {
             kind: 'create',
-            id, record, attributes,
-            initialState, initialStateEventId,
-            initialStateAt,
+            id, record, attributes, initialState,
         };
     }
     if (kind === 'edit') {

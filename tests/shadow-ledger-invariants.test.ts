@@ -55,7 +55,6 @@ function getDocument(
 const N_START = generateIdentifier();
 const N_FINISH = generateIdentifier();
 const INV_REC_1 = generateIdentifier();
-const INV_REC_1_EV = generateIdentifier();
 const INV_REC_1_ATTR = generateIdentifier();
 const INV_CHAIN_1 = generateIdentifier();
 const INV_FLOW_1_EV = generateIdentifier();
@@ -225,7 +224,7 @@ function workOrderCreateBody(
 // and attribute pairs are exercised alongside the other six
 // families in this same mix — not merely in isolation.
 function createRecordBody(
-    id: string, eventId: string, organization: string,
+    id: string, organization: string,
     attributes: Record<string, unknown>[] = [],
 ) {
     return {
@@ -239,8 +238,6 @@ function createRecordBody(
         },
         attributes,
         initialState: 'active',
-        initialStateEventId: eventId,
-        initialStateAt: AT,
     };
 }
 
@@ -304,7 +301,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/record-types/', org2Token,
         createRecordBody(
-            INV_REC_1, INV_REC_1_EV, ORGANIZATION_TWO,
+            INV_REC_1, ORGANIZATION_TWO,
             [{
                 id: INV_REC_1_ATTR,
                 organization_id: ORGANIZATION_TWO,

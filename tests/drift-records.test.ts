@@ -74,17 +74,12 @@ const SEED_FLOW_ORGANIZATION_TWO = seedIdentifier('seed-flow-org2');
 const REC_DRIFT_CHAIN_1_ATTR_A = generateIdentifier();
 const REC_DRIFT_CHAIN_1_ATTR_B = generateIdentifier();
 const REC_DRIFT_CHAIN_1_ATTR_C = generateIdentifier();
-const REC_DRIFT_CHAIN_1_GENESIS = generateIdentifier();
 const REC_DRIFT_CHAIN_1_EDIT = generateIdentifier();
 const REC_DRIFT_CHAIN_1_REJECTED = generateIdentifier();
-const REC_DRIFT_CHAIN_2_GENESIS = generateIdentifier();
 const REC_DRIFT_DUP_1_A_ATTR = generateIdentifier();
-const REC_DRIFT_DUP_1_A_EV = generateIdentifier();
 const REC_DRIFT_DUP_1_B_ATTR = generateIdentifier();
-const REC_DRIFT_DUP_1_B_EV = generateIdentifier();
 const REC_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 const REC_DRIFT_METHOD_FILTER_1_ATTR = generateIdentifier();
-const REC_DRIFT_METHOD_FILTER_1_EV = generateIdentifier();
 const REC_DRIFT_Z = generateIdentifier();
 const EV_DRIFT_Z = generateIdentifier();
 const REC_DRIFT_A = generateIdentifier();
@@ -310,8 +305,6 @@ function createRecordBody(
     organization: string,
     name: string,
     attributes: readonly Record<string, unknown>[],
-    stateEventId: string,
-    stateAt: string,
 ): Record<string, unknown> {
     return {
         kind: 'create',
@@ -324,8 +317,6 @@ function createRecordBody(
         },
         attributes,
         initialState: 'active',
-        initialStateEventId: stateEventId,
-        initialStateAt: stateAt,
     };
 }
 
@@ -740,7 +731,6 @@ async () => {
                     attrB, recordId, 'Attr B', STARK_ORGANIZATION,
                 ),
             ],
-            REC_DRIFT_CHAIN_1_GENESIS, nowUtc(),
         ),
     ));
     assertStrictEquals(created.status, 201);
@@ -875,7 +865,7 @@ async () => {
             + '/record-types/', token,
         createRecordBody(
             secondRecordId, STARK_ORGANIZATION, 'Second Record',
-            [], REC_DRIFT_CHAIN_2_GENESIS, nowUtc(),
+            [],
         ),
     ));
     assertStrictEquals(secondCreated.status, 201);
@@ -920,8 +910,6 @@ async () => {
                     'Attr A', STARK_ORGANIZATION,
                 ),
             ],
-            REC_DRIFT_DUP_1_A_EV,
-            '2026-05-02T00:00:00.000000Z',
         ),
     ));
     assertStrictEquals(first.status, 201);
@@ -944,8 +932,6 @@ async () => {
                     'Attr B', STARK_ORGANIZATION,
                 ),
             ],
-            REC_DRIFT_DUP_1_B_EV,
-            '2026-05-02T00:00:01.000000Z',
         ),
     ));
     assertStrictEquals(second.status, 201);
@@ -1002,8 +988,6 @@ async () => {
                     STARK_ORGANIZATION,
                 ),
             ],
-            REC_DRIFT_METHOD_FILTER_1_EV,
-            '2026-05-03T00:00:00.000000Z',
         ),
     ));
     assertStrictEquals(created.status, 201);

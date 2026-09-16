@@ -431,8 +431,6 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
             },
             attributes: [],
             initialState: 'active',
-            initialStateEventId: 'id',
-            initialStateAt: AT,
         },
     ),
     writeExample(

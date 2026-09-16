@@ -340,7 +340,6 @@ Deno.test(
     'validateRecordWriteBody accepts a valid'
     + ' create body',
     () => {
-        const eventId = generateIdentifier();
         const out = validateRecordWriteBody({
             kind: 'create',
             id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -363,22 +362,12 @@ Deno.test(
                 },
             ],
             initialState: 'active',
-            initialStateEventId: eventId,
-            initialStateAt:
-                '2025-01-01T00:00:00.000000Z',
         });
         assertStrictEquals(out.kind, 'create');
         assertStrictEquals(out.id, 'rbfHGatkwQzGZJVXKJEeyw');
         if (out.kind === 'create') {
             assertStrictEquals(
                 out.initialState, 'active',
-            );
-            assertStrictEquals(
-                out.initialStateEventId, eventId,
-            );
-            assertStrictEquals(
-                out.initialStateAt,
-                '2025-01-01T00:00:00.000000Z',
             );
         }
     },
@@ -411,9 +400,6 @@ Deno.test(
                     },
                 ],
                 initialState: 'active',
-                initialStateEventId: generateIdentifier(),
-                initialStateAt:
-                    '2025-01-01T00:00:00.000000Z',
             }),
             Error, 'record_id must match top-level id',
         );
@@ -435,9 +421,6 @@ Deno.test(
                 },
                 attributes: [],
                 initialState: 'in-progress',
-                initialStateEventId: generateIdentifier(),
-                initialStateAt:
-                    '2025-01-01T00:00:00.000000Z',
             }),
             Error, 'expected RecordState',
         );
@@ -445,8 +428,8 @@ Deno.test(
 );
 
 Deno.test(
-    'validateRecordWriteBody create rejects a'
-    + ' missing initialStateEventId',
+    'validateRecordWriteBody create rejects'
+    + ' initialStateEventId as an unexpected key',
     () => {
         assertThrows(
             () => validateRecordWriteBody({
@@ -459,8 +442,9 @@ Deno.test(
                 },
                 attributes: [],
                 initialState: 'active',
-            } as never),
-            Error, 'missing required key',
+                initialStateEventId: 'XufQcWIKhZshfJYOVNeUSw',
+            }),
+            Error, 'unexpected key',
         );
     },
 );

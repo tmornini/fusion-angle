@@ -1239,8 +1239,6 @@ export function recordSeedBody(
             constraints: a.constraints,
         })),
         initialState: event.state,
-        initialStateEventId: event.id,
-        initialStateAt: event.at,
     };
 }
 
