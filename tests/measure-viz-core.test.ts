@@ -31,6 +31,9 @@ import {
     budgetPressure,
     meanPhaseBuckets,
     systemMetrics,
+    pageCandle,
+    systemCandle,
+    trendAxisMax,
     MEASURE_BOOT_PAGE_INIT,
     VIZ_PAYLOAD_VERSION,
 } from '../web-app/app/measure-viz-core.ts';
@@ -860,4 +863,104 @@ Deno.test('systemMetrics composes window metrics', () => {
     assertStrictEquals(m.systemDeltaMs, 250);
     assertStrictEquals(m.overBudget, 2);
     assert(m.budgetP50 !== null);
+});
+
+// --- candles ---
+
+Deno.test('pageCandle null without spread', () => {
+    assertStrictEquals(
+        pageCandle({ readyMs: 100, phases: {} }),
+        null,
+    );
+});
+
+Deno.test('pageCandle carries spread and median', () => {
+    assertEquals(
+        pageCandle({
+            readyMs: 357,
+            phases: {},
+            spread: {
+                min: 331, max: 402, mean: 361.2, sigma: 19.8,
+            },
+        }),
+        {
+            min: 331,
+            max: 402,
+            mean: 361.2,
+            sigma: 19.8,
+            median: 357,
+        },
+    );
+});
+
+Deno.test('systemCandle averages page spreads', () => {
+    const s = sampleSweep('t', {
+        a: {
+            readyMs: 100,
+            phases: {},
+            spread: { min: 80, max: 140, mean: 104, sigma: 20 },
+        },
+        b: {
+            readyMs: 300,
+            phases: {},
+            spread: { min: 200, max: 400, mean: 296, sigma: 40 },
+        },
+    });
+    assertEquals(systemCandle(s), {
+        min: 140,
+        max: 270,
+        mean: 200,
+        sigma: 30,
+        median: 200,
+    });
+    assertStrictEquals(systemCandle(s)!.median, meanReadyMs(s));
+});
+
+Deno.test('systemCandle null when any page lacks spread', () => {
+    const s = sampleSweep('t', {
+        a: {
+            readyMs: 100,
+            phases: {},
+            spread: { min: 80, max: 140, mean: 104, sigma: 20 },
+        },
+        b: { readyMs: 300, phases: {} },
+    });
+    assertStrictEquals(systemCandle(s), null);
+});
+
+Deno.test('systemCandle null for a sweep with no pages', () => {
+    assertStrictEquals(
+        systemCandle(sampleSweep('t', {})),
+        null,
+    );
+});
+
+Deno.test('trendAxisMax is the largest of y, candle max, budget', () => {
+    const candle = {
+        min: 90, max: 700, mean: 300, sigma: 50, median: 280,
+    };
+    const points = [
+        { y: 280, candle },
+        { y: 500, candle: null },
+    ];
+    // candle max above every y
+    assertStrictEquals(trendAxisMax(points, null), 700);
+    // budget above everything
+    assertStrictEquals(trendAxisMax(points, 900), 900);
+    // y above candle and budget
+    assertStrictEquals(
+        trendAxisMax(
+            [{ y: 800, candle }, { y: 500, candle: null }],
+            600,
+        ),
+        800,
+    );
+});
+
+Deno.test('trendAxisMax floors at 1', () => {
+    assertStrictEquals(
+        trendAxisMax([{ y: 0, candle: null }], null),
+        1,
+    );
+    assertStrictEquals(trendAxisMax([], null), 1);
 });

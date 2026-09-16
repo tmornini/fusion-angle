@@ -808,3 +808,83 @@ export function systemMetrics(
         budgetP50,
     };
 }
+
+// --- candles ---
+
+export type Candle = {
+    min: number;
+    max: number;
+    mean: number;
+    sigma: number;
+    median: number;
+};
+
+/** Null when the page predates spread recording. */
+export function pageCandle(
+    page: HistoryLine['pages'][string],
+): Candle | null {
+    if (page.spread === undefined) return null;
+    return {
+        min: page.spread.min,
+        max: page.spread.max,
+        mean: page.spread.mean,
+        sigma: page.spread.sigma,
+        median: page.readyMs,
+    };
+}
+
+/**
+ * Mean over pages of each spread field; median is the
+ * mean of page medians (meanReadyMs). Null when the sweep
+ * has no pages or any page lacks spread.
+ */
+export function systemCandle(
+    sweep: HistoryLine,
+): Candle | null {
+    const pages = Object.values(sweep.pages);
+    if (pages.length === 0) return null;
+    let min = 0;
+    let max = 0;
+    let mean = 0;
+    let sigma = 0;
+    let median = 0;
+    for (const p of pages) {
+        if (p.spread === undefined) return null;
+        min += p.spread.min;
+        max += p.spread.max;
+        mean += p.spread.mean;
+        sigma += p.spread.sigma;
+        median += p.readyMs;
+    }
+    const n = pages.length;
+    return {
+        min: min / n,
+        max: max / n,
+        mean: mean / n,
+        sigma: sigma / n,
+        median: median / n,
+    };
+}
+
+/**
+ * Largest of every point's y, every present candle's max,
+ * and the budget. Values ≤ 0 floor to 1, as the trend
+ * builder does.
+ */
+export function trendAxisMax(
+    points: Array<{ y: number; candle: Candle | null }>,
+    budgetMs: number | null,
+): number {
+    let max = 0;
+    for (const p of points) {
+        if (p.y > max) max = p.y;
+        if (p.candle !== null && p.candle.max > max) {
+            max = p.candle.max;
+        }
+    }
+    if (budgetMs !== null && budgetMs > max) {
+        max = budgetMs;
+    }
+    if (max <= 0) return 1;
+    return max;
+}
