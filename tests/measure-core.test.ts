@@ -270,6 +270,20 @@ Deno.test('statsForPage trims extremes on readyMs', () => {
     assertStrictEquals(s.readyMs.median, 10.5);
 });
 
+Deno.test('statsForPage mean and sigma on trimmed set', () => {
+    // n=8 → drop 1 each tail → [4,4,4,5,5,7]
+    // mean = 29/6; sample σ = √(41/30)
+    const runs: PageRun[] = [2, 4, 4, 4, 5, 5, 7, 9].map(
+        (readyMs) => ({ readyMs, phases: {} }),
+    );
+    const s = statsForPage(runs);
+    assert(Math.abs(s.readyMs.mean - 29 / 6) < 1e-12);
+    assert(
+        Math.abs(s.readyMs.sigma - Math.sqrt(41 / 30))
+            < 1e-12,
+    );
+});
+
 // --- compareBudgets ---
 
 function page(
@@ -280,6 +294,8 @@ function page(
             min: medianReady,
             median: medianReady,
             max: medianReady,
+            mean: medianReady,
+            sigma: 0,
         },
         phases: {},
     };
@@ -394,6 +410,8 @@ Deno.test('shapeHistoryLine maps median stats', () => {
                     min: 80,
                     median: 100,
                     max: 140,
+                    mean: 104,
+                    sigma: 22,
                 },
                 phases: {
                     'boot:db-open': 12,
@@ -405,6 +423,8 @@ Deno.test('shapeHistoryLine maps median stats', () => {
                     min: 200,
                     median: 250,
                     max: 300,
+                    mean: 250,
+                    sigma: 40,
                 },
                 phases: {},
             },
@@ -438,6 +458,8 @@ Deno.test('formatReport includes page names and numbers', () => {
                 min: 200,
                 median: 250,
                 max: 300,
+                mean: 250,
+                sigma: 40,
             },
             phases: { fetch: 80 },
         },
@@ -446,6 +468,8 @@ Deno.test('formatReport includes page names and numbers', () => {
                 min: 80,
                 median: 100,
                 max: 140,
+                mean: 104,
+                sigma: 22,
             },
             phases: { 'boot:db-open': 12 },
         },

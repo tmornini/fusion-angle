@@ -7,7 +7,13 @@ export type PageRun = {
 };
 
 export type PageStats = {
-    readyMs: { min: number; median: number; max: number };
+    readyMs: {
+        min: number;
+        median: number;
+        max: number;
+        mean: number;
+        sigma: number;
+    };
     phases: Record<string, number>; // median per phase
 };
 
@@ -168,10 +174,10 @@ export function budgetReadyMsFromSamples(
 }
 
 /**
- * Aggregate min/median/max readyMs and per-phase medians
- * across runs. Each series is first trimmed (default 10%
- * each tail) so min/max/median ignore environment
- * extremes. Empty runs → throws.
+ * Aggregate min/median/max/mean/sample σ readyMs and
+ * per-phase medians across runs. Each series is first
+ * trimmed (default 10% each tail) so every statistic
+ * ignores environment extremes. Empty runs → throws.
  */
 export function statsForPage(runs: PageRun[]): PageStats {
     if (runs.length === 0) {
@@ -202,6 +208,8 @@ export function statsForPage(runs: PageRun[]): PageStats {
             min: Math.min(...readyValues),
             median: median(readyValues),
             max: Math.max(...readyValues),
+            mean: mean(readyValues),
+            sigma: sampleStandardDeviation(readyValues),
         },
         phases,
     };
