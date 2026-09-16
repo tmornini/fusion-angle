@@ -26,18 +26,20 @@ emitted() {
 
 bundle_client() {
     local dest="$1"
-    deno run --frozen --allow-read \
-        --allow-write="$dest" \
-        web-app/app/compose.ts "$dest"
-
     mkdir -p "$dest/assets"
     deno bundle --frozen \
         --platform browser \
-        --format iife \
+        --format esm \
+        --code-splitting \
         --minify \
         --keep-names \
-        -o "$dest/assets/app.js" \
+        --outdir "$dest/assets" \
         web-app/app/server-core.ts
+
+    if [ -f "$dest/assets/server-core.js" ]; then
+        mv "$dest/assets/server-core.js" \
+            "$dest/assets/app.js"
+    fi
 
     emitted "Server bundle created" \
         "$dest/assets/app.js"
@@ -63,6 +65,11 @@ bundle_client() {
 
     emitted "Bundle created" "$dest/assets/root-redirect.js"
 
+    cp web-app/assets/*.woff2 "$dest/assets/"
+    cp web-app/assets/favicon.ico "$dest/assets/"
+    cp web-app/assets/favicon.svg "$dest/assets/"
+    cp web-app/assets/mark.png "$dest/assets/"
+
     cat web-app/app/styles/tokens.css \
         web-app/app/styles/fonts.css \
         web-app/app/styles/light-mode.css \
@@ -74,6 +81,10 @@ bundle_client() {
         web-app/app/styles/responsive.css \
         web-app/app/styles/command-palette.css \
         > "$dest/styles.concat.css"
+
+    deno run --frozen --allow-read \
+        --allow-write="$dest" \
+        web-app/app/hash-static.ts "$dest"
 
     deno bundle --frozen --minify \
         --external '*.woff2' \
@@ -92,9 +103,17 @@ bundle_client() {
             -o "$dest/assets/$name.css" "$f"
         emitted "Styles created" "$dest/assets/$name.css"
     done
-    cp web-app/assets/*.woff2 "$dest/assets/"
     cp web-app/index.html "$dest/"
-    cp web-app/assets/favicon.ico "$dest/assets/"
-    cp web-app/assets/favicon.svg "$dest/assets/"
-    cp web-app/assets/mark.png "$dest/assets/"
+
+    deno run --frozen --allow-read \
+        --allow-write="$dest" \
+        web-app/app/hash-static.ts "$dest"
+
+    deno run --frozen --allow-read \
+        --allow-write="$dest" \
+        web-app/app/compose.ts "$dest"
+
+    deno run --frozen --allow-read \
+        --allow-write="$dest" \
+        web-app/app/hash-static.ts --gzip "$dest"
 }
