@@ -101,14 +101,19 @@ before the first gesture. A click at the
 top-left of a fullscreen or flush window is the
 Apple menu; the next click opens About This Mac.
 Open a second tab of the same context only where a
-same-jar case needs one (SV8, SV8b, SV9); open a
-second browser context — a separate cookie jar —
-where a case needs a second identity (SV6, SV7,
-SV10), recording BLOCKED with the reason named if
-the driver offers no multi-context support; activate
-whichever tab you are driving; confirm
-`document.visibilityState === 'visible'` before
-every gesture and every timing assertion.
+same-jar case needs one (SV8, SV8b, SV9). For a
+second identity (SV6, SV7, SV10) mint a second
+cookie jar with `Target.createBrowserContext`
+then `Target.createTarget` (`browserContextId`
+set, `url` `about:blank`) and
+`Target.attachToTarget` (`flatten: true`) — the
+same sequence `tests/browser/fixtures.ts`
+`newPage()` uses. `new_tab()` is the same jar.
+One Chrome is required, not a BLOCKED reason.
+BLOCKED only if `createBrowserContext` itself
+fails. Activate whichever tab you are driving;
+confirm `document.visibilityState === 'visible'`
+before every gesture and every timing assertion.
 
 Drive with compositor mouse and CDP key events. Never
 `js()` fetch the API — the bearer is memory-only; read
@@ -145,6 +150,15 @@ not repeat the note in every case.
 - F56: no canvas click before Space.
 - List-row drags are pointer capture on `.drag-handle`.
 - Probe for the skeleton before fetches settle.
+  I21: `Fetch.enable` pause on
+  `*://localhost:*/api/organizations/*` (never
+  `/api/authentication/*`) before the navigation;
+  do not `wait_for_load`. On the first
+  `Fetch.requestPaused`, query `.skeleton-card`
+  or `.skeleton-grid`, then continue every paused
+  request and `Fetch.disable`. A miss without the
+  pause is BLOCKED. A miss with the pause in
+  place is FAIL of the exploratory half.
 - Reduced motion is `Emulation.setEmulatedMedia`.
 - Downloads are intercepted at `URL.createObjectURL`;
   uploads are built with `DataTransfer`.
@@ -178,11 +192,6 @@ not repeat the note in every case.
   `document.visibilityState === 'visible'` before
   the port-drag. Driving the hidden tab is BLOCKED,
   not FAIL.
-- B21: the access JWT is memory-only. There is no
-  public `putSessionToken` on the production bundle.
-  If the in-memory token cannot be replaced without
-  `js()` of the API, record BLOCKED. The Layer 1 pin
-  decides cookie refresh.
 - WB16: snapshot Performance *before* inbox
   navigation. A transition POST dropped by navigation
   is BLOCKED, not FAIL. The Layer 1 pins decide the
@@ -256,7 +265,27 @@ not repeat the note in every case.
   DEFERRED on WB14, not FAIL. Layer 1 pins decide
   the 412. The live re-GET, conflict notice, and
   no-auto-retry half is exploratory. WB19 history
-  remains readable after archive.
+  remains readable after archive. The instance
+  `Edit` (`[data-action="edit-instance"]`) sits
+  below the fold at 1280×800. `scrollIntoView` it
+  (`block: "center"`) or raise
+  `Browser.setWindowBounds` height until the
+  Instances section is on-screen, then click that
+  button — never the record-type header Edit,
+  which opens the type form. A targeting miss is
+  BLOCKED, not FAIL. Restore the 1280×800 bounds
+  after the click if you raised them.
+- SV6/SV7/SV10: a second cookie jar is
+  `Target.createBrowserContext` then
+  `Target.createTarget` with that
+  `browserContextId` (Layer 2
+  `tests/browser/fixtures.ts` `newPage()`).
+  `new_tab()` is the same jar (SV8). One Chrome
+  is required, not a BLOCKED reason. BLOCKED only
+  if `createBrowserContext` itself fails. SV7
+  DEFERRED on SV6; two tabs of one jar is SV8b,
+  not SV7. SV10's stale-until-navigation residual
+  is PASS, not FAIL.
 
 ### Scoring
 
@@ -295,6 +324,12 @@ exploratory half (no Layer 1 pin renders the live
 Customer Profile list).
 WB19a/WB19b when the bound WO is already archived:
 DEFERRED on WB14. Layer 1 pins decide the 412.
+I21 skeleton miss without the Fetch pause:
+BLOCKED naming that. A miss with the pause in
+place is FAIL of the exploratory half.
+SV7 when SV6 did not produce a second jar:
+DEFERRED on SV6, not FAIL. Two tabs of one jar
+is SV8b.
 
 Nothing blocks on any outcome. BLOCKED is allowed for a
 driver limit: with no gate riding on the walk, an honest
@@ -309,7 +344,7 @@ by the master.
 | AT. Automated Test Suite | 5 |
 | A. Build & Setup | 5 |
 | AA. Data Entry Workflow | 46 |
-| B. Entry Pages | 31 |
+| B. Entry Pages | 30 |
 | C. Core: Dashboard | 7 |
 | D. Core: Ideas Workflow | 38 |
 | E. Core: Projects | 12 |
@@ -323,7 +358,7 @@ by the master.
 | R. Records | 25 |
 | J. Teardown | 3 |
 | SV. Server (Deno + Postgres) | 9 |
-| **Total** | **401** |
+| **Total** | **400** |
 
 A3 **is** SV1 — counted once, in A. The explorer
 skips SV1. F is 80 (F1–F75 plus F37a, F37b, F38a,
@@ -331,7 +366,7 @@ F38b, F57a).
 
 ### Combined Totals (CLI + Browser)
 
-The per-section table above counts 401 distinct
+The per-section table above counts 400 distinct
 TEST-PLAN cases (A3 is SV1; not counted twice). The
 CLI count is the most recent `./test` (AT2)
 report — the main `tests/*.test.ts` suite plus the
@@ -1374,13 +1409,6 @@ the second organization.
        duplicates almost exactly; exploratory — the
        live open and the painted chip in tab B (same
        as SV8)
-- [ ] **B21** Silent refresh: after signing in, replace the in-memory access token with an expired JWT (keep the live `refresh_token` cookie), then navigate to `members/`. PASS: the page loads with no bounce and no error card — the dead access token was cookie-refreshed transparently. The production bundle does not export `putSessionToken`; the access JWT is memory-only by design. If the token cannot be replaced without `js()` of the API, record BLOCKED naming that — an honest BLOCKED costs nothing.
-  Pin: tests/adapters-refresh-mutex.test.ts 'two
-       concurrent 401s cause one refresh POST' (a dead
-       access token against `members` under a cookie
-       session transparently refreshes and the
-       original call still succeeds); exploratory —
-       the live page load with no bounce or error card
 - [ ] **B22** Dead refresh: clear the `refresh_token` cookie and drop the in-memory access token, then open `dashboard/`. PASS: bounced once to `auth?return=dashboard` — no retry loop, no console error storm.
   Pin: tests/adapters-refresh-mutex.test.ts
        'cookie-session recover after a failed facade
@@ -4327,14 +4355,25 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   Drive before WB14. If the WO is already archived,
   DEFERRED on WB14 — not FAIL. Bind a work order to
   an instance. Open the action screen in two tabs.
-  In tab 2, change an instance value via the
-  records detail instance editor (or a second transition)
-  so the head etag advances. In tab 1, edit a value and
-  transition. PASS: tab 1 receives 412, re-GETs the
-  instance, re-presents the action screen with a conflict
-  notice and a warning toast ("This instance changed
+  In tab 2, open the bound record's detail. The
+  Instances section sits below the fold at
+  1280×800 — `scrollIntoView` the row's
+  `[data-action="edit-instance"]` (`block:
+  "center"`) or raise `Browser.setWindowBounds`
+  height until that button is on-screen, then
+  click it. Do not click the record-type header
+  Edit (that opens the type form). Change an
+  instance value and Save so the head etag
+  advances (or drive a second transition). In tab
+  1, edit a value and transition. PASS: tab 1
+  receives 412, re-GETs the instance, re-presents
+  the action screen with a conflict notice and a
+  warning toast ("This instance changed
   underneath you — values refreshed; re-apply your
-  edit"), and does **not** auto-retry the transition.
+  edit"), and does **not** auto-retry the
+  transition. A targeting miss on header Edit is
+  BLOCKED, not FAIL. Restore 1280×800 bounds
+  after if you raised them.
   Pin: tests/api-work-order-transition-instance.test.ts
        'value-bearing stale If-Match → 412' (decides the
        server 412 when a transition's held etag is
@@ -5887,10 +5926,19 @@ layout.
 ### Loading States
 
 - [ ] **I21** Navigate to a data-dependent page
-  with mock data loaded; do not `wait_for_load`
-  first (see Driving notes). PASS: loading
-  skeleton (card-grid, card-list, or detail
-  pattern) appears, then content replaces it.
+  with mock data loaded (members or ideas).
+  Localhost GETs settle in 0–1 ms, so a poll
+  after `wait_for_load` never sees the skeleton.
+  Before the navigation, `Fetch.enable` pausing
+  `*://localhost:*/api/organizations/*` — never
+  `/api/authentication/*`. Do not `wait_for_load`.
+  On the first `Fetch.requestPaused`, query
+  `.skeleton-card` or `.skeleton-grid`. PASS: the
+  skeleton is in the container, then continue
+  every paused request, `Fetch.disable`, and
+  content replaces it. A miss without the pause
+  is BLOCKED. A miss with the pause in place is
+  FAIL of the exploratory half.
   Pin: exploratory — the live pre-settlement
        skeleton; `loadInto` is tested only after its
        fetch settles (empty, data, or error), never
@@ -6938,22 +6986,32 @@ Do not file **SV10** as a regression.
 ### Two identities, one database, one origin
 
 Both SV6 and SV7 need two identities signed in at
-once, not two tabs of one identity — the browser-use
-plugin's two browser **contexts** (two cookie jars,
-one Chrome) are how the walk now gets that. If the
-driver offers no multi-context support, record
-BLOCKED naming that reason; an honest BLOCKED costs
-nothing.
+once, not two tabs of one identity. A second
+cookie jar is CDP `Target.createBrowserContext`,
+then `Target.createTarget` with that
+`browserContextId` and `Target.attachToTarget`
+(`flatten: true`) — the same sequence Layer 2
+`tests/browser/fixtures.ts` `newPage()` uses
+against one Chrome. `new_tab()` shares the
+default jar (that is SV8, not this section). One
+Chrome is the setup, not a BLOCKED reason.
+BLOCKED only if `createBrowserContext` itself
+fails; an honest BLOCKED costs nothing. SV7 then
+DEFERRED on SV6.
 
 - [ ] **SV6** Two browser contexts against the one
   crank origin (two cookie jars, one Chrome, one
-  Postgres). In context A, sign in as
+  Postgres). Mint context B with
+  `Target.createBrowserContext` (do not
+  `new_tab()`). In context A, sign in as
   `demo@example.com`. In context B, sign in as
   `sarah.chen@company.com` (stdout password; Sarah
   is Stark, same organization as the admin). PASS:
   both dashboards load; the sidebar member chips
   name different people; one Postgres, two
-  sessions.
+  sessions. Proof that B is a fresh jar: before
+  B signs in, a gated URL on B bounces to `auth`
+  even while A is signed in.
   Pin: tests/browser/two-jars.test.ts 'two contexts
        hold two identities on one origin';
        exploratory — the live two-context sign-in
@@ -6964,7 +7022,11 @@ nothing.
   Idea). In context B, navigate to `ideas/` (or
   reload if already there). PASS: Sarah's list
   includes A's new idea — two identities, one
-  database.
+  database. If SV6 did not produce a second jar,
+  DEFERRED on SV6, not FAIL. Two tabs of one jar
+  is the wrong setup: BroadcastChannel would
+  refresh B live (that is SV8b) and would not
+  prove the shared database.
   Pin: tests/browser/two-jars.test.ts 'two contexts
        hold two identities on one origin';
        exploratory — the live UI-driven create, as
@@ -7022,9 +7084,12 @@ cross-tab one: SV8b just proved two tabs of one jar
 DO refresh live via BroadcastChannel. Demonstrating
 staleness needs two separate identities (two browser
 contexts, as SV6/SV7 set up) — one jar's tabs cannot
-show it. If the driver offers no multi-context
-support, record BLOCKED naming that reason rather
-than a case that would read as a FAIL.
+show it. Mint the second jar the same way as SV6
+(`Target.createBrowserContext`). BLOCKED only if
+that call fails, not because the daemon is "one
+Chrome". A case driven as two tabs of one jar
+cannot show staleness (BroadcastChannel would
+refresh B) — that is BLOCKED targeting, not FAIL.
 
 - [ ] **SV10** Context B (Sarah Chen, from SV6/SV7)
   is still signed in and already sitting on
@@ -7040,7 +7105,8 @@ than a case that would read as a FAIL.
   separate browser contexts. A second context
   looking stale until navigation is **not FAIL**.
   After B navigates or reloads, the card from this
-  write is present (same pin as SV7).
+  write is present (same pin as SV7). If SV6 did
+  not produce a second jar, DEFERRED on SV6.
   Pin: exploratory — the pre-navigation staleness
        and the post-navigation appearance; no CLI
        or browser test decides the staleness
@@ -7076,7 +7142,7 @@ Total: <N> cases — PASS X · FAIL Y · BLOCKED Z · DEFERRED D · DRIFT R
 | AT | 5 | | | | | |
 | A | 5 | | | | | |
 | AA | 46 | | | | | |
-| B | 31 | | | | | |
+| B | 30 | | | | | |
 | C | 7 | | | | | |
 | D | 38 | | | | | |
 | E | 12 | | | | | |

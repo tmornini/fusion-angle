@@ -1245,8 +1245,9 @@ Off the critical path; each with its oracle.
     is a does-not-throw smoke test and the key-index
     logic is unexported inside the DOM listeners
   - The loading skeleton before a fetch settles (I21) —
-    Layer 2, probing before `wait_for_load`; Layer 1 is
-    possible by reading `innerHTML` between calling
+    the walk pauses `Fetch` on `/api/organizations/*`
+    so the pending skeleton is observable; a Layer 1
+    pin can still read `innerHTML` between calling
     `loadInto` and awaiting it
   - The toast's top-center position and its ~6-second
     auto-dismiss (I23) — Layer 2, reading computed
