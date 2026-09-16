@@ -501,6 +501,57 @@ Deno.test('GATE 3: unknown / spent / raced code all 401 with the'
         true);
 });
 
+Deno.test(
+    'authorization-code issued event is named by jti',
+    async () => {
+        const db = await freshDb();
+        await seedRootAdmin(db);
+        await seedAuthorizationCodeMessagePair(
+            db, 'the-code-spent',
+            'XXZruirZyAOoRpNxaDnpSA', 'web',
+        );
+        const first = await handleRequest(
+            db, tokenRequest({
+                grant_type: 'authorization_code',
+                code: 'the-code-spent',
+                client_id: 'web',
+            }),
+        );
+        assertStrictEquals(first.status, 201);
+        const identityId = 'XXZruirZyAOoRpNxaDnpSA';
+        const derivedId =
+            await deriveAuthorizationCodeId(
+                'the-code-spent',
+            );
+        const prefix = '/identities/'
+            + identityId + '/tokens/';
+        const markerPrefix = '/identities/'
+            + identityId + '/authorization-codes/';
+        const marker = await db.messagePairs
+            .getDocumentHistory(
+                markerPrefix, derivedId,
+            );
+        assert(marker.length > 0, 'marker document');
+        assertStrictEquals(
+            await authorizationCodeSpent(
+                db, derivedId, identityId,
+            ),
+            true,
+        );
+        const issued = (await deriveIdentityTokensFor(
+            db, identityId,
+        )).filter(r => r.action === 'issued');
+        assertEquals(
+            new Set(issued.map(r => r.jti)).size,
+            issued.length,
+            'one head per jti',
+        );
+        const old = await db.messagePairs
+            .getDocumentHistory(prefix, derivedId);
+        assertEquals(old.length, 0);
+    },
+);
+
 async function initialPair(
     db: MemoryDbAdapter,
 ): Promise<{ access_token: string; refresh_token: string }> {

@@ -347,17 +347,17 @@ const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
     TOKEN_EVENT_ROUTE_PATTERN.split('/');
 
 // Synthesizes ONE token event pair at the jti's own
-// document — `name` is the jti, or, for the
-// authorization_code chain root, the code's sha256 spend
-// marker (api/authentication.ts authorizationCodeSpent; spec
-// 2026-09-15 § 6). The SAME document, method, and response
-// shape a real PUT identities/:id/tokens/:jti stores; the
-// response `id` is the name (identityTokenEntityOf: GET
-// wins). Formed PRE-TX — crypto, hashing, and timers never
-// run inside an open transaction. requesterIdentityId is the
-// event's OWN identity_id — the named convention for a write
-// with no authenticated actor in view at this depth. A jti
-// is an identifier, not a bearer secret.
+// document — `name` is always the jti. The authorization-
+// code spend marker is a different prefix
+// (formAuthorizationCodeMarkerPair). The SAME document,
+// method, and response shape a real PUT
+// identities/:id/tokens/:jti stores; the response `id` is
+// the name (identityTokenEntityOf: GET wins). Formed PRE-TX
+// — crypto, hashing, and timers never run inside an open
+// transaction. requesterIdentityId is the event's OWN
+// identity_id — the named convention for a write with no
+// authenticated actor in view at this depth. A jti is an
+// identifier, not a bearer secret.
 export async function formTokenEventMessagePair(
     name: Id,
     event: Omit<IdentityTokenEntity, 'id'>,
@@ -386,6 +386,49 @@ export async function formTokenEventMessagePair(
             ...validateIdentityTokenEntity(body),
             id: name,
         },
+        operationId,
+    });
+}
+
+// The authorization-code spend marker: a document at
+// identities/:id/authorization-codes/:hash whose body is
+// `{ jti }` and whose response is `{ jti, id: hash }`.
+// Global plane. Formed PRE-TX. Not a public HTTP route —
+// grantAuthorizationCode appends it beside the issued
+// event, marker first so a crash after the marker still
+// fails a replay closed.
+const AUTH_CODE_MARKER_ROUTE_PATTERN =
+    'identities/:id/authorization-codes/:hash';
+const AUTH_CODE_MARKER_ROUTE_SEGMENTS: readonly string[] =
+    AUTH_CODE_MARKER_ROUTE_PATTERN.split('/');
+
+export async function formAuthorizationCodeMarkerPair(
+    hash: string,
+    jti: string,
+    identityId: Id,
+    at: string,
+    operationId: string,
+): Promise<MessagePair> {
+    const pathSegments = [
+        AUTH_CODE_MARKER_ROUTE_SEGMENTS[0]!,
+        identityId,
+        AUTH_CODE_MARKER_ROUTE_SEGMENTS[2]!,
+        hash,
+    ];
+    const body = { jti };
+    return formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/' + pathSegments.join('/'),
+        routePattern: AUTH_CODE_MARKER_ROUTE_PATTERN,
+        routeSegments: AUTH_CODE_MARKER_ROUTE_SEGMENTS,
+        pathSegments,
+        headerFields: [],
+        body,
+        requesterIdentityId: identityId,
+        requestAt: at,
+        organization: undefined,
+        responseStatus: HTTP_OK,
+        responseBody: { jti, id: hash },
         operationId,
     });
 }

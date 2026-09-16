@@ -42,6 +42,7 @@ import {
     planRotation,
     isTokenRevoked,
     chainIdForJti,
+    latestActionForJti,
     revocationAppends,
     jtiSetsEqual,
 } from './identity-tokens.ts';
@@ -66,6 +67,7 @@ import {
     appendMessagePairAlways,
     canonicalPath,
     formAuthMessagePair,
+    formAuthorizationCodeMarkerPair,
     formTokenEventMessagePair,
     formWriteMessagePair,
 } from './message-pair.ts';
@@ -488,17 +490,16 @@ export async function tokenRevocationReason(
     return null;
 }
 
-// The two-step narrow shared by rotation and revocation, run
-// BOTH pre-tx (the provisional read) and in-tx (the
-// authoritative re-read): ONE collection read of the
-// identity's own tokens (deriveIdentityTokensFor — one head
-// per jti document at the nested prefix), folded in memory
-// first for the presented jti's chain_id, then for every row
-// of that chain — planRotation's replay path and an explicit
-// revocation act on every jti the chain has ever held, so a
-// jti-only fold would under-revoke. A jti absent from this
-// identity's collection is unknown: chainId null, rows
-// empty. The refresh grant already verified the JWT
+// The collection read a replay rotation and an explicit
+// revocation share, run BOTH pre-tx and in-tx: ONE collection
+// read of the identity's own tokens (deriveIdentityTokensFor
+// — one head per jti document at the nested prefix), folded
+// in memory first for the presented jti's chain_id, then for
+// every row of that chain — planRotation's replay path and
+// an explicit revocation act on every jti the chain has ever
+// held, so a jti-only fold would under-revoke. A jti absent
+// from this identity's collection is unknown: chainId null,
+// rows empty. The refresh grant already verified the JWT
 // (claims.sub); the rotation and revocation routes carry the
 // identity on their path. Never the whole plane (spec
 // 2026-09-15 exact-read folds § 1).
@@ -581,8 +582,9 @@ export type RotationOutcome =
     | { readonly kind: 'rotate'; readonly newJti: string }
     | { readonly kind: 'fail' };
 
-// One rotation attempt's PRE-TX groundwork: the provisional read
-// — FLIPPED onto readTokenChainFromLedger (Phase 13 Task 6) —
+// One rotation attempt's PRE-TX groundwork: the presented
+// jti's document (happy path: latest action issued or
+// unknown), else the identity's tokens collection (replay),
 // the provisional plan (planRotation, bytes unchanged), and a
 // pre-minted row id + event pair for whichever appends that plan
 // carries. `newJti` is the ONE value that survives every attempt
@@ -602,10 +604,20 @@ async function planRotationAttempt(
     readonly plan: RotationPlan;
     readonly writes: readonly TokenEventWrite[];
 }> {
-    const { rows } = await readTokenChainFromLedger(
-        adapter, identityId, presentedJti,
+    const events = await deriveIdentityTokenEventsForJti(
+        adapter, presentedJti, identityId,
     );
-    const plan = planRotation(rows, presentedJti, newJti, nowUtc());
+    const latest = latestActionForJti(
+        events, presentedJti,
+    );
+    const rows = latest === 'issued' || latest === null
+        ? events
+        : (await readTokenChainFromLedger(
+            adapter, identityId, presentedJti,
+        )).rows;
+    const plan = planRotation(
+        rows, presentedJti, newJti, nowUtc(),
+    );
     const appends = plan.kind === 'unknown' ? [] : plan.appends;
     return {
         plan,
@@ -663,9 +675,20 @@ export async function rotateRefreshJti(
         );
         try {
             return await adapter.transaction(async (view) => {
-                    const { rows } = await readTokenChainFromLedger(
-                        view, identityId, presentedJti,
+                    const events =
+                        await deriveIdentityTokenEventsForJti(
+                            view, presentedJti, identityId,
+                        );
+                    const latest = latestActionForJti(
+                        events, presentedJti,
                     );
+                    const rows =
+                        latest === 'issued' || latest === null
+                            ? events
+                            : (await readTokenChainFromLedger(
+                                view, identityId,
+                                presentedJti,
+                            )).rows;
                     const freshPlan = planRotation(
                         rows, presentedJti, newJti, nowUtc(),
                     );
@@ -1108,15 +1131,14 @@ async function grantClientCredentials(
         : replay;
 }
 
-// GATE 3 — KEY-BY-ANCHOR (Phase 13 Task 7): the presented code's
-// sha256 digest, pre-tx always — formed pre-tx — crypto,
-// hashing, and timers never run inside an open transaction
-// (AGENTS.md § Transaction bodies await only row ops). It IS
-// the issued root's event pair name — the one token document
-// not named by its jti (formTokenEventMessagePair takes the
-// name). authorizeCodeIssuer matches the LIVE code
-// against the authorize response family's stored `code` field
-// (pairs are stored verbatim).
+// GATE 3: the presented code's sha256 digest, pre-tx always —
+// formed pre-tx — crypto, hashing, and timers never run inside
+// an open transaction (AGENTS.md § Transaction bodies await
+// only row ops). It names the spend marker document at
+// /identities/<id>/authorization-codes/:hash, not the issued
+// token event (named by its jti). authorizeCodeIssuer matches
+// the LIVE code against the authorize response family's stored
+// `code` field (pairs are stored verbatim).
 export async function deriveAuthorizationCodeId(
     code: string,
 ): Promise<string> {
@@ -1126,10 +1148,13 @@ export async function deriveAuthorizationCodeId(
 const AUTHORIZE_PREFIX =
     canonicalPath(undefined, '/authentication/authorize/');
 
-function tokensEventPrefixFor(identityId: Id): string {
+function authorizationCodesPrefixFor(
+    identityId: Id,
+): string {
     return canonicalPath(
         undefined,
-        '/identities/' + identityId + '/tokens/',
+        '/identities/' + identityId
+            + '/authorization-codes/',
     );
 }
 
@@ -1206,24 +1231,21 @@ async function authorizeCodeIssuer(
 // PRE-TX (ii) fast-fail AND the in-tx re-check share this ONE
 // function — adapter-shaped (the membershipExistsFor /
 // deriveIdentityTokenEventsForJti precedent), `dbOrView` is
-// whichever face is in scope: the plain adapter pre-tx, the open
-// transaction view in-tx. A genuine event already lives at
-// 'identities/<identityId>/tokens/<derivedId>' exactly when
-// this code has already minted a chain root — the pair append
-// at that KEYED document IS the spend marker (KEY-BY-ANCHOR),
-// replacing the retired authorization_codes 'consumed' row.
-// Scoped to that ONE collection so a coincidental non-token
-// hit — astronomically unlikely for a 64-hex-char sha256
-// digest against 22-char base62 ids, but never assumed —
-// cannot false-positive the guard.
+// whichever face is in scope: the plain adapter pre-tx, the
+// open transaction view in-tx. A genuine marker already lives
+// at identities/<identityId>/authorization-codes/<derivedId>
+// exactly when this code has been spent. Marker-first append
+// so a crash after the marker still fails a replay closed.
 export async function authorizationCodeSpent(
     dbOrView: DbAdapter,
     derivedId: Id,
     identityId: Id,
 ): Promise<boolean> {
-    const spent = await dbOrView.messagePairs.getDocumentHistory(
-        tokensEventPrefixFor(identityId), derivedId,
-    );
+    const spent = await dbOrView.messagePairs
+        .getDocumentHistory(
+            authorizationCodesPrefixFor(identityId),
+            derivedId,
+        );
     return spent.length > 0;
 }
 
@@ -1295,12 +1317,6 @@ async function grantAuthorizationCode(
         return invalid;
     }
     const refreshJti = generateIdentifier();
-    // KEY-BY-ANCHOR: the root row's id IS the derived id, and
-    // this call passes it as the event pair's name (Auth 1b's
-    // named exception — formTokenEventMessagePair takes the
-    // name) — see deriveAuthorizationCodeId's own comment for
-    // why that collision is the spend guard itself.
-    const rootId = derivedId;
     const chainId = generateIdentifier();
     const at = nowUtc();
     const name = await nameFor(adapter, issuer.identityId);
@@ -1320,22 +1336,28 @@ async function grantAuthorizationCode(
     const messagePair = await formAuthMessagePair(
         seed, body, issuer.identityId, HTTP_OK, response,
     );
-    // The root's OWN event pair (Phase 13 Task 5): formed pre-tx
-    // against `issuer.identityId` — a code's issuer cannot change
-    // between the pre-tx read and the in-tx write below (its own
-    // authorize pair is immutable once appended), so this task
-    // retires the old codeState-driven re-read that used to
-    // (defensively) re-resolve it in-tx.
-    const eventMessagePair = await formTokenEventMessagePair(rootId, {
-        jti: refreshJti, identity_id: issuer.identityId,
-        action: 'issued', chain_id: chainId, at,
-    }, messagePair.operationId);
+    // Marker and issued event formed pre-tx against
+    // `issuer.identityId` — a code's issuer cannot change
+    // between the pre-tx read and the in-tx write below (its
+    // own authorize pair is immutable once appended).
+    const markerMessagePair =
+        await formAuthorizationCodeMarkerPair(
+            derivedId, refreshJti, issuer.identityId, at,
+            messagePair.operationId,
+        );
+    const eventMessagePair = await formTokenEventMessagePair(
+        refreshJti, {
+            jti: refreshJti, identity_id: issuer.identityId,
+            action: 'issued', chain_id: chainId, at,
+        }, messagePair.operationId,
+    );
     const consumed = await adapter.transaction(async (view) => {
             if (await authorizationCodeSpent(
                 view, derivedId, issuer.identityId,
             )) {
                 return false;
             }
+            await appendMessagePairOnce(view, markerMessagePair);
             await appendMessagePairOnce(view, eventMessagePair);
             await appendMessagePairAlways(view, messagePair);
             return true;

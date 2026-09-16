@@ -226,12 +226,13 @@ Deno.test('a full login flow keeps requests/responses balanced,'
 
     // seedRootAdmin: org + membership (2; role-grants retired)
     // + identity + pii + credential (3) + authorize + token
-    // + token-event + pbkdf2-to-scrypt rehash (4) = 9.
-    assertStrictEquals(requests.length, 9);
+    // + token-event + spend marker + pbkdf2-to-scrypt rehash
+    // (5) = 10.
+    assertStrictEquals(requests.length, 10);
     // The AUTH hops stay operation documents (name ''); the
-    // token grant's row event pair rides its OWN row's document
-    // instead, so it alone carries a non-empty name in this
-    // slice. Indices 5–6 are authorize + token.
+    // token grant's issued event and spend marker ride their
+    // own documents, so they carry non-empty names. Indices
+    // 5–6 are authorize + token.
     const authHops = requests.slice(5).filter(
         row => row.path === '/authentication/authorize/'
             || row.path === '/authentication/token/',
@@ -380,14 +381,14 @@ async () => {
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // 12: the fixture's own identity + pii + credential pairs
+    // 13: the fixture's own identity + pii + credential pairs
     // (3) + seedRootAdmin's 2 fixture pairs + authorize +
-    // token (the token hop's own event pair, Phase 13 Task 5,
-    // plus pbkdf2 rehash, brings fullLoginFlow's count to 9)
+    // token (the token hop's own event pair, spend marker,
+    // plus pbkdf2 rehash, brings fullLoginFlow's count to 10)
     // + refresh's own operation message pair + refresh's
     // rotate-branch event pairs (2: the retired root, the
     // issued successor — Phase 13 Task 5).
-    assertStrictEquals(requests.length, 12);
+    assertStrictEquals(requests.length, 13);
     const refreshRequest = requests.find(
         r => r.path === '/authentication/token/'
             && r.request.includes(first.refresh_token),

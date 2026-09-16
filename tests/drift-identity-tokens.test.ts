@@ -63,25 +63,14 @@ const CHAIN_OMIT = generateIdentifier();
 // Phase 13 Task 6/7 shipped two ledger-derived reads that replace
 // row-plane lookups on Commandment II hot paths: the by-jti fold
 // (deriveIdentityTokenEventsForJti, tokenRevocationReason's
-// SECOND read) and the code-spend guard (authorizationCodeSpent,
-// grantAuthorizationCode's PRE-tx fast-fail + IN-TX re-check).
-// Both run PRE-TX AND IN-TX (Task 9a re-anchors the IN-TX legs
-// onto the SAME derivations) — the pre-tx-vs-in-tx PARITY legs
-// below prove the two call sites see identical results (the
-// membershipExistsFor precedent).
-//
-// Task 9 retires the identity_tokens/authorization_codes ROW
-// PLANE entirely (nothing has read either row-plane table since
-// Tasks 6/7's own flips), so the row-plane-vs-derived-plane
-// drift gate this file used to carry (comparing the derivation
-// against a live db.identityTokens.getAll() oracle) retires with
-// it. The wire-format proofs that oracle served survive here,
-// re-anchored onto a LITERAL expected reconstruction instead —
-// PUT/GET identity-tokens' row-write sweep is covered by
-// tests/api-shadow-ledger-tokens.test.ts and tests/api-identity-
-// token-rotation.test.ts (both re-anchored onto the derived plane
-// this same task); the admin-only GET gating lives in tests/api-
-// identity-spine-verb-gaps.test.ts.
+// SECOND read — now the jti document's PUT history) and the
+// code-spend guard (authorizationCodeSpent,
+// grantAuthorizationCode's PRE-tx fast-fail + IN-TX re-check —
+// now the authorization-codes marker prefix). Both run PRE-TX
+// AND IN-TX — the pre-tx-vs-in-tx PARITY legs below prove the
+// two call sites see identical results (the membershipExistsFor
+// precedent). One head per jti: the issued event is named by
+// its jti; the spend marker is a different prefix.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -380,8 +369,9 @@ Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
         ),
     );
     assertEquals(inTx, preTx);
-    assertStrictEquals(preTx.length, 1);
-    assertStrictEquals(preTx[0]!.action, 'rotated');
+    assertStrictEquals(preTx.length, 2);
+    assertStrictEquals(preTx[0]!.action, 'issued');
+    assertStrictEquals(preTx[1]!.action, 'rotated');
 
     const preTxMissing = await deriveIdentityTokenEventsForJti(
         db, GHOST_JTI, 'XXZruirZyAOoRpNxaDnpSA',
