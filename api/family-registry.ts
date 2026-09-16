@@ -152,3 +152,7 @@ export const ORGANIZATION_MEMBERS_COLLECTION_PATTERN =
 export const ORGANIZATION_MEMBER_DETAIL_PATTERN =
     ORGANIZATION_MEMBERS_COLLECTION_PATTERN
         + ':identity-id';
+// The seats the ledger has DELETEd at the same prefix —
+// read-only, derived, never a family of its own.
+export const ORGANIZATION_FORMER_MEMBERS_COLLECTION_PATTERN =
+    'organizations/:organization-id/former-members/';

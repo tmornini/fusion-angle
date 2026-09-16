@@ -1320,6 +1320,17 @@ export interface MembershipEntity {
     at: string;
 }
 
+// A seat the ledger has DELETEd: the identity once held a
+// place in this organization and holds none now. `at` is
+// the removal pair's own arrival time — the moment the
+// seat ended — never the seat's grant time.
+export interface FormerSeatEntity {
+    id: Id;
+    organization_id: Id;
+    identity_id: Id;
+    at: string;
+}
+
 // An invitation binding an identity to an organization, awaiting the holder's
 // answer. Immutable like a membership, but its lifecycle is derived from the
 // invitation document's own PUT history (INVITATION_STATES,
