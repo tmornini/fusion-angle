@@ -17,7 +17,7 @@ skew tests folded into item 7.
 
 2. The authentication header out of the message; roles
    and views — `HOISTED_HEADER_NAMES`
-   (`api/message-pair.ts:519-521`) stores
+   (`api/message-pair.ts:512-515`) stores
    `Authorization:` verbatim in every write pair's
    `request`, so the ledger holds every bearer token
    ever spent on a write; the
@@ -49,7 +49,7 @@ skew tests folded into item 7.
    `tests/api-pii-tombstone.test.ts`; physical delete or
    crypto-shredding is the one place append-only yields,
    and the brainstorm names which); the in-band
-   plaintext comment at `api/mock-data.ts:145-156`,
+   plaintext comment at `api/mock-data.ts:145-157`,
    which still says PBKDF2 and names a column that is
    not there (owner call).
 3. `/status` — `{ up: boolean, components: { postgres:
@@ -93,7 +93,7 @@ skew tests folded into item 7.
    never wipe the tenant database from a laptop and the
    Render `ipAllowList` loses `0.0.0.0/0`. Request and
    error logs as one JSON object per line — `api/api.ts:
-   347` and `:2081` print a label, an object, and an
+   347` and `:2076-2082` print a label, an object, and an
    error as three values (the Office of Structured
    Observability wants one document with level, message,
    and request identity). An alert when `/status` is not
@@ -112,7 +112,7 @@ skew tests folded into item 7.
    validator, derive, seed, the roster and detail reads,
    and the Members page's edit. Replaces the
    one-profile-per-identity covenant at
-   `api/types.ts:1301-1303`; the seed already carries
+   `api/types.ts:1303-1304`; the seed already carries
    the contradiction (the admin holds two seats with one
    title). Lands before items 10 and 11, whose designer
    roster and AI seats read it, and replaces the
@@ -123,19 +123,21 @@ skew tests folded into item 7.
    `state_at` / `state_event_id` (Decision 7's trio) out
    of every document PUT so ideas, projects, flows, and
    objectives (`lifecycle: 'trio'` at `api/routes.ts:
-   369, 381, 402, 495`) take the shape work-orders,
+   365, 377, 398, 491`) take the shape work-orders,
    identities, and ai-agents already have: lifecycle is
    its own event pairs at an operation path, and the
    absence of a row IS the absence of the event. Sites:
-   the reduction (`api/derive-documents.ts:148-157`),
-   the stamp (`api/document-family.ts:118`), every
+   the reduction (`api/derive-documents.ts:146-154`),
+   the stamp (`api/document-family.ts:123`), every
    derive (`api/derive-ideas.ts:54, 83`,
    `api/derive-projects.ts:39, 70`,
    `api/derive-flows.ts:75`), the seeds
-   (`api/mock-data/seed-message-pairs.ts:733, 913`; the
-   1453 pin moves), the validators' trio-key gates, and
-   the wire — decide whether GET still presents `state`,
-   derived, so the pages do not change. Eighty files
+   (`api/mock-data/seed-message-pairs.ts` trio omit-keys
+   at 717-718, 757-758, 789-790, 1212-1213; remaining
+   `state_at` / `state_event_id` stamp at 947-948), the
+   validators' trio-key gates, and the wire — decide
+   whether GET still presents `state`, derived, so the
+   pages do not change. Eighty files
    name the trio, fifty-eight of them tests. Precedes
    item 10, so the flow rewrite lands on the stateless
    shape once. Merged: no lifecycle transition table at
@@ -211,8 +213,9 @@ skew tests folded into item 7.
     `web-app/flows/detail.ts` (`canvasFocusOf`'s walk is
     the second instance the remediation added); in-place
     `viewBox` mutation at four method sites
-    (`web-app/app/presenters/flow-designer.ts:537, 556,
-    1012, 1042`); `hasUndoHistory` as `pairs > 1`
+    (`web-app/app/presenters/flow-designer.ts:537-538,
+    556-559, 1036-1039, 1066-1067`); `hasUndoHistory` as
+    `pairs > 1`
     (`api/derive-flows.ts:108` — the client's
     approximation, read by no route; the undo route
     walks the stack itself and its bottom-of-stack 201
@@ -247,12 +250,12 @@ skew tests folded into item 7.
     every node is an AI seat; record content treated as
     data, never as instruction. Consumes items 8, 9, and
     10. Merged: roster seat naming an AI agent
-    (`tests/family-registry.test.ts:112-113`);
+    (`tests/family-registry.test.ts:111-119`);
     FLOW-CANVAS.md's display-only AI checkboxes
     (`## Members and attributes`).
 12. Two processes — high availability for the app and
     for Postgres on Render. The app's precondition is in
-    the tree: `api/derive-states.ts:811-823` — the live
+    the tree: `api/derive-states.ts:517-529` — the live
     claim route decides expiry against `Date.now()` and
     replay reproduces it only inside one process; record
     the expiry decision as its own event first (remove
@@ -275,7 +278,7 @@ Off the critical path; each with its oracle.
 - An inner pair of a composed operation skipped while
   the top-level pair landed answers 201;
   `appendMessagePairOnce` returns void and the gate never
-  holds inner hashes (`api/message-pair.ts:686-701`).
+  holds inner hashes (`api/message-pair.ts:675-686`).
   Oracle: a composed create whose inner hash collides
   with an earlier pair
 - The run-four remediation's remaining seams — R6 and
@@ -337,6 +340,54 @@ Off the critical path; each with its oracle.
   first tenant holds real data. Oracle: a Layer-2 case that
   boots the executable against a schema one step behind and
   reads and writes a pair.
+- Wipe and reseed live databases onto the exact-read
+  shapes. Spec Decision 8: invitation `state` on the
+  head, PII at `('/identities/<id>/', 'pii')`, token
+  `name = jti`, no `/identity-tokens/`. Production
+  derives do not dual-read those old shapes; a live
+  ledger that predates the landing still holds them
+  until `./bin/postgres-wipe` then `./bin/postgres-seed`,
+  or the Render equivalents through `./deploy`. Decision
+  9's measure witness landed at `3aaee31`
+  (`measurements/history.jsonl`, `boot:auth-gate`
+  recovered vs `c50e849`) and is closed. Oracle: every
+  live database has been wiped and reseeded after
+  `66457197`
+- Drop leftover `/identity-providers/` dual-read.
+  Nested providers are the source of truth;
+  `deriveIdentityProvidersFor` still scans the retired
+  flat prefix so leftover seed pairs still join
+  (`api/derive-identity-spine.ts:228-301`). Exact-read
+  Decision 8 retired the invitation, PII, and token
+  dual-reads; this one remains. Cheap after the wipe
+  bullet. Oracle: that derive reads only
+  `/identities/<id>/providers/`, and a leftover flat
+  pair does not appear
+- XSS can use the refresh cookie from the page. The
+  cookie is HttpOnly, SameSite=Strict, Path=
+  `/api/authentication`, Secure
+  (`api/authentication.ts:160-174`; pin
+  `tests/api-authentication-token.test.ts` 'token JSON
+  has no refresh_token; Set-Cookie is HttpOnly'), so a
+  page script cannot read it — a same-origin `fetch` to
+  `/api/authentication/token` still sends it and the
+  JSON returns a live access token. CSP `script-src
+  'self'` (`server/http-server.ts:41-47`) narrows
+  injection; it does not close cookie-use. Closes KNOWN
+  seam "XSS can use the refresh cookie from the page".
+  Oracle: a Layer 1 case that an unauthenticated page
+  script cannot mint a live access token from the
+  cookie alone
+- Layer 2 on the exact-read landing. `./test browser`
+  has not run on master `66457197`; AGENTS.md makes it
+  the gate before `./bin/build`, a deploy, or a walk.
+  Interpretation (A) of the plan changed one visible
+  thing only Layer 2/3 can see: a successor's `parent:`
+  line on the Tokens page shows while the successor is
+  live and disappears once the successor is itself
+  rotated (TEST-PLAN.md G25 carries the caveat). The
+  `3aaee31` history row is a measure, not this gate.
+  Oracle: `./test browser` green on `66457197` or later
 - `render.yaml` Blueprint as a second source of
   truth for the dashboard service. Oracle: a
   committed `render.yaml` that matches the live
@@ -357,11 +408,73 @@ Off the critical path; each with its oracle.
   Deno porting task would have reached into four other
   tasks' files. Oracle: one definition, five importers,
   `./validate` green.
+- Reword the exact-read plan's regex constraint.
+  `docs/superpowers/plans/2026-09-15-exact-read-folds.md`
+  Global Constraints say "No regex over the ledger's
+  paths anywhere under `api/`", which over-claims:
+  `ORGANIZATION_NESTED_URI_PREFIX.exec(path)` in
+  `api/derive-states.ts` (`ownerFromPath`) parses the
+  path of one pair already fetched by an exact document
+  read to extract its organization segment — a parse of
+  a known pair, not a read by pattern. The spec's axiom
+  (a read is an exact `path`, or an exact `path` and
+  `name`) holds. Say "no read discovers pairs by
+  pattern" instead. Oracle: the reworded line, and the
+  one `.exec` named as the sanctioned parse
+- Gate the PII PUT on a live identity document.
+  `PUT identities/:id/pii` writes the slot at
+  `('/identities/<id>/', 'pii')` with no check that
+  `identities/:id` has a live head, and
+  `deriveIdentityPii` needs none either — so a future
+  write can mint an orphan slot that `GET` answers 200
+  for while `deriveIdentityPiiRows` (login by email,
+  grant by email, the roster views) cannot see it. Spec
+  2026-09-15 exact-read folds § 3 covers existing data
+  by wipe (Decision 8), not future writes. A validator
+  at the gate, not a downstream check. Oracle: a PUT
+  with no identity document 404s, and
+  `tests/drift-identities.test.ts`'s orphan-slot pin
+  becomes unreachable by construction, not by fixture
+- Name the authorization_code chain root by its jti.
+  Spec § 6 keeps the root's document named by the
+  code's sha256 spend marker, so the root's 'issued'
+  event lives at the marker document while its later
+  'rotated' / 'revoked' events land at the jti's own
+  document: once that root rotates,
+  `deriveIdentityTokensFor` returns two heads carrying
+  one jti (safe — every fold groups by jti and resolves
+  by `at`, fail-closed), and `GET identities/:id/tokens/`
+  and the Tokens page show one phantom 'issued' row
+  for it forever. The fix is a spec change: name the
+  root by its jti and spend-mark by a separate document
+  (`authorizationCodeSpent` keeps its own exact read).
+  Oracle: one head per jti on every chain kind
+- Split the `default-organization` singleton the way PII
+  split. Exact-read spec Defers: the SET document is
+  still a collection-shaped path with empty name (`path
+  = /identities/<id>/default-organization/`, `name =
+  ''` — `api/derive-default-organization.ts:11-17`),
+  while PII is `path = /identities/<id>/`, `name = pii`.
+  HTTP can stay `identities/:id/default-organization`;
+  only the stored split changes. Oracle:
+  `getDocumentHistory('/identities/<id>/',
+  'default-organization')` is the SET document, and the
+  empty-name prefix is gone after wipe
+- Claim and release path vocabulary. Claim is the
+  pre-PII shape: `path =
+  /organizations/<org>/work-orders/<id>/claim/`, `name
+  = ''` (`api/derive-states.ts:1002`; wired
+  `organizations/:id/work-orders/:id/claim` at
+  `api/message-pair.ts:915`). Release and transition
+  are the same empty-name operations. Item 12 records
+  expiry as an event; it does not rename the path.
+  Oracle: claim/release are document reads at a known
+  `(path, name)`, not empty-name collection prefixes
 - The cross-party delegation ledger
-  (`api/authentication.ts:884-886`;
-  `tests/api-authentication-token.test.ts:678`)
+  (`api/authentication.ts:871-879`;
+  `tests/api-authentication-token.test.ts:687`)
 - Passkey, provider-IdP, and corporate-OIDC ceremonies
-  (`api/authentication.ts:1595-1597`;
+  (`api/authentication.ts:1575-1595`;
   `tests/api-authentication-authorize.test.ts:225`)
 - Per-client multi-audience, DPoP `cnf`, jti reuse
   detection (`api/types.ts:508-510`;
@@ -399,7 +512,7 @@ Off the critical path; each with its oracle.
   flows `onEmpty` arms (only ideas is pinned), `loadInto`'s
   retry branch, a work order both claimed and completed,
   and the archived-genesis walk
-  (`web-app/app/adapters/objectives.ts:190-192`)
+  (`web-app/app/adapters/objectives.ts:150-151`)
 - `./measure` harvests error-page timings;
   `page:ready` carries no status —
   `web-app/app/measure.ts`
@@ -439,7 +552,7 @@ Off the critical path; each with its oracle.
   modal fails to open with an error toast instead of
   rendering —
   `web-app/app/adapters/objectives.ts:311`,
-  `web-app/projects/detail.ts:318`
+  `web-app/projects/detail.ts:986`
 - Node-only modules still live under `web-app/app/` —
   `measure.ts`, `generate-api-documentation.ts`,
   `compose.ts`, `generate-schema-svg.ts`,
@@ -503,14 +616,15 @@ Off the critical path; each with its oracle.
   `cpuModel` (`web-app/app/measure.ts:946`). Deno exposes
   no CPU-model API — `navigator.hardwareConcurrency` is a
   count — and the `sysctl` workaround was rejected as
-  unverifiable and macOS-only. All 14 rows in
-  `measurements/history.jsonl` carry a real chip name; no
-  row written from here on will. The truthful shape omits
-  the field rather than storing a sentinel, which needs
-  `measure-core.ts`'s field type and `shapeHistoryLine`
-  (:36, :264) together with `measure-viz.ts:986`, whose
-  `|| ''` is itself the default-value sin. Oracle: a row
-  with no `cpuModel` key renders without the separator.
+  unverifiable and macOS-only. Sixteen rows in
+  `measurements/history.jsonl`; the last two (`c50e849`,
+  `3aaee31`) already store `"unknown"`. The truthful
+  shape omits the field rather than storing a sentinel,
+  which needs `measure-core.ts`'s field type and
+  `shapeHistoryLine` (:36, :264) together with
+  `measure-viz.ts:986`, whose `|| ''` is itself the
+  default-value sin. Oracle: a row with no `cpuModel`
+  key renders without the separator.
 - Stale-history comment cleanup as one pass — comments
   still describe a past state as present. Sampled:
   `web-app/app/measure-cli.ts` names a Node harness;
@@ -1253,9 +1367,9 @@ Off the critical path; each with its oracle.
 - Attribute drag-reorder (TEST-PLAN R8)
 - A flow loaded with Auto Fit OFF no longer fits on
   first paint. `withCanvasSize`
-  (`web-app/app/presenters/flow-designer.ts:996-1017`)
+  (`web-app/app/presenters/flow-designer.ts:1020-1041`)
   fits only under `isAutoFit`, and the load-time block
-  (`web-app/flows/detail.ts:1685-1697`) is the only
+  (`web-app/flows/detail.ts:1684-1695`) is the only
   load-time fit — its `reconcileFitFromDom()` returns
   early for the same reason. RECORDED, behavior
   unchanged. The sentence it falsifies is "onFlowLoaded
@@ -1344,8 +1458,8 @@ Off the critical path; each with its oracle.
   `mu = ln(FUSION_ANGLE_LATENCY)`; otherwise the
   no-op. Merged: the shim's "both presets pass a
   no-op today" (`api/latency.ts:1-5`,
-  `api/db-backed.ts:31-32`, `api/api.ts:2133-2134` —
-  revise the three comments when done). Oracle:
+  `api/db-backed.ts:31-32` — revise both comments when
+  done). Oracle:
   `FUSION_ANGLE_LATENCY=200` under `local` lifts every
   `./bin/measure` median by about 200 ms; unset leaves
   the no-op.
@@ -1358,75 +1472,6 @@ Off the critical path; each with its oracle.
   `./test-browser` has run green on one machine
   (2026-08-28). Restore it if two machines disagree.
   Oracle: `./test-browser` green on two machines
-- Gate the PII PUT on a live identity document.
-  `PUT identities/:id/pii` writes the slot at
-  `('/identities/<id>/', 'pii')` with no check that
-  `identities/:id` has a live head, and
-  `deriveIdentityPii` needs none either — so a future
-  write can mint an orphan slot that `GET` answers 200
-  for while `deriveIdentityPiiRows` (login by email,
-  grant by email, the roster views) cannot see it. Spec
-  2026-09-15 exact-read folds § 3 covers existing data
-  by wipe (Decision 8), not future writes. A validator
-  at the gate, not a downstream check. Oracle: a PUT
-  with no identity document 404s, and
-  `tests/drift-identities.test.ts`'s orphan-slot pin
-  becomes unreachable by construction, not by fixture
-- Name the authorization_code chain root by its jti.
-  Spec § 6 keeps the root's document named by the
-  code's sha256 spend marker, so the root's 'issued'
-  event lives at the marker document while its later
-  'rotated' / 'revoked' events land at the jti's own
-  document: once that root rotates,
-  `deriveIdentityTokensFor` returns two heads carrying
-  one jti (safe — every fold groups by jti and resolves
-  by `at`, fail-closed), and `GET identities/:id/tokens/`
-  and the Tokens page show one phantom 'issued' row
-  for it forever. The fix is a spec change: name the
-  root by its jti and spend-mark by a separate document
-  (`authorizationCodeSpent` keeps its own exact read).
-  Oracle: one head per jti on every chain kind
-- Layer 2 on the exact-read landing. `./test browser`
-  has not run on master `66457197`; AGENTS.md makes it
-  the gate before `./bin/build`, a deploy, or a walk.
-  Interpretation (A) of the plan changed one visible
-  thing only Layer 2/3 can see: a successor's `parent:`
-  line on the Tokens page shows while the successor is
-  live and disappears once the successor is itself
-  rotated (TEST-PLAN.md G25 carries the caveat).
-  Oracle: `./test browser` green on `66457197` or later
-- Wipe, reseed, and witness the exact-read landing.
-  Spec Decision 8: every live database reaches the new
-  shapes (invitation `state` on the head, PII at
-  `('/identities/<id>/', 'pii')`, token `name = jti`,
-  no `/identity-tokens/`) by `./bin/postgres-wipe` then
-  `./bin/postgres-seed`, or the Render equivalents
-  through `./deploy`; no production derive dual-reads
-  the old shapes. Spec Decision 9: a full `./bin/measure`
-  against the landed master, compared with the
-  2026-09-15 local measure that opened the spec
-  (`c50e849`), is the witness that `boot:auth-gate` no
-  longer tracks `readyMs` with ledger size — a witness,
-  not a gate. The ceremony cannot run under the Claude
-  Code sandbox (Chrome's crashpad bootstrap is denied);
-  the operator's shell runs it. The 2026-09-15 attempt
-  was stopped as broken before it recorded. Oracle: a
-  `measurements/history.jsonl` line whose `sha` is
-  `66457197` or later, with `boot:auth-gate` flat
-  against the seed's ledger size
-- Reword the exact-read plan's regex constraint.
-  `docs/superpowers/plans/2026-09-15-exact-read-folds.md`
-  Global Constraints say "No regex over the ledger's
-  paths anywhere under `api/`", which over-claims:
-  `ORGANIZATION_NESTED_URI_PREFIX.exec(path)` in
-  `api/derive-states.ts` (`ownerFromPath`) parses the
-  path of one pair already fetched by an exact document
-  read to extract its organization segment — a parse of
-  a known pair, not a read by pattern. The spec's axiom
-  (a read is an exact `path`, or an exact `path` and
-  `name`) holds. Say "no read discovers pairs by
-  pattern" instead. Oracle: the reworded line, and the
-  one `.exec` named as the sanctioned parse
 
 ## Sequencing
 
@@ -1442,12 +1487,13 @@ Off the critical path; each with its oracle.
   once)
 - 8 → 9 → 10 → 11 (the bell, then chats, then
   processes, then the worker)
-- Items 2, 8, and 12 close KNOWN seams — the closer
-  removes the ARCHITECTURE.md bullet and this file's
-  line in one commit
+- Items 2, 5, 8, and 12, and the later-work XSS
+  bullet, close KNOWN seams — the closer removes the
+  ARCHITECTURE.md bullet and this file's line in one
+  commit
 - Item 6 precedes routing the roster through the
   profile
-- `api/derive-states.ts:811-823` (claim-expiry as its
+- `api/derive-states.ts:517-529` (claim-expiry as its
   own event) lands before any multi-process deployment
   — item 12's first commit, or item 11's if the worker
   is a second process
