@@ -328,7 +328,7 @@ export async function putProjectPosition(
 
 // State transition for an existing project: sends the new
 // state and fires ONE document PUT via putProject — hop count
-// 1 → 1 (today it is one PUT states/:id). Callers supply the
+// 1 → 1 (today it is one PUT projects/:id). Callers supply the
 // eight fields they already hold FROM RAW SOURCES ONLY — never
 // from ProjectView's display-transformed accessors (see the
 // DATA-CORRUPTION TRAP note on ProjectView). Entity fields

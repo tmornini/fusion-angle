@@ -455,7 +455,7 @@ export async function computeFlowBackupResolution(
     ctx: RequestContext,
     backup: Backup,
 ): Promise<ImportResolution> {
-    // Lifecycle state rides the project GET row trio —
+    // State rides the project GET row —
     // no second hop to the states log.
     const [flows, projects] =
         await Promise.all([

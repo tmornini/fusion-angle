@@ -349,15 +349,6 @@ export { param, requireOrganization, withoutId };
 // (states ROW half stripped (message plane only)). Genesis
 // is head-presence-defined — a fresh id's PUT simply finds no
 // head, so it authors like any other transition.
-//
-// MEMBER_ID CAVEAT: sameEvent (store-state.ts) compares member_id
-// too, so a state-UNCHANGED edit (the resent state fields match
-// the current head byte-for-byte) must replay the STORED head
-// event's member_id — never the editing actor — or a different
-// member plainly editing a field after someone else's transition
-// would 409 (LedgerImmutabilityError). A genuinely fabricated
-// state event still fails sameEvent on state/at and 409s,
-// exactly as a bare states/:id resend would.
 const IDEAS_WIRING: DocumentFamilyWiring = {
     family: 'ideas',
     httpNest: 'organization',
@@ -495,11 +486,11 @@ export function identityDocumentEntityOf(
 // the FOURTH member of MEMBERS_WIRING's shared-log-with-genesis
 // 'stateless' bucket (see its own comment above for the full
 // rationale-contrast): the shared id (member.id === identity.id,
-// always) already receives a genesis states event at create and
-// archive/reactivate via PUT states/:id, so the identities
-// document plane carries NO lifecycle of its own — its REAL
-// states events ride the untouched states plane instead. A
-// 'stateless' family's ONLY tombstone signal is a DELETE-method
+// always) has its ACTIVE/ARCHIVED lifecycle carried by the
+// membership SEAT itself, added and removed via PUT/DELETE
+// organizations/:id/members/:id (postMembershipDocumentOp), so
+// the identities document plane carries NO lifecycle of its
+// own. A 'stateless' family's ONLY tombstone signal is a DELETE-method
 // head, already 404-absent via deriveDocumentsAt with no further
 // walk needed (document-family.ts's derivedDocumentEntity) — the
 // SAME deleted-filter escape hatch every 'stateless' family
@@ -1123,11 +1114,11 @@ function documentOperationOrganization(
 
 // Idea document write (Decision 7): ONE shape serves create,
 // edit, and transition — genesis is head-presence-defined (a
-// fresh id's PUT simply finds no head, so the ternary below
-// falls to `actor`, authoring the birth like any other
-// transition). Phase Final Task 2: the ideas ROW half is
-// stripped — the pair + states.postEvent commit as ONE
-// transaction (states ROW half stripped — message plane only).
+// fresh id's PUT simply finds no head, authoring the birth
+// like any other transition). Phase Final Task 2: the ideas
+// ROW half is stripped — the pair + states.postEvent commit as
+// ONE transaction (states ROW half stripped — message plane
+// only).
 // WRITE_RESPONSE_SPECS successBody forms the wire
 // bytes; the reconstructed return is for below-facade callers
 // and type parity. `messagePair` is optional so the seed's
@@ -1157,11 +1148,11 @@ export async function postIdeaDocumentOp(
 
 // Project document write (Decision 7): ONE shape serves
 // create, edit, and transition — genesis is head-presence-
-// defined (a fresh id's PUT simply finds no head, so the
-// ternary below falls to `actor`, authoring the birth like any
-// other transition). Phase Final Task 2: the projects ROW half
-// is stripped — the pair + states.postEvent commit as ONE
-// transaction (states ROW half stripped — message plane only).
+// defined (a fresh id's PUT simply finds no head, authoring
+// the birth like any other transition). Phase Final Task 2:
+// the projects ROW half is stripped — the pair +
+// states.postEvent commit as ONE transaction (states ROW half
+// stripped — message plane only).
 // WRITE_RESPONSE_SPECS successBody forms the wire
 // bytes; the reconstructed return is for below-facade callers
 // and type parity. `messagePair` is optional so the seed's
@@ -2643,9 +2634,11 @@ export async function postMembershipDocumentOp(
 
 // Member document write — Phase Final Task 2: the members
 // ROW half is stripped — pure message-plane write. No states
-// interaction (genesis/archive ride PUT states/:id). `messagePair`
-// is optional so a below-facade caller keeps compiling; the
-// live route always supplies one.
+// interaction (genesis/archive ride the membership SEAT via
+// PUT/DELETE organizations/:id/members/:id,
+// postMembershipDocumentOp). `messagePair` is optional so a
+// below-facade caller keeps compiling; the live route always
+// supplies one.
 export async function postMemberDocumentOp(
     db: DbAdapter,
     _id: Id,
@@ -5679,8 +5672,8 @@ export const routes: Route[] = [
     // GET is FLIPPED (Task 7): the collection derives from the
     // message ledger rather than the old objectives table. Rides
     // the generic documentCollectionGetHandler —
-    // objectiveDocumentEntityOf stamps entity fields plus the
-    // lifecycle-current state (A9). POST stays this hand-written
+    // objectiveDocumentEntityOf reads entity fields and `state`
+    // alike from the head body. POST stays this hand-written
     // bundle — objectives' own create forms the document PLUS
     // its first revision pair in one pass
     // (postObjectiveCreationOp), mirroring records'/work-
@@ -5739,8 +5732,8 @@ export const routes: Route[] = [
     // objectives/:id is the seventh family. GET is FLIPPED
     // (Task 7): absorbed into the generic documentEntityRoute —
     // GET dispatches to documentGetHandler(OBJECTIVES_WIRING);
-    // objectiveDocumentEntityOf stamps entity fields plus the
-    // lifecycle-current state (A9). PUT stays
+    // objectiveDocumentEntityOf reads entity fields and `state`
+    // alike from the head body. PUT stays
     // documentPutHandler(OBJECTIVES_WIRING), unchanged from
     // before this flip (Task 2); objectives/:id has no DELETE
     // today, mirroring the ideas/projects/work-orders

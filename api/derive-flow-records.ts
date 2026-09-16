@@ -27,7 +27,7 @@ import {
 // deriveFlowWorkOrders, this join's own :frid document carries a
 // LIVE GET route (flows/:id/records/:frid), so a by-id read
 // (deriveFlowRecord) is needed alongside the collection read —
-// deriveIdea/deriveFlow's own absent/DELETE-head -> Entity
+// deriveFlow's own absent/DELETE-head -> Entity
 // NotFoundError shape, applied to a join rather than a document
 // family. LIVE: GET flows/:id/records and GET flows/:id/
 // records/:frid are wired to deriveFlowRecords/deriveFlowRecord
