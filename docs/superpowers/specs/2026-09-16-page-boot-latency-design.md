@@ -1,7 +1,8 @@
 # Page boot latency: six internal cuts
 
 - Date: 2026-09-16
-- Status: awaiting review, pre-plan
+- Status: plan written, awaiting review
+- Plan: `docs/superpowers/plans/2026-09-16-page-boot-latency.md`
 - Worktree: `.worktrees/2026-09-16-page-boot-latency`
 - Base: master at `750c39b0`
 - Parent:
