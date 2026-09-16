@@ -242,6 +242,23 @@ Deno.test('parseHistoryJsonl rejects a non-number spread field', () => {
     assertMatch(err.message, /invalid shape/);
 });
 
+Deno.test('parseHistoryJsonl rejects a non-object page', () => {
+    const good = sampleSweep('2026-01-01T00:00:00.000Z', {
+        dashboard: { readyMs: 100, phases: {} },
+    });
+    const bad = {
+        ...sampleSweep('2026-01-02T00:00:00.000Z', {}),
+        pages: { dashboard: null },
+    };
+    const err = assertThrows(
+        () => parseHistoryJsonl(
+            `${JSON.stringify(good)}\n${JSON.stringify(bad)}\n`,
+        ),
+    ) as Error;
+    assertMatch(err.message, /line 2/);
+    assertMatch(err.message, /invalid shape/);
+});
+
 // --- parseBudgetsJson ---
 
 Deno.test('parseBudgetsJson happy', () => {
