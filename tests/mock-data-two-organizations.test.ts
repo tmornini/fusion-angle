@@ -57,7 +57,7 @@ import { seededMockDb } from './mock-seed.ts';
 const RECORDS_WIRING: DocumentFamilyWiring = {
     family: 'record-types',
     httpNest: 'organization',
-    lifecycle: 'trio',
+    lifecycle: 'state',
     notFoundTable: 'record_types',
     validateDocument: validateRecordDocumentBody,
     documentOp: postRecordDocumentOp,
@@ -140,7 +140,7 @@ async function derivedRecordAttributes(
 const OBJECTIVES_WIRING: DocumentFamilyWiring = {
     family: 'objectives',
     httpNest: 'organization',
-    lifecycle: 'trio',
+    lifecycle: 'state',
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,

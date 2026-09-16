@@ -361,7 +361,7 @@ export { param, requireOrganization, withoutId };
 const IDEAS_WIRING: DocumentFamilyWiring = {
     family: 'ideas',
     httpNest: 'organization',
-    lifecycle: 'trio',
+    lifecycle: 'state',
     notFoundTable: 'ideas',
     validateDocument: validateIdeaDocumentBody,
     documentOp: postIdeaDocumentOp,
@@ -370,7 +370,7 @@ const IDEAS_WIRING: DocumentFamilyWiring = {
 const PROJECTS_WIRING: DocumentFamilyWiring = {
     family: 'projects',
     httpNest: 'organization',
-    lifecycle: 'trio',
+    lifecycle: 'state',
     notFoundTable: 'projects',
     validateDocument: validateProjectDocumentBody,
     documentOp: postProjectDocumentOp,
@@ -387,7 +387,7 @@ const PROJECTS_WIRING: DocumentFamilyWiring = {
 const FLOWS_WIRING: DocumentFamilyWiring = {
     family: 'flows',
     httpNest: 'organization',
-    lifecycle: 'trio',
+    lifecycle: 'state',
     notFoundTable: 'flows',
     validateDocument: validateFlowDocumentBody,
     documentOp: postFlowDocumentOp,
@@ -457,7 +457,7 @@ function objectiveDocumentEntityOf(
     };
 }
 // The objectives wiring row — the seventh family, now the
-// FIFTH 'trio' one (states-document retirement). Its three
+// FIFTH 'state' one (states-document retirement). Its three
 // old 'stateless' rationales are all RETIRED with the
 // states/:id document that anchored them: the wire body DOES
 // grow the trio (the zero-delta covenant died with the
@@ -472,7 +472,7 @@ function objectiveDocumentEntityOf(
 const OBJECTIVES_WIRING: DocumentFamilyWiring = {
     family: 'objectives',
     httpNest: 'organization',
-    lifecycle: 'trio',
+    lifecycle: 'state',
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,

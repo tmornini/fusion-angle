@@ -108,7 +108,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 const OBJECTIVES_TEST_WIRING: DocumentFamilyWiring = {
     family: 'objectives',
     httpNest: 'organization',
-    lifecycle: 'trio',
+    lifecycle: 'state',
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,

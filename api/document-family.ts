@@ -100,13 +100,12 @@ export interface DocumentFamilyWiring {
     // HTTP nest. Storage prefix is still
     // /${family}/ under the fenced organization.
     readonly httpNest: 'global' | 'organization';
-    // Fourth-family evidence (work-orders): 'trio' families
-    // carry the Decision 7 lifecycle trio in every document
-    // body and get the lifecycle walk + DELETED filter;
-    // 'stateless' families carry entity fields only and skip
-    // both (their lifecycle, if any, lives in operation-path
-    // event pairs, never the document).
-    readonly lifecycle: 'trio' | 'stateless';
+    // A 'state' family carries domain `state` in every
+    // document body; a head whose state is `deleted` is a
+    // tombstone. A 'stateless' family carries entity fields
+    // only; its lifecycle, if any, lives in operation-path
+    // event pairs, never the document.
+    readonly lifecycle: 'state' | 'stateless';
     // The identifier the wire 404 body speaks —
     // EntityNotFoundError's table. Family name for ideas/
     // projects/flows; 'work_orders' for work-orders (the
@@ -124,7 +123,7 @@ export interface DocumentFamilyWiring {
         messagePair?: MessagePair,
     ) => Promise<unknown>;
     // Head-pair body -> wire entity (id + organization_id
-    // stamped by the caller). A 'trio' family's mapper reads
+    // stamped by the caller). A 'state' family's mapper reads
     // `state` from the body like every other field.
     readonly entityOf: (
         document: DerivedDocument,
@@ -210,7 +209,7 @@ export async function throwDocumentMiss(
 }
 
 // The generic per-id read: the live PUT head at this
-// document. No head is a miss. For a 'trio' family a head
+// document. No head is a miss. For a 'state' family a head
 // whose body says `deleted` is a miss too. Both take the
 // throwDocumentMiss ladder, so 403 and 404 are unchanged.
 async function derivedDocumentEntity(
@@ -232,7 +231,7 @@ async function derivedDocumentEntity(
     }
     const document = headDocumentOf(head);
     if (
-        wiring.lifecycle === 'trio'
+        wiring.lifecycle === 'state'
         && documentIsTombstone(document)
     ) {
         throw await throwDocumentMiss(
@@ -502,10 +501,7 @@ export function documentVersionListHandler(
     // projects, objectives) return entityOf snapshots
     // stamped with the pair facts (etag, at, member_id) —
     // beyond, not identical to, GET collection / GET :id.
-    if (
-        wiring.lifecycle === 'trio'
-        && wiring.family === 'flows'
-    ) {
+    if (wiring.family === 'flows') {
         return documentStateHistoryHandler(
             wiring,
             (db, organization, id) =>
@@ -579,13 +575,13 @@ export function documentCollectionGetHandler(
             await db.messagePairs.getCollectionHeadPairs(
                 prefix,
             );
-        // Oldest live head (response_at, id) first. A 'trio'
+        // Oldest live head (response_at, id) first. A 'state'
         // tombstone is omitted.
         const rows: unknown[] = [];
         for (const head of heads) {
             const document = headDocumentOf(head);
             if (
-                wiring.lifecycle === 'trio'
+                wiring.lifecycle === 'state'
                 && documentIsTombstone(document)
             ) continue;
             rows.push(wiring.entityOf(document, organizationId));

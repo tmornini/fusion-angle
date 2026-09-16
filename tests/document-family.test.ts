@@ -334,7 +334,7 @@ async function withSyntheticLockedFamily<T>(
         // interface — this is the fourth DocumentFamilyWiring
         // construction site (the other three are
         // routes.ts's ideas/projects/flows rows).
-        lifecycle: 'trio',
+        lifecycle: 'state',
         notFoundTable: TEST_FAMILY,
         validateDocument: (body) => body,
         documentOp: testDocumentOp,
@@ -790,19 +790,19 @@ Deno.test('withSyntheticLockedFamily leaves no residue behind',
 
 // -- (d) the fourth-family wiring growth: `lifecycle` and
 // `notFoundTable` (work-orders evidence). A SYNTHETIC
-// 'stateless' registration proves derivedDocumentEntity and
+// 'stateless' registration proves a 'stateless' body needs no
+// `state` key: derivedDocumentEntity and
 // documentCollectionGetHandler skip the lifecycle walk +
-// DELETED-state filter entirely for 'stateless' — a trio-less
-// body (no state/state_at/state_event_id) would make
-// documentLifecycleEvents' pickString throw if the 'trio' walk
-// ran, so a clean pass here is proof the branch is skipped, not
-// merely tolerant. A DELETE head still 404s (deriveDocumentsAt's
-// own head-absent semantics — the only tombstone a stateless
-// family has), and that 404 carries the registration's
-// notFoundTable, never its family, proving the two are
-// independent facts. Handlers are called DIRECTLY (no
-// registration/route-table ceremony) since GET derivation needs
-// only the wiring value itself. -----------------------------
+// DELETED-state filter entirely for 'stateless', so a body
+// carrying no state/state_at/state_event_id passes clean
+// rather than making documentLifecycleEvents' pickString
+// throw, proof the branch is skipped, not merely tolerant. A
+// DELETE head is a stateless family's only tombstone
+// (deriveDocumentsAt's own head-absent semantics), and that
+// 404 carries the registration's notFoundTable, never its
+// family, proving the two are independent facts. Handlers are
+// called DIRECTLY (no registration/route-table ceremony) since
+// GET derivation needs only the wiring value itself. ---------
 
 const STATELESS_FAMILY = 'stateless-test-docs';
 const STATELESS_TABLE = 'stateless_storage_table';
@@ -869,7 +869,7 @@ async function deleteStatelessDocumentMessagePair(
     );
 }
 
-Deno.test('stateless lifecycle: a trio-less document PUT derives'
+Deno.test('stateless lifecycle: a stateless document PUT derives'
 + ' through documentGetHandler with no throw', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -883,8 +883,8 @@ Deno.test('stateless lifecycle: a trio-less document PUT derives'
     });
 });
 
-Deno.test('stateless lifecycle: documentCollectionGetHandler skips'
-+ ' the per-document history walk too', async () => {
+Deno.test('stateless lifecycle: documentCollectionGetHandler'
++ ' derives a stateless body', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await putStatelessDocumentMessagePair(db, SL_2, { v: 'listed' });
