@@ -51,7 +51,11 @@ skew tests folded into item 7.
    and the brainstorm names which); the in-band
    plaintext comment at `api/mock-data.ts:145-157`,
    which still says PBKDF2 and names a column that is
-   not there (owner call).
+   not there (owner call); the authorize-code lookup
+   is a document read done as a body search
+   (`getAllWhereBody`, GIN `message_pairs_body` —
+   examination report), and the hashed name is this
+   item's design.
 3. `/status` — `{ up: boolean, components: { postgres:
    boolean } }`, 200 when every component is up and 503
    when any is not, built for more components. Decide:
@@ -96,9 +100,16 @@ skew tests folded into item 7.
    347` and `:2076-2082` print a label, an object, and an
    error as three values (the Office of Structured
    Observability wants one document with level, message,
-   and request identity). An alert when `/status` is not
-   200 or the error rate rises. `TRUSTED_PROXY_HOPS` set
-   to Render's real hop count. Consumes item 3. Merged:
+   and request identity). One request clock, read once
+   at arrival and carried in the context: the request
+   log stamps `Date.now()` at accept
+   (`server/http-server.ts`) while `request_at` is
+   minted later in `incomingContext` after the body
+   (examination report); latency must be their
+   difference, not a second clock. An alert when
+   `/status` is not 200 or the error rate rises.
+   `TRUSTED_PROXY_HOPS` set to Render's real hop
+   count. Consumes item 3. Merged:
    the throttle seam — a global cap if the hops are
    wrong, refresh and exchange unlimited
    (`tests/http-throttle.test.ts`); the `ipAllowList`
@@ -340,6 +351,36 @@ Off the critical path; each with its oracle.
   first tenant holds real data. Oracle: a Layer-2 case that
   boots the executable against a schema one step behind and
   reads and writes a pair.
+- Stamp parameters stay text until Postgres parses
+  them. A stamp bound as `timestamptz` (bare
+  placeholder or `::timestamptz`) truncates to
+  milliseconds on the second execution of a prepared
+  statement. Today only `insertPair` does this, and
+  `append casts both stamps to timestamptz` guards
+  `$6::text::timestamptz` / `$9::text::timestamptz`
+  (`api/backend-postgres.ts:581-583`). Oracle: every
+  stamp-bearing parameter in `api/backend-postgres.ts`
+  carries `::text::`, or text OIDs are forced at
+  `api/postgres-client.ts`; a second execution of a
+  stamp write still round-trips six digits
+- The memory backend's sort coerces `response_at`
+  with `?? ''` on a NOT NULL column
+  (`byResponseAtThenId`, `api/backend-buffer-tx.ts:
+  37-38`; examination report). Oracle: the sort
+  helper takes the same string the keyed path does;
+  a missing stamp throws
+- Gate Operation-ID non-reuse. The client mints one
+  Operation-ID per write (`writeHeaders` in
+  `web-app/app/adapters/shared.ts`); API.md item 3
+  says an Operation-ID names one write and is never
+  reused except a byte-identical retry. The server
+  does not enforce it: `operation_id uuid NOT NULL`
+  has no uniqueness (`api/schema-postgres.ts:23`),
+  and a read by operation id is neither a collection
+  nor a document read. Oracle: a second, different
+  request with a spent Operation-ID is 400; a
+  byte-identical retry still 200s; a PATCH and its
+  revision pair still share one id
 - Wipe and reseed live databases onto the exact-read
   shapes. Spec Decision 8: invitation `state` on the
   head, PII at `('/identities/<id>/', 'pii')`, token
@@ -460,16 +501,29 @@ Off the critical path; each with its oracle.
   `getDocumentHistory('/identities/<id>/',
   'default-organization')` is the SET document, and the
   empty-name prefix is gone after wipe
+- Split `client_registration` the way PII split.
+  Registration is still the pre-PII shape: `path =
+  /identities/<id>/registration/`, `name = ''`
+  (`api/derive-identity-spine.ts:425-466`;
+  WRITE_RESPONSE_SPECS `name: ''` at
+  `api/routes.ts:3243`). HTTP can stay
+  `identities/:id/registration`; only the stored
+  split changes. Oracle:
+  `getDocumentHistory('/identities/<id>/',
+  'registration')` is the SET document, and the
+  empty-name prefix is gone after wipe
 - Claim and release path vocabulary. Claim is the
   pre-PII shape: `path =
   /organizations/<org>/work-orders/<id>/claim/`, `name
   = ''` (`api/derive-states.ts:1002`; wired
   `organizations/:id/work-orders/:id/claim` at
-  `api/message-pair.ts:915`). Release and transition
-  are the same empty-name operations. Item 12 records
+  `api/message-pair.ts:915`). Release, transition,
+  and binding are the same empty-name operations
+  (`api/derive-states.ts:1250-1255`). Item 12 records
   expiry as an event; it does not rename the path.
-  Oracle: claim/release are document reads at a known
-  `(path, name)`, not empty-name collection prefixes
+  Oracle: claim/release/binding are document reads
+  at a known `(path, name)`, not empty-name
+  collection prefixes
 - The cross-party delegation ledger
   (`api/authentication.ts:871-879`;
   `tests/api-authentication-token.test.ts:687`)
@@ -529,6 +583,15 @@ Off the critical path; each with its oracle.
   fetch window; a pending flag would close it but
   reintroduces the shared state the design avoids —
   `web-app/app/channels.ts:138-154`
+- The records list's steady-state subscribe is still
+  fire-and-forget. `subscribeRecordChanges(async () => {
+  … await getRecords … })` (`web-app/records/index.ts:
+  118-127`) has no error handler. Critical-functionality
+  path fenced `subscribeOnce`'s four `onEmpty` inits and
+  excluded this sibling. Oracle: a failing re-GET on
+  the records list renders Try Again, zero unhandled
+  rejection — the same pin shape as
+  `tests/ideas-empty-subscribe.test.ts`
 - Three fixed `setImmediate` drains guard negative
   assertions after an asynchronous delivery: the raw-PUT
   "must not wake the page" checks in
@@ -584,6 +647,25 @@ Off the critical path; each with its oracle.
   TEST-PLAN case claims the feedback survives. Oracle: a
   Layer 1 test asserting the typed feedback reaches the
   transition
+- Roster map mints `{ erased: true }` before the PII
+  fill. `buildHumanMemberMap` plants a tombstone on
+  every seat (`web-app/app/adapters/members.ts:96`);
+  `getHumanMemberMap` then overwrites it. Spec
+  2026-09-04 critical-functionality-path named this
+  the same sentinel sin as the shipped
+  `emptyPersonProfile` and said to put it in Later
+  work. A fill that throws leaves seats looking
+  erased. Oracle: `buildHumanMemberMap` carries no
+  PII placeholder; a row is filled or absent
+- Toast doubled live region and tab order.
+  `ensureContainer` appends last in tab order and sets
+  `aria-live=polite` (`web-app/app/toast.ts:94-104`);
+  each toast is also `role=status` (`:117-119`).
+  Critical-functionality path: accessibility
+  precondition, unmeasured. Pause-on-hover shipped;
+  this did not. Oracle: tab from the last page control
+  reaches the live toast's dismiss; one live region,
+  not two
 - The browser type fence is gone, not weakened. Ambient
   Node globals unlock per `deno check` invocation: one
   `node:` specifier anywhere in the checked graph gives
