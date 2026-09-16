@@ -1358,6 +1358,75 @@ Off the critical path; each with its oracle.
   `./test-browser` has run green on one machine
   (2026-08-28). Restore it if two machines disagree.
   Oracle: `./test-browser` green on two machines
+- Gate the PII PUT on a live identity document.
+  `PUT identities/:id/pii` writes the slot at
+  `('/identities/<id>/', 'pii')` with no check that
+  `identities/:id` has a live head, and
+  `deriveIdentityPii` needs none either — so a future
+  write can mint an orphan slot that `GET` answers 200
+  for while `deriveIdentityPiiRows` (login by email,
+  grant by email, the roster views) cannot see it. Spec
+  2026-09-15 exact-read folds § 3 covers existing data
+  by wipe (Decision 8), not future writes. A validator
+  at the gate, not a downstream check. Oracle: a PUT
+  with no identity document 404s, and
+  `tests/drift-identities.test.ts`'s orphan-slot pin
+  becomes unreachable by construction, not by fixture
+- Name the authorization_code chain root by its jti.
+  Spec § 6 keeps the root's document named by the
+  code's sha256 spend marker, so the root's 'issued'
+  event lives at the marker document while its later
+  'rotated' / 'revoked' events land at the jti's own
+  document: once that root rotates,
+  `deriveIdentityTokensFor` returns two heads carrying
+  one jti (safe — every fold groups by jti and resolves
+  by `at`, fail-closed), and `GET identities/:id/tokens/`
+  and the Tokens page show one phantom 'issued' row
+  for it forever. The fix is a spec change: name the
+  root by its jti and spend-mark by a separate document
+  (`authorizationCodeSpent` keeps its own exact read).
+  Oracle: one head per jti on every chain kind
+- Layer 2 on the exact-read landing. `./test browser`
+  has not run on master `66457197`; AGENTS.md makes it
+  the gate before `./bin/build`, a deploy, or a walk.
+  Interpretation (A) of the plan changed one visible
+  thing only Layer 2/3 can see: a successor's `parent:`
+  line on the Tokens page shows while the successor is
+  live and disappears once the successor is itself
+  rotated (TEST-PLAN.md G25 carries the caveat).
+  Oracle: `./test browser` green on `66457197` or later
+- Wipe, reseed, and witness the exact-read landing.
+  Spec Decision 8: every live database reaches the new
+  shapes (invitation `state` on the head, PII at
+  `('/identities/<id>/', 'pii')`, token `name = jti`,
+  no `/identity-tokens/`) by `./bin/postgres-wipe` then
+  `./bin/postgres-seed`, or the Render equivalents
+  through `./deploy`; no production derive dual-reads
+  the old shapes. Spec Decision 9: a full `./bin/measure`
+  against the landed master, compared with the
+  2026-09-15 local measure that opened the spec
+  (`c50e849`), is the witness that `boot:auth-gate` no
+  longer tracks `readyMs` with ledger size — a witness,
+  not a gate. The ceremony cannot run under the Claude
+  Code sandbox (Chrome's crashpad bootstrap is denied);
+  the operator's shell runs it. The 2026-09-15 attempt
+  was stopped as broken before it recorded. Oracle: a
+  `measurements/history.jsonl` line whose `sha` is
+  `66457197` or later, with `boot:auth-gate` flat
+  against the seed's ledger size
+- Reword the exact-read plan's regex constraint.
+  `docs/superpowers/plans/2026-09-15-exact-read-folds.md`
+  Global Constraints say "No regex over the ledger's
+  paths anywhere under `api/`", which over-claims:
+  `ORGANIZATION_NESTED_URI_PREFIX.exec(path)` in
+  `api/derive-states.ts` (`ownerFromPath`) parses the
+  path of one pair already fetched by an exact document
+  read to extract its organization segment — a parse of
+  a known pair, not a read by pattern. The spec's axiom
+  (a read is an exact `path`, or an exact `path` and
+  `name`) holds. Say "no read discovers pairs by
+  pattern" instead. Oracle: the reworded line, and the
+  one `.exec` named as the sanctioned parse
 
 ## Sequencing
 
