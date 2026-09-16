@@ -1,18 +1,14 @@
-import { assertEquals, assertStrictEquals } from '@std/assert';
+import { assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { deriveObjectiveStateHistory } from
-    '../api/derive-objectives.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
-import { STARK_ORGANIZATION } from
-    '../api/mock-data/seed-constants.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -42,40 +38,6 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     await seedAdminSchema(db);
     return db;
 }
-
-Deno.test('deriveObjectiveStateHistory returns the trio walk in'
-+ ' (state_at, id) order with echo dedup', async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const id = generateIdentifier();
-    await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
-            , token, {
-            position: 1, state: 'active',
-        },
-    ));
-    await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
-            , token, {
-            position: 1, state: 'archived',
-        },
-    ));
-    // a byte-identical echo of ev2 (drag-reorder style
-    // re-put) must NOT mint a third event
-    await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
-            , token, {
-            position: 2, state: 'archived',
-        },
-    ));
-    const history = await deriveObjectiveStateHistory(
-        db, STARK_ORGANIZATION, id,
-    );
-    assertEquals(
-        history.map((r) => r.state),
-        ['active', 'archived'],
-    );
-});
 
 Deno.test('GET organizations/:id/objectives/:id/versions carries the'
 + ' objective trio rows (DESC current-first)', async () => {

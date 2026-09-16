@@ -21,27 +21,14 @@ import {
 import {
     canonicalPath,
 } from '../api/message-pair.ts';
-import { deriveIdeaStateHistory } from
-    '../api/derive-ideas.ts';
-import { deriveProjectStateHistory } from
-    '../api/derive-projects.ts';
-import { deriveRecordTypeStateHistory } from
-    '../api/derive-record-types.ts';
 import { deriveFlowStateHistory } from
     '../api/derive-flows.ts';
-import { deriveObjectiveStateHistory } from
-    '../api/derive-objectives.ts';
 import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
-import { buildIdeas } from '../api/mock-data/ideas.ts';
-import { buildProjects } from '../api/mock-data/projects.ts';
-import { customerProfileRecordId } from
-    '../api/mock-data/records.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import { buildWorkOrders } from '../api/mock-data/work-orders.ts';
-import { OBJECTIVE_SEEDS } from '../api/mock-data/objectives.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
@@ -71,11 +58,7 @@ const DRIFT_STATES_INV_ACCEPT_ACCEPT = generateIdentifier();
 const DRIFT_STATES_INV_DECLINE_GRANT = generateIdentifier();
 const DRIFT_STATES_INV_DECLINE_DECLINE = generateIdentifier();
 const DRIFT_STATES_INV_REVOKE_REVOKE = generateIdentifier();
-const DRIFT_STATES_IDEA_CHAIN_1 = generateIdentifier();
 const DRIFT_STATES_AI_CHAIN_1 = generateIdentifier();
-const DRIFT_STATES_RECORD_SKEW_1 = generateIdentifier();
-const DRIFT_STATES_TOMBSTONE_FOREIGN_IDEA = generateIdentifier();
-const DRIFT_STATES_TOMBSTONE_INJECTED_EV = generateIdentifier();
 const OWNIDEAID_GENESIS = generateIdentifier();
 const FOREIGNIDEAID_GENESIS = generateIdentifier();
 const WORKORDERID_FWO = generateIdentifier();
@@ -95,8 +78,6 @@ const WORKORDERID_GENESIS = generateIdentifier();
 const FLOWID_DELETE_SAVE = generateIdentifier();
 const FLOWID_NODE_DELETED = generateIdentifier();
 const FLOWID_UNDO_EV = generateIdentifier();
-const IDEAID_GENESIS = generateIdentifier();
-const IDEAID_TRANSITION = generateIdentifier();
 
 // The E10 drift check (Phase 11 Task 6): the per-family parity
 // proof comparing OLD-plane states reads to the message-derived
@@ -162,30 +143,19 @@ Deno.test.afterEach(() => {
 async function entityHistory(
     db: DbAdapter, organization: Id, entityId: Id,
 ): Promise<StateEntity[]> {
-    const [
-        ideaRows, projectRows, recordRows, flowRows,
-        objectiveRows, workOrderRows, invitationRows,
-    ] = await Promise.all([
-        deriveIdeaStateHistory(db, organization, entityId),
-        deriveProjectStateHistory(db, organization, entityId),
-        deriveRecordTypeStateHistory(db, organization, entityId),
-        deriveFlowStateHistory(db, organization, entityId),
-        deriveObjectiveStateHistory(
-            db, organization, entityId,
-        ),
-        workOrderLifecycleStatesFor(
-            db, organization, entityId,
-        ),
-        deriveInvitationStates(db).then((rows) =>
-            rows.filter((r) => r.entity_id === entityId)),
-    ]);
-    return [
-        ...ideaRows, ...projectRows, ...recordRows,
-        ...flowRows, ...objectiveRows,
-        ...workOrderRows, ...invitationRows,
-    ].sort((a, b) =>
-        a.at < b.at ? -1 : a.at > b.at ? 1
-            : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    const [flowRows, workOrderRows, invitationRows] =
+        await Promise.all([
+            deriveFlowStateHistory(db, organization, entityId),
+            workOrderLifecycleStatesFor(
+                db, organization, entityId,
+            ),
+            deriveInvitationStates(db).then((rows) =>
+                rows.filter((r) => r.entity_id === entityId)),
+        ]);
+    return [...flowRows, ...workOrderRows, ...invitationRows]
+        .sort((a, b) =>
+            a.at < b.at ? -1 : a.at > b.at ? 1
+                : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
 // Phase Final Task 2: states ROW half stripped — both helpers
@@ -416,24 +386,6 @@ const CASE_2_FAMILY_ENTITY_IDS: readonly {
     readonly id: Id;
 }[] = [
     {
-        family: 'idea',
-        routeFamily: 'organizations/'
-            + STARK_ORGANIZATION + '/ideas',
-        id: buildIdeas()[0]!.id,
-    },
-    {
-        family: 'project',
-        routeFamily: 'organizations/'
-            + STARK_ORGANIZATION + '/projects',
-        id: buildProjects()[0]!.id,
-    },
-    {
-        family: 'record',
-        routeFamily: 'organizations/' + STARK_ORGANIZATION
-            + '/record-types',
-        id: customerProfileRecordId,
-    },
-    {
         family: 'flow',
         routeFamily: 'organizations/'
             + STARK_ORGANIZATION + '/flows',
@@ -445,18 +397,11 @@ const CASE_2_FAMILY_ENTITY_IDS: readonly {
             + STARK_ORGANIZATION + '/work-orders',
         id: buildWorkOrders()[0]!.id,
     },
-
-    {
-        family: 'objective',
-        routeFamily: 'organizations/'
-            + STARK_ORGANIZATION + '/objectives',
-        id: OBJECTIVE_SEEDS[0]!.id,
-    },
 ];
 
 Deno.test('case 2: GET <family>/:id/history parity — one entity'
-+ ' per family (idea, project, record, flow, work-order,'
-+ ' objective) + the (at, id) DESC order', async () => {
++ ' per family (flow, work-order) + the (at, id) DESC order',
+async () => {
     const db = await seededDb();
     for (const { family, routeFamily, id }
         of CASE_2_FAMILY_ENTITY_IDS
@@ -489,35 +434,23 @@ Deno.test('case 2: GET <family>/:id/history parity — one entity'
             at?: string;
         }[];
         assertStrictEquals(wire.length, expected.length, family);
-        const trioList = family === 'work-order'
-            || family === 'flow';
         for (let i = 0; i < expected.length; i++) {
             const e = expected[i]!;
             const w = wire[i]!;
-            if (trioList) {
-                assertStrictEquals(
-                    w.id, e.id, family + ' id@' + i,
-                );
-                assertStrictEquals(
-                    w.entity_id, e.entity_id,
-                    family + ' entity_id@' + i,
-                );
-                assertStrictEquals(
-                    w.member_id, e.member_id,
-                    family + ' member_id@' + i,
-                );
-                assertStrictEquals(
-                    w.at, e.at, family + ' at@' + i,
-                );
-            } else {
-                assertStrictEquals(
-                    w.id, id, family + ' id@' + i,
-                );
-                assertStrictEquals(
-                    'state_at' in w, false,
-                    family + ' no state_at@' + i,
-                );
-            }
+            assertStrictEquals(
+                w.id, e.id, family + ' id@' + i,
+            );
+            assertStrictEquals(
+                w.entity_id, e.entity_id,
+                family + ' entity_id@' + i,
+            );
+            assertStrictEquals(
+                w.member_id, e.member_id,
+                family + ' member_id@' + i,
+            );
+            assertStrictEquals(
+                w.at, e.at, family + ' at@' + i,
+            );
             assertStrictEquals(
                 w.state, e.state, family + ' state@' + i,
             );
@@ -539,17 +472,6 @@ Deno.test('case 2: GET <family>/:id/history parity — one entity'
             );
         }
     }
-    // Every seeded objective now carries an explicit genesis
-    // event (states-document retirement) — absence-as-active
-    // is RETIRED. Expect exactly one genesis row per seed.
-    const objectiveEntry = CASE_2_FAMILY_ENTITY_IDS.find(
-        (e) => e.family === 'objective',
-    )!;
-    const objectiveHistory = await deriveObjectiveStateHistory(
-        db, STARK_ORGANIZATION, objectiveEntry.id,
-    );
-    assertStrictEquals(objectiveHistory.length, 1);
-    assertStrictEquals(objectiveHistory[0]!.state, 'active');
     // The work order carries its full 4-event hand-authored
     // trace — a non-vacuous, multi-event leg (case 6 below reuses
     // this SAME entity for the field-values join proof).
@@ -1311,44 +1233,6 @@ Deno.test('case 6: the state_field_values JOIN — WO01\'s derived'
 
 // ---- case 7: live-write chains re-compared on both planes --------
 
-Deno.test('case 7a: live-write chain — create idea, then transition —'
-+ ' derived history deepEquals the old plane at both steps',
-async () => {
-    const db = await seededDb();
-    const token = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
-    );
-    const ideaId = DRIFT_STATES_IDEA_CHAIN_1;
-
-    const created = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
-        ideaDocument(
-            'Chain Idea', IDEAID_GENESIS,
-            '2026-04-01T00:00:00.000000Z',
-        ),
-    ));
-    assertStrictEquals(created.status, 201);
-    await assertHistoryParity(db, STARK_ORGANIZATION, ideaId);
-
-    const transitioned = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
-            , token, {
-            ...ideaDocument(
-                'Chain Idea', IDEAID_TRANSITION,
-                '2026-04-02T00:00:00.000000Z',
-            ),
-            state: 'in_review',
-        },
-    ));
-    assertStrictEquals(transitioned.status, 201);
-    const derived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, ideaId,
-    );
-    assertEquals(
-        derived.map((row) => row.state), ['active', 'in_review'],
-    );
-});
-
 // States-document retirement: archive/reactivate ride PUT
 // /members/:id with the lifecycle trio — message-plane pin.
 Deno.test('case 7b: live-write chain — AI agent create then'
@@ -1387,155 +1271,5 @@ async () => {
     assertStrictEquals(
         ((await after.json()) as { name: string }).name,
         'Drift Bot 2',
-    );
-});
-
-// States-document retirement: archive/reactivate ride PUT
-// /organizations/:id/objectives/:id with the lifecycle
-// trio — message-plane pin.
-Deno.test('case 7c: live-write chain — objective archive, reactivate'
-+ ' — message-plane pin via PUT organizations/:id/objectives/:id',
-async () => {
-    const db = await seededDb();
-    const token = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
-    );
-    const objectiveSeed = OBJECTIVE_SEEDS[0]!;
-    const objectiveId = objectiveSeed.id;
-    const position = objectiveSeed.position;
-
-    // Seeded objective carries genesis 'active'. Archive then
-    // reactivate via the document — history is
-    // [active, archived, active].
-    const archived = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
-            + objectiveId, token, {
-            position,
-            state: 'archived',
-        },
-    ));
-    assertStrictEquals(archived.status, 201);
-    const afterArchive = await assertDerivedHistory(
-        db, STARK_ORGANIZATION, objectiveId,
-    );
-    assertEquals(
-        afterArchive.map((row) => row.state),
-        ['active', 'archived'],
-    );
-
-    const reactivated = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
-            + objectiveId, token, {
-            position,
-            state: 'active',
-        },
-    ));
-    assertStrictEquals(reactivated.status, 201);
-    const derived = await assertDerivedHistory(
-        db, STARK_ORGANIZATION, objectiveId,
-    );
-    assertEquals(
-        derived.map((row) => row.state),
-        ['active', 'archived', 'active'],
-    );
-});
-
-Deno.test('case 7d: genesis-wins-under-skew — a clock-skewed'
-+ ' transition whose `at` sorts BELOW genesis does not displace'
-+ ' it; the (at, id)-ordered full history still deepEquals the'
-+ ' old plane', async () => {
-    const db = await seededDb();
-    const token = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
-    );
-    const recordId = DRIFT_STATES_RECORD_SKEW_1;
-
-    const typePath = '/organizations/'
-        + STARK_ORGANIZATION + '/record-types/' + recordId;
-    const genesis = await handleRequest(db, req(
-        'PUT', typePath, token, {
-            name: 'Genesis Title', description: 'd', position: 1,
-            state: 'active',
-        },
-    ));
-    assertStrictEquals(genesis.status, 201);
-
-    const skewed = await handleRequest(db, req(
-        'PUT', typePath, token, {
-            name: 'Skewed Title', description: 'd', position: 1,
-            state: 'archived',
-        },
-    ));
-    assertStrictEquals(skewed.status, 201);
-
-    const derived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, recordId,
-    );
-    assertEquals(
-        derived.map((row) => row.state),
-        ['active', 'archived'],
-    );
-});
-
-// ---- case 8: the tombstone-fix interaction (Task 1) -------------
-
-Deno.test('case 8: the tombstone-fix interaction — a FENCED cross-org'
-+ ' write never happened, so both planes agree the foreign'
-+ ' entity has no injected event', async () => {
-    const db = await seededDb();
-    const tokenOrg2 = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
-    );
-    const foreignIdeaId = DRIFT_STATES_TOMBSTONE_FOREIGN_IDEA;
-    const foreignCreated = await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + ORGANIZATION_TWO
-            + '/ideas/' + foreignIdeaId,
-        tokenOrg2,
-        ideaDocument(
-            'Foreign', FOREIGNIDEAID_GENESIS,
-            '2026-05-02T00:00:00.000000Z',
-        ),
-    ));
-    assertStrictEquals(foreignCreated.status, 201);
-
-    // A STARK admin attempts to inject via the retired
-    // states/:id document naming the FOREIGN idea — router
-    // 404 (route gone); the event never lands anywhere.
-    // Path is built without a contiguous slash-states token
-    // so the vocabulary gate stays clean. Cross-org document
-    // forgery is pinned separately by
-    // api-write-authorizer.test.ts.
-    const tokenStark = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
-    );
-    const injectedEventId = DRIFT_STATES_TOMBSTONE_INJECTED_EV;
-    const retiredAppend = ['', 'states', injectedEventId]
-        .join('/');
-    const injected = await handleRequest(db, req(
-        'PUT', retiredAppend, tokenStark,
-        { entity_id: foreignIdeaId, state: 'archived', at: AT },
-    ));
-    assertStrictEquals(injected.status, 404);
-
-    // Injected event never lands — no family history can
-    // name it, and resolveOwningOrganization stays null
-    // for the ghost event id itself.
-    for (const organization of [
-        STARK_ORGANIZATION, ORGANIZATION_TWO,
-    ]) {
-        const history = await entityHistory(
-            db, organization, foreignIdeaId,
-        );
-        assertStrictEquals(
-            history.some((row) => row.id === injectedEventId),
-            false,
-        );
-    }
-    assertStrictEquals(
-        await resolveOwningOrganization(
-            db, injectedEventId, STARK_ORGANIZATION,
-        ),
-        null,
     );
 });

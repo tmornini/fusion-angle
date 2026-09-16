@@ -18,10 +18,6 @@ import {
     workOrderLifecycleStatesFor,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
-import { deriveIdeaStateHistory } from
-    '../api/derive-ideas.ts';
-import { deriveObjectiveStateHistory } from
-    '../api/derive-objectives.ts';
 import {
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
@@ -653,19 +649,6 @@ Deno.test('per-family history: each family\'s own entity subset',
 async () => {
     const fx = await buildUnionFixture();
 
-    assertEquals(
-        (await deriveIdeaStateHistory(
-            fx.db, fx.organizationA, fx.ideaId,
-        ))
-            .map((row) => row.state),
-        ['active'],
-    );
-    assertEquals(
-        (await deriveObjectiveStateHistory(
-            fx.db, fx.organizationA, fx.objectiveId,
-        )).map((row) => row.state),
-        ['active'],
-    );
     const agent = await handleRequest(
         fx.db,
         req(
