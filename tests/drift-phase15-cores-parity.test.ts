@@ -45,11 +45,6 @@ import {
     asWorkOrderFlowGraph,
 } from '../api/validators.ts';
 import {
-    deriveIdeas,
-} from '../api/derive-ideas.ts';
-import { deriveProjects } from
-    '../api/derive-projects.ts';
-import {
     latestClaimEvent,
     isClaimEventExpired,
 } from '../api/work-order-claims.ts';
@@ -61,6 +56,15 @@ import {
     apiRequest,
     pairIdOf,
 } from './http-fixtures.ts';
+import {
+    documentCollectionGetHandler,
+    documentFamilyWiring,
+    type DocumentFamilyWiring,
+} from '../api/document-family.ts';
+// This file reaches routes.ts only through mock-seed.ts;
+// import it directly for the family-wiring registration
+// side effect getCollection below depends on.
+import '../api/routes.ts';
 
 const N_START = generateIdentifier();
 const N_FINISH = generateIdentifier();
@@ -114,6 +118,25 @@ function req(
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
+}
+
+const READER = 'XXZruirZyAOoRpNxaDnpSA';
+
+function wiringOf(family: string): DocumentFamilyWiring {
+    const wiring = documentFamilyWiring(family);
+    if (wiring === undefined) {
+        throw new Error('no wiring registered for ' + family);
+    }
+    return wiring;
+}
+
+async function getCollection(
+    db: MemoryDbAdapter, family: string, organization: string,
+): Promise<{ id: string; state: string }[]> {
+    const rows = await documentCollectionGetHandler(
+        wiringOf(family),
+    )(db, [organization], READER, organization, []);
+    return rows as { id: string; state: string }[];
 }
 
 function workOrderFlowGraph(
@@ -601,17 +624,17 @@ async () => {
 
     // Ideas + projects + flows + records load from the
     // message plane (row halves retired across Stage B).
-    const ideasStark = await deriveIdeas(
-        db, STARK_ORGANIZATION,
+    const ideasStark = await getCollection(
+        db, 'ideas', STARK_ORGANIZATION,
     );
-    const ideasTwo = await deriveIdeas(
-        db, ORGANIZATION_TWO,
+    const ideasTwo = await getCollection(
+        db, 'ideas', ORGANIZATION_TWO,
     );
-    const projectsStark = await deriveProjects(
-        db, STARK_ORGANIZATION,
+    const projectsStark = await getCollection(
+        db, 'projects', STARK_ORGANIZATION,
     );
-    const projectsTwo = await deriveProjects(
-        db, ORGANIZATION_TWO,
+    const projectsTwo = await getCollection(
+        db, 'projects', ORGANIZATION_TWO,
     );
     const recordToken = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,

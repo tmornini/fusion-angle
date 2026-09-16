@@ -1,6 +1,4 @@
 import { assert, assertMatch, assertStrictEquals } from '@std/assert';
-import { deriveIdeaStateHistory } from
-    '../api/derive-ideas.ts';
 import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
@@ -15,6 +13,7 @@ import { organizationToken } from './token-fixtures.ts';
 import {
     storedWorkOrderFlowGraph,
     DEFAULT_LOCK_TIMEOUT,
+    type Id,
 } from '../api/types.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
@@ -24,6 +23,34 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import {
+    documentFamilyWiring,
+    documentGetHandler,
+    type DocumentFamilyWiring,
+} from '../api/document-family.ts';
+// This file reaches routes.ts only through mock-seed.ts;
+// import it directly for the family-wiring registration
+// side effect getDocument below depends on.
+import '../api/routes.ts';
+
+const READER: Id = 'XXZruirZyAOoRpNxaDnpSA';
+
+function wiringOf(family: string): DocumentFamilyWiring {
+    const wiring = documentFamilyWiring(family);
+    if (wiring === undefined) {
+        throw new Error('no wiring registered for ' + family);
+    }
+    return wiring;
+}
+
+function getDocument(
+    db: MemoryDbAdapter, family: string, organization: Id,
+    id: Id,
+): Promise<unknown> {
+    return documentGetHandler(wiringOf(family))(
+        db, [organization, id], READER, organization, [],
+    );
+}
 
 const N_START = generateIdentifier();
 const N_FINISH = generateIdentifier();
@@ -458,7 +485,7 @@ Deno.test('every pair\'s envelope timestamps are RFC-3339 zulu'
 // ledger — proof the shadow-ledger request is not merely
 // present but semantically faithful to what was really written.
 Deno.test('a seeded idea\'s create-pair request reproduces its'
-+ ' actual genesis row in states', async () => {
++ ' GET state', async () => {
     const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
     const requests = await db.messagePairs.getAll();
@@ -474,11 +501,8 @@ Deno.test('a seeded idea\'s create-pair request reproduces its'
             state: string;
         };
     };
-    const history = await deriveIdeaStateHistory(
-        db, STARK_ORGANIZATION, idea.id,
-    );
-    const genesis = history[0];
-    assert(genesis, 'derived state missing');
-    assertStrictEquals(genesis.entity_id, idea.id);
-    assertStrictEquals(genesis.state, parsed.body.state);
+    const document = await getDocument(
+        db, 'ideas', STARK_ORGANIZATION, idea.id,
+    ) as { state: string };
+    assertStrictEquals(document.state, parsed.body.state);
 });

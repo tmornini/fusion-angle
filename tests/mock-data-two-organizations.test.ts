@@ -7,11 +7,8 @@ import {
 } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    deriveIdeas,
     deriveIdeaSubmissions,
 } from '../api/derive-ideas.ts';
-import { deriveProjects } from
-    '../api/derive-projects.ts';
 import {
     deriveBaselineScores,
     deriveActualScores,
@@ -22,6 +19,7 @@ import {
 } from '../api/derive-flow-records.ts';
 import {
     documentCollectionGetHandler,
+    documentFamilyWiring,
     type DocumentFamilyWiring,
 } from '../api/document-family.ts';
 import {
@@ -165,6 +163,25 @@ async function derivedObjectives(
 const ORGANIZATION_ONE = 'AjdvjuECVZEgZoFajaIEkg';
 const ORGANIZATION_TWO = 'BBjWJsjYIDkTRKIIPrzWRw';
 
+const READER = 'XXZruirZyAOoRpNxaDnpSA';
+
+function wiringOf(family: string): DocumentFamilyWiring {
+    const wiring = documentFamilyWiring(family);
+    if (wiring === undefined) {
+        throw new Error('no wiring registered for ' + family);
+    }
+    return wiring;
+}
+
+async function getCollection(
+    db: MemoryDbAdapter, family: string, organization: string,
+): Promise<{ id: string; state: string }[]> {
+    const rows = await documentCollectionGetHandler(
+        wiringOf(family),
+    )(db, [organization], READER, organization, []);
+    return rows as { id: string; state: string }[];
+}
+
 async function seed() {
     return { db: await seededMockDb() };
 }
@@ -255,13 +272,15 @@ Deno.test('each org owns at least one of every org-scoped'
     for (const organization of [
         ORGANIZATION_ONE, ORGANIZATION_TWO,
     ]) {
-        const ideas = await deriveIdeas(db, organization);
+        const ideas = await getCollection(
+            db, 'ideas', organization,
+        );
         assert(
             ideas.length >= 1,
             `org ${organization} owns no ideas`,
         );
-        const projects = await deriveProjects(
-            db, organization,
+        const projects = await getCollection(
+            db, 'projects', organization,
         );
         assert(
             projects.length >= 1,
@@ -477,8 +496,8 @@ Deno.test('every project score names an author in its'
     for (const organization of [
         ORGANIZATION_ONE, ORGANIZATION_TWO,
     ]) {
-        const projects = await deriveProjects(
-            db, organization,
+        const projects = await getCollection(
+            db, 'projects', organization,
         );
         for (const p of projects) {
             projectOrganization.set(p.id, organization);

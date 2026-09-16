@@ -25,13 +25,8 @@ import {
     validateActualScoreEntity,
 } from '../api/validators.ts';
 import {
-    deriveIdea,
-    deriveIdeas,
     deriveIdeaSubmissions,
 } from '../api/derive-ideas.ts';
-import {
-    deriveProjects,
-} from '../api/derive-projects.ts';
 import { deriveProjectFlows } from
     '../api/derive-project-flows.ts';
 import {
@@ -47,6 +42,8 @@ import {
 } from '../api/derive-organizations.ts';
 import {
     documentCollectionGetHandler,
+    documentFamilyWiring,
+    documentGetHandler,
     type DocumentFamilyWiring,
 } from '../api/document-family.ts';
 import {
@@ -61,8 +58,6 @@ import {
     deriveInvitationStates,
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
-import { deriveIdeaStateHistory } from
-    '../api/derive-ideas.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import {
     assignOrganization,
@@ -78,6 +73,7 @@ import { l2cFlowId } from
     '../api/mock-data/lead-to-close-flow.ts';
 import {
     SYSTEM_MEMBER_ID,
+    type Id,
     type WorkOrderEntity,
     type StateEntity,
 } from '../api/types.ts';
@@ -125,6 +121,34 @@ async function seededWorkOrderLifecycle(
     return rows;
 }
 
+const READER: Id = 'XXZruirZyAOoRpNxaDnpSA';
+
+function wiringOf(family: string): DocumentFamilyWiring {
+    const wiring = documentFamilyWiring(family);
+    if (wiring === undefined) {
+        throw new Error('no wiring registered for ' + family);
+    }
+    return wiring;
+}
+
+function getDocument(
+    db: MemoryDbAdapter, family: string, organization: Id,
+    id: Id,
+): Promise<unknown> {
+    return documentGetHandler(wiringOf(family))(
+        db, [organization, id], READER, organization, [],
+    );
+}
+
+async function getCollection(
+    db: MemoryDbAdapter, family: string, organization: Id,
+): Promise<{ id: Id; state: string }[]> {
+    const rows = await documentCollectionGetHandler(
+        wiringOf(family),
+    )(db, [organization], READER, organization, []);
+    return rows as { id: Id; state: string }[];
+}
+
 // Each entry: table name, getAll fn, validator.
 // Phase Final Task 2: members/humanMembers/aiMembers seed
 // row halves stripped — non-empty pins retired with the
@@ -152,23 +176,27 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
     }),
 };
 
-// Phase Final Task 2 / C3: bulk deriveStates retired —
-// validate surviving family lifecycle derives.
-Deno.test('mock-data seeds non-empty derived lifecycle states',
-async () => {
-    const db = await seededDb();
-    const rows = [
-        ...await seededWorkOrderLifecycle(db),
-        ...await deriveInvitationStates(db),
-        ...await deriveIdeaStateHistory(
-            db, STARK_ORGANIZATION, buildIdeas()[0]!.id,
-        ),
-    ];
-    assert(rows.length > 0, 'derived lifecycle empty');
-    for (const row of rows) {
-        validateStateEntity(withoutId(row));
-    }
-});
+// Phase Final Task 2 / C3: bulk deriveStates retired — the
+// idea/project/objective/record-type legs rode the retired
+// walk (deriveIdeaStateHistory et al., now read through GET
+// above); work-order lifecycle and invitation-state rows are
+// still produced by surviving derives and still owe
+// validateStateEntity a caller.
+Deno.test(
+    'work-order and invitation state rows validate as'
+    + ' StateEntity',
+    async () => {
+        const db = await seededDb();
+        const rows = [
+            ...await seededWorkOrderLifecycle(db),
+            ...await deriveInvitationStates(db),
+        ];
+        assert(rows.length > 0, 'state rows empty');
+        for (const row of rows) {
+            validateStateEntity(withoutId(row));
+        }
+    },
+);
 
 for (const [name, getAll, validate] of TABLES) {
     Deno.test(
@@ -197,12 +225,14 @@ for (const [name, getAll, validate] of TABLES) {
 
 // Phase Final Task 2: ideas(+idea_submissions) seed row halves
 // stripped — validate the derived plane (message-plane truth).
-Deno.test('mock-data seeds non-empty derived ideas per org',
+Deno.test('mock-data seeds non-empty ideas per org',
 async () => {
     const db = await seededDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-        const ideas = await deriveIdeas(db, organization);
+        const ideas = await getCollection(
+            db, 'ideas', organization,
+        );
         assert(
             ideas.length > 0,
             'ideas empty in org ' + organization,
@@ -243,21 +273,21 @@ async () => {
         for (const sub of subs) {
             validateIdeaSubmissionEntity(withoutId(sub));
         }
-        // Per-idea deriveIdea also validates single-get path.
-        await deriveIdea(db, organization, id);
+        // Per-idea GET also validates the single-get path.
+        await getDocument(db, 'ideas', organization, id);
     }
     assert(total > 0, 'no derived idea submissions');
 });
 
 // Phase Final Task 2: projects(+project_flows+scores) seed
 // row halves stripped — validate the derived plane.
-Deno.test('mock-data seeds non-empty derived projects per org',
+Deno.test('mock-data seeds non-empty projects per org',
 async () => {
     const db = await seededDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-        const projects = await deriveProjects(
-            db, organization,
+        const projects = await getCollection(
+            db, 'projects', organization,
         );
         assert(
             projects.length > 0,
@@ -291,8 +321,8 @@ async () => {
     let total = 0;
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-        const projects = await deriveProjects(
-            db, organization,
+        const projects = await getCollection(
+            db, 'projects', organization,
         );
         for (const project of projects) {
             const joins = await deriveProjectFlows(
@@ -314,8 +344,8 @@ Deno.test('mock-data derived baseline/actual scores pass'
     let actualTotal = 0;
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-        const projects = await deriveProjects(
-            db, organization,
+        const projects = await getCollection(
+            db, 'projects', organization,
         );
         for (const project of projects) {
             const baselines = await deriveBaselineScores(
@@ -370,8 +400,8 @@ async () => {
     let checked = 0;
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-        const projects = await deriveProjects(
-            db, organization,
+        const projects = await getCollection(
+            db, 'projects', organization,
         );
         for (const project of projects) {
             for (const row of [

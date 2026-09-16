@@ -23,8 +23,6 @@ import {
     getBaselineScoresForProject,
     getActualScoresForProject,
 } from '../web-app/app/adapters/project-scoring.ts';
-import { deriveProjects } from
-    '../api/derive-projects.ts';
 import {
     deriveObjectiveRevisions,
 } from '../api/derive-objective-revisions.ts';
@@ -36,9 +34,38 @@ import {
     ORGANIZATION_TWO_OBJECTIVE,
 } from '../api/mock-data/seed-message-pairs.ts';
 import { sharedMockDb } from './mock-seed.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    documentCollectionGetHandler,
+    documentFamilyWiring,
+    type DocumentFamilyWiring,
+} from '../api/document-family.ts';
+// This file reaches routes.ts only through mock-seed.ts;
+// import it directly for the family-wiring registration
+// side effect getCollection below depends on.
+import '../api/routes.ts';
 
 // Phase Final Task 2: objectives(+objective_revisions) seed
 // row halves stripped — assertions ride the message plane.
+
+const READER: Id = 'XXZruirZyAOoRpNxaDnpSA';
+
+function wiringOf(family: string): DocumentFamilyWiring {
+    const wiring = documentFamilyWiring(family);
+    if (wiring === undefined) {
+        throw new Error('no wiring registered for ' + family);
+    }
+    return wiring;
+}
+
+async function getCollection(
+    db: MemoryDbAdapter, family: string, organization: Id,
+): Promise<{ id: Id; state: string }[]> {
+    const rows = await documentCollectionGetHandler(
+        wiringOf(family),
+    )(db, [organization], READER, organization, []);
+    return rows as { id: Id; state: string }[];
+}
 
 async function projectIdsByState(
     ctx: RequestContext,
@@ -135,8 +162,8 @@ Deno.test('approved projects have full baseline coverage',
         const organizationByProject = new Map<string, string>();
         for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
             , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-            for (const p of await deriveProjects(
-                db, organization,
+            for (const p of await getCollection(
+                db, 'projects', organization,
             )) {
                 organizationByProject.set(p.id, organization);
             }

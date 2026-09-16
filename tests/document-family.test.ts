@@ -48,7 +48,6 @@ import {
     DOCUMENT_FAMILY_WIRINGS,
     type DocumentFamilyWiring,
 } from '../api/document-family.ts';
-import { deriveIdea } from '../api/derive-ideas.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { ApiError, HTTP_PRECONDITION_FAILED } from
@@ -56,6 +55,7 @@ import { ApiError, HTTP_PRECONDITION_FAILED } from
 import {
     apiRequest,
     pairIdOf,
+    storedPutBodyText,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -206,6 +206,12 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
     const operationId = generateIdentifier();
+    // The stored PUT response is the wire truth GET must
+    // reproduce below — id plus the full document body, the
+    // same shape a real route dispatch's successBody stores.
+    const responseBody = {
+        id: 'gZsGVjTnvrgHQLzbKnQckg', ...body,
+    };
     const messagePair = await formWriteMessagePair({
         method: 'PUT'
             , pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -215,7 +221,7 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
         pathSegments: ['ideas', 'gZsGVjTnvrgHQLzbKnQckg'],
         headerFields: [], body, requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseStatus: 200, responseBody,
         operationId,
     });
     const written = await route.put!(
@@ -231,8 +237,13 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
             , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
         [],
     );
-    assertEquals(got, await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg'
-        , 'gZsGVjTnvrgHQLzbKnQckg'));
+    assertEquals(
+        got,
+        JSON.parse(await storedPutBodyText(
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+            'gZsGVjTnvrgHQLzbKnQckg',
+        )),
+    );
 });
 
 // -- (c) the locked arm, against a SYNTHETIC registration. ---
