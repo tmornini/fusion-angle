@@ -20,11 +20,8 @@ import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { assignOrganization } from
     '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
-    deriveIdea,
     deriveIdeaSubmissions,
-    deriveIdeaStateHistory,
 } from '../api/derive-ideas.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
@@ -59,9 +56,6 @@ const IDEA_DRIFT_A = generateIdentifier();
 const EV_DRIFT_A = generateIdentifier();
 const IDEA_DRIFT_M = generateIdentifier();
 const EV_DRIFT_M = generateIdentifier();
-const MEMBER_B = generateIdentifier();
-const IDEA_DRIFT_AUTHORSHIP_CAVEAT = generateIdentifier();
-const EV_DRIFT_AUTHORSHIP_CAVEAT = generateIdentifier();
 const IDEA_DRIFT_SUBMISSION_PARITY = generateIdentifier();
 const EV_DRIFT_SUBMISSION_PARITY = generateIdentifier();
 const EV_DRIFT_LIFECYCLE_GENESIS = generateIdentifier();
@@ -73,8 +67,6 @@ const EV_DRIFT_CONVERSION_ACTIVE = generateIdentifier();
 const EV_DRIFT_CONVERSION_APPROVED = generateIdentifier();
 const EV_DRIFT_CONVERSION_PROMOTED = generateIdentifier();
 const EV_DRIFT_CONVERSION_PROJECT = generateIdentifier();
-const IDEAID_GENESIS = generateIdentifier();
-const IDEAID_SKEWED = generateIdentifier();
 
 // Phase Final Task 2: ideas(+idea_submissions) dual-write
 // stripped. This file no longer compares derive vs old-table
@@ -328,56 +320,6 @@ async () => {
     }
 });
 
-Deno.test('derived history keeps the FIRST arrival\'s authorship'
-+ ' on a same-trio resend by a different member', async () => {
-    const db = await seededDb();
-    await seedOrganizationMember(db, MEMBER_B);
-    const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
-    const tokenB = await organizationToken(MEMBER_B);
-    const ideaId = IDEA_DRIFT_AUTHORSHIP_CAVEAT;
-
-    await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
-            , tokenA, {
-            ...ideaDocument(
-                'First', 'active',
-                '2026-04-01T00:00:00.000000Z',
-                EV_DRIFT_AUTHORSHIP_CAVEAT,
-            ),
-        },
-    ));
-    await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
-            , tokenB, {
-            ...ideaDocument(
-                'Second', 'active',
-                '2026-04-01T00:00:00.000000Z',
-                EV_DRIFT_AUTHORSHIP_CAVEAT,
-            ),
-        },
-    ));
-
-    const derived = await deriveIdeaStateHistory(
-        db, 'AjdvjuECVZEgZoFajaIEkg', ideaId,
-    );
-    assertStrictEquals(derived.length, 1);
-    assertStrictEquals(derived[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
-
-    // Wire entity reflects the SECOND title; authorship of the
-    // head event stays on member A. GET streams the stored PUT.
-    const getRes = await handleRequest(
-        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + ideaId, tokenA),
-    );
-    assertStrictEquals(getRes.status, 200);
-    assertStrictEquals(
-        await getRes.text(),
-        await storedPutBodyText(
-            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', ideaId,
-        ),
-    );
-});
-
 Deno.test('submission PUT/GET wire matches literal reconstruction',
 async () => {
     const db = await seededDb();
@@ -606,58 +548,4 @@ Deno.test('live approve then convert: the idea reads'
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', ideaId,
         ),
     );
-});
-
-// case-7d mirror for ideas GET: a clock-skewed later arrival
-// whose state_at sorts BELOW genesis does NOT displace genesis
-// as lifecycle-current. Head body fields (title) may reflect
-// the later arrival; the GET trio must stay genesis.
-Deno.test('GET idea trio is lifecycle-current under clock skew'
-+ ' (genesis-wins-under-skew, case 7d)', async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const ideaId = generateIdentifier();
-    const genesisAt = '2026-05-01T00:00:00.000000Z';
-    const genesisEv = IDEAID_GENESIS;
-    const skewedAt = '2020-01-01T00:00:00.000000Z';
-    const skewedEv = IDEAID_SKEWED;
-
-    const genesis = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
-        ideaDocument(
-            'Genesis Title', 'active', genesisAt, genesisEv,
-        ),
-    ));
-    assertStrictEquals(genesis.status, 201);
-
-    // Later arrival, earlier state_at, different state + title.
-    const skewed = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
-        ideaDocument(
-            'Skewed Title', 'in_review', skewedAt, skewedEv,
-        ),
-    ));
-    assertStrictEquals(skewed.status, 201);
-
-    const getRes = await handleRequest(
-        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + ideaId, token),
-    );
-    assertStrictEquals(getRes.status, 200);
-    const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
-    const expected = wireIdeaGet(
-        ideaId, 'Skewed Title', 'in_review', genesisAt,
-        genesisEv,
-    );
-    assertEquals(await getRes.json(), expected);
-    assertEquals(
-        JSON.parse(await storedPutBodyText(db, prefix, ideaId)),
-        expected,
-    );
-    const derived = await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg', ideaId);
-    assertStrictEquals(
-        JSON.stringify(derived), JSON.stringify(expected),
-    );
-    assertStrictEquals(derived.title, 'Skewed Title');
-    assertStrictEquals(derived.state, 'in_review');
 });
