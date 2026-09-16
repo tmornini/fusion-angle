@@ -17,6 +17,7 @@ import {
     getBaselineScoresForProject,
     getActualScoresForProject,
     getProjectScoring,
+    getDashboardScoringBundle,
     getPortfolioImpactSummary,
     getObjectiveScoringInputs,
     buildObjectiveAggregates,
@@ -211,7 +212,9 @@ Deno.test('getPortfolioImpactSummary averages project averages',
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await organizationToken());
         await seedTwoApprovedProjects(db, ctx);
-        const r = await getPortfolioImpactSummary(ctx);
+        const r = getPortfolioImpactSummary(
+            await getDashboardScoringBundle(ctx),
+        );
         assertStrictEquals(r.projectCount, 2);
         assertStrictEquals(r.baselineMean, 20); // (60 + -20) / 2
     });
@@ -223,7 +226,9 @@ Deno.test('buildObjectiveAggregates returns per-objective rows',
         const ctx = createRequestContext(db, await organizationToken());
         await seedTwoApprovedProjects(db, ctx);
         const rows = buildObjectiveAggregates(
-            await getObjectiveScoringInputs(ctx),
+            getObjectiveScoringInputs(
+                await getDashboardScoringBundle(ctx),
+            ),
         );
         assertStrictEquals(rows.length, 1);
         assertStrictEquals(rows[0]!.objectiveId, 'ohqxgUBEaFQwYbXsonRPmg');
@@ -281,7 +286,9 @@ Deno.test(
             },
         );
         const trendlines = buildObjectiveTrendlines(
-            await getObjectiveScoringInputs(ctx),
+            getObjectiveScoringInputs(
+                await getDashboardScoringBundle(ctx),
+            ),
         );
         const points = trendlines.get('ohqxgUBEaFQwYbXsonRPmg');
         assert(points, 'ohqxgUBEaFQwYbXsonRPmg trendline must exist');
@@ -324,7 +331,9 @@ Deno.test(
             },
         );
         const trendlines = buildObjectiveTrendlines(
-            await getObjectiveScoringInputs(ctx),
+            getObjectiveScoringInputs(
+                await getDashboardScoringBundle(ctx),
+            ),
         );
         const points = trendlines.get('ohqxgUBEaFQwYbXsonRPmg');
         assert(points, 'ohqxgUBEaFQwYbXsonRPmg trendline must exist');
@@ -369,7 +378,9 @@ Deno.test(
             },
         );
         const trendlines = buildObjectiveTrendlines(
-            await getObjectiveScoringInputs(ctx),
+            getObjectiveScoringInputs(
+                await getDashboardScoringBundle(ctx),
+            ),
         );
         const points = trendlines.get('ohqxgUBEaFQwYbXsonRPmg');
         assert(points, 'ohqxgUBEaFQwYbXsonRPmg trendline must exist');
@@ -402,7 +413,9 @@ Deno.test(
             at: '2026-05-14T00:00:00.000000Z',
         });
         const trendlines = buildObjectiveTrendlines(
-            await getObjectiveScoringInputs(ctx),
+            getObjectiveScoringInputs(
+                await getDashboardScoringBundle(ctx),
+            ),
         );
         assertEquals(trendlines.get('ohqxgUBEaFQwYbXsonRPmg'), []);
     },
