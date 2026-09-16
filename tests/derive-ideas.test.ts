@@ -1,18 +1,20 @@
 import {
-    assert,
     assertEquals,
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
+import type { DbAdapter } from '../api/db.ts';
 import { EntityNotFoundError } from '../api/db.ts';
-import { organizationToken } from './token-fixtures.ts';
+import type { Id } from '../api/types.ts';
 import {
-    deriveIdea,
-    deriveIdeas,
-    deriveIdeaStateHistory,
-} from '../api/derive-ideas.ts';
+    documentCollectionGetHandler,
+    documentFamilyWiring,
+    documentGetHandler,
+    type DocumentFamilyWiring,
+} from '../api/document-family.ts';
+import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
@@ -21,6 +23,33 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 
 const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
+
+const READER: Id = 'XXZruirZyAOoRpNxaDnpSA';
+
+function wiringOf(family: string): DocumentFamilyWiring {
+    const wiring = documentFamilyWiring(family);
+    if (wiring === undefined) {
+        throw new Error('no wiring registered for ' + family);
+    }
+    return wiring;
+}
+
+function getDocument(
+    db: DbAdapter, family: string, organization: Id, id: Id,
+): Promise<unknown> {
+    return documentGetHandler(wiringOf(family))(
+        db, [organization, id], READER, organization, [],
+    );
+}
+
+async function getCollection(
+    db: DbAdapter, family: string, organization: Id,
+): Promise<{ id: Id; state: string }[]> {
+    const rows = await documentCollectionGetHandler(
+        wiringOf(family),
+    )(db, [organization], READER, organization, []);
+    return rows as { id: Id; state: string }[];
+}
 
 function req(
     method: string,
@@ -69,7 +98,7 @@ function putIdea(
     ));
 }
 
-Deno.test('a created idea derives', async () => {
+Deno.test('a created idea reads through the handler', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ideaId = generateIdentifier();
@@ -77,10 +106,10 @@ Deno.test('a created idea derives', async () => {
         db, token, ideaId, 'Fresh Idea', 'active',
     );
     assertStrictEquals(res.status, 201);
-    const derived = await deriveIdea(
-        db, STARK_ORGANIZATION, ideaId,
+    const document = await getDocument(
+        db, 'ideas', STARK_ORGANIZATION, ideaId,
     );
-    assertEquals(derived, {
+    assertEquals(document, {
         id: ideaId,
         organization_id: STARK_ORGANIZATION,
         title: 'Fresh Idea',
@@ -94,7 +123,7 @@ Deno.test('a created idea derives', async () => {
     });
 });
 
-Deno.test('an edited idea derives the edit body', async () => {
+Deno.test('an edited idea reads the edit body', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ideaId = generateIdentifier();
@@ -106,16 +135,10 @@ Deno.test('an edited idea derives the edit body', async () => {
         db, token, ideaId, 'After Edit', 'active',
     );
     assertStrictEquals(res.status, 201);
-    const derived = await deriveIdea(
-        db, STARK_ORGANIZATION, ideaId,
-    );
-    assertStrictEquals(derived.title, 'After Edit');
-    // The unchanged trio replays the SAME event, not a new one —
-    // still one row in the derived history.
-    const history = await deriveIdeaStateHistory(
-        db, STARK_ORGANIZATION, ideaId,
-    );
-    assertStrictEquals(history.length, 1);
+    const document = await getDocument(
+        db, 'ideas', STARK_ORGANIZATION, ideaId,
+    ) as { title: string };
+    assertStrictEquals(document.title, 'After Edit');
 });
 
 Deno.test(
@@ -132,14 +155,16 @@ Deno.test(
         );
         assertStrictEquals(res.status, 201);
 
-        const ideas = await deriveIdeas(db, STARK_ORGANIZATION);
+        const ideas = await getCollection(
+            db, 'ideas', STARK_ORGANIZATION,
+        );
         assertStrictEquals(
             ideas.some((idea) => idea.id === ideaId),
             false,
         );
         await assertRejects(
-            () => deriveIdea(
-                db, STARK_ORGANIZATION, ideaId,
+            () => getDocument(
+                db, 'ideas', STARK_ORGANIZATION, ideaId,
             ),
             EntityNotFoundError,
         );
@@ -161,23 +186,19 @@ Deno.test(
             'deleted',
         );
         assertStrictEquals(res.status, 201);
-        const ideas = await deriveIdeas(db, STARK_ORGANIZATION);
+        const ideas = await getCollection(
+            db, 'ideas', STARK_ORGANIZATION,
+        );
         assertStrictEquals(
             ideas.some((idea) => idea.id === ideaId),
             false,
         );
         await assertRejects(
-            () => deriveIdea(
-                db, STARK_ORGANIZATION, ideaId,
+            () => getDocument(
+                db, 'ideas', STARK_ORGANIZATION, ideaId,
             ),
             EntityNotFoundError,
         );
-        const history = await deriveIdeaStateHistory(
-            db, STARK_ORGANIZATION, ideaId,
-        );
-        assertStrictEquals(history.length, 2);
-        assertStrictEquals(history[0]!.state, 'active');
-        assertStrictEquals(history[1]!.state, 'deleted');
     },
 );
 
@@ -194,26 +215,11 @@ Deno.test('ordering is oldest live head (at, id)', async () => {
             db, token, id, 'Order ' + id, 'active',
         );
     }
-    const derived = await deriveIdeas(db, STARK_ORGANIZATION);
-    const observed = derived
+    const collection = await getCollection(
+        db, 'ideas', STARK_ORGANIZATION,
+    );
+    const observed = collection
         .map((idea) => idea.id)
         .filter((id) => ids.includes(id));
     assertEquals(observed, ids);
 });
-
-Deno.test(
-    'the synthesized genesis equals the actual states genesis '
-    + 'row field-for-field',
-    async () => {
-        const db = await seededDb();
-        // A seeded idea (org 'AjdvjuECVZEgZoFajaIEkg' by
-        // assignOrganization(0)) whose
-        // ONLY event is its own creation — no post-genesis
-        // transitions in the mock data.
-        const ideaId = 'YvOylAxOjQcgmNmsSoVBPQ';
-        const derivedHistory = await deriveIdeaStateHistory(
-            db, STARK_ORGANIZATION, ideaId,
-        );
-        assert(derivedHistory.length >= 1);
-    },
-);

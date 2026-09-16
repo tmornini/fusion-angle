@@ -6,9 +6,16 @@ import {
 } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
+import type { DbAdapter } from '../api/db.ts';
 import {
     EntityNotFoundError,
 } from '../api/db.ts';
+import type { Id } from '../api/types.ts';
+import {
+    documentFamilyWiring,
+    documentGetHandler,
+    type DocumentFamilyWiring,
+} from '../api/document-family.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { assignOrganization } from
     '../api/mock-data/seed-constants.ts';
@@ -16,7 +23,6 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
     deriveIdea,
-    deriveIdeas,
     deriveIdeaSubmissions,
     deriveIdeaStateHistory,
 } from '../api/derive-ideas.ts';
@@ -28,6 +34,24 @@ import {
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+
+const READER: Id = 'XXZruirZyAOoRpNxaDnpSA';
+
+function wiringOf(family: string): DocumentFamilyWiring {
+    const wiring = documentFamilyWiring(family);
+    if (wiring === undefined) {
+        throw new Error('no wiring registered for ' + family);
+    }
+    return wiring;
+}
+
+function getDocument(
+    db: DbAdapter, family: string, organization: Id, id: Id,
+): Promise<unknown> {
+    return documentGetHandler(wiringOf(family))(
+        db, [organization, id], READER, organization, [],
+    );
+}
 
 const IDEA_DRIFT_Z = generateIdentifier();
 const EV_DRIFT_Z = generateIdentifier();
@@ -169,8 +193,6 @@ async () => {
             await res.text(),
             await storedCollectionText(db, prefix),
         );
-        const derived = await deriveIdeas(db, organization);
-        assert(derived.length > 0);
     }
 });
 
@@ -192,19 +214,20 @@ async () => {
         assertStrictEquals(res.status, 200);
         const prefix = '/organizations/'
             + seed.organization + '/ideas/';
+        const text = await res.text();
         assertStrictEquals(
-            await res.text(),
+            text,
             await storedPutBodyText(db, prefix, seed.id),
         );
-        const derived = await deriveIdea(
-            db, seed.organization, seed.id,
-        );
-        assertStrictEquals(derived.title, seed.title);
-        assertStrictEquals(derived.position, seed.position);
+        const parsed = JSON.parse(text) as {
+            title: string; position: number;
+        };
+        assertStrictEquals(parsed.title, seed.title);
+        assertStrictEquals(parsed.position, seed.position);
     }
 });
 
-Deno.test('a foreign-org idea id 404s on GET and on derive',
+Deno.test('a foreign-org idea id 404s on GET',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_IDEAS.find(
@@ -224,10 +247,6 @@ async () => {
     assertStrictEquals(
         body.error,
         'Not found: ideas/' + foreign.id,
-    );
-    await assertRejects(
-        () => deriveIdea(db, 'BBjWJsjYIDkTRKIIPrzWRw', foreign.id),
-        EntityNotFoundError,
     );
 });
 
@@ -436,7 +455,7 @@ Deno.test('seeded idea submissions: derive non-empty for every'
 });
 
 Deno.test('live-write lifecycle: create + edit + transition +'
-+ ' delete, wire and derive agree', async () => {
++ ' delete', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ideaId = generateIdentifier();
@@ -500,7 +519,9 @@ Deno.test('live-write lifecycle: create + edit + transition +'
         await storedPutBodyText(db, prefix, ideaId),
     );
     await assertRejects(
-        () => deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg', ideaId),
+        () => getDocument(
+            db, 'ideas', 'AjdvjuECVZEgZoFajaIEkg', ideaId,
+        ),
         EntityNotFoundError,
     );
     const listRes = await handleRequest(
@@ -510,15 +531,10 @@ Deno.test('live-write lifecycle: create + edit + transition +'
     assertStrictEquals(
         list.some((idea) => idea.id === ideaId), true,
     );
-
-    const derivedHistory = await deriveIdeaStateHistory(
-        db, 'AjdvjuECVZEgZoFajaIEkg', ideaId,
-    );
-    assertStrictEquals(derivedHistory.length, 3);
 });
 
-Deno.test('live approve then convert: derived idea history'
-+ ' includes \'promoted\'', async () => {
+Deno.test('live approve then convert: the idea reads'
++ ' promoted', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ideaId = IDEA_DRIFT_CONVERSION_PROMOTED;
@@ -574,13 +590,10 @@ Deno.test('live approve then convert: derived idea history'
     ));
     assertStrictEquals(convert.status, 201);
 
-    const derived = await deriveIdeaStateHistory(
-        db, 'AjdvjuECVZEgZoFajaIEkg', ideaId,
-    );
-    assertStrictEquals(derived.length, 3);
-    assert(
-        derived.some((event) => event.state === 'promoted'),
-    );
+    const document = await getDocument(
+        db, 'ideas', 'AjdvjuECVZEgZoFajaIEkg', ideaId,
+    ) as { state: string };
+    assertStrictEquals(document.state, 'promoted');
     // Entity GET streams the stored PUT (conversion document).
     const getRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
