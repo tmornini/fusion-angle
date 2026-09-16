@@ -981,3 +981,10 @@ Deno.test('trendAxisMax floors at 1', () => {
     );
     assertStrictEquals(trendAxisMax([], null), 1);
 });
+
+Deno.test('trendAxisMax keeps a maximum below one', () => {
+    assertStrictEquals(
+        trendAxisMax([{ y: 0.5, candle: null }], null),
+        0.5,
+    );
+});
