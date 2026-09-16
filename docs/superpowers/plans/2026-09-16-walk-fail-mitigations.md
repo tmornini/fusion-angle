@@ -230,7 +230,7 @@ Markdown only: no `./test validate`.
   → `FormerSeatEntity[]`; foreign path org 403;
   member-tier GET allowed. Task 3 reads it.
 
-- [ ] **Step 1: Write the failing derive tests**
+- [x] **Step 1: Write the failing derive tests**
 
 Append to `tests/api-organization-member-seat.test.ts`.
 Extend its `'../api/types.ts'` import with
@@ -331,14 +331,14 @@ async () => {
 });
 ```
 
-- [ ] **Step 2: Watch them fail**
+- [x] **Step 2: Watch them fail**
 
 Run the Layer 1 one-file command with
 `--filter 'former-members'` on each file. Expected:
 every `status` assertion fails `404 !== 200` — the
 router has no such route.
 
-- [ ] **Step 3: The entity**
+- [x] **Step 3: The entity**
 
 In `api/types.ts`, directly after the
 `MembershipEntity` interface:
@@ -356,7 +356,7 @@ export interface FormerSeatEntity {
 }
 ```
 
-- [ ] **Step 4: The derive**
+- [x] **Step 4: The derive**
 
 In `api/derive-memberships.ts`: extend the
 `./types.ts` type import with `FormerSeatEntity`; add
@@ -414,7 +414,7 @@ export async function deriveOrganizationFormerSeats(
 }
 ```
 
-- [ ] **Step 5: The pattern, the route, the policy row**
+- [x] **Step 5: The pattern, the route, the policy row**
 
 `api/family-registry.ts`, after
 `ORGANIZATION_MEMBER_DETAIL_PATTERN`:
@@ -459,7 +459,7 @@ after `'/organizations/:id/members': ['GET'],`:
     '/organizations/:id/former-members': ['GET'],
 ```
 
-- [ ] **Step 6: Regenerate the API documentation**
+- [x] **Step 6: Regenerate the API documentation**
 
 ```bash
 ./bin/generate-api-documentation
@@ -472,7 +472,7 @@ Both land with this commit — `./test validate` runs
 `generate-api-documentation --check` and fails on a
 stale tree.
 
-- [ ] **Step 7: Watch them pass, then the gate**
+- [x] **Step 7: Watch them pass, then the gate**
 
 Re-run Step 2's two filtered runs: green. Then
 `./test validate`: green. `tests/api-identifier-route-gate.test.ts`
@@ -482,7 +482,7 @@ new route inherits it. If any other route-surface pin
 counts routes, update the count in the same commit —
 never delete the pin.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add api/types.ts api/derive-memberships.ts \
@@ -522,7 +522,7 @@ git commit -m "Derive an organization's former seats over HTTP"
   `member.name()`). Tasks 4, 6, 7 rely on nothing
   else.
 
-- [ ] **Step 1: Write the four failing pins**
+- [x] **Step 1: Write the four failing pins**
 
 `tests/adapters-members-union.test.ts` — add the
 imports:
@@ -754,7 +754,7 @@ Deno.test(
 );
 ```
 
-- [ ] **Step 2: Watch all five fail for the named reason**
+- [x] **Step 2: Watch all five fail for the named reason**
 
 Run the one-file command on each of the four files
 with `--filter 'D1'`, `'G9'`, `'WB3'`, and
@@ -768,7 +768,7 @@ at the adapter layer on this base: `getIdeas` and
 after the seed's B28; `buildInboxItems` throws the
 same for a leaver-created work order.
 
-- [ ] **Step 3: The kind**
+- [x] **Step 3: The kind**
 
 In `api/types.ts`, directly after the `SystemMember`
 class, replacing the existing `Member` union:
@@ -820,7 +820,7 @@ export function isFormerMember(
 (`FormerSeatEntity` is declared later in the file;
 interfaces hoist.)
 
-- [ ] **Step 4: The union in the map**
+- [x] **Step 4: The union in the map**
 
 In `web-app/app/adapters/members-union.ts`: add
 `FormerSeatEntity` to the `import type { … }` block
@@ -870,7 +870,7 @@ branch reads PII; every other kind returns
 `member.name()`, and `FormerMember.name()` is the
 label.
 
-- [ ] **Step 5: Check the whole type universe**
+- [x] **Step 5: Check the whole type universe**
 
 ```bash
 deno check --frozen api shared server tests web-app
@@ -884,7 +884,7 @@ If `deno check` names an exhaustive switch over
 `Member['kind']`, add an explicit `'former'` arm
 there — never a default.
 
-- [ ] **Step 6: Watch them pass, then the gate**
+- [x] **Step 6: Watch them pass, then the gate**
 
 Re-run Step 2's four filtered runs: green, including
 the untouched 'memberName throws on missing id
@@ -892,7 +892,7 @@ the untouched 'memberName throws on missing id
 by id with both kinds present' (size stays 4: no
 former seats there). Then `./test validate`: green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add api/types.ts web-app/app/adapters/members-union.ts \
@@ -922,7 +922,7 @@ git commit -m "Name a de-seated author Former member"
   `#org-edit-btn` and `#objectives-box` (organization),
   `[data-retry-btn]` (the error card's Try Again).
 
-- [ ] **Step 1: Write the three tests**
+- [x] **Step 1: Write the three tests**
 
 ```typescript
 import { assert, assertStrictEquals } from '@std/assert';
@@ -1032,7 +1032,7 @@ Deno.test(
 );
 ```
 
-- [ ] **Step 2: Run `./test browser`**
+- [x] **Step 2: Run `./test browser`**
 
 Expected: all three green — Task 3's Layer 1 pins
 already reproduced the walk's throw and the fix. If
@@ -1043,7 +1043,7 @@ neighbour such as `getSentInvitations`), pin it red at
 Layer 1 in that adapter's test file, fix, and only
 then return here. Do not commit a red Layer 2 test.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/browser/former-member.test.ts
@@ -1060,7 +1060,7 @@ git commit -m "Pin ideas, archive, and organization after B28"
 
 Doc only. No tests.
 
-- [ ] **Step 1: Name the read**
+- [x] **Step 1: Name the read**
 
 After the sentence ending "…not a seat." add:
 
@@ -1072,7 +1072,7 @@ lists those heads, and the name resolver paints them as
 id.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add ARCHITECTURE.md
@@ -1104,7 +1104,7 @@ git commit -m "Document former seats in ARCHITECTURE"
   four active objectives are listed below; nine
   seeded projects are `approved`.
 
-- [ ] **Step 1: Write the pin**
+- [x] **Step 1: Write the pin**
 
 Extend the file's imports: `assertNotStrictEquals`
 from `@std/assert`; `getProjectEntity` and
@@ -1196,7 +1196,7 @@ Deno.test(
 );
 ```
 
-- [ ] **Step 2: Run it and read the colour**
+- [x] **Step 2: Run it and read the colour**
 
 One-file command, `--filter 'K29'`.
 
@@ -1213,7 +1213,7 @@ One-file command, `--filter 'K29'`.
   together as "Count a new actual in the objective
   aggregate".
 
-- [ ] **Step 3: `./test validate`, then commit**
+- [x] **Step 3: `./test validate`, then commit**
 
 ```bash
 git add tests/adapters-project-scoring.test.ts
@@ -1244,7 +1244,7 @@ git commit -m "Pin the objective aggregate after a new actual"
   baselines and at least one actual, so Lower
   expenses already has ≥ 2 dots and a live slider.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```typescript
 import { assertStrictEquals } from '@std/assert';
@@ -1321,7 +1321,7 @@ the live DOM, so a new dot proves the BroadcastChannel
 bell and the repaint. The walk's "~1 second" stays
 exploratory; `until` bounds the wait at 10 s.
 
-- [ ] **Step 2: Run `./test browser` and read the colour**
+- [x] **Step 2: Run `./test browser` and read the colour**
 
 - **Green:** the cross-tab path works; the walk's
   FAIL was an expectation artifact (the box paints a
@@ -1353,7 +1353,7 @@ exploratory; `until` bounds the wait at 10 s.
   Remove the probe before committing the Layer 2
   test.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/browser/dashboard-objectives.test.ts
@@ -1377,7 +1377,7 @@ either task means the same sentence plus "fixed
 2026-09-16" is NOT written — the commit history
 carries it.
 
-- [ ] **Step 1: Name the mean in the case**
+- [x] **Step 1: Name the mean in the case**
 
 In K29's body, after "the three arc-gauge cards
 refresh only on full page load." add:
@@ -1403,7 +1403,7 @@ Replace K29's Pin clause with:
        exploratory — the ~1 second
 ```
 
-- [ ] **Step 2: Drop the TODO bullet**
+- [x] **Step 2: Drop the TODO bullet**
 
 Delete, under "Unpinned but pinnable":
 
@@ -1413,7 +1413,7 @@ Delete, under "Unpinned but pinnable":
     BroadcastChannel test
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add TEST-PLAN.md TODO.md
@@ -1424,7 +1424,7 @@ git commit -m "Name the K29 mean and its pins"
 
 ### Task 9: Land
 
-- [ ] **Step 1: Layer 2 gate on the whole branch**
+- [x] **Step 1: Layer 2 gate on the whole branch**
 
 ```bash
 git rebase master
@@ -1435,7 +1435,7 @@ Both green. If master moved under a file this branch
 touched, resolve, re-run, and amend the affected
 commit — never a fix-up commit on top.
 
-- [ ] **Step 2: Tick this plan**
+- [x] **Step 2: Tick this plan**
 
 Mark every `- [ ]` above `- [x]`, then:
 
