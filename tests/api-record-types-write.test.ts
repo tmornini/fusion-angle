@@ -168,7 +168,7 @@ const COLLECTION =
     '/organizations/' + ORGANIZATION + '/record-types/';
 
 Deno.test('PUT .../record-types/:id admin → 200, body echoes '
-+ 'entity; GET sees trio',
++ 'entity; GET sees state',
 async () => {
     const { db, adminToken } = await adminDb();
     const body = typeBody('Rental', 1, 'active');

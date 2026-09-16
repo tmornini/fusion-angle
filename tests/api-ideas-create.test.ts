@@ -55,9 +55,9 @@ function ideaFields(title: string) {
     };
 }
 
-// The genesis case of the document PUT (Decision 7): the SAME
-// shape an edit or transition carries — entity fields plus the
-// lifecycle trio. There is no separate "create body" shape.
+// The genesis case of the document PUT: the SAME shape an edit
+// or transition carries — entity fields plus state. There is no
+// separate "create body" shape.
 function ideaGenesisBody(title: string) {
     return {
         ...ideaFields(title),

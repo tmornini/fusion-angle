@@ -82,7 +82,7 @@ function documentFields(
 // -- 1. validateObjectiveDocumentBody ------------------------
 
 Deno.test('validateObjectiveDocumentBody accepts the entity field'
-+ ' plus the lifecycle trio and an optional organization_id',
++ ' plus state and an optional organization_id',
 () => {
     const doc = validateObjectiveDocumentBody({
         ...documentFields(),
@@ -131,7 +131,7 @@ Deno.test('validateObjectiveDocumentBody rejects a missing'
 });
 
 Deno.test('validateObjectiveDocumentBody rejects a body missing'
-+ ' the lifecycle trio', () => {
++ ' state', () => {
     assertThrows(
         () => validateObjectiveDocumentBody(entityFields()),
         ValidationError,
@@ -173,7 +173,7 @@ Deno.test('PUT organizations/:id/objectives/:id accepts state and'
     assertStrictEquals('state_event_id' in wire, false);
 });
 
-Deno.test('PUT organizations/:id/objectives/:id without the trio is 400',
+Deno.test('PUT organizations/:id/objectives/:id without state is 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);

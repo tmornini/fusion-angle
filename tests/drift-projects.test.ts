@@ -112,7 +112,7 @@ function projectDocument(title: string, state: string, position = 1) {
 }
 
 // PUT response shape (documentWriteResponseSpec / G1):
-// entity fields plus lifecycle-current trio.
+// entity fields only.
 function wireProjectPut(
     id: string,
     title: string,
@@ -135,9 +135,8 @@ function wireProjectPut(
     };
 }
 
-// GET projectEntityOf form: entity fields plus lifecycle-
-// current trio (state ← event.state, state_at ← event.at,
-// state_event_id ← event.id) — never the head body trio.
+// GET projectEntityOf form: entity fields plus the head
+// body's own state.
 function wireProjectGet(
     id: string,
     title: string,
@@ -495,7 +494,6 @@ Deno.test('live conversion case: a converted idea\'s project'
     const list = await listRes.json() as { id: string }[];
     assert(list.some((p) => p.id === projectId));
 
-    // GET trio is the lifecycle-current genesis event.
     const versions = await versionsOf(
         db, token, 'projects', projectId,
     );

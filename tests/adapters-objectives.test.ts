@@ -43,9 +43,8 @@ function ctxFor(db: MemoryDbAdapter) {
     return createRequestContext(db, DEV_TOKEN);
 }
 
-// Seed an objective document with a lifecycle trio — raw
-// PUT organizations/:id/objectives/:id requires state/state_at/state_event_id
-// after the states-document retirement gate (Task 1).
+// Seed an objective document: raw PUT
+// organizations/:id/objectives/:id requires state.
 function objectiveDoc(position: number, state: 'active' | 'archived') {
     return {
         position,
@@ -489,8 +488,8 @@ function recordingCtx(
 }
 
 Deno.test(
-    'postObjectiveArchival PUTs the document with an'
-    + ' archived trio and the current position',
+    'postObjectiveArchival PUTs the document with the'
+    + ' archived state and the current position',
     async () => {
         const { ctx, calls } = recordingCtx({
             GET: async (path) => {

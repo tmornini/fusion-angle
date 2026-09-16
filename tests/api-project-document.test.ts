@@ -187,7 +187,7 @@ async () => {
 });
 
 Deno.test('the pair request body carries domain state;'
-+ ' GET has no trio metadata', async () => {
++ ' GET carries no event fields', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await handleRequest(db, req(

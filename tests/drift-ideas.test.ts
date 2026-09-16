@@ -94,7 +94,7 @@ function ideaDocument(title: string, state: string, position = 1) {
 }
 
 // PUT response shape (documentWriteResponseSpec / G1):
-// entity fields plus lifecycle-current trio.
+// entity fields only.
 function wireIdeaPut(
     id: string,
     title: string,
@@ -114,9 +114,8 @@ function wireIdeaPut(
     };
 }
 
-// GET ideaEntityOf form: entity fields plus lifecycle-current
-// trio (state ← event.state, state_at ← event.at,
-// state_event_id ← event.id) — never the head body trio.
+// GET ideaEntityOf form: entity fields plus the head body's
+// own state.
 function wireIdeaGet(
     id: string,
     title: string,

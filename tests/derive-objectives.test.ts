@@ -12,9 +12,8 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// Objectives' own state-history reduction (states-document
-// retirement): unit-level trio walk + echo dedup, and the
-// family history route GET organizations/:id/objectives/:id/versions. Uses
+// Objectives' versions route: GET
+// organizations/:id/objectives/:id/versions. Uses
 // seedAdminSchema (not postMockDataLoad) so the suite stays
 // self-contained; seeded genesis lives in mock-data/drift
 // pins. Writes go through the live gate.
@@ -40,7 +39,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 }
 
 Deno.test('GET organizations/:id/objectives/:id/versions carries the'
-+ ' objective trio rows (DESC current-first)', async () => {
++ ' objective rows (DESC current-first)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const id = generateIdentifier();

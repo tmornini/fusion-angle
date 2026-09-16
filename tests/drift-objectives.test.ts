@@ -142,7 +142,7 @@ async function derivedObjective(
 }
 
 // PUT response shape (documentWriteResponseSpec / G1):
-// entity fields plus lifecycle-current trio.
+// entity fields only.
 function wireObjectivePut(
     id: string,
     position: number,
@@ -156,9 +156,7 @@ function wireObjectivePut(
 }
 
 // GET objectiveDocumentEntityOf form: entity fields plus
-// lifecycle-current trio (state ← event.state, state_at ←
-// event.at, state_event_id ← event.id) — never the head
-// body trio.
+// the head body's own state.
 function wireObjectiveGet(
     id: string,
     position: number,
@@ -1058,7 +1056,7 @@ async () => {
 Deno.test('THE ARCHIVED-INCLUSION PIN: an objective with a live'
 + " 'archived' document-plane event appears in GET /objectives"
 + ' AND GET organizations/:id/objectives/:id 200 — archived is NOT deleted;'
-+ " trio families exclude only state='deleted'",
++ " state families exclude only state='deleted'",
 async () => {
     const db = await seededDb();
     const token = await organizationToken();

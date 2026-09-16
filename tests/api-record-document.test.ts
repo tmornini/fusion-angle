@@ -94,7 +94,7 @@ async function versionsOf(
 // -- 1. validateRecordDocumentBody --------------------------
 
 Deno.test('validateRecordDocumentBody accepts entity fields plus'
-+ ' the trio, organization_id omitted', () => {
++ ' state, organization_id omitted', () => {
     const doc = validateRecordDocumentBody(
         recordDocument('Fresh', 'active'),
     );
@@ -126,7 +126,7 @@ Deno.test('validateRecordDocumentBody rejects a stray key',
     );
 });
 
-Deno.test('validateRecordDocumentBody rejects a trio-less body',
+Deno.test('validateRecordDocumentBody rejects a body without state',
 () => {
     assertThrows(
         () => validateRecordDocumentBody(

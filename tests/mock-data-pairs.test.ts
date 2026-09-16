@@ -385,8 +385,8 @@ Deno.test('a seeded record create pair sits at its org-nested'
 });
 
 Deno.test('a seeded record\'s document message pair sits at its'
-+ ' entity document, its body carrying the entity plus the'
-+ ' state trio (no id or organization_id key)', async () => {
++ ' entity document, its body carrying the entity plus'
++ ' state (no id or organization_id key)', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
     // The document message pair shares its (path, name) with the
@@ -481,8 +481,8 @@ Deno.test('a seeded objective create pair sits at its org-nested'
 });
 
 Deno.test('a seeded objective\'s document message pair sits at its'
-+ ' entity document, body carrying position plus the'
-+ ' lifecycle trio and no organization_id key', async () => {
++ ' entity document, body carrying position plus state'
++ ' and no organization_id key', async () => {
     const db = await sharedMockDb();
     const starkSeed = OBJECTIVE_SEEDS[0]!;
     const requests = await db.messagePairs.getAll();

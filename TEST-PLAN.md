@@ -6042,8 +6042,8 @@ document order with the rest of this section.
   moves from active to the Archived sub-section, with
   strikethrough.
   Pin: tests/adapters-objectives.test.ts
-       'postObjectiveArchival PUTs the document with an
-       archived trio and the current position';
+       'postObjectiveArchival PUTs the document with the
+       archived state and the current position';
        tests/presenter-organization-objectives.test.ts
        'renders archived section under active' (its own
        assertions are unscoped `.includes()` calls that
