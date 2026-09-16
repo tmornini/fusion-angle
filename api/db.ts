@@ -185,9 +185,13 @@ export interface WriteLocks {
 // The byte-level seam. Store classes compose a backend
 // to obtain rows; backends own persistence + encoding,
 // stores own semantics (tombstones, splices, singletons).
-// `transaction` is the primitive every row op crosses;
-// `ensureTable` is schema lifecycle, never a row op.
+// `read` is one statement with no BEGIN; `transaction`
+// is BEGIN/COMMIT; `ensureTable` is schema lifecycle,
+// never a row op.
 export interface StorageBackend {
+    read<R>(
+        fn: (tx: Tx) => Promise<R>,
+    ): Promise<R>;
     transaction<R>(
         mode: TxMode,
         fn: (tx: Tx) => Promise<R>,
@@ -202,7 +206,7 @@ export interface StorageBackend {
 }
 
 // How a store reaches storage. Standalone, a store opens a
-// fresh single-op transaction via `backendRunner`; joined
+// fresh `read` or `transaction` via `backendRunner`; joined
 // to an open view, it returns the open `tx` via
 // `ambientRunner` — no AsyncLocalStorage, no ambient global,
 // just the runner the store was handed at construction.
@@ -214,7 +218,9 @@ export type TxRunner = <R>(
 export const backendRunner = (
     backend: StorageBackend,
 ): TxRunner =>
-    (mode, fn) => backend.transaction(mode, fn);
+    (mode, fn) => mode === 'readonly'
+        ? backend.read(fn)
+        : backend.transaction(mode, fn);
 
 // Join the open tx: the open transaction's mode is
 // already fixed, so this ignores the declared mode and

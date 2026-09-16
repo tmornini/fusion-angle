@@ -75,6 +75,11 @@ function wrap(sql: Tagged): SqlClient {
 export interface PostgresConnectOptions {
     readonly statementTimeoutMs?: number;
     readonly acquireTimeoutMs?: number;
+    readonly debug?: (
+        connection: number,
+        query: string,
+        parameters: unknown[],
+    ) => void;
 }
 
 export function connectPostgres(
@@ -83,9 +88,13 @@ export function connectPostgres(
 ): SqlClient {
     const acquireMs = options?.acquireTimeoutMs;
     const statementMs = options?.statementTimeoutMs;
+    const debug = options?.debug;
     return wrap(postgres(url, {
         max: POOL_MAX,
         onnotice: () => {},
+        ...(debug !== undefined
+            ? { debug }
+            : {}),
         ...(acquireMs !== undefined
             ? {
                 connect_timeout: Math.max(
