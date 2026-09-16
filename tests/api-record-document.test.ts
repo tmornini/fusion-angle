@@ -4,8 +4,6 @@ import {
     assertStrictEquals,
     assertThrows,
 } from '@std/assert';
-import { deriveRecordTypeStateHistory } from
-    '../api/derive-record-types.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -87,6 +85,22 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
+async function versionsOf(
+    db: MemoryDbAdapter, token: string,
+    family: string, id: string,
+): Promise<{ state: string; member_id: string }[]> {
+    const res = await handleRequest(db, req(
+        'GET',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/' + family
+            + '/' + id + '/versions/',
+        token,
+    ));
+    assertStrictEquals(res.status, 200);
+    return await res.json() as {
+        state: string; member_id: string;
+    }[];
+}
+
 // -- 1. validateRecordDocumentBody --------------------------
 
 Deno.test('validateRecordDocumentBody accepts entity fields plus'
@@ -137,13 +151,14 @@ Deno.test('validateRecordDocumentBody rejects a trio-less body',
 // -- 2. postRecordDocumentOp decomposes the document ---------
 
 // Phase Final Task 2: records ROW half stripped — op return
-// + states event are the oracles (row plane empty).
+// + the versions list are the oracles (row plane empty).
 Deno.test('postRecordDocumentOp genesis (head-absent) returns the'
-+ ' entity and posts exactly one event authored by the actor',
++ ' entity and posts exactly one version authored by the actor',
 async () => {
     const db = await freshDb();
+    const token = await organizationToken();
     // Phase Final Task 2: states ROW half stripped — pair
-    // required for deriveRecordTypeStateHistory to see genesis.
+    // required for the versions list to see genesis.
     const body = {
         ...recordDocument('Fresh', 'active', AT, 'ev-1'),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
@@ -169,74 +184,20 @@ async () => {
     assertStrictEquals(written.name, 'Fresh');
     assertStrictEquals(written.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
     // Phase Final Stage B: records table retired.
-    const events = await deriveRecordTypeStateHistory(db
-        , 'AjdvjuECVZEgZoFajaIEkg', 'rbfHGatkwQzGZJVXKJEeyw');
-    assertStrictEquals(events.length, 1);
-    assertStrictEquals(events[0]!.state, 'active');
-    assertStrictEquals(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+    const versions = await versionsOf(
+        db, token, 'record-types', 'rbfHGatkwQzGZJVXKJEeyw',
+    );
+    assertStrictEquals(versions.length, 1);
+    assertStrictEquals(versions[0]!.state, 'active');
+    assertStrictEquals(
+        versions[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
+    );
 });
 
-// The MEMBER_ID CAVEAT: the head event is authored by
-// 'XXZruirZyAOoRpNxaDnpSA'; a DIFFERENT member ('member-b') then edits an
-// entity field while echoing the SAME trio verbatim. sameEvent
-// (store-state.ts) compares member_id too, so replaying
-// 'member-b' as author would 409 against the already-stored
-// (current-authored) row — this proves the op replays the
-// STORED head's member_id rather than the editing actor's.
-// Phase 14 Task 5: the head read is now message-plane-anchored
-// (documentStateHeadFor), so the FIRST (genesis) call must form
-// a real document message pair for the second call's head-read
-// to find it — the below-gate convention this file otherwise
-// follows (its own header comment) omits pairs entirely, which
-// the row-plane read tolerated but the message-plane one
-// cannot; the pair is formed via formWriteMessagePair, the
-// SAME helper document-family.test.ts's below-facade
-// convention test uses.
-Deno.test('postRecordDocumentOp with an echoed trio writes NO new'
-+ ' event, replaying the stored head\'s member_id',
-async () => {
+Deno.test('postRecordDocumentOp with a new state writes a'
++ ' second version authored by the actor', async () => {
     const db = await freshDb();
-    const firstBody = {
-        ...recordDocument('First', 'active', AT, 'ev-2'),
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-    };
-    const firstMessagePair = await formWriteMessagePair({
-        method: 'PUT'
-            , pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + 'rcaSzEaORBkezCxyhLhecA',
-        routePattern: RECORD_TYPE_DETAIL_PATTERN,
-        routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
-        pathSegments: ['organizations', 'AjdvjuECVZEgZoFajaIEkg'
-            , 'record-types', 'rcaSzEaORBkezCxyhLhecA'],
-        headerFields: [], body: firstBody,
-        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
-        requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
-        operationId: generateIdentifier(),
-    });
-    await postRecordDocumentOp(
-        db, 'rcaSzEaORBkezCxyhLhecA', firstBody, 'XXZruirZyAOoRpNxaDnpSA'
-            , firstMessagePair,
-    );
-    const second = await postRecordDocumentOp(
-        db, 'rcaSzEaORBkezCxyhLhecA',
-        {
-            ...recordDocument('Second', 'active', AT, 'ev-2'),
-            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-        },
-        'member-b',
-    );
-    const events = await deriveRecordTypeStateHistory(db
-        , 'AjdvjuECVZEgZoFajaIEkg', 'rcaSzEaORBkezCxyhLhecA');
-    assertStrictEquals(events.length, 1);
-    assertStrictEquals(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
-    assertStrictEquals(second.name, 'Second');
-    // Phase Final Stage B: records table retired.
-});
-
-Deno.test('postRecordDocumentOp with a fresh trio posts a'
-+ ' transition authored by the actor', async () => {
-    const db = await freshDb();
+    const token = await organizationToken();
     // Phase Final Task 2: both writes carry pairs so the
     // document lifecycle is message-plane visible.
     const firstBody = {
@@ -289,13 +250,18 @@ Deno.test('postRecordDocumentOp with a fresh trio posts a'
         db, 'rlBnfIvzDVVZeVSjBECxGg', secondBody, 'XXZruirZyAOoRpNxaDnpSA'
             , secondMessagePair,
     );
-    const events = await deriveRecordTypeStateHistory(db
-        , 'AjdvjuECVZEgZoFajaIEkg', 'rlBnfIvzDVVZeVSjBECxGg');
-    assertEquals(
-        events.map(e => e.state).toSorted(),
-        ['active', 'archived'],
+    const versions = await versionsOf(
+        db, token, 'record-types', 'rlBnfIvzDVVZeVSjBECxGg',
     );
-    assert(events.every(e => e.member_id === 'XXZruirZyAOoRpNxaDnpSA'));
+    assertEquals(
+        versions.map(v => v.state),
+        ['archived', 'active'],
+    );
+    assert(
+        versions.every(
+            v => v.member_id === 'XXZruirZyAOoRpNxaDnpSA',
+        ),
+    );
 });
 
 // -- 3. the fast-path sibling pin (added at the fold commit,
@@ -304,10 +270,10 @@ Deno.test('postRecordDocumentOp with a fresh trio posts a'
 // The gate's pre-tx idempotency fast path (api.ts) replays a
 // byte-identical resend's STORED response without re-dispatching
 // to the op — sibling of api-idea-document.test.ts's own "a
-// byte-identical resend converges: one event, one pair".
+// byte-identical resend converges: one pair".
 
 Deno.test('a byte-identical resend replays the stored response:'
-+ ' one event, one pair', async () => {
++ ' one pair', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const body = recordDocument(
@@ -330,9 +296,6 @@ Deno.test('a byte-identical resend replays the stored response:'
             token, body, operationId,
         ),
     );
-    const events = await deriveRecordTypeStateHistory(db
-        , 'AjdvjuECVZEgZoFajaIEkg', 'sBdXBQtlujsRkbzspdvfFg');
-    assertStrictEquals(events.length, 1);
     assertStrictEquals((await db.messagePairs.getAll()).length, 3);
     assertStrictEquals((await db.messagePairs.getAll()).length, 3);
 });

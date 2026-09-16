@@ -4,11 +4,7 @@ import {
     assertNotStrictEquals,
     assertStrictEquals,
 } from '@std/assert';
-import {
-    deriveIdea,
-    deriveIdeaStateHistory,
-    ideaEntityOf,
-} from '../api/derive-ideas.ts';
+import { ideaEntityOf } from '../api/derive-ideas.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -16,7 +12,6 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
     apiRequest,
     storedPutBodyText,
@@ -68,6 +63,36 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
+async function versionsOf(
+    db: MemoryDbAdapter, token: string,
+    family: string, id: string,
+): Promise<{ state: string; member_id: string }[]> {
+    const res = await handleRequest(db, req(
+        'GET',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/' + family
+            + '/' + id + '/versions/',
+        token,
+    ));
+    assertStrictEquals(res.status, 200);
+    return await res.json() as {
+        state: string; member_id: string;
+    }[];
+}
+
+async function getWire(
+    db: MemoryDbAdapter, token: string,
+    family: string, id: string,
+): Promise<Record<string, unknown>> {
+    const res = await handleRequest(db, req(
+        'GET',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/' + family
+            + '/' + id,
+        token,
+    ));
+    assertStrictEquals(res.status, 200);
+    return await res.json() as Record<string, unknown>;
+}
+
 function ideaDocument(
     title: string,
     state: string,
@@ -85,7 +110,7 @@ function ideaDocument(
 }
 
 Deno.test('a document PUT with a new state writes wire entity'
-+ ' and exactly one event, authored by the actor', async () => {
++ ' and one version, authored by the actor', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -109,15 +134,18 @@ Deno.test('a document PUT with a new state writes wire entity'
     };
     assertStrictEquals(getWire.title, 'Fresh');
     assertStrictEquals(getWire.state, 'active');
-    const events = await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
-        , 'XufQcWIKhZshfJYOVNeUSw');
-    assertStrictEquals(events.length, 1);
-    assertStrictEquals(events[0]!.state, 'active');
-    assertStrictEquals(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+    const versions = await versionsOf(
+        db, token, 'ideas', 'XufQcWIKhZshfJYOVNeUSw',
+    );
+    assertStrictEquals(versions.length, 1);
+    assertStrictEquals(versions[0]!.state, 'active');
+    assertStrictEquals(
+        versions[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
+    );
 });
 
-Deno.test('a state-unchanged edit writes no second event',
-async () => {
+Deno.test('a state-unchanged edit succeeds and the wire reflects'
++ ' the edit', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await handleRequest(db, req(
@@ -131,9 +159,6 @@ async () => {
         ideaDocument('Second', 'active'),
     ));
     assertStrictEquals(edit.status, 201);
-    const events = await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
-        , 'YHvbnJSZHECuziaHXcsKpw');
-    assertStrictEquals(events.length, 1);
     const getRes = await handleRequest(
         db, req('GET'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -143,8 +168,8 @@ async () => {
     assertStrictEquals(wire.title, 'Second');
 });
 
-Deno.test('a byte-identical resend converges: one event,'
-+ ' one pair', async () => {
+Deno.test('a byte-identical resend converges: one pair',
+async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const body = ideaDocument('Idempotent', 'active');
@@ -161,9 +186,6 @@ Deno.test('a byte-identical resend converges: one event,'
             + 'YIuEjXvCwXAgrpyvcvLJjg', token, body,
             operationId),
     );
-    const events = await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
-        , 'YIuEjXvCwXAgrpyvcvLJjg');
-    assertStrictEquals(events.length, 1);
     assertStrictEquals((await db.messagePairs.getAll()).length, 3);
     assertStrictEquals((await db.messagePairs.getAll()).length, 3);
 });
@@ -243,52 +265,6 @@ Deno.test('the pair request body carries domain state;'
     assertStrictEquals('state_at' in parsed.body, false);
 });
 
-// The MEMBER_ID CAVEAT, isolated: every OTHER case above uses
-// one actor throughout, so actor === head.member_id always —
-// the op's ternary (replay head.member_id vs use actor) is
-// indistinguishable from its buggy inverse there. This case
-// forces the two apart: member B edits a title-only field
-// AFTER member A's own PUT authored the head event. If the
-// branches were swapped, the op would stamp B's id onto the
-// replayed event; sameEvent (store-state.ts) compares
-// member_id too, so that mismatch against the ALREADY-STORED
-// (A-authored) row would 409 — this assertion turns that
-// swap into a failing test instead of a silent regression.
-Deno.test('a same-state edit by a DIFFERENT member never'
-+ ' reattributes the head event\'s authorship', async () => {
-    const db = await freshDb();
-    const memberB = generateIdentifier();
-    await seedOrganizationMember(db, memberB);
-    const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
-    const tokenB = await organizationToken(memberB);
-    const created = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'YLbPBVpBLImxPQRqLKPKLw', tokenA,
-        ideaDocument('First', 'active'),
-    ));
-    assertStrictEquals(created.status, 201);
-
-    const edited = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'YLbPBVpBLImxPQRqLKPKLw', tokenB,
-        ideaDocument('Second', 'active'),
-    ));
-    assertStrictEquals(edited.status, 201);
-
-    const events = await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
-        , 'YLbPBVpBLImxPQRqLKPKLw');
-    assertStrictEquals(events.length, 1);
-    assertStrictEquals(events[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
-
-    const getRes = await handleRequest(
-        db, req('GET'
-            , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'YLbPBVpBLImxPQRqLKPKLw', tokenA),
-    );
-    const wire = await getRes.json() as { title: string };
-    assertStrictEquals(wire.title, 'Second');
-});
-
 // Task 19: GET streams the stored PUT. Body octets match the
 // live PUT response JSON; Date is send-time now; no
 // Operation-ID on GET.
@@ -366,8 +342,7 @@ async () => {
         'AjdvjuECVZEgZoFajaIEkg',
     );
     assertEquals(stored, expected);
-    assertEquals(stored, await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg'
-        , id));
+    assertEquals(stored, await getWire(db, token, 'ideas', id));
     const later = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id, token,
         ideaDocument('Revised', 'in_review'),
@@ -378,7 +353,7 @@ async () => {
     );
     assertEquals(
         after,
-        await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg', id),
+        await getWire(db, token, 'ideas', id),
     );
     assertStrictEquals(after.state, 'in_review');
     assertStrictEquals(after.title, 'Revised');

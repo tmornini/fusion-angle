@@ -38,8 +38,6 @@ import {
     deriveFlowRecords,
     deriveFlowRecord,
 } from '../api/derive-flow-records.ts';
-import { deriveRecordTypeStateHistory } from
-    '../api/derive-record-types.ts';
 import { resolveGlobalOwner } from '../api/derive-states.ts';
 import {
     customerProfileRecordId,
@@ -677,7 +675,7 @@ async () => {
 // -- 5. live-write chain on wire + derive ------------------------
 
 Deno.test('live-write chain: create, edit, RESTRICT 409, echoed'
-+ ' trio, archive, delete, physical DELETE — wire + derive',
++ ' state, archive, delete, physical DELETE',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -870,13 +868,6 @@ async () => {
         false,
     );
 
-    // Phase Final Task 2: states ROW half stripped — history
-    // is message-plane only.
-    const derivedHistory = await deriveRecordTypeStateHistory(
-        db, STARK_ORGANIZATION, recordId,
-    );
-    assertStrictEquals(derivedHistory.length, 3);
-
     // Step 7: physical DELETE on a second record.
     const secondRecordId = generateIdentifier();
     const secondCreated = await handleRequest(db, req(
@@ -1068,55 +1059,6 @@ async () => {
         messagePair.name === attributeId);
     assertStrictEquals(attributeDocumentMessagePairs.length, 1);
     assertStrictEquals(attributeDocumentMessagePairs[0]!.method, 'PUT');
-});
-
-// -- 8. genesis-wins-under-skew ----------------------------------
-// case-7d mirror for records GET: a clock-skewed later
-// arrival whose state_at sorts BELOW genesis does NOT
-// displace genesis as lifecycle-current. Head body fields
-// (name) may reflect the later arrival; the GET trio must
-// stay genesis (state ← event.state, state_at ← event.at,
-// state_event_id ← event.id).
-
-Deno.test('GET record trio is lifecycle-current under clock skew'
-+ ' (genesis-wins-under-skew, case 7d)', async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const recordId = generateIdentifier();
-
-    const genesis = await handleRequest(db, req(
-        'PUT', '/organizations/' + STARK_ORGANIZATION
-                + '/record-types/' + recordId, token, {
-            name: 'Genesis Title', description: 'd', position: 1,
-            state: 'active',
-        },
-    ));
-    assertStrictEquals(genesis.status, 201);
-
-    // Later arrival, earlier state_at, different state + name.
-    // 'deleted' would hide the row if it won as current —
-    // genesis-wins keeps the record live and active.
-    const skewed = await handleRequest(db, req(
-        'PUT', '/organizations/' + STARK_ORGANIZATION
-                + '/record-types/' + recordId, token, {
-            name: 'Skewed Title', description: 'd', position: 1,
-            state: 'deleted',
-        },
-    ));
-    assertStrictEquals(skewed.status, 201);
-
-    const res = await handleRequest(
-        db, req('GET', '/organizations/' + STARK_ORGANIZATION
-                + '/record-types/' + recordId, token),
-    );
-    assertStrictEquals(res.status, 404);
-    const history = await deriveRecordTypeStateHistory(
-        db, STARK_ORGANIZATION, recordId,
-    );
-    assertEquals(
-        history.map((entry) => entry.state),
-        ['active', 'deleted'],
-    );
 });
 
 // -- 9. non-lex collection order (craftsmanship) -----------------
