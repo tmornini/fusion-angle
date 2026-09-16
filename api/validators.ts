@@ -3395,27 +3395,24 @@ export interface ObjectiveCreateBody {
     readonly revisionId: string;
     readonly revision: Record<string, unknown>;
     readonly initialState: ObjectiveState;
-    readonly initialStateEventId: string;
-    readonly initialStateAt: string;
 }
 
 const OBJECTIVE_CREATE_KEYS: readonly string[] = [
     'id', 'objective', 'revisionId', 'revision',
-    'initialState', 'initialStateEventId', 'initialStateAt',
+    'initialState',
 ];
 
 // The HTTP-body gate for POST /objectives: the objective row
-// plus its FIRST revision and the genesis lifecycle trio,
-// written atomically. Genesis is an explicit event minted at
-// create (states-document retirement); the trio folds onto
-// the document message pair via objectiveDocumentBodyOf. The
-// objective fields are NOT fully validated here: the org-
-// scoped store stamps organization_id from the verified
-// token and re-validates through validateObjectiveEntity
-// AFTER the stamp, so the body OMITS it. The revision sub-
-// object is re-validated by the objective_revisions store's
-// own validator; its member_id is a row column (who authored
-// the definition), not state authorship.
+// plus its FIRST revision and the initial state. The state
+// folds onto the document message pair via
+// objectiveDocumentBodyOf. The objective fields are NOT
+// fully validated here: the org-scoped store stamps
+// organization_id from the verified token and re-validates
+// through validateObjectiveEntity AFTER the stamp, so the
+// body OMITS it. The revision sub-object is re-validated by
+// the objective_revisions store's own validator; its
+// member_id is a row column (who authored the definition),
+// not state authorship.
 export function validateObjectiveCreateBody(
     body: Record<string, unknown>,
 ): ObjectiveCreateBody {
@@ -3444,19 +3441,8 @@ export function validateObjectiveCreateBody(
         pickString(body, 'initialState'),
         'ObjectiveCreateBody.initialState',
     );
-    const initialStateEventId = pickIdentifier(body, 'initialStateEventId');
-    if (initialStateEventId === '') {
-        throw new ValidationError(
-            'ObjectiveCreateBody.initialStateEventId'
-            + ' must be non-empty',
-        );
-    }
-    const initialStateAt = validateTimestampField(
-        body, 'initialStateAt', 'ObjectiveCreateBody',
-    );
     return {
-        id, objective, revisionId, revision,
-        initialState, initialStateEventId, initialStateAt,
+        id, objective, revisionId, revision, initialState,
     };
 }
 

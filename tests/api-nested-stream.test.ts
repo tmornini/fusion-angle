@@ -458,8 +458,6 @@ async () => {
                 at: AT,
             },
             initialState: 'active',
-            initialStateEventId: generateIdentifier(),
-            initialStateAt: AT,
         },
     ));
     assertStrictEquals(created.status, 201);

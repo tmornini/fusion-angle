@@ -14,6 +14,7 @@ import {
     validateRecordAttributeEntity,
     validateFlowDocumentBody,
     validateMessagePairEntity,
+    validateObjectiveCreateBody,
     asStoredGraph,
     asConstraint,
     assertFlowGraphWriteLaw,
@@ -1357,6 +1358,24 @@ Deno.test(
                 ...validMessagePair, method: 'put',
             }),
             Error, 'method must match ^[A-Z]+$',
+        );
+    },
+);
+
+Deno.test(
+    'validateObjectiveCreateBody rejects initialStateEventId'
+    + ' as an unexpected key',
+    () => {
+        assertThrows(
+            () => validateObjectiveCreateBody({
+                id: 'sVWUntTCtQYFCpONjkzAKg',
+                objective: { position: 1 },
+                revisionId: 'YHvbnJSZHECuziaHXcsKpw',
+                revision: {},
+                initialState: 'active',
+                initialStateEventId: 'XufQcWIKhZshfJYOVNeUSw',
+            }),
+            Error, 'unexpected key',
         );
     },
 );

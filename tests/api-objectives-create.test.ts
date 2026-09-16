@@ -21,8 +21,7 @@ function objectiveFields() {
 }
 
 // A first-revision body. member_id is a row column (who authored
-// the definition), supplied in the body. Genesis is a separate
-// lifecycle trio on the create body (states-document retirement).
+// the definition), supplied in the body.
 function revisionFields(id: string, name: string) {
     return {
         objective_id: id,
@@ -30,14 +29,6 @@ function revisionFields(id: string, name: string) {
         description: 'd',
         member_id: 'XXZruirZyAOoRpNxaDnpSA',
         at: '2026-05-14T00:00:00.000000Z',
-    };
-}
-
-function genesisTrio(_id: string) {
-    return {
-        initialState: 'active',
-        initialStateEventId: generateIdentifier(),
-        initialStateAt: '2026-05-14T00:00:00.000000Z',
     };
 }
 
@@ -52,7 +43,7 @@ Deno.test(
             objective: objectiveFields(),
             revisionId: 'sVWUntTCtQYFCpONjkzAKg',
             revision: revisionFields(id, 'Revenue'),
-            ...genesisTrio(id),
+            initialState: 'active',
         }, DEV_TOKEN);
         // Phase Final Task 2: row halves stripped — GET is
         // pair-derived.
@@ -105,7 +96,7 @@ Deno.test(
                 objective: objectiveFields(),
                 revisionId: generateIdentifier(),
                 revision: revisionFields(id, ''),
-                ...genesisTrio(id),
+                initialState: 'active',
             }, DEV_TOKEN),
         );
         await assertRejects(

@@ -212,8 +212,6 @@ function objectiveCreateBody(
             member_id: 'XXZruirZyAOoRpNxaDnpSA', at,
         },
         initialState: 'active',
-        initialStateEventId: generateIdentifier(),
-        initialStateAt: at,
     };
 }
 

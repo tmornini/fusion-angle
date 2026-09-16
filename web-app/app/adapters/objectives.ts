@@ -307,9 +307,7 @@ export async function postObjectiveCreation(
     // transaction server-side. The body OMITS organization_id —
     // the org fence stamps it from the verified token. The
     // revision's member_id is a row column (who authored the
-    // definition), supplied here. Genesis trio mints with the
-    // create body (states-document retirement) — no separate
-    // states/:id event.
+    // definition), supplied here.
     await ctx.POST(
         organizationCollection(ctx, 'objectives'),
         {
@@ -326,8 +324,6 @@ export async function postObjectiveCreation(
             at,
         },
         initialState: 'active',
-        initialStateEventId: generateIdentifier(),
-        initialStateAt: at,
     });
     notifyObjectiveChange();
 }
