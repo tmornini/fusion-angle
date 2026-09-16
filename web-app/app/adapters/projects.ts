@@ -231,14 +231,12 @@ export async function getProjectEntity(
     );
 }
 
-// The wire document PUT /projects/:id now takes (Decision 7):
-// today's entity fields plus the lifecycle trio, camelCase on
-// this side of the adapter seam — the IdeaDocumentFields
-// precedent (adapters/ideas.ts). organization_id is EXCLUDED
-// too — the client never supplies it (the org fence stamps it
-// downstream). GET ProjectEntity also carries snake_case
-// lifecycle stamp fields — omit them here so the PUT body is
-// not double-keyed (snake + camel).
+// The wire document PUT /projects/:id now takes today's
+// entity fields plus state, camelCase on this side of the
+// adapter seam — the IdeaDocumentFields precedent
+// (adapters/ideas.ts). organization_id is EXCLUDED too — the
+// client never supplies it (the org fence stamps it
+// downstream).
 export type ProjectDocumentFields =
     Omit<
         ProjectEntity,
@@ -261,9 +259,9 @@ export async function putProject(
 
 // The current row's writable fields, read fresh so the
 // domain ops below can overwrite whole-row without the
-// caller ever holding the wire shape. Strip GET-stamped
-// snake_case trio so putProject's camelCase mint is the only
-// lifecycle payload.
+// caller ever holding the wire shape. Strip the GET-stamped
+// state so the caller's new state is the only lifecycle
+// value in the PUT body.
 async function projectRowFields(
     ctx: RequestContext,
     id: string,
@@ -328,14 +326,14 @@ export async function putProjectPosition(
     });
 }
 
-// State transition for an existing project (Decision 7):
-// mints a fresh trio and fires ONE document PUT via putProject
-// — hop count 1 → 1 (today it is one PUT states/:id). Callers
-// supply the eight fields they already hold FROM RAW SOURCES
-// ONLY — never from ProjectView's display-transformed
-// accessors (see the DATA-CORRUPTION TRAP note on ProjectView).
-// Entity fields only — strip any GET-stamped snake_case trio
-// at the call site before passing here.
+// State transition for an existing project: sends the new
+// state and fires ONE document PUT via putProject — hop count
+// 1 → 1 (today it is one PUT states/:id). Callers supply the
+// eight fields they already hold FROM RAW SOURCES ONLY — never
+// from ProjectView's display-transformed accessors (see the
+// DATA-CORRUPTION TRAP note on ProjectView). Entity fields
+// only — strip any GET-stamped state at the call site before
+// passing here.
 export async function postProjectStateChange(
     ctx: RequestContext,
     id: string,

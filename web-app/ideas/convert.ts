@@ -598,9 +598,9 @@ async function performConversion(
     );
     // Strip server-stamped keys: postIdeaConversion's
     // promotedIdea is entity fields only (no id, org, or GET
-    // lifecycle trio). Passing the full entity through a
-    // variable bypasses excess-property checks and 400s at
-    // the validator.
+    // state). Passing the full entity through a variable
+    // bypasses excess-property checks and 400s at the
+    // validator.
     const {
         id: _id,
         organization_id: _organizationId,

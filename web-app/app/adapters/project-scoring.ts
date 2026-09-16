@@ -179,8 +179,8 @@ export async function getPortfolioImpactSummary(
     projectCount: number;
     actualCount: number;
 }> {
-    // Approved filter reads the project GET row trio —
-    // no second hop to the states log.
+    // Approved filter reads the project GET row — no
+    // second hop.
     const [
         objectives,
         projectRows,
@@ -272,8 +272,8 @@ export interface ObjectiveScoringInputs {
 export async function getObjectiveScoringInputs(
     ctx: RequestContext,
 ): Promise<ObjectiveScoringInputs> {
-    // Approved filter reads the project GET row trio —
-    // no second hop to the states log.
+    // Approved filter reads the project GET row — no
+    // second hop.
     const [
         activeObjectives,
         projectRows,

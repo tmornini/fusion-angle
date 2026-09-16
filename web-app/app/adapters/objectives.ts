@@ -77,8 +77,8 @@ export async function getObjectiveStates(
     return out;
 }
 
-// Archived set from the GET-stamped lifecycle trio on
-// each objective row — no hop to the states log.
+// Archived set from the GET-stamped state on each objective
+// row — no second hop.
 export async function getArchivedObjectiveIds(
     ctx: RequestContext,
 ): Promise<Set<ObjectiveId>> {
@@ -346,11 +346,11 @@ export async function postObjectiveRevision(
 }
 
 // Read-then-put: only position is echoed from the current
-// head (GET-stamped snake_case lifecycle trio is never
-// re-sent); the transition trio is minted fresh. The get-
-// then-put race against a concurrent drag-reorder is
-// ACCEPTED (spec §2) — objectives concurrency is 'simple'
-// and the page is admin-facing.
+// head (the GET-stamped state is never re-sent); the
+// transition sends the new state fresh. The get-then-put
+// race against a concurrent drag-reorder is ACCEPTED (spec
+// §2) — objectives concurrency is 'simple' and the page is
+// admin-facing.
 export async function postObjectiveArchival(
     ctx: RequestContext,
     id: ObjectiveId,

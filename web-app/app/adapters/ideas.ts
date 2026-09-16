@@ -197,22 +197,20 @@ export async function getIdea(
     };
 }
 
-// The wire document PUT /ideas/:id now takes (Decision 7):
-// today's entity fields plus the lifecycle trio, camelCase on
-// this side of the adapter seam. organization_id is EXCLUDED
-// too — the client never supplies it (the org fence stamps it
-// downstream); postIdeaCreation's fresh entity naturally lacks
-// it, while an edit/transition's entity (spread from an
-// existing read, below) may still carry it at runtime as a
-// harmless extra the validator tolerates but ignores. A
-// state-UNCHANGED save (title/position/etc. edited, trio echoed
-// back unchanged) converges to a no-op event write at the op; a
-// genuine transition (postIdeaStateChange below) mints a fresh
-// trio. Genesis (postIdeaCreation below) is just the
-// head-absent case of this SAME PUT (Decision 7) — one shape
-// serves create, edit, and transition. GET IdeaEntity also
-// carries snake_case lifecycle stamp fields — omit them here
-// so the PUT body is not double-keyed (snake + camel).
+// The wire document PUT /ideas/:id now takes today's entity
+// fields plus state, camelCase on this side of the adapter
+// seam. organization_id is EXCLUDED too — the client never
+// supplies it (the org fence stamps it downstream);
+// postIdeaCreation's fresh entity naturally lacks it, while an
+// edit/transition's entity (spread from an existing read,
+// below) may still carry it at runtime as a harmless extra the
+// validator tolerates but ignores. A state-UNCHANGED save
+// (title/position/etc. edited, state echoed back unchanged)
+// converges to a no-op event write at the op; a genuine
+// transition (postIdeaStateChange below) sends a new state.
+// Genesis (postIdeaCreation below) is just the head-absent
+// case of this SAME PUT — one shape serves create, edit, and
+// transition.
 export type IdeaDocumentFields =
     Omit<
         IdeaEntity,
@@ -233,17 +231,16 @@ export async function putIdea(
     ideaChanges.notify();
 }
 
-// Idea creation (Decision 7, Phase 2 Task 3, R1): genesis is
-// head-presence-defined — the FIRST document version at this
-// document IS the birth, so create folds into the SAME PUT
-// ideas/:id that putIdea already drives for edits and
-// transitions. The id and the trio (state, stateAt,
-// stateEventId) are minted ONCE here, before the single
-// ctx.PUT hop (via putIdea) — a retry resends the identical
-// bytes, hitting the op's idempotency fold. Use only at the
-// create call site; transitions of an existing idea go through
-// postIdeaStateChange; putIdea remains for entity edits (title,
-// position) that do not change state.
+// Idea creation: genesis is head-presence-defined — the FIRST
+// document version at this document IS the birth, so create
+// folds into the SAME PUT ideas/:id that putIdea already
+// drives for edits and transitions. The id and state are
+// minted ONCE here, before the single ctx.PUT hop (via
+// putIdea) — a retry resends the identical bytes, hitting the
+// op's idempotency fold. Use only at the create call site;
+// transitions of an existing idea go through
+// postIdeaStateChange; putIdea remains for entity edits
+// (title, position) that do not change state.
 export async function postIdeaCreation(
     ctx: RequestContext,
     id: string,
@@ -261,12 +258,12 @@ export async function postIdeaCreation(
     });
 }
 
-// A transition: composes the document PUT with a FRESH trio
+// A transition: composes the document PUT with a FRESH state
 // (mint-once-reuse — a retry of the SAME transition resends
 // this same pinned pair, converging at the op) over the
 // idea's CURRENT entity fields — hop count 1 → 1 (one
-// ctx.PUT, via putIdea). Strip GET-stamped snake_case trio
-// so putIdea's camelCase mint is the only lifecycle payload.
+// ctx.PUT, via putIdea). Strip the GET-stamped state so the
+// new state is the only lifecycle value in the PUT body.
 export async function postIdeaStateChange(
     ctx: RequestContext,
     idea: IdeaEntity,

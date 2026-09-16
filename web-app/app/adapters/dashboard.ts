@@ -67,8 +67,8 @@ export type GaugeData = RatioGauge | BipolarGauge;
 export async function getDashboardGauges(
     ctx: RequestContext,
 ): Promise<GaugeData[]> {
-    // Lifecycle state rides the project GET row trio
-    // (Phase A stamp) — no second hop to the states log.
+    // Lifecycle state rides the project GET row
+    // (Phase A stamp) — no second hop.
     const [allProjects, impact] =
         await Promise.all([
             getProjectEntities(ctx),
@@ -204,8 +204,8 @@ export async function getDashboardStats(
     { label: string; value: number }[]
 > {
     // Header counts (header-info.ts on every sidebar
-    // page) read lifecycle from the entity GET row trios
-    // already fetched — two fewer states-log requests.
+    // page) read lifecycle from the entity GET rows
+    // already fetched — two fewer requests.
     const [ideas, projects, flows] =
         await Promise.all([
             getIdeaEntities(ctx),
