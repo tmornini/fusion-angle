@@ -1383,21 +1383,6 @@ Off the critical path; each with its oracle.
     a third test in `tests/browser/two-jars.test.ts`: B
     sits on `ideas/`, A writes, B's DOM is unchanged
     until B navigates
-- The gap list above is the 2026-08-29 audit catalogs'
-  output, not an exhaustive sweep of TEST-PLAN.md's own
-  `exploratory` clauses. Thirteen purely-exploratory
-  cases no catalog listed are its known residue — AA3,
-  B4, B5, B12, B13, B14, G22, G23, G23a, G38, G39, G42,
-  and I27. Several are species already filed above: G22,
-  G23, G23a, G38, G39, and G42 each say in their own
-  `Pin:` that the page module carries no CLI or browser
-  test, exactly as G12 does; I27 is A5's
-  console-and-network covenant on a longer path; B4 and
-  B14 are static auth-page copy, decidable by the markup
-  test F4 wants. F2 is exploratory too and is NOT residue
-  — it is retired, PASS vacuously. Once the audit
-  workspace is gone, those thirteen `Pin:` clauses in
-  TEST-PLAN.md are the only record of them
 - Profile as its own document,
   `identities/:id/profile`, 404 = no profile — closes
   whole-or-none — `tests/api-identity-document.test.ts`
@@ -1411,40 +1396,6 @@ Off the critical path; each with its oracle.
   separate finding
 - A full TEST-PLAN.md walk using serial subagents, so
   session context stays short — TEST-PLAN.md `## The walk`
-- 2026-09-02 walk F23/AA32: compositor cannot hold
-  Shift across a mouse gesture. Layer 1 pins and
-  `tests/browser/canvas-gestures.test.ts` 'Shift held
-  mid port-drag commits an edge and adds no node
-  (F23)' decide the product. Score BLOCKED when
-  Shift is missing on pointer-up — TEST-PLAN.md
-  Driving notes
-- 2026-09-02 walk AA33/AA34: DEFERRED on AA32 stray
-  nodes. Attribute-ref writes:
-  `tests/presenter-misc.test.ts` R12 pins +
-  `tests/browser/canvas-gestures.test.ts`
-  'Shift-drag adds an edge and Review accepts two
-  attribute refs (AA32/AA33/AA34)'
-- 2026-09-02 walk F37b: re-activate tab A after F37a;
-  Layer 2 pin `tests/browser/canvas-gestures.test.ts`
-  'plain port-drag on an auto-layout flow adds a
-  node and Undo restores (F37b)'
-- 2026-09-02 walk R12: driver (panel never opened).
-  `buildAttributeRefRow` Layer 1 pin is green —
-  `tests/presenter-misc.test.ts`
-- 2026-09-02 walk F26/F28/F14: compositor mis-hit /
-  missed Zoom-in. Layer 2 pins in
-  `tests/browser/canvas-gestures.test.ts` and
-  `tests/browser/canvas-pan.test.ts`
-- 2026-09-02 second walk AA9/WB11: Layer 2
-  characterization pins close the only maybe-product
-  FAILs. Green pins (or a product fix behind a red
-  one) decide them; compositor leftovers stay
-  BLOCKED — TEST-PLAN.md Driving notes;
-  tests/browser/member-strengths.test.ts
-  'chip toggles persist on save and reload (AA9)';
-  tests/browser/workbox-transition.test.ts
-  'bind, fill, and submit navigates to the inbox
-  (WB11)'
 - Billing (`web-app/billing/`)
 - Attribute drag-reorder (TEST-PLAN R8)
 - A flow loaded with Auto Fit OFF no longer fits on
