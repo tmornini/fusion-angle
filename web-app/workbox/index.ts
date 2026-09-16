@@ -188,12 +188,14 @@ async function fetchInboxRows(
     ctx: RequestContext,
 ): Promise<InboxRows> {
     const [
-        workOrders, histories, memberMap,
+        workOrders, memberMap,
     ] = await Promise.all([
         getWorkOrders(ctx),
-        getWorkOrderHistories(ctx),
         getMemberMap(ctx),
     ]);
+    const histories = await getWorkOrderHistories(
+        ctx, workOrders,
+    );
     workOrdersById = new Map(
         workOrders.map(w => [w.id, w]),
     );
