@@ -1,4 +1,9 @@
-import { assert, assertRejects, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -166,6 +171,86 @@ function buildTestGraph(): {
 // -- Tests ------------------------------------
 
 Deno.test(
+    'getFlowStats does not GET work-orders/',
+    async () => {
+        const paths: string[] = [];
+        const organization = 'AjdvjuECVZEgZoFajaIEkg';
+        const flowId = 'flow-1';
+        const ctx = {
+            identity: { organization },
+            GET: async (path: string) => {
+                paths.push(path);
+                if (
+                    path.endsWith(
+                        '/flows/' + flowId
+                            + '/work-orders/',
+                    )
+                ) {
+                    return [{
+                        work_order_id: 'w-join',
+                    }];
+                }
+                if (path.endsWith('/work-orders/')) {
+                    return [{ id: 'w-coll' }];
+                }
+                if (path.endsWith('/history')) {
+                    return [];
+                }
+                if (
+                    path.endsWith('/members/')
+                    || path === 'ai-agents/'
+                ) {
+                    return [];
+                }
+                return {
+                    id: flowId,
+                    organization_id: organization,
+                    name: 'Stats',
+                    is_locked: false,
+                    is_auto_layout: false,
+                    is_auto_fit: false,
+                    lock_timeout: 0,
+                    graph: {
+                        nodes: [],
+                        edges: [],
+                    },
+                    hasUndoHistory: false,
+                };
+            },
+        } as unknown as RequestContext;
+        await getFlowStats(ctx, flowId, 0);
+        assertEquals(
+            paths.some(p =>
+                p.endsWith('/work-orders/')
+                && !p.includes('/flows/'),
+            ),
+            false,
+        );
+        assert(
+            paths.some(p =>
+                p.includes('/flows/')
+                && p.endsWith('/work-orders/'),
+            ),
+        );
+        assert(
+            paths.some(p =>
+                p.endsWith(
+                    '/work-orders/w-join/history',
+                ),
+            ),
+        );
+        assertEquals(
+            paths.some(p =>
+                p.endsWith(
+                    '/work-orders/w-coll/history',
+                ),
+            ),
+            false,
+        );
+    },
+);
+
+Deno.test(
     'getFlowStats only includes this flow\'s'
     + ' work orders',
     async () => {
@@ -288,9 +373,9 @@ Deno.test(
                 ctx, generateIdentifier(), Date.now(),
             ),
         );
-        // getFlowStats fans four reads out through
+        // getFlowStats fans three reads out through
         // Promise.all; getFlowGraph's rejection settles the
-        // caller while the other three are still in flight.
+        // caller while the other two are still in flight.
         // Yield a macrotask turn so those ops complete in
         // the test that started them.
         await new Promise(resolve => setTimeout(resolve, 0));
