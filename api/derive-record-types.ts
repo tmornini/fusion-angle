@@ -1,15 +1,11 @@
 import type { DbAdapter } from './db.ts';
 import { missedReadError } from './derive-states.ts';
-import type { Id, StateEntity } from './types.ts';
+import type { Id } from './types.ts';
 import { pickString, pickNumber } from './validators.ts';
 import {
-    documentMessagePairsAt,
-    documentLifecycleEvents,
-    stateHistoryFrom,
     headDocumentOf,
     documentIsTombstone,
     type DerivedDocument,
-    type DocumentMessagePair,
 } from './derive-documents.ts';
 import { messageStore } from './message-store.ts';
 
@@ -47,21 +43,6 @@ export function recordTypeEntityOf(
         description: pickString(body, 'description'),
         position: pickNumber(body, 'position'),
         state: pickString(body, 'state'),
-    };
-}
-
-async function fetchRecordTypeDocumentMessagePairs(
-    db: DbAdapter,
-    prefix: string,
-    id: Id,
-): Promise<{
-    readonly messagePairs: readonly DocumentMessagePair[];
-}> {
-    const history = await db.messagePairs.getDocumentHistory(
-        prefix, id,
-    );
-    return {
-        messagePairs: documentMessagePairsAt(history, prefix),
     };
 }
 
@@ -103,25 +84,6 @@ export async function deriveRecordTypeEntity(
         );
     }
     return recordTypeEntityOf(document, organization);
-}
-
-// One row per distinct state_event_id — (state_at, id) ASC.
-// Handler reverses for DESC on the wire. Empty history is a
-// miss (handler maps via missedReadError).
-export async function deriveRecordTypeStateHistory(
-    db: DbAdapter,
-    organization: Id,
-    id: Id,
-): Promise<StateEntity[]> {
-    const prefix = recordTypesUriPrefix(organization);
-    const { messagePairs } =
-        await fetchRecordTypeDocumentMessagePairs(
-            db, prefix, id,
-        );
-    return stateHistoryFrom(
-        documentLifecycleEvents(messagePairs),
-        id,
-    );
 }
 
 export async function requireRecordTypeExists(
