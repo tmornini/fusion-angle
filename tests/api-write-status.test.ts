@@ -21,10 +21,7 @@ import {
 const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const MEMBERSHIP_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/';
 
-function ideaDocument(
-    title: string,
-    _stateEventId: string,
-): Record<string, unknown> {
+function ideaDocument(title: string): Record<string, unknown> {
     return {
         title,
         position: 1,
@@ -118,7 +115,7 @@ async () => {
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'yNqCXXgKLCqDESGScIzYrQ', token,
-        ideaDocument('First', 'ev-ws-1'),
+        ideaDocument('First'),
         undefined, operationId,
     ));
     assertStrictEquals(res.status, 201);
@@ -141,9 +138,7 @@ async () => {
     const path = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
         + 'yGetEtagEqRespIdXXXXXw';
     const put = await handleRequest(
-        db, req('PUT', path, token, ideaDocument(
-            'GetEtag', 'ev-ws-get-etag',
-        )),
+        db, req('PUT', path, token, ideaDocument('GetEtag')),
     );
     assertStrictEquals(put.status, 201);
     const putId = pairIdOf(put);
@@ -161,7 +156,7 @@ Deno.test('same-body PUT is 200 and does not append',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    const body = ideaDocument('Same', 'ev-ws-same');
+    const body = ideaDocument('Same');
     const first = await handleRequest(
         db, req('PUT'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -201,7 +196,7 @@ Deno.test('exact retry returns the original as 200',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    const body = ideaDocument('Retry', 'ev-ws-retry');
+    const body = ideaDocument('Retry');
     const operationId = generateIdentifier();
     const first = await handleRequest(
         db, req('PUT'

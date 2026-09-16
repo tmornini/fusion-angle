@@ -17,8 +17,6 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
 } from '../api/types.ts';
-import { nowUtc } from
-    '../api/types.ts';
 import { canonicalPath } from '../api/message-pair.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {
@@ -74,8 +72,6 @@ const SEED_FLOW_ORGANIZATION_TWO = seedIdentifier('seed-flow-org2');
 const REC_DRIFT_CHAIN_1_ATTR_A = generateIdentifier();
 const REC_DRIFT_CHAIN_1_ATTR_B = generateIdentifier();
 const REC_DRIFT_CHAIN_1_ATTR_C = generateIdentifier();
-const REC_DRIFT_CHAIN_1_EDIT = generateIdentifier();
-const REC_DRIFT_CHAIN_1_REJECTED = generateIdentifier();
 const REC_DRIFT_DUP_1_A_ATTR = generateIdentifier();
 const REC_DRIFT_DUP_1_B_ATTR = generateIdentifier();
 const REC_DRIFT_METHOD_FILTER_1 = generateIdentifier();
@@ -327,8 +323,6 @@ function editRecordBody(
     attributes: readonly Record<string, unknown>[],
     removedAttributeIds: readonly string[],
     state: string,
-    _stateAt: string,
-    _stateEventId: string,
 ): Record<string, unknown> {
     return {
         kind: 'edit',
@@ -740,8 +734,6 @@ async () => {
     // Phase Final Stage B: records table retired.
 
     // Step 2: edit — add attrC, remove attrA.
-    const editStateAt = nowUtc();
-    const editStateEventId = REC_DRIFT_CHAIN_1_EDIT;
     const edited = await handleRequest(db, req(
         'POST', '/organizations/' + STARK_ORGANIZATION
             + '/record-types/', token,
@@ -753,7 +745,7 @@ async () => {
                 ),
             ],
             [attrA],
-            'active', editStateAt, editStateEventId,
+            'active',
         ),
     ));
     assertStrictEquals(edited.status, 201);
@@ -774,7 +766,7 @@ async () => {
         editRecordBody(
             recordId, STARK_ORGANIZATION, 'Chain Record',
             [], ['CPJmMPXRaBIiNdGBofUPVg'],
-            'active', nowUtc(), REC_DRIFT_CHAIN_1_REJECTED,
+            'active',
         ),
     ));
     assertStrictEquals(rejected.status, 409);

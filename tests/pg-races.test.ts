@@ -91,10 +91,7 @@ function req(
     });
 }
 
-function ideaDocument(
-    title: string,
-    _stateEventId: string,
-): Record<string, unknown> {
+function ideaDocument(title: string): Record<string, unknown> {
     return {
         title,
         position: 1,
@@ -394,9 +391,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
 
     Deno.test('exact-hash dedup keeps one pair', async () => {
         const token = await organizationToken();
-        const body = ideaDocument(
-            'Dedup', 'ev-race-dedup',
-        );
+        const body = ideaDocument('Dedup');
         const op = generateIdentifier();
         const [left, right] = await Promise.all([
             handleRequest(db, req(

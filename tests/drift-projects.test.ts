@@ -69,13 +69,9 @@ async function versionsOf(
 }
 
 const PROJECT_DRIFT_Z = generateIdentifier();
-const EV_DRIFT_Z = generateIdentifier();
 const PROJECT_DRIFT_A = generateIdentifier();
-const EV_DRIFT_A = generateIdentifier();
 const PROJECT_DRIFT_M = generateIdentifier();
-const EV_DRIFT_M = generateIdentifier();
 const PROJECT_DRIFT_LIFECYCLE = generateIdentifier();
-const EV_DRIFT_LIFECYCLE_GENESIS = generateIdentifier();
 const PROJECT_DRIFT_CONVERSION = generateIdentifier();
 const EV_DRIFT_CONVERSION_IDEA = generateIdentifier();
 
@@ -101,13 +97,7 @@ function req(
     });
 }
 
-function projectDocument(
-    title: string,
-    state: string,
-    _stateAt: string,
-    _stateEventId: string,
-    position = 1,
-) {
+function projectDocument(title: string, state: string, position = 1) {
     return {
         title,
         description: 'd',
@@ -152,8 +142,6 @@ function wireProjectGet(
     id: string,
     title: string,
     state: string,
-    _stateAt: string,
-    _stateEventId: string,
     position = 1,
     organization = 'AjdvjuECVZEgZoFajaIEkg',
     overrides: Record<string, unknown> = {},
@@ -280,34 +268,26 @@ async () => {
         {
             id: PROJECT_DRIFT_Z,
             title: 'Zulu',
-            at: '2026-07-01T00:00:00.000000Z',
-            ev: EV_DRIFT_Z,
         },
         {
             id: PROJECT_DRIFT_A,
             title: 'Alpha',
-            at: '2026-07-01T00:00:01.000000Z',
-            ev: EV_DRIFT_A,
         },
         {
             id: PROJECT_DRIFT_M,
             title: 'Mike',
-            at: '2026-07-01T00:00:02.000000Z',
-            ev: EV_DRIFT_M,
         },
     ];
     for (const f of fixtures) {
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + f.id
                 , token,
-            projectDocument(f.title, 'submitted', f.at, f.ev),
+            projectDocument(f.title, 'submitted'),
         ));
         assertStrictEquals(put.status, 201);
         assertEquals(
             await put.json(),
-            wireProjectGet(
-                f.id, f.title, 'submitted', f.at, f.ev,
-            ),
+            wireProjectGet(f.id, f.title, 'submitted'),
         );
     }
     const res = await handleRequest(
@@ -353,11 +333,7 @@ async () => {
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
             , token, {
-            ...projectDocument(
-                'Lifecycle Project', 'submitted',
-                '2026-03-01T00:00:00.000000Z',
-                EV_DRIFT_LIFECYCLE_GENESIS,
-            ),
+            ...projectDocument('Lifecycle Project', 'submitted'),
         },
     ));
     await handleRequest(db, req(

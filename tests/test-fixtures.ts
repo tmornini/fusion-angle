@@ -30,10 +30,7 @@ export async function seedAdminSchema(
 export function ideaBody(
     organization: string,
     title: string,
-): Omit<
-    IdeaEntity,
-    'id' | 'state' | 'state_at' | 'state_event_id'
-> {
+): Omit<IdeaEntity, 'id' | 'state'> {
     return {
         organization_id: organization,
         title,

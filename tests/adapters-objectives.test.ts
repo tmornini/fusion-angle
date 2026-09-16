@@ -46,12 +46,7 @@ function ctxFor(db: MemoryDbAdapter) {
 // Seed an objective document with a lifecycle trio — raw
 // PUT organizations/:id/objectives/:id requires state/state_at/state_event_id
 // after the states-document retirement gate (Task 1).
-function objectiveDoc(
-    position: number,
-    state: 'active' | 'archived',
-    _eventId: string,
-    _at = '2026-01-01T00:00:00.000000Z',
-) {
+function objectiveDoc(position: number, state: 'active' | 'archived') {
     return {
         position,
         state,
@@ -66,12 +61,12 @@ Deno.test('getObjectives returns all', async () => {
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg',
-        objectiveDoc(0, 'active', 'ev-o1'),
+        objectiveDoc(0, 'active'),
     );
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + o2,
-        objectiveDoc(1, 'active', 'ev-o2'),
+        objectiveDoc(1, 'active'),
     );
     const rows = await getObjectives(ctx);
     assertStrictEquals(rows.length, 2);
@@ -223,7 +218,7 @@ Deno.test('getArchivedObjectiveIds returns a Set', async () => {
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg',
-        objectiveDoc(0, 'archived', 'ev-o1-arch'),
+        objectiveDoc(0, 'archived'),
     );
     const ids = await getArchivedObjectiveIds(ctx);
     assert(ids.has('ohqxgUBEaFQwYbXsonRPmg'));

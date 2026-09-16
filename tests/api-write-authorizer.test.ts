@@ -37,10 +37,7 @@ function req(
     });
 }
 
-function ideaDocument(
-    title: string,
-    _stateEventId: string,
-) {
+function ideaDocument(title: string) {
     return {
         title,
         position: 1,
@@ -93,7 +90,7 @@ Deno.test('foreign-id PUT organizations/:id/ideas/:id geneses at this'
     const created = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gfwcurTzrfssEsWJyNeUyQ', tokenA,
-        ideaDocument('A-owned', 'ev-idea-a'),
+        ideaDocument('A-owned'),
     ));
     assertStrictEquals(created.status, 201);
 
@@ -101,7 +98,7 @@ Deno.test('foreign-id PUT organizations/:id/ideas/:id geneses at this'
         'PUT',
         '/organizations/' + organizationB + '/ideas/gfwcurTzrfssEsWJyNeUyQ',
         tokenB,
-        ideaDocument('stolen', 'ev-steal'),
+        ideaDocument('stolen'),
     ));
     assertStrictEquals(foreign.status, 201);
     const gotB = await handleRequest(db, req(
@@ -140,7 +137,7 @@ async () => {
         '/organizations/' + organizationB
             + '/ideas/gmdHxjEYmxOsDKfNPlGSig',
         tokenB,
-        ideaDocument('B-new', 'ev-idea-b'),
+        ideaDocument('B-new'),
     ));
     assertStrictEquals(res.status, 201);
     // Phase Final Task 2: ideas row half stripped — org stamp

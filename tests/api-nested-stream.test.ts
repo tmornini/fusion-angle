@@ -73,7 +73,7 @@ async function freshDb(): Promise<{
     return { db, token: await organizationToken() };
 }
 
-function ideaDocument(title: string, _ev: string) {
+function ideaDocument(title: string) {
     return {
         title,
         position: 1,
@@ -147,7 +147,7 @@ async () => {
     const sid = generateIdentifier();
     const putIdea = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
-        ideaDocument('G6 Idea', 'ev-g6'),
+        ideaDocument('G6 Idea'),
     ));
     assertStrictEquals(putIdea.status, 201);
     const fields = {

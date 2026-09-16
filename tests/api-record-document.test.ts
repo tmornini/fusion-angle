@@ -62,12 +62,7 @@ function recordFields(name: string) {
     };
 }
 
-function recordDocument(
-    name: string,
-    state: string,
-    _stateAt: string,
-    _stateEventId: string,
-) {
+function recordDocument(name: string, state: string) {
     return {
         ...recordFields(name),
         state,
@@ -101,7 +96,7 @@ async function versionsOf(
 Deno.test('validateRecordDocumentBody accepts entity fields plus'
 + ' the trio, organization_id omitted', () => {
     const doc = validateRecordDocumentBody(
-        recordDocument('Fresh', 'active', AT, 'ev-1'),
+        recordDocument('Fresh', 'active'),
     );
     assertEquals(doc.entity, {
         name: 'Fresh', description: 'd', position: 1,
@@ -114,7 +109,7 @@ Deno.test('validateRecordDocumentBody accepts entity fields plus'
 Deno.test('validateRecordDocumentBody tolerates a caller-forged'
 + ' organization_id', () => {
     const doc = validateRecordDocumentBody({
-        ...recordDocument('Fresh', 'active', AT, 'ev-1'),
+        ...recordDocument('Fresh', 'active'),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     });
     assertStrictEquals(doc.entity.name, 'Fresh');
@@ -124,9 +119,7 @@ Deno.test('validateRecordDocumentBody rejects a stray key',
 () => {
     assertThrows(
         () => validateRecordDocumentBody({
-            ...recordDocument(
-                'Fresh', 'active', AT, 'ev-1',
-            ),
+            ...recordDocument('Fresh', 'active'),
             bogus: 'x',
         }),
         ValidationError,
@@ -155,7 +148,7 @@ async () => {
     // Phase Final Task 2: states ROW half stripped — pair
     // required for the versions list to see genesis.
     const body = {
-        ...recordDocument('Fresh', 'active', AT, 'ev-1'),
+        ...recordDocument('Fresh', 'active'),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
     const messagePair = await formWriteMessagePair({
@@ -196,9 +189,7 @@ Deno.test('postRecordDocumentOp with a new state writes a'
     // Phase Final Task 2: both writes carry pairs so the
     // document lifecycle is message-plane visible.
     const firstBody = {
-        ...recordDocument(
-            'First', 'active', AT, 'ev-3a',
-        ),
+        ...recordDocument('First', 'active'),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
     const firstMessagePair = await formWriteMessagePair({
@@ -220,10 +211,7 @@ Deno.test('postRecordDocumentOp with a new state writes a'
             , firstMessagePair,
     );
     const secondBody = {
-        ...recordDocument(
-            'First', 'archived',
-            '2026-01-02T00:00:00.000000Z', 'ev-3b',
-        ),
+        ...recordDocument('First', 'archived'),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
     const secondMessagePair = await formWriteMessagePair({
@@ -271,9 +259,7 @@ Deno.test('a byte-identical resend replays the stored response:'
 + ' one pair', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    const body = recordDocument(
-        'Idempotent', 'active', AT, 'ev-resend',
-    );
+    const body = recordDocument('Idempotent', 'active');
     const operationId = generateIdentifier();
     await handleRequest(
         db, req(

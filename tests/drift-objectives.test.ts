@@ -65,7 +65,6 @@ const OBJ_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 const OBJ_DRIFT_Z = generateIdentifier();
 const OBJ_DRIFT_A = generateIdentifier();
 const OBJ_DRIFT_M = generateIdentifier();
-const OBJ_DRIFT_SKEW_1_GENESIS = generateIdentifier();
 
 // Phase Final Task 2: objectives(+objective_revisions)
 // dual-write stripped. This file no longer compares derive
@@ -123,7 +122,6 @@ const OBJECTIVES_TEST_WIRING: DocumentFamilyWiring = {
 
 const READER_ACTOR: Id = generateIdentifier();
 const OBJECTIVEID_REV_1 = generateIdentifier();
-const OBJECTIVEID_ACTIVE = generateIdentifier();
 const OBJECTIVEID_REV_2 = generateIdentifier();
 const OBJECTIVEID_REV_3 = generateIdentifier();
 
@@ -165,8 +163,6 @@ function wireObjectiveGet(
     id: string,
     position: number,
     state: string,
-    _stateAt: string,
-    _stateEventId: string,
     organization = STARK_ORGANIZATION,
 ): ObjectiveEntity {
     return {
@@ -637,11 +633,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
         assertStrictEquals(derived.state, 'active');
         assertEquals(
             await reposition.json(),
-            wireObjectiveGet(
-                objectiveId, 77, 'active',
-                '2026-06-01T00:00:00.000000Z',
-                OBJECTIVEID_ACTIVE,
-            ),
+            wireObjectiveGet(objectiveId, 77, 'active'),
         );
     }
 
@@ -1156,11 +1148,7 @@ async () => {
         assertStrictEquals(put.status, 201);
         assertEquals(
             await put.json(),
-            wireObjectiveGet(
-                f.id, f.position, 'active',
-                '2026-06-13T00:00:00.000000Z',
-                f.id,
-            ),
+            wireObjectiveGet(f.id, f.position, 'active'),
         );
     }
     const res = await handleRequest(
@@ -1204,8 +1192,6 @@ Deno.test('GET objective trio is lifecycle-current under clock skew'
     const db = await seededDb();
     const token = await organizationToken();
     const objectiveId = generateIdentifier();
-    const genesisAt = '2026-06-01T00:00:00.000000Z';
-    const genesisEv = OBJ_DRIFT_SKEW_1_GENESIS;
 
     const genesis = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
@@ -1229,10 +1215,7 @@ Deno.test('GET objective trio is lifecycle-current under clock skew'
     ));
     assertStrictEquals(skewed.status, 201);
 
-    const expected = wireObjectiveGet(
-        objectiveId, 99, 'archived',
-        genesisAt, genesisEv,
-    );
+    const expected = wireObjectiveGet(objectiveId, 99, 'archived');
 
     const res = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'

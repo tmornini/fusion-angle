@@ -225,8 +225,6 @@ function aiMemberDetail(name: string) {
 
 async function createAiMember(
     db: MemoryDbAdapter, token: string, id: string,
-    _initialState: string, _initialStateEventId: string,
-    _initialStateAt: string,
 ): Promise<void> {
     const res = await handleRequest(db, req(
         'PUT', '/ai-agents/' + id, token,
@@ -486,10 +484,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     // orphan (members are GLOBAL plane; ownership rides the
     // membership message plane).
     const aiMemberId = generateIdentifier();
-    await createAiMember(
-        db, tokenA, aiMemberId, 'active',
-        generateIdentifier(), '2026-01-03T00:00:00.000000Z',
-    );
+    await createAiMember(db, tokenA, aiMemberId);
 
     // (c) a work order's create-op birth (3 events).
     const workOrderId = generateIdentifier();

@@ -40,7 +40,6 @@ import { seedSeat } from './root-admin-fixture.ts';
 // replay. Composed POST create-with-attributes is Task 9.
 
 const AT = '2026-01-01T00:00:00.000000Z';
-const AT2 = '2026-01-02T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 
 interface RecordTypePutEcho {
@@ -76,8 +75,6 @@ function typeBody(
     name: string,
     position: number,
     state: string,
-    _stateAt?: string,
-    _stateEventId?: string,
     description?: string,
 ): Record<string, unknown> {
     return {
@@ -174,9 +171,7 @@ Deno.test('PUT .../record-types/:id admin → 200, body echoes '
 + 'entity; GET sees trio',
 async () => {
     const { db, adminToken } = await adminDb();
-    const body = typeBody(
-        'Rental', 1, 'active', AT, 'rt-1-genesis',
-    );
+    const body = typeBody('Rental', 1, 'active');
     const put = await handleRequest(db, req(
         'PUT', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken, body,
     ));
@@ -203,9 +198,7 @@ async () => {
     const { db, memberToken } = await adminDb();
     const put = await handleRequest(db, req(
         'PUT', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', memberToken,
-        typeBody(
-            'Rental', 1, 'active', AT, 'rt-1-genesis',
-        ),
+        typeBody('Rental', 1, 'active'),
     ));
     assertStrictEquals(put.status, 403);
 });
@@ -219,17 +212,11 @@ async () => {
     await seedOrganizationDocument(db, organizationB, 'Beta');
     await seedRecordTypeBelowGate(
         db, organizationB, foreignId,
-        typeBody(
-            'Foreign', 0, 'active', AT,
-            generateIdentifier(),
-        ),
+        typeBody('Foreign', 0, 'active'),
     );
     const put = await handleRequest(db, req(
         'PUT', DETAIL + foreignId, adminToken,
-        typeBody(
-            'Stolen', 0, 'active', AT,
-            generateIdentifier(),
-        ),
+        typeBody('Stolen', 0, 'active'),
     ));
     assertStrictEquals(put.status, 201);
     const got = await handleRequest(db, req(
@@ -246,9 +233,7 @@ async () => {
     const { db, adminToken } = await adminDb();
     const put = await handleRequest(db, req(
         'PUT', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
-        typeBody(
-            'Rental', 1, 'active', AT, 'rt-1-genesis',
-        ),
+        typeBody('Rental', 1, 'active'),
     ));
     assertStrictEquals(put.status, 201);
     const del = await handleRequest(db, req(
@@ -272,9 +257,7 @@ async () => {
         await adminDb();
     await handleRequest(db, req(
         'PUT', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
-        typeBody(
-            'Rental', 1, 'active', AT, 'rt-1-genesis',
-        ),
+        typeBody('Rental', 1, 'active'),
     ));
     const del = await handleRequest(db, req(
         'DELETE', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', memberToken,
@@ -288,9 +271,7 @@ async () => {
     const { db, adminToken } = await adminDb();
     await handleRequest(db, req(
         'PUT', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
-        typeBody(
-            'Rental', 1, 'active', AT, 'rt-1-genesis',
-        ),
+        typeBody('Rental', 1, 'active'),
     ));
     const flowCreate = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', adminToken, {
@@ -359,9 +340,7 @@ async () => {
     const { db, adminToken } = await adminDb();
     await handleRequest(db, req(
         'PUT', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
-        typeBody(
-            'Rental', 1, 'active', AT, 'rt-1-genesis',
-        ),
+        typeBody('Rental', 1, 'active'),
     ));
     const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
@@ -382,17 +361,12 @@ async () => {
     const { db, adminToken } = await adminDb();
     const first = await handleRequest(db, req(
         'PUT', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
-        typeBody(
-            'Before', 1, 'active', AT, 'rt-1-genesis',
-        ),
+        typeBody('Before', 1, 'active'),
     ));
     assertStrictEquals(first.status, 201);
     const second = await handleRequest(db, req(
         'PUT', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
-        typeBody(
-            'After', 2, 'active', AT2, 'rt-1-genesis',
-            'updated',
-        ),
+        typeBody('After', 2, 'active', 'updated'),
     ));
     assertStrictEquals(second.status, 201);
     const echo = await second.json() as RecordTypePutEcho;
@@ -413,9 +387,7 @@ Deno.test('stored PUT body equals recordTypeEntityOf of the'
 + ' same chain', async () => {
     const { db, adminToken } = await adminDb();
     const id = generateIdentifier();
-    const body = typeBody(
-        'Streamed', 1, 'active', AT, 'ev-g1',
-    );
+    const body = typeBody('Streamed', 1, 'active');
     const put = await handleRequest(
         db, req('PUT', DETAIL + id, adminToken, body),
     );
@@ -443,10 +415,7 @@ Deno.test('stored PUT body equals recordTypeEntityOf of the'
     );
     const skewed = await handleRequest(db, req(
         'PUT', DETAIL + id, adminToken,
-        typeBody(
-            'Skewed', 1, 'archived',
-            '2020-01-01T00:00:00.000000Z', 'ev-g1-skew',
-        ),
+        typeBody('Skewed', 1, 'archived'),
     ));
     assertStrictEquals(skewed.status, 201);
     const afterSkew = JSON.parse(

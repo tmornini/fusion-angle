@@ -83,12 +83,7 @@ function assertDesc(rows: HistoryEvent[]): void {
 
 // -- Ideas --------------------------------------------------
 
-function ideaBody(
-    title: string,
-    state: string,
-    _stateAt: string,
-    _stateEventId: string,
-) {
+function ideaBody(title: string, state: string) {
     return {
         title,
         position: 1,
@@ -112,12 +107,7 @@ async function seedIdeaLifecycle(
             'PUT',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id,
             token,
-            ideaBody(
-                'Hist Idea',
-                'active',
-                '2026-03-01T00:00:00.000000Z',
-                generateIdentifier(),
-            ),
+            ideaBody('Hist Idea', 'active'),
         ),
     );
     assertStrictEquals(g.status, 201);
@@ -127,12 +117,7 @@ async function seedIdeaLifecycle(
             'PUT',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id,
             token,
-            ideaBody(
-                'Hist Idea',
-                'in_review',
-                '2026-03-02T00:00:00.000000Z',
-                generateIdentifier(),
-            ),
+            ideaBody('Hist Idea', 'in_review'),
         ),
     );
     assertStrictEquals(t.status, 201);
@@ -156,12 +141,7 @@ Deno.test(
                 'PUT',
                 '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id,
                 DEV_TOKEN,
-                ideaBody(
-                    'Hist Idea',
-                    'active',
-                    '2026-03-01T00:00:00.000000Z',
-                    generateIdentifier(),
-                ),
+                ideaBody('Hist Idea', 'active'),
             ),
         );
         assertStrictEquals(genesis.status, 201);
@@ -172,12 +152,7 @@ Deno.test(
                 'PUT',
                 '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id,
                 DEV_TOKEN,
-                ideaBody(
-                    'Hist Idea Revised',
-                    'in_review',
-                    '2026-03-02T00:00:00.000000Z',
-                    generateIdentifier(),
-                ),
+                ideaBody('Hist Idea Revised', 'in_review'),
             ),
         );
         assertStrictEquals(later.status, 201);
@@ -365,12 +340,7 @@ Deno.test(
 
 // -- Projects -----------------------------------------------
 
-function projectBody(
-    title: string,
-    state: string,
-    _stateAt: string,
-    _stateEventId: string,
-) {
+function projectBody(title: string, state: string) {
     return {
         title,
         description: 'd',
@@ -395,12 +365,7 @@ async function seedProjectLifecycle(
             'PUT',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + id,
             token,
-            projectBody(
-                'Hist Project',
-                'submitted',
-                '2026-03-01T00:00:00.000000Z',
-                generateIdentifier(),
-            ),
+            projectBody('Hist Project', 'submitted'),
         ),
     );
     assertStrictEquals(g.status, 201);
@@ -410,12 +375,7 @@ async function seedProjectLifecycle(
             'PUT',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + id,
             token,
-            projectBody(
-                'Hist Project',
-                'under_review',
-                '2026-03-02T00:00:00.000000Z',
-                generateIdentifier(),
-            ),
+            projectBody('Hist Project', 'under_review'),
         ),
     );
     assertStrictEquals(t.status, 201);
@@ -512,12 +472,7 @@ Deno.test(
 
 // -- Records ------------------------------------------------
 
-function recordBody(
-    name: string,
-    state: string,
-    _stateAt: string,
-    _stateEventId: string,
-) {
+function recordBody(name: string, state: string) {
     return {
         name,
         description: 'd',
@@ -537,12 +492,7 @@ async function seedRecordLifecycle(
             'PUT',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/' + id,
             token,
-            recordBody(
-                'Hist Record',
-                'active',
-                '2026-03-01T00:00:00.000000Z',
-                generateIdentifier(),
-            ),
+            recordBody('Hist Record', 'active'),
         ),
     );
     assertStrictEquals(g.status, 201);
@@ -552,12 +502,7 @@ async function seedRecordLifecycle(
             'PUT',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/' + id,
             token,
-            recordBody(
-                'Hist Record',
-                'archived',
-                '2026-03-02T00:00:00.000000Z',
-                generateIdentifier(),
-            ),
+            recordBody('Hist Record', 'archived'),
         ),
     );
     assertStrictEquals(t.status, 201);
@@ -948,11 +893,7 @@ Deno.test(
 
 // -- Objectives ---------------------------------------------
 
-function objectiveBody(
-    state: string,
-    _stateAt: string,
-    _stateEventId: string,
-) {
+function objectiveBody(state: string) {
     return {
         position: 1,
         state,
@@ -970,11 +911,7 @@ async function seedObjectiveLifecycle(
             'PUT',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id,
             token,
-            objectiveBody(
-                'active',
-                '2026-03-01T00:00:00.000000Z',
-                generateIdentifier(),
-            ),
+            objectiveBody('active'),
         ),
     );
     assertStrictEquals(g.status, 201);
@@ -984,11 +921,7 @@ async function seedObjectiveLifecycle(
             'PUT',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id,
             token,
-            objectiveBody(
-                'archived',
-                '2026-03-02T00:00:00.000000Z',
-                generateIdentifier(),
-            ),
+            objectiveBody('archived'),
         ),
     );
     assertStrictEquals(t.status, 201);

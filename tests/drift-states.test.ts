@@ -40,7 +40,6 @@ import {
 
 const DRIFT_STATES_FENCE_OWN_IDEA = generateIdentifier();
 const DRIFT_STATES_FENCE_FOREIGN_IDEA = generateIdentifier();
-const DRIFT_STATES_FENCE_FOREIGN_DEL_EV = generateIdentifier();
 const DRIFT_STATES_WO_CHAIN_1 = generateIdentifier();
 const DRIFT_STATES_WO_CHAIN_FLOW_PLACEHOLDER = generateIdentifier();
 const N_START = generateIdentifier();
@@ -59,8 +58,6 @@ const DRIFT_STATES_INV_DECLINE_GRANT = generateIdentifier();
 const DRIFT_STATES_INV_DECLINE_DECLINE = generateIdentifier();
 const DRIFT_STATES_INV_REVOKE_REVOKE = generateIdentifier();
 const DRIFT_STATES_AI_CHAIN_1 = generateIdentifier();
-const OWNIDEAID_GENESIS = generateIdentifier();
-const FOREIGNIDEAID_GENESIS = generateIdentifier();
 const WORKORDERID_FWO = generateIdentifier();
 const WORKORDERID_EV1 = generateIdentifier();
 const WORKORDERID_EV2 = generateIdentifier();
@@ -100,13 +97,6 @@ const FLOWID_UNDO_EV = generateIdentifier();
 // Graph sidecars pin document-message-pair graphDelta / revivals.
 
 const AT = '2026-01-01T00:00:00.000000Z';
-// Strictly later than AT: at an EQUAL `at`, latestByKey's
-// (at, id) tiebreak falls to the larger event id, and
-// 'drift-states-fence-foreign-idea-genesis' sorts after
-// DRIFT_STATES_FENCE_FOREIGN_DEL_EV — an equal-`at` delete
-// would lose the tiebreak and the foreign idea would never
-// genuinely read as deleted (case 3's deleted-entity leg).
-const LATER = '2026-06-01T00:00:00.000000Z';
 
 function req(
     method: string,
@@ -174,8 +164,6 @@ async function assertDerivedHistory(
 
 function ideaDocument(
     title: string,
-    _stateEventId: string,
-    _at: string,
     state = 'active',
 ): Record<string, unknown> {
     return {
@@ -507,7 +495,7 @@ async () => {
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ownIdeaId
             , tokenStark,
-        ideaDocument('Own', OWNIDEAID_GENESIS, AT),
+        ideaDocument('Own'),
     ));
 
     const foreignIdeaId = DRIFT_STATES_FENCE_FOREIGN_IDEA;
@@ -516,7 +504,7 @@ async () => {
         '/organizations/' + ORGANIZATION_TWO
             + '/ideas/' + foreignIdeaId,
         tokenOrg2,
-        ideaDocument('Foreign', FOREIGNIDEAID_GENESIS, AT),
+        ideaDocument('Foreign'),
     ));
     assertStrictEquals(foreignCreated.status, 201);
 
@@ -528,12 +516,7 @@ async () => {
         '/organizations/' + ORGANIZATION_TWO
             + '/ideas/' + foreignIdeaId,
         tokenOrg2,
-        ideaDocument(
-            'Foreign',
-            DRIFT_STATES_FENCE_FOREIGN_DEL_EV,
-            LATER,
-            'deleted',
-        ),
+        ideaDocument('Foreign', 'deleted'),
     ));
     assertStrictEquals(foreignDeleted.status, 201);
 

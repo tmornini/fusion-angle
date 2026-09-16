@@ -65,8 +65,6 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 function projectDocument(
     title: string,
     state: string,
-    _stateAt: string,
-    _stateEventId: string,
 ): Record<string, unknown> {
     return {
         title,
@@ -87,12 +85,10 @@ function putProject(
     id: string,
     title: string,
     state: string,
-    stateAt: string,
-    stateEventId: string,
 ): Promise<Response> {
     return handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + id, token,
-        projectDocument(title, state, stateAt, stateEventId),
+        projectDocument(title, state),
     ));
 }
 
@@ -107,14 +103,10 @@ Deno.test(
         const token = await organizationToken();
         const projectId = generateIdentifier();
         await putProject(
-            db, token, projectId, 'Genesis Title',
-            'submitted', '2026-06-01T00:00:00.000000Z',
-            generateIdentifier(),
+            db, token, projectId, 'Genesis Title', 'submitted',
         );
         const res = await putProject(
-            db, token, projectId, 'Tomb Title',
-            'deleted', '2020-01-01T00:00:00.000000Z',
-            generateIdentifier(),
+            db, token, projectId, 'Tomb Title', 'deleted',
         );
         assertStrictEquals(res.status, 201);
         const projects = await getCollection(

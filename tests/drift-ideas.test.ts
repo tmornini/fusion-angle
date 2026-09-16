@@ -51,20 +51,11 @@ function getDocument(
 }
 
 const IDEA_DRIFT_Z = generateIdentifier();
-const EV_DRIFT_Z = generateIdentifier();
 const IDEA_DRIFT_A = generateIdentifier();
-const EV_DRIFT_A = generateIdentifier();
 const IDEA_DRIFT_M = generateIdentifier();
-const EV_DRIFT_M = generateIdentifier();
 const IDEA_DRIFT_SUBMISSION_PARITY = generateIdentifier();
-const EV_DRIFT_SUBMISSION_PARITY = generateIdentifier();
-const EV_DRIFT_LIFECYCLE_GENESIS = generateIdentifier();
-const EV_DRIFT_LIFECYCLE_REVIEW = generateIdentifier();
-const EV_DRIFT_LIFECYCLE_DELETED = generateIdentifier();
 const IDEA_DRIFT_CONVERSION_PROMOTED = generateIdentifier();
 const PROJECT_DRIFT_CONVERSION_PROMOTED = generateIdentifier();
-const EV_DRIFT_CONVERSION_ACTIVE = generateIdentifier();
-const EV_DRIFT_CONVERSION_APPROVED = generateIdentifier();
 const EV_DRIFT_CONVERSION_PROMOTED = generateIdentifier();
 const EV_DRIFT_CONVERSION_PROJECT = generateIdentifier();
 
@@ -89,13 +80,7 @@ function req(
     });
 }
 
-function ideaDocument(
-    title: string,
-    state: string,
-    _stateAt: string,
-    _stateEventId: string,
-    position = 1,
-) {
+function ideaDocument(title: string, state: string, position = 1) {
     return {
         title,
         position,
@@ -136,8 +121,6 @@ function wireIdeaGet(
     id: string,
     title: string,
     state: string,
-    _stateAt: string,
-    _stateEventId: string,
     position = 1,
     organization = 'AjdvjuECVZEgZoFajaIEkg',
 ) {
@@ -253,34 +236,28 @@ async () => {
         {
             id: IDEA_DRIFT_Z,
             title: 'Zulu',
-            at: '2026-07-01T00:00:00.000000Z',
-            ev: EV_DRIFT_Z,
         },
         {
             id: IDEA_DRIFT_A,
             title: 'Alpha',
-            at: '2026-07-01T00:00:01.000000Z',
-            ev: EV_DRIFT_A,
         },
         {
             id: IDEA_DRIFT_M,
             title: 'Mike',
-            at: '2026-07-01T00:00:02.000000Z',
-            ev: EV_DRIFT_M,
         },
     ];
     for (const f of fixtures) {
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + f.id
                 , token,
-            ideaDocument(f.title, 'active', f.at, f.ev),
+            ideaDocument(f.title, 'active'),
         ));
         assertStrictEquals(put.status, 201);
         // PUT response is canonicalJson (sorted keys) from
         // the stored pair; values match WRITE_RESPONSE_SPECS.
         assertEquals(
             await put.json(),
-            wireIdeaGet(f.id, f.title, 'active', f.at, f.ev),
+            wireIdeaGet(f.id, f.title, 'active'),
         );
     }
     // Oldest live head (at, id): z, a, m — insertion, not
@@ -327,11 +304,7 @@ async () => {
     const ideaId = IDEA_DRIFT_SUBMISSION_PARITY;
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
-        ideaDocument(
-            'Submission Parity', 'active',
-            '2026-02-01T00:00:00.000000Z',
-            EV_DRIFT_SUBMISSION_PARITY,
-        ),
+        ideaDocument('Submission Parity', 'active'),
     ));
     const subBody = {
         idea_id: ideaId,
@@ -404,29 +377,15 @@ Deno.test('live-write lifecycle: create + edit + transition +'
 
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
-        ideaDocument(
-            'Lifecycle Idea', 'active',
-            '2026-03-01T00:00:00.000000Z',
-            EV_DRIFT_LIFECYCLE_GENESIS,
-        ),
+        ideaDocument('Lifecycle Idea', 'active'),
     ));
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
-        ideaDocument(
-            'Lifecycle Idea Edited', 'active',
-            '2026-03-01T00:00:00.000000Z',
-            EV_DRIFT_LIFECYCLE_GENESIS,
-            2,
-        ),
+        ideaDocument('Lifecycle Idea Edited', 'active', 2),
     ));
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
-        ideaDocument(
-            'Lifecycle Idea Edited', 'in_review',
-            '2026-03-02T00:00:00.000000Z',
-            EV_DRIFT_LIFECYCLE_REVIEW,
-            2,
-        ),
+        ideaDocument('Lifecycle Idea Edited', 'in_review', 2),
     ));
     const beforeDelete = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -441,12 +400,7 @@ Deno.test('live-write lifecycle: create + edit + transition +'
 
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
-        ideaDocument(
-            'Lifecycle Idea Edited', 'deleted',
-            '2026-03-03T00:00:00.000000Z',
-            EV_DRIFT_LIFECYCLE_DELETED,
-            2,
-        ),
+        ideaDocument('Lifecycle Idea Edited', 'deleted', 2),
     ));
 
     // Trio-deleted is still a live PUT head. GET streams it.
@@ -484,19 +438,11 @@ Deno.test('live approve then convert: the idea reads'
 
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
-        ideaDocument(
-            'Approve Then Convert', 'active',
-            '2026-06-01T00:00:00.000000Z',
-            EV_DRIFT_CONVERSION_ACTIVE,
-        ),
+        ideaDocument('Approve Then Convert', 'active'),
     ));
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
-        ideaDocument(
-            'Approve Then Convert', 'approved',
-            '2026-06-02T00:00:00.000000Z',
-            EV_DRIFT_CONVERSION_APPROVED,
-        ),
+        ideaDocument('Approve Then Convert', 'approved'),
     ));
     const convert = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId

@@ -262,7 +262,6 @@ async function seedClaim(
 async function seedRelease(
     ctx: RequestContext,
     workOrderId: string,
-    _releaseAt: string,
 ): Promise<void> {
     await ctx.DELETE(
         'organizations/AjdvjuECVZEgZoFajaIEkg'
@@ -551,7 +550,7 @@ Deno.test(
         // Record an explicit release so no live
         // claim remains, simulating an unclaimed
         // work order.
-        await seedRelease(ctx, woId, nowUtc());
+        await seedRelease(ctx, woId);
 
         await postWorkOrderTransition(ctx, {
             workOrderId: woId,
@@ -846,7 +845,7 @@ Deno.test(
         // Release the creation-time claim so this
         // test exercises pure claim-creation
         // without the expiration-notice branch.
-        await seedRelease(ctx, woId, nowUtc());
+        await seedRelease(ctx, woId);
         await pause(2);
         await putWorkOrderClaim(ctx, woId);
 
@@ -870,7 +869,7 @@ Deno.test(
         // Release the creation-time claim so the
         // two explicit claim calls below are the
         // only contributors to the count.
-        await seedRelease(ctx, woId, nowUtc());
+        await seedRelease(ctx, woId);
         await pause(2);
         await putWorkOrderClaim(ctx, woId);
         await pause(2);
@@ -1038,10 +1037,7 @@ Deno.test(
         await seedClaim(ctx, released, now);
         // releaseAt strictly after claimAt so the replay
         // sees a live prior claim and emits claim_released.
-        const later = new Date(Date.now() + 1_000)
-            .toISOString()
-            .replace('Z', '000Z');
-        await seedRelease(ctx, released, later);
+        await seedRelease(ctx, released);
         const timeouts = new Map<string, number>([
             [fresh1, DEFAULT_LOCK_TIMEOUT],
             [fresh2, DEFAULT_LOCK_TIMEOUT],
