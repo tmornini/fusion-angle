@@ -346,6 +346,21 @@ header button.tool:hover {
 .point-hit { cursor: pointer; fill: transparent; }
 .point-vis { pointer-events: none; }
 .sel-band { fill: var(--band); pointer-events: none; }
+.candle-whisker {
+  stroke: var(--muted);
+  stroke-width: 1;
+  pointer-events: none;
+}
+.candle-box {
+  fill: var(--band);
+  stroke: var(--accent);
+  pointer-events: none;
+}
+.candle-median {
+  stroke: var(--accent);
+  stroke-width: 2;
+  pointer-events: none;
+}
 .tooltip {
   position: fixed;
   z-index: 50;
@@ -727,6 +742,57 @@ function vizClientScript(): string {
     var b = meanReadyMs(sweeps[endIndex]);
     if (a === null || b === null) return null;
     return b - a;
+  }
+  function pageCandle(page) {
+    if (page.spread === undefined) return null;
+    return {
+      min: page.spread.min,
+      max: page.spread.max,
+      mean: page.spread.mean,
+      sigma: page.spread.sigma,
+      median: page.readyMs,
+    };
+  }
+  function systemCandle(sweep) {
+    var keys = Object.keys(sweep.pages);
+    if (!keys.length) return null;
+    var min = 0;
+    var max = 0;
+    var mean = 0;
+    var sigma = 0;
+    var median = 0;
+    for (var i = 0; i < keys.length; i++) {
+      var p = sweep.pages[keys[i]];
+      if (p.spread === undefined) return null;
+      min += p.spread.min;
+      max += p.spread.max;
+      mean += p.spread.mean;
+      sigma += p.spread.sigma;
+      median += p.readyMs;
+    }
+    var n = keys.length;
+    return {
+      min: min / n,
+      max: max / n,
+      mean: mean / n,
+      sigma: sigma / n,
+      median: median / n,
+    };
+  }
+  function trendAxisMax(points, budgetMs) {
+    var max = 0;
+    for (var i = 0; i < points.length; i++) {
+      var p = points[i];
+      if (p.y > max) max = p.y;
+      if (p.candle !== null && p.candle.max > max) {
+        max = p.candle.max;
+      }
+    }
+    if (budgetMs !== null && budgetMs > max) {
+      max = budgetMs;
+    }
+    if (max <= 0) return 1;
+    return max;
   }
   function budgetPressure() {
     var to = sweeps[endIndex];
@@ -1119,18 +1185,17 @@ function vizClientScript(): string {
       + metricCard('Budget p50', p50);
   }
   function buildTrendSvg(points, opts) {
-    // points: {index, y, tipLines[]}
-    // opts: {budgetMs?}
+    // points: {index, y, candle, tipLines[]}
+    // opts: {budgetMs?, labelIndices?}
     if (!points.length) {
       return '<p class="muted">No samples in window.'
         + '</p>';
     }
-    var ys = points.map(function (p) { return p.y; });
-    var unitVals = ys.slice();
-    if (opts.budgetMs != null) {
-      unitVals.push(opts.budgetMs);
-    }
-    var unit = pickAxisUnit(unitVals);
+    var budgetMs = opts.budgetMs == null
+      ? null
+      : opts.budgetMs;
+    var yMax = trendAxisMax(points, budgetMs);
+    var unit = pickAxisUnit([yMax]);
     var w = 640;
     var h = 260;
     var padL = 56;
@@ -1139,8 +1204,6 @@ function vizClientScript(): string {
     var padB = 36;
     var plotW = w - padL - padR;
     var plotH = h - padT - padB;
-    var yMax = Math.max.apply(null, unitVals);
-    if (yMax <= 0) yMax = 1;
     var span = endIndex - startIndex;
     function xPos(idx) {
       if (span === 0) return padL + plotW / 2;
@@ -1175,8 +1238,8 @@ function vizClientScript(): string {
         + formatAxisTick(msTick, unit) + '</text>',
       );
     }
-    if (opts.budgetMs != null) {
-      var by = yPos(opts.budgetMs);
+    if (budgetMs !== null) {
+      var by = yPos(budgetMs);
       parts.push(
         '<line x1="' + padL + '" x2="' + (w - padR)
         + '" y1="' + by + '" y2="' + by
@@ -1189,6 +1252,41 @@ function vizClientScript(): string {
       + padT + '" width="0" height="' + plotH
       + '" visibility="hidden"/>',
     );
+    var candleBoxMaxWidth = 10;
+    var candleBoxSlotFraction = 0.6;
+    var boxW = span === 0
+      ? candleBoxMaxWidth
+      : Math.min(
+        candleBoxMaxWidth,
+        candleBoxSlotFraction * (plotW / span),
+      );
+    // Candles first, so the existing polyline, point,
+    // and hit circle paint on top of them.
+    for (var ci = 0; ci < points.length; ci++) {
+      var c = points[ci].candle;
+      if (c === null) continue;
+      var cx = xPos(points[ci].index);
+      parts.push(
+        '<line class="candle-whisker" x1="' + cx
+        + '" x2="' + cx + '" y1="' + yPos(c.max)
+        + '" y2="' + yPos(c.min) + '"/>',
+      );
+      var boxTop = yPos(c.mean + c.sigma);
+      var boxH = Math.max(
+        1, yPos(c.mean - c.sigma) - boxTop,
+      );
+      parts.push(
+        '<rect class="candle-box" x="' + (cx - boxW / 2)
+        + '" y="' + boxTop + '" width="' + boxW
+        + '" height="' + boxH + '"/>',
+      );
+      var my = yPos(c.median);
+      parts.push(
+        '<line class="candle-median" x1="'
+        + (cx - boxW / 2) + '" x2="' + (cx + boxW / 2)
+        + '" y1="' + my + '" y2="' + my + '"/>',
+      );
+    }
     var d = '';
     for (var j = 0; j < points.length; j++) {
       var pt = points[j];
@@ -1341,22 +1439,33 @@ function vizClientScript(): string {
     var nPages = pageKeysUnion().length;
     var points = series.map(function (p) {
       var s = sweeps[p.index];
+      var candle = systemCandle(s);
+      var tipLines = [
+        ['SHA', s.sha],
+        ['Date', formatUtc(s.at)],
+        ['Mean', formatDurationPerf(p.meanMs, false)],
+      ];
+      if (candle !== null) {
+        tipLines.push(
+          ['Low', formatDurationPerf(candle.min, false)],
+          ['High', formatDurationPerf(candle.max, false)],
+          [
+            'Box',
+            formatDurationPerf(candle.mean, false)
+            + ' ± '
+            + formatDurationPerf(candle.sigma, false),
+          ],
+        );
+      }
+      tipLines.push(
+        ['Runs', String(s.runs) + ' runs'],
+        ['Pages', p.sampleCount + ' / ' + nPages],
+      );
       return {
         index: p.index,
         y: p.meanMs,
-        tipLines: [
-          ['SHA', s.sha],
-          ['Date', formatUtc(s.at)],
-          [
-            'Mean',
-            formatDurationPerf(p.meanMs, false),
-          ],
-          ['Runs', String(s.runs) + ' runs'],
-          [
-            'Pages',
-            p.sampleCount + ' / ' + nPages,
-          ],
-        ],
+        candle: candle,
+        tipLines: tipLines,
       };
     });
     el.innerHTML = buildTrendSvg(points, {
@@ -1364,7 +1473,11 @@ function vizClientScript(): string {
     })
       + '<p class="muted">Mean of page medians. '
       + 'Drag point→point to set window. '
-      + 'No system budget line.</p>';
+      + 'No system budget line.</p>'
+      + '<p class="muted">Candle: whiskers trimmed '
+      + 'min–max, box mean ± 1σ, tick median. '
+      + 'Sweeps without a candle predate spread '
+      + 'recording.</p>';
     wireTrend(el);
   }
   function renderSysBudget() {
@@ -1608,18 +1721,30 @@ function vizClientScript(): string {
       var p = sweeps[i].pages[page];
       if (!p) continue;
       var s = sweeps[i];
+      var candle = pageCandle(p);
+      var tipLines = [
+        ['SHA', s.sha],
+        ['Date', formatUtc(s.at)],
+        ['Ready', formatDurationPerf(p.readyMs, false)],
+      ];
+      if (candle !== null) {
+        tipLines.push(
+          ['Low', formatDurationPerf(candle.min, false)],
+          ['High', formatDurationPerf(candle.max, false)],
+          [
+            'Box',
+            formatDurationPerf(candle.mean, false)
+            + ' ± '
+            + formatDurationPerf(candle.sigma, false),
+          ],
+        );
+      }
+      tipLines.push(['Runs', String(s.runs) + ' runs']);
       points.push({
         index: i,
         y: p.readyMs,
-        tipLines: [
-          ['SHA', s.sha],
-          ['Date', formatUtc(s.at)],
-          [
-            'Ready',
-            formatDurationPerf(p.readyMs, false),
-          ],
-          ['Runs', String(s.runs) + ' runs'],
-        ],
+        candle: candle,
+        tipLines: tipLines,
       });
     }
     if (!points.length) {
@@ -1644,6 +1769,11 @@ function vizClientScript(): string {
       '<p class="muted">Gaps mean the page was absent '
       + 'from that sweep. Drag point→point to set '
       + 'window.</p>';
+    html +=
+      '<p class="muted">Candle: whiskers trimmed '
+      + 'min–max, box mean ± 1σ, tick median. '
+      + 'Sweeps without a candle predate spread '
+      + 'recording.</p>';
     body.innerHTML = html;
     wireTrend(body);
   }
