@@ -244,32 +244,41 @@ async function nameFor(
     }
 }
 
-// The subject's reachable orgs — every org it is a member of,
-// derived fresh from the membership ledger (never cached). The
-// source of the token's `orgs` claim and the exchange's
-// member-check. Mint-time only — the gate reads claims.
+// The subject's reachable orgs and mint-time claim roles —
+// one `{type}:{organization_id}` per live seat — from a
+// single membership derivation. Source of the token's
+// `orgs` claim and the exchange's member-check. Mint-time
+// only — the gate reads claims.
+export async function subjectClaims(
+    adapter: DbAdapter,
+    identityId: Id,
+): Promise<{
+    readonly organizations: Id[];
+    readonly roles: string[];
+}> {
+    const rows = await deriveMembershipsForIdentity(
+        adapter, identityId,
+    );
+    return {
+        organizations: rows.map(
+            m => m.organization_id,
+        ),
+        roles: rows.map(
+            m => composeClaimRole(
+                m.type, m.organization_id,
+            ),
+        ),
+    };
+}
+
+// Thin wrapper over subjectClaims for callers that need
+// only the reachable organization ids.
 export async function subjectOrganizations(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id[]> {
-    const rows = await deriveMembershipsForIdentity(
-        adapter, identityId);
-    return rows.map(m => m.organization_id);
-}
-
-// Claim roles baked at mint: one `{type}:{organization_id}`
-// per live seat. The
-// gate projects these for the fenced organization; it never
-// re-derives role grants.
-async function subjectRoles(
-    adapter: DbAdapter,
-    identityId: Id,
-): Promise<string[]> {
-    const rows = await deriveMembershipsForIdentity(
-        adapter, identityId);
-    return rows.map(
-        m => composeClaimRole(m.type, m.organization_id),
-    );
+    return (await subjectClaims(adapter, identityId))
+        .organizations;
 }
 
 // The org a flat (un-exchanged) token resolves to, server-side:
@@ -403,6 +412,10 @@ async function issueTokenPair(
     seed: AuthMessagePairSeed | undefined,
     act?: { sub: Id },
     organization?: Id,
+    claims?: {
+        readonly organizations: readonly Id[];
+        readonly roles: readonly string[];
+    },
 ): Promise<{
     readonly response: TokenResponse;
     readonly refreshToken: string;
@@ -411,14 +424,16 @@ async function issueTokenPair(
     const refreshJti = generateIdentifier();
     const chainId = generateIdentifier();
     const at = nowUtc();
-    const organizations =
-        await subjectOrganizations(adapter, identityId);
-    const roles = await subjectRoles(adapter, identityId);
-    const minted = await mintPair(identityId, name, refreshJti, act, {
-        ...(organization ? { organization } : {}),
-        organizations,
-        roles,
-    });
+    const resolved = claims ?? await subjectClaims(
+        adapter, identityId,
+    );
+    const minted = await mintPair(
+        identityId, name, refreshJti, act, {
+            ...(organization ? { organization } : {}),
+            organizations: resolved.organizations,
+            roles: resolved.roles,
+        },
+    );
     const response = minted.response;
     const messagePair = seed === undefined
         ? undefined
@@ -864,13 +879,15 @@ async function grantRefresh(
     }
     const newJti = generateIdentifier();
     const name = await nameFor(adapter, verified.claims.sub);
-    const organizations = await subjectOrganizations(
-        adapter, verified.claims.sub);
-    const roles = await subjectRoles(
-        adapter, verified.claims.sub);
+    const claims = await subjectClaims(
+        adapter, verified.claims.sub,
+    );
     const minted = await mintPair(
         verified.claims.sub, name, newJti,
-        undefined, { organizations, roles },
+        undefined, {
+            organizations: claims.organizations,
+            roles: claims.roles,
+        },
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(
@@ -892,10 +909,11 @@ async function grantRefresh(
 }
 
 // token-exchange (RFC 8693): mint a delegated token where sub =
-// the subject and act = the acting party. Both subject_token and
-// actor_token are VERIFIED (signature/exp/nbf/aud) AND
-// revocation-checked — the same frozen HMAC the refresh grant
-// checks, so this is not weaker than the rest of the gate.
+// the subject and act = the acting party. Both tokens are
+// VERIFIED (signature/exp/nbf/aud). Subject equals actor is
+// checked next — a cross-party exchange 403s before any
+// revocation check. Same-string tokens share one revocation
+// check; distinct strings with equal sub check both jtis.
 // DELEGATION POLICY: self-delegation ONLY (subject === actor).
 // A cross-party exchange has no delegation ledger to authorize
 // act-as, so it fails closed — 403, minting nothing — until
@@ -915,13 +933,28 @@ async function grantTokenExchange(
             ? body.actor_token
             : '';
     const now = nowEpochSeconds();
-    const subjectV =
-        await verifyAccessToken(subjectToken, now);
-    const actorV = await verifyAccessToken(actorToken, now);
+    const sameToken = subjectToken === actorToken;
+    const subjectV = await verifyAccessToken(
+        subjectToken, now,
+    );
+    const actorV = sameToken
+        ? subjectV
+        : await verifyAccessToken(actorToken, now);
     if (!subjectV.valid || !actorV.valid) {
         return failure(
             HTTP_UNAUTHORIZED,
-            'token-exchange needs valid subject/actor tokens',
+            'token-exchange needs valid'
+                + ' subject/actor tokens',
+        );
+    }
+    const subject = subjectV.claims.sub;
+    const actor = actorV.claims.sub;
+    if (subject !== actor) {
+        return failure(
+            HTTP_FORBIDDEN,
+            'token-exchange is limited to'
+                + ' self-delegation'
+                + ' (subject must equal actor)',
         );
     }
     const subjectRev = await tokenRevocationReason(
@@ -931,29 +964,26 @@ async function grantTokenExchange(
     if (subjectRev !== null) {
         return failure(HTTP_UNAUTHORIZED, subjectRev);
     }
-    const actorRev = await tokenRevocationReason(
-        adapter, actorV.claims.sub,
-        actorV.claims.iat, actorV.claims.jti,
-    );
-    if (actorRev !== null) {
-        return failure(HTTP_UNAUTHORIZED, actorRev);
-    }
-    const subject = subjectV.claims.sub;
-    const actor = actorV.claims.sub;
-    if (subject !== actor) {
-        return failure(
-            HTTP_FORBIDDEN,
-            'token-exchange is limited to self-delegation'
-                + ' (subject must equal actor)',
+    if (!sameToken) {
+        const actorRev = await tokenRevocationReason(
+            adapter, actorV.claims.sub,
+            actorV.claims.iat, actorV.claims.jti,
         );
+        if (actorRev !== null) {
+            return failure(
+                HTTP_UNAUTHORIZED, actorRev,
+            );
+        }
     }
+    const claims = await subjectClaims(
+        adapter, subject,
+    );
     const organization =
         typeof body.organization === 'string'
             ? body.organization
             : '';
     if (organization !== '') {
-        const organizations = await subjectOrganizations(adapter, subject);
-        if (!organizations.includes(organization)) {
+        if (!claims.organizations.includes(organization)) {
             return failure(
                 HTTP_FORBIDDEN,
                 'subject is not a member of'
@@ -966,6 +996,7 @@ async function grantTokenExchange(
         adapter, subject, name, body, seed,
         { sub: actor },
         organization === '' ? undefined : organization,
+        claims,
     );
     return {
         ok: true,
@@ -1060,12 +1091,12 @@ async function grantClientCredentials(
     const refreshJti = generateIdentifier();
     const chainId = generateIdentifier();
     const at = nowUtc();
-    const organizations =
-        await subjectOrganizations(adapter, clientId);
-    const roles = await subjectRoles(adapter, clientId);
+    const claims = await subjectClaims(adapter, clientId);
     const minted = await mintPair(
-        clientId, name, refreshJti, undefined,
-        { organizations, roles },
+        clientId, name, refreshJti, undefined, {
+            organizations: claims.organizations,
+            roles: claims.roles,
+        },
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(
@@ -1320,17 +1351,19 @@ async function grantAuthorizationCode(
     const chainId = generateIdentifier();
     const at = nowUtc();
     const name = await nameFor(adapter, issuer.identityId);
-    const organizations =
-        await subjectOrganizations(adapter, issuer.identityId);
-    const roles =
-        await subjectRoles(adapter, issuer.identityId);
+    const claims = await subjectClaims(
+        adapter, issuer.identityId,
+    );
     // act.sub = the acting client (RFC 8693), mirroring
     // grantTokenExchange's own act:{sub: actor}. sub stays
     // the user; issuer.clientId is already verified equal to
     // the redeeming client_id above.
     const minted = await mintPair(
         issuer.identityId, name, refreshJti,
-        { sub: issuer.clientId }, { organizations, roles },
+        { sub: issuer.clientId }, {
+            organizations: claims.organizations,
+            roles: claims.roles,
+        },
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(

@@ -44,14 +44,20 @@ export async function getIdentityOrganizations(
             HTTP_FORBIDDEN,
         );
     }
-    const memberships = await deriveMembershipsForIdentity(
-        db, identityId,
-    );
-    const mine = new Set(
-        memberships.map(m => m.organization_id),
-    );
-    const organizations = await deriveOrganizations(db);
-    return organizations.filter(o => mine.has(o.id));
+    return db.readTransaction(async (view) => {
+        const organizations =
+            await deriveOrganizations(view);
+        const memberships =
+            await deriveMembershipsForIdentity(
+                view, identityId, organizations,
+            );
+        const mine = new Set(
+            memberships.map(m => m.organization_id),
+        );
+        return organizations.filter(
+            o => mine.has(o.id),
+        );
+    });
 }
 
 // PUT/GET /identities/:id/default-organization — a simple
