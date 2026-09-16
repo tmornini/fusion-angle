@@ -9,13 +9,7 @@ export const l2cProjectId =
     'MBITVgcXjXZiQkMeFSivxg';
 
 export function buildProjects():
-    Omit<
-        ProjectEntity,
-        | 'organization_id'
-        | 'state'
-        | 'state_at'
-        | 'state_event_id'
-    >[] {
+    Omit<ProjectEntity, 'organization_id' | 'state'>[] {
     return [
         {
             id: 'wqGTTFdYUGnmBxWCppmkOQ',

@@ -116,6 +116,9 @@
 
 import type {
     Id,
+    IdeaState,
+    ProjectState,
+    RecordState,
     StateEntity,
     StateFieldValueEntity,
     AIMemberEntity,
@@ -230,216 +233,167 @@ import type { ScoreSeedProject } from './scores.ts';
 // exactly one `daysFromNow(-60, 9, 0)` call, not several.
 export const wfTimestamp = daysFromNow(-60, 9, 0);
 
-// One state event per seeded idea — the creation moment of
-// each idea on the states log, doubling as postIdeaDocumentOp's
-// genesis-state input.
-export const ideaStateEvents: StateEntity[] = [
+// The genesis facts a seeded document PUT carries beyond the
+// entity row: its initial state and the member credited with
+// creating it, keyed by entity id.
+export interface SeedGenesis<S extends string> {
+    readonly entityId: Id;
+    readonly state: S;
+    readonly memberId: Id;
+}
+
+// One genesis row per seeded idea: its initial state and the
+// member credited with creating it.
+export const ideaGenesis: readonly SeedGenesis<IdeaState>[] = [
     {
-        id: 'qsmyPbkaUgaWdrMXqSjoKw',
-        entity_id: 'YvOylAxOjQcgmNmsSoVBPQ',
+        entityId: 'YvOylAxOjQcgmNmsSoVBPQ',
         state: 'in_review',
-        member_id: 'MQFcPtrZPIGjMCRAXtZUnA',
-        at: daysFromNow(-75, 9, 30),
+        memberId: 'MQFcPtrZPIGjMCRAXtZUnA',
     },
     {
-        id: 'uumGafmpNksyqbIylOBVHA',
-        entity_id: 'WurwPqXxGtLhRAoCEcPzfQ',
+        entityId: 'WurwPqXxGtLhRAoCEcPzfQ',
         state: 'approved',
-        member_id: 'VvzFEpfYONDAsCCwNlIFCQ',
-        at: daysFromNow(-70, 9, 0),
+        memberId: 'VvzFEpfYONDAsCCwNlIFCQ',
     },
     {
-        id: 'nMUREhBfGuUoGoBYGdomHw',
-        entity_id: 'yrDiezFyhDHGgXzGeIWoSQ',
+        entityId: 'yrDiezFyhDHGgXzGeIWoSQ',
         state: 'active',
-        member_id: 'CJrglMsNBxOWWfbihHQSeg',
-        at: daysFromNow(-65, 9, 0),
+        memberId: 'CJrglMsNBxOWWfbihHQSeg',
     },
     {
-        id: 'FGHwVyemAMHQwocmsPhoQA',
-        entity_id: 'pYmalQFqpoXdbpYAJfOswA',
+        entityId: 'pYmalQFqpoXdbpYAJfOswA',
         state: 'in_review',
-        member_id: 'jrMOZzVdWXvLgMpcHoyBTw',
-        at: daysFromNow(-55, 9, 0),
+        memberId: 'jrMOZzVdWXvLgMpcHoyBTw',
     },
     {
-        id: 'EyIVnDozimafEKMIoWBGmw',
-        entity_id: 'RAHAvUqwVABJnzTniWhUTQ',
+        entityId: 'RAHAvUqwVABJnzTniWhUTQ',
         state: 'active',
-        member_id: 'RPzLGrWcstxLaHoBcViPLQ',
-        at: daysFromNow(-50, 9, 0),
+        memberId: 'RPzLGrWcstxLaHoBcViPLQ',
     },
     {
-        id: 'SybZHKZVpQTaNphnAoeEDw',
-        entity_id: 'IjrYiSuRyjkQaqiRLhadAg',
+        entityId: 'IjrYiSuRyjkQaqiRLhadAg',
         state: 'sent_back',
-        member_id: 'zyGBRshxOnKHUfcyFRqowg',
-        at: daysFromNow(-45, 9, 0),
+        memberId: 'zyGBRshxOnKHUfcyFRqowg',
     },
     {
-        id: 'dYrdYYDGrEAmVRZqHzcusw',
-        entity_id: 'MmMKBsQBLxNfbMAOlAaKkQ',
+        entityId: 'MmMKBsQBLxNfbMAOlAaKkQ',
         state: 'in_review',
-        member_id: 'MQFcPtrZPIGjMCRAXtZUnA',
-        at: daysFromNow(-75, 10, 0),
+        memberId: 'MQFcPtrZPIGjMCRAXtZUnA',
     },
     {
-        id: 'JoKIkijcCGJaSVAiVcyabA',
-        entity_id: 'QtpzfPiJsMdmoDpPaHvtVQ',
+        entityId: 'QtpzfPiJsMdmoDpPaHvtVQ',
         state: 'in_review',
-        member_id: 'SsVAZghfSzMZRZmxNKIizw',
-        at: daysFromNow(-35, 9, 0),
+        memberId: 'SsVAZghfSzMZRZmxNKIizw',
     },
     {
-        id: 'CCxJyXOAOnFKfaatOVIBJA',
-        entity_id: 'eizcntIrQMWrajcGkQZvUA',
+        entityId: 'eizcntIrQMWrajcGkQZvUA',
         state: 'in_review',
-        member_id: 'CJrglMsNBxOWWfbihHQSeg',
-        at: daysFromNow(-30, 9, 0),
+        memberId: 'CJrglMsNBxOWWfbihHQSeg',
     },
     {
-        id: 'xtwxaKPVjEpchKhgkbWVzw',
-        entity_id: 'AzSBhumyEAkdkFSUBaJrpA',
+        entityId: 'AzSBhumyEAkdkFSUBaJrpA',
         state: 'in_review',
-        member_id: 'jrMOZzVdWXvLgMpcHoyBTw',
-        at: daysFromNow(-25, 9, 0),
+        memberId: 'jrMOZzVdWXvLgMpcHoyBTw',
     },
     {
-        id: 'OHpSABWAwjJOyTuaFeAxBg',
-        entity_id: 'PkrEwSLQlrldLRwlAMVhRA',
+        entityId: 'PkrEwSLQlrldLRwlAMVhRA',
         state: 'in_review',
-        member_id: 'RPzLGrWcstxLaHoBcViPLQ',
-        at: daysFromNow(-20, 9, 0),
+        memberId: 'RPzLGrWcstxLaHoBcViPLQ',
     },
 ];
 
-// One state event per seeded project (including the org-2
-// override's own event) — the creation moment of each project
-// on the states log, doubling as postProjectDocumentOp's
-// genesis-state input.
-export const projectStateEvents: StateEntity[] = [
+// One genesis row per seeded project (including the org-2
+// override's own row): its initial state and the member
+// credited with creating it.
+export const projectGenesis: readonly SeedGenesis<ProjectState>[] = [
     {
         // 'submitted' so the scoring loop skips this
         // org-'BBjWJsjYIDkTRKIIPrzWRw'
         // project — no cross-org score against org-'AjdvjuECVZEgZoFajaIEkg'
         // objectives.
-        id: seedIdentifier('seed-state-project-org2'),
-        entity_id: seedIdentifier('seed-project-org2'),
+        entityId: seedIdentifier('seed-project-org2'),
         state: 'submitted',
-        member_id: SYSTEM_MEMBER_ID,
-        at: MOCK_SEED_TIMESTAMP,
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe01Cu5tSegmAi5pEv01',
-        entity_id: 'wqGTTFdYUGnmBxWCppmkOQ',
+        entityId: 'wqGTTFdYUGnmBxWCppmkOQ',
         state: 'approved',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-60, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe02Aut0Rep0rtComp02',
-        entity_id: 'kAxUZTXdcMCAttuoyCdSYA',
+        entityId: 'kAxUZTXdcMCAttuoyCdSYA',
         state: 'archived',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-110, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe03SalesP1p3App03Z',
-        entity_id: l2cProjectId,
+        entityId: l2cProjectId,
         state: 'approved',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-55, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe04PredMa1ntRev04AB',
-        entity_id: 'ORXAfsQvNowpmJfBwQAtWg',
+        entityId: 'ORXAfsQvNowpmJfBwQAtWg',
         state: 'under_review',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-18, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe05RtAna1ytComp05CD',
-        entity_id: 'OTmPQEfeyDzqGNOmlFSUMw',
+        entityId: 'OTmPQEfeyDzqGNOmlFSUMw',
         state: 'archived',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-95, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe06SmInvOptSnt06EF',
-        entity_id: 'OXxlaOFaAWfVofOqOHeTrQ',
+        entityId: 'OXxlaOFaAWfVofOqOHeTrQ',
         state: 'sent_back',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-38, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe07Empl0yTraRev07GH',
-        entity_id: 'ObmAspkIgRMWsTRDWpkSUw',
+        entityId: 'ObmAspkIgRMWsTRDWpkSUw',
         state: 'under_review',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-12, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe08CustSuppApp08IJ',
-        entity_id: 'OfgrTrJuepfpmOSjtBhrYA',
+        entityId: 'OfgrTrJuepfpmOSjtBhrYA',
         state: 'approved',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-48, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe09C0mp1AudApp09KL',
-        entity_id: 'OjDbHdsCibzUBZCSRSqucw',
+        entityId: 'OjDbHdsCibzUBZCSRSqucw',
         state: 'approved',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-72, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe10MlRgD1s4App10MN',
-        entity_id: 'OmGoTHQFHRevqlrGWPgtKA',
+        entityId: 'OmGoTHQFHRevqlrGWPgtKA',
         state: 'approved',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-82, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe11V0iceField11OPQ',
-        entity_id: 'OtSStAjEiIerCMcUwNgMbQ',
+        entityId: 'OtSStAjEiIerCMcUwNgMbQ',
         state: 'approved',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-40, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe12CarbF00tCmp12RS',
-        entity_id: 'OvIEhORMAYZxBcQZKkgkow',
+        entityId: 'OvIEhORMAYZxBcQZKkgkow',
         state: 'archived',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-120, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe13W0rk4rcRev13TU',
-        entity_id: 'OvJSmafViYCdfyAIdgzJTQ',
+        entityId: 'OvJSmafViYCdfyAIdgzJTQ',
         state: 'under_review',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-22, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe14SmartD0cAp14VWX',
-        entity_id: 'PGtnaoTOuWCcbADPrancjA',
+        entityId: 'PGtnaoTOuWCcbADPrancjA',
         state: 'approved',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-65, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe15Inv3st0rAp15YZA',
-        entity_id: 'PIImLccwpnfvbBBMsIKoMA',
+        entityId: 'PIImLccwpnfvbBBMsIKoMA',
         state: 'approved',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-58, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'pSe16MktSentSubmt16BC',
-        entity_id: 'PIfhHMLQQxTxKFDdabXbOw',
+        entityId: 'PIfhHMLQQxTxKFDdabXbOw',
         state: 'submitted',
-        member_id: SYSTEM_MEMBER_ID,
-        at: daysFromNow(-5, 9, 0),
+        memberId: SYSTEM_MEMBER_ID,
     },
 ];
 
@@ -478,23 +432,18 @@ export const flowStateEvents: StateEntity[] = [
     },
 ];
 
-// One state event per seeded Record — the creation moment of
-// each Record on the states log, doubling as postRecordWriteOp's
-// initial-state input.
-export const recordStateEvents: StateEntity[] = [
+// One genesis row per seeded Record: its initial state and
+// the member credited with creating it.
+export const recordGenesis: readonly SeedGenesis<RecordState>[] = [
     {
-        id: 'rRUEoKtGRZWwFoRtqQCICQ',
-        entity_id: customerProfileRecordId,
+        entityId: customerProfileRecordId,
         state: 'active',
-        member_id: SYSTEM_MEMBER_ID,
-        at: wfTimestamp,
+        memberId: SYSTEM_MEMBER_ID,
     },
     {
-        id: 'rSQsPfJUwbWduxxswfPuqg',
-        entity_id: projectBriefRecordId,
+        entityId: projectBriefRecordId,
         state: 'active',
-        member_id: SYSTEM_MEMBER_ID,
-        at: wfTimestamp,
+        memberId: SYSTEM_MEMBER_ID,
     },
 ];
 
@@ -710,21 +659,15 @@ export function humanMemberPiiSeedBody(
 // here since the seed drives postIdeaDocumentOp below the org
 // fence (no scoping wrapper to stamp it).
 export function ideaSeedBody(
-    idea: Omit<
-        IdeaEntity,
-        | 'organization_id'
-        | 'state'
-        | 'state_at'
-        | 'state_event_id'
-    >,
-    event: StateEntity,
+    idea: Omit<IdeaEntity, 'organization_id' | 'state'>,
+    state: IdeaState,
     index: number,
 ): Record<string, unknown> {
     const { id: _id, ...ideaFields } = idea;
     return {
         ...ideaFields,
         organization_id: assignOrganization(index),
-        state: event.state,
+        state,
     };
 }
 
@@ -750,21 +693,15 @@ export function ideaSubmissionSeedBody(
 // org, so `organization` is passed straight through rather than
 // derived from an index.
 export function projectSeedBody(
-    project: Omit<
-        ProjectEntity,
-        | 'organization_id'
-        | 'state'
-        | 'state_at'
-        | 'state_event_id'
-    >,
-    event: StateEntity,
+    project: Omit<ProjectEntity, 'organization_id' | 'state'>,
+    state: ProjectState,
     organization: Id,
 ): Record<string, unknown> {
     const { id: _id, ...projectFields } = project;
     return {
         ...projectFields,
         organization_id: organization,
-        state: event.state,
+        state,
     };
 }
 
@@ -783,11 +720,7 @@ export const secondOrganizationProjectId =
     seedIdentifier('seed-project-org2');
 
 type ProjectSeedFields = Omit<
-    ProjectEntity,
-    | 'organization_id'
-    | 'state'
-    | 'state_at'
-    | 'state_event_id'
+    ProjectEntity, 'organization_id' | 'state'
 >;
 
 export function projectOrg2(
@@ -817,25 +750,22 @@ export function projectOrganizationFor(
 
 // The ScoreSeedProject view buildSeedScoreRows needs per
 // project — id, organization_id, start_date, state — resolved
-// PURELY from the SAME projectStateEvents / projectOrganizationFor
+// PURELY from the SAME projectGenesis / projectOrganizationFor
 // / buildProjects / projectOrg2 both pass 1 (this file) and
 // pass 2 (mock-data.ts) already share, so a future project
-// addition can never drift the two callers apart. State comes
-// from projectStateEvents (never a stored row column — the
-// states log is the sole source of entity state), the SAME
-// lookup postMockDataLoadIn used pre-hoist.
+// addition can never drift the two callers apart.
 export function buildScoreSeedProjects():
     readonly ScoreSeedProject[] {
     const projects = buildProjects();
-    const projectStateEventById = new Map(
-        projectStateEvents.map(e => [e.entity_id, e]),
+    const projectGenesisById = new Map(
+        projectGenesis.map(g => [g.entityId, g]),
     );
     return [...projects, projectOrg2(projects)].map(
         project => ({
             id: project.id,
             organization_id: projectOrganizationFor(project),
             start_date: project.start_date,
-            state: projectStateEventById.get(project.id)!.state,
+            state: projectGenesisById.get(project.id)!.state,
         }),
     );
 }
@@ -1205,15 +1135,9 @@ export function defaultOrganizationSeedBody(
 }
 
 export function recordSeedBody(
-    r: Omit<
-        RecordEntity,
-        | 'organization_id'
-        | 'state'
-        | 'state_at'
-        | 'state_event_id'
-    >,
+    r: Omit<RecordEntity, 'organization_id' | 'state'>,
     index: number,
-    event: StateEntity,
+    state: RecordState,
     attributes: readonly Omit<
         RecordAttributeEntity, 'organization_id'
     >[],
@@ -1238,7 +1162,7 @@ export function recordSeedBody(
             options: a.options,
             constraints: a.constraints,
         })),
-        initialState: event.state,
+        initialState: state,
     };
 }
 
@@ -1407,13 +1331,13 @@ interface MockDataInvocation {
 export function buildMockDataInvocations():
     readonly MockDataInvocation[] {
     const members = buildMembers();
-    const ideaStateEventById = new Map(
-        ideaStateEvents.map(e => [e.entity_id, e]),
+    const ideaGenesisById = new Map(
+        ideaGenesis.map(g => [g.entityId, g]),
     );
     const ideas = buildIdeas();
     const projects = buildProjects();
-    const projectStateEventById = new Map(
-        projectStateEvents.map(e => [e.entity_id, e]),
+    const projectGenesisById = new Map(
+        projectGenesis.map(g => [g.entityId, g]),
     );
     const mockFlows = buildFlows();
     const flowRelations = buildFlowGraphRelations(
@@ -1425,8 +1349,8 @@ export function buildMockDataInvocations():
     const aiMembers = buildAiMembers();
     const mockRecords = buildRecords();
     const mockRecordAttributes = buildRecordAttributes();
-    const recordStateEventByRecordId = new Map(
-        recordStateEvents.map(e => [e.entity_id, e]),
+    const recordGenesisById = new Map(
+        recordGenesis.map(g => [g.entityId, g]),
     );
     const pools = humanMemberPoolsByOrganization(members);
     const workOrders = buildWorkOrders();
@@ -1567,14 +1491,14 @@ export function buildMockDataInvocations():
         ideas.map((idea, i) => [idea.id, i]),
     );
     ideas.forEach((idea, i) => {
-        const event = ideaStateEventById.get(idea.id)!;
+        const genesis = ideaGenesisById.get(idea.id)!;
         invocations.push({
             key: seedMessagePairKey('ideas', idea.id),
             routePattern: 'organizations/:id/ideas/:id',
             idParams: [assignOrganization(i), idea.id],
             organization: assignOrganization(i),
-            requesterIdentityId: event.member_id,
-            body: ideaSeedBody(idea, event, i),
+            requesterIdentityId: genesis.memberId,
+            body: ideaSeedBody(idea, genesis.state, i),
         });
     });
     // Phase 12 Task 3 / Phase Final Task 2: the two seeded
@@ -1618,15 +1542,17 @@ export function buildMockDataInvocations():
         });
     }
     for (const project of [...projects, projectOrg2(projects)]) {
-        const event = projectStateEventById.get(project.id)!;
+        const genesis = projectGenesisById.get(project.id)!;
         const organization = projectOrganizationFor(project);
         invocations.push({
             key: seedMessagePairKey('projects', project.id),
             routePattern: 'organizations/:id/projects/:id',
             idParams: [organization, project.id],
             organization,
-            requesterIdentityId: event.member_id,
-            body: projectSeedBody(project, event, organization),
+            requesterIdentityId: genesis.memberId,
+            body: projectSeedBody(
+                project, genesis.state, organization,
+            ),
         });
     }
     for (const flow of mockFlows) {
@@ -1803,13 +1729,13 @@ export function buildMockDataInvocations():
         });
     }
     mockRecords.forEach((r, i) => {
-        const event = recordStateEventByRecordId.get(r.id)!;
+        const genesis = recordGenesisById.get(r.id)!;
         const attributes = mockRecordAttributes.filter(
             a => a.record_id === r.id,
         );
         const organization = assignOrganization(i);
         const createBody = recordSeedBody(
-            r, i, event, attributes,
+            r, i, genesis.state, attributes,
         );
         // Task 23: record document/op invocations ride the
         // nested record-types patterns (same storage documents
@@ -1822,7 +1748,7 @@ export function buildMockDataInvocations():
             idParams: [organization],
             op: true,
             organization,
-            requesterIdentityId: event.member_id,
+            requesterIdentityId: genesis.memberId,
             body: createBody,
         });
         // Phase 6 Task 4: create appends the document message
@@ -1844,7 +1770,7 @@ export function buildMockDataInvocations():
             routePattern: RECORD_TYPE_DETAIL_PATTERN,
             idParams: [organization, r.id],
             organization,
-            requesterIdentityId: event.member_id,
+            requesterIdentityId: genesis.memberId,
             body: recordDocumentBodyOf(b),
         });
         for (const a of attributes) {
@@ -1857,7 +1783,7 @@ export function buildMockDataInvocations():
                 routePattern: ATTRIBUTE_DETAIL_PATTERN,
                 idParams: [organization, r.id, a.id],
                 organization,
-                requesterIdentityId: event.member_id,
+                requesterIdentityId: genesis.memberId,
                 body: recordAttributeDocumentBodyOf(
                     a as unknown as Record<string, unknown>,
                 ),
@@ -1869,7 +1795,7 @@ export function buildMockDataInvocations():
     // flow-work-order joins' shape above. The requesting
     // identity is the bound RECORD's own state-event member —
     // the same identity that seeded the record itself (verified
-    // by content: every recordStateEvents row above is authored
+    // by content: every recordGenesis row above is authored
     // by SYSTEM_MEMBER_ID), not a second, independently-picked
     // author.
     for (const join of mockFlowRecords) {
@@ -1884,8 +1810,8 @@ export function buildMockDataInvocations():
                 join.flow_id, join.id,
             ],
             organization: flowRecordOrganizationFor(join),
-            requesterIdentityId: recordStateEventByRecordId
-                .get(join.record_id)!.member_id,
+            requesterIdentityId: recordGenesisById
+                .get(join.record_id)!.memberId,
             body: flowRecordJoinSeedBody(join),
         });
     }
