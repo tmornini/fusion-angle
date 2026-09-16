@@ -35,6 +35,10 @@ export function shouldSurfaceFault(
     return !isAbortFault(err);
 }
 
+// One latch for the floor and for caught reportFault.
+// Production boots once; tests pageshow in finally.
+let pageUnloading = false;
+
 // One voice for a failed gesture: log the fault bound to the
 // request's trace id, then toast the gesture's name with the
 // fault's message. `message` names the WHOLE gesture ('Failed
@@ -44,6 +48,9 @@ export function reportFault(
     message: string,
     err: unknown,
 ): void {
+    if (!shouldSurfaceFault(err, pageUnloading)) {
+        return;
+    }
     log.with(ctx.requestId)
         .error(message, undefined, err);
     showToast(
@@ -58,16 +65,15 @@ export function reportFault(
 // vanishing to the console while the UI proceeds. Aborted
 // fetches and pagehide teardown do not toast.
 export function initErrorSurfacing(): void {
-    let unloading = false;
     window.addEventListener('pagehide', () => {
-        unloading = true;
+        pageUnloading = true;
     });
     window.addEventListener('pageshow', () => {
-        unloading = false;
+        pageUnloading = false;
     });
     window.addEventListener('error', (event) => {
         const fault = event.error ?? event.message;
-        if (!shouldSurfaceFault(fault, unloading)) {
+        if (!shouldSurfaceFault(fault, pageUnloading)) {
             return;
         }
         log.error('uncaught error', 'core', fault);
@@ -77,7 +83,7 @@ export function initErrorSurfacing(): void {
         'unhandledrejection',
         (event) => {
             if (!shouldSurfaceFault(
-                event.reason, unloading,
+                event.reason, pageUnloading,
             )) {
                 return;
             }
