@@ -1,4 +1,9 @@
-import { assert, assertEquals, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertEquals,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -20,9 +25,15 @@ import {
     postProjectBaselineScoring,
     postProjectActualMeasurement,
 } from '../web-app/app/adapters/project-scoring.ts';
-import { putProject } from '../web-app/app/adapters/projects.ts';
+import {
+    getProjectEntity,
+    postProjectStateChange,
+    putProject,
+} from '../web-app/app/adapters/projects.ts';
+import { latestPerPair } from '../web-app/app/scoring-format.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { seededMockDb } from './mock-seed.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -465,3 +476,83 @@ Deno.test('postProjectActualMeasurement appends via GET scores',
         assertStrictEquals(rows[0]!.score, 33);
         assertStrictEquals(rows[0]!.memberId, 'XXZruirZyAOoRpNxaDnpSA');
     });
+
+// K29's walk on the seed: Market Sentiment Analyzer starts
+// `submitted` with no scores; AA24a baselines and approves
+// it; K29 saves one actual. The Objectives box paints the
+// MEAN of every approved project's latest actual for the
+// objective — one −44 moves the mean, never shows −44 —
+// and the trendline's last point is that mean.
+const MARKET_SENTIMENT_ANALYZER = 'PIfhHMLQQxTxKFDdabXbOw';
+const LOWER_EXPENSES = 'JobGWBxUTEBusPcVhYEKtA';
+const STARK_OBJECTIVES = [
+    'JobGWBxUTEBusPcVhYEKtA',
+    'QVZjTYvKwffyfGpYILwkOA',
+    'VhxqyRIQytSnUArslwxyog',
+    'GNRUyOMVpjoeEQWrZkRMkQ',
+];
+
+Deno.test(
+    'a new actual on a newly approved project moves the'
+    + ' objective aggregate and its trendline (K29)',
+    async () => {
+        const db = await seededMockDb();
+        const ctx = createRequestContext(
+            db, await organizationToken(),
+        );
+        await postProjectBaselineScoring(
+            ctx, MARKET_SENTIMENT_ANALYZER,
+            STARK_OBJECTIVES.map(objectiveId => ({
+                objectiveId, score: 10,
+            })),
+        );
+        const {
+            id: _id,
+            organization_id: _organization,
+            state: _state,
+            ...fields
+        } = await getProjectEntity(
+            ctx, MARKET_SENTIMENT_ANALYZER,
+        );
+        await postProjectStateChange(
+            ctx, MARKET_SENTIMENT_ANALYZER, fields, 'approved',
+        );
+        const before = buildObjectiveAggregates(
+            await getObjectiveScoringInputs(ctx),
+        ).find(a => a.objectiveId === LOWER_EXPENSES)!;
+        await postProjectActualMeasurement(
+            ctx, MARKET_SENTIMENT_ANALYZER,
+            [{ objectiveId: LOWER_EXPENSES, score: -44 }],
+        );
+        const inputs = await getObjectiveScoringInputs(ctx);
+        const after = buildObjectiveAggregates(inputs)
+            .find(a => a.objectiveId === LOWER_EXPENSES)!;
+        assertStrictEquals(
+            after.projectsActualScored,
+            before.projectsActualScored + 1,
+        );
+        const latest = latestPerPair(
+            inputs.actualScores.filter(
+                a => inputs.approvedProjectIds.has(a.projectId),
+            ),
+        )
+            .filter(a => a.objectiveId === LOWER_EXPENSES)
+            .map(a => a.score);
+        assertStrictEquals(
+            after.latestActualMean,
+            Math.round(
+                latest.reduce((sum, x) => sum + x, 0)
+                    / latest.length,
+            ),
+        );
+        assertNotStrictEquals(
+            after.latestActualMean, before.latestActualMean,
+        );
+        const trend = buildObjectiveTrendlines(inputs)
+            .get(LOWER_EXPENSES)!;
+        assertStrictEquals(
+            trend[trend.length - 1]!.value,
+            after.latestActualMean,
+        );
+    },
+);
