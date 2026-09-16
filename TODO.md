@@ -1428,11 +1428,18 @@ Off the critical path; each with its oracle.
   — the focusing click is the viewport center, never the
   top-left brand (that is the Apple menu when Chrome is
   fullscreen or flush with the menu bar; the next click
-  opens About This Mac). Then click the intended control
-  once. Named by the 2026-08-29 three-layers audit and
-  carried as a driving note in TEST-PLAN.md's `## The
-  walk`. Oracle: a Layer 2 test under `tests/browser/`
-  asserting one click after reload reaches the element.
+  opens About This Mac). The same corner is
+  `#sidebar-toggle` (I7, I9, I28), `#mobile-sidebar-open`
+  (I11, I14, I15), landing `.navbar-logo` (B2, B3), and
+  a C5 miss of `.sidebar-nav-item`. Drive those by
+  selector, not screenshot-xy. Then click the intended
+  control once. Named by the 2026-08-29 three-layers
+  audit and carried as a driving note in TEST-PLAN.md's
+  `## The walk`. Oracle:
+  `tests/test-plan-apple-menu.test.ts` (the document
+  names the selectors). A Layer 2 test under
+  `tests/browser/` asserting one click after reload
+  reaches the element is still unwritten.
 - Spec 6 did not run — replacing `npm:postgres@3.4.9`
   with `jsr:@db/postgres` behind `api/postgres-client.ts`.
   Spec:

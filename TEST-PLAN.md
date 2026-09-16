@@ -96,7 +96,8 @@ visible for the whole walk. Leave Chrome out of
 fullscreen: `Browser.getWindowForTarget` then
 `Browser.setWindowBounds` with `windowState`
 "normal" and `top` at least 80 so the page sits
-below the macOS menu bar. A focusing click at the
+below the macOS menu bar. Confirm those bounds
+before the first gesture. A click at the
 top-left of a fullscreen or flush window is the
 Apple menu; the next click opens About This Mac.
 Open a second tab of the same context only where a
@@ -151,12 +152,19 @@ not repeat the note in every case.
   early.
 - Authentication is throttled to five hits per 60 seconds
   per client, counting `authorize` and `token` together.
-- The first click after a reload only focuses the window
-  (TODO.md). The focusing click is the viewport center,
-  never the top-left brand — that is the Apple menu when
-  Chrome is fullscreen or flush with the menu bar, and
-  the next click opens About This Mac. Then click the
-  intended control once.
+- Never click the macOS Apple menu (screen top-left).
+  `#sidebar-toggle` (the brand is collapse/expand, not
+  home), `#mobile-sidebar-open`, landing `.navbar-logo`,
+  and `#mobile-menu-toggle` sit in that corner. A
+  screenshot-xy click there, when Chrome is fullscreen
+  or flush with the menu bar, opens the Apple menu;
+  the next click opens About This Mac. Confirm
+  `windowState` is `normal` and `top` ≥ 80, then drive
+  those controls by selector (CDP box-model at the
+  element's center). The first click after a reload
+  only focuses the window (TODO.md); that focusing
+  click is the viewport center, then the intended
+  control once.
 - Shift-drag (AA32/F19/F23): if the compositor does not
   deliver Shift on pointer-up, the FSM emits add-node
   instead of add-edge. Record BLOCKED naming that; do
@@ -1258,9 +1266,14 @@ the second organization.
        hero/feature/CTA content and the live
        3-second stay
 - [ ] **B2** "Start Free Trial" (hero CTA) and "Get Started" (navbar CTA) are present and navigate to `auth/index.html`. PASS: buttons exist with correct target.
+  Drive the CTAs (`[data-goto-auth]`), never
+  `.navbar-logo` — a screenshot-xy click on the
+  landing brand is the Apple menu.
   Pin: exploratory — the live buttons and their
        navigation target
 - [ ] **B3** "Sign In" button is present and navigates to `auth/index.html`. PASS: button exists with correct target.
+  Drive `[data-goto-auth]`, never `.navbar-logo`
+  (Apple menu; same as B2).
   Pin: exploratory — the live button and its
        navigation target
 
@@ -1564,6 +1577,9 @@ the second organization.
        surfaces and the painted dual-concentric and
        bipolar arcs
 - [ ] **C5** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
+  Click `.sidebar-nav-item`, never `#sidebar-toggle`
+  (the brand is collapse, and a screenshot-xy click
+  there is the Apple menu).
   Pin: exploratory — each link's live navigation
 - [ ] **C6** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
   Pin: exploratory — the sidebar's fixed position
@@ -5768,6 +5784,8 @@ works; functional billing is tracked in `TODO.md`.
 ### Sidebar
 
 - [ ] **I7** Click the sidebar collapse button. PASS: sidebar collapses to icon-only view, main content area expands.
+  Drive `#sidebar-toggle` by selector, not
+  screenshot-xy on the brand (Apple menu).
   Pin: tests/browser/sidebar.test.ts 'collapse and
        expand transition the sidebar width' (its
        collapse half: width to 64px, the
@@ -5786,6 +5804,8 @@ works; functional billing is tracked in `TODO.md`.
        corrupt-value rejection is (a sibling test in
        `tests/state-init.test.ts`)
 - [ ] **I9** Click the expand button. PASS: sidebar returns to full width with labels.
+  Drive `#sidebar-toggle` by selector, not
+  screenshot-xy on the collapsed brand (Apple menu).
   Pin: tests/browser/sidebar.test.ts 'collapse and
        expand transition the sidebar width' (its
        expand half: width back to 256px, nav-text
@@ -5817,6 +5837,8 @@ layout.
        visible, and that it goes hidden again after
        the restore
 - [ ] **I11** Tap/click the hamburger menu. PASS: mobile sidebar sheet slides in from the left with navigation links.
+  Drive `#mobile-sidebar-open` by selector, not
+  screenshot-xy on the hamburger (Apple menu).
   Pin: exploratory — the live drawer slide-in;
        `initMobileDrawer` carries no CLI or browser
        test today
@@ -5826,8 +5848,12 @@ layout.
   Pin: exploratory — the live navigation and the
        drawer's default-hidden state on the next page
 - [ ] **I14** Open the mobile sidebar, press `Escape`. PASS: sidebar closes.
+  Open via `#mobile-sidebar-open` by selector
+  (Apple menu), then Escape.
   Pin: exploratory — the live Escape-close
 - [ ] **I15** Open the mobile sidebar, press `Tab` repeatedly. PASS: focus cycles through focusable elements inside the sidebar without escaping to the page behind it. `Shift+Tab` at the first element wraps to the last.
+  Open via `#mobile-sidebar-open` by selector
+  (Apple menu), then Tab.
   Pin: exploratory — the live focus cycle and wrap;
        no focus-trap test exists today
 
@@ -5928,6 +5954,8 @@ layout.
   sidebar. PASS: tab 2 reflects the collapsed state without manual
   reload (cross-tab sync via StorageEvent on
   `fusion-angle:sidebar-collapsed`).
+  Drive `#sidebar-toggle` by selector in tab 1,
+  not screenshot-xy on the brand (Apple menu).
   Pin: exploratory — the live cross-tab sync; only
        the `STORAGE_KEY_THEME` branch of `state.ts`'s
        shared storage-event listener is tested (a
