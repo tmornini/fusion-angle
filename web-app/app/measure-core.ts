@@ -33,6 +33,13 @@ export type BudgetVerdict =
     | { ok: true }
     | { ok: false; offenders: BudgetOffender[] };
 
+export type PageSpread = {
+    min: number;
+    max: number;
+    mean: number;
+    sigma: number;
+};
+
 export type HistoryLine = {
     at: string; // ISO
     sha: string;
@@ -45,7 +52,11 @@ export type HistoryLine = {
     runs: number;
     pages: Record<
         string,
-        { readyMs: number; phases: Record<string, number> }
+        {
+            readyMs: number;
+            phases: Record<string, number>;
+            spread?: PageSpread;
+        }
     >;
 };
 
@@ -266,8 +277,9 @@ export function compareBudgets(
 
 /**
  * Shape one history JSONL object from sweep stats.
- * Pages map carries each page's median readyMs and
- * median phase timings. Caller stringifies + appends.
+ * Pages map carries each page's median readyMs, median
+ * phase timings, and the trimmed spread (min, max, mean,
+ * sample σ). Caller stringifies + appends.
  */
 export function shapeHistoryLine(input: {
     at: string;
@@ -282,6 +294,12 @@ export function shapeHistoryLine(input: {
         pages[page] = {
             readyMs: s.readyMs.median,
             phases: { ...s.phases },
+            spread: {
+                min: s.readyMs.min,
+                max: s.readyMs.max,
+                mean: s.readyMs.mean,
+                sigma: s.readyMs.sigma,
+            },
         };
     }
     return {

@@ -166,6 +166,79 @@ Deno.test('parseHistoryJsonl bad line includes line number', () => {
     assertMatch(err.message, /line 2/i);
 });
 
+function twoLinesSecondSpread(spread: unknown): string {
+    const good = sampleSweep('2026-01-01T00:00:00.000Z', {
+        dashboard: { readyMs: 100, phases: {} },
+    });
+    const bad = {
+        ...sampleSweep('2026-01-02T00:00:00.000Z', {}),
+        pages: {
+            dashboard: { readyMs: 100, phases: {}, spread },
+        },
+    };
+    return `${JSON.stringify(good)}\n${JSON.stringify(bad)}\n`;
+}
+
+Deno.test('parseHistoryJsonl accepts a page without spread', () => {
+    const a = sampleSweep('2026-01-01T00:00:00.000Z', {
+        dashboard: { readyMs: 100, phases: {} },
+    });
+    const lines = parseHistoryJsonl(JSON.stringify(a) + '\n');
+    assertStrictEquals(
+        lines[0]!.pages.dashboard!.spread,
+        undefined,
+    );
+});
+
+Deno.test('parseHistoryJsonl accepts a valid spread', () => {
+    const a = sampleSweep('2026-01-01T00:00:00.000Z', {
+        dashboard: {
+            readyMs: 357,
+            phases: {},
+            spread: {
+                min: 331, max: 402, mean: 361.2, sigma: 19.8,
+            },
+        },
+    });
+    const lines = parseHistoryJsonl(JSON.stringify(a) + '\n');
+    assertEquals(lines[0]!.pages.dashboard!.spread, {
+        min: 331,
+        max: 402,
+        mean: 361.2,
+        sigma: 19.8,
+    });
+});
+
+Deno.test('parseHistoryJsonl rejects sigma below zero', () => {
+    const err = assertThrows(
+        () => parseHistoryJsonl(twoLinesSecondSpread({
+            min: 1, max: 2, mean: 1.5, sigma: -0.1,
+        })),
+    ) as Error;
+    assertMatch(err.message, /line 2/);
+    assertMatch(err.message, /invalid shape/);
+});
+
+Deno.test('parseHistoryJsonl rejects min above max', () => {
+    const err = assertThrows(
+        () => parseHistoryJsonl(twoLinesSecondSpread({
+            min: 3, max: 2, mean: 2.5, sigma: 0.5,
+        })),
+    ) as Error;
+    assertMatch(err.message, /line 2/);
+    assertMatch(err.message, /invalid shape/);
+});
+
+Deno.test('parseHistoryJsonl rejects a non-number spread field', () => {
+    const err = assertThrows(
+        () => parseHistoryJsonl(twoLinesSecondSpread({
+            min: 1, max: 2, mean: 'x', sigma: 0.5,
+        })),
+    ) as Error;
+    assertMatch(err.message, /line 2/);
+    assertMatch(err.message, /invalid shape/);
+});
+
 // --- parseBudgetsJson ---
 
 Deno.test('parseBudgetsJson happy', () => {

@@ -5,6 +5,7 @@
 import type {
     Budgets,
     HistoryLine,
+    PageSpread,
 } from './measure-core.ts';
 
 export type DurationUnit = 'us' | 'ms' | 's';
@@ -131,7 +132,32 @@ function isHistoryLine(v: unknown): v is HistoryLine {
     ) {
         return false;
     }
+    for (const page of Object.values(
+        o.pages as Record<string, unknown>,
+    )) {
+        if (page === null || typeof page !== 'object') {
+            return false;
+        }
+        const spread = (page as { spread?: unknown }).spread;
+        if (spread === undefined) continue;
+        if (!isPageSpread(spread)) return false;
+    }
     return true;
+}
+
+function isPageSpread(v: unknown): v is PageSpread {
+    if (v === null || typeof v !== 'object') return false;
+    const o = v as Record<string, unknown>;
+    const { min, max, mean, sigma } = o;
+    if (
+        typeof min !== 'number' || !Number.isFinite(min)
+        || typeof max !== 'number' || !Number.isFinite(max)
+        || typeof mean !== 'number' || !Number.isFinite(mean)
+        || typeof sigma !== 'number' || !Number.isFinite(sigma)
+    ) {
+        return false;
+    }
+    return min <= max && sigma >= 0;
 }
 
 export function parseBudgetsJson(text: string): Budgets {

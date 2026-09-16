@@ -393,7 +393,7 @@ Deno.test('compareBudgets lists every offender', () => {
 
 // --- shapeHistoryLine ---
 
-Deno.test('shapeHistoryLine maps median stats', () => {
+Deno.test('shapeHistoryLine maps median stats and spread', () => {
     const line = shapeHistoryLine({
         at: '2026-07-12T00:00:00.000Z',
         sha: 'abc123',
@@ -441,10 +441,22 @@ Deno.test('shapeHistoryLine maps median stats', () => {
                 'boot:db-open': 12,
                 fetch: 40,
             },
+            spread: {
+                min: 80,
+                max: 140,
+                mean: 104,
+                sigma: 22,
+            },
         },
         ideas: {
             readyMs: 250,
             phases: {},
+            spread: {
+                min: 200,
+                max: 300,
+                mean: 250,
+                sigma: 40,
+            },
         },
     });
 });
