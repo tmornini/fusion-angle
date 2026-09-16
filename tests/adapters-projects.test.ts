@@ -214,9 +214,7 @@ Deno.test(
     },
 );
 
-const TRIO = {
-    state: 'approved' as ProjectState,
-};
+const STATE: ProjectState = 'approved';
 
 Deno.test('putProject persists a new project', async () => {
     const { ctx } = await adminContext();
@@ -224,7 +222,7 @@ Deno.test('putProject persists a new project', async () => {
         buildProject('pnXmXrxOWayANgDLdCjuBw', 'Created');
     await putProject(
         ctx, 'pnXmXrxOWayANgDLdCjuBw',
-        { ...entity, ...TRIO },
+        { ...entity, state: STATE },
     );
     const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     assertStrictEquals(stored.title, 'Created');
@@ -237,7 +235,7 @@ Deno.test('putProject updates an existing project', async () => {
         buildProject('pnXmXrxOWayANgDLdCjuBw', 'After', { progress: 100 });
     await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
         ...entity,
-        ...TRIO,
+        state: STATE,
     });
     const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     assertStrictEquals(stored.title, 'After');
@@ -252,7 +250,7 @@ Deno.test(
             buildProject('pnXmXrxOWayANgDLdCjuBw', 'Persisted');
         await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
             ...entity,
-            ...TRIO,
+            state: STATE,
         });
         const fresh = createRequestContext(db, await organizationToken());
         const row = await getProjectEntity(fresh, 'pnXmXrxOWayANgDLdCjuBw');
@@ -277,7 +275,7 @@ Deno.test(
             startDate: '2026-02-01',
             targetEndDate: '2026-11-30',
             estimatedCost: 75000,
-        }, TRIO);
+        }, STATE);
         const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
         assertStrictEquals(stored.title, 'After');
         assertStrictEquals(
@@ -306,7 +304,7 @@ Deno.test(
                 position: 1,
             },
         );
-        await putProjectPosition(ctx, 'pnXmXrxOWayANgDLdCjuBw', 9.5, TRIO);
+        await putProjectPosition(ctx, 'pnXmXrxOWayANgDLdCjuBw', 9.5, STATE);
         const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
         assertStrictEquals(stored.position, 9.5);
         assertStrictEquals(stored.title, 'Stay');
@@ -323,9 +321,9 @@ Deno.test(
                 estimated_cost: 4000,
                 actual_cost: 2000,
             }),
-            ...TRIO,
+            state: STATE,
             id: 'pnXmXrxOWayANgDLdCjuBw',
-        }, TRIO);
+        }, STATE);
         const view = new ProjectView(project, [], [], []);
         assertStrictEquals(view.idForLink(), 'pnXmXrxOWayANgDLdCjuBw');
         assertStrictEquals(view.titleText(), 'Viewable');
@@ -389,9 +387,9 @@ Deno.test(
                 start_date: '2026-01-01',
                 target_end_date: '2026-01-11',
             }),
-            ...TRIO,
+            state: STATE,
             id: 'pnXmXrxOWayANgDLdCjuBw',
-        }, TRIO);
+        }, STATE);
         const view = new ProjectView(project, [], [], []);
         assertStrictEquals(view.timeBaselineDays(), 10);
     },

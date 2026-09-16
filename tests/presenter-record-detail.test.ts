@@ -26,7 +26,7 @@ function pageFor(
             position: 1,
             state,
         },
-        { state },
+        state,
     );
     return new RecordDetailPresenter({
         record: model,

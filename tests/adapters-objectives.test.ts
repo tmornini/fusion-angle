@@ -23,7 +23,7 @@ import {
     getObjectiveRevisionsByObjective,
     getActiveObjectives,
     getCurrentObjectiveDefinitions,
-    getObjectiveStateDetails,
+    getObjectiveStates,
     postObjectiveCreation,
     postObjectiveArchival,
     postObjectiveReactivation,
@@ -381,9 +381,9 @@ Deno.test(
             others.map(o => o.position),
             1,
         );
-        const details = await getObjectiveStateDetails(ctx);
+        const states = await getObjectiveStates(ctx);
         await putObjectivePosition(
-            ctx, o3, newPos, details.get(o3)!,
+            ctx, o3, newPos, states.get(o3)!,
         );
 
         // Phase Final Task 2: positions from GET (message plane).
@@ -418,12 +418,12 @@ Deno.test(
             ctx, o3, 'C', 'd', 3,
         );
 
-        const details = await getObjectiveStateDetails(ctx);
+        const states = await getObjectiveStates(ctx);
         await putObjectivePosition(
-            ctx, o2, 1.5, details.get(o2)!,
+            ctx, o2, 1.5, states.get(o2)!,
         );
         await putObjectivePosition(
-            ctx, o3, 1.25, details.get(o3)!,
+            ctx, o3, 1.25, states.get(o3)!,
         );
 
         // Phase Final Task 2: positions from GET (message plane).
@@ -529,16 +529,14 @@ Deno.test(
 );
 
 Deno.test(
-    'putObjectivePosition echoes the supplied trio'
+    'putObjectivePosition echoes the supplied state'
     + ' verbatim',
     async () => {
         const { ctx, calls } = recordingCtx({
             PUT: async () => ({}),
         });
         await putObjectivePosition(
-            ctx, 'ohqxgUBEaFQwYbXsonRPmg', 1.5, {
-                state: 'active',
-            },
+            ctx, 'ohqxgUBEaFQwYbXsonRPmg', 1.5, 'active',
         );
         assertStrictEquals(calls.length, 1);
         assertStrictEquals(calls[0]!.method, 'PUT');

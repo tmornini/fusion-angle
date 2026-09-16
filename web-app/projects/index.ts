@@ -187,9 +187,7 @@ async function onProjectsLoaded(
             await putProjectPosition(
                 sessionContext(), id,
                 newPosition,
-                {
-                    state: project.stateValue(),
-                },
+                project.stateValue(),
             );
         },
     );

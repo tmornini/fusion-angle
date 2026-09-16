@@ -1,7 +1,6 @@
 import type {
     ProjectEntity,
     ProjectState,
-    ProjectStateDetail,
     ObjectiveEntity,
     ObjectiveId,
 } from '../../../api/types.ts';
@@ -46,7 +45,6 @@ export {
     Project,
     type ProjectState,
     type ProjectEntity,
-    type ProjectStateDetail,
     isProjectState,
     COST_DIVISOR,
 } from '../../../api/types.ts';
@@ -59,17 +57,14 @@ export async function getProjectEntities(
     );
 }
 
-// Lifecycle-current trio is stamped on the ProjectEntity GET
-// row (Phase A). Map snake_case wire → ProjectStateDetail;
-// no second hop to a lifecycle log or history alias.
-export function projectStateDetailFromRow(
+// Domain state rides the ProjectEntity GET row; narrow it
+// once, at the wire.
+export function projectStateOf(
     row: ProjectEntity,
-): ProjectStateDetail {
-    return {
-        state: assertProjectState(
-            row.state, 'project ' + row.id,
-        ),
-    };
+): ProjectState {
+    return assertProjectState(
+        row.state, 'project ' + row.id,
+    );
 }
 
 export async function getProjects(
@@ -78,10 +73,10 @@ export async function getProjects(
     const rows = await getProjectEntities(ctx);
     return rows
         .filter(row => projectStateIsNotDeleted(
-            projectStateDetailFromRow(row).state,
+            projectStateOf(row),
         ))
         .map(row => new Project(
-            row, projectStateDetailFromRow(row),
+            row, projectStateOf(row),
         ));
 }
 
@@ -91,7 +86,7 @@ export async function getProject(
 ): Promise<Project> {
     const row = await getProjectEntity(ctx, id);
     return new Project(
-        row, projectStateDetailFromRow(row),
+        row, projectStateOf(row),
     );
 }
 
@@ -305,7 +300,7 @@ export async function putProjectFields(
     ctx: RequestContext,
     id: string,
     patch: ProjectFieldsPatch,
-    detail: ProjectStateDetail,
+    state: ProjectState,
 ): Promise<void> {
     const fields = await projectRowFields(ctx, id);
     await putProject(ctx, id, {
@@ -315,7 +310,7 @@ export async function putProjectFields(
         start_date: patch.startDate,
         target_end_date: patch.targetEndDate,
         estimated_cost: patch.estimatedCost,
-        state: detail.state,
+        state,
     });
 }
 
@@ -323,13 +318,13 @@ export async function putProjectPosition(
     ctx: RequestContext,
     id: string,
     position: number,
-    detail: ProjectStateDetail,
+    state: ProjectState,
 ): Promise<void> {
     const fields = await projectRowFields(ctx, id);
     await putProject(ctx, id, {
         ...fields,
         position,
-        state: detail.state,
+        state,
     });
 }
 

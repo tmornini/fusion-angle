@@ -4,7 +4,6 @@ import type {
     RecordEntity,
     RecordId,
     RecordState,
-    RecordStateDetail,
 } from '../../../api/types.ts';
 import {
     RecordModel,
@@ -106,17 +105,12 @@ export async function getRecord(
     );
 }
 
-// Lifecycle-current trio is stamped on the RecordEntity GET
-// row (Phase A). Map snake_case wire → RecordStateDetail;
-// no second hop to a lifecycle log or history alias.
-function recordStateDetailFromRow(
-    row: RecordEntity,
-): RecordStateDetail {
-    return {
-        state: assertRecordState(
-            row.state, 'record ' + row.id,
-        ),
-    };
+// Domain state rides the RecordEntity GET row; narrow it
+// once, at the wire.
+function recordStateOf(row: RecordEntity): RecordState {
+    return assertRecordState(
+        row.state, 'record ' + row.id,
+    );
 }
 
 // The record detail page's read: one domain facet
@@ -131,7 +125,7 @@ export async function getRecordModel(
 ): Promise<RecordModel> {
     const row = await getRecord(ctx, id);
     return new RecordModel(
-        row, recordStateDetailFromRow(row),
+        row, recordStateOf(row),
     );
 }
 
@@ -173,7 +167,7 @@ export async function getRecords(
     }
     return rows.map(row => ({
         record: new RecordModel(
-            row, recordStateDetailFromRow(row),
+            row, recordStateOf(row),
         ),
         attributeCount:
             attrCountByRecord.get(row.id)

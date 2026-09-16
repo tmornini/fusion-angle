@@ -33,7 +33,7 @@ import {
     getActiveObjectives,
     getObjectives,
     getArchivedObjectiveIds,
-    getObjectiveStateDetails,
+    getObjectiveStates,
     getCurrentObjectiveDefinition,
     getCurrentObjectiveDefinitions,
     postObjectiveCreation,
@@ -130,22 +130,22 @@ interface ObjectivesData {
         >
     >;
     archivedAt: Map<string, string>;
-    stateDetails: Awaited<
-        ReturnType<typeof getObjectiveStateDetails>
+    states: Awaited<
+        ReturnType<typeof getObjectiveStates>
     >;
 }
 
 async function fetchObjectivesData(
     ctx: ReturnType<typeof sessionContext>,
 ): Promise<ObjectivesData> {
-    // One bulk trio read per load — drag-reorder echoes
-    // each id's detail from this map (no per-drag GET).
-    const [active, allObjs, archivedIds, stateDetails] =
+    // One bulk state read per load — drag-reorder echoes
+    // each id's state from this map (no per-drag GET).
+    const [active, allObjs, archivedIds, states] =
         await Promise.all([
             getActiveObjectives(ctx),
             getObjectives(ctx),
             getArchivedObjectiveIds(ctx),
-            getObjectiveStateDetails(ctx),
+            getObjectiveStates(ctx),
         ]);
     const archived = allObjs.filter(
         o => archivedIds.has(o.id),
@@ -161,7 +161,7 @@ async function fetchObjectivesData(
         archived,
         defs,
         archivedAt: new Map<string, string>(),
-        stateDetails,
+        states,
     };
 }
 
@@ -183,22 +183,21 @@ function paintObjectives(
         '[data-list="active"]', box,
     );
     if (!activeList) return;
-    const stateDetails = data.stateDetails;
+    const states = data.states;
     initDragReorder(
         activeList,
         '[data-objective-id]',
         'data-objective-id',
         async (id, newPosition) => {
             const dragCtx = sessionContext();
-            const detail = stateDetails.get(id);
-            if (detail === undefined) {
+            const state = states.get(id);
+            if (state === undefined) {
                 throw new Error(
-                    'no state detail for objective '
-                        + id,
+                    'no state for objective ' + id,
                 );
             }
             await putObjectivePosition(
-                dragCtx, id, newPosition, detail,
+                dragCtx, id, newPosition, state,
             );
         },
     );

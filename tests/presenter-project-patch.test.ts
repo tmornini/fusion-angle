@@ -33,9 +33,7 @@ function buildView() {
         actual_cost: 12000,
         position: 1,
         state: 'approved',
-    }, {
-        state: 'approved',
-    });
+    }, 'approved');
     return new ProjectView(project, [], [], []);
 }
 

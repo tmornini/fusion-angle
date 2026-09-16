@@ -1362,18 +1362,6 @@ export interface ProjectFlowEntity {
     at: string;
 }
 
-// Domain lifecycle state for an idea. Ledger facts stay
-// on the pair / etag / versions list.
-export interface IdeaStateDetail {
-    readonly state: IdeaState;
-}
-
-// Domain lifecycle state for an objective. Ledger facts
-// stay on the pair / etag / versions list.
-export interface ObjectiveStateDetail {
-    readonly state: ObjectiveState;
-}
-
 export class Idea {
     readonly #id: string;
     readonly #title: string;
@@ -1387,12 +1375,12 @@ export class Idea {
 
     constructor(
         entity: IdeaEntity,
-        detail: IdeaStateDetail,
+        state: IdeaState,
     ) {
         this.#id = entity.id;
         this.#title = entity.title;
         this.#position = entity.position;
-        this.#state = detail.state;
+        this.#state = state;
         this.#problemStatement =
             entity.problem_statement;
         this.#targetUsers =
@@ -1477,12 +1465,6 @@ export class Idea {
     }
 }
 
-// Domain lifecycle state for a project. Ledger facts stay
-// on the pair / etag / versions list.
-export interface ProjectStateDetail {
-    readonly state: ProjectState;
-}
-
 export class Project {
     readonly #id: string;
     readonly #title: string;
@@ -1497,13 +1479,13 @@ export class Project {
 
     constructor(
         entity: ProjectEntity,
-        detail: ProjectStateDetail,
+        state: ProjectState,
     ) {
         this.#id = entity.id;
         this.#title = entity.title;
         this.#description =
             entity.description;
-        this.#state = detail.state;
+        this.#state = state;
         this.#progress = entity.progress;
         this.#startDate =
             entity.start_date;
@@ -1608,12 +1590,6 @@ export class Project {
     }
 }
 
-// Domain lifecycle state for a record-type. Ledger facts
-// stay on the pair / etag / versions list.
-export interface RecordStateDetail {
-    readonly state: RecordState;
-}
-
 export class RecordModel {
     readonly #id: string;
     readonly #name: string;
@@ -1623,13 +1599,13 @@ export class RecordModel {
 
     constructor(
         entity: RecordEntity,
-        detail: RecordStateDetail,
+        state: RecordState,
     ) {
         this.#id = entity.id;
         this.#name = entity.name;
         this.#description = entity.description;
         this.#position = entity.position;
-        this.#state = detail.state;
+        this.#state = state;
     }
 
     idForLink(): string {

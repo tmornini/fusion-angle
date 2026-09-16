@@ -11,7 +11,6 @@ import {
     ideaIsVisible,
     assertIdeaState,
 } from '../../../api/types.ts';
-import type { IdeaStateDetail } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     organizationCollection,
@@ -125,17 +124,10 @@ export interface IdeaWithSubmitter {
     readonly submittedAt: string;
 }
 
-// Lifecycle-current trio is stamped on the IdeaEntity GET
-// row (Phase A). Map snake_case wire → IdeaStateDetail;
-// no second hop to a lifecycle log or history alias.
-function ideaStateDetailFromRow(
-    row: IdeaEntity,
-): IdeaStateDetail {
-    return {
-        state: assertIdeaState(
-            row.state, 'idea ' + row.id,
-        ),
-    };
+// Domain state rides the IdeaEntity GET row; narrow it once,
+// at the wire.
+function ideaStateOf(row: IdeaEntity): IdeaState {
+    return assertIdeaState(row.state, 'idea ' + row.id);
 }
 
 export async function getIdeas(
@@ -155,7 +147,7 @@ export async function getIdeas(
     );
     return rows
         .filter(row => ideaIsVisible(
-            ideaStateDetailFromRow(row).state,
+            ideaStateOf(row),
         ))
         .map(row => {
             const submission =
@@ -169,7 +161,7 @@ export async function getIdeas(
             return {
                 idea: new Idea(
                     row,
-                    ideaStateDetailFromRow(row),
+                    ideaStateOf(row),
                 ),
                 entity: row,
                 submitterName: memberName(
@@ -195,7 +187,7 @@ export async function getIdea(
     ]);
     return {
         idea: new Idea(
-            row, ideaStateDetailFromRow(row),
+            row, ideaStateOf(row),
         ),
         entity: row,
         submitterName: memberName(

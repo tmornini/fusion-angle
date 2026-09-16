@@ -3,7 +3,7 @@ import type {
     ObjectiveEntity,
     ObjectiveId,
     ObjectiveRevisionEntity,
-    ObjectiveStateDetail,
+    ObjectiveState,
 } from '../../../api/types.ts';
 import {
     assertObjectiveState,
@@ -54,31 +54,25 @@ export async function getObjective(
     );
 }
 
-// Lifecycle-current trio is stamped on the ObjectiveEntity
-// GET row (Phase A). Map snake_case wire → ObjectiveStateDetail;
-// no second hop to a lifecycle log or history alias.
-export function objectiveStateDetailFromRow(
+// Domain state rides the ObjectiveEntity GET row; narrow it
+// once, at the wire.
+export function objectiveStateOf(
     row: ObjectiveEntity,
-): ObjectiveStateDetail {
-    return {
-        state: assertObjectiveState(
-            row.state, 'objective ' + row.id,
-        ),
-    };
+): ObjectiveState {
+    return assertObjectiveState(
+        row.state, 'objective ' + row.id,
+    );
 }
 
-// Bulk objective trio read from GET-stamped rows — drag-
-// reorder and archive/reactivate echo each id's current
-// trio without minting a fresh event.
-export async function getObjectiveStateDetails(
+// One bulk state read from GET rows: drag-reorder echoes
+// each id's current state.
+export async function getObjectiveStates(
     ctx: RequestContext,
-): Promise<Map<Id, ObjectiveStateDetail>> {
+): Promise<Map<ObjectiveId, ObjectiveState>> {
     const rows = await getObjectives(ctx);
-    const out = new Map<Id, ObjectiveStateDetail>();
+    const out = new Map<ObjectiveId, ObjectiveState>();
     for (const row of rows) {
-        out.set(
-            row.id, objectiveStateDetailFromRow(row),
-        );
+        out.set(row.id, objectiveStateOf(row));
     }
     return out;
 }
@@ -389,13 +383,13 @@ export async function putObjectivePosition(
     ctx: RequestContext,
     id: ObjectiveId,
     position: number,
-    stateDetail: ObjectiveStateDetail,
+    state: ObjectiveState,
 ): Promise<void> {
     await ctx.PUT(
         organizationItem(ctx, 'objectives', id),
         {
         position,
-        state: stateDetail.state,
+        state,
     });
     notifyObjectiveChange();
 }

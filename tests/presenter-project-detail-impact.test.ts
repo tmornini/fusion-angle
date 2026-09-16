@@ -81,9 +81,7 @@ function makeProject() {
         actual_cost: 50000,
         position: 0,
         state: 'approved',
-    }, {
-        state: 'approved',
-    });
+    }, 'approved');
 }
 
 const objectives: ObjectiveEntity[] = [
