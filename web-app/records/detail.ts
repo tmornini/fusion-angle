@@ -17,8 +17,7 @@ import {
     getRecord,
     getRecordModel,
     getRecordAttributesByRecord,
-    getFlowSummariesForRecord,
-    getWorkOrdersForRecord,
+    loadRecordFlowJoins,
     putRecord,
     postRecordChange,
     postRecordStateChange,
@@ -31,6 +30,7 @@ import {
     deleteRecordInstance,
     activeOrganization,
 } from '../app/adapters/index.ts';
+import { getFlowEntities } from '../app/adapters/flows.ts';
 import {
     RecordDetailPresenter,
     RecordDetailEditPresenter,
@@ -181,24 +181,24 @@ async function load(
             const [
                 record,
                 attributes,
-                flows,
-                workOrders,
                 instances,
+                flows,
             ] = await Promise.all([
                 getRecordModel(ctx, id),
                 getRecordAttributesByRecord(
                     ctx, id,
                 ),
-                getFlowSummariesForRecord(
-                    ctx, id,
-                ),
-                getWorkOrdersForRecord(ctx, id),
                 getRecordInstances(ctx, id),
+                getFlowEntities(ctx),
             ]);
+            const { summaries, workOrders } =
+                await loadRecordFlowJoins(
+                    ctx, id, flows,
+                );
             return {
                 record,
                 attributes,
-                flows,
+                flows: summaries,
                 workOrders,
                 instances,
             };
