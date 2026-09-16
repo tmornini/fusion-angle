@@ -14,15 +14,13 @@ import {
 } from './family-registry.ts';
 import { missedReadError } from './derive-states.ts';
 import {
-    deriveDocumentsAt,
     documentMessagePairsAt,
     documentLifecycleEvents,
     stateHistoryFrom,
-    currentDocumentState,
-    DELETED_STATE,
     requestBodyOf,
+    headDocumentOf,
+    documentIsTombstone,
     type DerivedDocument,
-    type DocumentMessagePair,
 } from './derive-documents.ts';
 import type {
     Route,
@@ -218,15 +216,10 @@ export async function throwDocumentMiss(
     );
 }
 
-// The generic per-id derivation: store.getDocumentHistory at this
-// document, reduce to the head document (deriveDocumentsAt),
-// and — for a 'trio' family ONLY — walk the lifecycle
-// history over those same pairs to 404 a lifecycle-deleted
-// document too. A 'stateless' family's document body carries
-// no trio, so its ONLY tombstone signal is a DELETE-method
-// head — already 404-absent via deriveDocumentsAt. Soft-
-// deleted foreign docs miss the caller prefix and 403 via
-// the global probe.
+// The generic per-id read: the live PUT head at this
+// document. No head is a miss. For a 'trio' family a head
+// whose body says `deleted` is a miss too. Both take the
+// throwDocumentMiss ladder, so 403 and 404 are unchanged.
 async function derivedDocumentEntity(
     wiring: DocumentFamilyWiring,
     db: DbAdapter,
@@ -236,29 +229,22 @@ async function derivedDocumentEntity(
     const prefix = canonicalPath(
         organization, '/' + wiring.family + '/',
     );
-    const stored = await messageStore(db).getDocumentHistory(
+    const head = await messageStore(db).getDocumentHead(
         prefix, id,
     );
-    const document = deriveDocumentsAt(
-        stored, prefix,
-    ).get(id);
-    if (document === undefined) {
+    if (head === null) {
         throw await throwDocumentMiss(
             wiring, db, organization, id,
         );
     }
-    if (wiring.lifecycle === 'trio') {
-        const messagePairs = documentMessagePairsAt(
-            stored, prefix,
-        ).filter((messagePair) => messagePair.name === id);
-        const history = stateHistoryFrom(
-            documentLifecycleEvents(messagePairs), id,
+    const document = headDocumentOf(head);
+    if (
+        wiring.lifecycle === 'trio'
+        && documentIsTombstone(document)
+    ) {
+        throw await throwDocumentMiss(
+            wiring, db, organization, id,
         );
-        if (currentDocumentState(history) === DELETED_STATE) {
-            throw await throwDocumentMiss(
-                wiring, db, organization, id,
-            );
-        }
     }
     return wiring.entityOf(document, organization);
 }
@@ -596,63 +582,20 @@ export function documentCollectionGetHandler(
         const prefix = canonicalPath(
             organizationId, '/' + wiring.family + '/',
         );
-        const store = messageStore(db);
-        const live = await store.getCollection(prefix);
-        const stored = await db.messagePairs.getCollectionPairs(prefix,
-        );
-        const documents = deriveDocumentsAt(
-            stored, prefix,
-        );
-        // The per-document history walk (and its DELETED
-        // filter) runs for a 'trio' family ONLY — same gate as
-        // derivedDocumentEntity above, same reason: a
-        // 'stateless' body carries no trio to walk, and a
-        // DELETE head is already absent from `documents`.
-        const messagePairsById = new Map<
-            Id, DocumentMessagePair[]
-        >();
-        if (wiring.lifecycle === 'trio') {
-            for (const messagePair of documentMessagePairsAt(
-                stored, prefix,
-            )) {
-                const list = messagePairsById.get(
-                    messagePair.name,
-                );
-                if (list === undefined) {
-                    messagePairsById.set(
-                        messagePair.name, [messagePair],
-                    );
-                } else {
-                    list.push(messagePair);
-                }
-            }
-        }
-        const byId = new Map<Id, unknown>();
-        for (const [id, document] of documents) {
-            if (wiring.lifecycle === 'trio') {
-                const history = stateHistoryFrom(
-                    documentLifecycleEvents(
-                        messagePairsById.get(id) ?? [],
-                    ),
-                    id,
-                );
-                if (
-                    currentDocumentState(history)
-                        === DELETED_STATE
-                ) continue;
-            }
-            byId.set(
-                id,
-                wiring.entityOf(document, organizationId),
+        const heads =
+            await db.messagePairs.getCollectionHeadPairs(
+                prefix,
             );
-        }
-        // Oldest live head (at, id) first — getCollection
-        // order. Bodies match GET :id (entityOf), not the
-        // stored PUT echo. Trio-deleted heads are omitted.
+        // Oldest live head (response_at, id) first. A 'trio'
+        // tombstone is omitted.
         const rows: unknown[] = [];
-        for (const entity of live) {
-            const row = byId.get(liveHeadId(entity));
-            if (row !== undefined) rows.push(row);
+        for (const head of heads) {
+            const document = headDocumentOf(head);
+            if (
+                wiring.lifecycle === 'trio'
+                && documentIsTombstone(document)
+            ) continue;
+            rows.push(wiring.entityOf(document, organizationId));
         }
         return rows;
     };

@@ -154,6 +154,26 @@ export function deriveDocumentsAt(
 // Phase 3.
 export const DELETED_STATE = 'deleted';
 
+// The head pair as the document a family mapper reads.
+export function headDocumentOf(
+    head: MessagePairEntity,
+): DerivedDocument {
+    return {
+        name: head.name,
+        messagePairId: head.id,
+        method: head.method,
+        body: requestBodyOf(head.request),
+    };
+}
+
+// A head whose body says `deleted` is a tombstone: absent
+// from GET and from its collection.
+export function documentIsTombstone(
+    document: DerivedDocument,
+): boolean {
+    return pickString(document.body, 'state') === DELETED_STATE;
+}
+
 export interface DocumentLifecycleEvent {
     readonly stateEventId: Id;
     readonly state: string;
