@@ -28,6 +28,7 @@ import {
 } from '../api/document-family.ts';
 import {
     pickNumber,
+    pickString,
     validateObjectiveDocumentBody,
 } from '../api/validators.ts';
 import { postObjectiveDocumentOp } from '../api/routes.ts';
@@ -111,13 +112,12 @@ const OBJECTIVES_TEST_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,
-    // Mirror routes.ts objectiveDocumentEntityOf: stamp trio
-    // from lifecycle-current (required on trio path).
-    entityOf: (document, organization, current) => ({
+    // Mirror routes.ts objectiveDocumentEntityOf.
+    entityOf: (document, organization) => ({
         id: document.name,
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
-        state: current!.state,
+        state: pickString(document.body, 'state'),
     }),
 };
 

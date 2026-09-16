@@ -28,6 +28,7 @@ import {
     validateRecordDocumentBody,
     validateObjectiveDocumentBody,
     pickNumber,
+    pickString,
 } from '../api/validators.ts';
 import {
     postRecordDocumentOp,
@@ -62,7 +63,7 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'record_types',
     validateDocument: validateRecordDocumentBody,
     documentOp: postRecordDocumentOp,
-    entityOf: (document, organization, current) => ({
+    entityOf: (document, organization) => ({
         id: document.name,
         organization_id: organization,
         name: String(document.body['name'] ?? ''),
@@ -70,7 +71,7 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
             document.body['description'] ?? '',
         ),
         position: Number(document.body['position'] ?? 0),
-        state: current!.state,
+        state: pickString(document.body, 'state'),
     }),
 };
 
@@ -145,11 +146,11 @@ const OBJECTIVES_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,
-    entityOf: (document, organization, current) => ({
+    entityOf: (document, organization) => ({
         id: document.name,
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
-        state: current!.state,
+        state: pickString(document.body, 'state'),
     }),
 };
 

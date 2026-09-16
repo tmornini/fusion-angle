@@ -366,10 +366,7 @@ const IDEAS_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'ideas',
     validateDocument: validateIdeaDocumentBody,
     documentOp: postIdeaDocumentOp,
-    // ideaEntityOf requires the lifecycle-current event; the
-    // generic trio path always supplies it after DELETED filter.
-    entityOf: (document, organization, current) =>
-        ideaEntityOf(document, organization, current!),
+    entityOf: ideaEntityOf,
 };
 const PROJECTS_WIRING: DocumentFamilyWiring = {
     family: 'projects',
@@ -378,11 +375,7 @@ const PROJECTS_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'projects',
     validateDocument: validateProjectDocumentBody,
     documentOp: postProjectDocumentOp,
-    // projectEntityOf requires the lifecycle-current event;
-    // the generic trio path always supplies it after DELETED
-    // filter.
-    entityOf: (document, organization, current) =>
-        projectEntityOf(document, organization, current!),
+    entityOf: projectEntityOf,
 };
 // The flows wiring row. entityOf is derive-flows.ts's OWN
 // flowEntityOf. G2 stored PUT is flowStoredEntityOf (that
@@ -399,7 +392,7 @@ const FLOWS_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'flows',
     validateDocument: validateFlowDocumentBody,
     documentOp: postFlowDocumentOp,
-    entityOf: (document, organization, _current?) =>
+    entityOf: (document, organization) =>
         flowEntityOf(document, organization),
 };
 // The work-orders wiring row — the fourth family, and the
@@ -419,7 +412,6 @@ const FLOWS_WIRING: DocumentFamilyWiring = {
 function workOrderDocumentEntityOf(
     document: DerivedDocument,
     organization: Id,
-    _current?: { readonly state: string },
 ): object {
     return {
         id: document.name,
@@ -452,22 +444,17 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
 // unstamped key leak into the read path ahead of the
 // fenced `organization` argument — picking only
 // `position` closes that off by construction. Head
-// document → wire ObjectiveEntity. Entity fields come
-// from the head body; domain `state` is stamped from
-// the lifecycle-current event (never re-copied from
-// the head body — genesis-wins-under-skew). `current` is
-// required on the live trio path (document-family always
-// supplies it after the DELETED filter).
+// document → wire ObjectiveEntity. Entity fields and
+// domain `state` alike come from the head body.
 function objectiveDocumentEntityOf(
     document: DerivedDocument,
     organization: Id,
-    current: { readonly state: string },
 ): ObjectiveEntity {
     return {
         id: document.name,
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
-        state: current.state,
+        state: pickString(document.body, 'state'),
     };
 }
 // The objectives wiring row — the seventh family, now the
@@ -482,9 +469,7 @@ function objectiveDocumentEntityOf(
 // notFoundTable is 'objectives' — its storage table name
 // matches its family name, like ideas/projects/flows/records
 // (work-orders/record-attributes are the two whose names
-// diverge). objectiveDocumentEntityOf requires the lifecycle-
-// current event; the generic trio path always supplies it
-// after DELETED filter.
+// diverge).
 const OBJECTIVES_WIRING: DocumentFamilyWiring = {
     family: 'objectives',
     httpNest: 'organization',
@@ -492,10 +477,7 @@ const OBJECTIVES_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,
-    entityOf: (document, organization, current) =>
-        objectiveDocumentEntityOf(
-            document, organization, current!,
-        ),
+    entityOf: objectiveDocumentEntityOf,
 };
 // The bare identities row spreads safely (no organization_id,
 // no trio). `_organization` stays unused: identities is
@@ -503,7 +485,6 @@ const OBJECTIVES_WIRING: DocumentFamilyWiring = {
 export function identityDocumentEntityOf(
     document: DerivedDocument,
     _organization: Id,
-    _current?: { readonly state: string },
 ): object {
     return {
         id: document.name,
@@ -539,7 +520,6 @@ const IDENTITIES_WIRING: DocumentFamilyWiring = {
 export function aiAgentDocumentEntityOf(
     document: DerivedDocument,
     _organization: Id,
-    _current?: { readonly state: string },
 ): object {
     return {
         id: document.name,
@@ -3074,7 +3054,6 @@ export const WRITE_RESPONSE_SPECS:
                         body: raw,
                     },
                     organization,
-                    { state: pickString(raw, 'state') },
                 );
             },
         },
@@ -3416,7 +3395,7 @@ export interface DocumentMessagePairFormInput {
 // (resolveStreamedTrioWriteBody). Other families still
 // use successBody alone.
 export async function formDocumentMessagePairFor(
-    db: DbAdapter,
+    _db: DbAdapter,
     input: DocumentMessagePairFormInput,
 ): Promise<MessagePair> {
     const routeSegments = input.routePattern.split('/');
@@ -3434,12 +3413,10 @@ export async function formDocumentMessagePairFor(
     } else {
         const spec = resolveWriteResponseSpec(input.routePattern);
         responseStatus = spec.status;
-        const streamed = await resolveStreamedTrioWriteBody(
-            db,
+        const streamed = resolveStreamedTrioWriteBody(
             input.routePattern,
             [...input.params],
             input.body,
-            input.requesterIdentityId,
             input.organization,
         );
         responseBody = streamed ?? spec.successBody?.(
@@ -5095,14 +5072,8 @@ export const routes: Route[] = [
             const id = param(p, 1);
             const snapshots = await versionSnapshotsAt(
                 db, recordTypesUriPrefix(org), id,
-                (document) => recordTypeEntityOf(
-                    document, org,
-                    {
-                        state: pickString(
-                            document.body, 'state',
-                        ),
-                    },
-                ),
+                (document) =>
+                    recordTypeEntityOf(document, org),
             );
             if (snapshots.length === 0) {
                 throw await missedReadError(
@@ -5139,7 +5110,6 @@ export const routes: Route[] = [
                     body,
                 },
                 org,
-                { state: pickString(body, 'state') },
             );
         },
     }),

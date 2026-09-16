@@ -264,7 +264,6 @@ Deno.test('stored PUT body equals projectEntityOf of the same'
             body,
         },
         'AjdvjuECVZEgZoFajaIEkg',
-        { state: 'submitted' },
     );
     assertEquals(stored, expected);
     assertEquals(

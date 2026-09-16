@@ -8,7 +8,6 @@ import {
     documentLifecycleEvents,
     stateHistoryFrom,
     currentDocumentState,
-    currentLifecycleEvent,
     DELETED_STATE,
     type DerivedDocument,
     type DocumentMessagePair,
@@ -23,8 +22,7 @@ import { liveHeadId, messageStore } from
 
 const RECORD_TYPES_TABLE = 'record_types';
 
-// Wire row for a live record-type document. Trio stamped from
-// the lifecycle-current event (never re-copied from head body).
+// Wire row for a live record-type document.
 export interface RecordTypeWireRow {
     readonly id: Id;
     readonly organization_id: Id;
@@ -44,7 +42,6 @@ export function recordTypesUriPrefix(
 export function recordTypeEntityOf(
     document: DerivedDocument,
     organization: Id,
-    current: { readonly state: string },
 ): RecordTypeWireRow {
     const body = document.body;
     return {
@@ -53,7 +50,7 @@ export function recordTypeEntityOf(
         name: pickString(body, 'name'),
         description: pickString(body, 'description'),
         position: pickNumber(body, 'position'),
-        state: current.state,
+        state: pickString(body, 'state'),
     };
 }
 
@@ -121,12 +118,9 @@ export async function deriveRecordTypeCollection(
         if (currentDocumentState(history) === DELETED_STATE) {
             continue;
         }
-        const current = currentLifecycleEvent(history)!;
         byId.set(
             id,
-            recordTypeEntityOf(
-                document, organization, current,
-            ),
+            recordTypeEntityOf(document, organization),
         );
     }
     const live = await messageStore(db).getCollection(prefix);
@@ -162,10 +156,7 @@ export async function deriveRecordTypeEntity(
             db, id, organization, RECORD_TYPES_TABLE,
         );
     }
-    const current = currentLifecycleEvent(history)!;
-    return recordTypeEntityOf(
-        document, organization, current,
-    );
+    return recordTypeEntityOf(document, organization);
 }
 
 // One row per distinct state_event_id — (state_at, id) ASC.

@@ -128,9 +128,8 @@ const RECORDS_TEST_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'record_types',
     validateDocument: validateRecordDocumentBody,
     documentOp: postRecordDocumentOp,
-    // Mirror routes.ts recordDocumentEntityOf: stamp trio
-    // from lifecycle-current (required on trio path).
-    entityOf: (document, organization, current) => {
+    // Mirror routes.ts recordDocumentEntityOf.
+    entityOf: (document, organization) => {
         const body = document.body;
         return {
             id: document.name,
@@ -138,7 +137,7 @@ const RECORDS_TEST_WIRING: DocumentFamilyWiring = {
             name: pickString(body, 'name'),
             description: pickString(body, 'description'),
             position: pickNumber(body, 'position'),
-            state: current!.state,
+            state: pickString(body, 'state'),
         };
     },
 };

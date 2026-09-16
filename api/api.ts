@@ -923,11 +923,9 @@ export async function handleRequest(
                 && body === undefined
                     ? undefined
                     : await resolveStreamedTrioWriteBody(
-                        effective,
                         routePattern,
                         params,
                         body,
-                        actor,
                         organization,
                     );
             messagePair = await formWriteMessagePair({

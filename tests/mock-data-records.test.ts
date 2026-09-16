@@ -15,6 +15,7 @@ import {
 } from '../api/document-family.ts';
 import {
     validateRecordDocumentBody,
+    pickString,
 } from '../api/validators.ts';
 import {
     loadAttributeSchemaById,
@@ -52,7 +53,7 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'records',
     validateDocument: validateRecordDocumentBody,
     documentOp: postRecordDocumentOp,
-    entityOf: (document, organization, current) => ({
+    entityOf: (document, organization) => ({
         id: document.name,
         organization_id: organization,
         name: String(document.body['name'] ?? ''),
@@ -60,7 +61,7 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
             document.body['description'] ?? '',
         ),
         position: Number(document.body['position'] ?? 0),
-        state: current!.state,
+        state: pickString(document.body, 'state'),
     }),
 };
 

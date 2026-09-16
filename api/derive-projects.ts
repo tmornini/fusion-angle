@@ -9,7 +9,6 @@ import {
     documentLifecycleEvents,
     stateHistoryFrom,
     currentDocumentState,
-    currentLifecycleEvent,
     DELETED_STATE,
     type DerivedDocument,
     type DocumentMessagePair,
@@ -35,20 +34,15 @@ function projectsUriPrefix(organization: Id): string {
     return canonicalPath(organization, '/projects/');
 }
 
-// The derived entity: the head document's body minus the
-// lifecycle trio (head body fields are NOT copied — the trio is
-// stamped from the lifecycle-current StateEntity instead) plus
-// organization_id stamped from the derivation's OWN organization
-// parameter — never the body's own value. A create body omits
-// organization_id; the org-scoped store stamps it on the old
-// plane, and the prefix scanned here already IS that same org,
-// so the stamp is unconditional. `current` is required: every
-// live project GET builds history first and passes the
-// lifecycle-current event (genesis-wins-under-skew).
+// The derived entity: the head document's body plus
+// organization_id stamped from the derivation's OWN
+// organization parameter — never the body's own value. A
+// create body omits organization_id, and the prefix scanned
+// here already IS that organization, so the stamp is
+// unconditional.
 export function projectEntityOf(
     document: DerivedDocument,
     organization: Id,
-    current: { readonly state: string },
 ): ProjectEntity {
     const body = document.body;
     return {
@@ -63,7 +57,7 @@ export function projectEntityOf(
         estimated_cost: pickNumber(body, 'estimated_cost'),
         actual_cost: pickNumber(body, 'actual_cost'),
         position: pickNumber(body, 'position'),
-        state: current.state,
+        state: pickString(body, 'state'),
     };
 }
 
@@ -150,12 +144,9 @@ export async function deriveProjects(
         if (currentDocumentState(history) === DELETED_STATE) {
             continue;
         }
-        // After DELETED filter history is non-empty for every
-        // live trio document (genesis always mints an event).
-        const current = currentLifecycleEvent(history)!;
         byId.set(
             projectId,
-            projectEntityOf(document, organization, current),
+            projectEntityOf(document, organization),
         );
     }
     const live = await messageStore(db).getCollection(prefix);
@@ -191,8 +182,7 @@ export async function deriveProject(
             db, projectId, organization, PROJECTS_TABLE,
         );
     }
-    const current = currentLifecycleEvent(history)!;
-    return projectEntityOf(document, organization, current);
+    return projectEntityOf(document, organization);
 }
 
 // One row per pair whose state_event_id is NEW — the document

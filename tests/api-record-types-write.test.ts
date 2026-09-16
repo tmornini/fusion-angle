@@ -433,7 +433,6 @@ Deno.test('stored PUT body equals recordTypeEntityOf of the'
             body,
         },
         ORGANIZATION,
-        { state: 'active' },
     );
     assertEquals(stored, expected);
     assertEquals(

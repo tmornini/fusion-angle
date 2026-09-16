@@ -364,7 +364,6 @@ async () => {
             body,
         },
         'AjdvjuECVZEgZoFajaIEkg',
-        { state: 'active' },
     );
     assertEquals(stored, expected);
     assertEquals(stored, await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg'
