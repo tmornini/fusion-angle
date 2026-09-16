@@ -65,3 +65,35 @@ export function resolveOrganizationGate<T>(
     }
     return null;
 }
+
+export type BootOrganizationBranch =
+    | { readonly kind: 'scoped'; readonly id: string }
+    | {
+        readonly kind: 'exchange';
+        readonly id: string;
+    }
+    | { readonly kind: 'walk' };
+
+export function resolveBootOrganizationBranch(
+    tokenOrganization: string | undefined,
+    tokenOrganizations: readonly string[] | undefined,
+    persisted: string | null,
+): BootOrganizationBranch {
+    const reachable = tokenOrganizations ?? [];
+    if (
+        tokenOrganization !== undefined
+        && reachable.includes(tokenOrganization)
+    ) {
+        return {
+            kind: 'scoped',
+            id: tokenOrganization,
+        };
+    }
+    if (
+        persisted !== null
+        && reachable.includes(persisted)
+    ) {
+        return { kind: 'exchange', id: persisted };
+    }
+    return { kind: 'walk' };
+}

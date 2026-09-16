@@ -18,12 +18,16 @@ interface TokenGrantResponse {
 export async function postSessionRefresh(
     ctx: RequestContext,
     refreshToken: string,
+    organization?: string,
 ): Promise<SessionCredentials> {
     const body: Record<string, unknown> = {
         grant_type: 'refresh',
     };
     if (!isCookieSession()) {
         body.refresh_token = refreshToken;
+    }
+    if (organization !== undefined) {
+        body.organization = organization;
     }
     const grant = await ctx.POST<TokenGrantResponse>(
         'authentication/token', body);

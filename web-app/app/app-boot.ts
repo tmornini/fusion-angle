@@ -17,6 +17,12 @@ import {
     UnauthorizedError,
 } from './adapters/index.ts';
 import {
+    RequestError,
+    HTTP_FORBIDDEN,
+} from '../../api/http-errors.ts';
+import { principalFromToken } from
+    '../../shared/access-token-decode.ts';
+import {
     getSessionToken,
     putSessionToken,
     sessionTokenIsSeeded,
@@ -46,6 +52,7 @@ import {
 import {
     getPreference,
     putPreference,
+    deletePreference,
 } from './adapters/preferences.ts';
 import {
     type SessionCredentials,
@@ -59,6 +66,7 @@ import { runSingleFlightRefresh } from
 import {
     resolveCredentialDecision,
     resolveOrganizationGate,
+    resolveBootOrganizationBranch,
 } from './credential-resolution.ts';
 import {
     postSessionRefresh,
@@ -99,17 +107,44 @@ function bounceTo(
     return true;
 }
 
-// Scope the session to an active organization: enumerate
-// the member's reachable organizations, resolve the active
-// one (the persisted choice, else the identity's default,
-// else the first reachable), and install an organization-
-// scoped token BEFORE first render so every read is fenced
-// to one tenant. Returns the fetched organization rows
-// (empty = unscoped). Callers that need a bounce decision
-// treat empty as fail; auth-exempt pages degrade
-// anonymously.
+// Scope the session to an active organization. A token
+// already scoped to a reachable tenant, or a flat token
+// whose organizations claim contains the persisted choice,
+// ends here with no GETs (null = sidebar self-fetches).
+// Otherwise walk today's path: enumerate reachable
+// organizations, resolve the active one (persisted, else
+// the identity's default, else the first reachable), and
+// exchange. Empty walk rows = unscoped. Callers that need
+// a bounce decision treat empty reachable as fail;
+// auth-exempt pages degrade anonymously.
 async function scopeBootToActiveOrganization(
-): Promise<readonly OrganizationEntity[]> {
+): Promise<readonly OrganizationEntity[] | null> {
+    const principal = principalFromToken(
+        getSessionToken(),
+    );
+    const branch = resolveBootOrganizationBranch(
+        principal.organization,
+        principal.organizations,
+        getPreference(ACTIVE_ORGANIZATION_ID),
+    );
+    if (branch.kind === 'scoped') {
+        putPreference(
+            ACTIVE_ORGANIZATION_ID, branch.id,
+        );
+        return null;
+    }
+    if (branch.kind === 'exchange') {
+        const ctx = sessionContext();
+        putSessionToken(
+            await postOrganizationSessionExchange(
+                ctx, getSessionToken(), branch.id,
+            ),
+        );
+        putPreference(
+            ACTIVE_ORGANIZATION_ID, branch.id,
+        );
+        return null;
+    }
     const ctx = sessionContext();
     // getIdentityDefaultOrganization returns null when no
     // default is set (never throws on absence) — both reads
@@ -152,7 +187,7 @@ async function scopeBootToActiveOrganization(
 // auth); a dead or failed refresh degrades to the unscoped
 // state rather than aborting boot.
 async function scopeBootIfCredentialed(
-): Promise<readonly OrganizationEntity[]> {
+): Promise<readonly OrganizationEntity[] | null> {
     let creds: SessionCredentials | null;
     try {
         creds = getSessionCredentials();
@@ -208,15 +243,32 @@ async function cookieRefreshAndInstall(
         : '';
     const ctx = createRequestContext(
         getClientFacade(), token);
+    const persisted = getPreference(
+        ACTIVE_ORGANIZATION_ID,
+    );
     try {
         const access = await runSingleFlightRefresh(
             async () => {
                 try {
                     const creds = await postSessionRefresh(
-                        ctx, '');
+                        ctx, '', persisted ?? undefined,
+                    );
                     putSessionToken(creds.accessToken);
                     return creds.accessToken;
                 } catch (err) {
+                    if (err instanceof RequestError
+                        && err.status === HTTP_FORBIDDEN
+                        && persisted !== null) {
+                        deletePreference(
+                            ACTIVE_ORGANIZATION_ID,
+                        );
+                        const creds =
+                            await postSessionRefresh(
+                                ctx, '',
+                            );
+                        putSessionToken(creds.accessToken);
+                        return creds.accessToken;
+                    }
                     if (err instanceof UnauthorizedError) {
                         return null;
                     }
@@ -271,21 +323,31 @@ async function bootAuthGate(): Promise<boolean> {
 // Resolve the boot's organization scope, or bounce a
 // zero-membership identity to its only reachable surface —
 // pending invitations. Sibling to bootAuthGate: returns
-// false once it has redirected, so the caller stops
+// null once it has redirected, so the caller stops
 // booting. Accepting an invitation grants the first
 // membership and unblocks every organization-scoped route.
+// organizations is null when the sidebar should self-fetch.
 async function bootOrganizationGate(
-): Promise<readonly OrganizationEntity[] | null> {
+): Promise<{
+    readonly organizations:
+        readonly OrganizationEntity[] | null;
+} | null> {
     const organizations =
         await scopeBootToActiveOrganization();
+    const principal = principalFromToken(
+        getSessionToken(),
+    );
+    const reachable = organizations === null
+        ? (principal.organizations ?? [])
+        : organizations.map(o => o.id);
     const decided = resolveOrganizationGate(
-        organizations, getPageName(),
+        reachable, getPageName(),
     );
     if (decided === null) {
         bounceTo('invitations');
         return null;
     }
-    return decided;
+    return { organizations };
 }
 
 // Refresh a dead-access / live-refresh session and install
@@ -360,7 +422,7 @@ export async function bootApp(): Promise<void> {
     }
 
     let bootOrganizations:
-        readonly OrganizationEntity[] = [];
+        readonly OrganizationEntity[] | null = [];
     if (
         PAGE_REGISTRY[pageName]?.requiresAuth
             !== false
@@ -377,7 +439,7 @@ export async function bootApp(): Promise<void> {
         if (scoped === null) {
             return;   // bounced to invitations
         }
-        bootOrganizations = scoped;
+        bootOrganizations = scoped.organizations;
     } else {
         markStart(MEASURE_BOOT_ORGANIZATION_SCOPE);
         bootOrganizations =

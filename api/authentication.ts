@@ -877,16 +877,34 @@ async function grantRefresh(
     if (refreshRev !== null) {
         return failure(HTTP_UNAUTHORIZED, refreshRev);
     }
-    const newJti = generateIdentifier();
-    const name = await nameFor(adapter, verified.claims.sub);
     const claims = await subjectClaims(
         adapter, verified.claims.sub,
     );
+    const organization =
+        typeof body.organization === 'string'
+            ? body.organization
+            : '';
+    if (organization !== '') {
+        if (!claims.organizations.includes(
+            organization,
+        )) {
+            return failure(
+                HTTP_FORBIDDEN,
+                'subject is not a member of'
+                    + ' the organization',
+            );
+        }
+    }
+    const newJti = generateIdentifier();
+    const name = await nameFor(adapter, verified.claims.sub);
     const minted = await mintPair(
         verified.claims.sub, name, newJti,
         undefined, {
             organizations: claims.organizations,
             roles: claims.roles,
+            ...(organization !== ''
+                ? { organization }
+                : {}),
         },
     );
     const response = minted.response;

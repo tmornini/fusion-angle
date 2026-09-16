@@ -683,6 +683,86 @@ Deno.test('an invalid refresh token is a 401 no-op', async () => {
         (await db.messagePairs.getAll()).length, before);
 });
 
+Deno.test(
+    'refresh with a live seat scopes the access token',
+    async () => {
+        const db = await freshDb();
+        await seedRootAdmin(db);
+        const pair1 = await initialPair(db);
+        const before = decodeAccessToken(pair1.access_token);
+        const organization = 'AjdvjuECVZEgZoFajaIEkg';
+        const res = await handleRequest(db, tokenRequest({
+            grant_type: 'refresh',
+            refresh_token: pair1.refresh_token,
+            organization,
+        }));
+        assertStrictEquals(res.status, 201);
+        const body = await res.json() as {
+            access_token: string;
+        };
+        const claims = decodeAccessToken(body.access_token);
+        assertStrictEquals(
+            claims.organization, organization,
+        );
+        assertEquals(
+            claims.organizations, before.organizations,
+        );
+    },
+);
+
+Deno.test(
+    'refresh with a foreign organization is 403',
+    async () => {
+        const db = await freshDb();
+        await seedRootAdmin(db);
+        const pair1 = await initialPair(db);
+        const before =
+            (await deriveIdentityTokensFor(
+                db, 'XXZruirZyAOoRpNxaDnpSA',
+            )).length;
+        const res = await handleRequest(db, tokenRequest({
+            grant_type: 'refresh',
+            refresh_token: pair1.refresh_token,
+            organization: '7',
+        }));
+        assertStrictEquals(res.status, 403);
+        const body = await res.json() as { error: string };
+        assertMatch(body.error, /not a member/);
+        assertStrictEquals(
+            (await deriveIdentityTokensFor(
+                db, 'XXZruirZyAOoRpNxaDnpSA',
+            )).length, before);
+        const stillLive = await handleRequest(
+            db, tokenRequest({
+                grant_type: 'refresh',
+                refresh_token: pair1.refresh_token,
+            }),
+        );
+        assertStrictEquals(stillLive.status, 201);
+    },
+);
+
+Deno.test(
+    'refresh without organization stays a flat token',
+    async () => {
+        const db = await freshDb();
+        await seedRootAdmin(db);
+        const pair1 = await initialPair(db);
+        const res = await handleRequest(db, tokenRequest({
+            grant_type: 'refresh',
+            refresh_token: pair1.refresh_token,
+        }));
+        assertStrictEquals(res.status, 201);
+        const body = await res.json() as {
+            access_token: string;
+        };
+        const claims = decodeAccessToken(body.access_token);
+        assertStrictEquals(
+            claims.organization, undefined,
+        );
+    },
+);
+
 Deno.test('token-exchange shapes sub=subject and act=actor',
 async () => {
     const db = await freshDb();
