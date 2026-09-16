@@ -657,6 +657,9 @@ export class IdeaPresenter {
                 )
             }">${this.#idea.titleText()}</a>
         </h3>
+        <p class="${
+            'text-sm text-muted mt-1'
+        }">${displayText(this.#submitterName)}</p>
         <div class="${
             'flex items-center gap-2 mt-1'
         }">
