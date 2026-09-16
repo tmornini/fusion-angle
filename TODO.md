@@ -1412,6 +1412,12 @@ Off the critical path; each with its oracle.
   separate finding
 - A full TEST-PLAN.md walk using serial subagents, so
   session context stays short — TEST-PLAN.md `## The walk`
+- Layer 2 pin `tests/browser/workbox-transition.test.ts`
+  'bind, fill, and submit navigates to the inbox (WB11)'
+  red at 88cb4d37: inbox path landed, then the
+  `Transition complete` toast timed out at 10s. Stub:
+  `docs/superpowers/test-plan-mitigations/2026-09-16-AT-AT5.md`.
+  Oracle: that test green; `./test browser` fail 0.
 - Billing (`web-app/billing/`)
 - Attribute drag-reorder (TEST-PLAN R8)
 - A flow loaded with Auto Fit OFF no longer fits on
