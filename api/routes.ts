@@ -342,7 +342,7 @@ export { param, requireOrganization, withoutId };
 // an entry point reached first; see the fix report.)
 //
 // Decision 7 state-in-entity (Phase 2/3): the PUT body is the
-// FULL document — the entity's own fields plus the state trio —
+// FULL document — the entity's own fields plus state —
 // validated once at the gate (documentWriteResponseSpec, via
 // validateDocument). Phase Final Task 2: the ideas ROW half is
 // stripped; the pair + states.postEvent land in ONE transaction
@@ -351,13 +351,13 @@ export { param, requireOrganization, withoutId };
 // head, so it authors like any other transition.
 //
 // MEMBER_ID CAVEAT: sameEvent (store-state.ts) compares member_id
-// too, so a state-UNCHANGED edit (the resent trio matches the
-// current head byte-for-byte) must replay the STORED head
+// too, so a state-UNCHANGED edit (the resent state fields match
+// the current head byte-for-byte) must replay the STORED head
 // event's member_id — never the editing actor — or a different
 // member plainly editing a field after someone else's transition
 // would 409 (LedgerImmutabilityError). A genuinely fabricated
-// trio still fails sameEvent on state/at and 409s, exactly as a
-// bare states/:id resend would.
+// state event still fails sameEvent on state/at and 409s,
+// exactly as a bare states/:id resend would.
 const IDEAS_WIRING: DocumentFamilyWiring = {
     family: 'ideas',
     httpNest: 'organization',
@@ -395,9 +395,10 @@ const FLOWS_WIRING: DocumentFamilyWiring = {
         flowEntityOf(document, organization),
 };
 // The work-orders wiring row — the fourth family, and the
-// FIRST 'stateless' one (Decision 7's lifecycle trio does not
-// apply to a work-order document; see postWorkOrderDocumentOp's
-// own comment for why). Both PUT (Task 2/3) and GET (Task 7)
+// FIRST 'stateless' one (Decision 7's state-in-entity design
+// does not apply to a work-order document; see
+// postWorkOrderDocumentOp's own comment for why). Both PUT
+// (Task 2/3) and GET (Task 7)
 // now ride the generic machinery, so entityOf serves a live GET
 // reader (documentGetHandler / documentCollectionGetHandler)
 // exactly as ideaEntityOf/projectEntityOf/flowEntityOf each
@@ -460,11 +461,11 @@ function objectiveDocumentEntityOf(
 // FIFTH 'state' one (states-document retirement). Its three
 // old 'stateless' rationales are all RETIRED with the
 // states/:id document that anchored them: the wire body DOES
-// grow the trio (the zero-delta covenant died with the
+// grow state (the zero-delta covenant died with the
 // document), genesis IS an explicit minted event (the seed
 // re-baselined its pins — no 911 pin survives), and
 // absence-as-active (R2) is retired — a fresh objective now
-// carries a genesis event like every other trio family.
+// carries a genesis event like every other state family.
 // notFoundTable is 'objectives' — its storage table name
 // matches its family name, like ideas/projects/flows/records
 // (work-orders/record-attributes are the two whose names
@@ -479,7 +480,7 @@ const OBJECTIVES_WIRING: DocumentFamilyWiring = {
     entityOf: objectiveDocumentEntityOf,
 };
 // The bare identities row spreads safely (no organization_id,
-// no trio). `_organization` stays unused: identities is
+// no state). `_organization` stays unused: identities is
 // GLOBAL plane (family-registry.ts: organizationNested:false).
 export function identityDocumentEntityOf(
     document: DerivedDocument,
@@ -528,7 +529,7 @@ export function aiAgentDocumentEntityOf(
 // The ai-agents wiring row — the FOURTEENTH registered
 // family. Not a member and not an identity: a standing
 // agent document on the global plane. Stateless: no
-// lifecycle trio. notFoundTable matches the family name.
+// lifecycle state. notFoundTable matches the family name.
 const AI_AGENTS_WIRING: DocumentFamilyWiring = {
     family: 'ai-agents',
     httpNest: 'global',
@@ -1237,7 +1238,7 @@ export async function postRecordDocumentOp(
 // WRITE_RESPONSE_SPECS successBody forms the wire bytes; the
 // reconstructed return is for below-facade callers and type
 // parity. validateRecordAttributeDocumentBody rejects a body
-// carrying the trio at the gate. `messagePair` is optional. The actor
+// carrying state at the gate. `messagePair` is optional. The actor
 // parameter is spelled `_actor`: no state event here to author.
 export async function postRecordAttributeDocumentOp(
     db: DbAdapter,
@@ -1599,8 +1600,8 @@ export interface ObjectiveCreationMessagePairs {
 
 // The wire body a live PUT objectives/:id would carry for
 // this SAME write: the entity field (organization_id
-// STRIPPED — the org rides the path) plus the lifecycle
-// trio mapped from the create body's initialState* — the
+// STRIPPED — the org rides the path) plus state mapped
+// from the create body's initialState* — the
 // recordDocumentBodyOf shape, so a synthesized document message pair
 // is byte-indistinguishable from what a live PUT would have
 // stored for the identical write.
@@ -1631,8 +1632,8 @@ export function objectiveRevisionBodyOf(
 // Objective creation: operation + document + first-revision
 // pairs commit as ONE transaction. Phase Final Task 2:
 // objectives + objective_revisions ROW halves stripped —
-// pure message-plane write. The genesis lifecycle trio folds
-// onto the document message pair via objectiveDocumentBodyOf
+// pure message-plane write. The genesis state folds onto
+// the document message pair via objectiveDocumentBodyOf
 // (states-document retirement); no separate states/:id event
 // is written. Exported so the seed can drive objective
 // creation through the same gate the route uses (Decision
@@ -1660,14 +1661,14 @@ export async function postObjectiveCreationOp(
     );
 }
 
-// Objective document write — the fifth lifecycle-trio family
+// Objective document write — the fifth lifecycle-state family
 // (states-document retirement). Phase Final Task 2: the
 // objectives ROW half is stripped — pure message-plane write
 // (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
 // successBody forms the wire bytes; the reconstructed return
 // is for below-facade callers and type parity.
-// validateObjectiveDocumentBody admits entity field plus the
-// lifecycle trio; Task 1 widens the gate only — state-event
+// validateObjectiveDocumentBody admits entity field plus
+// state; Task 1 widens the gate only — state-event
 // minting lands with later tasks. `messagePair` is optional so a
 // future below-facade caller keeps compiling; the live route
 // always supplies one, since 'objectives/:id' is pair-wired
@@ -2423,8 +2424,8 @@ export async function postWorkOrderBindingOp(
 // (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
 // successBody forms the wire bytes; the reconstructed return
 // is for below-facade callers and type parity.
-// validateWorkOrderDocumentBody rejects a body carrying the
-// trio at the gate. Exported so the seed can drive a work-
+// validateWorkOrderDocumentBody rejects a body carrying
+// state at the gate. Exported so the seed can drive a work-
 // order document write through the same op the route uses.
 // `messagePair` is optional. The actor parameter is spelled `_actor`:
 // no state event here to author.
@@ -2951,9 +2952,9 @@ export const WRITE_RESPONSE_SPECS:
     > = {
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody: it validates the
-    // full wire document (entity + trio) through the wiring's
-    // OWN validator. G1 trio families emit wiring.entityOf
-    // (id first, trio last — the GET derive), live writes
+    // full wire document (entity + state) through the wiring's
+    // OWN validator. G1 state families emit wiring.entityOf
+    // (id first, state last — the GET derive), live writes
     // included: entityOf runs over the incoming body and
     // yields the same object GET derives from the head.
     'organizations/:id/ideas/:id':
@@ -3135,7 +3136,7 @@ export const WRITE_RESPONSE_SPECS:
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody — see the ideas/:id
     // entry above for the shared rationale. G1: objectives/:id
-    // emits objectiveDocumentEntityOf (id first, trio last).
+    // emits objectiveDocumentEntityOf (id first, state last).
     'organizations/:id/objectives/:id':
         documentWriteResponseSpec(OBJECTIVES_WIRING),
     'organizations/:id/objectives/:id/revisions/:rid': {
@@ -4312,7 +4313,7 @@ export const routes: Route[] = [
     // Task 5): the list derives from the message ledger rather
     // than the old ideas table. Absorbed (Phase 4 Task 2) into
     // the generic documentCollectionRoute — wire-identical to
-    // the hand-written deriveIdeas dispatch it replaces.
+    // the hand-written dispatch it replaces.
     documentCollectionRoute(IDEAS_WIRING),
     // Convert an idea to a project (promotion): the LONE
     // cross-aggregate write. A new projects row, the promoted
@@ -4368,8 +4369,8 @@ export const routes: Route[] = [
             const ideaId = param(p, 1);
             const b = validateIdeaConversionBody(body);
             // The document a live PUT /projects/:id would
-            // carry: the entity's own fields plus the lifecycle
-            // trio this conversion assigns. Validated pre-tx —
+            // carry: the entity's own fields plus the state
+            // this conversion assigns. Validated pre-tx —
             // a malformed project body now 400s here instead of
             // at the in-tx store re-validation; same observable,
             // earlier.
@@ -4484,7 +4485,7 @@ export const routes: Route[] = [
     // the message ledger rather than the old projects table.
     // Absorbed (Phase 4 Task 2) into the generic
     // documentCollectionRoute — wire-identical to the
-    // hand-written deriveProjects dispatch it replaces.
+    // hand-written dispatch it replaces.
     documentCollectionRoute(PROJECTS_WIRING),
     // Idea submissions nest under their parent idea: param 0 is
     // the path org, param 1 is the idea, so the SERVER filters
@@ -4652,7 +4653,7 @@ export const routes: Route[] = [
     // message ledger at this project's flows document rather than
     // the old project_flows table — deriveProjectFlows is a
     // bespoke derivation (not a DocumentFamilyWiring family; a
-    // join row carries no lifecycle trio of its own), so this
+    // join row carries no lifecycle state of its own), so this
     // calls it directly rather than through a generic constructor.
     route('organizations/:id/projects/:id/flows/', {
         get: (db, p, _actor, organization) =>
@@ -4947,7 +4948,7 @@ export const routes: Route[] = [
     // ledger at this flow's work-orders document rather than the
     // old flow_work_orders table — deriveFlowWorkOrders is a
     // bespoke derivation (not a DocumentFamilyWiring family; a
-    // join row carries no lifecycle trio of its own), so this
+    // join row carries no lifecycle state of its own), so this
     // calls it directly rather than through a generic
     // constructor, mirroring deriveProjectFlows' own precedent.
     route('organizations/:id/flows/:id/work-orders/', {
@@ -4978,7 +4979,7 @@ export const routes: Route[] = [
     // :record-type-id) rather than the document-family
     // factories — documentPutHandler takes param 1 as id
     // on an org nest (param 0 is the path org). PUT
-    // reuses postRecordDocumentOp (same trio body /
+    // reuses postRecordDocumentOp (same state body /
     // pair append). POST reuses formRecordWriteMessagePairs +
     // postRecordWriteOp with nested documents.
     // DELETE is inline records/:id posture plus type RESTRICT.
@@ -5227,7 +5228,7 @@ export const routes: Route[] = [
         },
     }),
     // Nested instance value-revision versions (Task 19).
-    // NOT a lifecycle-trio clone: each entry is full state
+    // NOT a document-versions clone: each entry is full state
     // from a revision (or genesis) PUT pair (R5 — no fold),
     // projected by the caller's CURRENT read ACL. Wire
     // (at, id) DESC so index 0 is the live head. Empty →
@@ -5372,7 +5373,7 @@ export const routes: Route[] = [
     // the collection and the by-id read now ride deriveFlowRecords
     // / deriveFlowRecord — a bespoke derivation (not a
     // DocumentFamilyWiring family; a join row carries no lifecycle
-    // trio of its own), so this calls it directly rather than
+    // state of its own), so this calls it directly rather than
     // through a generic constructor, mirroring deriveFlowWorkOrders'
     // own precedent above. flows/:id/versions table-backed
     // nested read RETIRED Phase 15 Task 7 (zero callers).
@@ -5679,7 +5680,7 @@ export const routes: Route[] = [
     // message ledger rather than the old objectives table. Rides
     // the generic documentCollectionGetHandler —
     // objectiveDocumentEntityOf stamps entity fields plus the
-    // lifecycle-current trio (A9). POST stays this hand-written
+    // lifecycle-current state (A9). POST stays this hand-written
     // bundle — objectives' own create forms the document PLUS
     // its first revision pair in one pass
     // (postObjectiveCreationOp), mirroring records'/work-
@@ -5739,7 +5740,7 @@ export const routes: Route[] = [
     // (Task 7): absorbed into the generic documentEntityRoute —
     // GET dispatches to documentGetHandler(OBJECTIVES_WIRING);
     // objectiveDocumentEntityOf stamps entity fields plus the
-    // lifecycle-current trio (A9). PUT stays
+    // lifecycle-current state (A9). PUT stays
     // documentPutHandler(OBJECTIVES_WIRING), unchanged from
     // before this flip (Task 2); objectives/:id has no DELETE
     // today, mirroring the ideas/projects/work-orders
@@ -5757,7 +5758,7 @@ export const routes: Route[] = [
     // (the org fence still rides the facade re-entry). GET
     // is FLIPPED (Task 7): rides deriveObjectiveRevisions —
     // a bespoke derivation, not a DocumentFamilyWiring family
-    // (a nested document carries no lifecycle trio of its
+    // (a nested document carries no lifecycle state of its
     // own), so this calls it directly rather than through a
     // generic constructor, mirroring deriveFlowRecords' own
     // precedent above. The leaf id is param 2; only PUT is
@@ -5853,7 +5854,7 @@ export const routes: Route[] = [
     // Bulk lifecycle collection RETIRED (states-URI
     // elimination C3): the five-source union is gone.
     // Per-entity history lives on GET <family>/:id/history
-    // (work-orders stay /history; trio families stay
+    // (work-orders stay /history; every other family stays
     // /versions/). Nested field-values collection retired
     // with C4 (inline fold on WO history). bare states/:id
     // is already a router 404 (states-document retirement

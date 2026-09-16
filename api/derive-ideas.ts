@@ -17,9 +17,11 @@ import {
 } from './derive-documents.ts';
 
 // Ideas' own reshaping of the generic message-plane reduction
-// (derive-documents.ts) for idea submissions — the only
-// surface here still unrouted (Task 5 wires the idea entity
-// itself; the lifecycle-trio walk retired with Task 11).
+// (derive-documents.ts) for idea submissions — a bespoke
+// derivation, not a DocumentFamilyWiring family (a nested
+// document carries no lifecycle state of its own), so the
+// route calls it directly rather than through a generic
+// document-family constructor.
 
 function submissionsUriPrefix(
     organization: Id,

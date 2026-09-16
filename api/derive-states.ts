@@ -37,11 +37,10 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 // onward; bulk lifecycle collection retired — states-URI
 // elimination C3). Per-entity history rides GET
 // <family>/:id/history (work-orders) or /versions/
-// (trio families). Surviving derives in this module:
-//   (a) trio families — per-id derive*StateHistory readers live
-//       in their own family modules (ideas/projects/records/
-//       flows/objectives); write paths use family
-//       currentDocumentState / row-stamped trios.
+// (every other family). Surviving derives in this module:
+//   (a) flows — the per-id derive*StateHistory reader lives
+//       in its own family module; write paths use flows'
+//       own currentDocumentState / row-stamped trio.
 //   (b) deriveMemberStates RETIRED (C4) — leftover
 //       /members/ document-trio history; nothing reads
 //       that collection.

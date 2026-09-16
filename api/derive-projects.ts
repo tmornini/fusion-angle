@@ -4,9 +4,7 @@ import type { DerivedDocument } from './derive-documents.ts';
 
 // Projects' own reshaping of the generic message-plane
 // reduction (derive-documents.ts): the entity shape only this
-// family has. The collection/entity reads and the lifecycle-
-// trio walk retired with Task 11; Task 6 wired the route atop
-// the generic document-family handlers instead.
+// family has.
 
 // The derived entity: the head document's body plus
 // organization_id stamped from the derivation's OWN

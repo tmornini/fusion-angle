@@ -2237,11 +2237,9 @@ function documentEntityPattern(
         : wiring.family + '/:id';
 }
 
-// Stream families (ideas, projects, …). Work-orders still
-// assemble (binding). Flows stay on derive: stored PUT has
-// no trio, so a state-'deleted' head must 404 via the
-// lifecycle walk, and hasUndoHistory is stamped there.
-// Record instances still project.
+// Stream families read the stored head. Work-orders
+// assemble (binding). Flows stay on derive for
+// hasUndoHistory.
 function streamFamilyWiring(
     routePattern: string,
 ): ReturnType<typeof documentFamilyWiring> {

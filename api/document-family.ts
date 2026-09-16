@@ -112,8 +112,8 @@ export interface DocumentFamilyWiring {
     // first family whose storage table name differs from its
     // family name).
     readonly notFoundTable: string;
-    // Validates the full wire document (entity + trio [+ family
-    // extras]); throws ValidationError.
+    // Validates the full wire document (entity + state [+
+    // family extras]); throws ValidationError.
     readonly validateDocument:
         (body: Record<string, unknown>) => unknown;
     // The family's decompose op (old-plane rows + pair).

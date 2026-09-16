@@ -232,9 +232,7 @@ export function stateHistoryFrom(
 // older state_at than genesis) never displaces genesis. Mirrors
 // StateStore.getCurrentForIn's own (at, id) reduction over the
 // real states table exactly (shared/ledger-reduction.ts's
-// default compare). Families that stamp the lifecycle trio on
-// GET rows read the whole event; others only need `.state`
-// via currentDocumentState.
+// default compare).
 function currentLifecycleEvent(
     history: readonly StateEntity[],
 ): StateEntity | undefined {

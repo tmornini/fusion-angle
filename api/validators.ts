@@ -828,13 +828,15 @@ export interface IdentityDocumentBody {
 // registered family, and the FOURTH member of MEMBERS_WIRING's
 // shared-log-with-genesis 'stateless' bucket (see MEMBERS_WIRING
 // in routes.ts for the full rationale-contrast) — the shared id
-// (member.id === identity.id, always) already receives a genesis
-// states event at create and archive/reactivate via PUT
-// states/:id, so a document trio here would FREEZE that
-// lifecycle at genesis forever. THE LABEL MANDATE (the Phase 7
-// Objective precedent, a NAMED byte-parity-over-convention
-// choice): this gate delegates to validateIdentityEntity, so
-// the assertOnlyKeys label stays 'IdentityEntity' — NOT the
+// (member.id === identity.id, always) has its ACTIVE/ARCHIVED
+// lifecycle carried by the membership SEAT itself, added and
+// removed via PUT/DELETE organizations/:id/members/:id
+// (postMembershipDocumentOp), so a document trio here would
+// FREEZE that lifecycle at genesis forever. THE LABEL MANDATE
+// (the Phase 7 Objective precedent, a NAMED
+// byte-parity-over-convention choice): this gate delegates to
+// validateIdentityEntity, so the assertOnlyKeys label stays
+// 'IdentityEntity' — NOT the
 // 'IdentityDocumentBody' naming convention every other
 // *DocumentBody validator uses — the label appears in the wire
 // 400 body ("unexpected key ... for IdentityEntity"), and the
@@ -1320,8 +1322,9 @@ const IDEA_BODY_KEYS: readonly string[] = [
     'success_metrics',
 ];
 
-// Entity-field body only — lifecycle trio is GET stamp /
-// document-body, never part of this validator's key set.
+// Entity-field body only — state rides the document body;
+// a head whose state is `deleted` is a tombstone. State
+// itself is never part of this validator's key set.
 export type IdeaEntityFields = Omit<
     IdeaEntity,
     'id' | 'organization_id' | 'state'
@@ -1422,8 +1425,9 @@ const PROJECT_BODY_KEYS: readonly string[] = [
     'actual_cost', 'position',
 ];
 
-// Entity-field body only — lifecycle trio is GET stamp /
-// document-body, never part of this validator's key set.
+// Entity-field body only — state rides the document body;
+// a head whose state is `deleted` is a tombstone. State
+// itself is never part of this validator's key set.
 export type ProjectEntityFields = Omit<
     ProjectEntity,
     'id' | 'organization_id' | 'state'
@@ -2181,8 +2185,9 @@ const OBJECTIVE_BODY_KEYS: readonly string[] = [
     'organization_id', 'position',
 ];
 
-// Entity-field body only — lifecycle trio is GET stamp /
-// document-body, never part of this validator's key set.
+// Entity-field body only — state rides the document body;
+// a head whose state is `deleted` is a tombstone. State
+// itself is never part of this validator's key set.
 export type ObjectiveEntityFields = Omit<
     ObjectiveEntity,
     'id' | 'organization_id' | 'state'
@@ -2201,8 +2206,8 @@ export function validateObjectiveEntity(
 }
 
 // The HTTP-body gate for PUT /objectives/:id: entity field
-// plus the lifecycle trio — the fifth trio family (states-
-// document retirement). The old absence-as-active covenant
+// plus state — the fifth state family (states-document
+// retirement). The old absence-as-active covenant
 // (R2) and the genesis dilemma are RETIRED: genesis is an
 // explicit event minted at create, archive/reactivate ride
 // this SAME document, and no states/:id pair ever carries an
@@ -2216,7 +2221,7 @@ export function validateObjectiveEntity(
 // the convention's label would change those bytes.
 // organization_id is a TOLERATED-BUT-IGNORED optional
 // allowance, never expected: the live client's PUT body
-// carries entity fields plus the trio, but the seed's
+// carries entity fields plus state, but the seed's
 // below-facade create bodies carry organization_id too
 // (documentOperationOrganization's read-back shape in
 // routes.ts, mirrored by every sibling *DocumentBody
@@ -2446,8 +2451,9 @@ const RECORD_BODY_KEYS: readonly string[] = [
     'organization_id', 'name', 'description', 'position',
 ];
 
-// Entity-field body only — lifecycle trio is GET stamp /
-// document-body, never part of this validator's key set.
+// Entity-field body only — state rides the document body;
+// a head whose state is `deleted` is a tombstone. State
+// itself is never part of this validator's key set.
 export type RecordEntityFields = Omit<
     RecordEntity,
     'id' | 'organization_id' | 'state'
@@ -2493,14 +2499,14 @@ export interface RecordDocumentBody {
 }
 
 // The HTTP-body gate for PUT /records/:id (Decision 7): the
-// full wire document — the entity's own fields plus the
-// lifecycle trio folded in. organization_id is deliberately
-// absent from the expected set (like every other org-owned
-// write, the client never supplies it; the org fence stamps
-// it on the response) yet rides the `optional` allowance
-// rather than `expected` — a caller-forged organization_id is
-// tolerated-but-ignored, not rejected. The trio holds to the
-// SAME rules the bare states/:id route applies to an event
+// full wire document — the entity's own fields plus state
+// folded in. organization_id is deliberately absent from
+// the expected set (like every other org-owned write, the
+// client never supplies it; the org fence stamps it on the
+// response) yet rides the `optional` allowance rather than
+// `expected` — a caller-forged organization_id is tolerated-
+// but-ignored, not rejected. State holds to the SAME rules
+// the bare states/:id route applies to an event
 // (assertRecordState, an RFC-3339 `at`, a non-empty event
 // id). Phase Final Task 2: records ROW half stripped — this
 // gate is the sole entity-shape check for the document PUT
@@ -2831,7 +2837,7 @@ export interface RecordAttributeDocumentBody {
 
 // The HTTP-body gate for PUT /record-attributes/:id: the
 // sixth family, and the SECOND 'stateless' one (work-orders is
-// the first) — no lifecycle trio is admitted, so a document PUT
+// the first) — no state field is admitted, so a document PUT
 // here is a pure entity edit. organization_id is deliberately
 // absent from the expected set (like every other org-owned
 // write, the client never supplies it; the org fence stamps it
