@@ -32,6 +32,11 @@ import {
 import { seededMockDb } from './mock-seed.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { deleteHumanMemberSeat } from
+    '../web-app/app/adapters/members.ts';
+import { FORMER_MEMBER_NAME } from '../api/types.ts';
+import { STARK_ORGANIZATION } from
+    '../api/mock-data/seed-constants.ts';
 
 function buildIdea(
     _id: string, title: string,
@@ -444,3 +449,50 @@ Deno.test('getIdeas resolves every seeded submitter in'
         }
     }
 });
+
+Deno.test('getIdeas lists an idea whose submitter left (D1)',
+async () => {
+    const { db, ctx } = await adminContext();
+    const leaverId = generateIdentifier();
+    const ideaId = generateIdentifier();
+    await seedHumanMember(db, leaverId, 'Lisa Leaver');
+    await seedIdea(ctx, ideaId, 'Left behind', 'active');
+    await seedIdeaSubmission(
+        ctx, generateIdentifier(), ideaId, leaverId,
+        '2026-04-01T00:00:00.000000Z',
+    );
+    await deleteHumanMemberSeat(ctx, leaverId);
+    const rows = await getIdeas(ctx);
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.entity.id, ideaId);
+    assertStrictEquals(
+        rows[0]!.submitterName, FORMER_MEMBER_NAME,
+    );
+});
+
+// The walk's own shape (B28, then D1): the seed's Lisa Wang
+// (RPzLGrWcstxLaHoBcViPLQ) submits two of Stark's six
+// visible ideas. Removing her seat leaves the list whole.
+Deno.test(
+    'getIdeas survives B28 removing a seeded submitter (D1)',
+    async () => {
+        const db = await seededMockDb();
+        const ctx = createRequestContext(
+            db,
+            await organizationToken(
+                'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
+            ),
+        );
+        await deleteHumanMemberSeat(
+            ctx, 'RPzLGrWcstxLaHoBcViPLQ',
+        );
+        const rows = await getIdeas(ctx);
+        assertStrictEquals(rows.length, 6);
+        assertStrictEquals(
+            rows.filter(
+                r => r.submitterName === FORMER_MEMBER_NAME,
+            ).length,
+            2,
+        );
+    },
+);

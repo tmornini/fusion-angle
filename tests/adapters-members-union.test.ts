@@ -47,6 +47,10 @@ import {
 } from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { deleteHumanMemberSeat } from
+    '../web-app/app/adapters/members.ts';
+import { FORMER_MEMBER_NAME } from '../api/types.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 const NULL_STORAGE: Partial<Storage> = {
     getItem: () => null,
@@ -399,5 +403,44 @@ Deno.test(
         );
         assert(row !== undefined && isHumanMember(row));
         assertStrictEquals(row.profile().present, false);
+    }),
+);
+
+// A removed seat leaves the roster, not the ledger. The
+// map must still name what the leaver authored — as a
+// former member, never as an unknown id — and name them
+// again once re-seated.
+Deno.test(
+    'getMemberMap names a de-seated member Former member,'
+    + ' off the roster, and by name again once re-seated',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const { db, ctx } = await adminContext();
+        const leaverId = generateIdentifier();
+        await seedHumanMember(db, leaverId, 'Lisa Leaver');
+        assertStrictEquals(
+            memberName(await getMemberMap(ctx), leaverId),
+            'Lisa Leaver',
+        );
+        await deleteHumanMemberSeat(ctx, leaverId);
+        const map = await getMemberMap(ctx);
+        const former = map.get(leaverId);
+        assert(former !== undefined, 'former member mapped');
+        assertStrictEquals(former.kind, 'former');
+        assertStrictEquals(
+            memberName(map, leaverId), FORMER_MEMBER_NAME,
+        );
+        assert(
+            !(await getMembers(ctx)).some(
+                m => m.idForLink() === leaverId,
+            ),
+            'a former member is not a roster row',
+        );
+        await seedSeat(
+            db, 'AjdvjuECVZEgZoFajaIEkg', leaverId, 'member',
+        );
+        assertStrictEquals(
+            memberName(await getMemberMap(ctx), leaverId),
+            'Lisa Leaver',
+        );
     }),
 );

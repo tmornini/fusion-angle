@@ -870,10 +870,41 @@ export class SystemMember {
     }
 }
 
+export const FORMER_MEMBER_NAME = 'Former member';
+
+// A former member: an identity whose seat in the active
+// organization the ledger has DELETEd. What it authored
+// while seated — submissions, transitions, scores — still
+// names it, so the name resolver must know it and paint it
+// as what it is. Identity only: no seat, no profile, and no
+// PII read (a removed identity's PII is not the
+// organization's to paint). Never a roster row.
+export class FormerMember {
+    readonly kind = 'former' as const;
+    readonly #id: MemberId;
+
+    constructor(seat: FormerSeatEntity) {
+        this.#id = seat.identity_id;
+    }
+
+    idForLink(): string {
+        return this.#id;
+    }
+
+    name(): string {
+        return FORMER_MEMBER_NAME;
+    }
+
+    matchesSearch(_term: string): boolean {
+        return false;
+    }
+}
+
 export type Member =
     | HumanMember
     | AIMember
-    | SystemMember;
+    | SystemMember
+    | FormerMember;
 
 export function isHumanMember(
     w: Member,
@@ -891,6 +922,12 @@ export function isSystemMember(
     w: Member,
 ): w is SystemMember {
     return w.kind === 'system';
+}
+
+export function isFormerMember(
+    w: Member,
+): w is FormerMember {
+    return w.kind === 'former';
 }
 
 export interface IdeaEntity {

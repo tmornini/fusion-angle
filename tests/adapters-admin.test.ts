@@ -27,6 +27,8 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { deleteHumanMemberSeat } from
+    '../web-app/app/adapters/members.ts';
 
 function buildProject(
     id: string,
@@ -242,5 +244,24 @@ Deno.test(
         );
         const organization = await getOrganization(ctx);
         assertStrictEquals(organization.usedSeats(), 2);
+    },
+);
+
+// G9: the organization page counts ideas through getIdeas,
+// so a submitter who left took the whole page down.
+Deno.test(
+    'getOrganizationStats counts an idea whose submitter'
+    + ' left (G9)',
+    async () => {
+        const { db, ctx } = await adminContext();
+        const leaverId = generateIdentifier();
+        await seedMember(db, leaverId);
+        await seedIdea(
+            ctx, generateIdentifier(), 'active', leaverId,
+        );
+        await deleteHumanMemberSeat(ctx, leaverId);
+        const stats = await getOrganizationStats(ctx);
+        assertStrictEquals(stats.ideasCurrent, 1);
+        assertStrictEquals(stats.activePeopleCount, 1);
     },
 );
