@@ -157,6 +157,11 @@ seat by its DELETE; the last admin seat refuses (409), and
 a removed member's access ends at the next mint, refresh,
 or expiry per the named covenant. The system member is the
 constant `SYSTEM_MEMBER_ID` (`api/types.ts`), not a seat.
+A removed seat stays in the ledger as a DELETE head at
+the same prefix; `organizations/:id/former-members/`
+lists those heads, and the name resolver paints them as
+"Former member" — an author who left is not an unknown
+id.
 
 Invitation alphabet: pending, accepted, declined, revoked.
 Invitations are not org-fenced: the invitee must read an
