@@ -4,8 +4,6 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { deriveRecordTypeStateHistory } from
-    '../api/derive-record-types.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -49,7 +47,6 @@ Deno.test(
         const stored = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
         assertStrictEquals(stored.id, 'rbfHGatkwQzGZJVXKJEeyw');
         assertStrictEquals(stored.name, 'Customer');
-        // Lifecycle-current trio is stamped on the GET row.
         assertStrictEquals(stored.state, 'active');
     },
 );
@@ -153,7 +150,7 @@ Deno.test(
             initialState: 'active',
         });
         // Echo the create's own known head from the GET row
-        // trio — never a fresh mint (RecordChangeEdit).
+        // — never a fresh mint (RecordChangeEdit).
         const head = await getRecordModel(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
         await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'edit',
@@ -228,9 +225,8 @@ Deno.test(
 );
 
 Deno.test(
-    'postRecordStateChange records a new event'
-    + ' without changing non-lifecycle entity fields'
-    + ' on GET',
+    'postRecordStateChange changes state without'
+    + ' changing entity fields on GET',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -251,7 +247,7 @@ Deno.test(
             ctx, before, 'archived',
         );
         const after = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
-        // Entity content fields unchanged; GET trio advances
+        // Entity content fields unchanged; GET state advances
         // to the transition event (lifecycle-current stamp).
         assertStrictEquals(after.name, before.name);
         assertStrictEquals(after.description, 'orig');
@@ -261,10 +257,6 @@ Deno.test(
             ctx, 'rbfHGatkwQzGZJVXKJEeyw',
         );
         assertStrictEquals(model.stateValue(), 'archived');
-        const events = await deriveRecordTypeStateHistory(
-            db, 'AjdvjuECVZEgZoFajaIEkg', 'rbfHGatkwQzGZJVXKJEeyw',
-        );
-        assertStrictEquals(events.at(-1)?.state, 'archived');
     },
 );
 
@@ -327,42 +319,6 @@ Deno.test(
         assert(
             !ids.includes('fndCYAsXazdzMUlEGMNIZw'),
             'idea must not leak into records',
-        );
-    },
-);
-
-Deno.test(
-    'state events for records land in the unified'
-    + ' states log',
-    async () => {
-        const db = memoryDbAdapter();
-        await seedAdminSchema(db);
-        await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await organizationToken());
-        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
-            kind: 'create',
-            record: {
-                name: 'X',
-                description: '',
-                position: 1,
-            },
-            attributes: [],
-            initialState: 'active',
-        });
-        const sRqRSyldQDFbqkDYSObDqw = await getRecord(ctx
-            , 'rbfHGatkwQzGZJVXKJEeyw');
-        await postRecordStateChange(
-            ctx, sRqRSyldQDFbqkDYSObDqw, 'archived',
-        );
-        const events = await deriveRecordTypeStateHistory(db
-            , 'AjdvjuECVZEgZoFajaIEkg',
-            'rbfHGatkwQzGZJVXKJEeyw',
-        );
-        const values = events
-            .map(e => e.state)
-            .sort();
-        assertEquals(
-            values, ['active', 'archived'],
         );
     },
 );

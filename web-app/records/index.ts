@@ -141,7 +141,7 @@ function onRecordsLoaded(
             const ctx = sessionContext();
             // The entity fields still need a fresh fetch
             // (this handler is 2-hop, unlike ideas' 1-hop
-            // reorder) — the trio alone comes from the
+            // reorder) — state alone comes from the
             // already-loaded list model's accessors below.
             const fresh = await getRecord(
                 ctx, id,

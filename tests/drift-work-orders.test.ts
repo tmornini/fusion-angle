@@ -842,15 +842,16 @@ Deno.test('duplicate-create: two creates, same work-order id, fresh'
 
 // -- 7. document supersession (plain, NOT skew) -----------------
 
-// NAMED divergence from the trio families' skew tests: for a
-// stateless document, envelope order and arrival order are
-// STRUCTURALLY identical (nowUtc is globally strictly monotonic
-// and response `at` is minted synchronously pre-commit), so no
-// live two-PUT sequence can decouple them — and there is no body
-// timestamp to skew (the flows/ideas/projects skew tests
-// skewed the TRIO's state_at, which this stateless family
-// does not carry). This case asserts plain Simple-PUT
-// supersession only.
+// NAMED divergence from the flows skew test
+// (tests/derive-flows.test.ts's 'a clock-skewed transition
+// does NOT displace genesis'): for a stateless document,
+// envelope order and arrival order are STRUCTURALLY identical
+// (nowUtc is globally strictly monotonic and response `at` is
+// minted synchronously pre-commit), so no live two-PUT
+// sequence can decouple them — and there is no body timestamp
+// to skew (that test skewed the flow document's state_at,
+// which this stateless family does not carry). This case
+// asserts plain Simple-PUT supersession only.
 // Bare-req idiom, no header threading — a NAMED contrast to
 // derive-flows' locked-echo idiom (work-orders is 'simple'
 // concurrency, never 'locked').

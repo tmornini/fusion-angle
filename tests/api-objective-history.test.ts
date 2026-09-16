@@ -38,11 +38,7 @@ function req(
     });
 }
 
-function objectiveBody(
-    state: string,
-    _stateAt: string,
-    _stateEventId: string,
-) {
+function objectiveBody(state: string) {
     return {
         position: 1,
         state,
@@ -54,8 +50,6 @@ async function putObjective(
     id: string,
     token: string,
     state: string,
-    stateAt: string,
-    eventSuffix: string,
     organization = 'AjdvjuECVZEgZoFajaIEkg',
 ): Promise<void> {
     const res = await handleRequest(
@@ -65,9 +59,7 @@ async function putObjective(
             '/organizations/' + organization
                 + '/objectives/' + id,
             token,
-            objectiveBody(
-                state, stateAt, id + '-' + eventSuffix,
-            ),
+            objectiveBody(state),
             generateIdentifier(),
         ),
     );
@@ -81,10 +73,7 @@ Deno.test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const id = generateIdentifier();
-        await putObjective(
-            db, id, DEV_TOKEN, 'active',
-            '2026-04-01T00:00:00.000000Z', 'ev1',
-        );
+        await putObjective(db, id, DEV_TOKEN, 'active');
 
         const slashless = await handleRequest(
             db,
@@ -125,22 +114,10 @@ Deno.test(
         await seedAdminSchema(db);
         const id = generateIdentifier();
 
-        await putObjective(
-            db, id, DEV_TOKEN, 'active',
-            '2026-04-01T00:00:00.000000Z', 'ev1',
-        );
-        await putObjective(
-            db, id, DEV_TOKEN, 'archived',
-            '2026-04-02T00:00:00.000000Z', 'ev2',
-        );
-        await putObjective(
-            db, id, DEV_TOKEN, 'active',
-            '2026-04-03T00:00:00.000000Z', 'ev3',
-        );
-        await putObjective(
-            db, id, DEV_TOKEN, 'archived',
-            '2026-04-04T00:00:00.000000Z', 'ev4',
-        );
+        await putObjective(db, id, DEV_TOKEN, 'active');
+        await putObjective(db, id, DEV_TOKEN, 'archived');
+        await putObjective(db, id, DEV_TOKEN, 'active');
+        await putObjective(db, id, DEV_TOKEN, 'archived');
 
         const res = await handleRequest(
             db,

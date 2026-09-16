@@ -67,13 +67,6 @@ export function filterByField<T, K extends keyof T>(
     return rows.filter(row => row[field] === value);
 }
 
-// Ideas / projects / objectives / record-types carry domain
-// `state` on the GET row. This helper is a pass-through.
-interface TrioRow {
-    readonly id: string;
-    readonly state?: string;
-}
-
 export function organizationCollection(
     ctx: RequestContext,
     family: string,
@@ -92,28 +85,6 @@ export function organizationItem(
         + activeOrganization(ctx)
         + '/' + family + '/' + id;
 }
-
-export async function withLifecycleTrio<T extends TrioRow>(
-    _ctx: RequestContext,
-    _family: string,
-    row: T,
-): Promise<T> {
-    return row;
-}
-
-export async function withLifecycleTrios<T extends TrioRow>(
-    ctx: RequestContext,
-    family: string,
-    rows: readonly T[],
-): Promise<T[]> {
-    return Promise.all(
-        rows.map(
-            (row) => withLifecycleTrio(ctx, family, row),
-        ),
-    );
-}
-
-
 
 export interface RequestContext {
     readonly requestId: string;

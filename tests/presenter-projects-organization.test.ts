@@ -103,9 +103,7 @@ function makeProject(overrides: {
         actual_cost: 25000,
         position: overrides.position ?? 0,
         state: overrides.state ?? 'approved',
-    }, {
-        state: overrides.state ?? 'approved',
-    });
+    }, overrides.state ?? 'approved');
 }
 
 function makeOrganization() {

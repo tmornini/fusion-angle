@@ -17,8 +17,6 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
 } from '../api/types.ts';
-import { nowUtc } from
-    '../api/types.ts';
 import { canonicalPath } from '../api/message-pair.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {
@@ -38,8 +36,6 @@ import {
     deriveFlowRecords,
     deriveFlowRecord,
 } from '../api/derive-flow-records.ts';
-import { deriveRecordTypeStateHistory } from
-    '../api/derive-record-types.ts';
 import { resolveGlobalOwner } from '../api/derive-states.ts';
 import {
     customerProfileRecordId,
@@ -76,17 +72,10 @@ const SEED_FLOW_ORGANIZATION_TWO = seedIdentifier('seed-flow-org2');
 const REC_DRIFT_CHAIN_1_ATTR_A = generateIdentifier();
 const REC_DRIFT_CHAIN_1_ATTR_B = generateIdentifier();
 const REC_DRIFT_CHAIN_1_ATTR_C = generateIdentifier();
-const REC_DRIFT_CHAIN_1_GENESIS = generateIdentifier();
-const REC_DRIFT_CHAIN_1_EDIT = generateIdentifier();
-const REC_DRIFT_CHAIN_1_REJECTED = generateIdentifier();
-const REC_DRIFT_CHAIN_2_GENESIS = generateIdentifier();
 const REC_DRIFT_DUP_1_A_ATTR = generateIdentifier();
-const REC_DRIFT_DUP_1_A_EV = generateIdentifier();
 const REC_DRIFT_DUP_1_B_ATTR = generateIdentifier();
-const REC_DRIFT_DUP_1_B_EV = generateIdentifier();
 const REC_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 const REC_DRIFT_METHOD_FILTER_1_ATTR = generateIdentifier();
-const REC_DRIFT_METHOD_FILTER_1_EV = generateIdentifier();
 const REC_DRIFT_Z = generateIdentifier();
 const EV_DRIFT_Z = generateIdentifier();
 const REC_DRIFT_A = generateIdentifier();
@@ -124,13 +113,12 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 const RECORDS_TEST_WIRING: DocumentFamilyWiring = {
     family: 'record-types',
     httpNest: 'organization',
-    lifecycle: 'trio',
+    lifecycle: 'state',
     notFoundTable: 'record_types',
     validateDocument: validateRecordDocumentBody,
     documentOp: postRecordDocumentOp,
-    // Mirror routes.ts recordDocumentEntityOf: stamp trio
-    // from lifecycle-current (required on trio path).
-    entityOf: (document, organization, current) => {
+    // Mirror routes.ts recordDocumentEntityOf.
+    entityOf: (document, organization) => {
         const body = document.body;
         return {
             id: document.name,
@@ -138,7 +126,7 @@ const RECORDS_TEST_WIRING: DocumentFamilyWiring = {
             name: pickString(body, 'name'),
             description: pickString(body, 'description'),
             position: pickNumber(body, 'position'),
-            state: current!.state,
+            state: pickString(body, 'state'),
         };
     },
 };
@@ -313,8 +301,6 @@ function createRecordBody(
     organization: string,
     name: string,
     attributes: readonly Record<string, unknown>[],
-    stateEventId: string,
-    stateAt: string,
 ): Record<string, unknown> {
     return {
         kind: 'create',
@@ -327,8 +313,6 @@ function createRecordBody(
         },
         attributes,
         initialState: 'active',
-        initialStateEventId: stateEventId,
-        initialStateAt: stateAt,
     };
 }
 
@@ -339,8 +323,6 @@ function editRecordBody(
     attributes: readonly Record<string, unknown>[],
     removedAttributeIds: readonly string[],
     state: string,
-    _stateAt: string,
-    _stateEventId: string,
 ): Record<string, unknown> {
     return {
         kind: 'edit',
@@ -678,7 +660,7 @@ async () => {
 // -- 5. live-write chain on wire + derive ------------------------
 
 Deno.test('live-write chain: create, edit, RESTRICT 409, echoed'
-+ ' trio, archive, delete, physical DELETE — wire + derive',
++ ' state, archive, delete, physical DELETE',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -743,7 +725,6 @@ async () => {
                     attrB, recordId, 'Attr B', STARK_ORGANIZATION,
                 ),
             ],
-            REC_DRIFT_CHAIN_1_GENESIS, nowUtc(),
         ),
     ));
     assertStrictEquals(created.status, 201);
@@ -753,8 +734,6 @@ async () => {
     // Phase Final Stage B: records table retired.
 
     // Step 2: edit — add attrC, remove attrA.
-    const editStateAt = nowUtc();
-    const editStateEventId = REC_DRIFT_CHAIN_1_EDIT;
     const edited = await handleRequest(db, req(
         'POST', '/organizations/' + STARK_ORGANIZATION
             + '/record-types/', token,
@@ -766,7 +745,7 @@ async () => {
                 ),
             ],
             [attrA],
-            'active', editStateAt, editStateEventId,
+            'active',
         ),
     ));
     assertStrictEquals(edited.status, 201);
@@ -787,7 +766,7 @@ async () => {
         editRecordBody(
             recordId, STARK_ORGANIZATION, 'Chain Record',
             [], ['CPJmMPXRaBIiNdGBofUPVg'],
-            'active', nowUtc(), REC_DRIFT_CHAIN_1_REJECTED,
+            'active',
         ),
     ));
     assertStrictEquals(rejected.status, 409);
@@ -801,7 +780,7 @@ async () => {
     );
     await assertRecordWire();
 
-    // Step 4: echoed-trio PUT — no new states row.
+    // Step 4: echoed PUT — no new states row.
     const beforeStatesCount =
         0 /* states table retired */;
     const echoed = await handleRequest(db, req(
@@ -871,13 +850,6 @@ async () => {
         false,
     );
 
-    // Phase Final Task 2: states ROW half stripped — history
-    // is message-plane only.
-    const derivedHistory = await deriveRecordTypeStateHistory(
-        db, STARK_ORGANIZATION, recordId,
-    );
-    assertStrictEquals(derivedHistory.length, 3);
-
     // Step 7: physical DELETE on a second record.
     const secondRecordId = generateIdentifier();
     const secondCreated = await handleRequest(db, req(
@@ -885,7 +857,7 @@ async () => {
             + '/record-types/', token,
         createRecordBody(
             secondRecordId, STARK_ORGANIZATION, 'Second Record',
-            [], REC_DRIFT_CHAIN_2_GENESIS, nowUtc(),
+            [],
         ),
     ));
     assertStrictEquals(secondCreated.status, 201);
@@ -930,8 +902,6 @@ async () => {
                     'Attr A', STARK_ORGANIZATION,
                 ),
             ],
-            REC_DRIFT_DUP_1_A_EV,
-            '2026-05-02T00:00:00.000000Z',
         ),
     ));
     assertStrictEquals(first.status, 201);
@@ -954,8 +924,6 @@ async () => {
                     'Attr B', STARK_ORGANIZATION,
                 ),
             ],
-            REC_DRIFT_DUP_1_B_EV,
-            '2026-05-02T00:00:01.000000Z',
         ),
     ));
     assertStrictEquals(second.status, 201);
@@ -1012,8 +980,6 @@ async () => {
                     STARK_ORGANIZATION,
                 ),
             ],
-            REC_DRIFT_METHOD_FILTER_1_EV,
-            '2026-05-03T00:00:00.000000Z',
         ),
     ));
     assertStrictEquals(created.status, 201);
@@ -1069,55 +1035,6 @@ async () => {
         messagePair.name === attributeId);
     assertStrictEquals(attributeDocumentMessagePairs.length, 1);
     assertStrictEquals(attributeDocumentMessagePairs[0]!.method, 'PUT');
-});
-
-// -- 8. genesis-wins-under-skew ----------------------------------
-// case-7d mirror for records GET: a clock-skewed later
-// arrival whose state_at sorts BELOW genesis does NOT
-// displace genesis as lifecycle-current. Head body fields
-// (name) may reflect the later arrival; the GET trio must
-// stay genesis (state ← event.state, state_at ← event.at,
-// state_event_id ← event.id).
-
-Deno.test('GET record trio is lifecycle-current under clock skew'
-+ ' (genesis-wins-under-skew, case 7d)', async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const recordId = generateIdentifier();
-
-    const genesis = await handleRequest(db, req(
-        'PUT', '/organizations/' + STARK_ORGANIZATION
-                + '/record-types/' + recordId, token, {
-            name: 'Genesis Title', description: 'd', position: 1,
-            state: 'active',
-        },
-    ));
-    assertStrictEquals(genesis.status, 201);
-
-    // Later arrival, earlier state_at, different state + name.
-    // 'deleted' would hide the row if it won as current —
-    // genesis-wins keeps the record live and active.
-    const skewed = await handleRequest(db, req(
-        'PUT', '/organizations/' + STARK_ORGANIZATION
-                + '/record-types/' + recordId, token, {
-            name: 'Skewed Title', description: 'd', position: 1,
-            state: 'deleted',
-        },
-    ));
-    assertStrictEquals(skewed.status, 201);
-
-    const res = await handleRequest(
-        db, req('GET', '/organizations/' + STARK_ORGANIZATION
-                + '/record-types/' + recordId, token),
-    );
-    assertStrictEquals(res.status, 404);
-    const history = await deriveRecordTypeStateHistory(
-        db, STARK_ORGANIZATION, recordId,
-    );
-    assertEquals(
-        history.map((entry) => entry.state),
-        ['active', 'deleted'],
-    );
 });
 
 // -- 9. non-lex collection order (craftsmanship) -----------------

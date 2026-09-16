@@ -4,7 +4,6 @@ import type {
     RecordEntity,
     RecordId,
     RecordState,
-    RecordStateDetail,
 } from '../../../api/types.ts';
 import {
     RecordModel,
@@ -18,12 +17,6 @@ import {
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
-import {
-    nowUtc,
-} from '../../../api/types.ts';
-import {
-    generateIdentifier,
-} from '../../../shared/identifier.ts';
 import { getFlowEntities } from './flows.ts';
 
 // The flow↔record bindings across EVERY flow the caller's org
@@ -106,32 +99,27 @@ export async function getRecord(
     );
 }
 
-// Lifecycle-current trio is stamped on the RecordEntity GET
-// row (Phase A). Map snake_case wire → RecordStateDetail;
-// no second hop to a lifecycle log or history alias.
-function recordStateDetailFromRow(
-    row: RecordEntity,
-): RecordStateDetail {
-    return {
-        state: assertRecordState(
-            row.state, 'record ' + row.id,
-        ),
-    };
+// Domain state rides the RecordEntity GET row; narrow it
+// once, at the wire.
+function recordStateOf(row: RecordEntity): RecordState {
+    return assertRecordState(
+        row.state, 'record ' + row.id,
+    );
 }
 
 // The record detail page's read: one domain facet
 // carrying identity, content, and lifecycle state —
 // the raw row and its separate state never cross the
-// seam. Trio is the GET-stamped row fields (Decision 7)
-// so a plain field edit (the detail page's no-attribute-
-// change save) can echo it without minting a fresh event.
+// seam, so a plain field edit (the detail page's
+// no-attribute-change save) can echo the GET-stamped state
+// without minting a fresh event.
 export async function getRecordModel(
     ctx: RequestContext,
     id: RecordId,
 ): Promise<RecordModel> {
     const row = await getRecord(ctx, id);
     return new RecordModel(
-        row, recordStateDetailFromRow(row),
+        row, recordStateOf(row),
     );
 }
 
@@ -173,7 +161,7 @@ export async function getRecords(
     }
     return rows.map(row => ({
         record: new RecordModel(
-            row, recordStateDetailFromRow(row),
+            row, recordStateOf(row),
         ),
         attributeCount:
             attrCountByRecord.get(row.id)
@@ -184,17 +172,14 @@ export async function getRecords(
     }));
 }
 
-// The wire document PUT /records/:id now takes (Decision 7):
-// today's entity fields plus the lifecycle trio, camelCase on
-// this side of the adapter seam. organization_id is EXCLUDED
-// too — the client never supplies it (the org fence stamps it
-// downstream). A state-UNCHANGED save (name/description/
-// position edited, trio echoed back unchanged) converges to a
-// no-op event write at the op; a genuine transition
-// (postRecordStateChange below) mints a fresh trio. GET
-// RecordEntity also carries snake_case lifecycle stamp fields
-// — omit them here so the PUT body is not double-keyed
-// (snake + camel).
+// The wire document PUT /records/:id now takes today's entity
+// fields plus state, camelCase on this side of the adapter
+// seam. organization_id is EXCLUDED too — the client never
+// supplies it (the org fence stamps it downstream). A
+// state-UNCHANGED save (name/description/position edited,
+// state echoed back unchanged) converges to a no-op event
+// write at the op; a genuine transition
+// (postRecordStateChange below) sends a new state.
 export type RecordDocumentFields =
     Omit<
         RecordEntity,
@@ -264,16 +249,12 @@ export async function postRecordChange(
         ...a, organization_id: organization,
     }));
     if (change.kind === 'create') {
-        const initialStateEventId =
-            generateIdentifier();
         await ctx.POST(recordTypesPath(ctx), {
             kind: 'create',
             id,
             record,
             attributes,
             initialState: change.initialState,
-            initialStateEventId,
-            initialStateAt: nowUtc(),
         });
     } else {
         await ctx.POST(recordTypesPath(ctx), {
@@ -289,12 +270,12 @@ export async function postRecordChange(
     recordChanges.notify();
 }
 
-// A transition: composes the document PUT with a FRESH trio
+// A transition: composes the document PUT with a FRESH state
 // (mint-once-reuse — a retry of the SAME transition resends
 // this same pinned pair, converging at the op) over the
 // record's CURRENT entity fields — hop count 1 -> 1 (one
-// ctx.PUT, via putRecord). Strip GET-stamped snake_case trio
-// so putRecord's camelCase mint is the only lifecycle payload.
+// ctx.PUT, via putRecord). Strip the GET-stamped state so the
+// new state is the only lifecycle value in the PUT body.
 export async function postRecordStateChange(
     ctx: RequestContext,
     record: RecordEntity,

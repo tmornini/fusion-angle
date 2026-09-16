@@ -23,7 +23,7 @@ import {
     getObjectiveRevisionsByObjective,
     getActiveObjectives,
     getCurrentObjectiveDefinitions,
-    getObjectiveStateDetails,
+    getObjectiveStates,
     postObjectiveCreation,
     postObjectiveArchival,
     postObjectiveReactivation,
@@ -43,15 +43,9 @@ function ctxFor(db: MemoryDbAdapter) {
     return createRequestContext(db, DEV_TOKEN);
 }
 
-// Seed an objective document with a lifecycle trio — raw
-// PUT organizations/:id/objectives/:id requires state/state_at/state_event_id
-// after the states-document retirement gate (Task 1).
-function objectiveDoc(
-    position: number,
-    state: 'active' | 'archived',
-    _eventId: string,
-    _at = '2026-01-01T00:00:00.000000Z',
-) {
+// Seed an objective document: raw PUT
+// organizations/:id/objectives/:id requires state.
+function objectiveDoc(position: number, state: 'active' | 'archived') {
     return {
         position,
         state,
@@ -66,12 +60,12 @@ Deno.test('getObjectives returns all', async () => {
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg',
-        objectiveDoc(0, 'active', 'ev-o1'),
+        objectiveDoc(0, 'active'),
     );
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + o2,
-        objectiveDoc(1, 'active', 'ev-o2'),
+        objectiveDoc(1, 'active'),
     );
     const rows = await getObjectives(ctx);
     assertStrictEquals(rows.length, 2);
@@ -217,13 +211,12 @@ Deno.test('getArchivedObjectiveIds returns a Set', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const ctx = ctxFor(db);
-    // Seed archived via the document PUT carrying the
-    // lifecycle trio — GET objectives stamps state on
-    // the row (states-URI elimination B6).
+    // Seed archived via the document PUT — GET objectives
+    // stamps state on the row (states-URI elimination B6).
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg',
-        objectiveDoc(0, 'archived', 'ev-o1-arch'),
+        objectiveDoc(0, 'archived'),
     );
     const ids = await getArchivedObjectiveIds(ctx);
     assert(ids.has('ohqxgUBEaFQwYbXsonRPmg'));
@@ -332,7 +325,6 @@ Deno.test(
         assertStrictEquals(objectives[0]!.position, 1);
         assertStrictEquals(objectives[0]!.organization_id
             , 'AjdvjuECVZEgZoFajaIEkg');
-        // GET stamps lifecycle-current genesis trio.
         assertStrictEquals(objectives[0]!.state, 'active');
 
         const revisions =
@@ -381,9 +373,9 @@ Deno.test(
             others.map(o => o.position),
             1,
         );
-        const details = await getObjectiveStateDetails(ctx);
+        const states = await getObjectiveStates(ctx);
         await putObjectivePosition(
-            ctx, o3, newPos, details.get(o3)!,
+            ctx, o3, newPos, states.get(o3)!,
         );
 
         // Phase Final Task 2: positions from GET (message plane).
@@ -418,12 +410,12 @@ Deno.test(
             ctx, o3, 'C', 'd', 3,
         );
 
-        const details = await getObjectiveStateDetails(ctx);
+        const states = await getObjectiveStates(ctx);
         await putObjectivePosition(
-            ctx, o2, 1.5, details.get(o2)!,
+            ctx, o2, 1.5, states.get(o2)!,
         );
         await putObjectivePosition(
-            ctx, o3, 1.25, details.get(o3)!,
+            ctx, o3, 1.25, states.get(o3)!,
         );
 
         // Phase Final Task 2: positions from GET (message plane).
@@ -494,8 +486,8 @@ function recordingCtx(
 }
 
 Deno.test(
-    'postObjectiveArchival PUTs the document with an'
-    + ' archived trio and the current position',
+    'postObjectiveArchival PUTs the document with the'
+    + ' archived state and the current position',
     async () => {
         const { ctx, calls } = recordingCtx({
             GET: async (path) => {
@@ -529,16 +521,14 @@ Deno.test(
 );
 
 Deno.test(
-    'putObjectivePosition echoes the supplied trio'
+    'putObjectivePosition echoes the supplied state'
     + ' verbatim',
     async () => {
         const { ctx, calls } = recordingCtx({
             PUT: async () => ({}),
         });
         await putObjectivePosition(
-            ctx, 'ohqxgUBEaFQwYbXsonRPmg', 1.5, {
-                state: 'active',
-            },
+            ctx, 'ohqxgUBEaFQwYbXsonRPmg', 1.5, 'active',
         );
         assertStrictEquals(calls.length, 1);
         assertStrictEquals(calls[0]!.method, 'PUT');

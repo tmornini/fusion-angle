@@ -48,7 +48,6 @@ import {
     DOCUMENT_FAMILY_WIRINGS,
     type DocumentFamilyWiring,
 } from '../api/document-family.ts';
-import { deriveIdea } from '../api/derive-ideas.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { ApiError, HTTP_PRECONDITION_FAILED } from
@@ -56,6 +55,7 @@ import { ApiError, HTTP_PRECONDITION_FAILED } from
 import {
     apiRequest,
     pairIdOf,
+    storedPutBodyText,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -97,8 +97,8 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 }
 
 // -- (a) documentWriteResponseSpec's successBody, pinned
-// against FIXED expected literals. G1 trio families emit
-// wiring.entityOf (id first, trio last). Pinned to literals —
+// against FIXED expected literals. G1 families emit
+// wiring.entityOf (id first, state last). Pinned to literals —
 // the shape of a document PUT's successBody. -------
 
 Deno.test('documentWriteResponseSpec produces the ideas'
@@ -206,6 +206,12 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
     const operationId = generateIdentifier();
+    // The stored PUT response is the wire truth GET must
+    // reproduce below — id plus the full document body, the
+    // same shape a real route dispatch's successBody stores.
+    const responseBody = {
+        id: 'gZsGVjTnvrgHQLzbKnQckg', ...body,
+    };
     const messagePair = await formWriteMessagePair({
         method: 'PUT'
             , pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -215,7 +221,7 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
         pathSegments: ['ideas', 'gZsGVjTnvrgHQLzbKnQckg'],
         headerFields: [], body, requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseStatus: 200, responseBody,
         operationId,
     });
     const written = await route.put!(
@@ -231,8 +237,13 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
             , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
         [],
     );
-    assertEquals(got, await deriveIdea(db, 'AjdvjuECVZEgZoFajaIEkg'
-        , 'gZsGVjTnvrgHQLzbKnQckg'));
+    assertEquals(
+        got,
+        JSON.parse(await storedPutBodyText(
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+            'gZsGVjTnvrgHQLzbKnQckg',
+        )),
+    );
 });
 
 // -- (c) the locked arm, against a SYNTHETIC registration. ---
@@ -323,7 +334,7 @@ async function withSyntheticLockedFamily<T>(
         // interface — this is the fourth DocumentFamilyWiring
         // construction site (the other three are
         // routes.ts's ideas/projects/flows rows).
-        lifecycle: 'trio',
+        lifecycle: 'state',
         notFoundTable: TEST_FAMILY,
         validateDocument: (body) => body,
         documentOp: testDocumentOp,
@@ -779,19 +790,19 @@ Deno.test('withSyntheticLockedFamily leaves no residue behind',
 
 // -- (d) the fourth-family wiring growth: `lifecycle` and
 // `notFoundTable` (work-orders evidence). A SYNTHETIC
-// 'stateless' registration proves derivedDocumentEntity and
+// 'stateless' registration proves a 'stateless' body needs no
+// `state` key: derivedDocumentEntity and
 // documentCollectionGetHandler skip the lifecycle walk +
-// DELETED-state filter entirely for 'stateless' — a trio-less
-// body (no state/state_at/state_event_id) would make
-// documentLifecycleEvents' pickString throw if the 'trio' walk
-// ran, so a clean pass here is proof the branch is skipped, not
-// merely tolerant. A DELETE head still 404s (deriveDocumentsAt's
-// own head-absent semantics — the only tombstone a stateless
-// family has), and that 404 carries the registration's
-// notFoundTable, never its family, proving the two are
-// independent facts. Handlers are called DIRECTLY (no
-// registration/route-table ceremony) since GET derivation needs
-// only the wiring value itself. -----------------------------
+// DELETED-state filter entirely for 'stateless', so a body
+// carrying no state/state_at/state_event_id passes clean
+// rather than making documentLifecycleEvents' pickString
+// throw, proof the branch is skipped, not merely tolerant. A
+// DELETE head is a stateless family's only tombstone
+// (deriveDocumentsAt's own head-absent semantics), and that
+// 404 carries the registration's notFoundTable, never its
+// family, proving the two are independent facts. Handlers are
+// called DIRECTLY (no registration/route-table ceremony) since
+// GET derivation needs only the wiring value itself. ---------
 
 const STATELESS_FAMILY = 'stateless-test-docs';
 const STATELESS_TABLE = 'stateless_storage_table';
@@ -858,7 +869,7 @@ async function deleteStatelessDocumentMessagePair(
     );
 }
 
-Deno.test('stateless lifecycle: a trio-less document PUT derives'
+Deno.test('stateless lifecycle: a stateless document PUT derives'
 + ' through documentGetHandler with no throw', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -872,8 +883,8 @@ Deno.test('stateless lifecycle: a trio-less document PUT derives'
     });
 });
 
-Deno.test('stateless lifecycle: documentCollectionGetHandler skips'
-+ ' the per-document history walk too', async () => {
+Deno.test('stateless lifecycle: documentCollectionGetHandler'
++ ' derives a stateless body', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await putStatelessDocumentMessagePair(db, SL_2, { v: 'listed' });

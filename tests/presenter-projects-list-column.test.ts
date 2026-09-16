@@ -34,9 +34,7 @@ function makeProject(id: string): InstanceType<
         actual_cost: 0,
         position: 0,
         state: 'under_review',
-    }, {
-        state: 'under_review',
-    });
+    }, 'under_review');
 }
 
 Deno.test(

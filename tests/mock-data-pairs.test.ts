@@ -104,7 +104,7 @@ function messagePairJsonOf(message: string): {
 // 15 objectives-family (5 ops + 5 documents + 5 revisions —
 // Phase 7 Task 3's fixed 1+1+1 bundle synthesis, the flows
 // precedent, over the same 4 STARK + seed-objective-org2 set;
-// states-document retirement rides the genesis trio on those
+// states-document retirement rides the genesis state on those
 // same create/document bodies — pair COUNT unchanged)
 // + 145 work-order documents + 145 flow-work-order joins
 // (Phase 5 Task 4: the entity/join gap closed, one document
@@ -385,8 +385,8 @@ Deno.test('a seeded record create pair sits at its org-nested'
 });
 
 Deno.test('a seeded record\'s document message pair sits at its'
-+ ' entity document, its body carrying the entity plus the'
-+ ' state trio (no id or organization_id key)', async () => {
++ ' entity document, its body carrying the entity plus'
++ ' state (no id or organization_id key)', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
     // The document message pair shares its (path, name) with the
@@ -481,8 +481,8 @@ Deno.test('a seeded objective create pair sits at its org-nested'
 });
 
 Deno.test('a seeded objective\'s document message pair sits at its'
-+ ' entity document, body carrying position plus the'
-+ ' lifecycle trio and no organization_id key', async () => {
++ ' entity document, body carrying position plus state'
++ ' and no organization_id key', async () => {
     const db = await sharedMockDb();
     const starkSeed = OBJECTIVE_SEEDS[0]!;
     const requests = await db.messagePairs.getAll();

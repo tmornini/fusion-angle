@@ -43,10 +43,7 @@ function req(
     });
 }
 
-function ideaDocument(
-    title: string,
-    _stateEventId: string,
-): Record<string, unknown> {
+function ideaDocument(title: string): Record<string, unknown> {
     return {
         title,
         position: 1,
@@ -59,10 +56,7 @@ function ideaDocument(
     };
 }
 
-function projectDocument(
-    title: string,
-    _stateEventId: string,
-): Record<string, unknown> {
+function projectDocument(title: string): Record<string, unknown> {
     return {
         title,
         description: 'd',
@@ -209,7 +203,7 @@ export function defineStoreAcceptance(
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'tcoFxeBipRIaYftXqNfjIg', token,
-            ideaDocument('Live', 'ev-sa-live'),
+            ideaDocument('Live'),
         ));
         assertStrictEquals(put.status, 201);
         const putEtag = put.headers.get('ETag');
@@ -255,7 +249,7 @@ export function defineStoreAcceptance(
 
     Deno.test(name + ': same-body PUT is 200', async () => {
         const { db, token } = await ready();
-        const body = ideaDocument('Same', 'ev-sa-same');
+        const body = ideaDocument('Same');
         const first = await handleRequest(
             db, req('PUT'
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -282,7 +276,7 @@ export function defineStoreAcceptance(
 
     Deno.test(name + ': exact retry replays as 200', async () => {
         const { db, token } = await ready();
-        const body = ideaDocument('Retry', 'ev-sa-retry');
+        const body = ideaDocument('Retry');
         const operationId = generateIdentifier();
         const first = await handleRequest(
             db, req('PUT'
@@ -320,7 +314,7 @@ export function defineStoreAcceptance(
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'tWirePinAAAAAAAAAAAAAw', token,
-            ideaDocument('Wire', 'ev-sa-wire'),
+            ideaDocument('Wire'),
         ));
         assertStrictEquals(put.status, 201);
         assertStrictEquals(put.headers.get('Response-ID'), null);
@@ -333,7 +327,7 @@ export function defineStoreAcceptance(
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'tiYxjzuiloksGbOADnuMWA', token,
-            projectDocument('Other', 'ev-sa-miss'),
+            projectDocument('Other'),
         ));
         assertStrictEquals(put.status, 201);
         const got = await handleRequest(

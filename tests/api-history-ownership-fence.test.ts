@@ -14,7 +14,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 
 // Family-history ownership fence. Own-org history is 200
-// with the document-trio genesis; a miss at this document
+// with the document genesis; a miss at this document
 // is 404. 403 only when this document has a live PUT the
 // caller may not have. Full per-family coverage lives in
 // api-entity-history-routes.test.ts. Write-authorizer

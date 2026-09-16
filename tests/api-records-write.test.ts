@@ -12,8 +12,6 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
-import { deriveRecordTypeStateHistory } from
-    '../api/derive-record-types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -54,9 +52,6 @@ Deno.test(
                 },
             ],
             initialState: 'active',
-            initialStateEventId: generateIdentifier(),
-            initialStateAt:
-                '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const record = await GET<{
             id: string;
@@ -99,9 +94,6 @@ Deno.test(
             },
             attributes: [],
             initialState: 'active',
-            initialStateEventId: generateIdentifier(),
-            initialStateAt:
-                '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const record = await GET<{ name: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
@@ -142,9 +134,6 @@ Deno.test(
             },
             attributes: [],
             initialState: 'active',
-            initialStateEventId: generateIdentifier(),
-            initialStateAt:
-                '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'edit',
@@ -156,10 +145,8 @@ Deno.test(
                 position: 1,
             },
             attributes: [],
-            // Echoed from the create's own known head — NEVER
-            // a fresh mint — so the sameEvent decompose no-ops
-            // and this edit genuinely proves no state event was
-            // emitted.
+            // The edit arm echoes state verbatim; the test pins
+            // that an edit does not change it.
             state: 'active',
             removedAttributeIds: [],
         }, DEV_TOKEN);
@@ -172,12 +159,13 @@ Deno.test(
         assertStrictEquals(
             record.description, 'updated',
         );
-        const events = await deriveRecordTypeStateHistory(
-            db, 'AjdvjuECVZEgZoFajaIEkg', 'rbfHGatkwQzGZJVXKJEeyw',
+        const after = await GET<{ state: string }>(
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN,
         );
         assertStrictEquals(
-            events.length, 1,
-            'edit must not emit a state event',
+            after.state, 'active',
+            'edit must not change state',
         );
     },
 );
@@ -212,9 +200,6 @@ Deno.test(
                 },
             ],
             initialState: 'active',
-            initialStateEventId: generateIdentifier(),
-            initialStateAt:
-                '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'edit',
@@ -279,9 +264,6 @@ Deno.test(
                 },
             ],
             initialState: 'active',
-            initialStateEventId: generateIdentifier(),
-            initialStateAt:
-                '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'edit',
@@ -355,9 +337,6 @@ Deno.test(
                     },
                 ],
                 initialState: 'active',
-                initialStateEventId: generateIdentifier(),
-                initialStateAt:
-                    '2025-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
             Error,
             'must be non-empty',
@@ -395,9 +374,6 @@ Deno.test(
                     },
                 ],
                 initialState: 'active',
-                initialStateEventId: generateIdentifier(),
-                initialStateAt:
-                    '2025-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
             Error,
             'record_id must match top-level id',
@@ -447,9 +423,6 @@ Deno.test(
                 },
                 attributes: [],
                 initialState: 'pending',
-                initialStateEventId: generateIdentifier(),
-                initialStateAt:
-                    '2025-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
             Error,
             'expected RecordState',
@@ -475,9 +448,6 @@ Deno.test(
                 },
                 attributes: [],
                 initialState: 'active',
-                initialStateEventId: generateIdentifier(),
-                initialStateAt:
-                    '2025-01-01T00:00:00.000000Z',
                 extra: 'forbidden',
             }, DEV_TOKEN),
             Error,
@@ -511,46 +481,6 @@ Deno.test(
 );
 
 Deno.test(
-    'POST nested record-types create threads caller'
-    + ' initialStateAt to the initial state event',
-    async () => {
-        const db = await freshDb();
-        const recId = generateIdentifier();
-        await seedCurrentMember(db);
-        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
-            kind: 'create',
-            id: recId,
-            record: {
-                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-                name: 'Timed Record',
-                description: '',
-                position: 1,
-            },
-            attributes: [],
-            initialState: 'active',
-            initialStateEventId: generateIdentifier(),
-            // Far-future timestamp forces a distinct, verifiable
-            // at value so the test can confirm the caller's time
-            // was threaded to the event — not a server nowUtc().
-            initialStateAt:
-                '2099-07-01T00:00:00.000000Z',
-        }, DEV_TOKEN);
-        // bare per-entity current-state alias RETIRED
-        // (Phase 15 Task 7).
-        const history = await GET<{
-            id: string;
-            state: string;
-        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + recId + '/versions/', DEV_TOKEN);
-        assertStrictEquals(history.length, 1);
-        const current = history[0]!;
-        assertStrictEquals(current.id, recId);
-        assertStrictEquals(current.state, 'active');
-        assertStrictEquals('state_at' in current, false);
-    },
-);
-
-Deno.test(
     'POST nested record-types create ignores a raw colliding states'
     + ' row (states ROW half stripped)',
     async () => {
@@ -570,9 +500,6 @@ Deno.test(
             },
             attributes: [],
             initialState: 'active',
-            initialStateEventId: generateIdentifier(),
-            initialStateAt:
-                '2099-07-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const rec = await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'

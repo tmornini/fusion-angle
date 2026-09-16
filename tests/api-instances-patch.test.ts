@@ -1071,7 +1071,7 @@ async () => {
     await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'A' },
     ]);
-    const revision = await formDocumentMessagePairFor(db, {
+    const revision = await formDocumentMessagePairFor({
         routePattern: INSTANCE_DETAIL_PATTERN,
         params: [ORGANIZATION, TYPE_ID, INSTANCE_ID],
         method: 'PUT',

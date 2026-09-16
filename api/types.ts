@@ -137,12 +137,14 @@ export const OBJECTIVE_STATES = [
 export type ObjectiveState =
     typeof OBJECTIVE_STATES[number];
 
-// The invitation lifecycle, append-only in the states log keyed
-// to the invitation id. Grant (admin) appends 'pending'; the
-// invitee appends 'accepted' (which writes the membership) or
-// 'declined'; the admin appends 'revoked' to cancel a pending
-// invite. Current status = the latest event — derive, never
-// mutate. No 'deleted': an invitation persists as audit.
+// The invitation lifecycle, derived from the invitation
+// document's own head (never a states log —
+// deriveInvitationStates, derive-states.ts). Grant (admin)
+// PUTs 'pending'; the invitee PUTs 'accepted' (which writes
+// the membership) or 'declined'; the admin PUTs 'revoked' to
+// cancel a pending invite. Current status = the head's
+// state — derive, never mutate. No 'deleted': an invitation
+// persists as audit.
 export const INVITATION_STATES = [
     'pending',
     'accepted',
@@ -1320,9 +1322,10 @@ export interface MembershipEntity {
 
 // An invitation binding an identity to an organization, awaiting
 // the holder's answer. Immutable like a membership, but its
-// lifecycle lives in the states log (INVITATION_STATES). The org
-// is the inviting admin's; the identity is the invitee. An
-// ACCEPTED invitation is what writes the real membership row —
+// lifecycle is derived from its own document head
+// (INVITATION_STATES, deriveInvitationStates) — never a states
+// log. The org is the inviting admin's; the identity is the
+// invitee. An ACCEPTED invitation writes the real membership —
 // the invitation itself never grants reach. Global-spine (not
 // org-fenced), because the invitee must read an invitation to an
 // org they are not yet in; the invitation routes fence by the
@@ -1362,18 +1365,6 @@ export interface ProjectFlowEntity {
     at: string;
 }
 
-// Domain lifecycle state for an idea. Ledger facts stay
-// on the pair / etag / versions list.
-export interface IdeaStateDetail {
-    readonly state: IdeaState;
-}
-
-// Domain lifecycle state for an objective. Ledger facts
-// stay on the pair / etag / versions list.
-export interface ObjectiveStateDetail {
-    readonly state: ObjectiveState;
-}
-
 export class Idea {
     readonly #id: string;
     readonly #title: string;
@@ -1387,12 +1378,12 @@ export class Idea {
 
     constructor(
         entity: IdeaEntity,
-        detail: IdeaStateDetail,
+        state: IdeaState,
     ) {
         this.#id = entity.id;
         this.#title = entity.title;
         this.#position = entity.position;
-        this.#state = detail.state;
+        this.#state = state;
         this.#problemStatement =
             entity.problem_statement;
         this.#targetUsers =
@@ -1477,12 +1468,6 @@ export class Idea {
     }
 }
 
-// Domain lifecycle state for a project. Ledger facts stay
-// on the pair / etag / versions list.
-export interface ProjectStateDetail {
-    readonly state: ProjectState;
-}
-
 export class Project {
     readonly #id: string;
     readonly #title: string;
@@ -1497,13 +1482,13 @@ export class Project {
 
     constructor(
         entity: ProjectEntity,
-        detail: ProjectStateDetail,
+        state: ProjectState,
     ) {
         this.#id = entity.id;
         this.#title = entity.title;
         this.#description =
             entity.description;
-        this.#state = detail.state;
+        this.#state = state;
         this.#progress = entity.progress;
         this.#startDate =
             entity.start_date;
@@ -1608,12 +1593,6 @@ export class Project {
     }
 }
 
-// Domain lifecycle state for a record-type. Ledger facts
-// stay on the pair / etag / versions list.
-export interface RecordStateDetail {
-    readonly state: RecordState;
-}
-
 export class RecordModel {
     readonly #id: string;
     readonly #name: string;
@@ -1623,13 +1602,13 @@ export class RecordModel {
 
     constructor(
         entity: RecordEntity,
-        detail: RecordStateDetail,
+        state: RecordState,
     ) {
         this.#id = entity.id;
         this.#name = entity.name;
         this.#description = entity.description;
         this.#position = entity.position;
-        this.#state = detail.state;
+        this.#state = state;
     }
 
     idForLink(): string {

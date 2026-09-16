@@ -3,7 +3,7 @@ import type {
     ObjectiveEntity,
     ObjectiveId,
     ObjectiveRevisionEntity,
-    ObjectiveStateDetail,
+    ObjectiveState,
 } from '../../../api/types.ts';
 import {
     assertObjectiveState,
@@ -13,8 +13,6 @@ import {
     type RequestContext,
     organizationCollection,
     organizationItem,
-    withLifecycleTrio,
-    withLifecycleTrios,
 } from './shared.ts';
 import {
     createSubscriptionChannel,
@@ -42,11 +40,8 @@ export function notifyObjectiveChange(): void {
 export async function getObjectives(
     ctx: RequestContext,
 ): Promise<ObjectiveEntity[]> {
-    return withLifecycleTrios(
-        ctx, 'objectives',
-        await ctx.GET<ObjectiveEntity[]>(
-            organizationCollection(ctx, 'objectives'),
-        ),
+    return ctx.GET<ObjectiveEntity[]>(
+        organizationCollection(ctx, 'objectives'),
     );
 }
 
@@ -54,45 +49,36 @@ export async function getObjective(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<ObjectiveEntity> {
-    return withLifecycleTrio(
-        ctx, 'objectives',
-        await ctx.GET<ObjectiveEntity>(
-            organizationItem(ctx, 'objectives', id),
-        ),
+    return ctx.GET<ObjectiveEntity>(
+        organizationItem(ctx, 'objectives', id),
     );
 }
 
-// Lifecycle-current trio is stamped on the ObjectiveEntity
-// GET row (Phase A). Map snake_case wire → ObjectiveStateDetail;
-// no second hop to a lifecycle log or history alias.
-export function objectiveStateDetailFromRow(
+// Domain state rides the ObjectiveEntity GET row; narrow it
+// once, at the wire.
+export function objectiveStateOf(
     row: ObjectiveEntity,
-): ObjectiveStateDetail {
-    return {
-        state: assertObjectiveState(
-            row.state, 'objective ' + row.id,
-        ),
-    };
+): ObjectiveState {
+    return assertObjectiveState(
+        row.state, 'objective ' + row.id,
+    );
 }
 
-// Bulk objective trio read from GET-stamped rows — drag-
-// reorder and archive/reactivate echo each id's current
-// trio without minting a fresh event.
-export async function getObjectiveStateDetails(
+// One bulk state read from GET rows: drag-reorder echoes
+// each id's current state.
+export async function getObjectiveStates(
     ctx: RequestContext,
-): Promise<Map<Id, ObjectiveStateDetail>> {
+): Promise<Map<ObjectiveId, ObjectiveState>> {
     const rows = await getObjectives(ctx);
-    const out = new Map<Id, ObjectiveStateDetail>();
+    const out = new Map<ObjectiveId, ObjectiveState>();
     for (const row of rows) {
-        out.set(
-            row.id, objectiveStateDetailFromRow(row),
-        );
+        out.set(row.id, objectiveStateOf(row));
     }
     return out;
 }
 
-// Archived set from the GET-stamped lifecycle trio on
-// each objective row — no hop to the states log.
+// Archived set from the GET-stamped state on each objective
+// row — no second hop.
 export async function getArchivedObjectiveIds(
     ctx: RequestContext,
 ): Promise<Set<ObjectiveId>> {
@@ -315,9 +301,7 @@ export async function postObjectiveCreation(
     // transaction server-side. The body OMITS organization_id —
     // the org fence stamps it from the verified token. The
     // revision's member_id is a row column (who authored the
-    // definition), supplied here. Genesis trio mints with the
-    // create body (states-document retirement) — no separate
-    // states/:id event.
+    // definition), supplied here.
     await ctx.POST(
         organizationCollection(ctx, 'objectives'),
         {
@@ -334,8 +318,6 @@ export async function postObjectiveCreation(
             at,
         },
         initialState: 'active',
-        initialStateEventId: generateIdentifier(),
-        initialStateAt: at,
     });
     notifyObjectiveChange();
 }
@@ -364,11 +346,11 @@ export async function postObjectiveRevision(
 }
 
 // Read-then-put: only position is echoed from the current
-// head (GET-stamped snake_case lifecycle trio is never
-// re-sent); the transition trio is minted fresh. The get-
-// then-put race against a concurrent drag-reorder is
-// ACCEPTED (spec §2) — objectives concurrency is 'simple'
-// and the page is admin-facing.
+// head (the GET-stamped state is never re-sent); the
+// transition sends the new state fresh. The get-then-put
+// race against a concurrent drag-reorder is ACCEPTED (spec
+// §2) — objectives concurrency is 'simple' and the page is
+// admin-facing.
 export async function postObjectiveArchival(
     ctx: RequestContext,
     id: ObjectiveId,
@@ -401,13 +383,13 @@ export async function putObjectivePosition(
     ctx: RequestContext,
     id: ObjectiveId,
     position: number,
-    stateDetail: ObjectiveStateDetail,
+    state: ObjectiveState,
 ): Promise<void> {
     await ctx.PUT(
         organizationItem(ctx, 'objectives', id),
         {
         position,
-        state: stateDetail.state,
+        state,
     });
     notifyObjectiveChange();
 }

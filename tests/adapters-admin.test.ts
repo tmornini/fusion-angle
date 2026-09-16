@@ -200,10 +200,6 @@ Deno.test(
         assertStrictEquals(stats.ideasCurrent, 1);
         assertStrictEquals(stats.activePeopleCount, 2);
 
-        // Transitions through later document-trio PUTs
-        // (latest by 'at' wins) — the states/:id document is
-        // retired; project/idea/member lifecycle rides each
-        // family's own document.
         const { organization_id: _projectOrganizationId, ...pFields } =
             buildProject(projectId);
         await putProject(ctx, projectId, {

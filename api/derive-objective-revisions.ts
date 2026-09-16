@@ -29,7 +29,7 @@ import {
 // derivation, or vice versa).
 //
 // Revisions carry NO lifecycle of their own — there is no
-// revision-level trio, no DELETE at this document, and no by-id
+// revision-level state, no DELETE at this document, and no by-id
 // GET route (only objectives/:id/revisions is live; :rid is
 // PUT-only) — so this module exports the collection derivation
 // alone, unlike deriveFlowRecords' by-id sibling (deriveFlow

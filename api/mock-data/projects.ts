@@ -2,20 +2,14 @@ import type { ProjectEntity } from '../types.ts';
 import { dateOnly } from './seed-kit.ts';
 
 // The seeded Projects. l2cProjectId is shared with the
-// Lead-to-Close project-flow binding and the project state
-// events, so it is exported. Fixed data; the composition root
+// Lead-to-Close project-flow binding and the project genesis
+// row, so it is exported. Fixed data; the composition root
 // assigns organization_id at write time.
 export const l2cProjectId =
     'MBITVgcXjXZiQkMeFSivxg';
 
 export function buildProjects():
-    Omit<
-        ProjectEntity,
-        | 'organization_id'
-        | 'state'
-        | 'state_at'
-        | 'state_event_id'
-    >[] {
+    Omit<ProjectEntity, 'organization_id' | 'state'>[] {
     return [
         {
             id: 'wqGTTFdYUGnmBxWCppmkOQ',

@@ -3,28 +3,18 @@ import { EntityNotFoundError } from './db.ts';
 import type {
     Id, MessagePairEntity, StateEntity,
 } from './types.ts';
-import {
-    pickString,
-    validateRecordDocumentBody,
-} from './validators.ts';
 import type { MessagePair } from './message-pair.ts';
 import { canonicalPath } from './message-pair.ts';
-import {
-    familyRegistration,
-    RECORD_TYPE_DETAIL_PATTERN,
-} from './family-registry.ts';
+import { familyRegistration } from './family-registry.ts';
 import { missedReadError } from './derive-states.ts';
 import {
-    deriveDocumentsAt,
     documentMessagePairsAt,
     documentLifecycleEvents,
     stateHistoryFrom,
-    currentDocumentState,
-    currentLifecycleEvent,
-    DELETED_STATE,
     requestBodyOf,
+    headDocumentOf,
+    documentIsTombstone,
     type DerivedDocument,
-    type DocumentMessagePair,
 } from './derive-documents.ts';
 import type {
     Route,
@@ -35,10 +25,6 @@ import type {
 import { HTTP_OK } from './http-errors.ts';
 import { liveHeadId, messageStore } from
     './message-store.ts';
-import {
-    recordTypeEntityOf,
-    recordTypesUriPrefix,
-} from './derive-record-types.ts';
 import { flowStoredEntityOf } from './derive-flows.ts';
 
 // param/requireOrganization/withoutId live HERE, not in
@@ -114,21 +100,20 @@ export interface DocumentFamilyWiring {
     // HTTP nest. Storage prefix is still
     // /${family}/ under the fenced organization.
     readonly httpNest: 'global' | 'organization';
-    // Fourth-family evidence (work-orders): 'trio' families
-    // carry the Decision 7 lifecycle trio in every document
-    // body and get the lifecycle walk + DELETED filter;
-    // 'stateless' families carry entity fields only and skip
-    // both (their lifecycle, if any, lives in operation-path
-    // event pairs, never the document).
-    readonly lifecycle: 'trio' | 'stateless';
+    // A 'state' family carries domain `state` in every
+    // document body; a head whose state is `deleted` is a
+    // tombstone. A 'stateless' family carries entity fields
+    // only; its lifecycle, if any, lives in operation-path
+    // event pairs, never the document.
+    readonly lifecycle: 'state' | 'stateless';
     // The identifier the wire 404 body speaks —
     // EntityNotFoundError's table. Family name for ideas/
     // projects/flows; 'work_orders' for work-orders (the
     // first family whose storage table name differs from its
     // family name).
     readonly notFoundTable: string;
-    // Validates the full wire document (entity + trio [+ family
-    // extras]); throws ValidationError.
+    // Validates the full wire document (entity + state [+
+    // family extras]); throws ValidationError.
     readonly validateDocument:
         (body: Record<string, unknown>) => unknown;
     // The family's decompose op (old-plane rows + pair).
@@ -138,15 +123,11 @@ export interface DocumentFamilyWiring {
         messagePair?: MessagePair,
     ) => Promise<unknown>;
     // Head-pair body -> wire entity (id + organization_id
-    // stamped by the caller). Trio families that embed the
-    // lifecycle-current event (ideas, projects, records,
-    // objectives, members) receive `current` after the
-    // DELETED filter; other families accept and ignore the
-    // optional third argument.
+    // stamped by the caller). A 'state' family's mapper reads
+    // `state` from the body like every other field.
     readonly entityOf: (
         document: DerivedDocument,
         organization: Id,
-        current?: { readonly state: string },
     ) => object;
 }
 
@@ -227,15 +208,10 @@ export async function throwDocumentMiss(
     );
 }
 
-// The generic per-id derivation: store.getDocumentHistory at this
-// document, reduce to the head document (deriveDocumentsAt),
-// and — for a 'trio' family ONLY — walk the lifecycle
-// history over those same pairs to 404 a lifecycle-deleted
-// document too. A 'stateless' family's document body carries
-// no trio, so its ONLY tombstone signal is a DELETE-method
-// head — already 404-absent via deriveDocumentsAt. Soft-
-// deleted foreign docs miss the caller prefix and 403 via
-// the global probe.
+// The generic per-id read: the live PUT head at this
+// document. No head is a miss. For a 'state' family a head
+// whose body says `deleted` is a miss too. Both take the
+// throwDocumentMiss ladder, so 403 and 404 are unchanged.
 async function derivedDocumentEntity(
     wiring: DocumentFamilyWiring,
     db: DbAdapter,
@@ -245,34 +221,21 @@ async function derivedDocumentEntity(
     const prefix = canonicalPath(
         organization, '/' + wiring.family + '/',
     );
-    const stored = await messageStore(db).getDocumentHistory(
+    const head = await messageStore(db).getDocumentHead(
         prefix, id,
     );
-    const document = deriveDocumentsAt(
-        stored, prefix,
-    ).get(id);
-    if (document === undefined) {
+    if (head === null) {
         throw await throwDocumentMiss(
             wiring, db, organization, id,
         );
     }
-    if (wiring.lifecycle === 'trio') {
-        const messagePairs = documentMessagePairsAt(
-            stored, prefix,
-        ).filter((messagePair) => messagePair.name === id);
-        const history = stateHistoryFrom(
-            documentLifecycleEvents(messagePairs), id,
-        );
-        if (currentDocumentState(history) === DELETED_STATE) {
-            throw await throwDocumentMiss(
-                wiring, db, organization, id,
-            );
-        }
-        // After DELETED filter history is non-empty for every
-        // live trio document (genesis always mints an event).
-        const current = currentLifecycleEvent(history)!;
-        return wiring.entityOf(
-            document, organization, current,
+    const document = headDocumentOf(head);
+    if (
+        wiring.lifecycle === 'state'
+        && documentIsTombstone(document)
+    ) {
+        throw await throwDocumentMiss(
+            wiring, db, organization, id,
         );
     }
     return wiring.entityOf(document, organization);
@@ -514,12 +477,6 @@ async function serveDocumentRevision(
         method: found.method,
         body,
     };
-    if (wiring.lifecycle === 'trio') {
-        return wiring.entityOf(
-            document, organization,
-            stateFromDocument(document),
-        );
-    }
     return wiring.entityOf(document, organization);
 }
 
@@ -536,12 +493,6 @@ export function documentVersionGetHandler(
         );
 }
 
-function stateFromDocument(
-    document: DerivedDocument,
-): { readonly state: string } {
-    return { state: pickString(document.body, 'state') };
-}
-
 export function documentVersionListHandler(
     wiring: DocumentFamilyWiring,
 ): GetHandler {
@@ -550,10 +501,7 @@ export function documentVersionListHandler(
     // projects, objectives) return entityOf snapshots
     // stamped with the pair facts (etag, at, member_id) —
     // beyond, not identical to, GET collection / GET :id.
-    if (
-        wiring.lifecycle === 'trio'
-        && wiring.family === 'flows'
-    ) {
+    if (wiring.family === 'flows') {
         return documentStateHistoryHandler(
             wiring,
             (db, organization, id) =>
@@ -571,12 +519,7 @@ export function documentVersionListHandler(
         );
         const snapshots = await versionSnapshotsAt(
             db, prefix, id,
-            (document) => wiring.lifecycle === 'trio'
-                ? wiring.entityOf(
-                    document, org,
-                    stateFromDocument(document),
-                )
-                : wiring.entityOf(document, org),
+            (document) => wiring.entityOf(document, org),
         );
         if (snapshots.length === 0) {
             throw await throwDocumentMiss(
@@ -628,72 +571,20 @@ export function documentCollectionGetHandler(
         const prefix = canonicalPath(
             organizationId, '/' + wiring.family + '/',
         );
-        const store = messageStore(db);
-        const live = await store.getCollection(prefix);
-        const stored = await db.messagePairs.getCollectionPairs(prefix,
-        );
-        const documents = deriveDocumentsAt(
-            stored, prefix,
-        );
-        // The per-document history walk (and its DELETED
-        // filter) runs for a 'trio' family ONLY — same gate as
-        // derivedDocumentEntity above, same reason: a
-        // 'stateless' body carries no trio to walk, and a
-        // DELETE head is already absent from `documents`.
-        const messagePairsById = new Map<
-            Id, DocumentMessagePair[]
-        >();
-        if (wiring.lifecycle === 'trio') {
-            for (const messagePair of documentMessagePairsAt(
-                stored, prefix,
-            )) {
-                const list = messagePairsById.get(
-                    messagePair.name,
-                );
-                if (list === undefined) {
-                    messagePairsById.set(
-                        messagePair.name, [messagePair],
-                    );
-                } else {
-                    list.push(messagePair);
-                }
-            }
-        }
-        const byId = new Map<Id, unknown>();
-        for (const [id, document] of documents) {
-            if (wiring.lifecycle === 'trio') {
-                const history = stateHistoryFrom(
-                    documentLifecycleEvents(
-                        messagePairsById.get(id) ?? [],
-                    ),
-                    id,
-                );
-                if (
-                    currentDocumentState(history)
-                        === DELETED_STATE
-                ) continue;
-                const current =
-                    currentLifecycleEvent(history)!;
-                byId.set(
-                    id,
-                    wiring.entityOf(
-                        document, organizationId, current,
-                    ),
-                );
-                continue;
-            }
-            byId.set(
-                id,
-                wiring.entityOf(document, organizationId),
+        const heads =
+            await db.messagePairs.getCollectionHeadPairs(
+                prefix,
             );
-        }
-        // Oldest live head (at, id) first — getCollection
-        // order. Bodies match GET :id (entityOf), not the
-        // stored PUT echo. Trio-deleted heads are omitted.
+        // Oldest live head (response_at, id) first. A 'state'
+        // tombstone is omitted.
         const rows: unknown[] = [];
-        for (const entity of live) {
-            const row = byId.get(liveHeadId(entity));
-            if (row !== undefined) rows.push(row);
+        for (const head of heads) {
+            const document = headDocumentOf(head);
+            if (
+                wiring.lifecycle === 'state'
+                && documentIsTombstone(document)
+            ) continue;
+            rows.push(wiring.entityOf(document, organizationId));
         }
         return rows;
     };
@@ -708,30 +599,18 @@ export function documentCollectionRoute(
     };
 }
 
-// G1 trio families: stored PUT = today's GET derive
-// (wiring.entityOf over the chain, trio included). G2
-// flows: flowEntityOf minus hasUndoHistory. G3 stateless:
-// wiring.entityOf over the incoming body (no trio walk).
-const STREAM_TRIO_FAMILIES: ReadonlySet<string> = new Set([
+// Stream families: the stored PUT body is the family's own
+// entityOf over the incoming body — the same object GET
+// reads from the head. Flows keeps flowStoredEntityOf.
+const STREAM_FAMILIES: ReadonlySet<string> = new Set([
     'ideas',
     'projects',
     'objectives',
+    'identities',
+    'ai-agents',
 ]);
 
-const STREAM_STATELESS_FAMILIES: ReadonlySet<string> =
-    new Set([
-        'identities',
-        'ai-agents',
-    ]);
-
 const ID_PATTERN_SUFFIX = '/:id';
-
-// Arrival-last sentinel so this write is the newest link
-// in the lifecycle walk (first-occurrence-wins by
-// state_event_id; current is (state_at, id)).
-const INCOMING_MESSAGE_PAIR_AT =
-    '9999-12-31T23:59:59.999999Z';
-const INCOMING_MESSAGE_PAIR_ID = '\uffff';
 
 const ORGANIZATION_NEST_PREFIX = 'organizations/:id/';
 
@@ -755,15 +634,7 @@ export function idFamilyOf(
     return rest;
 }
 
-function trioCurrentFromBody(
-    _id: Id,
-    body: Record<string, unknown>,
-    _actor: Id,
-): { readonly state: string } {
-    return { state: pickString(body, 'state') };
-}
-
-function trioDocumentFromBody(
+function documentFromBody(
     id: Id,
     body: Record<string, unknown>,
 ): DerivedDocument {
@@ -773,106 +644,6 @@ function trioDocumentFromBody(
         method: PUT_METHOD,
         body,
     };
-}
-
-export async function streamedTrioEntityOf(
-    db: DbAdapter,
-    prefix: string,
-    id: Id,
-    body: Record<string, unknown>,
-    actor: Id,
-    organization: Id,
-    entityOf: DocumentFamilyWiring['entityOf'],
-): Promise<unknown> {
-    const raw = withoutId(body);
-    const stored = await messageStore(db).getDocumentHistory(
-        prefix, id,
-    );
-    const existing = documentMessagePairsAt(
-        stored, prefix,
-    );
-    const incoming: DocumentMessagePair = {
-        id: INCOMING_MESSAGE_PAIR_ID,
-        at: INCOMING_MESSAGE_PAIR_AT,
-        name: id,
-        method: PUT_METHOD,
-        body: raw,
-        requesterIdentityId: actor,
-    };
-    const history = stateHistoryFrom(
-        documentLifecycleEvents([...existing, incoming]),
-        id,
-    );
-    const document = trioDocumentFromBody(id, raw);
-    const current = currentLifecycleEvent(history)!;
-    return entityOf(document, organization, current);
-}
-
-async function streamedTrioWriteBody(
-    db: DbAdapter,
-    wiring: DocumentFamilyWiring,
-    id: Id,
-    body: Record<string, unknown>,
-    actor: Id,
-    organization: Id,
-): Promise<unknown> {
-    const raw = withoutId(body);
-    wiring.validateDocument(raw);
-    const prefix = canonicalPath(
-        organization,
-        '/' + wiring.family + '/',
-    );
-    return streamedTrioEntityOf(
-        db, prefix, id, raw, actor, organization,
-        wiring.entityOf,
-    );
-}
-
-// Live G1 write body: mapper over the chain including this
-// write. Undefined means the caller uses successBody.
-export async function resolveStreamedTrioWriteBody(
-    db: DbAdapter,
-    routePattern: string,
-    params: string[],
-    body: Record<string, unknown> | undefined,
-    actor: Id,
-    organization: Id | undefined,
-): Promise<unknown | undefined> {
-    if (body === undefined) return undefined;
-    if (routePattern === RECORD_TYPE_DETAIL_PATTERN) {
-        const org = param(params, 0);
-        const id = param(params, 1);
-        validateRecordDocumentBody(withoutId(body));
-        return streamedTrioEntityOf(
-            db,
-            recordTypesUriPrefix(org),
-            id,
-            body,
-            actor,
-            org,
-            (document, organization, current) =>
-                recordTypeEntityOf(
-                    document, organization, current!,
-                ),
-        );
-    }
-    const family = idFamilyOf(routePattern);
-    if (
-        family === undefined
-        || !STREAM_TRIO_FAMILIES.has(family)
-    ) {
-        return undefined;
-    }
-    const wiring = documentFamilyWiring(family);
-    if (wiring === undefined) return undefined;
-    return streamedTrioWriteBody(
-        db,
-        wiring,
-        entityIdParam(wiring, params),
-        body,
-        actor,
-        organization ?? '',
-    );
 }
 
 // The registration-first consult (Phase 8 Task 3, the first
@@ -897,47 +668,34 @@ export async function resolveStreamedTrioWriteBody(
 // this consult omits the line entirely for that class instead
 // of spreading over it.
 //
-// G1 trio families emit wiring.entityOf (id first, trio last
-// as GET does) instead of the entity-only echo. Live writes
-// prefer resolveStreamedTrioWriteBody (chain-current trio).
-// G2 flows emit flowEntityOf minus hasUndoHistory.
-// G3 stateless families emit wiring.entityOf (GET derive).
+// Stream families emit wiring.entityOf over the incoming
+// body (id first, as GET does) instead of the entity-only
+// echo — live writes included, the same object GET reads
+// from the head.
+// Flows emits flowStoredEntityOf over the incoming body.
 export function documentWriteResponseSpec(
     wiring: DocumentFamilyWiring,
 ): WriteResponseSpec {
     const organizationNested =
         familyRegistration(wiring.family)?.organizationNested
             !== false;
-    const streamTrio = STREAM_TRIO_FAMILIES.has(
-        wiring.family,
-    );
-    const streamStateless = STREAM_STATELESS_FAMILIES.has(
-        wiring.family,
-    );
     return {
         status: HTTP_OK,
-        successBody: (params, body, actor, organization) => {
+        successBody: (params, body, _actor, organization) => {
             const raw = withoutId(body ?? {});
             const doc = wiring.validateDocument(raw) as {
                 entity: Record<string, unknown>;
             };
             const id = entityIdParam(wiring, params);
-            if (streamTrio) {
+            if (STREAM_FAMILIES.has(wiring.family)) {
                 return wiring.entityOf(
-                    trioDocumentFromBody(id, raw),
+                    documentFromBody(id, raw),
                     organization ?? '',
-                    trioCurrentFromBody(id, raw, actor),
                 );
             }
             if (wiring.family === 'flows') {
                 return flowStoredEntityOf(
-                    trioDocumentFromBody(id, raw),
-                    organization ?? '',
-                );
-            }
-            if (streamStateless) {
-                return wiring.entityOf(
-                    trioDocumentFromBody(id, raw),
+                    documentFromBody(id, raw),
                     organization ?? '',
                 );
             }

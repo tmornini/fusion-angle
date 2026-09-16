@@ -119,9 +119,9 @@ async function saveGraph(
 // uses (putProject), so a message pair exists at this project's
 // document — required for the flipped GET projects route
 // (Phase 3 Task 6), which getFlowsWithProjectNames /
-// getProjectFlowEntities read, to derive it. A SYNTHESIZED
-// trio (this helper never carried one) — the state itself is
-// irrelevant to every caller here.
+// getProjectFlowEntities read, to derive it. A synthesized
+// state (this helper never carried one) — the state itself
+// is irrelevant to every caller here.
 async function seedProject(
     ctx: RequestContext,
     id: string,

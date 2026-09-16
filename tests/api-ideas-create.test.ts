@@ -55,12 +55,10 @@ function ideaFields(title: string) {
     };
 }
 
-// The genesis case of the document PUT (Decision 7): the SAME
-// shape an edit or transition carries — entity fields plus the
-// lifecycle trio. There is no separate "create body" shape.
-function ideaGenesisBody(
-    _ideaId: string, title: string, _at: string,
-) {
+// The genesis case of the document PUT: the SAME shape an edit
+// or transition carries — entity fields plus state. There is no
+// separate "create body" shape.
+function ideaGenesisBody(title: string) {
     return {
         ...ideaFields(title),
         state: 'active',
@@ -75,13 +73,7 @@ Deno.test(
         const res = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'gVvtDIaqhnkXZQcxZeSuiw', DEV_TOKEN,
-            // Far-future timestamp forces a distinct, verifiable
-            // at value so the test can confirm the caller's time
-            // was threaded to the event — not a server nowUtc().
-            ideaGenesisBody(
-                'gVvtDIaqhnkXZQcxZeSuiw', 'Fresh Idea',
-                '2099-01-01T00:00:00.000000Z',
-            ),
+            ideaGenesisBody('Fresh Idea'),
         ));
         assertStrictEquals(res.status, 201);
         const ideaRes = await handleRequest(
@@ -146,20 +138,17 @@ Deno.test(
 
 // R6: the create's partial-failure atomicity pin becomes a
 // retry-convergence pin (the tx is still atomic — proven above
-// by the rollback case). E6: the id and the trio are minted
+// by the rollback case). E6: the id and state are minted
 // ONCE by the caller; a byte-identical resend of the SAME
 // genesis PUT must hit the idempotency fold — one idea, one
 // genesis event, one stored pair — never a second row or a
 // second event.
 Deno.test(
     'a byte-identical resend of a genesis PUT converges:'
-    + ' one idea, one genesis event, one pair',
+    + ' one idea, one pair',
     async () => {
         const db = await freshDb();
-        const body = ideaGenesisBody(
-            'hJeymLqQwgpIHWgKlcHWNA', 'Retried',
-            '2026-01-01T00:00:00.000000Z',
-        );
+        const body = ideaGenesisBody('Retried');
         const operationId = generateIdentifier();
         const first = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -177,13 +166,6 @@ Deno.test(
             pairIdOf(second),
             pairIdOf(first),
         );
-        const { deriveIdeaStateHistory } = await import(
-            '../api/derive-ideas.ts'
-        );
-        const events = await deriveIdeaStateHistory(
-            db, 'AjdvjuECVZEgZoFajaIEkg', 'hJeymLqQwgpIHWgKlcHWNA',
-        );
-        assertStrictEquals(events.length, 1);
         assertStrictEquals((await db.messagePairs.getAll()).length, 3);
         assertStrictEquals((await db.messagePairs.getAll()).length, 3);
     },
@@ -196,10 +178,7 @@ Deno.test(
         const db = await freshDb();
         const res = await handleRequest(db, req(
             'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', DEV_TOKEN,
-            ideaGenesisBody(
-                'idea-405', 'Should Not Create',
-                '2026-01-01T00:00:00.000000Z',
-            ),
+            ideaGenesisBody('Should Not Create'),
         ));
         assertStrictEquals(res.status, 405);
         // seedRootAdmin only (org + membership); no write pair.

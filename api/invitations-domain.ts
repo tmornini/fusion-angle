@@ -680,20 +680,18 @@ async function acceptInvitation(
         type: 'member',
         at: transition.at,
     };
-    const seatDocument = await formDocumentMessagePairFor(
-        db, {
-            routePattern:
-                ORGANIZATION_MEMBER_DETAIL_PATTERN,
-            params: [
-                inv.organization_id, actor,
-            ],
-            body: seatDocumentBody,
-            requesterIdentityId: actor,
-            requestAt,
-            organization: inv.organization_id,
-            operationId,
-        },
-    );
+    const seatDocument = await formDocumentMessagePairFor({
+        routePattern:
+            ORGANIZATION_MEMBER_DETAIL_PATTERN,
+        params: [
+            inv.organization_id, actor,
+        ],
+        body: seatDocumentBody,
+        requesterIdentityId: actor,
+        requestAt,
+        organization: inv.organization_id,
+        operationId,
+    });
     let conflict = false;
     let committed = false;
     await db.transaction(async (view) => {

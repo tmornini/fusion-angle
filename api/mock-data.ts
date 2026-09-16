@@ -78,10 +78,10 @@ import {
     buildLeadToCloseWorkload,
 } from './mock-data/lead-to-close-flow.ts';
 import {
-    ideaStateEvents,
-    projectStateEvents,
+    ideaGenesis,
+    projectGenesis,
     flowStateEvents,
-    recordStateEvents,
+    recordGenesis,
     mockProjectFlows,
     mockFlowRecords,
     ideaSeedBody,
@@ -510,29 +510,28 @@ async function postMockDataLoadIn(
 
     const ideas = buildIdeas();
 
-    // Each seeded idea's sole state event doubles as its
-    // genesis event — driven through postIdeaDocumentOp below
-    // so the seed writes exactly as the genesis case of PUT
-    // /ideas/:id does (Decision 7, Phase 2 Task 3: create is
-    // just the head-absent case of the document PUT). Driving
-    // the op below the org fence, the unscoped store stamps
+    // Each seeded idea's genesis row drives
+    // postIdeaDocumentOp below, so the seed writes exactly as
+    // the genesis case of PUT /ideas/:id does (create is just
+    // the head-absent case of the document PUT). Driving the
+    // op below the org fence, the unscoped store stamps
     // nothing, so organization_id rides in the seed body
-    // instead of the (route-only) omission. ideaStateEvents is
+    // instead of the (route-only) omission. ideaGenesis is
     // imported from seed-message-pairs.ts — pass 1 there needs
     // the SAME array to form each idea's pair before this
     // transaction opens.
-    const ideaStateEventById = new Map(
-        ideaStateEvents.map(e => [e.entity_id, e]),
+    const ideaGenesisById = new Map(
+        ideaGenesis.map(g => [g.entityId, g]),
     );
 
     await Promise.all([
         ...ideas.map((idea, i) => {
-            const event = ideaStateEventById.get(idea.id)!;
+            const genesis = ideaGenesisById.get(idea.id)!;
             return postIdeaDocumentOp(
                 adapter,
                 idea.id,
-                ideaSeedBody(idea, event, i),
-                event.member_id,
+                ideaSeedBody(idea, genesis.state, i),
+                genesis.memberId,
                 requireMessagePair(
                     messagePairs, seedMessagePairKey('ideas', idea.id),
                 ),
@@ -563,34 +562,35 @@ async function postMockDataLoadIn(
 
     const projects = buildProjects();
 
-    // Each seeded project's sole state event doubles as its
-    // genesis event — driven through postProjectDocumentOp
-    // below exactly as ideas drive through postIdeaDocumentOp
-    // above (Decision 7, Phase 3 Task 3). Driving the op below
+    // Each seeded project's genesis row drives
+    // postProjectDocumentOp below exactly as ideas drive
+    // through postIdeaDocumentOp above. Driving the op below
     // the org fence, the unscoped store stamps nothing, so
     // organization_id rides in the seed body instead of the
-    // (route-only) omission. projectStateEvents (including the
-    // org-2 override's own event) is imported from
+    // (route-only) omission. projectGenesis (including the
+    // org-2 override's own row) is imported from
     // seed-message-pairs.ts — pass 1 there needs the SAME array
     // to form each project's pair before this transaction opens.
     // projectOrg2 extends projects[0] under organization
     // 'BBjWJsjYIDkTRKIIPrzWRw' —
     // the SAME construction pass 1 uses, so a seeded pair can
     // never drift from what this write actually stores.
-    const projectStateEventById = new Map(
-        projectStateEvents.map(e => [e.entity_id, e]),
+    const projectGenesisById = new Map(
+        projectGenesis.map(g => [g.entityId, g]),
     );
 
     await Promise.all(
         [...projects, projectOrg2(projects)].map(project => {
-            const event =
-                projectStateEventById.get(project.id)!;
+            const genesis =
+                projectGenesisById.get(project.id)!;
             const organization = projectOrganizationFor(project);
             return postProjectDocumentOp(
                 adapter,
                 project.id,
-                projectSeedBody(project, event, organization),
-                event.member_id,
+                projectSeedBody(
+                    project, genesis.state, organization,
+                ),
+                genesis.memberId,
                 requireMessagePair(
                     messagePairs, seedMessagePairKey('projects', project.id),
                 ),
@@ -640,18 +640,17 @@ async function postMockDataLoadIn(
     // array to form each join's pair before this transaction
     // opens.
 
-    // One state event per seeded Record — the
-    // creation moment of each Record on the states
-    // log. Records start at 'active'. Phase Final
-    // Task 2: records + record_attributes +
+    // One genesis row per seeded Record: its initial
+    // state and the member credited with creating it.
+    // Phase Final Task 2: records + record_attributes +
     // flow_records ROW halves stripped — seed drives
     // through postRecordWriteOp / postFlowRecordDocumentOp
-    // (pairs + states.postEvent only). recordStateEvents
+    // (pairs + states.postEvent only). recordGenesis
     // is imported from seed-message-pairs.ts — pass 1
     // there needs the SAME array to form each record's
     // pair before this transaction opens.
-    const recordStateEventByRecordId = new Map(
-        recordStateEvents.map(e => [e.entity_id, e]),
+    const recordGenesisById = new Map(
+        recordGenesis.map(g => [g.entityId, g]),
     );
 
     const mockWorkOrders = buildWorkOrders();
@@ -901,7 +900,7 @@ async function postMockDataLoadIn(
             ),
         ),
         ...mockRecords.map((r, i) => {
-            const event = recordStateEventByRecordId.get(r.id)!;
+            const genesis = recordGenesisById.get(r.id)!;
             const attributes = mockRecordAttributes.filter(
                 a => a.record_id === r.id,
             );
@@ -939,8 +938,8 @@ async function postMockDataLoadIn(
             };
             return postRecordWriteOp(
                 adapter,
-                recordSeedBody(r, i, event, attributes),
-                event.member_id,
+                recordSeedBody(r, i, genesis.state, attributes),
+                genesis.memberId,
                 recordMessagePairs,
             );
         }),

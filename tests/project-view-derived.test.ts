@@ -18,9 +18,7 @@ function makeProject(): Project {
         estimated_cost: 0, actual_cost: 0,
         position: 0,
         state: 'approved',
-    }, {
-        state: 'approved',
-    });
+    }, 'approved');
 }
 
 const T1 = '2026-05-14T00:00:00.000000Z';

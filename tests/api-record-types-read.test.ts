@@ -156,7 +156,7 @@ async () => {
 });
 
 Deno.test('GET .../record-types → 200 oldest live head '
-+ '(at, id) first, trio embedded, member token',
++ '(at, id) first, state embedded, member token',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();

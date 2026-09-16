@@ -1,54 +1,20 @@
-import type { DbAdapter } from './db.ts';
-import { missedReadError } from './derive-states.ts';
-import type { Id, ProjectEntity, StateEntity } from './types.ts';
+import type { Id, ProjectEntity } from './types.ts';
 import { pickString, pickNumber } from './validators.ts';
-import { canonicalPath } from './message-pair.ts';
-import {
-    deriveDocumentsAt,
-    documentMessagePairsAt,
-    documentLifecycleEvents,
-    stateHistoryFrom,
-    currentDocumentState,
-    currentLifecycleEvent,
-    DELETED_STATE,
-    type DerivedDocument,
-    type DocumentMessagePair,
-} from './derive-documents.ts';
-import { liveHeadId, messageStore } from
-    './message-store.ts';
+import type { DerivedDocument } from './derive-documents.ts';
 
-// Projects' own reshaping of the generic message-plane reduction
-// (derive-documents.ts): the async fetching (one prefix scan per
-// derivation, per family document) plus the entity/lifecycle
-// knowledge only this family has. Read-only and additive — no
-// route, adapter, or seed row reads any of this yet (Task 6 wires
-// the route); tests/drift-projects.test.ts is the proof of
-// equality against the old plane. Structurally mirrors
-// derive-ideas.ts (same private helper shapes, renamed for
-// projects) — a conversion-born project derives identically to a
-// PUT-born one, so this module carries no conversion special
-// case anywhere.
+// Projects' own reshaping of the generic message-plane
+// reduction (derive-documents.ts): the entity shape only this
+// family has.
 
-const PROJECTS_TABLE = 'projects';
-
-function projectsUriPrefix(organization: Id): string {
-    return canonicalPath(organization, '/projects/');
-}
-
-// The derived entity: the head document's body minus the
-// lifecycle trio (head body fields are NOT copied — the trio is
-// stamped from the lifecycle-current StateEntity instead) plus
-// organization_id stamped from the derivation's OWN organization
-// parameter — never the body's own value. A create body omits
-// organization_id; the org-scoped store stamps it on the old
-// plane, and the prefix scanned here already IS that same org,
-// so the stamp is unconditional. `current` is required: every
-// live project GET builds history first and passes the
-// lifecycle-current event (genesis-wins-under-skew).
+// The derived entity: the head document's body plus
+// organization_id stamped from the derivation's OWN
+// organization parameter — never the body's own value. A
+// create body omits organization_id, and the prefix scanned
+// here already IS that organization, so the stamp is
+// unconditional.
 export function projectEntityOf(
     document: DerivedDocument,
     organization: Id,
-    current: { readonly state: string },
 ): ProjectEntity {
     const body = document.body;
     return {
@@ -63,157 +29,6 @@ export function projectEntityOf(
         estimated_cost: pickNumber(body, 'estimated_cost'),
         actual_cost: pickNumber(body, 'actual_cost'),
         position: pickNumber(body, 'position'),
-        state: current.state,
+        state: pickString(body, 'state'),
     };
-}
-
-// The lifecycle trio walk, its (state_at, id) history ordering,
-// and the current-state reduction are byte-identical across
-// every document family — shared in derive-documents.ts
-// (documentLifecycleEvents/stateHistoryFrom/currentDocumentState)
-// rather than duplicated here. Deliberately separate from
-// DerivedDocument — the entity's OTHER fields follow arrival
-// order (whichever PUT landed last), but which lifecycle event
-// is CURRENT follows the trio's own (state_at, state_event_id),
-// never arrival order and never the envelope's `at`
-// (postProjectDocumentOp's genesis-wins-under-skew guarantee).
-
-async function fetchProjectMessagePairs(
-    db: DbAdapter,
-    prefix: string,
-): Promise<{
-    readonly documents: Map<string, DerivedDocument>;
-    readonly messagePairs: readonly DocumentMessagePair[];
-}> {
-    const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
-    );
-    return {
-        documents: deriveDocumentsAt(messagePairs, prefix),
-        messagePairs: documentMessagePairsAt(
-            messagePairs, prefix,
-        ),
-    };
-}
-
-async function fetchProjectDocumentMessagePairs(
-    db: DbAdapter,
-    prefix: string,
-    projectId: Id,
-): Promise<{
-    readonly document: DerivedDocument | undefined;
-    readonly messagePairs: readonly DocumentMessagePair[];
-}> {
-    const history = await db.messagePairs.getDocumentHistory(
-        prefix, projectId,
-    );
-    return {
-        document: deriveDocumentsAt(history, prefix)
-            .get(projectId),
-        messagePairs: documentMessagePairsAt(history, prefix),
-    };
-}
-
-// Oldest live head (at, id) first via getCollection,
-// deleted-filtered — the head lifecycle state 'deleted'
-// excludes a project exactly as EntityStore's states-log
-// tombstone filter does today (declined/archived projects
-// are NOT filtered here — client-side concerns, untouched).
-export async function deriveProjects(
-    db: DbAdapter,
-    organization: Id,
-): Promise<ProjectEntity[]> {
-    const prefix = projectsUriPrefix(organization);
-    const { documents, messagePairs } =
-        await fetchProjectMessagePairs(db, prefix);
-    const messagePairsByProjectId =
-        new Map<Id, DocumentMessagePair[]>();
-    for (const messagePair of messagePairs) {
-        const list = messagePairsByProjectId.get(
-            messagePair.name,
-        );
-        if (list === undefined) {
-            messagePairsByProjectId.set(
-                messagePair.name, [messagePair],
-            );
-        } else {
-            list.push(messagePair);
-        }
-    }
-    const byId = new Map<Id, ProjectEntity>();
-    for (const [projectId, document] of documents) {
-        const history = stateHistoryFrom(
-            documentLifecycleEvents(
-                messagePairsByProjectId.get(projectId) ?? [],
-            ),
-            projectId,
-        );
-        if (currentDocumentState(history) === DELETED_STATE) {
-            continue;
-        }
-        // After DELETED filter history is non-empty for every
-        // live trio document (genesis always mints an event).
-        const current = currentLifecycleEvent(history)!;
-        byId.set(
-            projectId,
-            projectEntityOf(document, organization, current),
-        );
-    }
-    const live = await messageStore(db).getCollection(prefix);
-    const projects: ProjectEntity[] = [];
-    for (const entity of live) {
-        const row = byId.get(liveHeadId(entity));
-        if (row !== undefined) projects.push(row);
-    }
-    return projects;
-}
-
-export async function deriveProject(
-    db: DbAdapter,
-    organization: Id,
-    projectId: Id,
-): Promise<ProjectEntity> {
-    const prefix = projectsUriPrefix(organization);
-    const { document, messagePairs } =
-        await fetchProjectDocumentMessagePairs(
-            db, prefix, projectId,
-        );
-    if (document === undefined) {
-        throw await missedReadError(
-            db, projectId, organization, PROJECTS_TABLE,
-        );
-    }
-    const history = stateHistoryFrom(
-        documentLifecycleEvents(messagePairs),
-        projectId,
-    );
-    if (currentDocumentState(history) === DELETED_STATE) {
-        throw await missedReadError(
-            db, projectId, organization, PROJECTS_TABLE,
-        );
-    }
-    const current = currentLifecycleEvent(history)!;
-    return projectEntityOf(document, organization, current);
-}
-
-// One row per pair whose state_event_id is NEW — the document
-// sequence IS the history, (state_at, id) ascending. Returns every
-// event regardless of current lifecycle state (deletion is just
-// another transition here) — the deleted-filter lives in
-// deriveProjects/deriveProject alone, mirroring how the real
-// states table's getAllFor never filters either. NOT routed —
-// drift-proof only.
-export async function deriveProjectStateHistory(
-    db: DbAdapter,
-    organization: Id,
-    projectId: Id,
-): Promise<StateEntity[]> {
-    const prefix = projectsUriPrefix(organization);
-    const { messagePairs } =
-        await fetchProjectDocumentMessagePairs(
-            db, prefix, projectId,
-        );
-    return stateHistoryFrom(
-        documentLifecycleEvents(messagePairs),
-        projectId,
-    );
 }

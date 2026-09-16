@@ -6,9 +6,16 @@ import {
 } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
+import type { DbAdapter } from '../api/db.ts';
 import {
     EntityNotFoundError,
 } from '../api/db.ts';
+import type { Id } from '../api/types.ts';
+import {
+    documentFamilyWiring,
+    documentGetHandler,
+    type DocumentFamilyWiring,
+} from '../api/document-family.ts';
 import { buildProjects } from '../api/mock-data/projects.ts';
 import {
     secondOrganizationProjectId,
@@ -18,12 +25,6 @@ import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { seedOrganizationMember } from './root-admin-fixture.ts';
-import {
-    deriveProject,
-    deriveProjects,
-    deriveProjectStateHistory,
-} from '../api/derive-projects.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
@@ -33,17 +34,44 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
+const READER: Id = 'XXZruirZyAOoRpNxaDnpSA';
+
+function wiringOf(family: string): DocumentFamilyWiring {
+    const wiring = documentFamilyWiring(family);
+    if (wiring === undefined) {
+        throw new Error('no wiring registered for ' + family);
+    }
+    return wiring;
+}
+
+function getDocument(
+    db: DbAdapter, family: string, organization: Id, id: Id,
+): Promise<unknown> {
+    return documentGetHandler(wiringOf(family))(
+        db, [organization, id], READER, organization, [],
+    );
+}
+
+async function versionsOf(
+    db: MemoryDbAdapter, token: string,
+    family: string, id: string,
+): Promise<{ state: string; member_id: string }[]> {
+    const res = await handleRequest(db, req(
+        'GET',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/' + family
+            + '/' + id + '/versions/',
+        token,
+    ));
+    assertStrictEquals(res.status, 200);
+    return await res.json() as {
+        state: string; member_id: string;
+    }[];
+}
+
 const PROJECT_DRIFT_Z = generateIdentifier();
-const EV_DRIFT_Z = generateIdentifier();
 const PROJECT_DRIFT_A = generateIdentifier();
-const EV_DRIFT_A = generateIdentifier();
 const PROJECT_DRIFT_M = generateIdentifier();
-const EV_DRIFT_M = generateIdentifier();
-const MEMBER_B = generateIdentifier();
-const PROJECT_DRIFT_AUTHORSHIP_CAVEAT = generateIdentifier();
-const EV_DRIFT_AUTHORSHIP_CAVEAT = generateIdentifier();
 const PROJECT_DRIFT_LIFECYCLE = generateIdentifier();
-const EV_DRIFT_LIFECYCLE_GENESIS = generateIdentifier();
 const PROJECT_DRIFT_CONVERSION = generateIdentifier();
 const EV_DRIFT_CONVERSION_IDEA = generateIdentifier();
 
@@ -54,8 +82,6 @@ const EV_DRIFT_CONVERSION_IDEA = generateIdentifier();
 // and non-lexical live fixtures (byIdAscending must diverge
 // from insertion order; never function-vs-function only).
 const EV_DRIFT_CONVERSION_PROJECT = generateIdentifier();
-const PROJECTID_GENESIS = generateIdentifier();
-const PROJECTID_SKEWED = generateIdentifier();
 
 function req(
     method: string,
@@ -71,13 +97,7 @@ function req(
     });
 }
 
-function projectDocument(
-    title: string,
-    state: string,
-    _stateAt: string,
-    _stateEventId: string,
-    position = 1,
-) {
+function projectDocument(title: string, state: string, position = 1) {
     return {
         title,
         description: 'd',
@@ -92,7 +112,7 @@ function projectDocument(
 }
 
 // PUT response shape (documentWriteResponseSpec / G1):
-// entity fields plus lifecycle-current trio.
+// entity fields only.
 function wireProjectPut(
     id: string,
     title: string,
@@ -115,15 +135,12 @@ function wireProjectPut(
     };
 }
 
-// GET projectEntityOf form: entity fields plus lifecycle-
-// current trio (state ← event.state, state_at ← event.at,
-// state_event_id ← event.id) — never the head body trio.
+// GET projectEntityOf form: entity fields plus the head
+// body's own state.
 function wireProjectGet(
     id: string,
     title: string,
     state: string,
-    _stateAt: string,
-    _stateEventId: string,
     position = 1,
     organization = 'AjdvjuECVZEgZoFajaIEkg',
     overrides: Record<string, unknown> = {},
@@ -158,8 +175,8 @@ const SEEDED_PROJECTS = [
     },
 ];
 
-Deno.test('seeded GET /projects wire equals deriveProjects'
-+ ' per org', async () => {
+Deno.test('seeded GET /projects wire equals stored live'
++ ' PUT bodies', async () => {
     const db = await seededDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
@@ -180,13 +197,11 @@ Deno.test('seeded GET /projects wire equals deriveProjects'
             await res.text(),
             await storedCollectionText(db, prefix),
         );
-        const derived = await deriveProjects(db, organization);
-        assert(derived.length > 0);
     }
 });
 
-Deno.test('per-project GET wire equals deriveProject for'
-+ ' every seed', async () => {
+Deno.test('per-project GET wire equals the stored PUT'
++ ' body', async () => {
     const db = await seededDb();
     for (const seed of SEEDED_PROJECTS) {
         const token = await organizationToken(
@@ -203,21 +218,22 @@ Deno.test('per-project GET wire equals deriveProject for'
         assertStrictEquals(res.status, 200);
         const prefix = '/organizations/'
             + seed.organization + '/projects/';
+        const text = await res.text();
         assertStrictEquals(
-            await res.text(),
+            text,
             await storedPutBodyText(db, prefix, seed.id),
         );
-        const derived = await deriveProject(
-            db, seed.organization, seed.id,
-        );
         if (seed.title !== undefined) {
-            assertStrictEquals(derived.title, seed.title);
-            assertStrictEquals(derived.position, seed.position);
+            const parsed = JSON.parse(text) as {
+                title: string; position: number;
+            };
+            assertStrictEquals(parsed.title, seed.title);
+            assertStrictEquals(parsed.position, seed.position);
         }
     }
 });
 
-Deno.test('a foreign-org project id 404s on GET and on derive',
+Deno.test('a foreign-org project id 404s on GET',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_PROJECTS.find(
@@ -238,10 +254,6 @@ async () => {
         body.error,
         'Not found: projects/' + foreign.id,
     );
-    await assertRejects(
-        () => deriveProject(db, 'BBjWJsjYIDkTRKIIPrzWRw', foreign.id),
-        EntityNotFoundError,
-    );
 });
 
 // Live fixtures inserted NON-LEX (z, then a, then m) so
@@ -255,34 +267,26 @@ async () => {
         {
             id: PROJECT_DRIFT_Z,
             title: 'Zulu',
-            at: '2026-07-01T00:00:00.000000Z',
-            ev: EV_DRIFT_Z,
         },
         {
             id: PROJECT_DRIFT_A,
             title: 'Alpha',
-            at: '2026-07-01T00:00:01.000000Z',
-            ev: EV_DRIFT_A,
         },
         {
             id: PROJECT_DRIFT_M,
             title: 'Mike',
-            at: '2026-07-01T00:00:02.000000Z',
-            ev: EV_DRIFT_M,
         },
     ];
     for (const f of fixtures) {
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + f.id
                 , token,
-            projectDocument(f.title, 'submitted', f.at, f.ev),
+            projectDocument(f.title, 'submitted'),
         ));
         assertStrictEquals(put.status, 201);
         assertEquals(
             await put.json(),
-            wireProjectGet(
-                f.id, f.title, 'submitted', f.at, f.ev,
-            ),
+            wireProjectGet(f.id, f.title, 'submitted'),
         );
     }
     const res = await handleRequest(
@@ -319,56 +323,6 @@ async () => {
     }
 });
 
-Deno.test('derived history keeps the FIRST arrival\'s authorship'
-+ ' on a same-trio resend by a different member', async () => {
-    const db = await seededDb();
-    await seedOrganizationMember(db, MEMBER_B);
-    const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
-    const tokenB = await organizationToken(MEMBER_B);
-    const projectId = PROJECT_DRIFT_AUTHORSHIP_CAVEAT;
-
-    await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
-            , tokenA, {
-            ...projectDocument(
-                'First', 'submitted',
-                '2026-04-01T00:00:00.000000Z',
-                EV_DRIFT_AUTHORSHIP_CAVEAT,
-            ),
-        },
-    ));
-    await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
-            , tokenB, {
-            ...projectDocument(
-                'Second', 'submitted',
-                '2026-04-01T00:00:00.000000Z',
-                EV_DRIFT_AUTHORSHIP_CAVEAT,
-            ),
-        },
-    ));
-
-    const derived = await deriveProjectStateHistory(
-        db, 'AjdvjuECVZEgZoFajaIEkg', projectId,
-    );
-    assertStrictEquals(derived.length, 1);
-    assertStrictEquals(derived[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
-
-    // Wire entity reflects the SECOND title; authorship of the
-    // head event stays on member A; GET trio is the one event.
-    const getRes = await handleRequest(
-        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
-            + projectId, tokenA),
-    );
-    assertStrictEquals(getRes.status, 200);
-    assertStrictEquals(
-        await getRes.text(),
-        await storedPutBodyText(
-            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
-        ),
-    );
-});
-
 Deno.test('live-write case: create + edit + transition + delete',
 async () => {
     const db = await seededDb();
@@ -378,11 +332,7 @@ async () => {
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
             , token, {
-            ...projectDocument(
-                'Lifecycle Project', 'submitted',
-                '2026-03-01T00:00:00.000000Z',
-                EV_DRIFT_LIFECYCLE_GENESIS,
-            ),
+            ...projectDocument('Lifecycle Project', 'submitted'),
         },
     ));
     await handleRequest(db, req(
@@ -418,16 +368,20 @@ async () => {
             + projectId, token),
     );
     assertStrictEquals(beforeDelete.status, 200);
+    const beforeText = await beforeDelete.text();
     assertStrictEquals(
-        await beforeDelete.text(),
+        beforeText,
         await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
         ),
     );
-    const derivedBefore = await deriveProject(
-        db, 'AjdvjuECVZEgZoFajaIEkg', projectId,
+    const beforeDocument = await getDocument(
+        db, 'projects', 'AjdvjuECVZEgZoFajaIEkg', projectId,
     );
-    assertStrictEquals(derivedBefore.state, 'under_review');
+    assertEquals(beforeDocument, JSON.parse(beforeText));
+    assertStrictEquals(
+        (beforeDocument as { state: string }).state, 'under_review',
+    );
 
     await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
@@ -456,7 +410,9 @@ async () => {
         ),
     );
     await assertRejects(
-        () => deriveProject(db, 'AjdvjuECVZEgZoFajaIEkg', projectId),
+        () => getDocument(
+            db, 'projects', 'AjdvjuECVZEgZoFajaIEkg', projectId,
+        ),
         EntityNotFoundError,
     );
     const listRes = await handleRequest(
@@ -467,13 +423,6 @@ async () => {
     assertStrictEquals(
         list.some((p) => p.id === projectId), true,
     );
-
-    const derivedHistory = await deriveProjectStateHistory(
-        db, 'AjdvjuECVZEgZoFajaIEkg', projectId,
-    );
-    // genesis + under_review + deleted (same-trio edit
-    // does not add a second event)
-    assertStrictEquals(derivedHistory.length, 3);
 });
 
 Deno.test('live conversion case: a converted idea\'s project'
@@ -527,8 +476,10 @@ Deno.test('live conversion case: a converted idea\'s project'
     const wireText = await getRes.text();
     const wire = JSON.parse(wireText) as { title: string };
     assertStrictEquals(wire.title, 'Converted Project');
-    const derived = await deriveProject(db, 'AjdvjuECVZEgZoFajaIEkg'
-        , projectId);
+    const document = await getDocument(
+        db, 'projects', 'AjdvjuECVZEgZoFajaIEkg', projectId,
+    );
+    assertEquals(document, JSON.parse(wireText));
     assertStrictEquals(
         wireText,
         await storedPutBodyText(
@@ -543,81 +494,9 @@ Deno.test('live conversion case: a converted idea\'s project'
     const list = await listRes.json() as { id: string }[];
     assert(list.some((p) => p.id === projectId));
 
-    const derivedHistory = await deriveProjectStateHistory(
-        db, 'AjdvjuECVZEgZoFajaIEkg', projectId,
+    const versions = await versionsOf(
+        db, token, 'projects', projectId,
     );
-    assertStrictEquals(derivedHistory.length, 1);
-    assertStrictEquals(derivedHistory[0]!.state, 'submitted');
-    // GET trio is the lifecycle-current genesis event.
-    assertStrictEquals(derived.state, 'submitted');
-});
-
-// case-7d mirror for projects GET: a clock-skewed later
-// arrival whose state_at sorts BELOW genesis does NOT
-// displace genesis as lifecycle-current. Head body fields
-// (title) may reflect the later arrival; the GET trio must
-// stay genesis.
-Deno.test('GET project trio is lifecycle-current under clock skew'
-+ ' (genesis-wins-under-skew, case 7d)', async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const projectId = generateIdentifier();
-    const genesisAt = '2026-05-01T00:00:00.000000Z';
-    const genesisEv = PROJECTID_GENESIS;
-    const skewedAt = '2020-01-01T00:00:00.000000Z';
-    const skewedEv = PROJECTID_SKEWED;
-
-    const genesis = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
-            , token,
-        projectDocument(
-            'Genesis Title', 'submitted',
-            genesisAt, genesisEv,
-        ),
-    ));
-    assertStrictEquals(genesis.status, 201);
-
-    // Later arrival, earlier state_at, different state + title.
-    const skewed = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
-            , token,
-        projectDocument(
-            'Skewed Title', 'under_review',
-            skewedAt, skewedEv,
-        ),
-    ));
-    assertStrictEquals(skewed.status, 201);
-
-    const expected = wireProjectGet(
-        projectId, 'Skewed Title', 'under_review',
-        genesisAt, genesisEv,
-    );
-    const getRes = await handleRequest(
-        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
-            + projectId, token),
-    );
-    assertStrictEquals(getRes.status, 200);
-    assertEquals(await getRes.json(), expected);
-    assertEquals(
-        JSON.parse(await storedPutBodyText(
-            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
-        )),
-        expected,
-    );
-
-    const derived = await deriveProject(db, 'AjdvjuECVZEgZoFajaIEkg'
-        , projectId);
-    assertStrictEquals(
-        JSON.stringify(derived), JSON.stringify(expected),
-    );
-    assertStrictEquals(derived.title, 'Skewed Title');
-    assertStrictEquals(derived.state, 'under_review');
-
-    const listRes = await handleRequest(
-        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
-            , token),
-    );
-    assertStrictEquals(listRes.status, 200);
-    const list = await listRes.json() as { id: string }[];
-    assert(list.some((row) => row.id === projectId));
+    assertStrictEquals(versions.length, 1);
+    assertStrictEquals(versions[0]!.state, 'submitted');
 });

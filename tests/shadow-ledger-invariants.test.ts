@@ -1,6 +1,4 @@
 import { assert, assertMatch, assertStrictEquals } from '@std/assert';
-import { deriveIdeaStateHistory } from
-    '../api/derive-ideas.ts';
 import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
@@ -15,6 +13,7 @@ import { organizationToken } from './token-fixtures.ts';
 import {
     storedWorkOrderFlowGraph,
     DEFAULT_LOCK_TIMEOUT,
+    type Id,
 } from '../api/types.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
@@ -24,11 +23,38 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import {
+    documentFamilyWiring,
+    documentGetHandler,
+    type DocumentFamilyWiring,
+} from '../api/document-family.ts';
+// This file reaches routes.ts only through mock-seed.ts;
+// import it directly for the family-wiring registration
+// side effect getDocument below depends on.
+import '../api/routes.ts';
+
+const READER: Id = 'XXZruirZyAOoRpNxaDnpSA';
+
+function wiringOf(family: string): DocumentFamilyWiring {
+    const wiring = documentFamilyWiring(family);
+    if (wiring === undefined) {
+        throw new Error('no wiring registered for ' + family);
+    }
+    return wiring;
+}
+
+function getDocument(
+    db: MemoryDbAdapter, family: string, organization: Id,
+    id: Id,
+): Promise<unknown> {
+    return documentGetHandler(wiringOf(family))(
+        db, [organization, id], READER, organization, [],
+    );
+}
 
 const N_START = generateIdentifier();
 const N_FINISH = generateIdentifier();
 const INV_REC_1 = generateIdentifier();
-const INV_REC_1_EV = generateIdentifier();
 const INV_REC_1_ATTR = generateIdentifier();
 const INV_CHAIN_1 = generateIdentifier();
 const INV_FLOW_1_EV = generateIdentifier();
@@ -90,7 +116,7 @@ function ideaFields(title: string) {
 
 // PUT /organizations/:id/ideas/:id now takes the FULL document (Decision 7):
 // the
-// entity fields plus the state trio. One fixed trio per idea
+// entity fields plus state. A fixed state per idea
 // id keeps both PUTs below a same-state edit.
 function ideaPutBody(_ideaId: string, title: string) {
     return {
@@ -109,7 +135,7 @@ function recordFields(name: string, organization: string) {
 }
 
 // PUT /records/:id now takes the FULL document (Decision 7):
-// the entity fields plus the state trio. A fixed trio keeps
+// the entity fields plus state. A fixed state keeps
 // this PUT below a same-state edit.
 function recordPutBody(
     _recordId: string, name: string, organization: string,
@@ -198,7 +224,7 @@ function workOrderCreateBody(
 // and attribute pairs are exercised alongside the other six
 // families in this same mix — not merely in isolation.
 function createRecordBody(
-    id: string, eventId: string, organization: string,
+    id: string, organization: string,
     attributes: Record<string, unknown>[] = [],
 ) {
     return {
@@ -212,15 +238,13 @@ function createRecordBody(
         },
         attributes,
         initialState: 'active',
-        initialStateEventId: eventId,
-        initialStateAt: AT,
     };
 }
 
 // A mock-data seed (EXPECTED_MESSAGE_PAIR_COUNT pre-formed
 // pairs, see mock-data-pairs.test.ts) plus one live-write
 // batch layered on top via handleRequest: one document PUT
-// (Supersedes minted, ideas), one idea state-change trio PUT
+// (Supersedes minted, ideas), one idea state-change PUT
 // (states/:id retired),
 // one FAILED write (work-order claim conflict 409), one create
 // POST (records — Phase 6 Task 4's own bundle: operation +
@@ -257,7 +281,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
         secondIdea.headers.get('Supersedes'), null,
     );
 
-    // Idea state-change trio PUT (states/:id retired) — a
+    // Idea state-change PUT (states/:id retired) — a
     // second lifecycle stamp on the same document.
     const stateAppend = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -277,7 +301,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/record-types/', org2Token,
         createRecordBody(
-            INV_REC_1, INV_REC_1_EV, ORGANIZATION_TWO,
+            INV_REC_1, ORGANIZATION_TWO,
             [{
                 id: INV_REC_1_ATTR,
                 organization_id: ORGANIZATION_TWO,
@@ -458,7 +482,7 @@ Deno.test('every pair\'s envelope timestamps are RFC-3339 zulu'
 // ledger — proof the shadow-ledger request is not merely
 // present but semantically faithful to what was really written.
 Deno.test('a seeded idea\'s create-pair request reproduces its'
-+ ' actual genesis row in states', async () => {
++ ' GET state', async () => {
     const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
     const requests = await db.messagePairs.getAll();
@@ -474,11 +498,8 @@ Deno.test('a seeded idea\'s create-pair request reproduces its'
             state: string;
         };
     };
-    const history = await deriveIdeaStateHistory(
-        db, STARK_ORGANIZATION, idea.id,
-    );
-    const genesis = history[0];
-    assert(genesis, 'derived state missing');
-    assertStrictEquals(genesis.entity_id, idea.id);
-    assertStrictEquals(genesis.state, parsed.body.state);
+    const document = await getDocument(
+        db, 'ideas', STARK_ORGANIZATION, idea.id,
+    ) as { state: string };
+    assertStrictEquals(document.state, parsed.body.state);
 });

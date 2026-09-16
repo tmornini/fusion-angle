@@ -28,6 +28,7 @@ import {
 } from '../api/document-family.ts';
 import {
     pickNumber,
+    pickString,
     validateObjectiveDocumentBody,
 } from '../api/validators.ts';
 import { postObjectiveDocumentOp } from '../api/routes.ts';
@@ -64,7 +65,6 @@ const OBJ_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 const OBJ_DRIFT_Z = generateIdentifier();
 const OBJ_DRIFT_A = generateIdentifier();
 const OBJ_DRIFT_M = generateIdentifier();
-const OBJ_DRIFT_SKEW_1_GENESIS = generateIdentifier();
 
 // Phase Final Task 2: objectives(+objective_revisions)
 // dual-write stripped. This file no longer compares derive
@@ -74,8 +74,8 @@ const OBJ_DRIFT_SKEW_1_GENESIS = generateIdentifier();
 // craftsmanship: byIdAscending must diverge from insertion
 // order; never function-vs-function only).
 //
-// Objectives are the FIFTH lifecycle-trio family (states-
-// document retirement). Absence-as-active (R2) is RETIRED —
+// Objectives are the FIFTH family (states-document
+// retirement). Absence-as-active (R2) is RETIRED —
 // every objective carries an explicit genesis event; archive/
 // reactivate ride PUT /organizations/:id/objectives/:id.
 // OBJECTIVES_TEST_WIRING
@@ -107,23 +107,21 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 const OBJECTIVES_TEST_WIRING: DocumentFamilyWiring = {
     family: 'objectives',
     httpNest: 'organization',
-    lifecycle: 'trio',
+    lifecycle: 'state',
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,
-    // Mirror routes.ts objectiveDocumentEntityOf: stamp trio
-    // from lifecycle-current (required on trio path).
-    entityOf: (document, organization, current) => ({
+    // Mirror routes.ts objectiveDocumentEntityOf.
+    entityOf: (document, organization) => ({
         id: document.name,
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
-        state: current!.state,
+        state: pickString(document.body, 'state'),
     }),
 };
 
 const READER_ACTOR: Id = generateIdentifier();
 const OBJECTIVEID_REV_1 = generateIdentifier();
-const OBJECTIVEID_ACTIVE = generateIdentifier();
 const OBJECTIVEID_REV_2 = generateIdentifier();
 const OBJECTIVEID_REV_3 = generateIdentifier();
 
@@ -144,7 +142,7 @@ async function derivedObjective(
 }
 
 // PUT response shape (documentWriteResponseSpec / G1):
-// entity fields plus lifecycle-current trio.
+// entity fields only.
 function wireObjectivePut(
     id: string,
     position: number,
@@ -158,15 +156,11 @@ function wireObjectivePut(
 }
 
 // GET objectiveDocumentEntityOf form: entity fields plus
-// lifecycle-current trio (state ← event.state, state_at ←
-// event.at, state_event_id ← event.id) — never the head
-// body trio.
+// the head body's own state.
 function wireObjectiveGet(
     id: string,
     position: number,
     state: string,
-    _stateAt: string,
-    _stateEventId: string,
     organization = STARK_ORGANIZATION,
 ): ObjectiveEntity {
     return {
@@ -212,8 +206,6 @@ function objectiveCreateBody(
             member_id: 'XXZruirZyAOoRpNxaDnpSA', at,
         },
         initialState: 'active',
-        initialStateEventId: generateIdentifier(),
-        initialStateAt: at,
     };
 }
 
@@ -602,7 +594,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
         assertStrictEquals(revs.length, 1);
     }
 
-    // Position PUT echoes the genesis trio (putObjectivePosition
+    // Position PUT echoes the genesis state (putObjectivePosition
     // shape) — same state_event_id so echo-dedup mints no event.
     const reposition = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
@@ -639,11 +631,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
         assertStrictEquals(derived.state, 'active');
         assertEquals(
             await reposition.json(),
-            wireObjectiveGet(
-                objectiveId, 77, 'active',
-                '2026-06-01T00:00:00.000000Z',
-                OBJECTIVEID_ACTIVE,
-            ),
+            wireObjectiveGet(objectiveId, 77, 'active'),
         );
     }
 
@@ -673,8 +661,8 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     }
 
     // ARCHIVE via PUT /organizations/:id/objectives/:id with the archived
-    // lifecycle trio — objective STAYS in the collection
-    // (trio families exclude only 'deleted'; archived is a
+    // state — objective STAYS in the collection
+    // (state families exclude only 'deleted'; archived is a
     // live objective state).
     const archived = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
@@ -1014,7 +1002,7 @@ async () => {
         ),
     ));
 
-    // Position body carries the echoed genesis trio — required
+    // Position body carries the echoed genesis state — required
     // by the document gate after states-document retirement.
     const positionBody = {
         position: 99,
@@ -1068,7 +1056,7 @@ async () => {
 Deno.test('THE ARCHIVED-INCLUSION PIN: an objective with a live'
 + " 'archived' document-plane event appears in GET /objectives"
 + ' AND GET organizations/:id/objectives/:id 200 — archived is NOT deleted;'
-+ " trio families exclude only state='deleted'",
++ " state families exclude only state='deleted'",
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -1158,11 +1146,7 @@ async () => {
         assertStrictEquals(put.status, 201);
         assertEquals(
             await put.json(),
-            wireObjectiveGet(
-                f.id, f.position, 'active',
-                '2026-06-13T00:00:00.000000Z',
-                f.id,
-            ),
+            wireObjectiveGet(f.id, f.position, 'active'),
         );
     }
     const res = await handleRequest(
@@ -1192,80 +1176,6 @@ async () => {
             await storedPutBodyText(db, prefix, row.id),
         );
     }
-});
-
-// case-7d mirror for objectives GET: a clock-skewed later
-// arrival whose state_at sorts BELOW genesis does NOT
-// displace genesis as lifecycle-current. Head body fields
-// (position) may reflect the later arrival; the GET trio must
-// stay genesis (state ← event.state, state_at ← event.at,
-// state_event_id ← event.id).
-
-Deno.test('GET objective trio is lifecycle-current under clock skew'
-+ ' (genesis-wins-under-skew, case 7d)', async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const objectiveId = generateIdentifier();
-    const genesisAt = '2026-06-01T00:00:00.000000Z';
-    const genesisEv = OBJ_DRIFT_SKEW_1_GENESIS;
-
-    const genesis = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
-            + objectiveId, token, {
-            position: 1,
-            state: 'active',
-        },
-    ));
-    assertStrictEquals(genesis.status, 201);
-
-    // Later arrival, earlier state_at, different state +
-    // position. 'archived' is a live objective state — if
-    // it won as current the GET trio would flip; genesis-
-    // wins keeps the objective active.
-    const skewed = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
-            + objectiveId, token, {
-            position: 99,
-            state: 'archived',
-        },
-    ));
-    assertStrictEquals(skewed.status, 201);
-
-    const expected = wireObjectiveGet(
-        objectiveId, 99, 'archived',
-        genesisAt, genesisEv,
-    );
-
-    const res = await handleRequest(
-        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
-            + objectiveId, token),
-    );
-    assertStrictEquals(res.status, 200);
-    assertEquals(await res.json(), expected);
-    assertEquals(
-        JSON.parse(await storedPutBodyText(
-            db,
-            '/organizations/' + STARK_ORGANIZATION
-                + '/objectives/',
-            objectiveId,
-        )),
-        expected,
-    );
-
-    const derived = await derivedObjective(
-        db, STARK_ORGANIZATION, objectiveId,
-    );
-    assertStrictEquals(
-        JSON.stringify(derived), JSON.stringify(expected),
-    );
-    assertStrictEquals(derived.position, 99);
-    assertStrictEquals(derived.state, 'archived');
-
-    const objectives = await derivedObjectives(
-        db, STARK_ORGANIZATION,
-    );
-    const row = objectives.find((o) => o.id === objectiveId);
-    assertEquals(row, expected);
 });
 
 // -- 10. revision PUT wire equals GET collection entry ---------

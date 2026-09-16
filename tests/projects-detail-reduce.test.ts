@@ -1,5 +1,6 @@
 import { assertMatch, assertNotMatch, assertStrictEquals } from '@std/assert';
 import { Project } from '../api/types.ts';
+import type { ProjectState } from '../api/types.ts';
 import { ProjectView } from
     '../web-app/app/adapters/projects.ts';
 import {
@@ -82,9 +83,7 @@ Deno.test(
             position: 0,
             state: 'approved',
         };
-        const detail = {
-            state: 'approved' as const,
-        };
+        const detail: ProjectState = 'approved';
         const view = new ProjectView(
             new Project(entity, detail),
             [], [], [],

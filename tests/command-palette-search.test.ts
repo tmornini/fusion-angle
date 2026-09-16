@@ -28,9 +28,7 @@ function buildIdea(
         expected_outcome: '',
         success_metrics: '',
         state,
-    }, {
-        state,
-    });
+    }, state);
 }
 
 function buildProject(
@@ -49,9 +47,7 @@ function buildProject(
         actual_cost: 0,
         position: 1,
         state: 'approved',
-    }, {
-        state: 'approved',
-    });
+    }, 'approved');
 }
 
 function buildHumanMember(

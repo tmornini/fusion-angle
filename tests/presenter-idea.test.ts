@@ -8,7 +8,6 @@ import {
     Idea,
     type IdeaEntity,
     type IdeaState,
-    type IdeaStateDetail,
     type ObjectiveEntity,
 } from '../api/types.ts';
 import {
@@ -121,20 +120,12 @@ function makeIdeaEntity(
     };
 }
 
-function makeStateDetail(
-    state: IdeaState = 'active',
-): IdeaStateDetail {
-    return {
-        state,
-    };
-}
-
 function makeIdea(
     overrides: Partial<IdeaEntity> = {},
     state: IdeaState = 'active',
 ): Idea {
     return new Idea(
-        makeIdeaEntity(overrides), makeStateDetail(state),
+        makeIdeaEntity(overrides), state,
     );
 }
 
@@ -146,7 +137,7 @@ function makeWithSubmitter(
 ): IdeaWithSubmitter {
     const entity = makeIdeaEntity(overrides);
     return {
-        idea: new Idea(entity, makeStateDetail(state)),
+        idea: new Idea(entity, state),
         entity,
         submitterName,
         submittedAt,
@@ -247,7 +238,7 @@ Deno.test(
         );
         const roundTripped = new Idea(
             { ...base, ...patch },
-            makeStateDetail(),
+            'active',
         );
         assertEquals(
             ideaDraftFromIdea(roundTripped),

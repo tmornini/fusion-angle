@@ -522,10 +522,10 @@ Deno.test(
     + ' record-write batch',
     async () => {
         const db = await seededDb();
-        // Record-edit trio echo still needs a sameEvent head
-        // on the RECORD (not the referrer parent). The
-        // fourth-leg referrer lands through a live instance
-        // head under the parent type.
+        // The edit body echoes `state` and still needs a
+        // sameEvent head on the RECORD (not the referrer
+        // parent). The fourth-leg referrer lands through a
+        // live instance head under the parent type.
         await seedInstanceReferrer(
             db, 'VXTdVVRluJDRBqbXWZBntA', 'High',
         );
@@ -543,9 +543,10 @@ Deno.test(
                 },
                 attributes: [],
                 // Echoes the SAME event pre-seeded above (ev1)
-                // — never a fresh mint — so the trio's own gate
-                // admits this body and the 409 below still
-                // proves the RESTRICT mechanism, not validation.
+                // — never a fresh mint — so the record-type
+                // document gate admits this body and the 409
+                // below still proves the RESTRICT mechanism,
+                // not validation.
                 state: 'active',
                 removedAttributeIds: ['VXTdVVRluJDRBqbXWZBntA'],
             }, DEV_TOKEN),

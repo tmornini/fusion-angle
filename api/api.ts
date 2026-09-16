@@ -57,7 +57,6 @@ import {
     idFamilyOf,
     throwDocumentMiss,
     requireOrganization,
-    resolveStreamedTrioWriteBody,
 } from './document-family.ts';
 import {
     messageStore,
@@ -918,18 +917,6 @@ export async function handleRequest(
                     });
                 }
             }
-            const streamedTrioBody =
-                method === 'PUT'
-                && body === undefined
-                    ? undefined
-                    : await resolveStreamedTrioWriteBody(
-                        effective,
-                        routePattern,
-                        params,
-                        body,
-                        actor,
-                        organization,
-                    );
             messagePair = await formWriteMessagePair({
                 method, pathname, routePattern,
                 routeSegments: matched.segments,
@@ -944,11 +931,10 @@ export async function handleRequest(
                 responseBody: method === 'PUT'
                     && body === undefined
                     ? undefined
-                    : streamedTrioBody
-                        ?? spec.successBody?.(
-                            params, body, actor,
-                            organization,
-                        ),
+                    : spec.successBody?.(
+                        params, body, actor,
+                        organization,
+                    ),
                 ...(echoMatchesHead
                     && echo !== null
                     && echo !== undefined
@@ -2251,11 +2237,9 @@ function documentEntityPattern(
         : wiring.family + '/:id';
 }
 
-// Stream families (ideas, projects, …). Work-orders still
-// assemble (binding). Flows stay on derive: stored PUT has
-// no trio, so a state-'deleted' head must 404 via the
-// lifecycle walk, and hasUndoHistory is stamped there.
-// Record instances still project.
+// Stream families read the stored head. Work-orders
+// assemble (binding). Flows stay on derive for
+// hasUndoHistory.
 function streamFamilyWiring(
     routePattern: string,
 ): ReturnType<typeof documentFamilyWiring> {

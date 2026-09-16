@@ -30,7 +30,7 @@ import {
 import {
     Project,
     getProjectEntity,
-    projectStateDetailFromRow,
+    projectStateOf,
     ProjectView,
     putProjectFields,
     postProjectStateChange,
@@ -58,7 +58,7 @@ import {
 import type {
     FlowListItem,
     ProjectEntity,
-    ProjectStateDetail,
+    ProjectState,
 } from '../app/adapters/index.ts';
 import {
     getMemberMap,
@@ -84,14 +84,14 @@ type PageState =
         kind: 'reading';
         view: ProjectView;
         entity: ProjectEntity;
-        detail: ProjectStateDetail;
+        detail: ProjectState;
         flows: FlowListItem[];
     }
     | {
         kind: 'editing';
         view: ProjectView;
         entity: ProjectEntity;
-        detail: ProjectStateDetail;
+        detail: ProjectState;
         flows: FlowListItem[];
         draft: ProjectDraftFields;
     };
@@ -123,13 +123,12 @@ const isFieldKey = makeFieldKeyValidator(FIELDS);
 // have no position accessor at all — composing a wire body
 // from the view would corrupt progress/actual_cost and fail
 // to compile on position. So the loader retains the RAW
-// entity + state detail beside the view. Lifecycle trio is
-// stamped on the ProjectEntity GET row — map via
-// projectStateDetailFromRow; no second states hop.
+// entity + state beside the view. State is read off
+// the GET row by `projectStateOf`; no second states hop.
 interface ProjectDetailData {
     view: ProjectView;
     entity: ProjectEntity;
-    detail: ProjectStateDetail;
+    detail: ProjectState;
     flows: FlowListItem[];
     active: Awaited<
         ReturnType<typeof getActiveObjectives>
@@ -159,7 +158,7 @@ async function loadProjectDetailData(
         getFlowsByProject(ctx, projectId),
         getActiveObjectives(ctx),
     ]);
-    const detail = projectStateDetailFromRow(entity);
+    const detail = projectStateOf(entity);
     const view = new ProjectView(
         new Project(entity, detail),
         objectives,
