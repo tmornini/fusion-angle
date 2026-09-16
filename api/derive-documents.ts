@@ -51,7 +51,7 @@ export function requestBodyOf(
 // provenance. Shared raw material for both the head-document
 // reduction below and a family's own lifecycle reduction over
 // the SAME pairs, grouped and compared by fields the family
-// alone knows (api/derive-ideas.ts's state trio).
+// alone knows.
 export interface DocumentMessagePair {
     readonly id: Id;
     readonly at: string;
@@ -143,15 +143,9 @@ export function deriveDocumentsAt(
     return documents;
 }
 
-// The lifecycle trio (state/state_at/state_event_id) a
-// document-class PUT body folds in (Decision 7), plus which
-// identity is credited as its author — byte-identical across
-// every document family (ideas, projects, and beyond): the
-// trio's field names are the SAME wire vocabulary regardless
-// of which entity the rest of the body describes, so this
-// reduction was never per-family logic despite living
-// duplicated in derive-ideas.ts/derive-projects.ts through
-// Phase 3.
+// Flows' document body carries state, state_at, and
+// state_event_id; every other document family carries state
+// alone.
 export const DELETED_STATE = 'deleted';
 
 // The head pair as the document a family mapper reads.
@@ -182,68 +176,27 @@ export interface DocumentLifecycleEvent {
     readonly etag: string;
 }
 
-// Walk a document's pairs in ARRIVAL order and keep the FIRST
-// occurrence of each distinct state_event_id: a later PUT
-// resending the same trio (the document op's MEMBER_ID
-// CAVEAT — an unchanged-state edit replays the STORED head's
-// member_id) is a duplicate, not a new lifecycle event, so its
-// own requester never surfaces as an author.
-//
-// A DELETE pair carries no trio — its stored body is empty
-// (design decision 6: DELETE tombstones the document, it never
-// carries wire fields), so it is skipped here entirely rather
-// than walked into pickString, which would throw on the missing
-// state_event_id key. The tombstone signal itself lives in
-// deriveDocumentsAt's head-absence check, not in this lifecycle
-// walk. Author gate 9: records is the first trio family whose
-// :id document carries a live DELETE route, so a delete-then-
-// recreate history (PUT, DELETE, PUT) is the first live case
-// that would otherwise crash here; behavior-preserving for
-// ideas/projects/flows, none of which has a DELETE at its own
-// document.
+// Flows' lifecycle walk. One event per distinct
+// state_event_id in arrival order: a later PUT resending the
+// same event id is an echo, not a new event. The validator
+// guarantees the key on every flow document body; a DELETE
+// pair carries no body and is skipped.
 export function documentLifecycleEvents(
     messagePairs: readonly DocumentMessagePair[],
 ): DocumentLifecycleEvent[] {
     const seen = new Set<Id>();
     const events: DocumentLifecycleEvent[] = [];
-    let afterDelete = false;
     for (const messagePair of messagePairs) {
-        if (messagePair.method === DELETE_METHOD) {
-            afterDelete = true;
-            continue;
-        }
-        if ('state_event_id' in messagePair.body) {
-            const stateEventId = pickString(
-                messagePair.body, 'state_event_id',
-            );
-            if (seen.has(stateEventId)) continue;
-            seen.add(stateEventId);
-            events.push({
-                stateEventId,
-                state: pickString(messagePair.body, 'state'),
-                stateAt: pickString(
-                    messagePair.body, 'state_at',
-                ),
-                memberId: messagePair.requesterIdentityId,
-                etag: messagePair.id,
-            });
-            afterDelete = false;
-            continue;
-        }
-        const state = pickString(messagePair.body, 'state');
-        const last = events[events.length - 1];
-        if (
-            !afterDelete
-            && last !== undefined
-            && last.state === state
-        ) {
-            continue;
-        }
-        afterDelete = false;
+        if (messagePair.method === DELETE_METHOD) continue;
+        const stateEventId = pickString(
+            messagePair.body, 'state_event_id',
+        );
+        if (seen.has(stateEventId)) continue;
+        seen.add(stateEventId);
         events.push({
-            stateEventId: messagePair.id,
-            state,
-            stateAt: messagePair.at,
+            stateEventId,
+            state: pickString(messagePair.body, 'state'),
+            stateAt: pickString(messagePair.body, 'state_at'),
             memberId: messagePair.requesterIdentityId,
             etag: messagePair.id,
         });
@@ -280,10 +233,9 @@ export function stateHistoryFrom(
 // StateStore.getCurrentForIn's own (at, id) reduction over the
 // real states table exactly (shared/ledger-reduction.ts's
 // default compare). Families that stamp the lifecycle trio on
-// GET rows (ideas, projects, records, objectives, members)
-// read the whole event; others only need `.state` via
-// currentDocumentState.
-export function currentLifecycleEvent(
+// GET rows read the whole event; others only need `.state`
+// via currentDocumentState.
+function currentLifecycleEvent(
     history: readonly StateEntity[],
 ): StateEntity | undefined {
     return latestByKey(history, () => 'current')

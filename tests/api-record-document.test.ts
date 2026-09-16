@@ -12,11 +12,6 @@ import { handleRequest } from '../api/api.ts';
 import { postRecordDocumentOp } from '../api/routes.ts';
 import { validateRecordDocumentBody } from '../api/validators.ts';
 import { ValidationError } from '../api/types.ts';
-import type { MessagePairEntity } from '../api/types.ts';
-import {
-    documentMessagePairsAt,
-    documentLifecycleEvents,
-} from '../api/derive-documents.ts';
 import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
     RECORD_TYPE_DETAIL_PATTERN,
@@ -298,86 +293,4 @@ Deno.test('a byte-identical resend replays the stored response:'
     );
     assertStrictEquals((await db.messagePairs.getAll()).length, 3);
     assertStrictEquals((await db.messagePairs.getAll()).length, 3);
-});
-
-// -- 4. the DELETE-pair walk filter (Author gate 9) ----------
-//
-// documentLifecycleEvents walks every 2xx PUT/DELETE pair at a
-// document; a DELETE pair's stored body is empty
-// (design decision 6), so before the fix it threw inside
-// pickString the moment it reached the DELETE pair. records is
-// the first trio family with a live DELETE at its :id document,
-// so a delete-then-recreate history is the first live
-// reproduction of the throw. No route dispatches records/:id
-// through this walk yet (GET stays hand-written until Task 7),
-// so this pins the shared derive-documents.ts fix directly
-// against fabricated pairs — below-gate, family-agnostic.
-
-async function storedMessagePairAt(
-    method: string,
-    name: string,
-    at: string,
-    body: Record<string, unknown> | undefined,
-): Promise<MessagePairEntity> {
-    const messagePair = await formWriteMessagePair({
-        method,
-        pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + name,
-        routePattern: RECORD_TYPE_DETAIL_PATTERN,
-        routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
-        pathSegments: ['organizations', 'AjdvjuECVZEgZoFajaIEkg'
-            , 'record-types', name],
-        headerFields: [],
-        body,
-        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
-        requestAt: at,
-        organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: method === 'DELETE' ? 204 : 200,
-        responseBody: undefined,
-        operationId: generateIdentifier(),
-    });
-    return {
-        id: messagePair.id,
-        path: messagePair.path,
-        name: messagePair.name,
-        requester_identity_id: messagePair.requesterIdentityId,
-        method: messagePair.method,
-        request_at: at,
-        request_hash: messagePair.requestHash,
-        request: messagePair.requestMessage,
-        response_at: at,
-        response: messagePair.responseMessage,
-        operation_id: messagePair.operationId,
-    };
-}
-
-Deno.test('documentLifecycleEvents skips a DELETE-method pair,'
-+ ' yielding the two PUT trios across a delete-then-recreate'
-+ ' history', async () => {
-    const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/';
-    const first = await storedMessagePairAt(
-        'PUT', 'rec-x', '2026-01-01T00:00:00.000000Z',
-        recordDocument('First', 'active', AT, 'ev-x1'),
-    );
-    const deleted = await storedMessagePairAt(
-        'DELETE', 'rec-x', '2026-01-02T00:00:00.000000Z',
-        undefined,
-    );
-    const second = await storedMessagePairAt(
-        'PUT', 'rec-x', '2026-01-03T00:00:00.000000Z',
-        recordDocument(
-            'Second', 'active',
-            '2026-01-03T00:00:00.000000Z', 'ev-x2',
-        ),
-    );
-    const messagePairs = documentMessagePairsAt(
-        [first, deleted, second], prefix,
-    )
-        .filter(messagePair => messagePair.name === 'rec-x');
-    assertStrictEquals(messagePairs.length, 3);
-    const events = documentLifecycleEvents(messagePairs);
-    assertEquals(
-        events.map(e => e.state),
-        ['active', 'active'],
-    );
 });
