@@ -618,10 +618,11 @@ export function pickOptionalString(
 // one width — a fractionless second sorts AFTER every
 // fractional stamp inside it ('Z' > '.'), so an admitted
 // off-width stamp could shadow the true latest event. The
-// gate is the persistence edge for externally-sourced rows
-// (PUT states/:id, the snapshot plane), so width is pinned
-// HERE; Date.parse then rejects impossible dates the shape
-// admits (e.g. month 13).
+// gate is the persistence edge for externally-sourced rows —
+// every document PUT's state_at/at field runs through
+// validateTimestampField below — so width is pinned HERE;
+// Date.parse then rejects impossible dates the shape admits
+// (e.g. month 13).
 const ISO_ZULU =
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 

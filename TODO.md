@@ -13,7 +13,7 @@ processes last. A "Merged:" clause names bullets absorbed
 from `## Later work`; they keep their oracles. Four
 former items left for `## Later work` (genericity, JSON
 parse/stringify, simulated latency, cachability) and the
-skew tests folded into item 7.
+skew tests, which went with item 7's trio.
 
 2. The authentication header out of the message; roles
    and views — `HOISTED_HEADER_NAMES`
@@ -130,40 +130,19 @@ skew tests folded into item 7.
    roster's absent profile with the read. Authored on
    the `2026-09-04-critical-functionality-path` branch;
    this is its master copy.
-7. Lifecycle out of the document body — fold `state` /
-   `state_at` / `state_event_id` (Decision 7's trio) out
-   of every document PUT so ideas, projects, flows, and
-   objectives (`lifecycle: 'trio'` at `api/routes.ts:
-   365, 377, 398, 491`) take the shape work-orders,
-   identities, and ai-agents already have: lifecycle is
-   its own event pairs at an operation path, and the
-   absence of a row IS the absence of the event. Sites:
-   the reduction (`api/derive-documents.ts:146-154`),
-   the stamp (`api/document-family.ts:123`), every
-   derive (`api/derive-ideas.ts:54, 83`,
-   `api/derive-projects.ts:39, 70`,
-   `api/derive-flows.ts:75`), the seeds
-   (`api/mock-data/seed-message-pairs.ts` trio omit-keys
-   at 717-718, 757-758, 789-790, 1212-1213; remaining
-   `state_at` / `state_event_id` stamp at 947-948), the
-   validators' trio-key gates, and the wire — decide
-   whether GET still presents `state`, derived, so the
-   pages do not change. Eighty files
-   name the trio, fifty-eight of them tests. Precedes
-   item 10, so the flow rewrite lands on the stateless
-   shape once. Merged: no lifecycle transition table at
-   any gate; the genesis-wins-under-skew tests — five
-   suites name a clock-skew case their fixtures never
-   build (`tests/drift-ideas.test.ts` 'GET idea trio is
-   lifecycle-current under clock skew' and its siblings
-   in drift-objectives, drift-projects, drift-records,
-   and derive-projects; `_stateAt` / `_stateEventId`
-   carry the unused-argument prefix), so they pass for
-   the wrong reason. With the trio gone the server
-   stamps every `at`, skew cannot exist, and the tests
-   go with the trio or rename to the arrival-order
-   covenant they keep — never the other exit, teaching
-   the PUT path to trust a caller's clock.
+7. Lifecycle out of the document body — closed the other
+   way by `docs/superpowers/specs/2026-09-15-retire-the-trio-design.md`:
+   state stays in the document body, PUT stores it, GET
+   reads it from the head, and ideas, projects,
+   objectives, and record-types have no lifecycle event
+   pairs. What closed: the server-side history walk over
+   those four families, the `'trio'` discriminant, the
+   two create-body event keys, the seed's per-entity
+   state rows, the client's four `*StateDetail`
+   wrappers, and the clock-skew and authorship-on-resend
+   tests whose fixtures never built the skew they named.
+   Flows keep their event walk and their three body
+   fields until item 10 rewrites them.
 8. The bell reaches the browser — every write already
    `pg_notify`s `fusion_events` with a scoped
    `NotificationEvent` (`api/notifications.ts`;
@@ -599,13 +578,17 @@ Off the critical path; each with its oracle.
   `tests/ideas-empty-subscribe.test.ts:190-203`, and the
   "idle tab ignores a peer refresh broadcast" check in
   `tests/adapters-refresh-mutex.test.ts:153-155`. A late
-  delivery can only pass them wrongly, never fail them,
-  so they never flake but prove less than they read as
-  proving; the ideas comment still says its drain matches
-  the post-bell assert, which 90f5c722 turned into a
-  deadline wait. Oracle: each check reads after a signal
-  that the delivery was processed — a render count on the
-  host stub for the two page tests, a second listener on
+  delivery can only pass them wrongly, never fail them —
+  but this branch saw `tests/ideas-empty-subscribe.test.ts`
+  fail three times under `--parallel` (the file itself
+  untouched; `BroadcastChannel` is process-global) and
+  `tests/adapters-flow-stats.test.ts` fail once, so the
+  fixed count still proves less than it reads as proving;
+  the ideas comment still says its drain matches the
+  post-bell assert, which 90f5c722 turned into a deadline
+  wait. Oracle: each check reads after a signal that the
+  delivery was processed — a render count on the host
+  stub for the two page tests, a second listener on
   `fusion-angle:refresh` for the mutex test — and no
   fixed-count drain remains at those three sites.
 - Objective lifecycle history compares two clocks:
@@ -1429,6 +1412,12 @@ Off the critical path; each with its oracle.
   separate finding
 - A full TEST-PLAN.md walk using serial subagents, so
   session context stays short — TEST-PLAN.md `## The walk`
+- Layer 2 pin `tests/browser/workbox-transition.test.ts`
+  'bind, fill, and submit navigates to the inbox (WB11)'
+  red at 88cb4d37: inbox path landed, then the
+  `Transition complete` toast timed out at 10s. Stub:
+  `docs/superpowers/test-plan-mitigations/2026-09-16-AT-AT5.md`.
+  Oracle: that test green; `./test browser` fail 0.
 - Billing (`web-app/billing/`)
 - Attribute drag-reorder (TEST-PLAN R8)
 - A flow loaded with Auto Fit OFF no longer fits on
@@ -1538,6 +1527,39 @@ Off the critical path; each with its oracle.
   `./test-browser` has run green on one machine
   (2026-08-28). Restore it if two machines disagree.
   Oracle: `./test-browser` green on two machines
+- `schema-svg.ts`'s `parseStores` still carries a dead
+  `StateStore`-matching branch
+  (`web-app/app/schema-svg.ts:156-162`): it can never
+  match now that `DbStores` holds only `messagePairs`,
+  so it has drawn nothing since that field left.
+  Oracle: `./test schema` green with the dead branch
+  gone, and `SCHEMA.svg` byte-identical.
+- `/members/` parents on the document plane are still
+  resolved by a full-history reduction,
+  `resolveViaMembershipPairPlane`
+  (`api/derive-states.ts:225-248`), which walks
+  `getDocumentHistory` and reduces it through
+  `deriveDocumentsAt` rather than reading the head
+  alone; a C4 tombstone comment at
+  `api/derive-states.ts:1382-1383` still narrates a
+  retired `/members/` document-trio history. Oracle:
+  the parent resolves from the head body alone.
+- Collection reads in `api/document-family.ts:575` and
+  `api/derive-record-types.ts:54` call
+  `db.messagePairs.getCollectionHeadPairs` directly,
+  while per-id reads go through
+  `messageStore(db).getDocumentHead`; a
+  `MessageStore.getCollectionHeads` seam would put the
+  tombstone decision in one layer. Oracle: both reads
+  go through the store seam, `./test validate` and
+  `./test postgres` green.
+- `documentLifecycleEvents`
+  (`api/derive-documents.ts:190`) keeps an
+  `if (messagePair.method === DELETE_METHOD) continue`
+  guard that no live test pins and no flow route can
+  reach — flows' `:id` route has get and put only.
+  Oracle: delete the guard, or pin it with a
+  flow-shaped fixture.
 
 ## Sequencing
 
@@ -1549,8 +1571,8 @@ Off the critical path; each with its oracle.
 - 3 → 5 → 12 (the health probe, then per process)
 - 6 → 10, 11 (the designer roster and AI seats read the
   profile)
-- 7 → 10 (the flow rewrite lands on the stateless shape
-  once)
+- 7 closed; 10 retires flows' event walk with the
+  rewrite
 - 8 → 9 → 10 → 11 (the bell, then chats, then
   processes, then the worker)
 - Items 2, 5, 8, and 12, and the later-work XSS
