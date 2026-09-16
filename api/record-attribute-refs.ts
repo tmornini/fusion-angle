@@ -11,9 +11,6 @@ import {
     relationFailClosed,
 } from './flow-graph-relations.ts';
 import {
-    deriveStateFieldValueReferrers,
-} from './derive-state-field-values.ts';
-import {
     flowGraphBindingsFromMessagePairs,
 } from './derive-flows.ts';
 import { deriveDocumentsAt } from './derive-documents.ts';
@@ -23,9 +20,9 @@ import {
 } from './derive-record-instances.ts';
 
 // Destroying a record attribute must not orphan its
-// covenants: state_field_values rows name the attribute in
-// IMMUTABLE event payloads (attribute_id), and flow / work-order
-// graphs bind it to nodes (NodeAttribute.attributeId).
+// covenants: flow / work-order graphs bind it to nodes
+// (NodeAttribute.attributeId), and live instance heads under
+// the parent type name it in their materialised values.
 // Cascading would rewrite history the ledger promised to
 // keep — so destruction is RESTRICTED: a referenced
 // attribute refuses to die (409) until its referrers are
@@ -34,7 +31,6 @@ import {
 // new reference between the check and the splice.
 
 export interface AttributeReferrers {
-    readonly valueCount: number;
     readonly flowIds: readonly string[];
     readonly workOrderIds: readonly string[];
     // Live instance heads under the parent type whose
@@ -43,20 +39,14 @@ export interface AttributeReferrers {
     readonly instanceIds: readonly string[];
 }
 
-// Every table the referrer scan touches. The state-field-value
-// leg is message-plane derived (Phase 14 Task 6,
-// deriveStateFieldValueReferrers in api/derive-state-field-
-// values.ts): pairs feed the derive, and each
-// candidate row's visibility is settled by
-// stateEventVisibilityFor (Phase 15 Task 3) on its parent
-// state event — message-plane, not the row-plane
-// rawHasRow/getById fence. The three graph legs (Phase 15
-// Task 4, Author gate 5) also read the message plane:
-// work-order document heads via the organization-scoped
-// work-orders collection prefix, and live node-attribute
-// bindings via flowGraphBindingsFromMessagePairs (graphDelta
-// attributeEvents + nodeFlowIds). RESTRICT is message-plane
-// only (`pairs` via derive helpers).
+// Every table the referrer scan touches. The three legs all
+// read the message plane: live flow bindings via
+// flowGraphBindingsFromMessagePairs (graphDelta
+// attributeEvents + nodeFlowIds), frozen work-order graphs via
+// document heads on the organization-scoped work-orders
+// collection prefix, and live instance heads via
+// deriveInstanceCollection under the parent type. RESTRICT is
+// message-plane only (`pairs` via derive helpers).
 
 interface BoundGraph {
     readonly nodes: readonly {
@@ -80,12 +70,11 @@ function graphBindsAttribute(
 // Referrers for each of `attributeIds`. `view` is the
 // organization-fenced transaction view; `boundOrganization`
 // is the verified token claim that fence was bound to (the
-// message-plane visibility probe and the organization-scoped
-// pair prefixes need it explicitly). `recordTypeId` is the
-// parent type id (nested path) or the flat body's
-// `record_id` — scopes the fourth-leg instance scan.
-// Live-flow referrers REPLAY the flow document message pair
-// history's graphDelta attributeEvents with the same
+// organization-scoped pair prefixes need it explicitly).
+// `recordTypeId` is the parent type id (nested path) or the
+// flat body's `record_id` — scopes the fourth-leg instance
+// scan. Live-flow referrers REPLAY the flow document message
+// pair history's graphDelta attributeEvents with the same
 // latestByKey/fail-closed reduction the row plane used
 // (flowGraphBindingsFromMessagePairs — Phase 15 Task 1);
 // node→flow naming rides nodeFlowIds from the same binding
@@ -93,10 +82,8 @@ function graphBindsAttribute(
 // snapshots. Frozen work-order referrers walk WO document
 // heads from the organization-scoped collection prefix
 // (deriveDocumentsAt — NEVER whole-plane getAll of
-// pairs). Field-value referrers are message-plane
-// derived (Phase 14 Task 6) — ONE
-// deriveStateFieldValueReferrers pass ahead of the loop,
-// keyed by attribute_id.
+// pairs). Instance referrers walk live instance heads under
+// the parent type via deriveInstanceCollection (fourth leg).
 export async function collectAttributeReferrers(
     view: DbAdapter,
     boundOrganization: string,
@@ -129,10 +116,6 @@ export async function collectAttributeReferrers(
     const bindings = await flowGraphBindingsFromMessagePairs(
         view, boundOrganization,
     );
-    const sfvReferrersByAttribute =
-        await deriveStateFieldValueReferrers(
-            view, boundOrganization, attributeIds,
-        );
     // Fourth leg: live instance heads under the parent type
     // whose head values name the attribute (derive module
     // owns prefix + revisionValuesOf — one voice).
@@ -141,8 +124,6 @@ export async function collectAttributeReferrers(
     );
     const referrers = new Map<string, AttributeReferrers>();
     for (const attributeId of attributeIds) {
-        const values =
-            sfvReferrersByAttribute.get(attributeId) ?? [];
         // Latest action per flow_node_id among events for THIS
         // attribute — same tie-break as currentNodeAttributes:
         // equal-`at` 'removed' outranks 'added' (fail-closed).
@@ -171,7 +152,6 @@ export async function collectAttributeReferrers(
             }
         }
         referrers.set(attributeId, {
-            valueCount: values.length,
             flowIds: [...flowIds],
             workOrderIds: workOrderGraphs
                 .filter(wo => graphBindsAttribute(
@@ -216,25 +196,19 @@ export async function deleteRecordAttributeSafe(
 export function hasReferrers(
     refs: AttributeReferrers,
 ): boolean {
-    return refs.valueCount > 0
-        || refs.flowIds.length > 0
+    return refs.flowIds.length > 0
         || refs.workOrderIds.length > 0
         || refs.instanceIds.length > 0;
 }
 
 // The 409 body: name what stands in the way so the caller
-// can dissolve the covenants first. Order: values; flows;
-// work orders; instance(s).
+// can dissolve the covenants first. Order: flows; work
+// orders; instance(s).
 export function describeReferrers(
     attributeId: string,
     refs: AttributeReferrers,
 ): string {
     const parts: string[] = [];
-    if (refs.valueCount > 0) {
-        parts.push(
-            refs.valueCount + ' state field value(s)',
-        );
-    }
     if (refs.flowIds.length > 0) {
         parts.push('flow(s) ' + refs.flowIds.join(', '));
     }

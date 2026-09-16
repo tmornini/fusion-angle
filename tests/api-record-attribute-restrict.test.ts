@@ -10,6 +10,7 @@ import { generateIdentifier } from
 import {
     DELETE,
     GET,
+    PATCH,
     POST,
     PUT,
     RequestError,
@@ -22,30 +23,18 @@ import { TABLE_NAMES } from '../api/db.ts';
 import type {
     GraphEdge,
 } from '../api/types.ts';
-import {
-    SYSTEM_MEMBER_ID,
-} from '../api/types.ts';
 import type { AttributeReferrers } from
     '../api/record-attribute-refs.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
-import {
-    postWorkOrderTransitionOp,
-} from '../api/routes.ts';
-import {
-    formWriteMessagePair,
-} from '../api/message-pair.ts';
-import { STARK_ORGANIZATION } from
-    '../api/mock-data/seed-constants.ts';
 
 // Destroying a record attribute is RESTRICT, not cascade:
-// while a state_field_values row names it or a live
-// flow-node-attribute relation row binds it, or a
-// work-order graph references it, DELETE (and a record-write
-// removal) is a 409 naming the referrers, and the whole
-// batch rolls back — cascading would orphan immutable
-// event payloads.
+// while a live flow-node-attribute relation row binds it, a
+// work-order graph references it, or a live instance head
+// names it, DELETE (and a record-write removal) is a 409
+// naming the referrers, and the whole batch rolls back —
+// cascading would orphan immutable event payloads.
 //
 // NAMED re-pin (Phase 15 Task 4): RESTRICT's three graph legs
 // are message-plane derived now — a raw
@@ -62,13 +51,10 @@ const ATTR_PAIR_PATH =
     TYPE_PATH + '/attributes/VQIOxpHjDOwLkDSFuazQVw';
 const AT = '2026-06-01T00:00:00.000000Z';
 const AT2 = '2026-06-02T00:00:00.000000Z';
-const WORK_ORDER_ID = generateIdentifier();
-const TRANSITION_EVENT_ID = generateIdentifier();
-const FIELD_VALUE_ID = generateIdentifier();
 const NODE_1 = generateIdentifier();
 const NODE_2 = generateIdentifier();
 const NODE_HOST = generateIdentifier();
-const NODE_NEXT = generateIdentifier();
+const INSTANCE_ID = generateIdentifier();
 const FNA_1 = generateIdentifier();
 const FNA_2 = generateIdentifier();
 const FLOW_HOST = generateIdentifier();
@@ -187,9 +173,9 @@ function workOrderNodeBinding(
 // Author gate 5 (Phase 15 Task 4): attribute bindings cannot
 // reach flow edges — GraphEdge has no attributes field and no
 // flow_edge_attributes table exists. RESTRICT therefore grows
-// NO edges leg; AttributeReferrers names only valueCount /
-// flowIds / workOrderIds. Short type-level + unit proof, not
-// an edges scan.
+// NO edges leg; AttributeReferrers names only flowIds /
+// workOrderIds / instanceIds. Short type-level + unit proof,
+// not an edges scan.
 Deno.test(
     'prove attribute bindings cannot reach flow edges',
     () => {
@@ -217,16 +203,15 @@ Deno.test(
         // AttributeReferrers is the RESTRICT wire shape —
         // no edgeIds / edge referrer slot exists. Task 7
         // adds instanceIds (fourth leg under the parent
-        // type); still no edges leg.
+        // type); still no edges leg. AttributeReferrers
+        // names only flowIds / workOrderIds / instanceIds.
         type ReferrerKeys = keyof AttributeReferrers;
         type OnlyKnownReferrerKeys =
             ReferrerKeys extends
-                | 'valueCount'
                 | 'flowIds'
                 | 'workOrderIds'
                 | 'instanceIds'
                 ? (
-                    | 'valueCount'
                     | 'flowIds'
                     | 'workOrderIds'
                     | 'instanceIds'
@@ -238,7 +223,6 @@ Deno.test(
             true;
         assertStrictEquals(referrerShapeProof, true);
         const sample: AttributeReferrers = {
-            valueCount: 0,
             flowIds: [],
             workOrderIds: [],
             instanceIds: [],
@@ -248,7 +232,6 @@ Deno.test(
             [
                 'flowIds',
                 'instanceIds',
-                'valueCount',
                 'workOrderIds',
             ],
         );
@@ -310,80 +293,27 @@ Deno.test(
     },
 );
 
-// NAMED re-pin (Phase 15 Task 7): leaf PUT
-// states/:id/field-values/:fvid retires; seed a field-value
-// referrer through the transition fold. Task 8 CUT: legacy
-// fieldValues appends stay below the gate (stored-data SFV
-// truth); the live wire rejects the key.
-async function seedFieldValueReferrer(
+// A live instance head under the parent type whose values
+// name `attributeId` — the fourth RESTRICT leg (spec
+// 2026-09-15 § 4: values live on the instance document).
+async function seedInstanceReferrer(
     db: MemoryDbAdapter,
     attributeId: string,
-    sfvId: string,
     value: string,
 ): Promise<void> {
-    // Phase Final Stage B: work_orders table retired — seed
-    // through the live document PUT so the message plane owns it.
-    await PUT(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + WORK_ORDER_ID, {
-            display_id: 'rfv1',
-            flow_graph: {
-                name: 'Restrict FV',
-                lockTimeout: 0,
-                nodes: [],
-                edges: [],
-            },
-            position: 1,
-        },
+    await PATCH(
+        db, TYPE_PATH + '/instances/' + INSTANCE_ID,
+        { set: [{ attribute_id: attributeId, value }] },
         DEV_TOKEN,
-    );
-    const body: Record<string, unknown> = {
-        transitionEventId: TRANSITION_EVENT_ID,
-        targetState: NODE_NEXT,
-        fieldValues: [{
-            id: sfvId,
-            fields: {
-                state_event_id: TRANSITION_EVENT_ID,
-                attribute_id: attributeId,
-                value,
-            },
-        }],
-        release: null,
-        transitionAt: AT,
-    };
-    const pathSegments = [
-        'organizations', STARK_ORGANIZATION,
-        'work-orders', WORK_ORDER_ID, 'transition',
-    ];
-    const pattern = 'organizations/:id/work-orders/:id/transition';
-    const messagePair = await formWriteMessagePair({
-        method: 'POST',
-        pathname: '/' + pathSegments.join('/'),
-        routePattern: pattern,
-        routeSegments: pattern.split('/'),
-        pathSegments,
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: AT,
-        organization: STARK_ORGANIZATION,
-        responseStatus: 204,
-        responseBody: undefined,
-        operationId: generateIdentifier(),
-    });
-    await postWorkOrderTransitionOp(
-        db, WORK_ORDER_ID, body, SYSTEM_MEMBER_ID,
-        undefined, [], messagePair,
     );
 }
 
 Deno.test(
-    'a field-value referrer blocks deletion with 409',
+    'an instance-head referrer blocks deletion with 409',
     async () => {
         const db = await seededDb();
-        await seedFieldValueReferrer(
-            db, 'VXTdVVRluJDRBqbXWZBntA', FIELD_VALUE_ID,
-            'High',
+        await seedInstanceReferrer(
+            db, 'VXTdVVRluJDRBqbXWZBntA', 'High',
         );
         const err = await assertRejects(
             () => DELETE(
@@ -393,7 +323,9 @@ Deno.test(
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);
-        assertStringIncludes(err.message, '1 state field value');
+        assertStringIncludes(
+            err.message, 'instance(s) ' + INSTANCE_ID,
+        );
         // RESTRICT 409: attribute still served on message plane.
         const still = await GET<{ id: string }>(
             db, ATTR1_PATH, DEV_TOKEN,
@@ -591,13 +523,11 @@ Deno.test(
     async () => {
         const db = await seededDb();
         // Record-edit trio echo still needs a sameEvent head
-        // on the RECORD (not the field-value parent). SFV
-        // referrer lands through the transition fold (Phase
-        // 15 Task 7) — leaf PUT retires.
-    // Phase Final Stage B: states table retired.
-        await seedFieldValueReferrer(
-            db, 'VXTdVVRluJDRBqbXWZBntA', FIELD_VALUE_ID,
-            'High',
+        // on the RECORD (not the referrer parent). The
+        // fourth-leg referrer lands through a live instance
+        // head under the parent type.
+        await seedInstanceReferrer(
+            db, 'VXTdVVRluJDRBqbXWZBntA', 'High',
         );
         const requestsBefore = await db.messagePairs.getAll();
         const responsesBefore = await db.messagePairs.getAll();

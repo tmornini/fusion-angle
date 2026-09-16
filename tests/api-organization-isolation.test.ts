@@ -19,7 +19,6 @@ import { SYSTEM_MEMBER_ID } from
     '../api/types.ts';
 import {
     seedIdentityCredential,
-    seedIdentityPii,
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import {
@@ -1344,7 +1343,7 @@ Deno.test('identity-pii shows an orphan with no membership',
 async () => {
     const fx = await deepDb();
     const orphan = generateIdentifier();
-    await seedIdentityPii(fx.db, orphan, {
+    await seedPersonIdentity(fx.db, orphan, {
         name: 'orphan', email: 'orphan@x.com',
         phone: '', bio: '',
     });

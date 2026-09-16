@@ -144,7 +144,7 @@ async () => {
         apiRequest({
             method: 'PUT',
             path: '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-                + 'udpCrXJSdUfkFbImFbBsWw',
+                + 'kHAXckusBqJjgcJLEuEurg',
             token: DEV_TOKEN,
             body: {
                 jti: 'kHAXckusBqJjgcJLEuEurg',

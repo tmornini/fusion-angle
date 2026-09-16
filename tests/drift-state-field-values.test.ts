@@ -16,9 +16,6 @@ import {
     nowUtc,
     SYSTEM_MEMBER_ID,
 } from '../api/types.ts';
-import {
-    deriveStateFieldValueReferrers,
-} from '../api/derive-state-field-values.ts';
 import { workOrderHistoryFor } from
     '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from
@@ -49,7 +46,9 @@ const FV_M = generateIdentifier();
 // GET states/:id/field-values retired (states-URI elimination
 // C4) — product reads fold field values on work-order
 // history. Task 8 CUT: legacy fieldValues appends stay
-// BELOW the gate (SFV census is STORED-data truth).
+// BELOW the gate. RESTRICT no longer reads this fold at
+// all — Task 6 (spec § 4) re-anchors the census on live
+// instance heads (deriveInstanceCollection).
 
 const LOCK_TIMEOUT_SECONDS = 300;
 const TRANSITION_PATTERN = 'organizations/:id/work-orders/:id/transition';
@@ -143,37 +142,6 @@ async function appendLegacyTransition(
         undefined, [], messagePair,
     );
 }
-
-Deno.test('RESTRICT: deriveStateFieldValueReferrers sees the'
-+ ' transition fold; SFV row plane stays empty',
-async () => {
-    const db = await seededDb();
-
-    await appendLegacyTransition(db, {
-        transitionEventId: TE_1,
-        targetState: N_NEXT,
-        fieldValues: [{
-            id: FV_1,
-            fields: {
-                state_event_id: TE_1,
-                attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
-                value: 'high',
-            },
-        }],
-        release: null,
-        transitionAt: nowUtc(),
-    });
-
-    const derived =
-        await deriveStateFieldValueReferrers(
-            db, STARK_ORGANIZATION, ['VPckAwjJsTGCEkKaOOGRGw'],
-        );
-    const rows = derived.get('VPckAwjJsTGCEkKaOOGRGw') ?? [];
-    assertStrictEquals(rows.length, 1);
-    assertStrictEquals(rows[0]!.id, FV_1);
-    assertStrictEquals(rows[0]!.attribute_id, 'VPckAwjJsTGCEkKaOOGRGw');
-    // Phase Final Stage B: state_field_values table retired.
-});
 
 // C4: route parity re-homes onto work-order history
 // (inline field_values fold), not GET states/:id/field-values.

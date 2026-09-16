@@ -62,7 +62,6 @@ const repoRoot = fromFileUrl(
 const NAMED_EXCEPTIONS: ReadonlySet<string> = new Set([
     'api/validators.ts',
     'api/derive-states.ts',
-    'api/derive-state-field-values.ts',
     'api/mock-data/seed-message-pairs.ts',
     'api/routes.ts',
     'web-app/app/adapters/work-orders-queries.ts',

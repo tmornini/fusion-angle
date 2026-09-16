@@ -34,7 +34,7 @@ import {
     authorizationCodeSpent, deriveAuthorizationCodeId,
 } from '../api/authentication.ts';
 import {
-    deriveIdentityTokens,
+    deriveIdentityTokensFor,
 } from '../api/derive-identity-tokens.ts';
 import { sha256Bytes } from '../shared/digest.ts';
 import { bytesToBase64Url } from '../shared/base64url.ts';
@@ -178,11 +178,12 @@ async () => {
 Deno.test('an unknown grant_type is a 400 with no side effects',
 async () => {
     const db = await freshDb();
+    const before = (await db.messagePairs.getAll()).length;
     const res = await handleRequest(
         db, tokenRequest({ grant_type: 'wat' }));
     assertStrictEquals(res.status, 400);
     assertStrictEquals(
-        (await deriveIdentityTokens(db)).length, 0);
+        (await db.messagePairs.getAll()).length, before);
 });
 
 // authorization_code client binding: a code issued under
@@ -380,7 +381,9 @@ Deno.test('replaying a consumed code is a 401 no-op', async () => {
         client_id: 'web',
     }));
     assertStrictEquals(first.status, 201);
-    const before = (await deriveIdentityTokens(db)).length;
+    const before = (await deriveIdentityTokensFor(
+        db, 'XXZruirZyAOoRpNxaDnpSA',
+    )).length;
     const replay = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
@@ -388,7 +391,9 @@ Deno.test('replaying a consumed code is a 401 no-op', async () => {
     assertStrictEquals(replay.status, 401);
     // no new token chain minted on the replay
     assertStrictEquals(
-        (await deriveIdentityTokens(db)).length, before);
+        (await deriveIdentityTokensFor(
+            db, 'XXZruirZyAOoRpNxaDnpSA',
+        )).length, before);
 });
 
 Deno.test(
@@ -415,7 +420,9 @@ Deno.test(
             [a.status, b.status].sort(), [201, 401],
         );
         assertStrictEquals(
-            (await deriveIdentityTokens(db)).length, 1,
+            (await deriveIdentityTokensFor(
+                db, 'XXZruirZyAOoRpNxaDnpSA',
+            )).length, 1,
             'exactly one token chain minted',
         );
     },
@@ -616,12 +623,13 @@ async () => {
 
 Deno.test('an invalid refresh token is a 401 no-op', async () => {
     const db = await freshDb();
+    const before = (await db.messagePairs.getAll()).length;
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'refresh', refresh_token: 'not.a.jwt',
     }));
     assertStrictEquals(res.status, 401);
     assertStrictEquals(
-        (await deriveIdentityTokens(db)).length, 0);
+        (await db.messagePairs.getAll()).length, before);
 });
 
 Deno.test('token-exchange shapes sub=subject and act=actor',
@@ -681,7 +689,9 @@ async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const before =
-        (await deriveIdentityTokens(db)).length;
+        (await deriveIdentityTokensFor(
+            db, 'XXZruirZyAOoRpNxaDnpSA',
+        )).length;
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
         subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
@@ -692,7 +702,9 @@ async () => {
     assertMatch(body.error, /self-delegation/);
     // grant-first: a denied exchange mints nothing
     assertStrictEquals(
-        (await deriveIdentityTokens(db)).length, before);
+        (await deriveIdentityTokensFor(
+            db, 'XXZruirZyAOoRpNxaDnpSA',
+        )).length, before);
 });
 
 Deno.test('token-exchange rejects unverifiable tokens with 401',
@@ -742,7 +754,9 @@ async () => {
         at: '2026-06-04T00:00:00.000000Z',
     });
     const before =
-        (await deriveIdentityTokens(db)).length;
+        (await deriveIdentityTokensFor(
+            db, 'XXZruirZyAOoRpNxaDnpSA',
+        )).length;
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
         subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
@@ -752,7 +766,9 @@ async () => {
     assertStrictEquals(res.status, 403);
     // grant-first: a denied exchange mints nothing
     assertStrictEquals(
-        (await deriveIdentityTokens(db)).length, before);
+        (await deriveIdentityTokensFor(
+            db, 'XXZruirZyAOoRpNxaDnpSA',
+        )).length, before);
 });
 
 Deno.test('a flat exchange carries orgs but no active org',
@@ -918,6 +934,7 @@ async () => {
         aud: 'fusion-angle',
         exp: now + 300, iat: now, jti,
     });
+    const before = (await db.messagePairs.getAll()).length;
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
@@ -928,7 +945,7 @@ async () => {
         await res.json(), { error: 'invalid_grant' },
     );
     assertStrictEquals(
-        (await deriveIdentityTokens(db)).length, 0,
+        (await db.messagePairs.getAll()).length, before,
     );
 });
 

@@ -231,32 +231,32 @@
   <rect class="empty" x="149" y="521" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="521" width="10" height="10" fill="none"/>
   <text class="uri" x="224" y="529">/api/identities/:id/tokens/</text>
-  <rect class="empty" x="29" y="539" width="10" height="10" fill="none"/>
-  <rect class="empty" x="69" y="539" width="10" height="10" fill="none"/>
-  <a href="post/identities/id/tokens/jti/revocation/index.html">
-    <circle class="filled" cx="114" cy="544" r="5"/>
+  <a href="get/identities/id/tokens/jti/index.html">
+    <circle class="filled" cx="34" cy="544" r="5"/>
   </a>
+  <a href="put/identities/id/tokens/jti/index.html">
+    <circle class="filled" cx="74" cy="544" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="539" width="10" height="10" fill="none"/>
   <rect class="empty" x="149" y="539" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="539" width="10" height="10" fill="none"/>
-  <text class="uri" x="224" y="547">/api/identities/:id/tokens/:jti/revocation</text>
+  <text class="uri" x="224" y="547">/api/identities/:id/tokens/:jti</text>
   <rect class="empty" x="29" y="557" width="10" height="10" fill="none"/>
   <rect class="empty" x="69" y="557" width="10" height="10" fill="none"/>
-  <a href="post/identities/id/tokens/jti/rotation/index.html">
+  <a href="post/identities/id/tokens/jti/revocation/index.html">
     <circle class="filled" cx="114" cy="562" r="5"/>
   </a>
   <rect class="empty" x="149" y="557" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="557" width="10" height="10" fill="none"/>
-  <text class="uri" x="224" y="565">/api/identities/:id/tokens/:jti/rotation</text>
-  <a href="get/identities/id/tokens/tid/index.html">
-    <circle class="filled" cx="34" cy="580" r="5"/>
+  <text class="uri" x="224" y="565">/api/identities/:id/tokens/:jti/revocation</text>
+  <rect class="empty" x="29" y="575" width="10" height="10" fill="none"/>
+  <rect class="empty" x="69" y="575" width="10" height="10" fill="none"/>
+  <a href="post/identities/id/tokens/jti/rotation/index.html">
+    <circle class="filled" cx="114" cy="580" r="5"/>
   </a>
-  <a href="put/identities/id/tokens/tid/index.html">
-    <circle class="filled" cx="74" cy="580" r="5"/>
-  </a>
-  <rect class="empty" x="109" y="575" width="10" height="10" fill="none"/>
   <rect class="empty" x="149" y="575" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="575" width="10" height="10" fill="none"/>
-  <text class="uri" x="224" y="583">/api/identities/:id/tokens/:tid</text>
+  <text class="uri" x="224" y="583">/api/identities/:id/tokens/:jti/rotation</text>
   <a href="get/identities/id/versions/index.html">
     <circle class="filled" cx="34" cy="598" r="5"/>
   </a>

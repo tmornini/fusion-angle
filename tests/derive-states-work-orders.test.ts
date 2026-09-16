@@ -6,13 +6,12 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
-import type { StateEntity } from '../api/types.ts';
 import {
     MS_PER_SECOND, nowUtc,
     setClockForTest, resetClock,
 } from '../api/types.ts';
 import {
-    deriveWorkOrderLifecycle,
+    workOrderLifecycleStatesFor,
 } from '../api/derive-states.ts';
 import {
     apiRequest,
@@ -155,12 +154,6 @@ function createWorkOrderBody(
     };
 }
 
-function forWorkOrder(
-    rows: readonly StateEntity[], workOrderId: string,
-): StateEntity[] {
-    return rows.filter((row) => row.entity_id === workOrderId);
-}
-
 // -- 1. a live create births exactly the three initial events ----
 
 Deno.test('a live create births exactly the three initial state'
@@ -192,8 +185,8 @@ Deno.test('a live create births exactly the three initial state'
     ));
     assertStrictEquals(created.status, 201);
 
-    const derived = forWorkOrder(
-        await deriveWorkOrderLifecycle(db), workOrderId,
+    const derived = await workOrderLifecycleStatesFor(
+        db, ORGANIZATION_A, workOrderId,
     );
     // Phase Final Task 2: states ROW half stripped.
     assertStrictEquals(derived.length, 3);
@@ -219,8 +212,12 @@ Deno.test('a SEEDED-shape work order (a bare document PUT, no create'
     ));
     assertStrictEquals(put.status, 201);
 
-    const derived = await deriveWorkOrderLifecycle(db);
-    assertEquals(forWorkOrder(derived, workOrderId), []);
+    assertEquals(
+        await workOrderLifecycleStatesFor(
+            db, ORGANIZATION_A, workOrderId,
+        ),
+        [],
+    );
 });
 
 // -- 3. a claim, then a claim past lockTimeout --------------------
@@ -282,8 +279,8 @@ Deno.test('a claim, then a claim past lockTimeout supersedes with'
     ));
     assertStrictEquals(claim2.status, 201);
 
-    const derived = forWorkOrder(
-        await deriveWorkOrderLifecycle(db), workOrderId,
+    const derived = await workOrderLifecycleStatesFor(
+        db, ORGANIZATION_A, workOrderId,
     );
     assert(derived.length >= 0); // Phase Final Task 2: row plane empty
     assertEquals(
@@ -319,8 +316,8 @@ Deno.test('claim → release → reclaim derives claimed,'
     ));
     assertStrictEquals(bareRelease.status, 404);
     assertEquals(
-        forWorkOrder(
-            await deriveWorkOrderLifecycle(db), workOrderId,
+        await workOrderLifecycleStatesFor(
+            db, ORGANIZATION_A, workOrderId,
         ),
         [],
     );
@@ -358,8 +355,8 @@ Deno.test('claim → release → reclaim derives claimed,'
     ));
     assertStrictEquals(claim2.status, 201);
 
-    const derived = forWorkOrder(
-        await deriveWorkOrderLifecycle(db), workOrderId,
+    const derived = await workOrderLifecycleStatesFor(
+        db, ORGANIZATION_A, workOrderId,
     );
     assertEquals(
         derived.map((row) => row.state),
@@ -427,8 +424,8 @@ Deno.test('a transition, then a transition with release ends the'
     ));
     assertStrictEquals(transition2.status, 201);
 
-    const derived = forWorkOrder(
-        await deriveWorkOrderLifecycle(db), workOrderId,
+    const derived = await workOrderLifecycleStatesFor(
+        db, ORGANIZATION_A, workOrderId,
     );
     // Phase Final Task 2: states ROW half stripped.
     // 3 births + transition1 (1, no release) + transition2
@@ -508,8 +505,8 @@ Deno.test('the MOVING lock_timeout case: an entity PUT changing'
     ));
     assertStrictEquals(claim2.status, 201);
 
-    const derived = forWorkOrder(
-        await deriveWorkOrderLifecycle(db), workOrderId,
+    const derived = await workOrderLifecycleStatesFor(
+        db, ORGANIZATION_A, workOrderId,
     );
     assert(derived.length >= 0); // Phase Final Task 2: row plane empty
     assertEquals(
@@ -562,8 +559,8 @@ Deno.test('HYBRID: a bare document PUT plus a transition genesis'
     ));
     assertStrictEquals(claim.status, 201);
 
-    const ours = forWorkOrder(
-        await deriveWorkOrderLifecycle(db), workOrderId,
+    const ours = await workOrderLifecycleStatesFor(
+        db, ORGANIZATION_A, workOrderId,
     );
     assertEquals(
         ours.map((row) => row.id),

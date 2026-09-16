@@ -8,7 +8,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import { requestMessageHash } from '../api/message-form.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
-import { seedIdentityPii } from './identity-fixtures.ts';
+import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
     apiRequest,
     storedPutBodyText,
@@ -57,6 +57,11 @@ const INV_BALANCE_3 = generateIdentifier();
 const MS_BALANCE_2 = generateIdentifier();
 const EV_BALANCE_ACC = generateIdentifier();
 const EV_BALANCE_DEC = generateIdentifier();
+const INV_DOC_5 = generateIdentifier();
+const MS_DOC_5 = generateIdentifier();
+const EV_ACC_5 = generateIdentifier();
+const INV_DOC_6 = generateIdentifier();
+const EV_REV_6 = generateIdentifier();
 
 function req(
     method: string,
@@ -73,17 +78,17 @@ function req(
 }
 
 // Phase 15 gate 6: grantInvitation resolves email via
-// deriveIdentityPiiRows, so a raw identityPii.put is
-// derivation-invisible. seedIdentityPii dual-writes the row
-// AND the identities/:id/pii pair — id/field values stay
-// identical; only the write mechanism changes.
+// deriveIdentityPiiRows, which lists the identities collection
+// and reads one PII document each — so the PII needs its
+// identities/:id document alongside it. seedPersonIdentity
+// writes both.
 async function person(
     db: MemoryDbAdapter,
     id: string,
     name: string,
     email: string,
 ): Promise<void> {
-    await seedIdentityPii(db, id, {
+    await seedPersonIdentity(db, id, {
         name, email, phone: '', bio: '',
     });
 }
@@ -153,11 +158,12 @@ async () => {
     const res = await grant(db, INV_DOC_1);
     assertStrictEquals(res.status, 200);
     const requests = await db.messagePairs.getAll();
-    // 6: the fixture's own membership pair (Phase 13 Task 1;
-    // role-grant retired), two identities/:id/pii pairs
-    // (Phase 15 gate 6), the organizations/:id document
-    // (Stage B), and the grant's own 2 pairs.
-    assertStrictEquals(requests.length, 6);
+    // 8: the fixture's own membership pair (Phase 13 Task 1;
+    // role-grant retired), two seeded people (an identities/:id
+    // document and its pii document each), the
+    // organizations/:id document (Stage B), and the grant's own
+    // 2 pairs.
+    assertStrictEquals(requests.length, 8);
     const pairsAt = requests.filter(
         r => r.path === '/invitations/'
             && r.name === INV_DOC_1,
@@ -174,12 +180,13 @@ async () => {
     const wire = documents[0]!.body;
     assertEquals(
         Object.keys(wire).sort(),
-        ['at', 'identity_id', 'organization_id'],
+        ['at', 'identity_id', 'organization_id', 'state'],
     );
     assertStrictEquals(wire.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
     assertStrictEquals(wire.identity_id, 'toccYYkLEABmlbpHJalgtQ');
     assertStrictEquals(wire.at, AT);
     assertStrictEquals(wire.email, undefined);
+    assertStrictEquals(wire.state, 'pending');
 });
 
 Deno.test('a duplicate grant appends ONLY its operation message pair — no'
@@ -213,13 +220,14 @@ async () => {
     });
     const res = await grant(db, INV_DOC_FAIL);
     assertStrictEquals(res.status, 409);
-    // 5: the fixture's own membership pair, two
-    // identities/:id/pii pairs (Phase 15 gate 6), the
-    // organizations/:id document (Stage B), plus toccYYkLEABmlbpHJalgtQ's own
-    // conflicting membership pair (Phase 13 Task 1) — the
-    // failed grant appends nothing further. Role-grant retired.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
+    // 7: the fixture's own membership pair, two seeded people
+    // (an identities/:id document and its pii document each),
+    // the organizations/:id document (Stage B), plus
+    // toccYYkLEABmlbpHJalgtQ's own conflicting membership pair
+    // (Phase 13 Task 1) — the failed grant appends nothing
+    // further. Role-grant retired.
+    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
 });
 
 // ── accept: the memberships document message pair
@@ -313,7 +321,78 @@ async () => {
             + 'members/'
             && r.name === 'toccYYkLEABmlbpHJalgtQ',
     );
+    const invitationDocuments = documentMessagePairsAt(
+        await db.messagePairs.getCollectionPairs('/invitations/'),
+        '/invitations/',
+    ).filter(messagePair => messagePair.name === INV_DOC_4);
+    assertStrictEquals(invitationDocuments.length, 2);
     assertStrictEquals(documents.length, 1);
+});
+
+Deno.test('a terminal answer appends a full PUT of the'
++ ' invitation document whose head carries the state',
+async () => {
+    const db = await freshDb();
+    await grant(db, INV_DOC_5);
+    const res = await accept(
+        db, INV_DOC_5, MS_DOC_5, EV_ACC_5,
+        '2026-01-01T00:00:01.000000Z',
+    );
+    assertStrictEquals(res.status, 204);
+    const documents = documentMessagePairsAt(
+        await db.messagePairs.getCollectionPairs('/invitations/'),
+        '/invitations/',
+    ).filter(messagePair => messagePair.name === INV_DOC_5);
+    assertStrictEquals(documents.length, 2);
+    assertEquals(documents[0]!.body, {
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'toccYYkLEABmlbpHJalgtQ',
+        at: AT,
+        state: 'pending',
+    });
+    assertEquals(documents[1]!.body, {
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'toccYYkLEABmlbpHJalgtQ',
+        at: AT,
+        state: 'accepted',
+    });
+    assertStrictEquals(
+        documents[1]!.requesterIdentityId,
+        'toccYYkLEABmlbpHJalgtQ',
+    );
+});
+
+Deno.test('a revoke appends a full PUT of the invitation'
++ ' document whose head carries the revoked state',
+async () => {
+    const db = await freshDb();
+    await grant(db, INV_DOC_6);
+    const res = await revokeFor(
+        db, INV_DOC_6, EV_REV_6,
+        '2026-01-01T00:00:01.000000Z',
+    );
+    assertStrictEquals(res.status, 204);
+    const documents = documentMessagePairsAt(
+        await db.messagePairs.getCollectionPairs('/invitations/'),
+        '/invitations/',
+    ).filter(messagePair => messagePair.name === INV_DOC_6);
+    assertStrictEquals(documents.length, 2);
+    assertEquals(documents[0]!.body, {
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'toccYYkLEABmlbpHJalgtQ',
+        at: AT,
+        state: 'pending',
+    });
+    assertEquals(documents[1]!.body, {
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'toccYYkLEABmlbpHJalgtQ',
+        at: AT,
+        state: 'revoked',
+    });
+    assertStrictEquals(
+        documents[1]!.requesterIdentityId,
+        'XXZruirZyAOoRpNxaDnpSA',
+    );
 });
 
 // ── deriveInvitations: the message-plane reduction ──
@@ -448,14 +527,13 @@ Deno.test('every stored invitation-family message verifies against'
     );
     const messagePairs = await db.messagePairs.getAll();
     // 3 grants x 2 (operation + invitation document) + 1 accept
-    // x 2 (operation + memberships document) + 1 decline x 1
-    // (operation only — decline synthesizes no document) = 9,
-    // plus the fixture's own membership pair (Phase 13
-    // Task 1; role-grant retired), four identities/:id/pii
-    // pairs (current, toccYYkLEABmlbpHJalgtQ, bruce, clark — Phase 15 gate
-    // 6),
-    // and the organizations/:id document (Stage B) = 15.
-    assertStrictEquals(messagePairs.length, 15);
+    // x 3 (operation + memberships document + the invitation's
+    // terminal document PUT) + 1 decline x 2 (operation +
+    // terminal document PUT) = 11, plus the fixture's own
+    // membership pair, four seeded people (an identities/:id
+    // document and its pii document each), and the
+    // organizations/:id document = 21.
+    assertStrictEquals(messagePairs.length, 21);
     for (const row of messagePairs) {
         assertStrictEquals(
             await requestMessageHash(row.request),

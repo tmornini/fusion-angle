@@ -1,10 +1,12 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import { assert, assertEquals, assertStrictEquals } from
+    '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { ORGANIZATION_TWO } from
     '../api/mock-data/seed-constants.ts';
 import { deriveIdentityPiiRows } from
     '../api/derive-identity-spine.ts';
 import {
+    deriveInvitation,
     deriveInvitations,
 } from '../api/derive-invitations.ts';
 import {
@@ -25,7 +27,6 @@ const INV_REHOME_PARITY_2 = generateIdentifier();
 const INV_REHOME_PARITY_2_GRANT = generateIdentifier();
 const INV_REHOME_LOAD_1 = generateIdentifier();
 const INV_REHOME_LOAD_1_GRANT = generateIdentifier();
-const INV_GHOST = generateIdentifier();
 
 // Phase 15 gate 6 parity pins: the re-homes that close
 // Author gate 6 for the exit census.
@@ -157,8 +158,9 @@ Deno.test('pendingInvitationFor lifecycle on the message plane'
     // Phase Final Stage B: roster tables retired.
 });
 
-Deno.test('loadInvitation shape: deriveInvitations find-by-id'
-+ ' for a live grant, absent for missing', async () => {
+Deno.test('deriveInvitation (one document read) equals'
++ ' deriveInvitations find-by-id, and is undefined for an'
++ ' unknown id', async () => {
     const db = await seededDb();
     const admin = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO);
@@ -173,19 +175,14 @@ Deno.test('loadInvitation shape: deriveInvitations find-by-id'
     ));
     assertStrictEquals(grant.status, 200);
 
-    // Phase Final Task 2: invitations ROW half stripped.
-    const derived = (await deriveInvitations(db))
-        .find(r => r.id === INV_REHOME_LOAD_1);
-    assert(derived !== undefined);
-    assertStrictEquals(derived.id, INV_REHOME_LOAD_1);
-    assertStrictEquals(derived.organization_id, ORGANIZATION_TWO);
-    assertStrictEquals(derived.state, 'pending');
-
-    // Missing id: message plane absent.
-    assertStrictEquals(
+    assertEquals(
+        await deriveInvitation(db, INV_REHOME_LOAD_1),
         (await deriveInvitations(db))
-            .find(r => r.id === INV_GHOST),
+            .find(r => r.id === INV_REHOME_LOAD_1),
+    );
+
+    assertEquals(
+        await deriveInvitation(db, generateIdentifier()),
         undefined,
     );
-    // Phase Final Stage B: roster tables retired.
 });

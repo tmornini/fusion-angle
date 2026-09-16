@@ -28,7 +28,7 @@ import { REQUEST_ID_HEADER } from '../api/request-context.ts';
 import {
     seedClientRegistration,
     seedIdentityCredential,
-    seedIdentityPii,
+    seedPersonIdentity,
 } from './identity-fixtures.ts';
 import {
     pairIdOf,
@@ -75,7 +75,7 @@ function jsonPost(
 async function seedPasswordUser(
     db: GuardedDbAdapter,
 ): Promise<void> {
-    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
+    await seedPersonIdentity(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Demo', email: 'demo@example.com',
         phone: '555-0100', bio: 'demo user',
     });
@@ -225,14 +225,14 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     const responses = await db.messagePairs.getAll();
 
     // seedRootAdmin: org + membership (2; role-grants retired)
-    // + pii + credential (2) + authorize + token + token-event
-    // + pbkdf2-to-scrypt rehash (4) = 8.
-    assertStrictEquals(requests.length, 8);
+    // + identity + pii + credential (3) + authorize + token
+    // + token-event + pbkdf2-to-scrypt rehash (4) = 9.
+    assertStrictEquals(requests.length, 9);
     // The AUTH hops stay operation documents (name ''); the
     // token grant's row event pair rides its OWN row's document
     // instead, so it alone carries a non-empty name in this
-    // slice. Indices 4–5 are authorize + token.
-    const authHops = requests.slice(4).filter(
+    // slice. Indices 5–6 are authorize + token.
+    const authHops = requests.slice(5).filter(
         row => row.path === '/authentication/authorize/'
             || row.path === '/authentication/token/',
     );
@@ -240,7 +240,7 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     for (const row of authHops) {
         assertStrictEquals(row.name, '');
     }
-    const tokenEventRequest = requests.slice(4).find(
+    const tokenEventRequest = requests.slice(5).find(
         row => row.path
             === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/',
     );
@@ -252,7 +252,7 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     // empty) name — a request/response pair shares one `id`
     // AND one (path, name) document (appendMessagePairOnce),
     // so this is the identical classification, re-applied.
-    const responseAuthHops = responses.slice(4).filter(
+    const responseAuthHops = responses.slice(5).filter(
         row => row.path === '/authentication/authorize/'
             || row.path === '/authentication/token/',
     );
@@ -260,14 +260,14 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     for (const row of responseAuthHops) {
         assertStrictEquals(row.name, '');
     }
-    const tokenEventResponse = responses.slice(4).find(
+    const tokenEventResponse = responses.slice(5).find(
         row => row.path
             === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/',
     );
     assert(tokenEventResponse);
     assertNotStrictEquals(tokenEventResponse!.name, '');
     // Response rows carry no predecessor columns.
-    for (const row of responses.slice(5)) {
+    for (const row of responses.slice(6)) {
         assertStrictEquals('supersedes' in row, false);
         assertStrictEquals('follows' in row, false);
     }
@@ -297,11 +297,11 @@ Deno.test('a wrong password stores no NEW pair beyond the'
                 pkce.code_challenge_method,
         }));
     assertStrictEquals(res.status, 401);
-    // 2: the fixture's own pii + credential pairs (Phase 13 Task
-    // 8's seedIdentityPii/seedIdentityCredential re-point) — the
-    // failed attempt itself appends no further pair.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
+    // 3: the fixture's own identity + pii + credential pairs
+    // (seedPersonIdentity/seedIdentityCredential) — the failed
+    // attempt itself appends no further pair.
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
 });
 
 Deno.test('a double-spent authorization code stores nothing on'
@@ -353,10 +353,10 @@ Deno.test('an unsupported grant_type stores no NEW pair beyond the'
     const res = await handleRequest(db, jsonPost(
         'authentication/token', { grant_type: 'wat' }));
     assertStrictEquals(res.status, 400);
-    // 2: the fixture's own pii + credential pairs (Phase 13 Task
-    // 8's seedIdentityPii/seedIdentityCredential re-point) — the
-    // rejected grant itself appends no further pair.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
+    // 3: the fixture's own identity + pii + credential pairs
+    // (seedPersonIdentity/seedIdentityCredential) — the rejected
+    // grant itself appends no further pair.
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
 });
 
 Deno.test('a refresh grant stores its own pair with live secrets',
@@ -380,14 +380,14 @@ async () => {
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // 11: the fixture's own pii + credential pairs (2, Phase 13
-    // Task 8) + seedRootAdmin's 2 fixture pairs + authorize +
+    // 12: the fixture's own identity + pii + credential pairs
+    // (3) + seedRootAdmin's 2 fixture pairs + authorize +
     // token (the token hop's own event pair, Phase 13 Task 5,
-    // plus pbkdf2 rehash, brings fullLoginFlow's count to 8)
+    // plus pbkdf2 rehash, brings fullLoginFlow's count to 9)
     // + refresh's own operation message pair + refresh's
     // rotate-branch event pairs (2: the retired root, the
     // issued successor — Phase 13 Task 5).
-    assertStrictEquals(requests.length, 11);
+    assertStrictEquals(requests.length, 12);
     const refreshRequest = requests.find(
         r => r.path === '/authentication/token/'
             && r.request.includes(first.refresh_token),
@@ -427,12 +427,12 @@ Deno.test('a token-exchange grant stores its own pair with live'
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // 6: the fixture's own pii + credential pairs (2, Phase 13
-    // Task 8) + seedRootAdmin's 2 fixture pairs + the exchange's
+    // 7: the fixture's own identity + pii + credential pairs
+    // (3) + seedRootAdmin's 2 fixture pairs + the exchange's
     // own event pair (Phase 13 Task 5: issueTokenPair's root
     // gains its own pair at the row's document) + its operation
     // pair.
-    assertStrictEquals(requests.length, 6);
+    assertStrictEquals(requests.length, 7);
     const exchangeRequest = requests.find(
         r => r.path === '/authentication/token/'
             && r.request.includes(subjectToken),
@@ -512,14 +512,14 @@ Deno.test('a client_credentials grant stores its own pair with live'
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // 7: dbWithPasswordUser's own pii + credential pairs (2,
-    // Phase 13 Task 8) + the fixture's own membership pair
+    // 8: dbWithPasswordUser's own identity + pii + credential
+    // pairs (3) + the fixture's own membership pair
     // (Phase 13 Task 1) + the registration-facet pair the
     // fixture seeds (clients elimination) precede the token
     // grant's spent-jti ticket, its own event pair (Phase 13
     // Task 5: the issued root's pair at the row's document),
     // and its operation message pair.
-    assertStrictEquals(requests.length, 7);
+    assertStrictEquals(requests.length, 8);
     const credRequest = requests.find(
         r => r.path === '/authentication/token/'
             && r.request.includes(assertion),

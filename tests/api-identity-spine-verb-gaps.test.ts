@@ -28,7 +28,7 @@ import { generateIdentifier } from
 // identities/:id/credentials/:cid, identities/:id/token-
 // revocations/:rid, role-grants, role-grants/:id,
 // identities/:id/tokens,
-// identities/:id/tokens/:tid, identities/:id/tokens/:jti/
+// identities/:id/tokens/:jti, identities/:id/tokens/:jti/
 // rotation, identities/:id/tokens/:jti/revocation,
 // identities/:id/providers, identities/:id/providers/:eid):
 // a matched pattern with no handler for the request's verb
@@ -706,7 +706,7 @@ async () => {
     const token = await organizationToken();
     const put = await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-            + 'wLQNiqsEnyBvOQwlbvBXwA',
+            + TOKEN_JTI,
         token, {
             jti: TOKEN_JTI, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'issued', chain_id: TOKEN_CHAIN,
@@ -817,13 +817,17 @@ Deno.test('POST /identity-tokens/:jti/revocation is retired'
     assertStrictEquals(res.status, 404);
 });
 
-Deno.test('POST rotation 403s when path identity is not the'
+// Spec 2026-09-15 exact-read folds § 1: the chain lookup reads
+// the path identity's OWN tokens collection, so a jti another
+// identity owns is unknown to it — 409, the same status as
+// reuse. Same security, the unknown status.
+Deno.test('POST rotation 409s when path identity is not the'
 + ' jti owner', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const put = await handleRequest(db, req(
         'PUT', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
-            + 'wTpHaplkXlJqajbBNhnkbg',
+            + 'kGolXBkfDPCBVKcZzZIHnQ',
         token, {
             jti: 'kGolXBkfDPCBVKcZzZIHnQ'
                 , identity_id: 'XXZruirZyAOoRpNxaDnpSA',
@@ -838,10 +842,10 @@ Deno.test('POST rotation 403s when path identity is not the'
             + 'rotation',
         token, {},
     ));
-    assertStrictEquals(res.status, 403);
+    assertStrictEquals(res.status, 409);
 });
 
-Deno.test('GET /identities/:id/tokens/:tid 404s for an absent'
+Deno.test('GET /identities/:id/tokens/:jti 404s for an absent'
 + ' jti', async () => {
     const db = await freshDb();
     const token = await organizationToken();

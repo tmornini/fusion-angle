@@ -249,17 +249,17 @@ Deno.test('a seeded person identity pair sits at the global'
 });
 
 Deno.test('a seeded human member\'s PII intake pair sits at its own'
-+ ' identities/:id/pii document, its body carrying the four PII'
-+ ' keys (Phase 10 Task 2\'s intake decomposition)', async () => {
++ ' identities/:id/ document named pii, its body carrying the'
++ ' four PII keys (Phase 10 Task 2\'s intake decomposition)',
+async () => {
     const db = await sharedMockDb();
     const firstMember = buildMembers()[0]!;
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
-        r => r.path
-            === '/identities/' + firstMember.id + '/pii/',
+        r => r.path === '/identities/' + firstMember.id + '/'
+            && r.name === 'pii',
     );
     assert(row, 'no request row for the seeded PII intake');
-    assertStrictEquals(row!.name, '');
     const embedded = messagePairJsonOf(row!.request) as {
         body: Record<string, unknown>;
     };
@@ -978,7 +978,8 @@ Deno.test('a bootstrap seed populates exactly eight balanced,'
     );
     assertStrictEquals(atSeat.length, 1);
     const atPii = requests.filter(
-        r => r.path === '/identities/XXZruirZyAOoRpNxaDnpSA/pii/',
+        r => r.path === '/identities/XXZruirZyAOoRpNxaDnpSA/'
+            && r.name === 'pii',
     );
     assertStrictEquals(atPii.length, 1);
     const atDefaultOrganization = requests.filter(

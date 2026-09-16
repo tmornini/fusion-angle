@@ -134,7 +134,6 @@ import {
     HTTP_OK,
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
-    HTTP_FORBIDDEN,
     HTTP_CONFLICT,
     HTTP_PRECONDITION_FAILED,
     HTTP_PRECONDITION_REQUIRED,
@@ -271,10 +270,8 @@ import {
 import {
     deriveIdentityTokensFor,
     deriveIdentityToken,
-    deriveIdentityTokenEventsForJti,
     identityTokenEntityOf,
 } from './derive-identity-tokens.ts';
-import { identityForJti } from './identity-tokens.ts';
 import {
     param,
     requireOrganization,
@@ -1055,8 +1052,8 @@ export async function postRecordWriteOp(
     payload: Record<string, unknown>,
     _actor: Id,
     messagePairs?: RecordWriteMessagePairs,
-    // Verified token organization for the RESTRICT SFV
-    // visibility probe (stateEventVisibilityFor). Optional so
+    // Verified token organization scoping the RESTRICT
+    // referrer sweep (collectAttributeReferrers). Optional so
     // the below-facade seed path (creates only; never removes
     // referenced attributes) keeps compiling; the live route
     // always supplies it when removals can fire.
@@ -2757,7 +2754,7 @@ export async function postIdentityPiiDocumentOp(
     messagePair?: MessagePair,
 ): Promise<IdentityPiiEntity> {
     const entity = piiEntityOf(id, {
-        name: '',
+        name: 'pii',
         messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
@@ -3217,7 +3214,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) => piiEntityOf(
             param(params, 0),
             {
-                name: '',
+                name: 'pii',
                 messagePairId: param(params, 0),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
@@ -3277,7 +3274,7 @@ export const WRITE_RESPONSE_SPECS:
     // G4: GET wins. identityTokenEntityOf is id-last;
     // identity_id is stamped from the path so stored PUT
     // = GET (omit-PUT cannot poison GET).
-    'identities/:id/tokens/:tid': {
+    'identities/:id/tokens/:jti': {
         status: HTTP_OK,
         successBody: (params, body) =>
             identityTokenEntityOf({
@@ -3287,6 +3284,7 @@ export const WRITE_RESPONSE_SPECS:
                 body: {
                     ...withoutId(body ?? {}),
                     identity_id: param(params, 0),
+                    jti: param(params, 1),
                 },
             }),
     },
@@ -4194,7 +4192,6 @@ export const routes: Route[] = [
         },
     }),
     // Nested token events (credentials/providers shape).
-    // Dual-read still sees leftover /identity-tokens/ pairs.
     // GET is admin-only (not in MEMBER_VERBS). POST on
     // rotation/revocation stays member-legal via
     // '/identities/:id/tokens' POST. Flat /identity-tokens
@@ -4208,14 +4205,14 @@ export const routes: Route[] = [
     // and append its message pair without a row write.
     // GET is FLIPPED: derived via deriveIdentityToken —
     // 404 body unchanged. PUT is PAIR-ONLY.
-    route('identities/:id/tokens/:tid', {
+    route('identities/:id/tokens/:jti', {
         get: (db, p) =>
             deriveIdentityToken(
                 db, param(p, 0), param(p, 1),
             ),
         put: (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
-            const id = param(p, 1);
+            const jti = param(p, 1);
             const raw = withoutId(body);
             if (
                 'identity_id' in raw
@@ -4226,12 +4223,18 @@ export const routes: Route[] = [
                     HTTP_BAD_REQUEST,
                 );
             }
+            if ('jti' in raw && raw['jti'] !== jti) {
+                throw new ApiError(
+                    'jti does not match path jti',
+                    HTTP_BAD_REQUEST,
+                );
+            }
             const stamped = {
-                ...raw, identity_id: identityId,
+                ...raw, identity_id: identityId, jti,
             };
             const entity = identityTokenEntityOf({
-                name: id,
-                messagePairId: id,
+                name: jti,
+                messagePairId: jti,
                 method: 'PUT',
                 body: stamped,
             });
@@ -4244,8 +4247,10 @@ export const routes: Route[] = [
             );
         },
     }),
-    // Rotate a refresh jti. Path identity must match the
-    // jti's ledger identity or 403. The ledger read, the
+    // Rotate a refresh jti. The path identity's own tokens
+    // collection is the only ledger this reads: a jti outside
+    // it is unknown — 409, the same status as reuse (spec
+    // 2026-09-15 § 1). The ledger read, the
     // rotation plan, and its appends ride ONE transaction
     // (rotateRefreshJti — the same body the refresh grant
     // runs), so two concurrent rotations of one chain
@@ -4271,25 +4276,13 @@ export const routes: Route[] = [
         post: async (db, p, _body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const presented = param(p, 1);
-            const owner = identityForJti(
-                await deriveIdentityTokenEventsForJti(
-                    db, presented,
-                ),
-                presented,
-            );
-            if (owner !== null && owner !== identityId) {
-                throw new ApiError(
-                    'token does not belong to this identity',
-                    HTTP_FORBIDDEN,
-                );
-            }
             const newJti = messagePair === undefined
                 ? generateIdentifier()
                 : (messagePairResponseBody(messagePair)?.['jti'] as
                     string | undefined)
                     ?? generateIdentifier();
             const outcome = await rotateRefreshJti(
-                db, presented, newJti, messagePair,
+                db, identityId, presented, newJti, messagePair,
             );
             if (outcome.kind === 'rotate') {
                 return { jti: outcome.newJti };
@@ -4302,28 +4295,17 @@ export const routes: Route[] = [
         },
     }),
     // Revoke the whole chain a jti belongs to (log out one
-    // session). Path identity must match the jti's ledger
-    // identity or 403. Read and appends ride one transaction;
-    // an unknown jti is an idempotent no-op that still
-    // appends its pair (revokeTokenChain guards both exit
-    // paths).
+    // session). A jti outside the path identity's own
+    // collection is unknown: an idempotent no-op that still
+    // appends its pair. Read and appends ride one
+    // transaction (revokeTokenChain guards both exit paths).
     route('identities/:id/tokens/:jti/revocation', {
         post: async (db, p, _body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const presented = param(p, 1);
-            const owner = identityForJti(
-                await deriveIdentityTokenEventsForJti(
-                    db, presented,
-                ),
-                presented,
+            await revokeTokenChain(
+                db, identityId, presented, messagePair,
             );
-            if (owner !== null && owner !== identityId) {
-                throw new ApiError(
-                    'token does not belong to this identity',
-                    HTTP_FORBIDDEN,
-                );
-            }
-            await revokeTokenChain(db, presented, messagePair);
         },
     }),
     // Nested provider events (credentials shape). Dual-read

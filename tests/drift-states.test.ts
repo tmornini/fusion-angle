@@ -10,7 +10,6 @@ import {
     setClockForTest, resetClock,
 } from '../api/types.ts';
 import {
-    deriveWorkOrderLifecycle,
     deriveInvitationStates,
     workOrderLifecycleStatesFor,
     workOrderHistoryFor,
@@ -45,7 +44,7 @@ import { buildWorkOrders } from '../api/mock-data/work-orders.ts';
 import { OBJECTIVE_SEEDS } from '../api/mock-data/objectives.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
-import { seedIdentityPii } from './identity-fixtures.ts';
+import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
@@ -219,12 +218,14 @@ function ideaDocument(
 }
 
 // Phase 15 gate 6: grantInvitation resolves email via
-// deriveIdentityPiiRows — seedIdentityPii dual-writes the row
-// and the identities/:id/pii pair so email resolution works.
+// deriveIdentityPiiRows, which lists the identities collection
+// and reads one PII document each — seedPersonIdentity writes
+// the identities/:id document and its PII, so email resolution
+// finds the person.
 async function person(
     db: MemoryDbAdapter, id: string, name: string, email: string,
 ): Promise<void> {
-    await seedIdentityPii(db, id, {
+    await seedPersonIdentity(db, id, {
         name, email, phone: '', bio: '',
     });
 }
@@ -675,23 +676,23 @@ async () => {
 
 Deno.test('case 4a: a SEEDED work order\'s births ride the'
 + ' transition-op source (states-document retirement) —'
-+ ' deriveWorkOrderLifecycle contributes the trace events'
-+ ' and workOrderLifecycleStatesFor reproduces history',
++ ' workOrderLifecycleStatesFor contributes the trace events'
++ ' and reproduces history',
 async () => {
     const db = await seededDb();
     // WO02 (buildWorkOrders()[1]) — a DIFFERENT seeded work order
     // than case 2's own WO01, so this leg stays orthogonal.
     const seededWorkOrderId = buildWorkOrders()[1]!.id;
-    const lifecycle = (await deriveWorkOrderLifecycle(db))
-        .filter((row) => row.entity_id === seededWorkOrderId);
+    const lifecycle = await workOrderLifecycleStatesFor(
+        db, STARK_ORGANIZATION, seededWorkOrderId,
+    );
     assert(
         lifecycle.length > 0,
         'seeded traces must derive from transition ops',
     );
-    const derived = await assertHistoryParity(
+    await assertHistoryParity(
         db, STARK_ORGANIZATION, seededWorkOrderId,
     );
-    assertStrictEquals(derived.length, lifecycle.length);
 });
 
 Deno.test('case 4b: work-order live-write chain — birth-claimed'

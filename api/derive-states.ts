@@ -45,15 +45,19 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 //   (b) deriveMemberStates RETIRED (C4) — leftover
 //       /members/ document-trio history; nothing reads
 //       that collection.
-//   (c) deriveWorkOrderLifecycle / workOrderLifecycleStatesFor /
-//       workOrderHistoryFor — the work-order operation-message-pair replay
-//       (gate 5d).
+//   (c) workOrderLifecycleStatesFor / workOrderHistoryFor — the
+//       work-order operation-message-pair replay (gate 5d; the
+//       whole-plane bulk fold retired — spec 2026-09-15 § 5).
 //   (d) flow-graph node/edge sidecars — live on the flow
 //       document-pair body (graphDelta.deletions / revivals);
 //       resolveFlowGraphOwner below resolves their owners.
 //       No bulk derive remains (C3).
 //   (e) deriveInvitationStates / invitationLifecycleStatesFor —
-//       invitation grant + three answering ops (gate 5f).
+//       the invitation document's own PUT history: the
+//       grant's 'pending' and the later terminal PUT (spec
+//       2026-09-15 § 2). The answering ops (acceptance /
+//       decline / revocation) are the HTTP audit alone; no
+//       derive reads them.
 // bare states/:id, the per-entity history alias, the bulk
 // lifecycle collection, the five-source union (deriveStates),
 // and nested field-values collection are RETIRED (C3/C4).
@@ -61,8 +65,8 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 // THE GATE-15 PRECEDENT (Phase 10): an org fence can be
 // reproduced from the MEMBERSHIP MESSAGE PLANE. This module's
 // resolveOwningOrganization / resolveGlobalOwner /
-// stateEventVisibilityFor / missedReadError apply that
-// technique for ownership and event-id fences.
+// missedReadError apply that technique for ownership and
+// event-id fences.
 //
 // IMMUNE TO THE DELETED FILTER: pairs are append-
 // only, so a family's document message pair still names its organization
@@ -484,300 +488,9 @@ export async function missedReadError(
 // fenceStatesByOwner RETIRED with the bulk lifecycle
 // collection (states-URI elimination C3). Per-entity and
 // collection history routes fence via
-// resolveOwningOrganization / missedReadError directly;
-// stateEventVisibilityFor covers event-id reads.
+// resolveOwningOrganization / missedReadError directly.
 
-// ---- stateEventVisibilityFor — the field-values fence --------
-// ---- successor (Phase 15 Task 1, Author gate 2) --------------
-
-// Three-way disposition matching the retired
-// isVisibleStateEvent row-plane branches (now re-pointed
-// onto this function, Phase 15 Task 3): (1) nowhere — a
-// visible orphan; (2) own-org (or owner-null entity) —
-// visible; (3) foreign — hidden. The return type is PART of
-// the gate, not an implementation detail. Boolean isVisible
-// folds as `visibility !== 'hidden'`.
-export type StateEventVisibility =
-    | 'orphan'
-    | 'visible'
-    | 'hidden';
-
-// Does a request body name `eventId` as an op-born state
-// event? Covers document-trio state_event_id, work-order
-// create/claim/transition ids, invitation lifecycle ids,
-// member genesis, and flow-graph deletion/revival sidecars.
-function bodyNamesStateEvent(
-    body: Record<string, unknown>,
-    eventId: Id,
-): boolean {
-    if (body['state_event_id'] === eventId) return true;
-    if (body['claimEventId'] === eventId) return true;
-    if (body['expireEventId'] === eventId) return true;
-    if (body['transitionEventId'] === eventId) return true;
-    if (body['releaseEventId'] === eventId) return true;
-    if (body['grantEventId'] === eventId) return true;
-    if (body['acceptEventId'] === eventId) return true;
-    if (body['declineEventId'] === eventId) return true;
-    if (body['revokeEventId'] === eventId) return true;
-    if (body['initialStateEventId'] === eventId) {
-        return true;
-    }
-    const stateEventIds = body['stateEventIds'];
-    if (
-        Array.isArray(stateEventIds)
-        && stateEventIds.includes(eventId)
-    ) {
-        return true;
-    }
-    const release = body['release'];
-    if (
-        typeof release === 'object'
-        && release !== null
-        && (release as Record<string, unknown>)['id']
-            === eventId
-    ) {
-        return true;
-    }
-    const delta = body['graphDelta'];
-    if (typeof delta === 'object' && delta !== null) {
-        const deletions = (delta as Record<string, unknown>)[
-            'deletions'
-        ];
-        if (Array.isArray(deletions)) {
-            for (const entry of deletions) {
-                if (
-                    typeof entry === 'object'
-                    && entry !== null
-                    && (entry as Record<string, unknown>)[
-                        'eventId'
-                    ] === eventId
-                ) {
-                    return true;
-                }
-            }
-        }
-    }
-    const revivals = body['revivals'];
-    if (Array.isArray(revivals)) {
-        for (const entry of revivals) {
-            if (
-                typeof entry === 'object'
-                && entry !== null
-                && (entry as Record<string, unknown>)[
-                    'eventId'
-                ] === eventId
-            ) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-// Tier (i)/(ii): does any of this organization's operation-message-pair
-// families name eventId? Indexed prefix reads only (the
-// workOrderClaimSourcesFor shape) — never a whole-plane
-// getAll of pairs.
-async function organizationHasOpBornEvent(
-    dbOrView: DbAdapter,
-    organization: Id,
-    eventId: Id,
-): Promise<boolean> {
-    for (
-        const family of ORGANIZATION_NESTED_ENTITY_FAMILIES
-    ) {
-        const prefix = canonicalPath(
-            organization, '/' + family + '/',
-        );
-        const stored = await dbOrView.messagePairs.getCollectionPairs(prefix,
-        );
-        for (const messagePair of documentMessagePairsAt(
-            stored, prefix,
-        )) {
-            if (bodyNamesStateEvent(messagePair.body, eventId)) {
-                return true;
-            }
-        }
-        for (const messagePair of operationMessagePairsAt(
-            stored, prefix,
-        )) {
-            if (bodyNamesStateEvent(messagePair.body, eventId)) {
-                return true;
-            }
-        }
-    }
-
-    // Claim/transition ride per-work-order sub-prefixes.
-    // Discover work-order ids from the collection pairs
-    // already readable via the work-orders family scan above
-    // — re-read that one prefix for the id set, then probe
-    // each sub-resource with an indexed path read.
-    const workOrdersPrefix = canonicalPath(
-        organization, '/work-orders/',
-    );
-    const workOrderMessagePairs =
-        await dbOrView.messagePairs.getCollectionPairs(workOrdersPrefix,
-        );
-    const workOrderIds = new Set<Id>(
-        workOrderMessagePairs.map((row) => row.name),
-    );
-    for (const workOrderId of workOrderIds) {
-        for (const sub of [
-            'claim', 'transition', 'release',
-        ] as const) {
-            const prefix = canonicalPath(
-                organization,
-                '/work-orders/' + workOrderId
-                    + '/' + sub + '/',
-            );
-            const stored =
-                await dbOrView.messagePairs.getCollectionPairs(prefix,
-                );
-            for (const messagePair of operationMessagePairsAt(
-                stored, prefix,
-            )) {
-                if (
-                    bodyNamesStateEvent(
-                        messagePair.body, eventId,
-                    )
-                ) {
-                    return true;
-                }
-            }
-        }
-    }
-
-    // Member genesis (global plane): initialStateEventId rides
-    // the human/AI create-op body. Live create writes the
-    // states row + op body but no states/:id pair and no
-    // membership — disposition via resolveOwningOrganization
-    // (null → visible to every asker; own/foreign as usual),
-    // matching the row-plane owner-null isVisible rule. The
-    // membership boolean alone would mis-orphan unowned
-    // genesis events (create never mints a membership).
-    for (const prefix of [
-        canonicalPath(undefined, '/ai-members/'),
-        canonicalPath(undefined, '/human-members/'),
-    ]) {
-        const stored = await dbOrView.messagePairs.getCollectionPairs(prefix,
-        );
-        for (const messagePair of operationMessagePairsAt(
-            stored, prefix,
-        )) {
-            if (!bodyNamesStateEvent(messagePair.body, eventId)) {
-                continue;
-            }
-            const owner = await resolveOwningOrganization(
-                dbOrView, messagePair.name, organization,
-            );
-            if (
-                owner === null
-                || owner === organization
-            ) {
-                return true;
-            }
-        }
-    }
-
-    // Invitations (flat path): organization lives in the
-    // grant body; answering ops nest under invitations/:id/.
-    {
-        const stored = await dbOrView.messagePairs.getCollectionPairs(
-            INVITATIONS_PREFIX,
-        );
-        for (const messagePair of operationMessagePairsAt(
-            stored, INVITATIONS_PREFIX,
-        )) {
-            if (
-                bodyNamesStateEvent(messagePair.body, eventId)
-                && pickString(
-                    messagePair.body, 'organization_id',
-                )
-                    === organization
-            ) {
-                return true;
-            }
-        }
-        const invitationIds = new Set<Id>(
-            stored.map((row) => row.name),
-        );
-        for (const invitationId of invitationIds) {
-            for (const sub of [
-                'acceptance', 'decline', 'revocation',
-            ] as const) {
-                const prefix = canonicalPath(
-                    undefined,
-                    '/invitations/' + invitationId
-                        + '/' + sub + '/',
-                );
-                const operationMessagePairs =
-                    await dbOrView.messagePairs.getCollectionPairs(prefix,
-                    );
-                for (const messagePair of operationMessagePairsAt(
-                    operationMessagePairs, prefix,
-                )) {
-                    if (!bodyNamesStateEvent(
-                        messagePair.body, eventId,
-                    )) {
-                        continue;
-                    }
-                    // Answering ops carry no organization_id;
-                    // ownership is the invitation's own.
-                    const owner =
-                        await resolveInvitationOwner(
-                            dbOrView, invitationId,
-                        );
-                    if (owner === organization) {
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-    return false;
-}
-
-// Tiered message-plane visibility disposition (successor of the
-// retired isVisibleStateEvent row-plane fence; live callers
-// re-pointed Phase 15 Task 3). Always view-accepting
-// (dbOrView); opens no nested transaction. The states/:id
-// event-append tier is RETIRED with the document itself —
-// cheapest remaining first:
-//   (i) own-org operation-message-pair family scan — op-born claim /
-//       transition / document-trio ids;
-//   (ii) widen-on-miss cross-org scan — foreign vs nowhere,
-//       only on the rare miss tail.
-export async function stateEventVisibilityFor(
-    dbOrView: DbAdapter,
-    boundOrganization: Id,
-    eventId: Id,
-): Promise<StateEventVisibility> {
-    // (i) own-org op-born scan.
-    if (
-        await organizationHasOpBornEvent(
-            dbOrView, boundOrganization, eventId,
-        )
-    ) {
-        return 'visible';
-    }
-
-    // (ii) widen-on-miss: distinguish foreign from nowhere.
-    for (const organization of await organizationIds(
-        dbOrView,
-    )) {
-        if (organization === boundOrganization) continue;
-        if (
-            await organizationHasOpBornEvent(
-                dbOrView, organization, eventId,
-            )
-        ) {
-            return 'hidden';
-        }
-    }
-    return 'orphan';
-}
-
-// ---- deriveWorkOrderLifecycle — the operation-message-pair
+// ---- workOrderLifecycleStatesFor — the operation-message-pair
 // reader (gate 5d) ---
 
 // Source (c) of the states-log union — the only one that reads
@@ -814,33 +527,6 @@ export async function stateEventVisibilityFor(
 // instant coincide in one process; a multi-process
 // deployment must record the actual expiry decision as
 // its own event rather than lean on this replay trick.
-
-// The work-orders COLLECTION path: POST 'work-orders' (create)
-// and PUT/DELETE 'work-orders/:id' (document) share this ONE
-// prefix per organization (family-registry.ts: work-orders is
-// organizationNested), partitioned apart by METHOD alone
-// (tests/drift-work-orders.test.ts case 8) — the create's name is
-// the body's OWN minted id, the SAME id a later PUT's name names.
-const WORK_ORDERS_COLLECTION_PATTERN =
-    /^\/organizations\/[^/]+\/work-orders\/$/;
-
-// The claim/transition/release sub-resource documents: UNLIKE
-// the collection prefix above, the work-order id rides the
-// PREFIX itself here (routes.ts: 'work-orders/:id/claim' /
-// 'work-orders/:id/transition' / retired
-// 'work-orders/:id/release'), so each distinct match names
-// ONE work order directly — captured, the organization
-// segment is not (a work-order id is globally unique, so
-// it is never needed to disambiguate).
-const WORK_ORDER_CLAIM_PATTERN =
-    /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/claim\/$/;
-// Exported (Phase 14 Task 6): api/derive-state-field-values.ts
-// scans for this SAME prefix shape to find every transition's
-// fieldValues fold, without re-deriving the document pattern.
-export const WORK_ORDER_TRANSITION_PATTERN =
-    /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/transition\/$/;
-const WORK_ORDER_RELEASE_PATTERN =
-    /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/release\/$/;
 
 // One decoded 2xx POST pair — an OPERATION path (create/claim/
 // transition are POST-only), the documentMessagePairsAt (derive-
@@ -888,8 +574,10 @@ function decodeRequestOperation(message: string): {
 }
 
 // (at, id) ascending — the total order every replay step below
-// orders its actions by, and the order the final derivation
-// returns rows in (deriveWorkOrderLifecycle's own header).
+// orders its actions by, and the order workOrderLifecycleStatesFor
+// returns rows in: these rows are SYNTHESIZED (no document of
+// their own to read 1:1), so there is no raw-store scan order to
+// reproduce — chronological (at, id) is the meaningful order.
 function atIdCompare(
     a: { readonly at: string; readonly id: string },
     b: { readonly at: string; readonly id: string },
@@ -900,15 +588,14 @@ function atIdCompare(
 }
 
 // Every successful (2xx) POST pair at `path`, (at, id)
-// ascending. REUSED below by source (f)
-// (deriveInvitationStates) — a flat, non-work-order
-// collection's own 2xx POST pairs, the exact shape this
-// function already reads generically. Source (c) once shared
-// this scan (deriveMemberGenesis); the states-document
-// retirement moved members onto the document-trio walk, so
-// only invitations remain. Exported (Phase 14 Task 6):
-// api/derive-state-field-values.ts's transition-fold reader
-// reuses this SAME decode over the work-orders/:id/transition
+// ascending. Source (c)'s work-order replay is the only
+// consumer left: source (e) once shared this scan, and the
+// invitation-document fold (spec 2026-09-15 § 2) moved
+// deriveInvitationStates onto documentMessagePairsAt; the
+// states-document retirement had already moved
+// deriveMemberGenesis onto the document-trio walk. Module-
+// private: this module's own transition-fold readers below
+// reuse this SAME decode over the work-orders/:id/transition
 // document, rather than re-implementing the POST-only,
 // (at, id)-sorted read.
 const POST_ONLY: ReadonlySet<string> = new Set(['POST']);
@@ -916,7 +603,7 @@ const POST_OR_PUT: ReadonlySet<string> = new Set([
     'POST', 'PUT',
 ]);
 
-export function operationMessagePairsAt(
+function operationMessagePairsAt(
     messagePairs: readonly MessagePairEntity[],
     path: string,
     methods: ReadonlySet<string> = POST_ONLY,
@@ -1264,202 +951,25 @@ function replayWorkOrderOperations(
     return events;
 }
 
-// Prefix-filtered pure core of the operation-message-pair reader (gate 5d).
-// When `organization` is set, only that org's work-orders
-// path family is considered (collection + claim/release/
-// transition); when undefined, every org — the whole-plane
-// scan deriveWorkOrderLifecycle needs. Returns ASC events and
-// the transition pairs consumed so bulk history can fold
-// field_values without a second plane pass.
-interface WorkOrderLifecyclePlane {
-    readonly events: readonly StateEntity[];
-    readonly transitionMessagePairs: readonly OperationMessagePair[];
-}
-
-function workOrderLifecycleFromPlane(
-    messagePairs: readonly MessagePairEntity[],
-    organization: Id | undefined,
-): WorkOrderLifecyclePlane {
-    const collectionPrefixes = new Set<string>();
-    if (organization !== undefined) {
-        collectionPrefixes.add(
-            canonicalPath(organization, '/work-orders/'),
-        );
-    } else {
-        for (const messagePair of messagePairs) {
-            if (WORK_ORDERS_COLLECTION_PATTERN.test(
-                messagePair.path,
-            )) {
-                collectionPrefixes.add(
-                    messagePair.path,
-                );
-            }
-        }
-    }
-    const createMessagePairs: OperationMessagePair[] = [];
-    const entityMessagePairs: DocumentMessagePair[] = [];
-    for (const prefix of collectionPrefixes) {
-        createMessagePairs.push(...operationMessagePairsAt(
-            messagePairs, prefix,
-        ));
-        entityMessagePairs.push(...documentMessagePairsAt(
-            messagePairs, prefix,
-        ));
-    }
-    const createMessagePairsByWorkOrder = Map.groupBy(
-        createMessagePairs, (messagePair) => messagePair.name,
-    );
-    const entityMessagePairsByWorkOrder = Map.groupBy(
-        entityMessagePairs, (messagePair) => messagePair.name,
-    );
-
-    const organizationRoot = organization === undefined
-        ? null
-        : '/organizations/' + organization + '/work-orders/';
-
-    const claimPrefixByWorkOrder = new Map<Id, string>();
-    const releasePrefixByWorkOrder = new Map<Id, string>();
-    const transitionPrefixByWorkOrder = new Map<Id, string>();
-    for (const messagePair of messagePairs) {
-        if (
-            organizationRoot !== null
-            && !messagePair.path.startsWith(
-                organizationRoot,
-            )
-        ) {
-            continue;
-        }
-        const claimMatch = WORK_ORDER_CLAIM_PATTERN.exec(
-            messagePair.path,
-        );
-        if (claimMatch !== null) {
-            claimPrefixByWorkOrder.set(
-                claimMatch[1]!, messagePair.path,
-            );
-        }
-        const releaseMatch =
-            WORK_ORDER_RELEASE_PATTERN.exec(
-                messagePair.path,
-            );
-        if (releaseMatch !== null) {
-            releasePrefixByWorkOrder.set(
-                releaseMatch[1]!,
-                messagePair.path,
-            );
-        }
-        const transitionMatch =
-            WORK_ORDER_TRANSITION_PATTERN.exec(
-                messagePair.path,
-            );
-        if (transitionMatch !== null) {
-            transitionPrefixByWorkOrder.set(
-                transitionMatch[1]!,
-                messagePair.path,
-            );
-        }
-    }
-
-    const workOrderIds = new Set<Id>([
-        ...createMessagePairsByWorkOrder.keys(),
-        ...claimPrefixByWorkOrder.keys(),
-        ...releasePrefixByWorkOrder.keys(),
-        ...transitionPrefixByWorkOrder.keys(),
-    ]);
-
-    const events: StateEntity[] = [];
-    const allTransitionMessagePairs: OperationMessagePair[] = [];
-    for (const workOrderId of workOrderIds) {
-        const claimPrefix =
-            claimPrefixByWorkOrder.get(workOrderId);
-        const releasePrefix =
-            releasePrefixByWorkOrder.get(workOrderId);
-        const transitionPrefix =
-            transitionPrefixByWorkOrder.get(workOrderId);
-        const claimMessagePairs = claimPrefix === undefined
-            ? []
-            : operationMessagePairsAt(
-                messagePairs, claimPrefix, POST_OR_PUT,
-            );
-        const releasePosts = releasePrefix === undefined
-            ? []
-            : operationMessagePairsAt(
-                messagePairs, releasePrefix,
-            );
-        const releaseDeletes = claimPrefix === undefined
-            ? []
-            : documentDeletesAsOperations(
-                documentMessagePairsAt(
-                    messagePairs, claimPrefix,
-                ),
-            );
-        const releaseMessagePairs = [
-            ...releasePosts, ...releaseDeletes,
-        ];
-        const transitionMessagePairs =
-            transitionPrefix === undefined
-                ? []
-                : operationMessagePairsAt(
-                    messagePairs, transitionPrefix,
-                );
-        allTransitionMessagePairs.push(...transitionMessagePairs);
-        events.push(...replayWorkOrderOperations(
-            createMessagePairsByWorkOrder.get(workOrderId) ?? [],
-            entityMessagePairsByWorkOrder.get(workOrderId) ?? [],
-            claimMessagePairs,
-            releaseMessagePairs,
-            transitionMessagePairs,
-            workOrderId,
-        ));
-    }
-    return {
-        events: events.sort(atIdCompare),
-        transitionMessagePairs: allTransitionMessagePairs,
-    };
-}
-
-// The operation-message-pair reader (gate 5d). ONE shared readonly tx over
-// db.messagePairs (torn-read closure) — every grouping and
-// replay step below is pure over the fetched array, no
-// further db reads. (at, id) ascending overall: these rows are
-// SYNTHESIZED (no document of their own to read 1:1), so there
-// is no raw-store scan order to reproduce — chronological
-// (at, id) is the meaningful order, and filtering this total
-// order by entity_id preserves it per work order.
-export async function deriveWorkOrderLifecycle(
-    db: DbAdapter,
-): Promise<StateEntity[]> {
-    return db.readTransaction(async (view) => {
-            const messagePairs = await view.messagePairs.getAll();
-            return [
-                ...workOrderLifecycleFromPlane(
-                    messagePairs, undefined,
-                ).events,
-            ];
-        },
-    );
-}
-
-// ENTITY-SCOPED sibling of deriveWorkOrderLifecycle above (Phase
-// 14 Task 1): reuses the SAME pure replay core
-// (replayWorkOrderOperations) over INDEXED reads scoped to ONE
-// known (organization, workOrderId) pair, rather than the
-// whole-org scan the multi-work-order reader needs to discover
-// EVERY id at once —
+// The work-order lifecycle read (gate 5d): reads INDEXED,
+// scoped to ONE known (organization, workOrderId) pair, then
+// replays with the pure replay core (replayWorkOrderOperations)
+// the retired whole-plane fold once shared with this reader
+// (spec 2026-09-15 § 5) —
 //   * create + document message pairs: document read at the
 //     work-orders prefix + this workOrderId (both
 //     a create's response and its later document PUT/DELETE
 //     share ONE name — drift-work-orders.test.ts case 8);
-//   * claim/release/transition: path at each sub-
-//     resource's own per-id document (WORK_ORDER_CLAIM_PATTERN/
-//     WORK_ORDER_RELEASE_PATTERN/
-//     WORK_ORDER_TRANSITION_PATTERN's own shape, constructed
-//     directly since the id is already known).
+//   * claim/release/transition: path at each sub-resource's
+//     own per-id document, its prefix constructed directly
+//     (canonicalPath + the known workOrderId) since the id is
+//     already known — no pattern match needed to discover it.
 // dbOrView-shaped and opens no nested transaction — callable from
 // WITHIN an already-open write-gate transaction. Phase 14 Task 4
 // wires the claim gate to workOrderClaimHistoryFor below; with
-// the states/:id document retired both siblings return the SAME
-// operation-message-pair replay (releases ride the release op,
-// not a standalone event-append).
+// the states/:id document retired both readers below return the
+// SAME operation-message-pair replay (releases ride the release
+// op, not a standalone event-append).
 interface WorkOrderClaimSources {
     readonly replayed: readonly StateEntity[];
 }
@@ -1669,11 +1179,12 @@ function historyEventsWithFieldValues(
 // workOrderLifecycleStatesFor (ASC) reborn with an inline
 // field-values fold from this work order's OWN transition
 // prefix pairs, returned (at, id) DESC so index 0 is current.
-// Head-reduction per field-value row id matches
-// stateFieldValuesFrom (api/derive-state-field-values.ts);
-// claim/birth/release rows carry field_values: []. Empty
-// lifecycle → missedReadError (404 miss at this document).
-// Entity-scoped indexed reads only — no whole-plane getAll.
+// Head-reduction per field-value row id uses the same
+// latestByKey pooling fieldValuesByTransitionEvent applies
+// above; claim/birth/release rows carry field_values: [].
+// Empty lifecycle → missedReadError (404 miss at this
+// document). Entity-scoped indexed reads only — no
+// whole-plane getAll.
 export async function workOrderHistoryFor(
     db: DbAdapter,
     organization: Id,
@@ -1877,214 +1388,60 @@ export async function workOrderDocumentHeadFor(
 // deleted/restored sidecars still live on the flow
 // document-pair body (graphDelta.deletions / revivals —
 // SIDECAR-KEEP); resolveFlowGraphOwner above still resolves
-// their owners for fences. Visibility of named sidecar
-// event ids rides stateEventVisibilityFor.
+// their owners for fences.
 
-// ---- deriveInvitationStates — the invitation lifecycle reader ---
-// ---- (gate 5f) ---------------------------------------------------
-
-// Source (f) of the states-log union. An invitation's own states
-// never ride the states/:id document (source a) — the invitations
-// side channel forms its own operation message pairs at the flat
-// '/invitations/' collection (the grant) and at
-// 'invitations/:id/<op>/' (the three answering ops), api/
-// invitations-domain.ts's own formWriteMessagePair/
-// formInvitationOperationMessagePair calls. Deliberately
-// NOT built atop deriveInvitations/
-// invitationOpStates (api/derive-invitations.ts) — both resolve
-// only a RESOLVED CURRENT STATE and DISCARD the event id and
-// member_id a StateEntity row needs (the brief's own NOTE) — this
-// is a fresh, StateEntity-emitting extraction over the SAME two
-// document families, never a retrofit of either.
-//
-// THE GRANT'S OWN DUPLICATE-ECHO (grantInvitation, api/invitations-
-// domain.ts): an ALREADY-pending (org, identity) pair still forms
-// its OWN operation message pair at whatever invitationId the SECOND
-// caller submitted (the 'existing' outcome branch) — but writes
-// NEITHER a states event NOR a document there. Cross-referencing
-// against the invitation's DOCUMENT plane (formed ONLY on the
-// 'fresh' outcome, at the SAME invitationId) excludes that phantom
-// pair: a document exists at an id iff its grant operation message pair
-// genuinely posted 'pending'.
-//
-// THE ANSWERING OPS' OWN NO-OP RESENDS (accept/decline/revoke):
-// each is idempotent on its OWN already-reached terminal state (a
-// re-accept/re-decline/re-revoke still forms an operation message pair but
-// posts NO event) — mutual exclusivity across the three op KINDS
-// is the domain gate's own covenant (derive-invitations.ts's
-// header), so at most one op kind ever succeeds per invitation,
-// but THAT kind can still accumulate repeat pairs. Since
-// appendMessagePairOnce mints each pair's response `at` synchronously
-// inside its own (serialized) transaction, the group's
-// chronologically EARLIEST (at, id) pair is always the one that
-// found the invitation still 'pending' and genuinely posted the
-// event — operationMessagePairsAt already returns each group (at, id)
-// ascending, so its first entry is that pair.
-const INVITATION_OP_PATH_PATTERN =
-    /^\/invitations\/([^/]+)\/(acceptance|decline|revocation)\/$/;
-
-interface InvitationOpFields {
-    readonly state: string;
-    readonly eventIdField: string;
-    readonly atField: string;
+// The invitation lifecycle, from the invitation document's
+// own history (api/derive-invitations.ts owns the head
+// read): every PUT at /invitations/<id> is one lifecycle
+// row — one row per PUT, the grant's 'pending' and the
+// terminal — id-lex ordered (a caller wanting chronological
+// order sorts by (at, id) itself). `id` and `at` are the
+// pair's own; `member_id` is the pair's requester (the
+// granting admin, the answering invitee, the revoking
+// admin). A duplicate grant writes no document and a no-op
+// resend appends no PUT, so neither has a row.
+function invitationLifecycleRowsOf(
+    messagePairs: readonly DocumentMessagePair[],
+): StateEntity[] {
+    const rows: StateEntity[] = [];
+    for (const messagePair of messagePairs) {
+        rows.push({
+            id: messagePair.id,
+            entity_id: messagePair.name,
+            state: pickString(messagePair.body, 'state'),
+            member_id: messagePair.requesterIdentityId,
+            at: messagePair.at,
+        });
+    }
+    return rows.sort(byIdAscending);
 }
 
-const INVITATION_OP_FIELDS: Readonly<
-    Record<string, InvitationOpFields>
-> = {
-    acceptance: {
-        state: 'accepted',
-        eventIdField: 'acceptEventId',
-        atField: 'acceptAt',
-    },
-    decline: {
-        state: 'declined',
-        eventIdField: 'declineEventId',
-        atField: 'declineAt',
-    },
-    revocation: {
-        state: 'revoked',
-        eventIdField: 'revokeEventId',
-        atField: 'revokeAt',
-    },
-};
-
+// Every invitation's lifecycle: ONE collection read of
+// /invitations/ — every pair of every document there.
 export async function deriveInvitationStates(
     db: DbAdapter,
 ): Promise<StateEntity[]> {
-    return db.readTransaction(async (view) => {
-            const stored = await view.messagePairs.getAll();
-            const rows: StateEntity[] = [];
-
-            const documentIds = new Set(
-                documentMessagePairsAt(
-                    stored, INVITATIONS_PREFIX,
-                ).map((messagePair) => messagePair.name),
-            );
-            for (const messagePair of operationMessagePairsAt(
-                stored, INVITATIONS_PREFIX,
-            )) {
-                if (!documentIds.has(messagePair.name)) {
-                    continue;
-                }
-                rows.push({
-                    id: pickString(
-                        messagePair.body, 'grantEventId',
-                    ),
-                    entity_id: messagePair.name,
-                    state: 'pending',
-                    member_id: messagePair.requesterIdentityId,
-                    at: pickString(messagePair.body, 'grantAt'),
-                });
-            }
-
-            const opPrefixes = new Set<string>();
-            for (const messagePair of stored) {
-                if (INVITATION_OP_PATH_PATTERN.test(
-                    messagePair.path,
-                )) {
-                    opPrefixes.add(messagePair.path);
-                }
-            }
-            for (const prefix of opPrefixes) {
-                const match =
-                    INVITATION_OP_PATH_PATTERN.exec(prefix)!;
-                const fields = INVITATION_OP_FIELDS[match[2]!];
-                if (fields === undefined) continue;
-                const earliest = operationMessagePairsAt(
-                    stored, prefix,
-                )[0];
-                if (earliest === undefined) continue;
-                rows.push({
-                    id: pickString(
-                        earliest.body, fields.eventIdField,
-                    ),
-                    entity_id: match[1]!,
-                    state: fields.state,
-                    member_id: earliest.requesterIdentityId,
-                    at: pickString(earliest.body, fields.atField),
-                });
-            }
-
-            return rows.sort(byIdAscending);
-        },
+    const stored = await db.messagePairs.getCollectionPairs(
+        INVITATIONS_PREFIX,
+    );
+    return invitationLifecycleRowsOf(
+        documentMessagePairsAt(stored, INVITATIONS_PREFIX),
     );
 }
 
-// ENTITY-SCOPED sibling of deriveInvitationStates above (Phase
-// 14 Task 1): the SAME grant + op-path reduction, restricted
-// to ONE known invitation id via INDEXED reads —
-// document read at the invitations prefix + this id
-// (grant + document share ONE name) and
-// path for each of the three op documents —
-// rather than the whole-collection scan
-// (documentIds discovery) and the whole-ledger pairs.getAll()
-// (op-prefix discovery) the multi-invitation reader above needs
-// to find EVERY id at once. dbOrView-shaped and opens no nested
-// transaction — callable from WITHIN an already-open write-gate
-// transaction (currentInvitationState's own accept/decline/
-// revoke in-tx reads, api/invitations-domain.ts — a LATER task
-// wires the call site; this task lands the core alone).
-//
-// THE PHANTOM-ECHO EXCLUSION carries over unchanged (deriveInvit-
-// ationStates' own header): the documentIds cross-reference,
-// applied here to the id-scoped read alone, still excludes a
-// duplicate grant's own operation message pair when no document was ever
-// written at this id.
+// One invitation's lifecycle: ONE document read. dbOrView-
+// shaped; opens no nested transaction
+// (currentInvitationState's in-tx gate reads through it).
 export async function invitationLifecycleStatesFor(
     dbOrView: DbAdapter,
     id: Id,
 ): Promise<StateEntity[]> {
-    const rows: StateEntity[] = [];
-
-    const collectionMessagePairs =
-        await dbOrView.messagePairs.getDocumentHistory(
-            INVITATIONS_PREFIX, id,
-        );
-    const hasDocument = documentMessagePairsAt(
-        collectionMessagePairs, INVITATIONS_PREFIX,
-    ).some((messagePair) => messagePair.name === id);
-    if (hasDocument) {
-        for (const messagePair of operationMessagePairsAt(
-            collectionMessagePairs, INVITATIONS_PREFIX,
-        )) {
-            rows.push({
-                id: pickString(
-                    messagePair.body, 'grantEventId',
-                ),
-                entity_id: messagePair.name,
-                state: 'pending',
-                member_id: messagePair.requesterIdentityId,
-                at: pickString(messagePair.body, 'grantAt'),
-            });
-        }
-    }
-
-    for (const op of [
-        'acceptance', 'decline', 'revocation',
-    ] as const) {
-        const prefix = canonicalPath(
-            undefined, '/invitations/' + id + '/' + op + '/',
-        );
-        const operationMessagePairs =
-            await dbOrView.messagePairs.getCollectionPairs(
-                prefix,
-            );
-        const fields = INVITATION_OP_FIELDS[op]!;
-        const earliest = operationMessagePairsAt(
-            operationMessagePairs, prefix,
-        )[0];
-        if (earliest === undefined) continue;
-        rows.push({
-            id: pickString(earliest.body, fields.eventIdField),
-            entity_id: id,
-            state: fields.state,
-            member_id: earliest.requesterIdentityId,
-            at: pickString(earliest.body, fields.atField),
-        });
-    }
-
-    return rows.sort(byIdAscending);
+    const history = await dbOrView.messagePairs.getDocumentHistory(
+        INVITATIONS_PREFIX, id,
+    );
+    return invitationLifecycleRowsOf(
+        documentMessagePairsAt(history, INVITATIONS_PREFIX),
+    );
 }
 
 // deriveTrioFamilyStates / deriveStates / fenceStatesByOwner /

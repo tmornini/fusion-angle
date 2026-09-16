@@ -9,7 +9,6 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { nowUtc } from '../api/types.ts';
 import {
-    deriveWorkOrderLifecycle,
     workOrderLifecycleStatesFor,
     workOrderClaimHistoryFor,
     workOrderHistoryFor,
@@ -50,20 +49,16 @@ const WORKORDERID_EE2 = generateIdentifier();
 const WORKORDERID_FV2 = generateIdentifier();
 
 // The Phase 14 Task 1 core: workOrderLifecycleStatesFor is the
-// ENTITY-SCOPED sibling of deriveWorkOrderLifecycle — it reuses
-// the SAME pure replay core (replayWorkOrderOperations, private
-// to api/derive-states.ts) over INDEXED reads scoped to ONE
-// known (organization, workOrderId) pair — name for the
-// create/document message pairs (they share ONE name at the work-orders
-// collection path), path for the claim/transition
-// sub-resource documents, and the organization's own states/:id
-// prefix (filtered locally to this entity) for gate 5a's rows —
-// rather than the whole-org scan deriveWorkOrderLifecycle needs
-// to discover EVERY work order's own ids at once. This file
-// proves it byte-identical to deriveWorkOrderLifecycle's own
-// per-entity subset AND to the row-plane db.states.getAllFor
-// oracle. No write path reads this core yet — Task 1 flips
-// nothing.
+// work-order lifecycle read — it runs the pure replay core
+// (replayWorkOrderOperations, private to api/derive-states.ts)
+// over INDEXED reads scoped to ONE known (organization,
+// workOrderId) pair — name for the create/document message
+// pairs (they share ONE name at the work-orders collection
+// path), path for the claim/transition sub-resource documents
+// (the whole-plane bulk fold retired — spec 2026-09-15 § 5).
+// This file proves each replay against the live route's own
+// wire/handleRequest outcome. No write path reads this core
+// yet — Task 1 flips nothing.
 
 // A real seeded flow carrying zero work-order joins (drift-work-
 // orders.test.ts's own EMPTY_FLOW_ID) — the join itself is
@@ -170,17 +165,8 @@ function createWorkOrderBody(
     };
 }
 
-async function bulkRowsFor(
-    db: MemoryDbAdapter, id: string,
-): Promise<unknown[]> {
-    return sortByAtId(
-        (await deriveWorkOrderLifecycle(db))
-            .filter((row) => row.entity_id === id),
-    );
-}
-
 Deno.test('workOrderLifecycleStatesFor: birth-claimed create alone'
-+ ' matches the bulk subset AND the row-plane oracle', async () => {
++ ' births exactly the three initial events', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const workOrderId = generateIdentifier();
@@ -210,7 +196,6 @@ Deno.test('workOrderLifecycleStatesFor: birth-claimed create alone'
         ),
     );
     assertStrictEquals(scoped.length, 3);
-    assertEquals(scoped, await bulkRowsFor(db, workOrderId));
     // Phase Final Task 2: states ROW half stripped — no
     // row-plane oracle.
 });
@@ -218,7 +203,7 @@ Deno.test('workOrderLifecycleStatesFor: birth-claimed create alone'
 Deno.test('workOrderLifecycleStatesFor: a full chain — birth, a'
 + ' transition with field values, a releasing transition, an'
 + ' entity PUT, a fresh re-claim, and an idempotent re-claim —'
-+ ' matches the bulk subset AND the row-plane oracle at the end',
++ ' ends at seven events',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -326,21 +311,18 @@ async () => {
         ),
     );
     assertStrictEquals(scoped.length, 7);
-    assertEquals(scoped, await bulkRowsFor(db, workOrderId));
     // Phase Final Task 2: states ROW half stripped — no
     // row-plane oracle.
 });
 
 // Named unclaim via POST organizations/:id/work-orders/:id/release — an
 // operation-message-pair
-// leg of deriveWorkOrderLifecycle's own replay (applyReleasePair),
-// so workOrderLifecycleStatesFor INCLUDES the claim_released
-// event and matches the bulk subset. Claim history sees the
-// same row (it rides the replayed half, not gate 5a's states
-// document).
+// leg of the lifecycle replay (applyReleasePair), so
+// workOrderLifecycleStatesFor INCLUDES the claim_released
+// event. Claim history sees the same row (it rides the
+// replayed half, not gate 5a's states document).
 Deno.test('workOrderLifecycleStatesFor: a release op\'s'
-+ ' claim_released is INCLUDED, matching'
-+ ' deriveWorkOrderLifecycle\'s own bulk subset — claim-history'
++ ' claim_released is INCLUDED — claim-history'
 + ' sees it too', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -379,7 +361,6 @@ Deno.test('workOrderLifecycleStatesFor: a release op\'s'
         ),
     );
     assertStrictEquals(scoped.length, 4);
-    assertEquals(scoped, await bulkRowsFor(db, workOrderId));
     const released = scoped.find(
         (row) => row.state === 'claim_released',
     );

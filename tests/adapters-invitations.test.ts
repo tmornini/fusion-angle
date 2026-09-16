@@ -25,8 +25,11 @@ import type { NotificationEvent } from '../api/notifications.ts';
 import {
     validateInvitationEntity,
 } from '../api/validators.ts';
-import { UnauthorizedError } from
-    '../api/http-errors.ts';
+import {
+    HTTP_CONFLICT,
+    RequestError,
+    UnauthorizedError,
+} from '../api/http-errors.ts';
 import {
     createRequestContext,
     type RequestContext,
@@ -36,7 +39,7 @@ import {
     reachableToken,
 } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
-import { seedIdentityPii } from './identity-fixtures.ts';
+import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
     postInvitationGrant,
     postInvitationAcceptance,
@@ -195,7 +198,7 @@ async function seedPerson(
     name: string,
     email: string,
 ): Promise<void> {
-    await seedIdentityPii(db, id, {
+    await seedPersonIdentity(db, id, {
         name, email, phone: '', bio: '',
     });
 }
@@ -287,12 +290,12 @@ Deno.test('validateInvitationEntity accepts a full body',
         validateInvitationEntity({
             organization_id: 'BBjWJsjYIDkTRKIIPrzWRw',
             identity_id: 'toccYYkLEABmlbpHJalgtQ',
-            at: AT,
+            at: AT, state: 'pending',
         }),
         {
             organization_id: 'BBjWJsjYIDkTRKIIPrzWRw',
             identity_id: 'toccYYkLEABmlbpHJalgtQ',
-            at: AT,
+            at: AT, state: 'pending',
         },
     );
 }));
@@ -303,7 +306,7 @@ Deno.test('validateInvitationEntity rejects an extra key',
         validateInvitationEntity({
             organization_id: 'BBjWJsjYIDkTRKIIPrzWRw'
                 , identity_id: 'toccYYkLEABmlbpHJalgtQ',
-            at: AT, state: 'pending',
+            at: AT, state: 'pending', email: 'sarah@x.com',
         }));
 }));
 
@@ -313,9 +316,28 @@ Deno.test('validateInvitationEntity rejects a bad timestamp',
         validateInvitationEntity({
             organization_id: 'BBjWJsjYIDkTRKIIPrzWRw'
                 , identity_id: 'toccYYkLEABmlbpHJalgtQ',
-            at: 'not-a-date',
+            at: 'not-a-date', state: 'pending',
         }));
 }));
+
+Deno.test('validateInvitationEntity rejects a missing state',
+    () => {
+        assertThrows(() => validateInvitationEntity({
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: 'toccYYkLEABmlbpHJalgtQ',
+            at: '2026-01-01T00:00:00.000000Z',
+        }));
+    });
+
+Deno.test('validateInvitationEntity rejects an unknown state',
+    () => {
+        assertThrows(() => validateInvitationEntity({
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: 'toccYYkLEABmlbpHJalgtQ',
+            at: '2026-01-01T00:00:00.000000Z',
+            state: 'lost',
+        }));
+    });
 
 // Phase Final Stage B: invitations table retired — store
 // round-trip pins live on message-plane document tests.
@@ -540,11 +562,13 @@ Deno.test('accept after revoke is rejected, no membership',
     await postInvitationRevocation(tony, inv.id);
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
-    await assertRejects(
+    const err = await assertRejects(
         () => postInvitationAcceptance(
             toccYYkLEABmlbpHJalgtQ, inv.id,
             'BBjWJsjYIDkTRKIIPrzWRw',
-        ));
+        )) as RequestError;
+    assertInstanceOf(err, RequestError);
+    assertStrictEquals(err.status, HTTP_CONFLICT);
     const wayne = (await deriveMembershipsAll(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ'
             && m.organization_id === 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -562,11 +586,13 @@ Deno.test('accept after decline is rejected',
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
     await postInvitationDecline(toccYYkLEABmlbpHJalgtQ, inv.id);
-    await assertRejects(
+    const err = await assertRejects(
         () => postInvitationAcceptance(
             toccYYkLEABmlbpHJalgtQ, inv.id,
             'BBjWJsjYIDkTRKIIPrzWRw',
-        ));
+        )) as RequestError;
+    assertInstanceOf(err, RequestError);
+    assertStrictEquals(err.status, HTTP_CONFLICT);
 }));
 
 Deno.test('decline after accept is rejected',
@@ -583,10 +609,12 @@ Deno.test('decline after accept is rejected',
         toccYYkLEABmlbpHJalgtQ, inv.id,
         'BBjWJsjYIDkTRKIIPrzWRw',
     );
-    await assertRejects(
+    const err = await assertRejects(
         () => postInvitationDecline(
             toccYYkLEABmlbpHJalgtQ, inv.id,
-        ));
+        )) as RequestError;
+    assertInstanceOf(err, RequestError);
+    assertStrictEquals(err.status, HTTP_CONFLICT);
 }));
 
 Deno.test('granting the same email twice is idempotent',

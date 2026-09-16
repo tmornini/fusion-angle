@@ -5461,8 +5461,15 @@ FSM, unlike `flows/detail`).
   `parent: —` for a root event (or the parent jti for a
   rotated one), an `issued`/`rotated`/`revoked` badge,
   and a LOCAL-time stamp; an identity with no tokens
-  shows "No tokens." The presenter consumes the
-  adapter's camelCase `TokenEvent` domain shape (`jti`,
+  shows "No tokens." The `parent:` line is HEAD-only: the
+  tokens collection returns one row per jti — its latest
+  event — so a successor's parent jti shows while that
+  successor is live and reverts to `parent: —` once the
+  successor is itself rotated, because the `issued` row
+  the parent line pairs against is no longer that jti's
+  head (spec 2026-09-15 exact-read folds § 6). The
+  presenter consumes the adapter's camelCase
+  `TokenEvent` domain shape (`jti`,
   `parentJti`, `action`, `at`) — a snake_case storage
   leak would render `parent: undefined` instead of
   `parent: —`. A non-canonical `identityId` (any value

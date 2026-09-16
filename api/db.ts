@@ -78,7 +78,6 @@ export class UniqueConstraintError extends Error {
 export interface EntityStore<
     T extends { id: string },
 > {
-    getAll(): Promise<T[]>;
     // The keyed sub-collection read: the literal `WHERE
     // path = $1`: every pair of every document in the
     // collection.

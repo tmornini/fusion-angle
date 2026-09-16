@@ -3,7 +3,7 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import type { Id } from '../api/types.ts';
 import { assertInvitationState } from '../api/types.ts';
-import { invitationOpStateFor } from '../api/derive-invitations.ts';
+import { deriveInvitation } from '../api/derive-invitations.ts';
 import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
@@ -15,15 +15,11 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// The Phase 14 Task 1 core: invitationOpStateFor is the ENTITY-
-// SCOPED sibling of the whole-ledger-scanning (private)
-// invitationOpStates — three indexed getCollectionPairs
-// reads (one per op kind) instead of a db.messagePairs.getAll()
-// walk. This file proves it correct against the ROW-PLANE
-// (states table) currentInvitationState reproduces, over three
-// live lifecycles (accept/decline/revoke) plus the never-
-// answered (pending) and never-granted (unknown id) cases. No
-// write path reads this core yet — Task 1 flips nothing.
+// The document-head oracle: deriveInvitation is ONE document
+// read whose head carries `state` (spec 2026-09-15 § 2).
+// This file proves it agrees with invitationLifecycleStatesFor
+// (the document's own history, latest row) over the three
+// live lifecycles plus pending and never-granted.
 
 function req(
     method: string,
@@ -43,13 +39,10 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
 }
 
-// The row-plane reproduction of currentInvitationState's OWN
-// pending-default fold (api/invitations-domain.ts, module-
-// private): 'pending' or an absent event both resolve to
-// undefined here, matching invitationOpStateFor's own "no
-// terminal op yet" contract — mirror the algorithm, never the
-// privacy (the drift-memberships-identity.test.ts leg-4
-// precedent).
+// The row-plane reproduction of deriveInvitation's own head
+// read: the document's OWN history, latest row, mirroring the
+// algorithm rather than the privacy (the
+// drift-memberships-identity.test.ts leg-4 precedent).
 async function rowPlaneOpState(
     db: MemoryDbAdapter, id: Id,
 ): Promise<string | undefined> {
@@ -64,9 +57,6 @@ async function rowPlaneOpState(
             : a.id < b.id ? -1
             : a.id > b.id ? 1 : 0,
     ).at(-1)!;
-    if (latest.state === 'pending') {
-        return undefined;
-    }
     return assertInvitationState(latest.state, 'invitation ' + id);
 }
 
@@ -90,23 +80,23 @@ async function grant(
     assertStrictEquals(res.status, 200);
 }
 
-Deno.test('invitationOpStateFor: pending (granted, unanswered)'
-+ ' derives undefined, matching the row-plane pending default',
+Deno.test('deriveInvitation: pending (granted, unanswered)'
++ ' derives \'pending\', matching the row-plane state',
 async () => {
     const db = await seededDb();
     const id = generateIdentifier();
     await grant(db, id, 'sarah.chen@company.com');
 
     assertStrictEquals(
-        await invitationOpStateFor(db, id), undefined,
+        (await deriveInvitation(db, id))?.state, 'pending',
     );
     assertStrictEquals(
-        await invitationOpStateFor(db, id),
+        (await deriveInvitation(db, id))?.state,
         await rowPlaneOpState(db, id),
     );
 });
 
-Deno.test('invitationOpStateFor: accepted derives \'accepted\','
+Deno.test('deriveInvitation: accepted derives \'accepted\','
 + ' matching the row-plane current state', async () => {
     const db = await seededDb();
     const id = generateIdentifier();
@@ -126,14 +116,16 @@ Deno.test('invitationOpStateFor: accepted derives \'accepted\','
     ));
     assertStrictEquals(accept.status, 204);
 
-    assertStrictEquals(await invitationOpStateFor(db, id), 'accepted');
     assertStrictEquals(
-        await invitationOpStateFor(db, id),
+        (await deriveInvitation(db, id))?.state, 'accepted',
+    );
+    assertStrictEquals(
+        (await deriveInvitation(db, id))?.state,
         await rowPlaneOpState(db, id),
     );
 });
 
-Deno.test('invitationOpStateFor: declined derives \'declined\','
+Deno.test('deriveInvitation: declined derives \'declined\','
 + ' matching the row-plane current state', async () => {
     const db = await seededDb();
     const id = generateIdentifier();
@@ -152,14 +144,16 @@ Deno.test('invitationOpStateFor: declined derives \'declined\','
     ));
     assertStrictEquals(decline.status, 204);
 
-    assertStrictEquals(await invitationOpStateFor(db, id), 'declined');
     assertStrictEquals(
-        await invitationOpStateFor(db, id),
+        (await deriveInvitation(db, id))?.state, 'declined',
+    );
+    assertStrictEquals(
+        (await deriveInvitation(db, id))?.state,
         await rowPlaneOpState(db, id),
     );
 });
 
-Deno.test('invitationOpStateFor: revoked derives \'revoked\','
+Deno.test('deriveInvitation: revoked derives \'revoked\','
 + ' matching the row-plane current state', async () => {
     const db = await seededDb();
     const id = generateIdentifier();
@@ -178,19 +172,21 @@ Deno.test('invitationOpStateFor: revoked derives \'revoked\','
     ));
     assertStrictEquals(revoke.status, 204);
 
-    assertStrictEquals(await invitationOpStateFor(db, id), 'revoked');
     assertStrictEquals(
-        await invitationOpStateFor(db, id),
+        (await deriveInvitation(db, id))?.state, 'revoked',
+    );
+    assertStrictEquals(
+        (await deriveInvitation(db, id))?.state,
         await rowPlaneOpState(db, id),
     );
 });
 
-Deno.test('invitationOpStateFor: a never-granted id derives'
+Deno.test('deriveInvitation: a never-granted id derives'
 + ' undefined, no throw', async () => {
     const db = await seededDb();
-    await invitationOpStateFor(db, generateIdentifier());
+    await deriveInvitation(db, generateIdentifier());
     assertStrictEquals(
-        await invitationOpStateFor(db, generateIdentifier()),
+        (await deriveInvitation(db, generateIdentifier()))?.state,
         undefined,
     );
 });

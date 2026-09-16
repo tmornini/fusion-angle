@@ -4,8 +4,6 @@ import {
 } from './db.ts';
 import type {
     GuardedDbAdapter,
-    DbStores,
-    EntityStore,
     StorageBackend,
     Tx,
     TxMode,
@@ -42,7 +40,14 @@ export class BackedDbAdapter
     readonly #open: () => Promise<void>;
     readonly #notify: NotificationPost;
 
-    readonly messagePairs!: EntityStore<MessagePairEntity>;
+    // Declared concrete, not as the `EntityStore` face: a
+    // test holding the adapter keeps `getAll()` as its
+    // whole-plane oracle, while nothing typed `DbAdapter` —
+    // every derive, route handler, and transaction view —
+    // can reach it.
+    readonly messagePairs!: HistoryEntityStore<
+        MessagePairEntity
+    >;
 
     constructor(
         backend: StorageBackend,
@@ -142,7 +147,12 @@ export class BackedDbAdapter
         return view;
     }
 
-    #buildStores(run: TxRunner): DbStores {
+    // Returns the concrete store so the class field keeps
+    // `getAll`; `DbStores` stays the view's type, and a
+    // view never sees the whole-plane read.
+    #buildStores(run: TxRunner): {
+        messagePairs: HistoryEntityStore<MessagePairEntity>;
+    } {
         return {
             messagePairs: new HistoryEntityStore(
                 'message_pairs', run, validateMessagePairEntity,

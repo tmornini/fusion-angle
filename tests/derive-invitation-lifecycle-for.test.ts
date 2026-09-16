@@ -18,15 +18,13 @@ import {
     compareIdentifiers,
 } from '../shared/identifier.ts';
 
-// The Phase 14 Task 1 core: invitationLifecycleStatesFor is the
-// ENTITY-SCOPED sibling of deriveInvitationStates — INDEXED
-// getAllWhere reads (name for the grant/document message pair,
-// path per op document) restricted to ONE known invitation
-// id, rather than the whole-collection + whole-ledger scans the
-// multi-invitation reader needs to DISCOVER every id. This file
-// proves it byte-identical to deriveInvitationStates's own
-// per-entity subset. No write path reads this core yet — Task 1
-// flips nothing.
+// invitationLifecycleStatesFor reads ONE invitation document's
+// own PUT history (api/derive-states.ts) — the grant's 'pending'
+// PUT, then the terminal PUT — via getDocumentHistory, rather
+// than the whole-collection scan deriveInvitationStates needs
+// to DISCOVER every id. This file proves it byte-identical to
+// deriveInvitationStates's own per-entity subset over the same
+// three live lifecycles plus pending and never-granted.
 
 function req(
     method: string,
@@ -87,7 +85,9 @@ async () => {
     const scoped = await invitationLifecycleStatesFor(db, id);
     assertStrictEquals(scoped.length, 1);
     assertStrictEquals(scoped[0]!.state, 'pending');
-    assertStrictEquals(scoped[0]!.id, grantEventId);
+    assertStrictEquals(
+        scoped[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
+    );
     assertEquals(scoped, await bulkRowsFor(db, id));
 });
 
@@ -190,12 +190,11 @@ Deno.test('invitationLifecycleStatesFor: a never-granted id derives'
     );
 });
 
-// -- the phantom-echo exclusion (finding 1: "Document existence --
-// -- is the grant proof") ----------------------------------------
+// -- the phantom-echo id: no document, so no rows ------------------
 
 Deno.test('invitationLifecycleStatesFor: a duplicate-grant\'s'
-+ ' PHANTOM echo id (an operation message pair with no document)'
-+ ' derives an EMPTY array — never a false \'pending\' row',
++ ' echo id (no document ever written there) derives an EMPTY'
++ ' array — structurally, not by cross-reference',
 async () => {
     const db = await seededDb();
     const freshId = generateIdentifier();
@@ -203,8 +202,9 @@ async () => {
 
     // A second grant for the SAME (org, identity) pair, submitted
     // with a DIFFERENT invitationId — the 'existing' outcome:
-    // 200, but no document at the submitted id (grantInvitation's
-    // own header).
+    // 200, but grantInvitation never PUTs a document at this id
+    // (only the 'fresh' branch does), so there is structurally
+    // nothing to read here — never a false 'pending' row.
     const echoId = generateIdentifier();
     const admin = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,

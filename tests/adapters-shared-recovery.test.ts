@@ -58,13 +58,13 @@ import {
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
 import {
-    deriveIdentityTokens,
+    deriveIdentityTokensFor,
 } from '../api/derive-identity-tokens.ts';
 import {
     apiRequest,
     refreshTokenFromSetCookie,
 } from './http-fixtures.ts';
-import { seedIdentityPii } from './identity-fixtures.ts';
+import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
     postInvitationAcceptance,
 } from '../web-app/app/adapters/invitations.ts';
@@ -291,8 +291,9 @@ Deno.test('concurrent 401s share exactly one refresh grant',
     assert(Array.isArray(members));
     assert(Array.isArray(organizations));
     // exactly ONE rotation event: the refresh jti was spent once
-    const rotations = (await deriveIdentityTokens(db))
-        .filter(row => row.action === 'rotated');
+    const rotations = (await deriveIdentityTokensFor(
+        db, 'XXZruirZyAOoRpNxaDnpSA',
+    )).filter(row => row.action === 'rotated');
     assertStrictEquals(rotations.length, 1);
     // the session survived (nothing was branded reuse)
     assertNotStrictEquals(getSessionCredentials(), null);
@@ -491,7 +492,7 @@ Deno.test('a concurrent facade refresh and remint present'
         db, ORGANIZATION_B, wayneAdmin, 'admin',
         '2026-06-04T00:00:00.000000Z',
     );
-    await seedIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA', {
+    await seedPersonIdentity(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Tony', email: 'demo@example.com',
         phone: '', bio: '',
     });
@@ -538,8 +539,9 @@ Deno.test('a concurrent facade refresh and remint present'
     assert(Array.isArray(members));
     // Assert on `revoked`, not `rotated`: the loser was a
     // replay, so the rotation count was already one.
-    const revoked = (await deriveIdentityTokens(db))
-        .filter(row => row.action === 'revoked');
+    const revoked = (await deriveIdentityTokensFor(
+        db, 'XXZruirZyAOoRpNxaDnpSA',
+    )).filter(row => row.action === 'revoked');
     assertStrictEquals(revoked.length, 0);
     assertNotStrictEquals(getSessionCredentials(), null);
 }));

@@ -16,8 +16,10 @@ import { deriveInvitations } from
     '../api/derive-invitations.ts';
 import { deriveOrganizations } from
     '../api/derive-organizations.ts';
-import { deriveDocumentsAt } from
-    '../api/derive-documents.ts';
+import {
+    deriveDocumentsAt,
+    documentMessagePairsAt,
+} from '../api/derive-documents.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
@@ -368,7 +370,7 @@ async () => {
     assertStrictEquals(
         (await invitationLifecycleStatesFor(db, INV_IDEM)).length, 1,
     );
-    // Event carries the caller-supplied at.
+    // The pending row is the grant's own document PUT.
     const life = await invitationLifecycleStatesFor(
         db, INV_IDEM,
     );
@@ -378,8 +380,14 @@ async () => {
             : a.id < b.id ? -1
             : a.id > b.id ? 1 : 0,
     ).at(-1)!;
-    assertStrictEquals(ev.at, GRANT_AT);
-    assertStrictEquals(ev.id, EV_G_IDEM);
+    const [grantPut] = documentMessagePairsAt(
+        await db.messagePairs.getDocumentHistory(
+            '/invitations/', INV_IDEM,
+        ),
+        '/invitations/',
+    );
+    assertStrictEquals(ev.id, grantPut!.id);
+    assertStrictEquals(ev.at, grantPut!.at);
 });
 
 Deno.test('accept: replay of fixed body is a no-op (two events total)',
@@ -419,7 +427,7 @@ async () => {
         (await invitationLifecycleStatesFor(db
             , 'hasVDnGjEylAnJDTPjnZuQ')).length, 2,
     );
-    // Event carries the caller-supplied at.
+    // The accepted row is the terminal PUT's own pair.
     const life = await invitationLifecycleStatesFor(
         db, 'hasVDnGjEylAnJDTPjnZuQ',
     );
@@ -429,8 +437,14 @@ async () => {
             : a.id < b.id ? -1
             : a.id > b.id ? 1 : 0,
     ).at(-1)!;
-    assertStrictEquals(ev.at, ACCEPT_AT);
-    assertStrictEquals(ev.id, EV_A_IDEM);
+    const terminalPut = documentMessagePairsAt(
+        await db.messagePairs.getDocumentHistory(
+            '/invitations/', 'hasVDnGjEylAnJDTPjnZuQ',
+        ),
+        '/invitations/',
+    ).at(-1)!;
+    assertStrictEquals(ev.id, terminalPut.id);
+    assertStrictEquals(ev.at, terminalPut.at);
     assertStrictEquals(ev.member_id, 'toccYYkLEABmlbpHJalgtQ');
 });
 
@@ -470,7 +484,7 @@ async () => {
         (await invitationLifecycleStatesFor(db
             , 'hlmIVMfGBbdTSoChNYsQkQ')).length, 2,
     );
-    // Event carries the caller-supplied at.
+    // The declined row is the terminal PUT's own pair.
     const life = await invitationLifecycleStatesFor(
         db, 'hlmIVMfGBbdTSoChNYsQkQ',
     );
@@ -480,8 +494,14 @@ async () => {
             : a.id < b.id ? -1
             : a.id > b.id ? 1 : 0,
     ).at(-1)!;
-    assertStrictEquals(ev.at, DECLINE_AT);
-    assertStrictEquals(ev.id, EV_D_IDEM);
+    const terminalPut = documentMessagePairsAt(
+        await db.messagePairs.getDocumentHistory(
+            '/invitations/', 'hlmIVMfGBbdTSoChNYsQkQ',
+        ),
+        '/invitations/',
+    ).at(-1)!;
+    assertStrictEquals(ev.id, terminalPut.id);
+    assertStrictEquals(ev.at, terminalPut.at);
 });
 
 Deno.test('revoke: replay of fixed body is a no-op (two events total)',
@@ -518,7 +538,7 @@ async () => {
         (await invitationLifecycleStatesFor(db
             , 'itekPiJIBiPQhcZveiqTKw')).length, 2,
     );
-    // Event carries the caller-supplied at.
+    // The revoked row is the terminal PUT's own pair.
     const life = await invitationLifecycleStatesFor(
         db, 'itekPiJIBiPQhcZveiqTKw',
     );
@@ -528,8 +548,14 @@ async () => {
             : a.id < b.id ? -1
             : a.id > b.id ? 1 : 0,
     ).at(-1)!;
-    assertStrictEquals(ev.at, REVOKE_AT);
-    assertStrictEquals(ev.id, EV_R_IDEM);
+    const terminalPut = documentMessagePairsAt(
+        await db.messagePairs.getDocumentHistory(
+            '/invitations/', 'itekPiJIBiPQhcZveiqTKw',
+        ),
+        '/invitations/',
+    ).at(-1)!;
+    assertStrictEquals(ev.id, terminalPut.id);
+    assertStrictEquals(ev.at, terminalPut.at);
     assertStrictEquals(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 

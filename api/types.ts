@@ -418,8 +418,8 @@ export interface StateEntity {
 // (GET work-orders/:id/history). Folded from transition pair
 // bodies — no state_event_id on the wire (the parent event
 // already carries id). Distinct from StateFieldValueEntity,
-// which still carries state_event_id for the RESTRICT
-// referrer derive (deriveStateFieldValueReferrers).
+// which still carries state_event_id for the transition-body
+// validator and the seed's legacy trace bags.
 export interface TransitionFieldValueEntity {
     id: Id;
     attribute_id: Id;
@@ -1341,6 +1341,11 @@ export interface InvitationEntity {
     // Same name on this entity and on that versions row,
     // different facts.
     at: string;
+    // The document's head IS the lifecycle: the grant PUTs
+    // 'pending'; accept, decline, and revoke each PUT the
+    // same document again with the terminal state (spec
+    // 2026-09-15 exact-read folds § 2). Required, never null.
+    state: InvitationState;
 }
 
 export interface IdeaSubmissionEntity {

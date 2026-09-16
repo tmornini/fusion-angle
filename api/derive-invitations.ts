@@ -1,54 +1,30 @@
 import type { DbAdapter } from './db.ts';
-import type { Id, InvitationState } from './types.ts';
+import {
+    assertInvitationState,
+    type Id,
+    type InvitationState,
+} from './types.ts';
 import { pickString } from './validators.ts';
 import { canonicalPath } from './message-pair.ts';
 import {
     deriveDocumentsAt,
     byIdAscending,
+    type DerivedDocument,
 } from './derive-documents.ts';
 
-// The invitation family's own reduction over the message
-// ledger — the roster phase's LAST derivation before the
-// readers flip (Task 8). The invitation ROW comes from the
-// grant's document head at the flat '/invitations/' path
-// (ONE keyed getAllWhere read per store — deriveDocumentsAt);
-// its STATE comes from a SEPARATE reduction this module owns,
-// since an invitation's lifecycle never rides the document
-// (Decision 6 would require a trio the wire body has
-// no room for — the invitations side channel forms its
-// operation message pairs at 'invitations/:id/acceptance' etc,
-// api/invitations-domain.ts's formInvitationOperationMessagePair).
-//
-// E13 FULL-SCAN NAMED CLASS: no index can serve "every pair
-// whose path has the shape /invitations/<id>/<op>/"
-// for an arbitrary id, so invitationOpStates below reads
-// db.messagePairs.getAll() — ONE full table scan, regardless of how
-// many invitations exist. Grown alongside every future
-// full-ledger scan; its measured cost is recorded at the
-// Task 9 CLI leg, not here.
-//
-// Mutual exclusivity of the three op states is the domain
-// gate's own covenant (grantInvitation/acceptInvitation/
-// declineInvitation/revokeInvitation each require 'pending' to
-// succeed; a conflict appends nothing), never re-derived here —
-// an id can accumulate repeat pairs of only ONE op kind.
+// The invitation family's reduction over the message ledger.
+// An invitation is ONE document: `path = /invitations/`,
+// `name = <id>`, body = organization_id, identity_id, at,
+// state. The grant PUTs it 'pending'; accept, decline, and
+// revoke each PUT it again with the terminal state
+// (api/invitations-domain.ts). The head IS the state: the
+// list is one collection read, one invitation is one
+// document read — no op-prefix scan, no whole-ledger read
+// (spec 2026-09-15 exact-read folds § 2).
 
 const INVITATIONS_PREFIX = canonicalPath(
     undefined, '/invitations/',
 );
-
-const OP_STATES: Readonly<Record<string, InvitationState>> = {
-    acceptance: 'accepted',
-    decline: 'declined',
-    revocation: 'revoked',
-};
-
-const OP_PATH_PATTERN =
-    /^\/invitations\/([^/]+)\/(acceptance|decline|revocation)\/$/;
-
-const INVITATION_OP_KINDS = [
-    'acceptance', 'decline', 'revocation',
-] as const;
 
 export interface DerivedInvitationRow {
     readonly id: Id;
@@ -58,60 +34,24 @@ export interface DerivedInvitationRow {
     readonly state: InvitationState;
 }
 
-// The E13 full-scan: every invitation id that has EVER reached
-// a terminal/answering op, mapped to the state that op proves.
-// 409s append nothing (the domain gate's own guard), so scanning
-// pairs — never a status filter — is sound: every pair found
-// here IS a genuine 2xx.
-async function invitationOpStates(
-    db: DbAdapter,
-): Promise<Map<Id, InvitationState>> {
-    const states = new Map<Id, InvitationState>();
-    for (const messagePair of await db.messagePairs.getAll()) {
-        const match = OP_PATH_PATTERN.exec(
-            messagePair.path,
-        );
-        if (match === null) continue;
-        const state = OP_STATES[match[2]!];
-        if (state === undefined) continue;
-        states.set(match[1]!, state);
-    }
-    return states;
+function invitationRowOf(
+    document: DerivedDocument,
+): DerivedInvitationRow {
+    return {
+        id: document.name,
+        organization_id: pickString(
+            document.body, 'organization_id',
+        ),
+        identity_id: pickString(document.body, 'identity_id'),
+        at: pickString(document.body, 'at'),
+        state: assertInvitationState(
+            pickString(document.body, 'state'),
+            'invitation ' + document.name,
+        ),
+    };
 }
 
-// ENTITY-SCOPED sibling of invitationOpStates above (Phase 14
-// Task 1): the SAME OP_STATES mutual-exclusivity covenant,
-// restricted to ONE known invitation id via three INDEXED
-// getCollectionPairs reads (one per op kind) rather
-// than the whole-ledger db.messagePairs.getAll() invitationOpStates
-// needs to DISCOVER every invitation's own op prefix out of an
-// unknown set of ids. dbOrView-shaped and opens no nested
-// transaction — callable from WITHIN an already-open write-gate
-// transaction (currentInvitationState's own accept/decline/
-// revoke in-tx reads, api/invitations-domain.ts — a LATER task
-// wires the call site; this task lands the core alone).
-// undefined means no terminal op has landed yet — the invitation
-// is still 'pending' (or the id names no invitation at all), a
-// distinction only a caller that already knows the id is genuine
-// can resolve.
-export async function invitationOpStateFor(
-    dbOrView: DbAdapter,
-    id: Id,
-): Promise<InvitationState | undefined> {
-    for (const op of INVITATION_OP_KINDS) {
-        const prefix = canonicalPath(
-            undefined, '/invitations/' + id + '/' + op + '/',
-        );
-        const rows = await dbOrView.messagePairs.getCollectionPairs(prefix,
-        );
-        if (rows.length > 0) return OP_STATES[op];
-    }
-    return undefined;
-}
-
-// Reads db.messagePairs ONLY. invitationsForInvitee and
-// sentInvitations derive their rows + state through this; the
-// enrichment joins (organization/pii) stay old-plane reads.
+// The collection read: every live invitation head, id-lex.
 export async function deriveInvitations(
     db: DbAdapter,
 ): Promise<DerivedInvitationRow[]> {
@@ -121,20 +61,28 @@ export async function deriveInvitations(
     const documents = deriveDocumentsAt(
         messagePairs, INVITATIONS_PREFIX,
     );
-    const opStates = await invitationOpStates(db);
     const rows: DerivedInvitationRow[] = [];
-    for (const [id, document] of documents) {
-        rows.push({
-            id,
-            organization_id: pickString(
-                document.body, 'organization_id',
-            ),
-            identity_id: pickString(
-                document.body, 'identity_id',
-            ),
-            at: pickString(document.body, 'at'),
-            state: opStates.get(id) ?? 'pending',
-        });
+    for (const document of documents.values()) {
+        rows.push(invitationRowOf(document));
     }
     return rows.sort(byIdAscending);
+}
+
+// The document read: one invitation's head, or undefined
+// when no document was ever written at this id. dbOrView-
+// shaped and opens no nested transaction — callable from
+// within an open write-gate transaction.
+export async function deriveInvitation(
+    dbOrView: DbAdapter,
+    id: Id,
+): Promise<DerivedInvitationRow | undefined> {
+    const history = await dbOrView.messagePairs.getDocumentHistory(
+        INVITATIONS_PREFIX, id,
+    );
+    const document = deriveDocumentsAt(
+        history, INVITATIONS_PREFIX,
+    ).get(id);
+    return document === undefined
+        ? undefined
+        : invitationRowOf(document);
 }

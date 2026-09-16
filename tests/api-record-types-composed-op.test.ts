@@ -12,7 +12,6 @@ import {
 } from '../api/db-memory.ts';
 import {
     handleRequest,
-    PUT,
 } from '../api/api.ts';
 import {
     organizationToken,
@@ -20,15 +19,6 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
-import {
-    postWorkOrderTransitionOp,
-} from '../api/routes.ts';
-import { formWriteMessagePair } from '../api/message-pair.ts';
-import {
-    SYSTEM_MEMBER_ID,
-} from '../api/types.ts';
-import { STARK_ORGANIZATION } from
-    '../api/mock-data/seed-constants.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
@@ -45,9 +35,7 @@ const COLLECTION =
     '/organizations/' + ORGANIZATION + '/record-types/';
 const TYPE_ID = generateIdentifier();
 const ATTR_ID = generateIdentifier();
-const WORK_ORDER_ID = generateIdentifier();
-const TRANSITION_EVENT_ID = generateIdentifier();
-const FIELD_VALUE_ID = generateIdentifier();
+const INSTANCE_ID = generateIdentifier();
 const FORGED_ORGANIZATION = generateIdentifier();
 const DETAIL = COLLECTION + TYPE_ID;
 const ATTR_DETAIL =
@@ -157,65 +145,19 @@ function editBody(
     };
 }
 
-async function seedFieldValueReferrer(
+// A live instance head under the composed type whose values
+// name `attributeId` — the fourth RESTRICT leg (spec
+// 2026-09-15 § 4: values live on the instance document).
+async function seedInstanceReferrer(
     db: MemoryDbAdapter,
     token: string,
     attributeId: string,
 ): Promise<void> {
-    await PUT(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + WORK_ORDER_ID, {
-            display_id: 'rfv1',
-            flow_graph: {
-                name: 'Restrict FV',
-                lockTimeout: 0,
-                nodes: [],
-                edges: [],
-            },
-            position: 1,
-        },
-        token,
-    );
-    // Task 8 CUT: legacy fieldValues is below-gate only
-    // (stored SFV referrer for RESTRICT; not the live wire).
-    const body: Record<string, unknown> = {
-        transitionEventId: TRANSITION_EVENT_ID,
-        targetState: generateIdentifier(),
-        fieldValues: [{
-            id: FIELD_VALUE_ID,
-            fields: {
-                state_event_id: TRANSITION_EVENT_ID,
-                attribute_id: attributeId,
-                value: 'High',
-            },
-        }],
-        release: null,
-        transitionAt: AT,
-    };
-    const pathSegments = [
-        'organizations', STARK_ORGANIZATION,
-        'work-orders', WORK_ORDER_ID, 'transition',
-    ];
-    const pattern = 'organizations/:id/work-orders/:id/transition';
-    const messagePair = await formWriteMessagePair({
-        method: 'POST',
-        pathname: '/' + pathSegments.join('/'),
-        routePattern: pattern,
-        routeSegments: pattern.split('/'),
-        pathSegments,
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: AT,
-        organization: STARK_ORGANIZATION,
-        responseStatus: 204,
-        responseBody: undefined,
-        operationId: generateIdentifier(),
-    });
-    await postWorkOrderTransitionOp(
-        db, WORK_ORDER_ID, body, SYSTEM_MEMBER_ID,
-        undefined, [], messagePair,
-    );
+    const patch = await handleRequest(db, req(
+        'PATCH', DETAIL + '/instances/' + INSTANCE_ID, token,
+        { set: [{ attribute_id: attributeId, value: 'High' }] },
+    ));
+    assertStrictEquals(patch.status, 201);
 }
 
 Deno.test('POST .../record-types kind create (admin) → 204; '
@@ -298,7 +240,7 @@ async () => {
         createBody(TYPE_ID, ATTR_ID, 'Asset'),
     ));
     assertStrictEquals(create.status, 201);
-    await seedFieldValueReferrer(
+    await seedInstanceReferrer(
         db, adminToken, ATTR_ID,
     );
 
@@ -310,7 +252,7 @@ async () => {
     ));
     assertStrictEquals(edit.status, 409);
     const err = await edit.json() as { error: string };
-    assertMatch(err.error, /1 state field value/);
+    assertMatch(err.error, /instance\(s\)/);
 
     const typeGet = await handleRequest(db, req(
         'GET', DETAIL, adminToken,
