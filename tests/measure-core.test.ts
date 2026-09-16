@@ -266,8 +266,22 @@ Deno.test('statsForPage trims extremes on readyMs', () => {
     const s = statsForPage(runs);
     assertStrictEquals(s.readyMs.min, 3);
     assertStrictEquals(s.readyMs.max, 18);
-    // 3..18 (16 values, even): (10+11)/BBjWJsjYIDkTRKIIPrzWRw = 10.5
+    // 3..18 (16 values, even): (10+11)/2 = 10.5
     assertStrictEquals(s.readyMs.median, 10.5);
+});
+
+Deno.test('statsForPage mean and sigma on trimmed set', () => {
+    // n=8 → drop 1 each tail → [4,4,4,5,5,7]
+    // mean = 29/6; sample σ = √(41/30)
+    const runs: PageRun[] = [2, 4, 4, 4, 5, 5, 7, 9].map(
+        (readyMs) => ({ readyMs, phases: {} }),
+    );
+    const s = statsForPage(runs);
+    assert(Math.abs(s.readyMs.mean - 29 / 6) < 1e-12);
+    assert(
+        Math.abs(s.readyMs.sigma - Math.sqrt(41 / 30))
+            < 1e-12,
+    );
 });
 
 // --- compareBudgets ---
@@ -280,6 +294,8 @@ function page(
             min: medianReady,
             median: medianReady,
             max: medianReady,
+            mean: medianReady,
+            sigma: 0,
         },
         phases: {},
     };
@@ -377,7 +393,7 @@ Deno.test('compareBudgets lists every offender', () => {
 
 // --- shapeHistoryLine ---
 
-Deno.test('shapeHistoryLine maps median stats', () => {
+Deno.test('shapeHistoryLine maps median stats and spread', () => {
     const line = shapeHistoryLine({
         at: '2026-07-12T00:00:00.000Z',
         sha: 'abc123',
@@ -394,6 +410,8 @@ Deno.test('shapeHistoryLine maps median stats', () => {
                     min: 80,
                     median: 100,
                     max: 140,
+                    mean: 104,
+                    sigma: 22,
                 },
                 phases: {
                     'boot:db-open': 12,
@@ -405,6 +423,8 @@ Deno.test('shapeHistoryLine maps median stats', () => {
                     min: 200,
                     median: 250,
                     max: 300,
+                    mean: 250,
+                    sigma: 40,
                 },
                 phases: {},
             },
@@ -421,10 +441,22 @@ Deno.test('shapeHistoryLine maps median stats', () => {
                 'boot:db-open': 12,
                 fetch: 40,
             },
+            spread: {
+                min: 80,
+                max: 140,
+                mean: 104,
+                sigma: 22,
+            },
         },
         ideas: {
             readyMs: 250,
             phases: {},
+            spread: {
+                min: 200,
+                max: 300,
+                mean: 250,
+                sigma: 40,
+            },
         },
     });
 });
@@ -438,6 +470,8 @@ Deno.test('formatReport includes page names and numbers', () => {
                 min: 200,
                 median: 250,
                 max: 300,
+                mean: 250,
+                sigma: 40,
             },
             phases: { fetch: 80 },
         },
@@ -446,6 +480,8 @@ Deno.test('formatReport includes page names and numbers', () => {
                 min: 80,
                 median: 100,
                 max: 140,
+                mean: 104,
+                sigma: 22,
             },
             phases: { 'boot:db-open': 12 },
         },

@@ -707,6 +707,39 @@ Off the critical path; each with its oracle.
   `measure-viz.ts:986`, whose `|| ''` is itself the
   default-value sin. Oracle: a row with no `cpuModel`
   key renders without the separator.
+- The measure visualizer's client mirrors have no test
+  binding them to the core. `vizClientScript()`
+  (`web-app/app/measure-viz.ts`) hand-transcribes
+  seventeen `measure-viz-core.ts` exports —
+  `rollupPhases`, `meanReadyMs`, `systemDeltaMs`,
+  `pageCandle`, `systemCandle`, `trendAxisMax`, and
+  their siblings — because the page is one file that
+  opens from disk and imports nothing (measure-candles
+  design § Pure core). Each pair was verified by reading
+  at review; nothing turns red when a core body changes
+  and its mirror does not. One `Deno.test` that
+  evaluates the template string in a `Function` scope
+  and runs every mirrored function against the core on
+  shared fixtures closes it, codebase-wide. Oracle: a
+  one-character change to any mirrored body in
+  `vizClientScript()` turns that test red.
+- A trend candle's box can overtop its whisker.
+  `trendAxisMax` (`web-app/app/measure-viz-core.ts`)
+  takes each point's median, its candle's max, and the
+  budget, never mean + σ (measure-candles plan,
+  Interpretation E), so a left-skewed trimmed set —
+  `[1, 10, 10, 10, 10]`: mean 8.2, sample σ ≈ 4.0,
+  mean + σ ≈ 12.2 > max 10 — puts the box top above the
+  plot's top pad, where the SVG clips it. The plan's
+  reasoning that nineteen trimmed samples keep the box
+  inside the whiskers is not true in general; page
+  loads are right-skewed, so it is rare, and it is
+  cosmetic. The fix is a spec amendment, not a client
+  patch: `trendAxisMax` also takes mean + σ and the
+  axis grows, or the box clamps to the whisker and the
+  mark says less. Oracle: a `Deno.test` on the box
+  geometry under that fixture, asserting the box top
+  never rises above the whisker top, red today.
 - Stale-history comment cleanup as one pass — comments
   still describe a past state as present. Sampled:
   `web-app/app/measure-cli.ts` names a Node harness;

@@ -31,6 +31,9 @@ import {
     budgetPressure,
     meanPhaseBuckets,
     systemMetrics,
+    pageCandle,
+    systemCandle,
+    trendAxisMax,
     MEASURE_BOOT_PAGE_INIT,
     VIZ_PAYLOAD_VERSION,
 } from '../web-app/app/measure-viz-core.ts';
@@ -164,6 +167,96 @@ Deno.test('parseHistoryJsonl bad line includes line number', () => {
         () => parseHistoryJsonl(text),
     ) as Error;
     assertMatch(err.message, /line 2/i);
+});
+
+function twoLinesSecondSpread(spread: unknown): string {
+    const good = sampleSweep('2026-01-01T00:00:00.000Z', {
+        dashboard: { readyMs: 100, phases: {} },
+    });
+    const bad = {
+        ...sampleSweep('2026-01-02T00:00:00.000Z', {}),
+        pages: {
+            dashboard: { readyMs: 100, phases: {}, spread },
+        },
+    };
+    return `${JSON.stringify(good)}\n${JSON.stringify(bad)}\n`;
+}
+
+Deno.test('parseHistoryJsonl accepts a page without spread', () => {
+    const a = sampleSweep('2026-01-01T00:00:00.000Z', {
+        dashboard: { readyMs: 100, phases: {} },
+    });
+    const lines = parseHistoryJsonl(JSON.stringify(a) + '\n');
+    assertStrictEquals(
+        lines[0]!.pages.dashboard!.spread,
+        undefined,
+    );
+});
+
+Deno.test('parseHistoryJsonl accepts a valid spread', () => {
+    const a = sampleSweep('2026-01-01T00:00:00.000Z', {
+        dashboard: {
+            readyMs: 357,
+            phases: {},
+            spread: {
+                min: 331, max: 402, mean: 361.2, sigma: 19.8,
+            },
+        },
+    });
+    const lines = parseHistoryJsonl(JSON.stringify(a) + '\n');
+    assertEquals(lines[0]!.pages.dashboard!.spread, {
+        min: 331,
+        max: 402,
+        mean: 361.2,
+        sigma: 19.8,
+    });
+});
+
+Deno.test('parseHistoryJsonl rejects sigma below zero', () => {
+    const err = assertThrows(
+        () => parseHistoryJsonl(twoLinesSecondSpread({
+            min: 1, max: 2, mean: 1.5, sigma: -0.1,
+        })),
+    ) as Error;
+    assertMatch(err.message, /line 2/);
+    assertMatch(err.message, /invalid shape/);
+});
+
+Deno.test('parseHistoryJsonl rejects min above max', () => {
+    const err = assertThrows(
+        () => parseHistoryJsonl(twoLinesSecondSpread({
+            min: 3, max: 2, mean: 2.5, sigma: 0.5,
+        })),
+    ) as Error;
+    assertMatch(err.message, /line 2/);
+    assertMatch(err.message, /invalid shape/);
+});
+
+Deno.test('parseHistoryJsonl rejects a non-number spread field', () => {
+    const err = assertThrows(
+        () => parseHistoryJsonl(twoLinesSecondSpread({
+            min: 1, max: 2, mean: 'x', sigma: 0.5,
+        })),
+    ) as Error;
+    assertMatch(err.message, /line 2/);
+    assertMatch(err.message, /invalid shape/);
+});
+
+Deno.test('parseHistoryJsonl rejects a non-object page', () => {
+    const good = sampleSweep('2026-01-01T00:00:00.000Z', {
+        dashboard: { readyMs: 100, phases: {} },
+    });
+    const bad = {
+        ...sampleSweep('2026-01-02T00:00:00.000Z', {}),
+        pages: { dashboard: null },
+    };
+    const err = assertThrows(
+        () => parseHistoryJsonl(
+            `${JSON.stringify(good)}\n${JSON.stringify(bad)}\n`,
+        ),
+    ) as Error;
+    assertMatch(err.message, /line 2/);
+    assertMatch(err.message, /invalid shape/);
 });
 
 // --- parseBudgetsJson ---
@@ -787,4 +880,111 @@ Deno.test('systemMetrics composes window metrics', () => {
     assertStrictEquals(m.systemDeltaMs, 250);
     assertStrictEquals(m.overBudget, 2);
     assert(m.budgetP50 !== null);
+});
+
+// --- candles ---
+
+Deno.test('pageCandle null without spread', () => {
+    assertStrictEquals(
+        pageCandle({ readyMs: 100, phases: {} }),
+        null,
+    );
+});
+
+Deno.test('pageCandle carries spread and median', () => {
+    assertEquals(
+        pageCandle({
+            readyMs: 357,
+            phases: {},
+            spread: {
+                min: 331, max: 402, mean: 361.2, sigma: 19.8,
+            },
+        }),
+        {
+            min: 331,
+            max: 402,
+            mean: 361.2,
+            sigma: 19.8,
+            median: 357,
+        },
+    );
+});
+
+Deno.test('systemCandle averages page spreads', () => {
+    const s = sampleSweep('t', {
+        a: {
+            readyMs: 100,
+            phases: {},
+            spread: { min: 80, max: 140, mean: 104, sigma: 20 },
+        },
+        b: {
+            readyMs: 300,
+            phases: {},
+            spread: { min: 200, max: 400, mean: 296, sigma: 40 },
+        },
+    });
+    assertEquals(systemCandle(s), {
+        min: 140,
+        max: 270,
+        mean: 200,
+        sigma: 30,
+        median: 200,
+    });
+    assertStrictEquals(systemCandle(s)!.median, meanReadyMs(s));
+});
+
+Deno.test('systemCandle null when any page lacks spread', () => {
+    const s = sampleSweep('t', {
+        a: {
+            readyMs: 100,
+            phases: {},
+            spread: { min: 80, max: 140, mean: 104, sigma: 20 },
+        },
+        b: { readyMs: 300, phases: {} },
+    });
+    assertStrictEquals(systemCandle(s), null);
+});
+
+Deno.test('systemCandle null for a sweep with no pages', () => {
+    assertStrictEquals(
+        systemCandle(sampleSweep('t', {})),
+        null,
+    );
+});
+
+Deno.test('trendAxisMax is the largest of y, candle max, budget', () => {
+    const candle = {
+        min: 90, max: 700, mean: 300, sigma: 50, median: 280,
+    };
+    const points = [
+        { y: 280, candle },
+        { y: 500, candle: null },
+    ];
+    // candle max above every y
+    assertStrictEquals(trendAxisMax(points, null), 700);
+    // budget above everything
+    assertStrictEquals(trendAxisMax(points, 900), 900);
+    // y above candle and budget
+    assertStrictEquals(
+        trendAxisMax(
+            [{ y: 800, candle }, { y: 500, candle: null }],
+            600,
+        ),
+        800,
+    );
+});
+
+Deno.test('trendAxisMax floors at 1', () => {
+    assertStrictEquals(
+        trendAxisMax([{ y: 0, candle: null }], null),
+        1,
+    );
+    assertStrictEquals(trendAxisMax([], null), 1);
+});
+
+Deno.test('trendAxisMax keeps a maximum below one', () => {
+    assertStrictEquals(
+        trendAxisMax([{ y: 0.5, candle: null }], null),
+        0.5,
+    );
 });
