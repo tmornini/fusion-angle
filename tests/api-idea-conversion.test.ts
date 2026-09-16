@@ -4,8 +4,6 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { deriveProjectStateHistory } from
-    '../api/derive-projects.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -124,7 +122,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 
 Deno.test(
     'POST organizations/:id/ideas/:id/conversion writes the project, the'
-    + ' promoted idea, two events, and N baselines in one'
+    + ' promoted idea, two documents, and N baselines in one'
     + ' operation',
     async () => {
         const db = await seededDb();
@@ -159,11 +157,13 @@ Deno.test(
         const project = await GET<{
             title: string;
             organization_id: string;
+            state: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN);
         assertStrictEquals(project.title, 'Promoted Project');
         // The fence stamped the bound org — never the body.
         assertStrictEquals(project.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
+        assertStrictEquals(project.state, 'submitted');
 
         // The idea moved to 'promoted', authored by the actor.
         // bare per-entity current-state alias RETIRED
@@ -180,12 +180,14 @@ Deno.test(
 
         // The new project entered at its initial state, also
         // authored by the actor.
-        const projectEvents = await deriveProjectStateHistory(db
-            , 'AjdvjuECVZEgZoFajaIEkg', 'pnXmXrxOWayANgDLdCjuBw');
-        assertStrictEquals(projectEvents.length, 1);
-        assertStrictEquals(projectEvents[0]!.state, 'submitted');
+        const projectVersions = await GET<{
+            state: string;
+            member_id: string;
+        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + 'pnXmXrxOWayANgDLdCjuBw/versions/', DEV_TOKEN);
+        assertStrictEquals(projectVersions.length, 1);
         assertStrictEquals(
-            projectEvents[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
+            projectVersions[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
         );
 
         const mine = await GET<

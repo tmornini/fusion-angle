@@ -4,8 +4,6 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { deriveRecordTypeStateHistory } from
-    '../api/derive-record-types.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -228,9 +226,8 @@ Deno.test(
 );
 
 Deno.test(
-    'postRecordStateChange records a new event'
-    + ' without changing non-lifecycle entity fields'
-    + ' on GET',
+    'postRecordStateChange changes state without'
+    + ' changing entity fields on GET',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -261,10 +258,6 @@ Deno.test(
             ctx, 'rbfHGatkwQzGZJVXKJEeyw',
         );
         assertStrictEquals(model.stateValue(), 'archived');
-        const events = await deriveRecordTypeStateHistory(
-            db, 'AjdvjuECVZEgZoFajaIEkg', 'rbfHGatkwQzGZJVXKJEeyw',
-        );
-        assertStrictEquals(events.at(-1)?.state, 'archived');
     },
 );
 
@@ -327,42 +320,6 @@ Deno.test(
         assert(
             !ids.includes('fndCYAsXazdzMUlEGMNIZw'),
             'idea must not leak into records',
-        );
-    },
-);
-
-Deno.test(
-    'state events for records land in the unified'
-    + ' states log',
-    async () => {
-        const db = memoryDbAdapter();
-        await seedAdminSchema(db);
-        await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await organizationToken());
-        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
-            kind: 'create',
-            record: {
-                name: 'X',
-                description: '',
-                position: 1,
-            },
-            attributes: [],
-            initialState: 'active',
-        });
-        const sRqRSyldQDFbqkDYSObDqw = await getRecord(ctx
-            , 'rbfHGatkwQzGZJVXKJEeyw');
-        await postRecordStateChange(
-            ctx, sRqRSyldQDFbqkDYSObDqw, 'archived',
-        );
-        const events = await deriveRecordTypeStateHistory(db
-            , 'AjdvjuECVZEgZoFajaIEkg',
-            'rbfHGatkwQzGZJVXKJEeyw',
-        );
-        const values = events
-            .map(e => e.state)
-            .sort();
-        assertEquals(
-            values, ['active', 'archived'],
         );
     },
 );

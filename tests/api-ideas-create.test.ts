@@ -153,7 +153,7 @@ Deno.test(
 // second event.
 Deno.test(
     'a byte-identical resend of a genesis PUT converges:'
-    + ' one idea, one genesis event, one pair',
+    + ' one idea, one pair',
     async () => {
         const db = await freshDb();
         const body = ideaGenesisBody(
@@ -177,13 +177,6 @@ Deno.test(
             pairIdOf(second),
             pairIdOf(first),
         );
-        const { deriveIdeaStateHistory } = await import(
-            '../api/derive-ideas.ts'
-        );
-        const events = await deriveIdeaStateHistory(
-            db, 'AjdvjuECVZEgZoFajaIEkg', 'hJeymLqQwgpIHWgKlcHWNA',
-        );
-        assertStrictEquals(events.length, 1);
         assertStrictEquals((await db.messagePairs.getAll()).length, 3);
         assertStrictEquals((await db.messagePairs.getAll()).length, 3);
     },

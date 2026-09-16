@@ -4,9 +4,6 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { deriveProjectStateHistory } from
-    '../api/derive-projects.ts';
-
 import {
     createRequestContext,
     type RequestContext,
@@ -351,9 +348,8 @@ Deno.test(
 );
 
 Deno.test(
-    'postProjectStateChange records a state event'
-    + ' without changing non-lifecycle entity fields'
-    + ' on GET',
+    'postProjectStateChange changes state without'
+    + ' changing entity fields on GET',
     async () => {
         const { db, ctx } = await adminContext();
         await seedCurrentMember(db);
@@ -374,21 +370,14 @@ Deno.test(
         );
 
         const after = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-        // Entity content fields unchanged; GET trio advances
-        // to the transition event (lifecycle-current stamp).
+        // Entity content fields unchanged; GET reflects the
+        // transition.
         assertStrictEquals(after.title, before.title);
         assertStrictEquals(after.position, before.position);
         assertStrictEquals(
             after.description, before.description,
         );
         assertStrictEquals(after.state, 'archived');
-        const events = await deriveProjectStateHistory(db
-            , 'AjdvjuECVZEgZoFajaIEkg', 'pnXmXrxOWayANgDLdCjuBw');
-        // genesis + transition
-        assertStrictEquals(events.length, 2);
-        assertStrictEquals(
-            events.at(-1)?.state, 'archived',
-        );
     },
 );
 

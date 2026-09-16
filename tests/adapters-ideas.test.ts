@@ -3,10 +3,6 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { deriveIdeaStateHistory } from
-    '../api/derive-ideas.ts';
-import { deriveProjectStateHistory } from
-    '../api/derive-projects.ts';
 import {
     createRequestContext,
     type RequestContext,
@@ -22,6 +18,8 @@ import {
     postIdeaStateChange,
     postIdeaConversion,
 } from '../web-app/app/adapters/ideas.ts';
+import { getProjectEntity } from
+    '../web-app/app/adapters/projects.ts';
 import {
     type IdeaEntity,
     type IdeaState,
@@ -228,8 +226,8 @@ Deno.test('archived ideas are filtered from getIdeas', async () => {
 });
 
 Deno.test(
-    'postIdeaCreation persists via GET and'
-    + ' records the initial state event',
+    'postIdeaCreation persists via GET with the'
+    + ' initial state',
     async () => {
         const { db, ctx } = await adminContext();
         await seedHumanMember(
@@ -247,21 +245,13 @@ Deno.test(
 
         const row = await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw');
         assertStrictEquals(row.title, 'Fresh');
-        const events =
-            await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
-                , 'fndCYAsXazdzMUlEGMNIZw');
-        assertStrictEquals(events.length, 1);
-        assertStrictEquals(
-            events[0]?.state,
-            'active',
-        );
+        assertStrictEquals(row.state, 'active');
     },
 );
 
 Deno.test(
-    'postIdeaStateChange records a state event'
-    + ' without changing non-lifecycle entity fields'
-    + ' on GET',
+    'postIdeaStateChange changes state without'
+    + ' changing entity fields on GET',
     async () => {
         const { db, ctx } = await adminContext();
         await seedHumanMember(
@@ -276,8 +266,8 @@ Deno.test(
         );
 
         const after = await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw');
-        // Entity content fields unchanged; GET trio advances
-        // to the transition event (lifecycle-current stamp).
+        // Entity content fields unchanged; GET reflects the
+        // transition.
         assertStrictEquals(after.title, before.title);
         assertStrictEquals(after.position, before.position);
         assertStrictEquals(
@@ -285,21 +275,12 @@ Deno.test(
             before.problem_statement,
         );
         assertStrictEquals(after.state, 'approved');
-        const events =
-            await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
-                , 'fndCYAsXazdzMUlEGMNIZw');
-        // genesis + transition
-        assertStrictEquals(events.length, 2);
-        assertStrictEquals(
-            events.at(-1)?.state, 'approved',
-        );
     },
 );
 
 Deno.test(
     'postIdeaConversion commits project, idea,'
-    + ' two state events, and N baseline rows in'
-    + ' one atomic batch',
+    + ' and N baseline rows in one atomic batch',
     async () => {
         const { db, ctx } = await adminContext();
         await seedHumanMember(
@@ -347,20 +328,15 @@ Deno.test(
         );
         assertStrictEquals(project.title, 'P1');
 
-        const ideaEvents =
-            await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
-                , 'fndCYAsXazdzMUlEGMNIZw');
-        assertStrictEquals(
-            ideaEvents.at(-1)?.state, 'promoted',
+        const idea = await getIdeaEntity(
+            ctx, 'fndCYAsXazdzMUlEGMNIZw',
         );
+        assertStrictEquals(idea.state, 'promoted');
 
-        const projectEvents =
-            await deriveProjectStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
-                , 'pnXmXrxOWayANgDLdCjuBw');
-        assertStrictEquals(projectEvents.length, 1);
-        assertStrictEquals(
-            projectEvents[0]?.state, 'submitted',
+        const promotedProject = await getProjectEntity(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );
+        assertStrictEquals(promotedProject.state, 'submitted');
 
         const mine =
             await ctx.GET<
