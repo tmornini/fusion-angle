@@ -13,8 +13,6 @@ import {
     type RequestContext,
     organizationCollection,
     organizationItem,
-    withLifecycleTrio,
-    withLifecycleTrios,
 } from './shared.ts';
 import {
     createSubscriptionChannel,
@@ -42,11 +40,8 @@ export function notifyObjectiveChange(): void {
 export async function getObjectives(
     ctx: RequestContext,
 ): Promise<ObjectiveEntity[]> {
-    return withLifecycleTrios(
-        ctx, 'objectives',
-        await ctx.GET<ObjectiveEntity[]>(
-            organizationCollection(ctx, 'objectives'),
-        ),
+    return ctx.GET<ObjectiveEntity[]>(
+        organizationCollection(ctx, 'objectives'),
     );
 }
 
@@ -54,11 +49,8 @@ export async function getObjective(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<ObjectiveEntity> {
-    return withLifecycleTrio(
-        ctx, 'objectives',
-        await ctx.GET<ObjectiveEntity>(
-            organizationItem(ctx, 'objectives', id),
-        ),
+    return ctx.GET<ObjectiveEntity>(
+        organizationItem(ctx, 'objectives', id),
     );
 }
 

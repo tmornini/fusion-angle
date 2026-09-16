@@ -16,8 +16,6 @@ import type { RequestContext } from './shared.ts';
 import {
     organizationCollection,
     organizationItem,
-    withLifecycleTrio,
-    withLifecycleTrios,
 } from './shared.ts';
 import {
     getCurrentHumanMember,
@@ -61,11 +59,8 @@ export {
 export async function getIdeaEntities(
     ctx: RequestContext,
 ): Promise<IdeaEntity[]> {
-    return withLifecycleTrios(
-        ctx, 'ideas',
-        await ctx.GET<IdeaEntity[]>(
-            organizationCollection(ctx, 'ideas'),
-        ),
+    return ctx.GET<IdeaEntity[]>(
+        organizationCollection(ctx, 'ideas'),
     );
 }
 
@@ -73,11 +68,8 @@ export async function getIdeaEntity(
     ctx: RequestContext,
     id: string,
 ): Promise<IdeaEntity> {
-    return withLifecycleTrio(
-        ctx, 'ideas',
-        await ctx.GET<IdeaEntity>(
-            organizationItem(ctx, 'ideas', id),
-        ),
+    return ctx.GET<IdeaEntity>(
+        organizationItem(ctx, 'ideas', id),
     );
 }
 

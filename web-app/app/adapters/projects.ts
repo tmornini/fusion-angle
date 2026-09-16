@@ -17,8 +17,6 @@ import type { RequestContext } from './shared.ts';
 import {
     organizationCollection,
     organizationItem,
-    withLifecycleTrio,
-    withLifecycleTrios,
 } from './shared.ts';
 import {
     createSubscriptionChannel,
@@ -56,11 +54,8 @@ export {
 export async function getProjectEntities(
     ctx: RequestContext,
 ): Promise<ProjectEntity[]> {
-    return withLifecycleTrios(
-        ctx, 'projects',
-        await ctx.GET<ProjectEntity[]>(
-            organizationCollection(ctx, 'projects'),
-        ),
+    return ctx.GET<ProjectEntity[]>(
+        organizationCollection(ctx, 'projects'),
     );
 }
 
@@ -236,11 +231,8 @@ export async function getProjectEntity(
     ctx: RequestContext,
     id: string,
 ): Promise<ProjectEntity> {
-    return withLifecycleTrio(
-        ctx, 'projects',
-        await ctx.GET<ProjectEntity>(
-            organizationItem(ctx, 'projects', id),
-        ),
+    return ctx.GET<ProjectEntity>(
+        organizationItem(ctx, 'projects', id),
     );
 }
 
