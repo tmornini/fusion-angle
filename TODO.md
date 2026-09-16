@@ -578,13 +578,17 @@ Off the critical path; each with its oracle.
   `tests/ideas-empty-subscribe.test.ts:190-203`, and the
   "idle tab ignores a peer refresh broadcast" check in
   `tests/adapters-refresh-mutex.test.ts:153-155`. A late
-  delivery can only pass them wrongly, never fail them,
-  so they never flake but prove less than they read as
-  proving; the ideas comment still says its drain matches
-  the post-bell assert, which 90f5c722 turned into a
-  deadline wait. Oracle: each check reads after a signal
-  that the delivery was processed — a render count on the
-  host stub for the two page tests, a second listener on
+  delivery can only pass them wrongly, never fail them —
+  but this branch saw `tests/ideas-empty-subscribe.test.ts`
+  fail three times under `--parallel` (the file itself
+  untouched; `BroadcastChannel` is process-global) and
+  `tests/adapters-flow-stats.test.ts` fail once, so the
+  fixed count still proves less than it reads as proving;
+  the ideas comment still says its drain matches the
+  post-bell assert, which 90f5c722 turned into a deadline
+  wait. Oracle: each check reads after a signal that the
+  delivery was processed — a render count on the host
+  stub for the two page tests, a second listener on
   `fusion-angle:refresh` for the mutex test — and no
   fixed-count drain remains at those three sites.
 - Objective lifecycle history compares two clocks:
@@ -1519,7 +1523,7 @@ Off the critical path; each with its oracle.
   Oracle: `./test-browser` green on two machines
 - `schema-svg.ts`'s `parseStores` still carries a dead
   `StateStore`-matching branch
-  (`web-app/app/schema-svg.ts:156-162`): it can never
+  (`web-app/app/schema-svg.ts:157-162`): it can never
   match now that `DbStores` holds only `messagePairs`,
   so it has drawn nothing since that field left.
   Oracle: `./test schema` green with the dead branch
@@ -1527,13 +1531,29 @@ Off the critical path; each with its oracle.
 - `/members/` parents on the document plane are still
   resolved by a full-history reduction,
   `resolveViaMembershipPairPlane`
-  (`api/derive-states.ts:222-245`), which walks
+  (`api/derive-states.ts:221-244`), which walks
   `getDocumentHistory` and reduces it through
   `deriveDocumentsAt` rather than reading the head
   alone; a C4 tombstone comment at
-  `api/derive-states.ts:1872-1873` still narrates a
+  `api/derive-states.ts:1871-1872` still narrates a
   retired `/members/` document-trio history. Oracle:
   the parent resolves from the head body alone.
+- Collection reads in `api/document-family.ts:575` and
+  `api/derive-record-types.ts:54` call
+  `db.messagePairs.getCollectionHeadPairs` directly,
+  while per-id reads go through
+  `messageStore(db).getDocumentHead`; a
+  `MessageStore.getCollectionHeads` seam would put the
+  tombstone decision in one layer. Oracle: both reads
+  go through the store seam, `./test validate` and
+  `./test postgres` green.
+- `documentLifecycleEvents`
+  (`api/derive-documents.ts:190`) keeps an
+  `if (messagePair.method === DELETE_METHOD) continue`
+  guard that no live test pins and no flow route can
+  reach — flows' `:id` route has get and put only.
+  Oracle: delete the guard, or pin it with a
+  flow-shaped fixture.
 
 ## Sequencing
 
