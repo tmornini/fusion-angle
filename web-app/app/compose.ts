@@ -232,7 +232,7 @@ function copyApiDocumentationRooms(): void {
     for (const name of [...Deno.readDirSync(src)].map((e) => e.name)) {
         if (
             name === 'index.html'
-            || name === 'index.ts'
+            || name.endsWith('.ts')
         ) {
             continue;
         }
