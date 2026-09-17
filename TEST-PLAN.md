@@ -1295,17 +1295,25 @@ the second organization.
 
 ### Landing Page (`landing/`)
 
-- [ ] **B1** Page renders with marketing hero content, feature sections, and call-to-action buttons, and stays. Wait ~3 seconds. PASS: still on `landing/index.html`. No hop to dashboard.
+- [ ] **B1** Page renders the hero ("Ideas are easy.
+  Execution is hard."), the stalls paragraph, the
+  five-step pipeline, the roadmap block labelled
+  "Roadmap, shaped with pilots", the three safety
+  cards, and the pilot section, and stays. Wait ~3
+  seconds. PASS: still on `landing/index.html`.
   Pin: tests/landing-stay.test.ts 'landing does not
-       shove to dashboard'; exploratory — the rendered
-       hero/feature/CTA content and the live
-       3-second stay
-- [ ] **B2** "Start Free Trial" (hero CTA) and "Get Started" (navbar CTA) are present and navigate to `auth/index.html`. PASS: buttons exist with correct target.
-  Drive the CTAs (`[data-goto-auth]`), never
-  `.navbar-logo` — a screenshot-xy click on the
-  landing brand is the Apple menu.
-  Pin: exploratory — the live buttons and their
-       navigation target
+       shove to dashboard'; tests/browser/landing.test.ts
+       'unsigned landing stays, books, and signs in'
+- [ ] **B2** "Book a pilot call" appears four times
+  (navbar, mobile menu, hero, pilot section) as
+  anchors carrying `data-book-pilot` whose `href` is
+  the scheduling URL; "See how it works" scrolls to
+  `#how-it-works`. PASS: the four hrefs match and the
+  anchor scrolls. Do not click a `data-book-pilot`
+  anchor in the walk: it leaves the origin. Drive by
+  selector, never `.navbar-logo` (Apple menu).
+  Pin: tests/browser/landing.test.ts 'unsigned landing
+       stays, books, and signs in'
 - [ ] **B3** "Sign In" button is present and navigates to `auth/index.html`. PASS: button exists with correct target.
   Drive `[data-goto-auth]`, never `.navbar-logo`
   (Apple menu; same as B2).
