@@ -1404,12 +1404,16 @@ the second organization.
        the body' (the server side of the same grant);
        exploratory — a literal reload specifically,
        as opposed to a brand-new tab
-- [ ] **B19** With no session, open each public page in turn — `landing/`, `auth/`, `not-found/`, `design-system/`. PASS: each renders normally with NO redirect to `auth`.
+- [ ] **B19** With no session, open each public page in turn — `landing/`, `auth/`, `not-found/`, `design-system/`, `api-documentation/`. PASS: each renders normally with NO redirect to `auth`.
   Pin: tests/page-registry.test.ts 'public pages are
        auth-exempt only' (decides `landing`, `auth`,
-       `not-found`, and `design-system` all carry
-       `requiresAuth: false`); exploratory — the live
-       render of each with no redirect
+       `not-found`, `design-system`, and
+       `api-documentation` all carry
+       `requiresAuth: false`);
+       tests/browser/api-documentation.test.ts
+       'api-documentation boots the elevation';
+       exploratory — the live render of each with no
+       redirect
 - [ ] **B20** After signing in, close the tab, then reopen `dashboard/index.html` in a new tab in the **same** cookie jar. PASS: still authenticated — no bounce (the HttpOnly `refresh_token` cookie is shared by the jar; boot cookie-refreshes).
   Pin: tests/browser/two-jars.test.ts 'two tabs share
        the cookie; sign-out in one bounces the other'
@@ -1556,6 +1560,12 @@ the second organization.
   both live on the Members page.)
   Pin: exploratory — the rendered order and
        styling of the 12 links
+- [ ] **C2a** Open API from the sidebar. PASS: the
+  elevation SVG is visible in `#api-elevation`. Click
+  a filled circle. PASS: `#api-room h1` is visible and
+  non-empty; the pane is not blank.
+  Pin: tests/browser/api-documentation.test.ts
+       'circle click paints a room'
 - [ ] **C3** Header shows search bar, company
   stats as structured tiles (org name as a
   `header-stat-label`, then per-stat value +
