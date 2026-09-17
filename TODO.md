@@ -285,6 +285,11 @@ Off the critical path; each with its oracle.
 
 ## Later work
 
+- The auth page's left panel shows invented stats —
+  "10K+ Active Users", "98% Satisfaction", "50+
+  Integrations" (`web-app/auth/index.ts:141-169`,
+  TEST-PLAN B5). Same sin as the landing mock-up;
+  its own spec.
 - One gate for the write. Ninety-six `appendMessagePairOnce`
   sites and six `appendMessagePairAlways` sites, 73 of them in
   `api/routes.ts`, because each handler owns its own storage
@@ -817,11 +822,6 @@ Off the critical path; each with its oracle.
     and deliberately no `data-edge-id`, which is what
     keeps it non-interactive (AA30) — Layer 1, a render
     test over `web-app/app/flow-graph.ts:869-882`
-  - The landing CTAs carrying `[data-goto-auth]` and
-    navigating to `auth/index.html` on click (B2, B3) —
-    Layer 2, a browser test on `web-app/landing/`;
-    `tests/landing-stay.test.ts` finds the string in the
-    page source but ties it to no element
   - The auth form's client-side validation messages —
     "Email is required", "Please enter a valid email
     address", "Password must be at least 6 characters"
