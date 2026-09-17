@@ -4703,17 +4703,22 @@ export const routes: Route[] = [
             )(db, p, actor, organization, roles) as {
                 id: string;
             }[];
-            const out: unknown[] = [];
-            for (const row of rows) {
-                const bind = await workOrderBindingFor(
+            const binds = await Promise.all(
+                rows.map(row => workOrderBindingFor(
                     db, org, row.id,
-                );
+                )),
+            );
+            const out: unknown[] = [];
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i]!;
+                const bind = binds[i]!;
                 out.push({
                     ...row,
                     ...(bind === null
                         ? {}
                         : {
-                            instance_id: bind.instanceId,
+                            instance_id:
+                                bind.instanceId,
                             record_type_id:
                                 bind.recordTypeId,
                         }),

@@ -54,13 +54,27 @@ export class PostgresBackend implements StorageBackend {
         this.#sql = sql;
     }
 
+    async read<R>(
+        fn: (tx: Tx) => Promise<R>,
+    ): Promise<R> {
+        try {
+            return await fn(
+                postgresTx(this.#sql, 'readonly', false),
+            );
+        } catch (error) {
+            throw mapPostgresError(error);
+        }
+    }
+
     async transaction<R>(
         mode: TxMode,
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R> {
         try {
             return await this.#sql.begin(
-                (sql) => fn(postgresTx(sql, mode)),
+                (sql) => fn(
+                    postgresTx(sql, mode, true),
+                ),
             );
         } catch (error) {
             throw mapPostgresError(error);
@@ -111,10 +125,13 @@ export class PostgresBackend implements StorageBackend {
     }
 }
 
+// Lock methods need an open transaction. Standalone
+// read passes false; transaction() passes true.
 function postgresTx(
     sql: SqlClient,
     mode: TxMode,
-): PostgresTx {
+    coordination: boolean,
+): Tx {
     const assertWritable = (): void => {
         if (mode === 'readonly') {
             throw new Error(
@@ -198,24 +215,48 @@ function postgresTx(
             );
             return insertPair(sql, written);
         },
-        async lockRequest(hash: string): Promise<void> {
-            await advisoryLock(sql, 'fusion.dedup.' + hash);
-        },
-        async lockDocument(
-            path: string,
-            name: string,
-        ): Promise<void> {
-            await advisoryLock(
-                sql, 'fusion.document.' + path + name,
-            );
-        },
-        async lockHead(id: string): Promise<void> {
-            await sql.query`
-                SELECT id FROM message_pairs
-                WHERE id = ${uuidTextOfIdentifier(id)}
-                FOR UPDATE
-            `;
-        },
+        ...(coordination
+            ? {
+                async lockRequest(
+                    hash: string,
+                ): Promise<void> {
+                    await advisoryLock(
+                        sql, 'fusion.dedup.' + hash,
+                    );
+                },
+                async lockDocument(
+                    path: string,
+                    name: string,
+                ): Promise<void> {
+                    await advisoryLock(
+                        sql,
+                        'fusion.document.' + path + name,
+                    );
+                },
+                async lockHead(
+                    id: string,
+                ): Promise<void> {
+                    await sql.query`
+                        SELECT id FROM message_pairs
+                        WHERE id = ${
+                            uuidTextOfIdentifier(id)
+                        }
+                        FOR UPDATE
+                    `;
+                },
+                async notify(
+                    event: NotificationEvent,
+                ): Promise<void> {
+                    const payload = notifyPayload(event);
+                    await sql.query`
+                        SELECT pg_notify(
+                            ${FUSION_EVENTS_CHANNEL},
+                            ${payload}
+                        )
+                    `;
+                },
+            }
+            : {}),
         async getHead(
             path: string,
             name: string,
@@ -232,17 +273,6 @@ function postgresTx(
                 id: identifierOfUuidText(row.id),
                 method: row.method,
             };
-        },
-        async notify(
-            event: NotificationEvent,
-        ): Promise<void> {
-            const payload = notifyPayload(event);
-            await sql.query`
-                SELECT pg_notify(
-                    ${FUSION_EVENTS_CHANNEL},
-                    ${payload}
-                )
-            `;
         },
     };
 }

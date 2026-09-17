@@ -170,21 +170,20 @@ export function fieldValuesByEventFromHistory(
 
 /* ── Per-item history fan-in ────────── */
 
-// Parallel GET work-orders/:id/history for each live
+// Parallel GET work-orders/:id/history for each given
 // work-order. Same Map shape as the retired bulk door.
 export async function getWorkOrderHistories(
     ctx: RequestContext,
+    orders: readonly { readonly id: Id }[],
 ): Promise<Map<Id, WorkOrderHistoryEventEntity[]>> {
-    const orders = await ctx.GET<{ id: Id }[]>(
-        organizationCollection(ctx, 'work-orders'),
-    );
     const pairs = await Promise.all(
         orders.map(async (row) => {
             const history = await ctx.GET<
                 WorkOrderHistoryEventEntity[]
             >(
-                organizationItem(ctx, 'work-orders', row.id)
-                    + '/history',
+                organizationItem(
+                    ctx, 'work-orders', row.id,
+                ) + '/history',
             );
             return [row.id, history] as const;
         }),
@@ -201,7 +200,12 @@ export async function getActiveClaimsByWorkOrder(
     ctx: RequestContext,
     lockTimeoutByWorkOrder: ReadonlyMap<Id, number>,
 ): Promise<Map<Id, { memberId: Id; at: string }>> {
-    const histories = await getWorkOrderHistories(ctx);
+    const histories = await getWorkOrderHistories(
+        ctx,
+        [...lockTimeoutByWorkOrder.keys()].map(
+            id => ({ id }),
+        ),
+    );
     const out = new Map<
         Id, { memberId: Id; at: string }
     >();
@@ -267,7 +271,12 @@ export function projectTransitions(
 export async function getTransitionEventsByWorkOrder(
     ctx: RequestContext,
 ): Promise<Map<Id, TransitionEvent[]>> {
-    const histories = await getWorkOrderHistories(ctx);
+    const orders = await ctx.GET<{ id: Id }[]>(
+        organizationCollection(ctx, 'work-orders'),
+    );
+    const histories = await getWorkOrderHistories(
+        ctx, orders,
+    );
     const out = new Map<Id, TransitionEvent[]>();
     for (const [entityId, history] of histories) {
         const events = projectTransitions(

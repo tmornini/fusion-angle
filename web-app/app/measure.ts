@@ -354,17 +354,24 @@ async function measurePage(
 // ── Main ──────
 
 async function main(): Promise<void> {
-    // Deno.env.toObject() is forbidden under a scoped
-    // --allow-env, so name every variable read here.
-    const measureEnv: MeasureEnv = {
-        MEASURE_PASSWORD: Deno.env.get('MEASURE_PASSWORD'),
-        POSTGRES_URL: Deno.env.get('POSTGRES_URL'),
-        JWT_HMAC_SIGNING_KEY: Deno.env.get(
-            'JWT_HMAC_SIGNING_KEY',
-        ),
-    };
+    // Help and bare --visualize read no env. Name
+    // every later get: toObject() is forbidden
+    // under a scoped --allow-env.
+    const argv = Deno.args;
+    const askingHelp = argv.includes('--help')
+        || argv.includes('-h');
+    const measureEnv: MeasureEnv = (
+        !askingHelp
+        && argv.includes('--base-url')
+    )
+        ? {
+            MEASURE_PASSWORD: Deno.env.get(
+                'MEASURE_PASSWORD',
+            ),
+        }
+        : {};
     const parsed = parseMeasureArgv(
-        Deno.args,
+        argv,
         measureEnv,
     );
     if (parsed.kind === 'help') {
@@ -419,9 +426,12 @@ async function main(): Promise<void> {
 
     let localServe: MeasureServeEnv | null = null;
     if (needsLocalMeasureServer(cli)) {
-        const serveEnv = readMeasureServeEnv(
-            measureEnv,
-        );
+        const serveEnv = readMeasureServeEnv({
+            POSTGRES_URL: Deno.env.get('POSTGRES_URL'),
+            JWT_HMAC_SIGNING_KEY: Deno.env.get(
+                'JWT_HMAC_SIGNING_KEY',
+            ),
+        });
         if (serveEnv.kind === 'error') {
             throw new Error(serveEnv.message);
         }

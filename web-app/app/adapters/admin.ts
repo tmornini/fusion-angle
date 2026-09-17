@@ -1,6 +1,8 @@
-import type {
-    OrganizationEntity,
-    MembershipEntity,
+import {
+    ideaIsVisible,
+    assertIdeaState,
+    type OrganizationEntity,
+    type MembershipEntity,
 } from '../../../api/types.ts';
 import {
     getOrganization as fetchOrganization,
@@ -12,7 +14,7 @@ import {
     type RequestContext,
 } from './shared.ts';
 import { getProjects } from './projects.ts';
-import { getIdeas } from './ideas.ts';
+import { getIdeaEntities } from './ideas.ts';
 import { getHumanMembers } from './members.ts';
 
 export type {
@@ -101,20 +103,30 @@ export class Organization {
     }
 }
 
+export async function getOrganizationSeats(
+    ctx: RequestContext,
+): Promise<MembershipEntity[]> {
+    const organization = ctx.identity.organization
+        ?? ctx.identity.organizations?.[0];
+    if (organization === undefined) {
+        return [];
+    }
+    return ctx.GET<MembershipEntity[]>(
+        'organizations/' + organization
+            + '/members/',
+    );
+}
+
 // Derive seat usage from the memberships ledger.
 // The read is org-fenced through the org-owned fence —
 // so the count is the active org's slice.
 async function deriveOrganizationFacts(
     ctx: RequestContext,
+    seatsP?: Promise<readonly MembershipEntity[]>,
 ): Promise<OrganizationDerived> {
-    const organization = ctx.identity.organization
-        ?? ctx.identity.organizations?.[0];
-    const seats = organization === undefined
-        ? []
-        : await ctx.GET<MembershipEntity[]>(
-            'organizations/' + organization
-                + '/members/',
-        );
+    const seats = seatsP !== undefined
+        ? await seatsP
+        : await getOrganizationSeats(ctx);
     const identities = new Set(
         seats.map(m => m.identity_id),
     );
@@ -125,10 +137,11 @@ async function deriveOrganizationFacts(
 
 export async function getOrganization(
     ctx: RequestContext,
+    seatsP?: Promise<readonly MembershipEntity[]>,
 ): Promise<Organization> {
     const [entity, derived] = await Promise.all([
         getOrganizationEntity(ctx),
-        deriveOrganizationFacts(ctx),
+        deriveOrganizationFacts(ctx, seatsP),
     ]);
     return new Organization(entity, derived);
 }
@@ -139,28 +152,38 @@ export interface OrganizationStats {
     activePeopleCount: number;
 }
 
-// Live counts computed from the source tables. The
-// state-log filters in getProjects / getIdeas /
-// getHumanMembers already drop deleted rows; we
-// further narrow projects to exclude 'declined',
-// ideas to exclude 'archived', and people to keep
-// only 'active'. The log is the truth — no stale
-// denormalized counter sits between this reader
-// and the entities it counts.
+// Live counts from the source collections. getProjects
+// drops deleted rows; we further exclude declined
+// projects, non-visible ideas, and (when seats are not
+// already in hand) count humans. The log is the truth —
+// no stale denormalized counter sits between this
+// reader and the entities it counts.
 export async function getOrganizationStats(
     ctx: RequestContext,
+    seatsP?: Promise<readonly MembershipEntity[]>,
 ): Promise<OrganizationStats> {
-    const [projects, ideas, humans] =
+    const [projects, ideaRows, activePeopleCount] =
         await Promise.all([
             getProjects(ctx),
-            getIdeas(ctx),
-            getHumanMembers(ctx),
+            getIdeaEntities(ctx),
+            seatsP !== undefined
+                ? seatsP.then(seats => new Set(
+                    seats.map(m => m.identity_id),
+                ).size)
+                : getHumanMembers(ctx).then(
+                    humans => humans.length,
+                ),
         ]);
     const projectsCurrent = projects.filter(
         p => p.stateValue() !== 'declined',
     ).length;
-    const ideasCurrent = ideas.length;
-    const activePeopleCount = humans.length;
+    const ideasCurrent = ideaRows.filter(row =>
+        ideaIsVisible(
+            assertIdeaState(
+                row.state, 'idea ' + row.id,
+            ),
+        ),
+    ).length;
     return {
         projectsCurrent,
         ideasCurrent,

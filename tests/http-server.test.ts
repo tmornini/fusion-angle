@@ -1,5 +1,6 @@
 import {
     assert,
+    assertEquals,
     assertMatch,
     assertNotMatch,
     assertStrictEquals,
@@ -23,8 +24,104 @@ import {
 import { fetchDiscardingBody } from
     './fixtures/fetch-discarding-body.ts';
 
+async function gzipBytes(
+    text: string,
+): Promise<Uint8Array> {
+    const source = new Blob([text]).stream()
+        .pipeThrough(
+            new CompressionStream('gzip'),
+        );
+    return new Uint8Array(
+        await new Response(source).arrayBuffer(),
+    );
+}
+
+function concatChunks(
+    chunks: readonly Uint8Array[],
+): Uint8Array {
+    let size = 0;
+    for (const chunk of chunks) size += chunk.byteLength;
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+    return bytes;
+}
+
+// Deno fetch decompresses gzip and injects Accept-Encoding
+// gzip,br, so a pin of sidecar bytes has to speak HTTP/1.1.
+async function rawRequest(
+    url: string,
+    method: string,
+    headers: Record<string, string>,
+): Promise<{
+    status: number;
+    header(name: string): string | null;
+    body: Uint8Array;
+}> {
+    const parsed = new URL(url);
+    const conn = await Deno.connect({
+        hostname: parsed.hostname,
+        port: Number(parsed.port),
+    });
+    try {
+        const lines = [
+            method + ' ' + parsed.pathname + ' HTTP/1.1',
+            'Host: ' + parsed.host,
+            'Connection: close',
+        ];
+        for (const [name, value] of Object.entries(headers)) {
+            lines.push(name + ': ' + value);
+        }
+        await conn.write(
+            new TextEncoder().encode(
+                lines.join('\r\n') + '\r\n\r\n',
+            ),
+        );
+        const chunks: Uint8Array[] = [];
+        const buf = new Uint8Array(8192);
+        for (;;) {
+            const n = await conn.read(buf);
+            if (n === null) break;
+            chunks.push(buf.slice(0, n));
+        }
+        const bytes = concatChunks(chunks);
+        const splitAt = new TextDecoder().decode(bytes)
+            .indexOf('\r\n\r\n');
+        if (splitAt === -1) {
+            throw new Error('no HTTP header terminator');
+        }
+        const head = new TextDecoder().decode(
+            bytes.slice(0, splitAt),
+        );
+        const body = bytes.slice(splitAt + 4);
+        const headerLines = head.split('\r\n');
+        const status = Number(
+            (headerLines[0] ?? '').split(' ')[1],
+        );
+        const parsedHeaders = new Headers();
+        for (const line of headerLines.slice(1)) {
+            const colon = line.indexOf(':');
+            if (colon === -1) continue;
+            parsedHeaders.append(
+                line.slice(0, colon).trim(),
+                line.slice(colon + 1).trim(),
+            );
+        }
+        return {
+            status,
+            header: (name) => parsedHeaders.get(name),
+            body,
+        };
+    } finally {
+        conn.close();
+    }
+}
+
 async function withServer(
-    files: Record<string, string>,
+    files: Record<string, string | Uint8Array>,
     handle: RequestHandler | undefined,
     run: (
         base: string,
@@ -42,7 +139,11 @@ async function withServer(
             await Deno.mkdir(join(path, '..'), {
                 recursive: true,
             });
-            await Deno.writeTextFile(path, body);
+            if (body instanceof Uint8Array) {
+                await Deno.writeFile(path, body);
+            } else {
+                await Deno.writeTextFile(path, body);
+            }
         }
         const options = {
             adapter: memoryDbAdapter(),
@@ -237,3 +338,162 @@ Deno.test('no web-app HTML carries a CSP meta; the server does',
         /Content-Security-Policy/,
     );
 });
+
+Deno.test(
+    'gzip sidecar is served when accepted',
+    async () => {
+        const body = 'console.log(1)';
+        const gz = await gzipBytes(body);
+        await withServer({
+            'assets/app.deadbeef.js': body,
+            'assets/app.deadbeef.js.gz': gz,
+        }, undefined, async (base) => {
+            const res = await rawRequest(
+                base + '/assets/app.deadbeef.js',
+                'GET',
+                { 'Accept-Encoding': 'gzip' },
+            );
+            assertStrictEquals(res.status, 200);
+            assertStrictEquals(
+                res.header('content-encoding'),
+                'gzip',
+            );
+            assertStrictEquals(
+                res.header('vary'),
+                'Accept-Encoding',
+            );
+            assertStrictEquals(
+                res.header('cache-control'),
+                HASHED_CACHE_CONTROL,
+            );
+            assertStrictEquals(
+                res.header('content-type')
+                    ?.startsWith(
+                        'text/javascript',
+                    )
+                    || res.header(
+                        'content-type',
+                    )?.includes('javascript'),
+                true,
+            );
+            assertStrictEquals(
+                res.header('content-length'),
+                String(gz.length),
+            );
+            assertEquals([...res.body], [...gz]);
+        });
+    },
+);
+
+Deno.test(
+    'identity body when gzip is not accepted',
+    async () => {
+        const body = 'console.log(1)';
+        const gz = await gzipBytes(body);
+        await withServer({
+            'assets/app.deadbeef.js': body,
+            'assets/app.deadbeef.js.gz': gz,
+        }, undefined, async (base) => {
+            const res = await fetch(
+                base + '/assets/app.deadbeef.js',
+                {
+                    headers: {
+                        'Accept-Encoding': 'identity',
+                    },
+                },
+            );
+            assertStrictEquals(res.status, 200);
+            assertStrictEquals(
+                res.headers.get('content-encoding'),
+                null,
+            );
+            assertStrictEquals(
+                res.headers.get('vary'),
+                'Accept-Encoding',
+            );
+            assertStrictEquals(
+                await res.text(), body,
+            );
+        });
+    },
+);
+
+Deno.test(
+    'HEAD reports the gzip Content-Length',
+    async () => {
+        const body = 'console.log(1)';
+        const gz = await gzipBytes(body);
+        await withServer({
+            'assets/app.deadbeef.js': body,
+            'assets/app.deadbeef.js.gz': gz,
+        }, undefined, async (base) => {
+            const res = await fetch(
+                base + '/assets/app.deadbeef.js',
+                {
+                    method: 'HEAD',
+                    headers: {
+                        'Accept-Encoding': 'gzip',
+                    },
+                },
+            );
+            assertStrictEquals(res.status, 200);
+            assertStrictEquals(
+                res.headers.get('content-encoding'),
+                'gzip',
+            );
+            assertStrictEquals(
+                res.headers.get('content-length'),
+                String(gz.length),
+            );
+            assertStrictEquals(
+                await res.text(), '',
+            );
+        });
+    },
+);
+
+Deno.test(
+    'gzip;q=0 does not accept the sidecar',
+    async () => {
+        const body = 'console.log(1)';
+        const gz = await gzipBytes(body);
+        await withServer({
+            'assets/app.deadbeef.js': body,
+            'assets/app.deadbeef.js.gz': gz,
+        }, undefined, async (base) => {
+            const res = await fetch(
+                base + '/assets/app.deadbeef.js',
+                {
+                    headers: {
+                        'Accept-Encoding': 'gzip;q=0',
+                    },
+                },
+            );
+            assertStrictEquals(res.status, 200);
+            assertStrictEquals(
+                res.headers.get('content-encoding'),
+                null,
+            );
+            assertStrictEquals(
+                await res.text(), body,
+            );
+        });
+    },
+);
+
+Deno.test(
+    'request path ending in .gz is 404',
+    async () => {
+        const body = 'console.log(1)';
+        const gz = await gzipBytes(body);
+        await withServer({
+            'assets/app.deadbeef.js': body,
+            'assets/app.deadbeef.js.gz': gz,
+        }, undefined, async (base) => {
+            const res = await fetchDiscardingBody(
+                base + '/assets/app.deadbeef.js.gz',
+            );
+            assertStrictEquals(res.status, HTTP_NOT_FOUND);
+        });
+    },
+);

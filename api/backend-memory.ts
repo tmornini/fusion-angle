@@ -29,6 +29,18 @@ export class MemoryStorageBackend
     // resolves. A throw skips the adoption, so the live
     // rows are byte-identical — rollback is "don't adopt",
     // never "undo".
+    async read<R>(
+        fn: (tx: Tx) => Promise<R>,
+    ): Promise<R> {
+        if (this.#rows === undefined) {
+            throw new MissingTableError(
+                'message_pairs',
+            );
+        }
+        const live = this.#rows;
+        return fn(bufferTx(live, 'readonly'));
+    }
+
     async transaction<R>(
         mode: TxMode,
         fn: (tx: Tx) => Promise<R>,

@@ -64,17 +64,30 @@ export function objectiveStateOf(
     );
 }
 
-// One bulk state read from GET rows: drag-reorder echoes
-// each id's current state.
-export async function getObjectiveStates(
-    ctx: RequestContext,
-): Promise<Map<ObjectiveId, ObjectiveState>> {
-    const rows = await getObjectives(ctx);
+export function objectiveStatesOf(
+    rows: readonly ObjectiveEntity[],
+): Map<ObjectiveId, ObjectiveState> {
     const out = new Map<ObjectiveId, ObjectiveState>();
     for (const row of rows) {
         out.set(row.id, objectiveStateOf(row));
     }
     return out;
+}
+
+export function activeObjectivesOf(
+    rows: readonly ObjectiveEntity[],
+): ObjectiveEntity[] {
+    return rows
+        .filter(o => o.state === 'active')
+        .sort((a, b) => a.position - b.position);
+}
+
+// One bulk state read from GET rows: drag-reorder echoes
+// each id's current state.
+export async function getObjectiveStates(
+    ctx: RequestContext,
+): Promise<Map<ObjectiveId, ObjectiveState>> {
+    return objectiveStatesOf(await getObjectives(ctx));
 }
 
 // Archived set from the GET-stamped state on each objective
@@ -267,10 +280,7 @@ export async function getCurrentObjectiveDefinitions(
 export async function getActiveObjectives(
     ctx: RequestContext,
 ): Promise<ObjectiveEntity[]> {
-    const all = await getObjectives(ctx);
-    return all
-        .filter(o => o.state === 'active')
-        .sort((a, b) => a.position - b.position);
+    return activeObjectivesOf(await getObjectives(ctx));
 }
 
 // The single-id form, for id-scoped gestures (e.g. the

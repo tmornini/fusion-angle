@@ -1,7 +1,10 @@
 import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
 import type {
-    Id, MembershipEntity, FormerSeatEntity,
+    Id,
+    MembershipEntity,
+    FormerSeatEntity,
+    OrganizationEntity,
 } from './types.ts';
 import {
     validateSeatDocumentBody,
@@ -30,8 +33,8 @@ import { latestByKey } from '../shared/ledger-reduction.ts';
 // (the seed's own 'XXZruirZyAOoRpNxaDnpSA', both STARK and ORGANIZATION_TWO).
 // deriveMembershipsForIdentity is therefore ENUMERATE-THEN-PROBE:
 // deriveOrganizations(db) (api/derive-organizations.ts) enumerates
-// every LIVE organization, then this walks each organization's
-// own '/organizations/<oid>/members/' prefix in turn —
+// every LIVE organization, then this probes each organization's
+// own '/organizations/<oid>/members/' prefix concurrently —
 // EXHAUSTIVE, never short-circuited, unlike
 // organizationHasMemberMessagePair's own co-membership
 // fast path (api/derive-states.ts): that
@@ -159,22 +162,45 @@ function byAtThenIdAscending<
 export async function deriveMembershipsForIdentity(
     db: DbAdapter,
     identityId: Id,
+    organizations?: readonly OrganizationEntity[],
 ): Promise<MembershipEntity[]> {
-    const organizations = await deriveOrganizations(db);
-    const rows: MembershipEntity[] = [];
-    for (const organization of organizations) {
-        const seatPrefix = seatsPrefixFor(organization.id);
-        const seatMessagePairs = await db.messagePairs.getCollectionPairs(
-            seatPrefix,
+    const run = async (
+        view: DbAdapter,
+        orgs: readonly OrganizationEntity[],
+    ): Promise<MembershipEntity[]> => {
+        const perSeat = await Promise.all(
+            orgs.map(async (organization) => {
+                const seatPrefix = seatsPrefixFor(
+                    organization.id,
+                );
+                const seatMessagePairs =
+                    await view.messagePairs
+                        .getCollectionPairs(
+                            seatPrefix,
+                        );
+                const seat = deriveDocumentsAt(
+                    seatMessagePairs, seatPrefix,
+                ).get(identityId);
+                return seat === undefined
+                    ? null
+                    : seatEntityOf(
+                        seat, organization.id,
+                    );
+            }),
         );
-        const seat = deriveDocumentsAt(
-            seatMessagePairs, seatPrefix,
-        ).get(identityId);
-        if (seat !== undefined) {
-            rows.push(seatEntityOf(seat, organization.id));
+        const rows: MembershipEntity[] = [];
+        for (const row of perSeat) {
+            if (row !== null) rows.push(row);
         }
+        return rows.sort(byAtThenIdAscending);
+    };
+    if (organizations !== undefined) {
+        return run(db, organizations);
     }
-    return rows.sort(byAtThenIdAscending);
+    return db.readTransaction(async (view) => {
+        const orgs = await deriveOrganizations(view);
+        return run(view, orgs);
+    });
 }
 
 // ONE organization's membership-presence probe, message-plane —

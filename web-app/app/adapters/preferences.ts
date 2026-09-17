@@ -52,6 +52,10 @@ function getStoredSidebarCollapsed(): boolean {
     );
 }
 
+function deletePreference(key: string): void {
+    localStorage.removeItem(key);
+}
+
 // Preference writes are non-critical:
 // theme and sidebar state are observable
 // fallbacks if persistence fails (the app
@@ -91,6 +95,7 @@ export type { StoredTheme };
 export {
     getPreference,
     putPreference,
+    deletePreference,
     getStoredTheme,
     getStoredSidebarCollapsed,
     isStoredTheme,

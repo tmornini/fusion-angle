@@ -44,6 +44,61 @@ const standalonePages = Object.entries(PAGE_REGISTRY)
 
 const PAGE_CSS_PLACEHOLDER = '        {{PAGE_CSS_LINKS}}\n';
 
+function manifestOf(
+    value: unknown,
+): Record<string, string> {
+    if (value === null
+        || typeof value !== 'object'
+        || Array.isArray(value)) {
+        throw new Error(
+            'asset-manifest.json is not an object',
+        );
+    }
+    const out: Record<string, string> = {};
+    for (const [key, val] of Object.entries(value)) {
+        if (typeof val !== 'string') {
+            throw new Error(
+                'asset-manifest.json values must be'
+                    + ' strings',
+            );
+        }
+        out[key] = val;
+    }
+    return out;
+}
+
+function readManifest(
+    outDir: string,
+): Record<string, string> {
+    const path = join(outDir, 'asset-manifest.json');
+    if (!exists(path)) return {};
+    return manifestOf(
+        JSON.parse(Deno.readTextFileSync(path)) as unknown,
+    );
+}
+
+function rewriteAssetRefs(
+    html: string,
+    manifest: Record<string, string>,
+): string {
+    let out = html;
+    const names = Object.keys(manifest)
+        .sort((a, b) => b.length - a.length);
+    for (const logical of names) {
+        const hashed = manifest[logical];
+        if (hashed === undefined) continue;
+        out = out.replaceAll(
+            '../assets/' + logical,
+            '../assets/' + hashed,
+        );
+        out = out.replaceAll(
+            'assets/' + logical,
+            'assets/' + hashed,
+        );
+    }
+    return out;
+}
+
 function buildPageCssLinks(
     bundles: string[] | undefined,
 ): string {
@@ -76,6 +131,7 @@ const COMPONENTS = [
 
 function compose(): void {
     const appDir = join(ROOT, 'app');
+    const manifest = readManifest(OUT);
 
     const allPages = [
             ...sidebarPages,
@@ -126,7 +182,10 @@ function compose(): void {
         if (!exists(outDir)) Deno.mkdirSync(outDir, { recursive: true });
 
         const outPath = join(outDir, `${sourceFile}.html`);
-        Deno.writeTextFileSync(outPath, html);
+        Deno.writeTextFileSync(
+            outPath,
+            rewriteAssetRefs(html, manifest),
+        );
     }
 
     console.log(`Composed ${sidebarPages.length} sidebar pages.`);
@@ -143,10 +202,22 @@ function compose(): void {
         const outDir = join(OUT, sourceDir);
         if (!exists(outDir)) Deno.mkdirSync(outDir, { recursive: true });
 
-        Deno.writeTextFileSync(join(outDir, `${sourceFile}.html`), html);
+        Deno.writeTextFileSync(
+            join(outDir, `${sourceFile}.html`),
+            rewriteAssetRefs(html, manifest),
+        );
     }
 
     console.log(`Composed ${standalonePages.length} standalone pages.`);
+
+    const rootIndex = join(OUT, 'index.html');
+    if (exists(rootIndex)) {
+        const html = Deno.readTextFileSync(rootIndex);
+        Deno.writeTextFileSync(
+            rootIndex,
+            rewriteAssetRefs(html, manifest),
+        );
+    }
 
     copyApiDocumentationRooms();
 }

@@ -1451,13 +1451,13 @@ Off the critical path; each with its oracle.
   'npm:' deno.json deno.lock` prints nothing;
   `./test-postgres` 52 passed; `./measure --check` green
   against the committed budgets.
-- Cachability — headers, `HEAD`, conditional
-  requests, and the rest; the brainstorm presents its
-  questions from most to least desirable. Start:
-  `server/http-server.ts` `NO_STORE` and
-  `CONTENT_SECURITY_POLICY`. Oracle: a measured
+- Cachability — hashed names and gzip sidecars have
+  shipped; `HEAD` reports the same `Content-Length` as
+  GET. Conditional requests (`If-None-Match` / `304`)
+  stay open. Start: `server/http-server.ts` `NO_STORE`
+  and `CONTENT_SECURITY_POLICY`. Oracle: a measured
   `./bin/measure` repeat-load delta naming the header
-  that earned it; hashed assets already carry
+  that earned it; hashed assets carry
   `HASHED_CACHE_CONTROL`.
 - Genericity — DRY, even once (the indulgence); spec
   away every nit. Merged: `putRecordInstance` PATCHes

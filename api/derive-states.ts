@@ -971,12 +971,14 @@ function replayWorkOrderOperations(
 // op, not a standalone event-append).
 interface WorkOrderClaimSources {
     readonly replayed: readonly StateEntity[];
+    readonly transitionMessagePairs:
+        readonly OperationMessagePair[];
 }
 
-// The reads + replay shared by workOrderLifecycleStatesFor and
-// workOrderClaimHistoryFor below, factored out so neither
-// duplicates the index reads or the replayWorkOrderOperations
-// call.
+// The reads + replay shared by workOrderLifecycleStatesFor,
+// workOrderClaimHistoryFor, and workOrderHistoryFor. History
+// consumes the transition pairs so it does not re-read that
+// prefix. Four independent reads run together; decode once.
 async function workOrderClaimSourcesFor(
     dbOrView: DbAdapter,
     organization: Id,
@@ -985,23 +987,44 @@ async function workOrderClaimSourcesFor(
     const collectionPrefix = canonicalPath(
         organization, '/work-orders/',
     );
-    const collectionMessagePairs =
-        await dbOrView.messagePairs.getDocumentHistory(
+    const claimPrefix = canonicalPath(
+        organization,
+        '/work-orders/' + workOrderId + '/claim/',
+    );
+    const releasePrefix = canonicalPath(
+        organization,
+        '/work-orders/' + workOrderId
+            + '/release/',
+    );
+    const transitionPrefix = canonicalPath(
+        organization,
+        '/work-orders/' + workOrderId
+            + '/transition/',
+    );
+    const [
+        collectionMessagePairs,
+        claimStored,
+        releaseStored,
+        transitionStored,
+    ] = await Promise.all([
+        dbOrView.messagePairs.getDocumentHistory(
             collectionPrefix, workOrderId,
-        );
+        ),
+        dbOrView.messagePairs.getCollectionPairs(
+            claimPrefix,
+        ),
+        dbOrView.messagePairs.getCollectionPairs(
+            releasePrefix,
+        ),
+        dbOrView.messagePairs.getCollectionPairs(
+            transitionPrefix,
+        ),
+    ]);
     const createMessagePairs = operationMessagePairsAt(
         collectionMessagePairs, collectionPrefix,
     );
     const entityMessagePairs = documentMessagePairsAt(
         collectionMessagePairs, collectionPrefix,
-    );
-
-    const claimPrefix = canonicalPath(
-        organization,
-        '/work-orders/' + workOrderId + '/claim/',
-    );
-    const claimStored = await dbOrView.messagePairs.getCollectionPairs(
-        claimPrefix,
     );
     const claimMessagePairs = operationMessagePairsAt(
         claimStored, claimPrefix, POST_OR_PUT,
@@ -1009,28 +1032,12 @@ async function workOrderClaimSourcesFor(
     const releaseDeletes = documentDeletesAsOperations(
         documentMessagePairsAt(claimStored, claimPrefix),
     );
-
-    const releasePrefix = canonicalPath(
-        organization,
-        '/work-orders/' + workOrderId + '/release/',
-    );
-    const releaseStored = await dbOrView.messagePairs.getCollectionPairs(
-        releasePrefix,
-    );
     const releaseMessagePairs = [
         ...operationMessagePairsAt(
             releaseStored, releasePrefix,
         ),
         ...releaseDeletes,
     ];
-
-    const transitionPrefix = canonicalPath(
-        organization,
-        '/work-orders/' + workOrderId + '/transition/',
-    );
-    const transitionStored =
-        await dbOrView.messagePairs.getCollectionPairs(transitionPrefix,
-        );
     const transitionMessagePairs = operationMessagePairsAt(
         transitionStored, transitionPrefix,
     );
@@ -1042,6 +1049,7 @@ async function workOrderClaimSourcesFor(
             transitionMessagePairs,
             workOrderId,
         ),
+        transitionMessagePairs,
     };
 }
 
@@ -1175,40 +1183,30 @@ function historyEventsWithFieldValues(
 }
 
 // GET work-orders/:id/history (states-URI elimination A1):
-// workOrderLifecycleStatesFor (ASC) reborn with an inline
-// field-values fold from this work order's OWN transition
-// prefix pairs, returned (at, id) DESC so index 0 is current.
-// Head-reduction per field-value row id uses the same
-// latestByKey pooling fieldValuesByTransitionEvent applies
-// above; claim/birth/release rows carry field_values: [].
-// Empty lifecycle → missedReadError (404 miss at this
-// document). Entity-scoped indexed reads only — no
-// whole-plane getAll.
+// claim-sources replay (ASC) with an inline field-values
+// fold from the same transition prefix pairs the replay
+// already read, returned (at, id) DESC so index 0 is
+// current. Head-reduction per field-value row id uses the
+// same latestByKey pooling fieldValuesByTransitionEvent
+// applies above; claim/birth/release rows carry
+// field_values: []. Empty lifecycle → missedReadError
+// (404 miss at this document). Entity-scoped indexed
+// reads only — no whole-plane getAll.
 export async function workOrderHistoryFor(
     db: DbAdapter,
     organization: Id,
     workOrderId: Id,
 ): Promise<WorkOrderHistoryEventEntity[]> {
-    const lifecycle = await workOrderLifecycleStatesFor(
-        db, organization, workOrderId,
-    );
+    const { replayed, transitionMessagePairs } =
+        await workOrderClaimSourcesFor(
+            db, organization, workOrderId,
+        );
+    const lifecycle = [...replayed].sort(atIdCompare);
     if (lifecycle.length === 0) {
         throw await missedReadError(
             db, workOrderId, organization, 'work_orders',
         );
     }
-
-    const transitionPrefix = canonicalPath(
-        organization,
-        '/work-orders/' + workOrderId + '/transition/',
-    );
-    const transitionStored = await db.messagePairs.getCollectionPairs(
-        transitionPrefix,
-    );
-    const transitionMessagePairs = operationMessagePairsAt(
-        transitionStored, transitionPrefix,
-    );
-
     return historyEventsWithFieldValues(
         lifecycle, transitionMessagePairs,
     );

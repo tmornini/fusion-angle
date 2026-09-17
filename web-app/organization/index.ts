@@ -24,16 +24,16 @@ import {
 } from '../app/dialog.ts';
 import {
     getOrganization,
+    getOrganizationSeats,
     getOrganizationStats,
     putOrganizationGeneralInfo,
     sessionContext,
     Organization,
     type OrganizationStats,
     type GeneralInfoDraft,
-    getActiveObjectives,
     getObjectives,
-    getArchivedObjectiveIds,
-    getObjectiveStates,
+    activeObjectivesOf,
+    objectiveStatesOf,
     getCurrentObjectiveDefinition,
     getCurrentObjectiveDefinitions,
     postObjectiveCreation,
@@ -47,6 +47,12 @@ import {
     subscribeInvitationChanges,
     generateIdentifier,
 } from '../app/adapters/index.ts';
+import {
+    fetchMeasureName,
+    markEnd,
+    markStart,
+    renderMeasureName,
+} from '../app/page-performance.ts';
 import { initDragReorder } from '../app/drag-reorder.ts';
 import {
     nextPosition,
@@ -118,9 +124,7 @@ async function rerender(): Promise<void> {
 }
 
 interface ObjectivesData {
-    active: Awaited<
-        ReturnType<typeof getActiveObjectives>
-    >;
+    active: ReturnType<typeof activeObjectivesOf>;
     archived: Awaited<
         ReturnType<typeof getObjectives>
     >;
@@ -130,25 +134,19 @@ interface ObjectivesData {
         >
     >;
     archivedAt: Map<string, string>;
-    states: Awaited<
-        ReturnType<typeof getObjectiveStates>
-    >;
+    states: ReturnType<typeof objectiveStatesOf>;
 }
 
 async function fetchObjectivesData(
     ctx: ReturnType<typeof sessionContext>,
 ): Promise<ObjectivesData> {
-    // One bulk state read per load — drag-reorder echoes
-    // each id's state from this map (no per-drag GET).
-    const [active, allObjs, archivedIds, states] =
-        await Promise.all([
-            getActiveObjectives(ctx),
-            getObjectives(ctx),
-            getArchivedObjectiveIds(ctx),
-            getObjectiveStates(ctx),
-        ]);
+    // One collection GET; drag-reorder echoes each id's
+    // state from this map (no per-drag GET).
+    const allObjs = await getObjectives(ctx);
+    const states = objectiveStatesOf(allObjs);
+    const active = activeObjectivesOf(allObjs);
     const archived = allObjs.filter(
-        o => archivedIds.has(o.id),
+        o => o.state === 'archived',
     );
     const defs =
         await getCurrentObjectiveDefinitions(
@@ -163,6 +161,16 @@ async function fetchObjectivesData(
         archivedAt: new Map<string, string>(),
         states,
     };
+}
+
+function organizationAndStats(
+    ctx: ReturnType<typeof sessionContext>,
+) {
+    const seatsP = getOrganizationSeats(ctx);
+    return Promise.all([
+        getOrganization(ctx, seatsP),
+        getOrganizationStats(ctx, seatsP),
+    ]);
 }
 
 function paintObjectives(
@@ -286,16 +294,18 @@ export async function init(): Promise<void> {
     // Wave 1: org shell + objectives + sent invitations
     // in parallel. Org-pair rejection takes precedence
     // (403 notice / error body) before other failures.
+    const fetchName = fetchMeasureName(
+        'organization-content',
+    );
+    markStart(fetchName);
     const [
         organizationPair, objectivesResult, sentResult,
     ] = await Promise.allSettled([
-        Promise.all([
-            getOrganization(ctx),
-            getOrganizationStats(ctx),
-        ]),
+        organizationAndStats(ctx),
         fetchObjectivesData(ctx),
         fetchSentInvitations(ctx),
     ]);
+    markEnd(fetchName);
 
     if (organizationPair.status === 'rejected') {
         const err = organizationPair.reason;
@@ -344,6 +354,10 @@ export async function init(): Promise<void> {
         () => void renderSentInvitations());
     // Shell render first (objectives box is empty shell);
     // then paint the parallel-fetched side panels.
+    const renderName = renderMeasureName(
+        'organization-content',
+    );
+    markStart(renderName);
     await rerenderShellOnly();
     if (objectivesResult.status === 'fulfilled') {
         paintObjectives(objectivesResult.value);
@@ -363,6 +377,7 @@ export async function init(): Promise<void> {
             sentResult.reason,
         );
     }
+    markEnd(renderName);
     $('#sent-invitations-list', document)
         ?.addEventListener(
             'click',
@@ -626,10 +641,7 @@ async function handleSave(): Promise<void> {
     }
     showToast('Organization saved', 'success');
     const [freshOrganization, freshStats] =
-        await Promise.all([
-            getOrganization(ctx),
-            getOrganizationStats(ctx),
-        ]);
+        await organizationAndStats(ctx);
     state = {
         kind: 'reading',
         organization: freshOrganization,

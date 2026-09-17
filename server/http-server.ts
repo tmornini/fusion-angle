@@ -156,10 +156,53 @@ function isDocumentNavigation(
         ) === 'navigate';
 }
 
+function gzipAccepted(header: string | null): boolean {
+    if (header === null || header === '') return false;
+    for (const raw of header.split(',')) {
+        const parts = raw.trim().split(';');
+        const coding = (parts[0] ?? '').trim()
+            .toLowerCase();
+        if (coding !== 'gzip') continue;
+        let q = 1;
+        for (const param of parts.slice(1)) {
+            const trimmed = param.trim();
+            const eq = trimmed.indexOf('=');
+            if (eq === -1) continue;
+            const key = trimmed.slice(0, eq).trim()
+                .toLowerCase();
+            if (key !== 'q') continue;
+            const value = Number(
+                trimmed.slice(eq + 1).trim(),
+            );
+            q = Number.isFinite(value) ? value : 0;
+        }
+        if (q > 0) return true;
+    }
+    return false;
+}
+
+async function sidecarStat(
+    filePath: string,
+): Promise<Deno.FileInfo | undefined> {
+    try {
+        const info = await Deno.stat(filePath + '.gz');
+        if (info.isFile) return info;
+    } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+            return undefined;
+        }
+        throw error;
+    }
+    return undefined;
+}
+
 async function existingStaticFile(
     root: string,
     urlPath: string,
 ): Promise<string | undefined> {
+    if (urlPath.toLowerCase().endsWith('.gz')) {
+        return undefined;
+    }
     const filePath = safeStaticPath(root, urlPath);
     if (filePath === undefined) return undefined;
     try {
@@ -286,6 +329,12 @@ async function serveStatic(
             { Allow: 'GET, HEAD' },
         );
     }
+    const urlPath = new URL(request.url).pathname;
+    if (urlPath.toLowerCase().endsWith('.gz')) {
+        return jsonResponse(
+            HTTP_NOT_FOUND, { error: 'Not found' },
+        );
+    }
     let info: Deno.FileInfo;
     try {
         info = await Deno.stat(filePath);
@@ -302,15 +351,32 @@ async function serveStatic(
             HTTP_NOT_FOUND, { error: 'Not found' },
         );
     }
+    const sidecar = await sidecarStat(filePath);
+    const useGzip = sidecar !== undefined
+        && gzipAccepted(
+            request.headers.get('accept-encoding'),
+        );
+    const servePath = useGzip
+        ? filePath + '.gz'
+        : filePath;
+    const size = useGzip && sidecar !== undefined
+        ? sidecar.size
+        : info.size;
     const ext = extname(filePath).toLowerCase();
     const mime = MIME_BY_EXT[ext]
         ?? 'application/octet-stream';
     const name = filePath.split(SEPARATOR).pop() ?? '';
     const headers: Record<string, string> = {
         'Content-Type': mime,
-        'Content-Length': String(info.size),
+        'Content-Length': String(size),
         'Cache-Control': staticCacheControl(name),
     };
+    if (sidecar !== undefined) {
+        headers['Vary'] = 'Accept-Encoding';
+    }
+    if (useGzip) {
+        headers['Content-Encoding'] = 'gzip';
+    }
     if (ext === '.html') {
         headers['Content-Security-Policy'] =
             CONTENT_SECURITY_POLICY;
@@ -323,7 +389,7 @@ async function serveStatic(
     }
     let file: Deno.FsFile;
     try {
-        file = await Deno.open(filePath, { read: true });
+        file = await Deno.open(servePath, { read: true });
     } catch (error) {
         if (error instanceof Deno.errors.NotFound) {
             return jsonResponse(

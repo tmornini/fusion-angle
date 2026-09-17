@@ -2,6 +2,7 @@ import type {
     Id,
     ObjectiveEntity,
     ObjectiveId,
+    ProjectEntity,
     ProjectObjectiveBaselineScoreEntity,
     ProjectObjectiveActualScoreEntity,
 } from '../../../api/types.ts';
@@ -107,13 +108,12 @@ export async function getActualScoresForProject(
 }
 
 // The baseline scores across EVERY project the caller's org can
-// see — reassembled from the nested per-project collections. The
-// projects list is org-scoped; each project's baseline scores
-// are fetched in parallel and concatenated.
+// see — reassembled from the nested per-project collections.
+// Callers pass the projects list they already hold.
 async function getAllBaselineScores(
     ctx: RequestContext,
+    projects: readonly { readonly id: Id }[],
 ): Promise<ObjectiveScore[]> {
-    const projects = await getProjectEntities(ctx);
     const perProject = await Promise.all(
         projects.map(p =>
             getBaselineScoresForProject(ctx, p.id)),
@@ -125,13 +125,53 @@ async function getAllBaselineScores(
 // reassembly as the baselines above.
 async function getAllActualScores(
     ctx: RequestContext,
+    projects: readonly { readonly id: Id }[],
 ): Promise<ObjectiveScore[]> {
-    const projects = await getProjectEntities(ctx);
     const perProject = await Promise.all(
         projects.map(p =>
             getActualScoresForProject(ctx, p.id)),
     );
     return perProject.flat();
+}
+
+export interface DashboardScoringBundle {
+    readonly projects: ProjectEntity[];
+    readonly objectives: ObjectiveEntity[];
+    readonly baselineScores: ObjectiveScore[];
+    readonly actualScores: ObjectiveScore[];
+}
+
+export function startDashboardScoringReads(
+    ctx: RequestContext,
+): {
+    readonly bundleP: Promise<DashboardScoringBundle>;
+    readonly objectivesP: Promise<ObjectiveEntity[]>;
+} {
+    const projectsP = getProjectEntities(ctx);
+    const objectivesP = getObjectives(ctx);
+    const bundleP = (async () => {
+        const projects = await projectsP;
+        const [
+            baselineScores,
+            actualScores,
+            objectives,
+        ] = await Promise.all([
+            getAllBaselineScores(ctx, projects),
+            getAllActualScores(ctx, projects),
+            objectivesP,
+        ]);
+        return {
+            projects, objectives,
+            baselineScores, actualScores,
+        };
+    })();
+    return { bundleP, objectivesP };
+}
+
+export async function getDashboardScoringBundle(
+    ctx: RequestContext,
+): Promise<DashboardScoringBundle> {
+    return startDashboardScoringReads(ctx).bundleP;
 }
 
 export async function getProjectScoring(
@@ -171,27 +211,18 @@ function groupByProject<T extends {
     return map;
 }
 
-export async function getPortfolioImpactSummary(
-    ctx: RequestContext,
-): Promise<{
+export function getPortfolioImpactSummary(
+    bundle: DashboardScoringBundle,
+): {
     baselineMean: number | undefined;
     actualMean: number | undefined;
     projectCount: number;
     actualCount: number;
-}> {
-    // Approved filter reads the project GET row — no
-    // second hop.
-    const [
-        objectives,
-        projectRows,
-        allBaseline,
-        allActual,
-    ] = await Promise.all([
-        getObjectives(ctx),
-        getProjectEntities(ctx),
-        getAllBaselineScores(ctx),
-        getAllActualScores(ctx),
-    ]);
+} {
+    const objectives = bundle.objectives;
+    const projectRows = bundle.projects;
+    const allBaseline = bundle.baselineScores;
+    const allActual = bundle.actualScores;
     const approved = projectRows.filter(p =>
         projectStateIsApproved(
             assertProjectState(
@@ -269,24 +300,14 @@ export interface ObjectiveScoringInputs {
     actualScores: ObjectiveScore[];
 }
 
-export async function getObjectiveScoringInputs(
-    ctx: RequestContext,
-): Promise<ObjectiveScoringInputs> {
-    // Approved filter reads the project GET row — no
-    // second hop.
-    const [
-        activeObjectives,
-        projectRows,
-        baselineScores,
-        actualScores,
-    ] = await Promise.all([
-        getActiveObjectives(ctx),
-        getProjectEntities(ctx),
-        getAllBaselineScores(ctx),
-        getAllActualScores(ctx),
-    ]);
+export function getObjectiveScoringInputs(
+    bundle: DashboardScoringBundle,
+): ObjectiveScoringInputs {
+    const activeObjectives = bundle.objectives
+        .filter(o => o.state === 'active')
+        .sort((a, b) => a.position - b.position);
     const approvedProjectIds = new Set(
-        projectRows
+        bundle.projects
             .filter(p =>
                 projectStateIsApproved(
                     assertProjectState(
@@ -300,8 +321,8 @@ export async function getObjectiveScoringInputs(
     return {
         activeObjectives,
         approvedProjectIds,
-        baselineScores,
-        actualScores,
+        baselineScores: bundle.baselineScores,
+        actualScores: bundle.actualScores,
     };
 }
 
@@ -492,14 +513,14 @@ export async function getProjectsScoreColumn(
         activeObjs,
         objectives,
         projectRows,
-        allBaseline,
-        allActual,
     ] = await Promise.all([
         getActiveObjectives(ctx),
         getObjectives(ctx),
         getProjectEntities(ctx),
-        getAllBaselineScores(ctx),
-        getAllActualScores(ctx),
+    ]);
+    const [allBaseline, allActual] = await Promise.all([
+        getAllBaselineScores(ctx, projectRows),
+        getAllActualScores(ctx, projectRows),
     ]);
     const totalActive = activeObjs.length;
     const posByObj = new Map<ObjectiveId, number>(

@@ -1,4 +1,8 @@
-import { assertStrictEquals } from '@std/assert';
+import {
+    assertMatch,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import './hmac-test-key.ts';
 import {
     memoryDbAdapter,
@@ -140,15 +144,19 @@ async () => {
         organization: ORGANIZATION_A,
     }, tokenRequestSeed());
     assertStrictEquals(res.ok, false);
-    if (!res.ok) assertStrictEquals(res.status, 401);
+    if (!res.ok) {
+        assertStrictEquals(res.status, 401);
+        assertStrictEquals(res.error, 'token revoked');
+    }
 });
 
 Deno.test('token-exchange rejects a logged-out actor token',
 async () => {
     const db = await revokedDb();
-    // u2 is a clean subject and a member; u1 is the
-    // logged-out actor. The subject passes every check,
-    // so only the actor-revocation check can reject.
+    // Distinct subject and actor: Decision 4 checks
+    // subject === actor before any revocation check, so
+    // a revoked actor in a cross-party exchange 403s
+    // self-delegation rather than 401 token revoked.
     await seedMembershipPair(
         db, generateIdentifier(), ORGANIZATION_A, USER_2,
         '2020-01-01T00:00:00.000000Z',
@@ -161,8 +169,60 @@ async () => {
         organization: ORGANIZATION_A,
     }, tokenRequestSeed());
     assertStrictEquals(res.ok, false);
-    if (!res.ok) assertStrictEquals(res.status, 401);
+    if (!res.ok) {
+        assertStrictEquals(res.status, 403);
+        assertMatch(res.error, /self-delegation/);
+    }
 });
+
+Deno.test(
+    'token-exchange rejects a revoked actor jti'
+        + ' with a live same-subject token',
+    async () => {
+        const db = memoryDbAdapter();
+        await db.postSchemaCreation();
+        await seedRootAdmin(db);
+        await seedOrganizationDocument(
+            db, ORGANIZATION_A, 'Acme',
+        );
+        await seedMembershipPair(
+            db, generateIdentifier(), ORGANIZATION_A,
+            USER_1, '2020-01-01T00:00:00.000000Z',
+        );
+        const actorJti = generateIdentifier();
+        const iat = Math.floor(Date.now() / 1000) - 10;
+        const subject = await tokenFor(USER_1);
+        const actor = await mintAccessToken({
+            aud: TOKEN_AUDIENCE,
+            sub: USER_1, roles: [], name: 'X',
+            iat, ttlSeconds: 900, jti: actorJti,
+        });
+        assertNotStrictEquals(subject, actor);
+        // Per-jti revoke of the actor document only —
+        // logout-everywhere is per-identity and would
+        // 401 subjectRev first.
+        await PUT(db, 'identities/' + USER_1
+            + '/tokens/' + actorJti, {
+            jti: actorJti, identity_id: USER_1,
+            action: 'revoked',
+            chain_id: generateIdentifier(),
+            at: nowUtc(),
+        }, await devToken());
+        const res = await postToken(db, {
+            grant_type: 'token-exchange',
+            subject_token: subject,
+            actor_token: actor,
+            organization: ORGANIZATION_A,
+        }, tokenRequestSeed());
+        assertStrictEquals(res.ok, false);
+        if (!res.ok) {
+            assertStrictEquals(res.status, 401);
+            assertStrictEquals(
+                res.error, 'token chain revoked',
+            );
+        }
+    },
+);
 
 Deno.test('refresh rejects a logged-out token', async () => {
     const db = await revokedDb();

@@ -7,6 +7,9 @@ import {
     getDashboardStats,
     getDashboardGauges,
 } from '../web-app/app/adapters/dashboard.ts';
+import {
+    getDashboardScoringBundle,
+} from '../web-app/app/adapters/project-scoring.ts';
 import { postIdeaCreation } from
     '../web-app/app/adapters/ideas.ts';
 import {
@@ -28,6 +31,14 @@ import {
     type FlowWithGraph,
     nowUtc,
 } from '../api/types.ts';
+
+async function gaugesOf(
+    ctx: RequestContext,
+) {
+    return getDashboardGauges(
+        await getDashboardScoringBundle(ctx),
+    );
+}
 
 function buildIdea(
     id: string,
@@ -263,7 +274,7 @@ Deno.test(
     'getDashboardGauges returns Time, Cost, Impact',
     async () => {
         const { ctx } = await adminContext();
-        const gauges = await getDashboardGauges(ctx);
+        const gauges = await gaugesOf(ctx);
         assertEquals(
             gauges.map(g => g.title),
             ['Time', 'Cost', 'Impact'],
@@ -279,7 +290,7 @@ Deno.test(
     'getDashboardGauges is zeroed on empty db',
     async () => {
         const { ctx } = await adminContext();
-        const gauges = await getDashboardGauges(ctx);
+        const gauges = await gaugesOf(ctx);
         const cost = gauges
             .find(g => g.title === 'Cost');
         assertStrictEquals(cost?.outer.value, 0);
@@ -304,7 +315,7 @@ Deno.test(
             estimated_cost: 9000,
             actual_cost: 9000,
         });
-        const gauges = await getDashboardGauges(ctx);
+        const gauges = await gaugesOf(ctx);
         const cost = gauges
             .find(g => g.title === 'Cost');
         assertStrictEquals(cost?.outer.value, 3000);
@@ -320,7 +331,7 @@ Deno.test(
             start_date: '2026-01-01',
             target_end_date: '2026-01-11',
         });
-        const gauges = await getDashboardGauges(ctx);
+        const gauges = await gaugesOf(ctx);
         const time = gauges
             .find(g => g.title === 'Time');
         assertStrictEquals(time?.outer.value, 10);
@@ -332,7 +343,7 @@ Deno.test(
     'getDashboardGauges returns the three sibling gauges',
     async () => {
         const { ctx } = await adminContext();
-        const gauges = await getDashboardGauges(ctx);
+        const gauges = await gaugesOf(ctx);
         assertStrictEquals(gauges.length, 3);
         const titles = gauges.map(
             g => g.title.toLowerCase(),
@@ -349,7 +360,7 @@ Deno.test(
     'getDashboardGauges marks Impact as bipolar',
     async () => {
         const { ctx } = await adminContext();
-        const gauges = await getDashboardGauges(ctx);
+        const gauges = await gaugesOf(ctx);
         const impact = gauges
             .find(g => g.title === 'Impact');
         assertStrictEquals(impact?.kind, 'bipolar');
@@ -360,7 +371,7 @@ Deno.test(
     'getDashboardGauges marks Time and Cost as ratio',
     async () => {
         const { ctx } = await adminContext();
-        const gauges = await getDashboardGauges(ctx);
+        const gauges = await gaugesOf(ctx);
         const time = gauges
             .find(g => g.title === 'Time');
         const cost = gauges
@@ -375,7 +386,7 @@ Deno.test(
     + ' undefined means without clamping to zero',
     async () => {
         const { ctx } = await adminContext();
-        const gauges = await getDashboardGauges(ctx);
+        const gauges = await gaugesOf(ctx);
         const impact = gauges
             .find(g => g.title === 'Impact');
         // Empty db => baselineMean and actualMean

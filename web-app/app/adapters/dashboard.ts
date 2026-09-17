@@ -17,6 +17,7 @@ import { getProjectEntities } from './projects.ts';
 import { getFlowEntities } from './flows.ts';
 import {
     getPortfolioImpactSummary,
+    type DashboardScoringBundle,
 } from './project-scoring.ts';
 
 export type GaugeIcon =
@@ -64,17 +65,13 @@ export interface BipolarGauge {
 
 export type GaugeData = RatioGauge | BipolarGauge;
 
-export async function getDashboardGauges(
-    ctx: RequestContext,
-): Promise<GaugeData[]> {
+export function getDashboardGauges(
+    bundle: DashboardScoringBundle,
+): GaugeData[] {
     // Lifecycle state rides the project GET row
     // (Phase A stamp) — no second hop.
-    const [allProjects, impact] =
-        await Promise.all([
-            getProjectEntities(ctx),
-            getPortfolioImpactSummary(ctx),
-        ]);
-    const projects = allProjects.filter(p =>
+    const impact = getPortfolioImpactSummary(bundle);
+    const projects = bundle.projects.filter(p =>
         projectStateIsApproved(
             assertProjectState(
                 p.state, 'project ' + p.id,

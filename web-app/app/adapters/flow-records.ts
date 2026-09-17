@@ -8,7 +8,6 @@ import type {
 } from '../../../api/types.ts';
 import {
     filterByField,
-    organizationCollection,
     organizationItem,
     type RequestContext,
 } from './shared.ts';
@@ -49,10 +48,13 @@ async function getFlowRecordsForFlow(
 // parallel and concatenated.
 async function getAllFlowRecordEntities(
     ctx: RequestContext,
+    flows?: readonly { readonly id: Id }[],
 ): Promise<FlowRecordEntity[]> {
-    const flows = await getFlowEntities(ctx);
+    const list = flows ?? await getFlowEntities(ctx);
     const perFlow = await Promise.all(
-        flows.map(f => getFlowRecordsForFlow(ctx, f.id)),
+        list.map(f => getFlowRecordsForFlow(
+            ctx, f.id,
+        )),
     );
     return perFlow.flat();
 }
@@ -61,10 +63,11 @@ async function getAllFlowRecordEntities(
 // can see — same per-flow reassembly as the bindings above.
 async function getAllFlowWorkOrderEntities(
     ctx: RequestContext,
+    flows?: readonly { readonly id: Id }[],
 ): Promise<FlowWorkOrderEntity[]> {
-    const flows = await getFlowEntities(ctx);
+    const list = flows ?? await getFlowEntities(ctx);
     const perFlow = await Promise.all(
-        flows.map(f => ctx.GET<FlowWorkOrderEntity[]>(
+        list.map(f => ctx.GET<FlowWorkOrderEntity[]>(
             organizationItem(ctx, 'flows', f.id)
                 + '/work-orders/',
         )),
@@ -166,18 +169,17 @@ export interface BoundFlowSummary {
 export async function getFlowSummariesForRecord(
     ctx: RequestContext,
     recordId: RecordId,
+    flows?: readonly FlowEntity[],
+    flowRecords?: readonly FlowRecordEntity[],
 ): Promise<BoundFlowSummary[]> {
-    const [rows, flows] = await Promise.all([
-        getAllFlowRecordEntities(ctx),
-        ctx.GET<FlowEntity[]>(
-            organizationCollection(ctx, 'flows'),
-        ),
-    ]);
+    const list = flows ?? await getFlowEntities(ctx);
+    const rows = flowRecords
+        ?? await getAllFlowRecordEntities(ctx, list);
     const wanted = new Set(
         filterByField(rows, 'record_id', recordId)
             .map(r => r.flow_id),
     );
-    return flows
+    return list
         .filter(f => wanted.has(f.id))
         .map(f => ({ id: f.id, name: f.name }));
 }
@@ -185,11 +187,18 @@ export async function getFlowSummariesForRecord(
 export async function getWorkOrdersForRecord(
     ctx: RequestContext,
     recordId: RecordId,
+    flows?: readonly { readonly id: Id }[],
+    flowRecords?:
+        | readonly FlowRecordEntity[]
+        | Promise<readonly FlowRecordEntity[]>,
 ): Promise<WorkOrder[]> {
+    const list = flows ?? await getFlowEntities(ctx);
     const [bindings, flowWorkOrders, workOrders]
         = await Promise.all([
-            getAllFlowRecordEntities(ctx),
-            getAllFlowWorkOrderEntities(ctx),
+            flowRecords ?? getAllFlowRecordEntities(
+                ctx, list,
+            ),
+            getAllFlowWorkOrderEntities(ctx, list),
             getWorkOrders(ctx),
         ]);
     const flowIds = new Set(
@@ -206,4 +215,32 @@ export async function getWorkOrdersForRecord(
     return workOrders.filter(
         wo => workOrderIds.has(wo.id),
     );
+}
+
+// Records fan-out and work-order joins keyed by one
+// flows list. One records GET per flow; joins start
+// without waiting for those records to resolve.
+export async function loadRecordFlowJoins(
+    ctx: RequestContext,
+    recordId: RecordId,
+    flows: readonly FlowEntity[],
+): Promise<{
+    readonly summaries: BoundFlowSummary[];
+    readonly workOrders: WorkOrder[];
+}> {
+    const flowRecordsP = getAllFlowRecordEntities(
+        ctx, flows,
+    );
+    const [flowRecords, workOrders] = await Promise.all([
+        flowRecordsP,
+        getWorkOrdersForRecord(
+            ctx, recordId, flows, flowRecordsP,
+        ),
+    ]);
+    return {
+        summaries: await getFlowSummariesForRecord(
+            ctx, recordId, flows, flowRecords,
+        ),
+        workOrders,
+    };
 }

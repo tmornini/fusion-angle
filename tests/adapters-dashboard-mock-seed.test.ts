@@ -5,6 +5,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { getDashboardGauges } from
     '../web-app/app/adapters/dashboard.ts';
 import {
+    getDashboardScoringBundle,
     getObjectiveScoringInputs,
     buildObjectiveAggregates,
 } from
@@ -21,7 +22,9 @@ Deno.test('mock seed produces portfolio Impact baseline +50',
     async () => {
         const db = await sharedMockDb();
         const ctx = createRequestContext(db, await organizationToken());
-        const gauges = await getDashboardGauges(ctx);
+        const gauges = getDashboardGauges(
+            await getDashboardScoringBundle(ctx),
+        );
         const impact = gauges.find(
             g => g.title === 'Impact',
         );
@@ -35,7 +38,9 @@ Deno.test('mock seed produces per-objective baseline means',
         const db = await sharedMockDb();
         const ctx = createRequestContext(db, await organizationToken());
         const aggs = buildObjectiveAggregates(
-            await getObjectiveScoringInputs(ctx),
+            getObjectiveScoringInputs(
+                await getDashboardScoringBundle(ctx),
+            ),
         );
         const expected: ReadonlyArray<
             [string, number]

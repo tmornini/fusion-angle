@@ -520,23 +520,27 @@ async () => {
     });
     assertStrictEquals(res.status, 201);
     await assertRootEventMessagePair(db, CURRENT_ID);
-    // KEY-BY-ANCHOR (Phase 13 Task 7, gate 3): the issued root's
-    // row id is now the code's OWN sha256 digest, not a fresh
-    // mint — the same value the SAME document's event pair name
-    // carries (assertRootEventMessagePair's own name match above).
+    // Issued event is named by its jti; the spend marker is a
+    // different prefix (authorization-codes/:hash).
     const [root] = await deriveIdentityTokensFor(db, CURRENT_ID);
-    assertStrictEquals(root!.id, await sha256Hex(AUTH_CODE));
+    assertStrictEquals(root!.id, root!.jti);
+    assertNotStrictEquals(root!.id, await sha256Hex(AUTH_CODE));
+    const derivedId = await sha256Hex(AUTH_CODE);
+    const marker = await db.messagePairs.getDocumentHistory(
+        '/identities/' + CURRENT_ID + '/authorization-codes/',
+        derivedId,
+    );
+    assert(marker.length > 0, 'marker document');
     const requests = await db.messagePairs.getAll();
     const operationMessagePair = requests.find(
         r => r.path === '/authentication/token/',
     );
     assert(operationMessagePair);
     assertStrictEquals(operationMessagePair!.name, '');
-    // 3 bootstrap + the seeded authorize pair (Phase 13 Task 7:
-    // the pre-tx lookup now needs a real authorize pair, not a
-    // raw authorizationCodes row alone) + the root's own event
-    // pair + the grant's own operation message pair.
-    assertStrictEquals(requests.length, 5);
+    // 3 bootstrap + the seeded authorize pair + the spend
+    // marker + the root's own event pair + the grant's own
+    // operation message pair.
+    assertStrictEquals(requests.length, 6);
 });
 
 Deno.test('a token-exchange grant (a real /authentication/token'

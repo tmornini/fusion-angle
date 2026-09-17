@@ -1,8 +1,6 @@
 import type { Id } from '../../../api/types.ts';
 import type { FlowGraph } from './flow-queries.ts';
-import type {
-    RequestContext,
-} from './shared.ts';
+import type { RequestContext } from './shared.ts';
 import {
     buildFlowStats,
     type FlowStatsInput,
@@ -30,15 +28,17 @@ export async function getFlowStats(
 }> {
     const [
         graph,
-        histories,
         fwoRows,
         memberMap,
     ] = await Promise.all([
         getFlowGraph(ctx, flowId),
-        getWorkOrderHistories(ctx),
         getFlowWorkOrderEntities(ctx, flowId),
         getMemberMap(ctx),
     ]);
+    const histories = await getWorkOrderHistories(
+        ctx,
+        fwoRows.map(r => ({ id: r.work_order_id })),
+    );
 
     const woIds = new Set(
         fwoRows.map(r => r.work_order_id),
