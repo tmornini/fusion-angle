@@ -7,135 +7,106 @@ import {
 import {
     ICON_SIZE,
     iconLogo,
-    iconSparkles,
-    iconArrowRight,
     iconMenu,
     iconX,
-    iconCheck,
-    iconBrain,
-    iconPeople,
-    iconZap,
-    iconShield,
-    iconLineChart,
-    iconMessageSquare,
 } from '../app/icons.ts';
 import { putLocation } from '../app/adapters/index.ts';
 
-const features = [
-    {
-        icon: iconBrain,
-        title: 'Intelligent Augmentation',
-        description:
-            'AI that learns from your'
-            + ' expertise and amplifies'
-            + ' your decision-making'
-            + ' capabilities without'
-            + ' replacing human judgment.',
-    },
-    {
-        icon: iconPeople,
-        title: 'Collaborative Flows',
-        description:
-            'Seamlessly integrate AI'
-            + ' assistance into your'
-            + " team's existing processes"
-            + ' with human oversight at'
-            + ' every step.',
-    },
-    {
-        icon: iconZap,
-        title: 'Real-Time Insights',
-        description:
-            'Get instant analysis and'
-            + ' recommendations while'
-            + ' maintaining full control'
-            + ' over the final decisions.',
-    },
-    {
-        icon: iconShield,
-        title: 'Enterprise Security',
-        description:
-            'Bank-grade encryption and'
-            + ' compliance with SOC 2,'
-            + ' GDPR, and HIPAA'
-            + ' requirements built-in.',
-    },
-    {
-        icon: iconLineChart,
-        title: 'Transparent Analytics',
-        description:
-            'Understand how AI arrives'
-            + ' at its suggestions with'
-            + ' clear explanations and'
-            + ' confidence scores.',
-    },
-    {
-        icon: iconMessageSquare,
-        title: 'Natural Communication',
-        description:
-            'Interact with AI using'
-            + ' natural language. No'
-            + ' technical expertise'
-            + ' required to get powerful'
-            + ' results.',
-    },
-];
+export const PILOT_SCHEDULING_URL = '';
 
-const steps = [
+const STALLS = [
+    'The idea never becomes a case, so nobody can'
+        + ' decide.',
+    'The approval leaves no record, so nobody can'
+        + ' say who agreed to what.',
+    'The work scatters across tools, so nobody can'
+        + ' see where it piles up.',
+] as const;
+
+const PIPELINE = [
     {
         number: '01',
-        title: 'Connect Your Data',
+        title: 'Ideas',
         description:
-            'Securely integrate with'
-            + ' your existing tools and'
-            + ' data sources. Our'
-            + ' platform adapts to your'
-            + ' infrastructure.',
-        points: [
-            'One-click integrations',
-            'Enterprise SSO',
-            'Custom API support',
-        ],
+            'An idea is captured as a case: the'
+            + ' problem, the target users, the'
+            + ' proposed solution, the expected'
+            + ' outcome, and the metrics that'
+            + ' would prove it.',
     },
     {
         number: '02',
-        title: 'Configure Your Flows',
+        title: 'Objectives and approval',
         description:
-            'Set up AI-assisted'
-            + ' processes that match your'
-            + " team's needs with human"
-            + ' checkpoints where they'
-            + ' matter.',
-        points: [
-            'Visual flow builder',
-            'Role-based permissions',
-            'Process automation',
-        ],
+            'Converting an idea scores it against'
+            + " your organization's objectives,"
+            + ' sets a budget and a duration, and'
+            + ' makes it a project. The score stays'
+            + ' on the record.',
     },
     {
         number: '03',
-        title: 'Amplify Your Team',
+        title: 'Projects',
         description:
-            'Let AI handle routine'
-            + ' tasks while your team'
-            + ' focuses on high-value'
-            + ' decisions and creative'
-            + ' work.',
-        points: [
-            'Real-time collaboration',
-            'Smart recommendations',
-            'Continuous learning',
-        ],
+            'A project tracks progress, dates, and'
+            + ' cost against plan. Actuals roll up'
+            + ' to the objectives it was approved'
+            + ' against.',
     },
-];
+    {
+        number: '04',
+        title: 'Flows',
+        description:
+            'Draw the process on a canvas, bind it'
+            + ' to a typed Record, publish it, and'
+            + ' it runs.',
+    },
+    {
+        number: '05',
+        title: 'Workbox',
+        description:
+            'A member claims a work order, satisfies'
+            + ' the fields its step requires, and'
+            + ' transitions it. A heat map shows'
+            + ' where work piles up.',
+    },
+] as const;
 
-const companies = [
-    'TechCorp',
-    'InnovateLab',
-    'DataFlow',
-    'NexGen',
-    'Synergi',
-];
+const SAFETY = [
+    {
+        title: 'Nothing is overwritten.',
+        body:
+            'Every change is a new, authored entry'
+            + ' in one ledger. Undo is another'
+            + ' entry.',
+    },
+    {
+        title: 'Your organization is the boundary.',
+        body:
+            'Scope comes from the verified sign-in'
+            + ' token, never the address bar. Remove'
+            + ' a member and their access ends'
+            + ' within minutes.',
+    },
+    {
+        title:
+            'A foreign write is refused before it'
+            + ' exists.',
+        body:
+            'A write that names a record outside'
+            + ' your organization is rejected'
+            + ' outright. Nothing is created in'
+            + ' your name by accident.',
+    },
+] as const;
+
+function bookPilot(className: string): SafeHtml {
+    return html`<a class="${className}"
+        data-book-pilot
+        href="${PILOT_SCHEDULING_URL}">${
+            'Book a pilot call'
+        }</a>`;
+}
 
 function buildNavbar(): SafeHtml {
     return html`
@@ -152,23 +123,17 @@ function buildNavbar(): SafeHtml {
                     }">Fusion Angle</span>
                 </a>
                 <div class="navbar-links">
-                    <a href="#features"
-                        class="${
-                            'navbar-link'
-                        }">${
-                            'Features'
-                    }</a>
                     <a href="#how-it-works"
-                        class="${
-                            'navbar-link'
-                        }">${
-                            'How It Works'
+                        class="navbar-link">${
+                            'How it works'
                     }</a>
-                    <a href="#about"
-                        class="${
-                            'navbar-link'
-                        }">${
-                            'About'
+                    <a href="#ai"
+                        class="navbar-link">${
+                            'AI'
+                    }</a>
+                    <a href="#pilot"
+                        class="navbar-link">${
+                            'Pilot'
                     }</a>
                 </div>
                 <div class="navbar-cta">
@@ -178,11 +143,7 @@ function buildNavbar(): SafeHtml {
                         data-goto-auth>${
                             'Sign In'
                     }</button>
-                    <button class="${
-                        'btn btn-primary'
-                    }" data-goto-auth>${
-                        'Get Started'
-                    }</button>
+                    ${bookPilot('btn btn-primary')}
                 </div>
                 <button class="${
                     'navbar-mobile-toggle'
@@ -198,17 +159,17 @@ function buildNavbar(): SafeHtml {
             <div class="${
                 'navbar-mobile-menu hidden'
             }" id="mobile-menu">
-                <a href="#features"
-                    class="navbar-link">${
-                        'Features'
-                }</a>
                 <a href="#how-it-works"
                     class="navbar-link">${
-                        'How It Works'
+                        'How it works'
                 }</a>
-                <a href="#about"
+                <a href="#ai"
                     class="navbar-link">${
-                        'About'
+                        'AI'
+                }</a>
+                <a href="#pilot"
+                    class="navbar-link">${
+                        'Pilot'
                 }</a>
                 <div class="${
                     'flex flex-col '
@@ -220,24 +181,11 @@ function buildNavbar(): SafeHtml {
                         data-goto-auth>${
                             'Sign In'
                     }</button>
-                    <button class="${
-                        'btn btn-primary'
-                    }" data-goto-auth>${
-                        'Get Started'
-                    }</button>
+                    ${bookPilot('btn btn-primary')}
                 </div>
             </div>
         </div>
     </nav>`;
-}
-
-function buildCompanyLogos(
-    companies: readonly string[],
-): SafeHtml {
-    return html`${companies.map(
-        company =>
-            html`<span>${company}</span>`,
-    )}`;
 }
 
 function buildHero(): SafeHtml {
@@ -252,124 +200,61 @@ function buildHero(): SafeHtml {
         }"></div>
         <div class="container">
             <div class="hero-content">
-                <div class="hero-badge">
-                    ${iconSparkles(ICON_SIZE.base, '')}
-                    <span>${
-                        'Human-Intelligence'
-                        + ' First'
-                    }</span>
-                </div>
                 <h1 class="${
                     'animate-fade-in-up'
-                }">
-                    AI That Amplifies
-                    <span class="${
-                        'highlight'
-                    }">${
-                        'Human Intelligence'
-                    }</span>
-                </h1>
+                }">${
+                    'Ideas are easy. Execution is hard.'
+                }</h1>
                 <p class="${
                     'hero-subtitle '
                     + 'animate-fade-in-up'
-                }">
-                    ${
-                        'Fusion Angle puts humans'
-                        + ' at the center. Our'
-                        + ' platform augments'
-                        + ' your expertise with'
-                        + ' intelligent'
-                        + ' automation, helping'
-                        + ' teams make better'
-                        + ' decisions faster.'
-                    }
-                </p>
+                }">${
+                    'Fusion Angle takes an idea to'
+                    + ' execution in one system: the'
+                    + ' case, the approval, the'
+                    + ' project, and the process that'
+                    + ' moves the work. For teams that'
+                    + ' have an AI strategy and need a'
+                    + ' place to execute it safely.'
+                }</p>
                 <div class="${
                     'hero-buttons '
                     + 'animate-fade-in-up'
                 }">
-                    <button class="${
-                        'btn btn-accent btn-xl'
-                    }" data-goto-auth>
-                        Start Free Trial ${
-                            iconArrowRight(ICON_SIZE.xl, '')
-                        }
-                    </button>
-                    <button class="${
+                    ${bookPilot(
+                        'btn btn-accent btn-xl',
+                    )}
+                    <a class="${
                         'btn btn-outline-hero'
                         + ' btn-xl'
-                    }">Watch Demo</button>
-                </div>
-                <div class="${
-                    'hero-trust '
-                    + 'animate-fade-in-up'
-                }">
-                    <p>${
-                        'Trusted by'
-                        + ' forward-thinking'
-                        + ' teams'
-                    }</p>
-                    <div class="${
-                        'hero-trust-logos'
-                    }">
-                        ${buildCompanyLogos(
-                            companies,
-                        )}
-                    </div>
+                    }" href="${
+                        '#how-it-works'
+                    }">${
+                        'See how it works'
+                    }</a>
                 </div>
             </div>
         </div>
     </section>`;
 }
 
-function buildFeatures(): SafeHtml {
+function buildStalls(): SafeHtml {
     return html`
-    <section id="features" class="${
+    <section id="stalls" class="${
         'features-section bg-background'
     }">
         <div class="container">
             <div class="section-header">
                 <h2>${
-                    'Built for the Way'
-                    + ' You Work'
+                    'Most ideas do not fail. They stall.'
                 }</h2>
-                <p>${
-                    'Powerful AI capabilities'
-                    + ' designed around human'
-                    + ' needs, not the other'
-                    + ' way around.'
-                }</p>
-            </div>
-            <div class="${
-                'grid grid-cols-1 '
-                + 'md:grid-cols-2 '
-                + 'lg:grid-cols-3 gap-6'
-            }">
-                ${features.map(
-                    feature => html`
-                <div class="${
-                    'card card-hover '
-                    + 'feature-card'
-                }">
-                    <div class="${
-                        'feature-icon'
-                    }">${
-                        feature.icon(ICON_SIZE['2xl'], '')
-                    }</div>
-                    <h3>${
-                        feature.title
-                    }</h3>
-                    <p>${
-                        feature.description
-                    }</p>
-                </div>`,
-                )}
+                <p>${STALLS.join(' ')}</p>
             </div>
         </div>
     </section>`;
 }
 
-function buildHowItWorks(): SafeHtml {
+function buildPipeline(): SafeHtml {
     return html`
     <section id="how-it-works"
         class="${
@@ -378,17 +263,16 @@ function buildHowItWorks(): SafeHtml {
         <div class="container">
             <div class="section-header">
                 <h2>${
-                    'Get Started in Minutes'
+                    'Idea to execution, one system'
                 }</h2>
                 <p>${
-                    'A straightforward path'
-                    + ' from setup to value,'
-                    + ' with support at every'
-                    + ' step.'
+                    'Every step ships today, under'
+                    + ' the names you will see in'
+                    + ' the product.'
                 }</p>
             </div>
             <div class="steps-list">
-                ${steps.map(
+                ${PIPELINE.map(
                     stepData => html`
                 <div class="step">
                     <div class="${
@@ -408,26 +292,6 @@ function buildHowItWorks(): SafeHtml {
                         <p>${
                             stepData.description
                         }</p>
-                        <ul class="${
-                            'step-points'
-                        }">
-                            ${stepData.points.map(
-                                point => html`
-                            <li class="${
-                                'step-point'
-                            }">
-                                <div class="${
-                                    'step-point'
-                                    + '-icon'
-                                }">${
-                                    iconCheck(ICON_SIZE.xs, '')
-                                }</div>
-                                <span>${
-                                    point
-                                }</span>
-                            </li>`,
-                            )}
-                        </ul>
                     </div>
                 </div>`,
                 )}
@@ -436,9 +300,89 @@ function buildHowItWorks(): SafeHtml {
     </section>`;
 }
 
-function buildCTA(): SafeHtml {
+function buildAiSeat(): SafeHtml {
     return html`
-    <section class="cta-section">
+    <section id="ai" class="${
+        'features-section bg-background'
+    }">
+        <div class="container">
+            <div class="section-header">
+                <div class="${
+                    'badge badge-outline'
+                }">${
+                    'Roadmap, shaped with pilots'
+                }</div>
+                <h2>${
+                    'People and AI, same process,'
+                    + ' same rules'
+                }</h2>
+                <p>${
+                    'An AI member already holds a'
+                    + ' seat on the roster: a name, a'
+                    + ' skill focus, and the model'
+                    + ' behind it. You can name it on'
+                    + ' a step of a flow.'
+                }</p>
+                <p>${
+                    'Next comes the worker. It will'
+                    + ' claim a work order at its'
+                    + ' step, do the work under the'
+                    + ' same validation a person'
+                    + ' faces, leave its name on every'
+                    + ' change, and hand the order on.'
+                    + ' You will correct it in the'
+                    + ' same conversation you would'
+                    + ' have with a colleague, and'
+                    + ' record content will be data'
+                    + ' to it, never instruction.'
+                }</p>
+                <p>${
+                    'That is how an AI strategy gets'
+                    + ' executed safely: one step at'
+                    + ' a time, on a process you drew,'
+                    + ' with a ledger of what the'
+                    + ' agent did.'
+                }</p>
+            </div>
+        </div>
+    </section>`;
+}
+
+function buildSafety(): SafeHtml {
+    return html`
+    <section id="safety" class="${
+        'features-section bg-background'
+    }">
+        <div class="container">
+            <div class="section-header">
+                <h2>${
+                    'Built to be trusted with the'
+                    + ' record'
+                }</h2>
+            </div>
+            <div class="${
+                'grid grid-cols-1 '
+                + 'md:grid-cols-2 '
+                + 'lg:grid-cols-3 gap-6'
+            }">
+                ${SAFETY.map(
+                    card => html`
+                <div class="${
+                    'card card-hover '
+                    + 'feature-card'
+                }">
+                    <h3>${card.title}</h3>
+                    <p>${card.body}</p>
+                </div>`,
+                )}
+            </div>
+        </div>
+    </section>`;
+}
+
+function buildPilot(): SafeHtml {
+    return html`
+    <section id="pilot" class="cta-section">
         <div class="cta-bg"></div>
         <div class="${
             'cta-blob cta-blob-1'
@@ -449,27 +393,34 @@ function buildCTA(): SafeHtml {
         <div class="container">
             <div class="cta-content">
                 <h2>${
-                    'Ready to Transform How'
-                    + ' Your Team Works?'
+                    'Run a pilot with us'
                 }</h2>
                 <p>${
-                    'Join thousands of teams'
-                    + ' who use Fusion Angle to'
-                    + ' amplify their human'
-                    + ' intelligence. Start'
-                    + ' your free trial'
-                    + ' today — no credit'
-                    + ' card required.'
+                    'We are a small team with a'
+                    + ' working product and no'
+                    + ' customers yet. A pilot is'
+                    + ' one team, one real process,'
+                    + ' and the founders on the'
+                    + ' call. You get the system and'
+                    + ' a direct line to the people'
+                    + ' building it. We get the'
+                    + ' process that proves the next'
+                    + ' step. There is no pricing'
+                    + ' page. We work that out'
+                    + ' together.'
                 }</p>
                 <div class="cta-buttons">
-                    <button class="${
-                        'btn btn-accent btn-xl'
-                    }" data-goto-auth>
-                        Start Free Trial ${
-                            iconArrowRight(ICON_SIZE.xl, '')
-                        }
-                    </button>
+                    ${bookPilot(
+                        'btn btn-accent btn-xl',
+                    )}
                 </div>
+                <p>${
+                    'Already a member? '
+                }<a href="${
+                    '../auth/index.html'
+                }" data-goto-auth>${
+                    'Sign in'
+                }</a></p>
             </div>
         </div>
     </section>`;
@@ -478,7 +429,7 @@ function buildCTA(): SafeHtml {
 function buildFooter(): SafeHtml {
     const year = new Date().getFullYear();
     return html`
-    <footer id="about" class="footer">
+    <footer class="footer">
         <div class="container">
             <div class="footer-grid">
                 <div class="footer-brand">
@@ -493,10 +444,7 @@ function buildFooter(): SafeHtml {
                         }">Fusion Angle</span>
                     </div>
                     <p>${
-                        'Human-Intelligence'
-                        + ' first AI platform.'
-                        + ' Amplifying expertise,'
-                        + ' not replacing it.'
+                        'Idea to execution, one system.'
                     }</p>
                 </div>
             </div>
@@ -522,9 +470,11 @@ export async function init(): Promise<void> {
         ${buildNavbar()}
         <main>
             ${buildHero()}
-            ${buildFeatures()}
-            ${buildHowItWorks()}
-            ${buildCTA()}
+            ${buildStalls()}
+            ${buildPipeline()}
+            ${buildAiSeat()}
+            ${buildSafety()}
+            ${buildPilot()}
         </main>
         ${buildFooter()}
     </div>`);
