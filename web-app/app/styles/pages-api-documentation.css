@@ -1,5 +1,33 @@
-/* API elevation page. */
+/* In-place API documentation rooms. */
 
-.api-documentation object {
+#api-elevation svg {
     width: 100%;
+    height: auto;
+}
+
+.api-doc-pre {
+    margin-top: var(--space-2);
+    padding: var(--space-4);
+    overflow: auto;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: hsl(var(--foreground));
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    white-space: pre-wrap;
+}
+
+.api-doc-list {
+    margin-top: var(--space-2);
+    color: hsl(var(--foreground));
+}
+
+.api-doc-list li + li {
+    margin-top: var(--space-2);
+}
+
+.api-doc-list a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
 }
