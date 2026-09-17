@@ -531,13 +531,17 @@ Deno.test(
             ctx, MARKET_SENTIMENT_ANALYZER, fields, 'approved',
         );
         const before = buildObjectiveAggregates(
-            await getObjectiveScoringInputs(ctx),
+            getObjectiveScoringInputs(
+                await getDashboardScoringBundle(ctx),
+            ),
         ).find(a => a.objectiveId === LOWER_EXPENSES)!;
         await postProjectActualMeasurement(
             ctx, MARKET_SENTIMENT_ANALYZER,
             [{ objectiveId: LOWER_EXPENSES, score: -44 }],
         );
-        const inputs = await getObjectiveScoringInputs(ctx);
+        const inputs = getObjectiveScoringInputs(
+            await getDashboardScoringBundle(ctx),
+        );
         const after = buildObjectiveAggregates(inputs)
             .find(a => a.objectiveId === LOWER_EXPENSES)!;
         assertStrictEquals(

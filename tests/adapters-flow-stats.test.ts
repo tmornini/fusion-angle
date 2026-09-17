@@ -198,6 +198,7 @@ Deno.test(
                 }
                 if (
                     path.endsWith('/members/')
+                    || path.endsWith('/former-members/')
                     || path === 'ai-agents/'
                 ) {
                     return [];
