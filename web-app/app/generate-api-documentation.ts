@@ -32,6 +32,7 @@ const AT = '2020-01-01T00:00:00.000Z';
 const KEPT_ROOT_NAMES = new Set([
     'index.html',
     'index.ts',
+    'presenter.ts',
 ]);
 const enc = new TextEncoder();
 
@@ -105,6 +106,18 @@ export function roomPathOf(
         );
     }
     return parts.join('/') + '/index.html';
+}
+
+export function roomHashOf(
+    verb: string,
+    segments: readonly string[],
+): string {
+    const path = roomPathOf(verb, segments);
+    const suffix = '/index.html';
+    if (path.endsWith(suffix)) {
+        return path.slice(0, -suffix.length);
+    }
+    return path;
 }
 
 function writeExample(
@@ -660,6 +673,27 @@ function statusHref(
         + 'statuses/' + code + '/';
 }
 
+function isGrantUri(uri: string): boolean {
+    return uri === '/authentication/token'
+        || uri === '/authentication/authorize';
+}
+
+function headersFor(
+    verb: string,
+    uri: string,
+): readonly string[] {
+    const lower = verb.toLowerCase();
+    const headers: string[] = [];
+    if (!isGrantUri(uri)) {
+        headers.push('Authorization: Bearer …');
+    }
+    headers.push('Operation-ID: on writes');
+    if (lower === 'put' && isLockedPutUri(uri)) {
+        headers.push('If-Match: strong etag');
+    }
+    return headers;
+}
+
 export function verbRoomHtml(
     verb: string,
     uri: string,
@@ -693,19 +727,9 @@ export function verbRoomHtml(
         );
     }
     lines.push('<h2>Headers</h2>', '<ul>');
-    const grant = uri === '/authentication/token'
-        || uri === '/authentication/authorize';
-    if (!grant) {
+    for (const header of headersFor(verb, uri)) {
         lines.push(
-            '  <li>Authorization: Bearer …</li>',
-        );
-    }
-    lines.push(
-        '  <li>Operation-ID: on writes</li>',
-    );
-    if (lower === 'put' && isLockedPutUri(uri)) {
-        lines.push(
-            '  <li>If-Match: strong etag</li>',
+            '  <li>' + escapeHtml(header) + '</li>',
         );
     }
     lines.push('</ul>', '<h2>Status</h2>', '<ul>');
@@ -835,7 +859,7 @@ export function svgOf(rows: readonly Route[]): string {
             HTTP_VERBS.forEach((verb, i) => {
                 const cx = verbColumnX(i) + VERB_W / 2;
                 if (verbs.has(verb)) {
-                    const href = roomPathOf(
+                    const href = '#' + roomHashOf(
                         verb, row.segments,
                     );
                     parts.push(
@@ -908,9 +932,232 @@ export function svgOf(rows: readonly Route[]): string {
     ].join('\n');
 }
 
-function generateAll(): Map<string, string> {
+interface CatalogRoom {
+    readonly hash: string;
+    readonly verb: string;
+    readonly uri: string;
+    readonly body: string;
+    readonly headers: readonly string[];
+    readonly statuses: readonly string[];
+}
+
+interface CatalogStatus {
+    readonly hash: string;
+    readonly code: string;
+    readonly body: string;
+}
+
+function catalogRoomsOf(): CatalogRoom[] {
+    const rooms: CatalogRoom[] = [];
+    for (const row of routes) {
+        const uri = uriOf(row);
+        for (const verb of offeredVerbs(row)) {
+            rooms.push({
+                hash: roomHashOf(verb, row.segments),
+                verb: verb.toUpperCase(),
+                uri: wireUriOf(uri),
+                body: exampleBodyFor(uri, verb),
+                headers: headersFor(verb, uri),
+                statuses: statusCodesFor(row, verb),
+            });
+        }
+    }
+    rooms.sort((a, b) =>
+        a.hash < b.hash
+            ? -1
+            : a.hash > b.hash ? 1 : 0,
+    );
+    return rooms;
+}
+
+function catalogStatusesOf(): CatalogStatus[] {
+    return STATUS_DOCUMENTS.map((doc) => ({
+        hash: 'statuses/' + String(doc.code),
+        code: String(doc.code),
+        body: doc.body === null
+            ? 'empty'
+            : formatJson(doc.body),
+    }));
+}
+
+function tsQuoted(chunk: string): string {
+    return "'"
+        + chunk
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r')
+        + "'";
+}
+
+function emitConcatLines(
+    value: string,
+    indent: string,
+    trailer = '',
+): string[] {
+    const lines: string[] = [];
+    let offset = 0;
+    let first = true;
+    const reserve = trailer.length;
+    if (value.length === 0) {
+        return [indent + tsQuoted('') + trailer];
+    }
+    while (offset < value.length) {
+        const prefix = first ? indent : indent + '+ ';
+        let take = Math.min(
+            LINE_MAX - prefix.length - 2 - reserve,
+            value.length - offset,
+        );
+        if (take < 1) take = 1;
+        let chunk = value.slice(offset, offset + take);
+        let quoted = tsQuoted(chunk);
+        while (
+            prefix.length + quoted.length + reserve
+                > LINE_MAX
+            && take > 1
+        ) {
+            take -= 1;
+            chunk = value.slice(
+                offset, offset + take,
+            );
+            quoted = tsQuoted(chunk);
+        }
+        lines.push(prefix + quoted);
+        offset += take;
+        first = false;
+    }
+    const last = lines.length - 1;
+    lines[last] = lines[last] + trailer;
+    return lines;
+}
+
+function emitField(
+    name: string,
+    value: string,
+    indent: string,
+): string[] {
+    const one = indent + name + ': '
+        + tsQuoted(value) + ',';
+    if (one.length <= LINE_MAX) {
+        return [one];
+    }
+    return [
+        indent + name + ':',
+        ...emitConcatLines(
+            value, indent + '    ', ',',
+        ),
+    ];
+}
+
+function emitStringArray(
+    values: readonly string[],
+    indent: string,
+): string[] {
+    if (values.length === 0) {
+        return [indent + '[],'];
+    }
+    const lines = [indent + '['];
+    for (const value of values) {
+        lines.push(...emitConcatLines(
+            value, indent + '    ', ',',
+        ));
+    }
+    lines.push(indent + '],');
+    return lines;
+}
+
+function emitRoomLiteral(
+    room: CatalogRoom,
+): string[] {
+    const i = '    ';
+    const i2 = '        ';
+    return [
+        i + '{',
+        ...emitField('hash', room.hash, i2),
+        ...emitField('verb', room.verb, i2),
+        ...emitField('uri', room.uri, i2),
+        ...emitField('body', room.body, i2),
+        i2 + 'headers:',
+        ...emitStringArray(room.headers, i2),
+        i2 + 'statuses:',
+        ...emitStringArray(room.statuses, i2),
+        i + '},',
+    ];
+}
+
+function emitStatusLiteral(
+    status: CatalogStatus,
+): string[] {
+    const i = '    ';
+    const i2 = '        ';
+    return [
+        i + '{',
+        ...emitField('hash', status.hash, i2),
+        ...emitField('code', status.code, i2),
+        ...emitField('body', status.body, i2),
+        i + '},',
+    ];
+}
+
+const ROOMS_HEADER = [
+    'export interface ApiDocRoom {',
+    '    readonly hash: string;',
+    '    readonly verb: string;',
+    '    readonly uri: string;',
+    '    readonly body: string;',
+    '    readonly headers: readonly string[];',
+    '    readonly statuses: readonly string[];',
+    '}',
+    '',
+    'export interface ApiDocStatus {',
+    '    readonly hash: string;',
+    '    readonly code: string;',
+    '    readonly body: string;',
+    '}',
+    '',
+].join('\n');
+
+function roomsTsOf(
+    rooms: readonly CatalogRoom[],
+    statuses: readonly CatalogStatus[],
+): string {
+    const lines = [ROOMS_HEADER];
+    lines.push(
+        'export const API_DOC_ROOMS:',
+        '    readonly ApiDocRoom[] = [',
+    );
+    for (const room of rooms) {
+        lines.push(...emitRoomLiteral(room));
+    }
+    lines.push('];', '');
+    lines.push(
+        'export const API_DOC_STATUSES:',
+        '    readonly ApiDocStatus[] = [',
+    );
+    for (const status of statuses) {
+        lines.push(...emitStatusLiteral(status));
+    }
+    lines.push('];', '');
+    return lines.join('\n');
+}
+
+function elevationTsOf(svg: string): string {
+    const chunks = emitConcatLines(svg, '    ', ';');
+    return 'export const API_ELEVATION_SVG: string =\n'
+        + chunks.join('\n') + '\n';
+}
+
+export function generateAll(): Map<string, string> {
     const out = new Map<string, string>();
-    out.set('API.svg', svgOf(routes));
+    const svg = svgOf(routes);
+    const catalogRooms = catalogRoomsOf();
+    const catalogStatuses = catalogStatusesOf();
+    out.set('API.svg', svg);
+    out.set(
+        'rooms.ts',
+        roomsTsOf(catalogRooms, catalogStatuses),
+    );
+    out.set('elevation.ts', elevationTsOf(svg));
     const rooms: { path: string; html: string }[] = [];
     for (const row of routes) {
         const uri = uriOf(row);
