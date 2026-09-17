@@ -8,6 +8,10 @@ import {
 } from './fixtures.ts';
 import { registryUrl } from
     '../../web-app/app/browser-drive.ts';
+import {
+    API_DOC_ROOMS,
+    API_DOC_STATUSES,
+} from '../../web-app/api-documentation/rooms.ts';
 
 const browser = useBrowser();
 
@@ -259,6 +263,47 @@ async () => {
             ),
             '',
         );
+    } finally {
+        await closeDocs(origin, page);
+    }
+});
+
+Deno.test('every catalog hash paints its title',
+async () => {
+    const { origin, page } = await openDocs('');
+    try {
+        const entries: {
+            hash: string;
+            title: string;
+        }[] = [
+            ...API_DOC_ROOMS.map((room) => ({
+                hash: room.hash,
+                title: room.verb + ' ' + room.uri,
+            })),
+            ...API_DOC_STATUSES.map((row) => ({
+                hash: row.hash,
+                title: row.code,
+            })),
+        ];
+        for (const entry of entries) {
+            await page.evaluate(
+                `location.hash = ${
+                    JSON.stringify('#' + entry.hash)
+                }; true`,
+            );
+            const heading = await page.until<string>(
+                `document.querySelector('${ROOM_H1}')`
+                + `?.checkVisibility() === true`
+                + ` && document.querySelector(`
+                + `'${ROOM_H1}').textContent.trim()`
+                + ` === ${JSON.stringify(entry.title)}`
+                + ` ? document.querySelector(`
+                + `'${ROOM_H1}').textContent.trim()`
+                + ` : null`,
+                'title for #' + entry.hash,
+            );
+            assertStrictEquals(heading, entry.title);
+        }
     } finally {
         await closeDocs(origin, page);
     }
