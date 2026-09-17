@@ -94,14 +94,16 @@
     animation: fade-in var(--duration-normal) var(--ease-out);
 }
 
-.navbar-mobile-menu a {
+.navbar-mobile-menu .navbar-link {
     display: block;
     padding: var(--space-2) 0;
     color: hsl(var(--muted-foreground));
     font-weight: var(--font-weight-medium);
     transition: color var(--duration-fast) var(--ease-default);
 }
-.navbar-mobile-menu a:hover { color: hsl(var(--foreground)); }
+.navbar-mobile-menu .navbar-link:hover {
+    color: hsl(var(--foreground));
+}
 
 
 .hero {
