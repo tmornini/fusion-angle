@@ -52,15 +52,29 @@ not mid-walk.
    anywhere aborts the walk — no explorer is
    dispatched. Read the seed reveal from stdout;
    it is shown once. A3 **is** SV1.
-3. Dispatch one explorer with the prompt below. A1–A3
-   are the master's — they run before the origin exists;
-   A4 onward are the explorer's.
-4. Receive one line per case. Write the summary
-   (`## Summary Format`) and one stub per FAIL cluster.
-5. Run **K8** (wipe and reseed — the explorer has returned),
-   then **J1–J3**.
+3. Dispatch explorers until every case from **A4**
+   through the end of `## SV` except **K8** has a
+   scored line in the checkpoint
+   `/tmp/fusion-angle-walk-${SHA}.txt` (create it
+   empty before the first explorer). A1–A3 are the
+   master's — they run before the origin exists.
+   Do not wait for the operator between explorers.
+   A return with missing IDs is not the end of the
+   walk: dispatch the next explorer immediately
+   with the remaining IDs, same origin, same garden
+   (do not re-seed; do not repeat Setup unless the
+   checkpoint has no lines yet). One explorer's
+   context limit is not a BLOCKED mass.
+4. When the checkpoint is complete, write the
+   summary (`## Summary Format`) and one stub per
+   FAIL cluster. Do not summarize an incomplete
+   checkpoint.
+5. Run **K8** (wipe and reseed — explorers have
+   returned), then **J1–J3**.
 
-The master does not drive the product and does not patch.
+The master does not drive the product and does not
+patch. The master does not invent deploy scripts;
+`./deploy --local` is the origin.
 
 ### The explorer prompt
 
@@ -78,11 +92,21 @@ Origin: http://localhost:8080
 Admin: {admin_username} / {admin_password}
 {the seed reveal's other sign-ins}
 
-Read TEST-PLAN.md from `## The walk` to the end. Every
-case from **A4** through the end of `## SV` is yours, in
-document order. A1–A3 are the master's. Skip K8
-(the master runs it after you return) and J (the
-master's teardown).
+Read TEST-PLAN.md from `## The walk` to the end.
+
+Checkpoint: /tmp/fusion-angle-walk-{SHA}.txt
+Append each scored line immediately. If the file
+already has lines, you are a successor: do not
+repeat Setup; do not clear cookies; start at the
+first ID after the last scored line that the
+master listed as remaining. The garden is live.
+
+Your IDs: every case from **A4** through the end
+of `## SV` that is not yet in the checkpoint, in
+document order — unless the master listed a
+remaining subset; then that subset is the whole
+job. A1–A3 are the master's. Skip K8 (the master
+runs it after explorers return) and J (teardown).
 
 Refuse if browser-use is not available. Do not fall back
 to Claude-in-Chrome or chrome-devtools MCP.
@@ -123,15 +147,38 @@ the product working, not a FAIL.
 
 Do not patch. Do not re-seed. Do not retry the plan.
 
-Score from ### Scoring. FAIL only when you drove the
-step and the product disagreed, and the disagree is
-not already decided by a green Pin. A missed
-compositor gesture, a hidden tab, a missing
-prerequisite, or a green pin for the unobserved half
-is BLOCKED or DEFERRED — never FAIL. DRIFT when the
-product matches a pin and the document is wrong.
+Drive every remaining case whose PASS line is a
+click, type, navigation, dialog, list, hash, or
+network-log read. Those can pass. Do not score
+them BLOCKED for "not driven", "not executed",
+"session capacity", "this pass", or "skipped".
 
-Return one line per case:
+Named driver-limit cases (### Driving notes:
+Shift-drag, F17 off-canvas, F37b hidden tab,
+list-drag hysteresis, slider-drag, I21 without
+the Fetch pause): one attempt. If the compositor
+does not deliver, BLOCKED naming the attempt,
+then move on. Do not grind or retry overnight.
+Later cases that share that exact limit score
+BLOCKED or DEFERRED from that attempt — do not
+re-drive the undeliverable gesture.
+
+If context is tight: stop after the last fully
+driven case. Write STOPPED-AT {ID} to the
+checkpoint. Leave later IDs unlisted. The master
+will dispatch a successor. Never invent BLOCKED
+rows to look finished.
+
+Score from ### Scoring. FAIL only when you drove
+the step and the product disagreed, and the
+disagree is not already decided by a green Pin.
+A missed compositor gesture you attempted, a
+hidden tab, a missing prerequisite, or a green
+pin for the unobserved half is BLOCKED or
+DEFERRED — never FAIL. DRIFT when the product
+matches a pin and the document is wrong.
+
+Return one line per driven case:
 ID PASS|FAIL|BLOCKED|DEFERRED|DRIFT — one-line note.
 ```
 
@@ -293,7 +340,7 @@ not repeat the note in every case.
 |---|---|
 | PASS | the PASS line was observed |
 | FAIL | the step was driven and the product disagreed with the PASS line, and no green Layer 1/2 pin already decides that observation — a finding, not a verdict |
-| BLOCKED | a step could not be performed (driver or environment), or the compositor did not deliver the gesture a green pin already decides; the reason is the note |
+| BLOCKED | a step was attempted and could not be performed (driver or environment), or the compositor did not deliver the gesture a green pin already decides; the reason names the attempt |
 | DEFERRED | a prerequisite case did not produce what this case needs |
 | DRIFT | passes in substance; the document or the UI text disagrees — the document changes |
 
@@ -331,11 +378,15 @@ SV7 when SV6 did not produce a second jar:
 DEFERRED on SV6, not FAIL. Two tabs of one jar
 is SV8b.
 
-Nothing blocks on any outcome. BLOCKED is allowed for a
-driver limit: with no gate riding on the walk, an honest
-BLOCKED costs nothing and a dishonest FAIL costs a day. A
-durable limit earns the case a one-line driving note, added
-by the master.
+Skip, session capacity, and "not driven" are not
+BLOCKED. They are an incomplete walk. The master
+dispatches the next explorer. BLOCKED is allowed
+for a driver limit that was attempted: with no gate
+riding on the walk, an honest BLOCKED costs nothing
+and a dishonest FAIL costs a day. A durable limit
+earns the case a one-line driving note, added by
+the master. Do not spend the night re-attempting a
+limit that note already names.
 
 ## Summary
 
@@ -7200,11 +7251,13 @@ Mitigation specs:
 (none) | ... | ...
 ```
 
-The summary reports counts. FAIL rows become stubs; there
-is no arithmetic to satisfy and no run is "fully green".
-`BLOCKED` names a driver or environment limit; `DRIFT`
-names a document that must change. Neither is a
-regression, and neither blocks.
+The summary reports counts after the checkpoint is
+complete. FAIL rows become stubs; there is no
+arithmetic to satisfy and no run is "fully green".
+`BLOCKED` names an attempted driver or environment
+limit; `DRIFT` names a document that must change.
+Neither is a regression, and neither blocks. An
+unlisted case is not BLOCKED — it is unfinished.
 
 ### Mitigation specs
 
