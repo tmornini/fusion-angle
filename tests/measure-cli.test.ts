@@ -190,6 +190,57 @@ Deno.test('visualize-only is disk-only, no local server', () => {
     assertStrictEquals(needsLocalMeasureServer(cli), false);
 });
 
+Deno.test('measure --help runs without env permission',
+async () => {
+    const output = await new Deno.Command('deno', {
+        args: [
+            'run',
+            '--frozen',
+            '--allow-read',
+            'web-app/app/measure.ts',
+            '--help',
+        ],
+        signal: AbortSignal.timeout(15_000),
+        env: {
+            POSTGRES_URL: '',
+            JWT_HMAC_SIGNING_KEY: '',
+            MEASURE_PASSWORD: '',
+            CHROME: '',
+        },
+    }).output();
+    const stdout = new TextDecoder().decode(
+        output.stdout,
+    );
+    const stderr = new TextDecoder().decode(
+        output.stderr,
+    );
+    assertStrictEquals(
+        output.code,
+        0,
+        stderr.trim() || stdout.trim(),
+    );
+    assertMatch(stdout, /Usage: \.\/measure/);
+    assertNotMatch(stderr, /Requires env access/);
+});
+
+Deno.test(
+    'measure wrapper grants env only when needed',
+() => {
+    const src = Deno.readTextFileSync('bin/measure');
+    assertMatch(
+        src,
+        /--allow-env=CHROME,MEASURE_PASSWORD/,
+    );
+    assertMatch(
+        src,
+        /--allow-env=CHROME,JWT_HMAC_SIGNING_KEY,POSTGRES_URL/,
+    );
+    assertNotMatch(
+        src,
+        /MEASURE_PASSWORD,POSTGRES_URL/,
+    );
+});
+
 Deno.test('bare ceremony needs a local Node server', () => {
     const result = finalizeMeasureCli(baseFlags());
     assertStrictEquals(result.kind, 'ok');

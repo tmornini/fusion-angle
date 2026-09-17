@@ -16,8 +16,10 @@ set -euo pipefail
 # write (the temp build and Chrome-profile directories,
 # plus budgets, history, and the visualizer HTML); net
 # (the measured origin, Chrome's debug port, and the
-# free-port probe); env (the four variables measure.ts
-# and cdp-client.ts read by name).
+# free-port probe); env granted per option. Help and
+# bare --visualize read none. --base-url reads CHROME
+# and MEASURE_PASSWORD. A local spawn reads CHROME,
+# the signing key, and POSTGRES_URL.
 #
 # --allow-run is unscoped, as in ./bin/test-browser,
 # because two of its targets are known only at run time:
@@ -30,10 +32,45 @@ set -euo pipefail
 BIN="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$BIN/.." && pwd)"
 cd "$ROOT"
+
+needs_help=false
+needs_visualize=false
+needs_extra=false
+needs_base_url=false
+for arg in "$@"; do
+    case "$arg" in
+        --help|-h)
+            needs_help=true
+            ;;
+        --visualize)
+            needs_visualize=true
+            ;;
+        --base-url)
+            needs_base_url=true
+            needs_extra=true
+            ;;
+        --check|--record|--write-budgets|--profile|--pages|--runs)
+            needs_extra=true
+            ;;
+    esac
+done
+
+env_flag=""
+if $needs_help \
+    || { $needs_visualize && ! $needs_extra; }
+then
+    env_flag=""
+elif $needs_base_url; then
+    env_flag="--allow-env=CHROME,MEASURE_PASSWORD"
+else
+    env_flag="--allow-env=CHROME,JWT_HMAC_SIGNING_KEY,POSTGRES_URL"
+fi
+
+# shellcheck disable=SC2086
 deno run --frozen \
     --allow-read \
     --allow-write="${TMPDIR:-/tmp}",measurements \
     --allow-net \
     --allow-run \
-    --allow-env=CHROME,JWT_HMAC_SIGNING_KEY,MEASURE_PASSWORD,POSTGRES_URL \
+    $env_flag \
     web-app/app/measure.ts "$@"
