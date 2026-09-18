@@ -5,58 +5,209 @@ file by shipping; `## Close protocol` is the exit.
 
 ## Critical product path
 
-Eleven items, in this order — each its own brainstorm →
+Fourteen items, in this order — each its own brainstorm →
 spec → plan → ship cycle, implemented sequentially,
-ordered by benefit over cost: what a pilot tenant needs
-first, the process engine and its AI worker on that, two
+ordered by benefit over cost: the ledger right, then
+fenced (items 0–3, one deploy), what a pilot tenant needs
+next, the process engine and its AI worker on that, two
 processes last. A "Merged:" clause names bullets absorbed
 from `## Later work`; they keep their oracles. Four
 former items left for `## Later work` (genericity, JSON
 parse/stringify, simulated latency, cachability) and the
-skew tests, which went with item 7's trio.
+skew tests, which went with item 8's trio.
 
-2. The authentication header out of the message; roles
-   and views — `HOISTED_HEADER_NAMES`
-   (`api/message-pair.ts:512-515`) stores
-   `Authorization:` verbatim in every write pair's
-   `request`, so the ledger holds every bearer token
-   ever spent on a write; the
-   `/authentication/authorize/` pair stores the login
-   body, password included, and the
-   `/authentication/token/` pair stores the refresh
-   token it was sent and the access token it issued
-   (`tests/api-shadow-ledger-auth.test.ts` 'live secrets
-   land in the auth-flow ledger rows' and 'a refresh
-   grant stores its own pair with live secrets' pin the
-   exposure). Every dump and backup carries all of it;
-   retire that before item 5 backs anything up. The
-   header leaves the `request` bytes for a column of its
-   own — whether `request_hash` still covers it is the
-   brainstorm's question, since replay identity across
-   two tokens changes either way — and the grant bodies
-   follow the same rule or are hashed in place; a view
-   the application reads that omits the column; a
-   schema-owner role that owns DDL, and application
-   roles (read-only, write-only, read-write) that cannot
-   read it, in place of `POSTGRES_DROP_SCHEMA`'s
-   `GRANT ALL … TO public`; what Render's Postgres lets
-   a role be, measured first. Merged: token-at-rest
-   hashing (closes KNOWN
-   seam "A raw dump still has verbatim auth messages");
-   two-role views (`tests/backend-postgres.test.ts`, the
-   re-grant); physical PII erasure (closes KNOWN seam
-   "Erased PII persists as superseded pairs" —
-   `tests/api-pii-tombstone.test.ts`; physical delete or
-   crypto-shredding is the one place append-only yields,
-   and the brainstorm names which); the in-band
+0. The table, right — what a pair stores and what the
+   store guarantees, before anything reads it
+   differently. `request` holds the entire request as
+   received: start line, every header, and the body
+   bytes exactly as received, never re-serialized — in
+   the form the runtime delivers it; header order,
+   header case, and the HTTP version token are not
+   recoverable under `Deno.serve`. A pair for which
+   nothing was received (item 1's sibling PUTs) stores
+   zero request bytes. `response` holds the entire
+   response as sent: the status actually sent (201 on a
+   first write, 200 on a same-body no-op, 204 on
+   DELETE), and `date`, `etag`, and `operation-id` as
+   the wire carries them; a later GET streams the body
+   under its own `date`. Every write is ONE statement,
+   guarded by constraints, never by a transaction or an
+   advisory lock: the INSERT mints `response_at` from
+   `clock_timestamp()`, splices it in as `date`, and
+   computes both hashes with Postgres's `sha256` over
+   the bytes it stores — the stamp and the hashes are
+   made where the row is made, on the one clock;
+   `response_hash` becomes a column. Row hashes stay
+   independent — no chain — so erasure stays possible.
+   Every pair names the pair it supersedes; a genesis
+   supersedes the ROOT, one row seeded with the schema
+   under the nil UUID, so the column is NOT NULL and no
+   sentinel exists. Two unique indexes carry the
+   invariants: `UNIQUE (path, name, supersedes)` — one
+   successor per head, one genesis per document — and a
+   partial `UNIQUE (request_hash)` over received,
+   non-grant requests — a byte-identical request lands
+   once and replays; the two grant routes always land.
+   An in-order PUT (`If-Match`) fills `supersedes` from
+   the client and answers 412 on rejection; a blind PUT
+   fills it from the head and retries, bounded; the
+   memory backend raises the same rejections in
+   TypeScript. Composed writes are one multi-row
+   INSERT; the bell rings from the same statement
+   (`RETURNING` into `pg_notify`). `transaction` and
+   `writeLocks` leave `DbAdapter`; item 13's "advisory
+   locks already cluster-wide" loses its referent. The
+   authorize `code` and the token grant's
+   `access_token` leave the response body for a
+   response header, stored in a column of its own; the
+   refresh token's `Set-Cookie` is the precedent, and
+   the departure from RFC 6749 §5.1 is accepted: both
+   clients are ours. The brainstorm names that header,
+   the root's values (it must satisfy every CHECK),
+   whether `supersedes` is a column or a succession
+   join table (a data-modifying CTE keeps one
+   statement either way), and how the gate reads which
+   index rejected a row. The DDL is final when this
+   item ships, but for `schema_marker`, which item 3
+   retires. Today falls short on every count:
+   `request` keeps six header names
+   (`HOISTED_HEADER_NAMES`, `api/message-pair.ts:555-558`)
+   and a body parsed and re-serialized with sorted
+   keys, and a field registry (`isStoredField`,
+   `shared/http-message/wire-codec.ts:45`) decides
+   which received fields survive — waste once every
+   header is stored; `response` keeps a 200 rewritten
+   to 201 at send time and a `response-id` field
+   naming the id the wire sends as `ETag`;
+   `api/message-pair.ts:288` computes the response
+   hash and nothing stores it; 69 `transaction(…)`
+   sites and three advisory-lock labels
+   (`api/backend-postgres.ts:220-243`) guard what the
+   two indexes will. Rides along: the in-band
    plaintext comment at `api/mock-data.ts:145-157`,
    which still says PBKDF2 and names a column that is
-   not there (owner call); the authorize-code lookup
-   is a document read done as a body search
-   (`getAllWhereBody`, GIN `message_pairs_body` —
-   examination report), and the hashed name is this
-   item's design.
-3. `/status` — `{ up: boolean, components: { postgres:
+   not there (owner call). Meets the JSON
+   parse/stringify bullet in `## Later work` and the
+   hash-and-verify half of its verifiable-ledger
+   bullet; the brainstorm says what is left of each.
+1. State arrives by PUT, and the application reads the
+   response as a unit — a POST or PATCH that modifies
+   data lands a sibling PUT in the same statement under
+   the same `operation_id`, as instance PATCH does today
+   (`postInstancePatchOp`, `api/routes.ts:3745-3761`).
+   A sibling PUT is synthesized — nothing was received
+   for it — so its `request` is zero bytes; item 0's
+   replay index excludes empty requests, so the shared
+   empty hash conflicts with nothing and locks nothing.
+   The PATCH revision and the token grant's
+   `tokens/:jti` pair become such pairs; the revision's
+   `If-Match`-only synthesized request
+   (`api/routes.ts:3724-3743`) retires with them.
+   Work-order create, claim, release, transition, and
+   binding each land a PUT of `work-orders/:id`, derive
+   reads the head, and `replayWorkOrderOperations`
+   retires — a faithful conversion, nothing item 11
+   will add; claim expiry stays decided at read time
+   (`api/derive-states.ts:517-529`), recording it is
+   item 13's. Authorize lands a PUT document named
+   `sha256(code)` (`deriveAuthorizationCodeId`) holding
+   `client_id`, `code_challenge`, and the issue
+   instant; the grant reads it by name. Flows keep
+   their event walk until item 11. A read hands out
+   the stored response whole: a document GET is the
+   stored bytes with two substitutions — the status
+   line (201 → 200) and `date` — made by ONE function
+   on the head, the body bytes untouched; a collection
+   GET is `multipart/mixed`, each part an
+   `application/http; msgtype=response` unit with the
+   same two substitutions, so one head is one unit
+   from either source. Derivation is head selection;
+   whatever still needs a body reads it in place from
+   the unit, never from `request`. The API client
+   keeps each response whole, and pages and presenters
+   read from the unit they were given. A per-route
+   audit proves each PUT response carries what its
+   readers need; a gap closes by the response saying
+   more. API tests pin the headers a read serves and
+   the headers it must not. Today: the five
+   work-order operations answer 204 and keep their
+   state in the POST request body alone
+   (`api/derive-states.ts:1023-1043`, `:1245`); the
+   authorize grant finds a code by body search
+   (`getAllWhereBody`, `api/authentication.ts:1254`,
+   GIN `message_pairs_body` — examination report);
+   derivation reads the request body at five seams
+   (`api/derive-documents.ts:95,159`,
+   `api/document-family.ts:396,473`,
+   `api/routes.ts:5088,5303`, `api/api.ts:1341`,
+   `api/authentication.ts:1257`); a document GET
+   parses the stored response, keeps the body, and
+   rebuilds three headers (`streamGetFromStored`); a
+   collection GET dismantles every head into an array
+   of bodies (`entitiesOf`,
+   `api/message-store.ts:57-66`); and the client
+   receives bare JSON. Follows item 0.
+2. The ledger fenced — roles and a view, on a table
+   items 0 and 1 have finished. What Render's Postgres
+   lets a role be, measured first. A schema-owner role
+   owns the DDL, the root row, `schema_marker`, seed,
+   and wipe; the application role INSERTs into the
+   table and SELECTs a view that omits `request` and
+   item 0's secret column — it never reads a received
+   request or an issued secret back, and item 1 made
+   sure it never needs to; a reporting role reads an
+   envelope-only view, no bytes at all;
+   `POSTGRES_DROP_SCHEMA`'s `GRANT ALL … TO public`
+   retires (`tests/backend-postgres.test.ts`, the
+   re-grant). `requester_identity_id` — the verified
+   token's `sub` — stays in the view. `request_hash`
+   verifies only for a role that reads `request`;
+   `response_hash` verifies through the view. PII
+   erasure stays a tombstone, and the view hides every
+   `identities/:id/pii` pair that precedes a DELETE at
+   its document — one probe on
+   `message_pairs_document`, proven with `EXPLAIN` and
+   `./bin/measure`; the DELETE head stays visible, and
+   every other family keeps its deleted history. Item
+   0's replay index still sees a hidden row, so a
+   resend of a hidden PUT conflicts on a pair the
+   application cannot read back; the spec names the
+   answer. The page's word for the act must not
+   promise deletion. Every byte stays recorded; a view
+   fences live readers only, so a dump or backup
+   carries the table whole, and item 6 no longer
+   orders this item. This item changes no row and no
+   column, and a test says so. KNOWN seams "A raw dump
+   still has verbatim auth messages" and "Erased PII
+   persists as superseded pairs" are reworded, not
+   closed: the bytes persist in the owner-only ledger,
+   and no application role reads them. Today: one
+   role, `fusion`, owns and reads everything
+   (`compose.yaml`), and every write pair's `request`
+   holds `Authorization:` verbatim
+   (`tests/api-shadow-ledger-auth.test.ts` 'live
+   secrets land in the auth-flow ledger rows'). Follows
+   items 0 and 1.
+3. Retire `schema_marker` for a definition check — the
+   marker (`api/schema-postgres.ts:26-29`) proves only
+   that a seed once finished; it cannot tell an
+   unwiped database with the old `text` stamp columns
+   from a correct one (SCHEMA.md § Operator tools).
+   Boot reads the live definition from the catalog —
+   `information_schema.columns`, `pg_get_constraintdef`,
+   `pg_get_indexdef`, and the root row — and compares
+   it to what the DDL declares, naming the drift; the
+   expected list lives beside the DDL, and `SCHEMA.svg`
+   goes from two tables to one. Item 0 made a seed one
+   statement, so a failed seed leaves nothing and the
+   last-stamp trick has no purpose; non-empty means a
+   pair beyond the root. Item 6's restore drill checks
+   the definition instead of the marker. Today: boot
+   gates on the marker row (`assertSchemaMarker`,
+   `server/postgres-gate.ts:28`), the seed stamps it
+   last (`api/backend-postgres.ts:110`) and refuses on
+   it (`server/seed.ts:111`). Follows item 2.
+4. `/status` — `{ up: boolean, components: { postgres:
    boolean } }`, 200 when every component is up and 503
    when any is not, built for more components. Decide:
    bearer-exempt or not (Render and compose probe it
@@ -67,8 +218,8 @@ skew tests, which went with item 7's trio.
    stores no pair; whether the throttle counts it and
    whether it logs. Replaces the compose healthcheck's
    `fetch('/')`, which proves static serving only. Item
-   5's health probe; item 12 answers it per process.
-4. A person's first sign-in — no page mints a human
+   5's health probe; item 13 answers it per process.
+5. A person's first sign-in — no page mints a human
    credential: the seed does
    (`api/mock-data/seed-message-pairs.ts:2609`), only
    services get a secret from the UI
@@ -88,7 +239,7 @@ skew tests, which went with item 7's trio.
    under item 2's discipline. Not sign-up: a stranger
    creating an organization stays in `## Later work`
    (SP-6). Merged: invitation email delivery.
-5. Operable — what a pilot tenant's data needs before it
+6. Operable — what a pilot tenant's data needs before it
    exists. A backup the operator has restored once:
    Render's schedule, a written restore drill, its
    measured duration, and a `schema_marker` that reads
@@ -109,12 +260,12 @@ skew tests, which went with item 7's trio.
    difference, not a second clock. An alert when
    `/status` is not 200 or the error rate rises.
    `TRUSTED_PROXY_HOPS` set to Render's real hop
-   count. Consumes item 3. Merged:
+   count. Consumes item 4. Merged:
    the throttle seam — a global cap if the hops are
    wrong, refresh and exchange unlimited
    (`tests/http-throttle.test.ts`); the `ipAllowList`
    bullet.
-6. The membership profile — an organization-side profile
+7. The membership profile — an organization-side profile
    per SEAT, so the identity "Tony Stark, CEO" holding a
    contractor seat elsewhere appears there as
    "contractor": the document shape (keys on the seat
@@ -125,12 +276,12 @@ skew tests, which went with item 7's trio.
    one-profile-per-identity covenant at
    `api/types.ts:1303-1304`; the seed already carries
    the contradiction (the admin holds two seats with one
-   title). Lands before items 10 and 11, whose designer
+   title). Lands before items 11 and 12, whose designer
    roster and AI seats read it, and replaces the
    roster's absent profile with the read. Authored on
    the `2026-09-04-critical-functionality-path` branch;
    this is its master copy.
-7. Lifecycle out of the document body — closed the other
+8. Lifecycle out of the document body — closed the other
    way by `docs/superpowers/specs/2026-09-15-retire-the-trio-design.md`:
    state stays in the document body, PUT stores it, GET
    reads it from the head, and ideas, projects,
@@ -142,8 +293,8 @@ skew tests, which went with item 7's trio.
    wrappers, and the clock-skew and authorship-on-resend
    tests whose fixtures never built the skew they named.
    Flows keep their event walk and their three body
-   fields until item 10 rewrites them.
-8. The bell reaches the browser — every write already
+   fields until item 11 rewrites them.
+9. The bell reaches the browser — every write already
    `pg_notify`s `fusion_events` with a scoped
    `NotificationEvent` (`api/notifications.ts`;
    `notifyPayload` in `api/advisory-lock.ts`, 8000-byte
@@ -157,25 +308,25 @@ skew tests, which went with item 7's trio.
    browser`), fenced to the session's organization and
    identity, delivered into the existing
    `fusion-angle:data` refresh so pages change nothing.
-   Precedes item 9 (a chat that does not update is not a
-   chat) and item 11 (the worker trusts the bell, never
+   Precedes item 10 (a chat that does not update is not a
+   chat) and item 12 (the worker trusts the bell, never
    polls). Merged: stale-until-navigation (closes KNOWN
    seam "Stale-until-navigation (no LISTEN)" —
    `tests/advisory-lock.test.ts`).
-9. Chats — a conversation on any document at
-   `/…/:collection/:id/chat/` with as little ceremony as
-   the plane allows: a message is a POST pair at that
-   document, the chat is that document's history, and
-   derive is `getMessagePairs` filtered to POST — no new
-   family shape unless the brainstorm finds one (edits,
-   deletions, and attachments are its questions).
-   Authorship is `requester_identity_id`, so an AI
-   seat's messages need no extra field. Reads ride the
-   fenced org; updates ride item 8. Consumed by item 10
-   (a chat on every record and work order) and item 11
-   (the channel a person uses to instruct and correct a
-   worker).
-10. Processes — re-implement flows, work orders, and the
+10. Chats — a conversation on any document at
+    `/…/:collection/:id/chat/` with as little ceremony as
+    the plane allows: a message is a POST pair at that
+    document, the chat is that document's history, and
+    derive is `getMessagePairs` filtered to POST — no new
+    family shape unless the brainstorm finds one (edits,
+    deletions, and attachments are its questions).
+    Authorship is `requester_identity_id`, so an AI
+    seat's messages need no extra field. Reads ride the
+    fenced org; updates ride item 9. Consumed by item 11
+    (a chat on every record and work order) and item 12
+    (the channel a person uses to instruct and correct a
+    worker).
+11. Processes — re-implement flows, work orders, and the
     workbox with a node as a process. Four kinds, each
     defined by what it waits on and what it emits:
     record modification (today's node — a member or
@@ -189,7 +340,7 @@ skew tests, which went with item 7's trio.
     directed and cyclic. Kept: the pair plane, the graph
     frozen into the work order at creation, the claim
     alphabet, all-see-all. Each record and work order
-    carries a chat (consumes item 9). The brainstorm's
+    carries a chat (consumes item 10). The brainstorm's
     first questions: what the two nested kinds share,
     and how a cycle across a sub-flow boundary
     terminates. Merged, the canvas debts the rewrite
@@ -217,7 +368,7 @@ skew tests, which went with item 7's trio.
     genericity bullet in `## Later work` (two zoom
     implementations, `#noteMutation`, `handleSpace`,
     Delete's `preventDefault`).
-11. Headless AI worker — a process that hears item 8's
+12. Headless AI worker — a process that hears item 9's
     bell for each AI seat's workbox, claims the work
     order as that seat (the `client_credentials` grant
     already mints a service identity's token, so every
@@ -226,38 +377,38 @@ skew tests, which went with item 7's trio.
     definition, the attribute values (which — the
     brainstorm decides), the node instructions
     (`withNodeTaskInstructions` already stores them),
-    and the chat (item 9), asks the model to follow them
+    and the chat (item 10), asks the model to follow them
     precisely, validates the reply at the gate like any
     other uninstructed voice, and applies it: attribute
     updates in record-PATCH form and the outgoing edge.
     API-only; no page. Decide in the brainstorm: an
     in-process loop or a second verb of the binary (a
-    second process is item 12's precondition, the
+    second process is item 13's precondition, the
     claim-expiry event, arriving early); the model
     behind an adapter with its key supplied at deploy
     and never logged; bounded retries with backoff; a
     loop guard and a spend ceiling for a cycle whose
     every node is an AI seat; record content treated as
-    data, never as instruction. Consumes items 8, 9, and
+    data, never as instruction. Consumes items 9, 10, and
     10. Merged: roster seat naming an AI agent
     (`tests/family-registry.test.ts:111-119`);
     FLOW-CANVAS.md's display-only AI checkboxes
     (`## Members and attributes`).
-12. Two processes — high availability for the app and
+13. Two processes — high availability for the app and
     for Postgres on Render. The app's precondition is in
     the tree: `api/derive-states.ts:517-529` — the live
     claim route decides expiry against `Date.now()` and
     replay reproduces it only inside one process; record
     the expiry decision as its own event first (remove
     the comment there when done). Then two replicas
-    behind Render's balancer, each answering item 3's
-    probe; LISTEN in each (item 8 is per process by
+    behind Render's balancer, each answering item 4's
+    probe; LISTEN in each (item 9 is per process by
     construction); advisory locks already cluster-wide;
     the throttle's per-process counters named as a known
     cost or moved to the store; a Postgres plan with a
     standby and a rehearsed failover. Closes KNOWN seam
     "Single mint process" and retires ARCHITECTURE.md's
-    "do not run two replicas". Consumes items 3, 5, 8,
+    "do not run two replicas". Consumes items 4, 6, 9,
     and the examination report's lock and growth findings
     (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`).
 
@@ -345,7 +496,7 @@ Off the critical path; each with its oracle.
   instead of returning its pairs for one place to store. A
   handler returns `MessagePair[]`; the gate appends them once,
   under one lock order, with one notification. Lands beside
-  items 7 and 10, which rewrite the largest handlers. Oracle:
+  items 8 and 11, which rewrite the largest handlers. Oracle:
   one append site in `api/api.ts`, zero in `api/routes.ts`.
 - The ledger sweep, built into `./bin/measure` the way
   `./deploy` grew modes. A ledger mode that subsumes a
@@ -372,7 +523,7 @@ Off the critical path; each with its oracle.
 - Growth: bytes per pair with two wire messages stored, heap
   against index bytes, `pg_dump` size at 1M, and autovacuum's
   insert-threshold behavior on the insert-only table. Oracle:
-  numbers in the sweep's JSON and a backup-size line item 5
+  numbers in the sweep's JSON and a backup-size line item 6
   can plan against.
 - Schema evolution. `CREATE … IF NOT EXISTS` plus a boolean
   `schema_marker` is the whole migration story: a DDL change
@@ -567,11 +718,12 @@ Off the critical path; each with its oracle.
   detection (`api/types.ts:508-510`;
   `shared/access-token-decode.ts:30-31`)
 - SP-6 sign-up (`web-app/auth/index.ts:655-663`)
-- Cryptographically verifiable ledger — brainstorm
-  hash-and-verify (or sign) of stored pairs. The dropped
-  `version` column hashed on write and was never checked
-  on read. `request_hash` is replay identity, not
-  response integrity — `SCHEMA.md` item 4
+- Cryptographically signed ledger — brainstorm signing
+  of stored pairs. Product-path item 0 hashes both
+  messages where they are stored and verifies them;
+  signing is what remains. The dropped `version` column
+  hashed on write and was never checked on read —
+  `SCHEMA.md` item 4
 - ACL-editing UI for record attributes (`read_roles` /
   `write_roles`) — R21's restricted branches are
   seed-produced today; setting an ACL is
@@ -1535,7 +1687,7 @@ Off the critical path; each with its oracle.
   `preventDefault` with nothing selected. Oracle: each
   named site collapsed to one definition, `./test
   validate` green; the canvas entries retire with
-  product-path item 10.
+  product-path item 11.
 - Fewer JSON parse/stringify — byte-stream header
   setting, mechanical sympathy and simplicity for
   the processor; measured first
@@ -1603,6 +1755,20 @@ Off the critical path; each with its oracle.
   reach — flows' `:id` route has get and put only.
   Oracle: delete the guard, or pin it with a
   flow-shaped fixture.
+- Physical PII erasure — deferred by decision:
+  product-path item 2 hides erased PII, it does not
+  delete it. Activates on a tenant contract or a
+  jurisdiction that requires physical deletion. The rows
+  the view hides are the rows to delete: the view's
+  predicate as a `DELETE`, behind a function owned by a
+  role the application never uses, with an erasure pair
+  naming the removed ids and hashes so every absence is
+  accounted for. `DELETE` is logical until `VACUUM`, and
+  WAL and point-in-time backups hold the bytes until
+  Render's retention expires — state the window. Oracle:
+  `tests/api-pii-tombstone.test.ts` 'erased PII remains
+  in superseded pairs; login is 401' inverted for the
+  erased pairs.
 
 ## Sequencing
 
@@ -1626,7 +1792,7 @@ Off the critical path; each with its oracle.
   profile
 - `api/derive-states.ts:517-529` (claim-expiry as its
   own event) lands before any multi-process deployment
-  — item 12's first commit, or item 11's if the worker
+  — item 13's first commit, or item 12's if the worker
   is a second process
 
 ## Close protocol
