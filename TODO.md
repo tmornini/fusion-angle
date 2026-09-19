@@ -216,62 +216,102 @@ skew tests, which went with item 8's trio.
    hash-and-verify half of its verifiable-ledger bullet;
    the brainstorm says what is left of each.
 1. State arrives by PUT, and the application reads the
-   response as a unit — a POST or PATCH that modifies
-   data lands a sibling PUT in the same statement under
-   the same `operation_id`, as instance PATCH does today
-   (`postInstancePatchOp`, `api/routes.ts:3745-3761`).
-   A sibling PUT is synthesized — nothing was received
-   for it — so its `request` is zero bytes; item 0's
-   replay index excludes empty requests, so the shared
-   empty hash conflicts with nothing and locks nothing.
-   The PATCH revision and the token grant's
-   `tokens/:jti` pair become such pairs; the revision's
-   `If-Match`-only synthesized request
-   (`api/routes.ts:3724-3743`) retires with them.
-   Work-order create, claim, release, transition, and
-   binding each land a PUT of `work-orders/:id`, derive
-   reads the head, and `replayWorkOrderOperations`
-   retires — a faithful conversion, nothing item 11
-   will add; claim expiry stays decided at read time
-   (`api/derive-states.ts:517-529`), recording it is
-   item 13's. Authorize lands a PUT document named
+   response as a unit — every PATCH, and every POST that
+   changes state, lands a sibling PUT in the same
+   statement under the same `operation_id`, as instance
+   PATCH does today (`postInstancePatchOp`,
+   `api/routes.ts:3745-3761`). POST has two kinds: one
+   changes state and is stored in PATCH's style; the other
+   only reads — a convenience over GET, joined or computed
+   by the database or the server — and stores nothing, as
+   a GET stores nothing. A PATCH or POST that would leave
+   the head's state unchanged stores nothing at all, as
+   item 0's PUT does: neither its own pair nor a sibling
+   lands. Today a no-op claim still stores its pair
+   (`api/routes.ts:1853-1857`) and a no-op PATCH appends a
+   version and answers 201
+   (`tests/api-instances-create.test.ts:585-586`).
+   Sameness is judged on responses — the candidate
+   response body against the head's response body — never
+   on the stored request bodies the check reads today
+   (`api/api.ts:1341`). A sibling PUT is synthesized —
+   nothing was received for it — so its `request` is zero
+   bytes, and the handler mints both ids, so nothing looks
+   the sibling up afterward (item 0 retires
+   `revisionMessagePairIdForPatch`). The PATCH revision
+   and the token grant's `tokens/:jti` pair become such
+   pairs; the revision's `If-Match`-only synthesized
+   request (`api/routes.ts:3724-3743`) retires with them.
+   Work-order create and transition (POST), claim and
+   binding (PUT), and release (DELETE) each land a PUT of
+   `work-orders/:id`, derive reads the head, and
+   `replayWorkOrderOperations` retires — a faithful
+   conversion, nothing item 11 will add; claim expiry
+   stays decided at read time
+   (`api/derive-states.ts:517-529`), recording it is item
+   13's. Authorize lands a PUT document named
    `sha256(code)` (`deriveAuthorizationCodeId`) holding
-   `client_id`, `code_challenge`, and the issue
-   instant; the grant reads it by name. Flows keep
-   their event walk until item 11. A read hands out
-   the stored response whole: a document GET is the
-   stored bytes with two substitutions — the status
-   line (201 → 200) and `date` — made by ONE function
-   on the head, the body bytes untouched; a collection
-   GET is `multipart/mixed`, each part an
-   `application/http; msgtype=response` unit with the
-   same two substitutions, so one head is one unit
-   from either source. Derivation is head selection;
-   whatever still needs a body reads it in place from
-   the unit, never from `request`. The API client
-   keeps each response whole, and pages and presenters
-   read from the unit they were given. A per-route
-   audit proves each PUT response carries what its
-   readers need; a gap closes by the response saying
-   more. API tests pin the headers a read serves and
-   the headers it must not. Today: the five
-   work-order operations answer 204 and keep their
-   state in the POST request body alone
-   (`api/derive-states.ts:1023-1043`, `:1245`); the
+   `client_id` and `code_challenge`; the grant reads it by
+   name and takes the issue instant from that pair's own
+   response stamp — today's grant reads the pair's arrival
+   stamp (`api/authentication.ts:1269-1273`) — because a
+   copy in the document would be a second source on a
+   second clock. Redeeming a code lands a successor to its
+   document in the grant's statement, so item 0's
+   one-successor index lets one redemption win and refuses
+   the rest, where a spent marker re-checked inside a
+   transaction does today (`authorizationCodeSpent`,
+   `api/authentication.ts:1288-1300`). Flows keep their
+   event walk until item 11. A read hands out the stored
+   response whole: a document GET is the stored bytes with
+   two substitutions — the status line (201 → 200) and
+   `date` — made by ONE function on the head, the body
+   bytes untouched; a collection GET is `multipart/mixed`,
+   each part an `application/http; msgtype=response` unit
+   with the same two substitutions, so one head is one
+   unit from either source. The boundary is a fresh
+   identifier per response, so no part can contain it, and
+   the client's rebuild owns the splitter. Measured on the
+   mock data against today's arrays of bare bodies, a part
+   costs 293 bytes, 215 of them the stored response's own
+   lines: lists grow 33% in all — a tenth for large
+   documents (flows, work orders), while most small ones
+   double or triple — and gzipped, which nothing at the
+   origin does today, they double, because each part's
+   three ids do not compress. A JSON array of the same
+   bytes as strings measured larger (38%), and a rebuilt
+   JSON form is a second representation, so multipart
+   stands. A before-and-after
+   `./bin/measure --record --visualize` run on the
+   list-heavy pages adds both sets of numbers to the
+   history, gating nothing. Derivation is head selection;
+   whatever still needs a body reads it in place from the
+   unit, never from `request`. The API client keeps each
+   response whole, and pages and presenters read from the
+   unit they were given; the packageable-client bullet on
+   the critical functionality path draws its boundary in
+   this rebuild. A per-route audit proves each PUT
+   response carries what its readers need; a gap closes by
+   the response saying more — the mock data already shows
+   one: a record instance's revisions store `{}` as their
+   response body and their content in the request. API
+   tests pin the headers a read serves and the headers it
+   must not. Today: the five work-order operations answer
+   204 and keep their state in their own request bodies
+   alone (`api/derive-states.ts:1023-1043`, `:1245`); the
    authorize grant finds a code by body search
-   (`getAllWhereBody`, `api/authentication.ts:1254`,
-   GIN `message_pairs_body` — examination report);
-   derivation reads the request body at five seams
+   (`getAllWhereBody`, `api/authentication.ts:1254`, GIN
+   `message_pairs_body` — examination report); derivation
+   reads the request body at five seams
    (`api/derive-documents.ts:95,159`,
    `api/document-family.ts:396,473`,
    `api/routes.ts:5088,5303`, `api/api.ts:1341`,
-   `api/authentication.ts:1257`); a document GET
-   parses the stored response, keeps the body, and
-   rebuilds three headers (`streamGetFromStored`); a
-   collection GET dismantles every head into an array
-   of bodies (`entitiesOf`,
-   `api/message-store.ts:57-66`); and the client
-   receives bare JSON. Follows item 0.
+   `api/authentication.ts:1257`); a document GET parses
+   the stored response, keeps the body, and rebuilds three
+   headers (`streamGetFromStored`); a collection GET
+   dismantles every head into an array of bodies
+   (`entitiesOf`, `api/message-store.ts:57-66`); and the
+   client receives bare JSON. Follows item 0.
 2. The ledger fenced — roles and a view, on a table
    items 0 and 1 have finished. What Render's Postgres
    lets a role be, measured first. A schema-owner role
