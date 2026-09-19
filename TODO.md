@@ -17,79 +17,157 @@ parse/stringify, simulated latency, cachability) and the
 skew tests, which went with item 8's trio.
 
 0. The table, right — what a pair stores and what the
-   store guarantees, before anything reads it
-   differently. `request` holds the entire request as
-   received: start line, every header, and the body
-   bytes exactly as received, never re-serialized — in
-   the form the runtime delivers it; header order,
-   header case, and the HTTP version token are not
-   recoverable under `Deno.serve`. A pair for which
+   store guarantees, before anything reads it differently.
+   Every stored message is in one canonical form: field
+   names lowercase; one line per name, repeats joined with
+   `, ` in the order received, `set-cookie` alone never
+   joined (RFC 9110 §5.3); lines ascending by name,
+   bytewise; `name: value` with one space and the value
+   trimmed; CRLF line ends, a blank line, then the body
+   bytes; the version token fixed at `HTTP/1.1` and a
+   response's reason phrase empty. A sender's line order,
+   name case, and version token are not recoverable, and
+   nothing depends on them. `shared/http-message` parses
+   and serializes exactly this form, request and response
+   alike, and keeps every received line: `content-length`
+   is checked against the body at the gate, never stripped
+   and recomputed. `request` holds the entire request as
+   received — start line, every header, and the body bytes
+   exactly as received, never re-serialized — less its
+   credential lines, hoisted as below. A pair for which
    nothing was received (item 1's sibling PUTs) stores
    zero request bytes. `response` holds the entire
-   response as sent: the status actually sent (201 on a
-   first write, 200 on a same-body no-op, 204 on
-   DELETE), and `date`, `etag`, and `operation-id` as
-   the wire carries them; a later GET streams the body
-   under its own `date`. Every write is ONE statement,
-   guarded by constraints, never by a transaction or an
-   advisory lock: the INSERT mints `response_at` from
-   `clock_timestamp()`, splices it in as `date`, and
-   computes both hashes with Postgres's `sha256` over
-   the bytes it stores — the stamp and the hashes are
-   made where the row is made, on the one clock;
-   `response_hash` becomes a column. Row hashes stay
-   independent — no chain — so erasure stays possible.
-   Every pair names the pair it supersedes; a genesis
-   supersedes the ROOT, one row seeded with the schema
-   under the nil UUID, so the column is NOT NULL and no
-   sentinel exists. Two unique indexes carry the
-   invariants: `UNIQUE (path, name, supersedes)` — one
-   successor per head, one genesis per document — and a
-   partial `UNIQUE (request_hash)` over received,
-   non-grant requests — a byte-identical request lands
-   once and replays; the two grant routes always land.
-   An in-order PUT (`If-Match`) fills `supersedes` from
-   the client and answers 412 on rejection; a blind PUT
-   fills it from the head and retries, bounded; the
-   memory backend raises the same rejections in
-   TypeScript. Composed writes are one multi-row
-   INSERT; the bell rings from the same statement
-   (`RETURNING` into `pg_notify`). `transaction` and
-   `writeLocks` leave `DbAdapter`; item 13's "advisory
+   response as sent, less its credential lines: the status
+   actually sent (201 on a first write, 204 on DELETE),
+   and `date`, `etag`, and `operation-id` as the wire
+   carries them; item 1 says how a read serves these
+   bytes. A runtime orders and cases the lines it puts on
+   the wire, so `response` is the message handed to it —
+   same lines, same values, same body bytes — and the
+   runtime must keep a `date` it is given (`Deno.serve`
+   does: measured, 2.9.6), so the stamp Postgres mints is
+   the `date` the wire carries. Secrets move to credential
+   lines: the password rides `Authorization: Basic`, no
+   longer the authorize body, and the authorize `code` and
+   the token grant's `access_token` leave the response
+   body for a response header; the refresh token's
+   `Set-Cookie` is the precedent, and the departure from
+   RFC 6749 §5.1 is accepted: both clients are ours.
+   Credential lines are hoisted whole — name and value —
+   out of `request` and `response` into a fenced column:
+   `authorization` and `cookie` from a request,
+   `set-cookie` and the new header from a response —
+   HTTP's own credential fields, not a list that grows
+   with our routes. No name sits on both sides of the
+   fence, so sorting by name merges the hoisted lines back
+   and rebuilds each message exactly: every byte stays
+   stored. SCHEMA.md's secrets section takes that rule
+   when this ships. Idempotency is the verb's
+   (RFC 9110 §9.2.2): a PUT or DELETE that would leave the
+   head's state unchanged lands nothing, and a repeated
+   POST or PATCH is a new request that runs again — its
+   only write is its sibling PUT (item 1). Nothing dedupes
+   requests. Every write is ONE statement, guarded by a
+   constraint, never by a transaction or a lock: the
+   INSERT mints `response_at` from `clock_timestamp()`,
+   splices it in as `date`, and computes every hash with
+   Postgres's `sha256` over the bytes it stores — the
+   stamp and the hashes are made where the row is made, on
+   the one clock. The hashes form a tree. Each leaf —
+   `request_hash`, `secret_hash`, `response_hash` — is
+   `sha256(salt ‖ bytes)`, its salt stored and fenced with
+   the bytes it hides: a bare digest of guessable bytes is
+   a guessing oracle, and a fast hash of a request that
+   held a password would sit beside the scrypt hash and
+   undercut it. `pair_hash` is `sha256` over the envelope
+   columns and the three leaves, so every reader verifies
+   the root from what it may see, and a reader who sees a
+   leaf's bytes and salt verifies that leaf too. Row
+   hashes stay independent — no chain: the root covers the
+   `supersedes` id, never a predecessor's hash — so
+   erasure stays possible. Every PUT and DELETE names the
+   pair it supersedes; a genesis supersedes the ROOT, one
+   row seeded with the schema under the nil UUID, so the
+   column is NOT NULL and no sentinel exists. A received
+   POST or PATCH supersedes nothing — its sibling PUT
+   supersedes the head. `supersedes` is not an enforced
+   reference: the physical eraser in `## Later work` must
+   be able to remove a superseded pair, and nothing may
+   rewrite its successor, whose root covers `supersedes`;
+   a `supersedes` that names no row means that pair was
+   erased, and the ROOT row keeps that the only meaning.
+   One unique index carries the invariants —
+   `UNIQUE (path, name, supersedes)` over PUT and DELETE
+   pairs: one successor per head, one genesis per
+   document. An in-order PUT (`If-Match`) fills
+   `supersedes` from the client and answers 412 on
+   rejection; a blind PUT fills it from the head and
+   retries, bounded; the memory backend raises the same
+   rejection in TypeScript. Composed writes are one
+   multi-row INSERT; the bell rings from the same
+   statement (`RETURNING` into `pg_notify`). `transaction`
+   and `writeLocks` leave `DbAdapter`; item 13's "advisory
    locks already cluster-wide" loses its referent. The
-   authorize `code` and the token grant's
-   `access_token` leave the response body for a
-   response header, stored in a column of its own; the
-   refresh token's `Set-Cookie` is the precedent, and
-   the departure from RFC 6749 §5.1 is accepted: both
-   clients are ours. The brainstorm names that header,
-   the root's values (it must satisfy every CHECK),
-   whether `supersedes` is a column or a succession
-   join table (a data-modifying CTE keeps one
-   statement either way), and how the gate reads which
-   index rejected a row. The DDL is final when this
-   item ships, but for `schema_marker`, which item 3
-   retires. Today falls short on every count:
-   `request` keeps six header names
-   (`HOISTED_HEADER_NAMES`, `api/message-pair.ts:555-558`)
-   and a body parsed and re-serialized with sorted
-   keys, and a field registry (`isStoredField`,
-   `shared/http-message/wire-codec.ts:45`) decides
-   which received fields survive — waste once every
-   header is stored; `response` keeps a 200 rewritten
-   to 201 at send time and a `response-id` field
-   naming the id the wire sends as `ETag`;
-   `api/message-pair.ts:288` computes the response
-   hash and nothing stores it; 69 `transaction(…)`
-   sites and three advisory-lock labels
-   (`api/backend-postgres.ts:220-243`) guard what the
-   two indexes will. Rides along: the in-band
-   plaintext comment at `api/mock-data.ts:145-157`,
-   which still says PBKDF2 and names a column that is
-   not there (owner call). Meets the JSON
-   parse/stringify bullet in `## Later work` and the
-   hash-and-verify half of its verifiable-ledger
-   bullet; the brainstorm says what is left of each.
+   brainstorm settles: the response credential header's
+   name; the root's values (it must satisfy every CHECK);
+   whether `supersedes` is a column or a succession join
+   table (a data-modifying CTE keeps one statement either
+   way) and how a pair that supersedes nothing is written
+   — either way the eraser stays unblocked and the root
+   covers the succession; one fenced column or one per
+   message, since a reader must tell which message a
+   hoisted line left; the salts — how many, where each is
+   stored, and what mints them (core Postgres has
+   `gen_random_uuid()`; `gen_random_bytes` is an
+   extension); the byte encoding of the envelope under
+   `pair_hash`; whether an in-order PUT whose state is
+   already the head answers 2xx, as RFC 9110 §13.1.1
+   permits, or 412; and which secrets still ride a body
+   (the token request's `code` and `code_verifier`, any
+   password a body still carries) and whether each moves
+   to a credential line. The DDL is final when this item
+   ships, but for `schema_marker`, which item 3 retires.
+   Today falls short on every count: `request` keeps six
+   header names (`HOISTED_HEADER_NAMES`,
+   `api/message-pair.ts:555-558`), `authorization`
+   verbatim among them, a body parsed and re-serialized
+   with sorted keys, and an `operation-id` line the client
+   never sent when one is missing
+   (`headerFieldsWithOperationId`,
+   `api/message-pair.ts:191-202`); the library sorts lines
+   but never joins repeats
+   (`shared/http-message/canonical.ts:13-25`), and strips
+   and recomputes `content-length` (`isStoredField`,
+   `shared/http-message/framing.ts:11-14`); `response`
+   keeps a 200 rewritten to 201 at send time and a
+   `response-id` field naming the id the wire sends as
+   `ETag`; `api/message-pair.ts:288` computes the response
+   hash and nothing stores it, and no hash is salted or
+   covers the envelope; the password rides the authorize
+   body (`api/authentication.ts:1558`); and 69
+   `transaction(…)` sites, three lock primitives — two
+   advisory labels and a `FOR UPDATE`
+   (`api/backend-postgres.ts:220-246`) — and a
+   request-hash dedupe that answers a byte-identical
+   request from the first (`appendMessagePairOnce`,
+   `api/message-pair.ts:718-729`) guard what one index and
+   the verbs will. Rides along: the in-band plaintext
+   comment at `api/mock-data.ts:145-157`, which still says
+   PBKDF2 and names a column that is not there (owner
+   call); and `operation-id` without defaults — the gate
+   requires it on every mutating request, the
+   bearer-exempt routes included (`requireOperationId`
+   skips them, `api/message-pair.ts:161`), and the client
+   mints it in one place and takes none from a caller: two
+   sites mint it today, each deferring to a supplied id no
+   caller supplies
+   (`web-app/app/adapters/shared.ts:185-198`,
+   `web-app/app/adapters/http-facade.ts:161-166`), the
+   second behind a `write` flag the verb already implies.
+   Meets the JSON parse/stringify bullet in
+   `## Later work` and the hash-and-verify half of its
+   verifiable-ledger bullet; the brainstorm says what is
+   left of each.
 1. State arrives by PUT, and the application reads the
    response as a unit — a POST or PATCH that modifies
    data lands a sibling PUT in the same statement under
