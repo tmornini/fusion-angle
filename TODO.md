@@ -742,6 +742,38 @@ Off the critical path; each with its oracle.
   `Retry-After`, a 503, an HTML 502 — asserting the
   attempts, the delays, and that a POST with an unknown
   outcome is never resent
+- Everything we own, named `fa_` — so that operating the
+  system makes what is ours trivial to find:
+  `env | grep FA_` lists every variable the system needs.
+  Every environment variable the system reads becomes
+  `FA_*`, and every Postgres role and login `fa_*` (item 2
+  creates its roles under the prefix). Product code reads
+  four names, and every reader is ours — `POSTGRES_URL`,
+  `JWT_HMAC_SIGNING_KEY`, `PORT`, and `TRUSTED_PROXY_HOPS`
+  (`server/boot.ts:59-72`; the URL again at
+  `server/postgres-seed.ts:68` and
+  `server/postgres-wipe.ts:60`; the key again at
+  `api/access-token.ts:36`, through the `process` global a
+  search for `Deno.env` misses) — so the app reads
+  `FA_POSTGRES_URL` directly and nothing translates. Names
+  others dictate stay at two edges: the Postgres image's
+  `POSTGRES_USER`, `POSTGRES_DB`, and `POSTGRES_PASSWORD`,
+  which `compose.yaml` fills from `FA_` values, and the
+  Render CLI's `RENDER_API_KEY`, which `deploy:191` and
+  `bin/postgres-seed:154` fill from their own argument; a
+  dependency that ever dictates a name gets its adapter.
+  Today's role and database are both `fusion`
+  (`compose.yaml:2,8-9`, `deploy:171`,
+  `bin/test-postgres:22`). Ships no later than the deploy
+  of items 0–3, which already changes what operators
+  configure, so they rename once. The brainstorm settles
+  how far "infrastructure" reaches: the database name,
+  compose's service and container names, the hosted
+  service names, and the test-only `CHROME` and
+  `CHROME_DEBUG_URL`. Oracle: `env | grep FA_` lists
+  everything the system needs, and a test finds every
+  environment read in product code and scripts and fails
+  on a name without the prefix outside the two edges
 
 ## Later work
 
