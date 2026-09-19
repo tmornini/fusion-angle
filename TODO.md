@@ -633,6 +633,52 @@ Off the critical path; each with its oracle.
   that walks the client entry point's import graph and
   finds no module outside the client's directory and
   `shared/`
+- API retries, unified — the client resends by two
+  unrelated mechanisms spread across its files, and leaves
+  the commonest failures unhandled. Contention: flow PUT
+  (`web-app/app/adapters/flow-mutations.ts:441-546`,
+  `MAX_PUT_ATTEMPTS = 3`) and flow undo
+  (`web-app/app/flow-operations.ts:707-763`,
+  `MAX_UNDO_ATTEMPTS = 3`) each hand-roll a loop that
+  absorbs a 412, rebuilds the body against the fresh head,
+  and resends, sharing only `jitteredBackoff`
+  (`web-app/app/adapters/shared.ts:330`). Auth recovery,
+  at two layers: on a 401 the facade refreshes once,
+  single-flight, through a raw `fetch` and resends once
+  (`web-app/app/adapters/http-facade.ts:276-297`), while
+  `withAuthRecovery` does the same above it through
+  `postSessionRefresh`
+  (`web-app/app/adapters/shared.ts:175`, `:498`); boot
+  refreshes twice more (`web-app/app/app-boot.ts:250`,
+  `:366`), and an accepted invitation re-mints its claims
+  in two attempts, no loop (`remintSessionClaims`,
+  `web-app/app/adapters/invitations.ts:234`). Unhandled: a
+  `fetch` that rejects — a dropped connection surfaces as
+  a raw `TypeError`; a request that never answers — no
+  `fetch` in the client carries a timeout or an abort
+  signal; a 429 — the throttle sends no `Retry-After`
+  (`server/http-server.ts:582-586`) and the client throws
+  it like any failure; a 502, 503, or 504; and an error
+  body that is not JSON — `unwrapResponse` parses every
+  failure as `{ error }`
+  (`web-app/app/adapters/http-facade.ts:80-98`), so a
+  proxy's HTML error page surfaces as a `SyntaxError` that
+  hides the status. One retry policy, in one place in the
+  client: every request under a timeout; backoff with
+  jitter, capped, never infinite; more attempts than
+  today's three, the spec naming the count and what
+  justifies it; and the verb decides what may be resent
+  after an unknown outcome (RFC 9110 §9.2.2) — GET, PUT,
+  and DELETE may, since a PUT that changes nothing lands
+  nothing (item 0), while a POST or PATCH may only after
+  an answer that proves nothing landed (401, 412, 429). A
+  resend is the same operation and keeps its
+  `operation-id`; the throttle sends `Retry-After` and the
+  client honors it. Oracle: a facade test over a scripted
+  transport — a rejection, a stall, a 429 with
+  `Retry-After`, a 503, an HTML 502 — asserting the
+  attempts, the delays, and that a POST with an unknown
+  outcome is never resent
 
 ## Later work
 
