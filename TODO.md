@@ -312,47 +312,159 @@ skew tests, which went with item 8's trio.
    dismantles every head into an array of bodies
    (`entitiesOf`, `api/message-store.ts:57-66`); and the
    client receives bare JSON. Follows item 0.
-2. The ledger fenced — roles and a view, on a table
-   items 0 and 1 have finished. What Render's Postgres
-   lets a role be, measured first. A schema-owner role
-   owns the DDL, the root row, `schema_marker`, seed,
-   and wipe; the application role INSERTs into the
-   table and SELECTs a view that omits `request` and
-   item 0's secret column — it never reads a received
-   request or an issued secret back, and item 1 made
-   sure it never needs to; a reporting role reads an
-   envelope-only view, no bytes at all;
-   `POSTGRES_DROP_SCHEMA`'s `GRANT ALL … TO public`
-   retires (`tests/backend-postgres.test.ts`, the
-   re-grant). `requester_identity_id` — the verified
-   token's `sub` — stays in the view. `request_hash`
-   verifies only for a role that reads `request`;
-   `response_hash` verifies through the view. PII
-   erasure stays a tombstone, and the view hides every
-   `identities/:id/pii` pair that precedes a DELETE at
-   its document — one probe on
-   `message_pairs_document`, proven with `EXPLAIN` and
-   `./bin/measure`; the DELETE head stays visible, and
-   every other family keeps its deleted history. Item
-   0's replay index still sees a hidden row, so a
-   resend of a hidden PUT conflicts on a pair the
-   application cannot read back; the spec names the
-   answer. The page's word for the act must not
-   promise deletion. Every byte stays recorded; a view
-   fences live readers only, so a dump or backup
-   carries the table whole, and item 6 no longer
-   orders this item. This item changes no row and no
-   column, and a test says so. KNOWN seams "A raw dump
-   still has verbatim auth messages" and "Erased PII
-   persists as superseded pairs" are reworded, not
-   closed: the bytes persist in the owner-only ledger,
-   and no application role reads them. Today: one
-   role, `fusion`, owns and reads everything
-   (`compose.yaml`), and every write pair's `request`
-   holds `Authorization:` verbatim
-   (`tests/api-shadow-ledger-auth.test.ts` 'live
-   secrets land in the auth-flow ledger rows'). Follows
-   items 0 and 1.
+2. The ledger fenced — roles, views, and a row policy, on
+   a table items 0 and 1 have finished. Designed to stock
+   Postgres and measured on 18.6, which compose runs; a
+   host is measured against the design afterwards, and a
+   shortfall is that host's recorded seam or a reason to
+   leave it, never a change to the application. Every
+   worker gets its own role and its own view, holding only
+   its verbs. Product roles cannot log in and hold every
+   grant; a deployment supplies logins under its own names
+   and joins each to one role — a grant only the role's
+   creator or a superuser may make (measured), so it runs
+   as `fa_owner` — so the DDL is identical on every host
+   and only memberships and secrets are the deployment's.
+   Every role and login of ours carries the `fa_` prefix
+   (the naming bullet on the critical functionality path).
+   Roles belong to the cluster: they outlive the wipe's
+   schema drop, every database in the cluster sees them,
+   and creating one twice fails (measured), so what
+   creates them checks first. `fa_owner` owns the
+   database, the schema, the DDL, the root row,
+   `schema_marker`, seed, and wipe, and holds the right to
+   create roles, so it creates the other `fa_` roles too
+   and no separate admin role exists; a member does not
+   inherit that right, so every owner session first
+   becomes `fa_owner`, which also makes `fa_owner`, not
+   the login, the owner of what it creates (measured).
+   `fa_api` — today's `fusion` split in two with
+   `fa_owner` — holds INSERT on its view and SELECT on
+   that view's unfenced columns, and nothing on the table:
+   one view carries every column in both directions, so
+   `RETURNING` hands item 0's minted `date` back, which
+   INSERT on the table beside SELECT on a second view
+   cannot — Postgres wants SELECT on every column
+   `RETURNING` names (measured). The column fence is the
+   grant on that view: `fa_api` never reads back
+   `request`, the fenced credential column, or the request
+   and secret salts; it reads the response, the response
+   salt, and all four digests, so it verifies `pair_hash`
+   and the response leaf, and a reader of envelopes alone
+   verifies the root alone. `requester_identity_id` — the
+   verified token's `sub` — stays readable. No read may
+   use `SELECT *` (one does,
+   `api/backend-postgres.ts:538`), and every read stops
+   selecting `request`, which item 1 made sure nothing
+   needs. Removing PII stays a tombstone, and the fence
+   hides every `identities/:id/pii` pair that precedes a
+   DELETE at its document; the DELETE head stays visible,
+   and every other family keeps its deleted history. A
+   hidden pair is never a head, so a blind PUT always
+   finds the head, and an in-order PUT that names a hidden
+   pair is refused by item 0's index and answers 412:
+   nothing needs a hidden pair back. The hiding rule is a
+   row policy on the table, not the view's WHERE: a role
+   that cannot log in owns the api's view and holds the
+   table grants, the policy applies to that role, and a
+   helper view of the PII DELETE pairs keeps the policy
+   from reading its own table, which Postgres refuses as
+   recursion (measured). A table's owner is exempt from
+   its policies, so later views `fa_owner` owns still see
+   the hidden pairs the eraser needs. Measured on 262,000
+   rows against the owner reading the bare table: at
+   50,000 versions a head read through the policy costs
+   0.062 ms against 0.049 ms (+0.013 ms, +27%), flat from
+   10 versions up; the same rule in a security-barrier
+   view costs 15.375 ms (+15.326 ms) and grows 0.3 µs a
+   version, because a barrier view cannot merge into the
+   outer query and its ORDER BY and LIMIT never reach the
+   index; a plain view is as fast as the policy and does
+   not hold the rule against a session that writes its own
+   SQL (measured). The mock data cannot judge this: 577 of
+   its 578 documents have one version. `EXPLAIN` and
+   `./bin/measure` prove the head read stays on
+   `message_pairs_document`. The memory backend hides the
+   same pairs in TypeScript. Item 7's profile can be
+   removed on its own only as its own document: keys on
+   the seat body would hide the seat's whole history. The
+   reduction takes back what Postgres grants every role.
+   `fa_owner` revokes CONNECT and TEMPORARY on the
+   database and every right on the schema from PUBLIC and
+   grants CONNECT and USAGE to `fa_` roles alone, so a
+   foreign login — one that belongs to none of our roles —
+   cannot connect, and `POSTGRES_DROP_SCHEMA`'s
+   `GRANT ALL … TO public` retires
+   (`api/backend-postgres.ts:29-33`,
+   `tests/backend-postgres.test.ts`, the re-grant). Four
+   revokes from PUBLIC need a superuser and only warn for
+   the owner (measured): `plpgsql`; large-object creation;
+   the 21 advisory-lock functions, only once item 0 has
+   removed the product's last use
+   (`api/backend-postgres.ts:286`); and catalog reads,
+   returned to `fa_owner`. With catalog reads gone the
+   driver's type lookup at connect is refused and its
+   unhandled rejection ends the process, and with
+   `fetch_types: false` the api's statements work
+   (measured, postgres.js 3.4.9), so
+   `api/postgres-client.ts` sets it; product SQL passes no
+   arrays today. After the reduction a member of `fa_api`
+   connects, uses the schema, inserts through its view,
+   reads its unfenced columns, and may LISTEN and NOTIFY,
+   which are commands and not grants — nothing else. A new
+   verb in the executable prepares a cluster as
+   `fa_owner`: fixed SQL beside the DDL, no input, safe to
+   run again; it creates the `fa_` roles that are absent
+   and says which steps it lacked the power for. Then seed
+   builds the schema, and wipe drops it and leaves the
+   roles. Two steps stay with the host's first login:
+   creating `fa_owner`, its login, and the database it
+   owns, and the four superuser revokes; the container
+   image's `POSTGRES_USER` is always a superuser
+   (measured), so compose has such a login and `fa_api`
+   must never be it. Each verb reads `FA_POSTGRES_URL`
+   from its own environment and only the value differs:
+   `serve` gets a member of `fa_api`; seed, wipe, and the
+   new verb get a member of `fa_owner`. The product never
+   creates a login and never handles a database password.
+   This item creates the roles whose workers exist —
+   `fa_owner`, `fa_api`, and the view's owner — and names
+   the next users of the principle, each created by the
+   item that builds its worker: `fa_archiver` (item 6),
+   `fa_eraser` (the physical-erasure bullet), and
+   `fa_reporter` (its bullet in `## Later work`). Until
+   the eraser ships, the page says the personal
+   information is removed from the application, never
+   erased or deleted: today the button, the dialog, and
+   its sentence say "Erase"
+   (`web-app/app/presenters/identity-detail.ts:284-292`,
+   `web-app/identities/detail.html:3-28`), and the code's
+   own word `erased` follows in a change of its own. Every
+   byte stays recorded; roles fence live readers only, so
+   a dump or backup carries the table whole, and item 6 no
+   longer orders this item. This item changes no row and
+   no column, and a test says so. Oracle: a Postgres test
+   logs in as a member of `fa_api` and is refused every
+   verb but its two. KNOWN seams "A raw dump still has
+   verbatim auth messages" and "Erased PII persists as
+   superseded pairs" are reworded, not closed: the bytes
+   persist in the owner-only ledger, and `fa_api` reads
+   none of them. The brainstorm settles: the name of the
+   role that owns the api's view; the view names; the
+   verb's name; the name of compose's first login; how the
+   view's owner comes to own the view (measured: a schema
+   CREATE granted for that one statement, then revoked);
+   whether the four superuser revokes are the verb's or
+   the deployment's; and what boot does on a host that
+   offered no superuser for them. Today: one role,
+   `fusion`, owns and reads everything, and compose,
+   `./deploy --local`, `bin/test-postgres`, and the tests
+   all assume that one login (`compose.yaml:2,8`,
+   `deploy:171`, `bin/test-postgres:22`); every write
+   pair's `request` holds `Authorization:` verbatim
+   (`tests/api-shadow-ledger-auth.test.ts` 'live secrets
+   land in the auth-flow ledger rows'). Follows items 0
+   and 1.
 3. Retire `schema_marker` for a definition check — the
    marker (`api/schema-postgres.ts:26-29`) proves only
    that a seed once finished; it cannot tell an
