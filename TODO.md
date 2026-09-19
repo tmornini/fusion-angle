@@ -123,7 +123,8 @@ skew tests, which went with item 8's trio.
    `pair_hash`; whether an in-order PUT whose state is
    already the head answers 2xx, as RFC 9110 §13.1.1
    permits, or 412; and which secrets still ride a body
-   (the token request's `code` and `code_verifier`, any
+   (the token request's `code` and `code_verifier`, the
+   token exchange's `subject_token` and `actor_token`, any
    password a body still carries) and whether each moves
    to a credential line. The DDL is final when this item
    ships, but for `schema_marker`, which item 3 retires.
@@ -154,20 +155,53 @@ skew tests, which went with item 8's trio.
    the verbs will. Rides along: the in-band plaintext
    comment at `api/mock-data.ts:145-157`, which still says
    PBKDF2 and names a column that is not there (owner
-   call); and `operation-id` without defaults — the gate
-   requires it on every mutating request, the
-   bearer-exempt routes included (`requireOperationId`
-   skips them, `api/message-pair.ts:161`), and the client
-   mints it in one place and takes none from a caller: two
-   sites mint it today, each deferring to a supplied id no
-   caller supplies
-   (`web-app/app/adapters/shared.ts:185-198`,
-   `web-app/app/adapters/http-facade.ts:161-166`), the
-   second behind a `write` flag the verb already implies.
-   Meets the JSON parse/stringify bullet in
-   `## Later work` and the hash-and-verify half of its
-   verifiable-ledger bullet; the brainstorm says what is
-   left of each.
+   call); and the two ids, without defaults.
+   `operation-id` names one write: every pair a request
+   lands carries it, and it joins a PATCH pair to its
+   revision (`revisionMessagePairIdForPatch`,
+   `api/api.ts:309-328`). It serves no idempotency —
+   nothing looks a request up by it. The caller supplies
+   it and the gate requires it on every mutating request,
+   the two bearer-exempt routes included:
+   `requireOperationId` skips them today
+   (`api/message-pair.ts:161`) and a side channel reads it
+   `?? ''` (`api/api.ts:1634-1636`). `request-id` names
+   one client request across every wire request it makes,
+   so the browser's fault reports and the server's logs
+   meet on one id. The server mints one only for a caller
+   that sends none (`incomingContext`,
+   `api/request-context.ts:66-71`) — a stranger's request
+   still needs a trace — and a malformed one answers 400
+   everywhere: today it answers 400 on an authenticated
+   route (`api/api.ts:443-456`) and is silently replaced
+   on the two exempt routes. Three client call sites send
+   neither id, each a raw `fetch` of
+   `POST authentication/token` with `Content-Type` alone:
+   `postCookieRefresh`
+   (`web-app/app/adapters/http-facade.ts:198-218`,
+   `grant_type: 'refresh'`), `postOrganizationExchange`
+   (`web-app/app/adapters/http-facade.ts:220-249`,
+   `grant_type: 'token-exchange'`), and
+   `probeRefreshSession`
+   (`web-app/app/apex-destination.ts:25-40`,
+   `grant_type: 'refresh'` again, a second copy of the
+   first). Each sends both: a fresh `operation-id`,
+   because a grant is a write, and a `request-id` — that
+   of the request whose 401 started the recovery, so the
+   401, its refresh, its exchange, and its resend read as
+   one request in the logs, or a fresh one where no
+   request exists yet (the apex probe). The client mints
+   `operation-id` in one place and takes none from a
+   caller: five sites mint it unless supplied, and no
+   caller supplies one —
+   `web-app/app/adapters/shared.ts:185-198`;
+   `web-app/app/adapters/http-facade.ts:161-166`, behind a
+   `write` flag the verb already implies; and the
+   in-process facade at `api/api.ts:2204-2207`,
+   `:2478-2481`, and `:2511-2514`. Meets the JSON
+   parse/stringify bullet in `## Later work` and the
+   hash-and-verify half of its verifiable-ledger bullet;
+   the brainstorm says what is left of each.
 1. State arrives by PUT, and the application reads the
    response as a unit — a POST or PATCH that modifies
    data lands a sibling PUT in the same statement under
