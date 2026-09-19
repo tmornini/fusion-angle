@@ -2173,19 +2173,32 @@ Off the critical path; each with its oracle.
   Oracle: delete the guard, or pin it with a
   flow-shaped fixture.
 - Physical PII erasure — deferred by decision:
-  product-path item 2 hides erased PII, it does not
+  product-path item 2 hides removed PII, it does not
   delete it. Activates on a tenant contract or a
-  jurisdiction that requires physical deletion. The rows
-  the view hides are the rows to delete: the view's
-  predicate as a `DELETE`, behind a function owned by a
-  role the application never uses, with an erasure pair
-  naming the removed ids and hashes so every absence is
-  accounted for. `DELETE` is logical until `VACUUM`, and
-  WAL and point-in-time backups hold the bytes until
-  Render's retention expires — state the window. Oracle:
-  `tests/api-pii-tombstone.test.ts` 'erased PII remains
-  in superseded pairs; login is 401' inverted for the
-  erased pairs.
+  jurisdiction that requires physical deletion. The pairs
+  item 2's policy hides are the pairs to delete, and
+  `fa_eraser` deletes them through a view of exactly those
+  pairs: it holds DELETE on that view and SELECT on the id
+  and the hash alone, sees no bytes, and cannot log in
+  (item 2's principle). Measured on Postgres 18.6: through
+  such a view a live pair and a DELETE head each delete
+  zero rows, the hidden pairs delete and come back named,
+  and the table itself is refused; `fa_owner` owns the
+  view, so item 2's policy hides nothing from it. An
+  erasure pair names the removed ids and hashes so every
+  absence is accounted for — item 0 left `supersedes`
+  unenforced for this — and writing it is an INSERT, which
+  a delete-only view cannot make: the brainstorm settles
+  whether the eraser also inserts through a view of its
+  own, held to erasure pairs by a check option (measured:
+  such a view refuses a row at another path), or another
+  role writes the record. Until it ships the page says
+  "removed", never "erased" (item 2). `DELETE` is logical
+  until `VACUUM`, and WAL and point-in-time backups hold
+  the bytes until the host's retention expires — state the
+  window. Oracle: `tests/api-pii-tombstone.test.ts`
+  'erased PII remains in superseded pairs; login is 401'
+  inverted for the erased pairs.
 
 ## Sequencing
 
