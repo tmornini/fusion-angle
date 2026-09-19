@@ -416,8 +416,18 @@ skew tests, which went with item 8's trio.
    measured duration, and a `schema_marker` that reads
    present afterward. Cross-environment blocking, so
    `./deploy --render TOKEN --postgres mock-data` can
-   never wipe the tenant database from a laptop and the
-   Render `ipAllowList` loses `0.0.0.0/0`. Request and
+   never wipe the tenant database from a laptop. No
+   connection reaches the database from outside its
+   host's private network — essential before launch. On
+   Render that is an emptied `ipAllowList`, which holds
+   `0.0.0.0/0` today; the brainstorm confirms an empty
+   list refuses every outside address and leaves the
+   private network alone. Nothing of ours needs the
+   outside door: on Render, seed and wipe already run as
+   jobs inside it (`bin/postgres-seed:168-171`,
+   `bin/postgres-wipe:127-130`). Item 2 refuses a foreign
+   login — one that belongs to none of our roles — and
+   this keeps the port out of its reach. Request and
    error logs as one JSON object per line — `api/api.ts:
    347` and `:2076-2082` print a label, an object, and an
    error as three values (the Office of Structured
