@@ -39,36 +39,36 @@ skew tests, which went with item 8's trio.
    zero request bytes. `response` holds the entire
    response as sent, less its credential lines: the status
    actually sent (201 on a first write, 204 on DELETE),
-   and `date`, `etag`, and `operation-id` as the wire
-   carries them; item 1 says how a read serves these
-   bytes. A runtime orders and cases the lines it puts on
-   the wire, so `response` is the message handed to it —
-   same lines, same values, same body bytes — and the
-   runtime must keep a `date` it is given (`Deno.serve`
-   does: measured, 2.9.6), so the stamp Postgres mints is
-   the `date` the wire carries. Secrets move to credential
-   lines: the password rides `Authorization: Basic`, no
-   longer the authorize body, and the authorize `code` and
-   the token grant's `access_token` leave the response
-   body for a response header; the refresh token's
-   `Set-Cookie` is the precedent, and the departure from
-   RFC 6749 §5.1 is accepted: both clients are ours.
-   Credential lines are hoisted whole — name and value —
-   out of `request` and `response` into a fenced column:
-   `authorization` and `cookie` from a request,
-   `set-cookie` and the new header from a response —
-   HTTP's own credential fields, not a list that grows
-   with our routes. No name sits on both sides of the
-   fence, so sorting by name merges the hoisted lines back
-   and rebuilds each message exactly: every byte stays
-   stored. SCHEMA.md's secrets section takes that rule
-   when this ships. Idempotency is the verb's
-   (RFC 9110 §9.2.2): a PUT or DELETE that would leave the
-   head's state unchanged lands nothing, and a repeated
-   POST or PATCH is a new request that runs again — its
-   only write is its sibling PUT (item 1). Nothing dedupes
-   requests. Every write is ONE statement, guarded by a
-   constraint, never by a transaction or a lock: the
+   and `date`, `etag`, `operation-id`, and `request-id` as
+   the wire carries them; item 1 says how a read serves
+   these bytes. A runtime orders and cases the lines it
+   puts on the wire, so `response` is the message handed
+   to it — same lines, same values, same body bytes — and
+   the runtime must keep a `date` it is given
+   (`Deno.serve` does: measured, 2.9.6), so the stamp
+   Postgres mints is the `date` the wire carries. Secrets
+   move to credential lines: the password rides
+   `Authorization: Basic`, no longer the authorize body,
+   and the authorize `code` and the token grant's
+   `access_token` leave the response body for a response
+   header; the refresh token's `Set-Cookie` is the
+   precedent, and the departure from RFC 6749 §5.1 is
+   accepted: both clients are ours. Credential lines are
+   hoisted whole — name and value — out of `request` and
+   `response` into a fenced column: `authorization` and
+   `cookie` from a request, `set-cookie` and the new
+   header from a response — HTTP's own credential fields,
+   not a list that grows with our routes. No name sits on
+   both sides of the fence, so sorting by name merges the
+   hoisted lines back and rebuilds each message exactly:
+   every byte stays stored. SCHEMA.md's secrets section
+   takes that rule when this ships. Idempotency is the
+   verb's (RFC 9110 §9.2.2): a PUT or DELETE that would
+   leave the head's state unchanged lands nothing, and a
+   repeated POST or PATCH is a new request that runs again
+   — its only write is its sibling PUT (item 1). Nothing
+   dedupes requests. Every write is ONE statement, guarded
+   by a constraint, never by a transaction or a lock: the
    INSERT mints `response_at` from `clock_timestamp()`,
    splices it in as `date`, and computes every hash with
    Postgres's `sha256` over the bytes it stores — the
@@ -120,16 +120,19 @@ skew tests, which went with item 8's trio.
    stored, and what mints them (core Postgres has
    `gen_random_uuid()`; `gen_random_bytes` is an
    extension); the byte encoding of the envelope under
-   `pair_hash`; whether an in-order PUT whose state is
-   already the head answers 2xx, as RFC 9110 §13.1.1
-   permits, or 412; and which secrets still ride a body
-   (the token request's `code` and `code_verifier`, the
-   token exchange's `subject_token` and `actor_token`, any
-   password a body still carries) and whether each moves
-   to a credential line. The DDL is final when this item
-   ships, but for `schema_marker`, which item 3 retires.
-   Today falls short on every count: `request` keeps six
-   header names (`HOISTED_HEADER_NAMES`,
+   `pair_hash`; whether the envelope gains the
+   server-minted `request_id`, the per-request key
+   `operation_id` stops being; whether an in-order PUT
+   whose state is already the head answers 2xx, as
+   RFC 9110 §13.1.1 permits, or 412; and which secrets
+   still ride a body (the token request's `code` and
+   `code_verifier`, the token exchange's `subject_token`
+   and `actor_token`, any password a body still carries)
+   and whether each moves to a credential line. The DDL is
+   final when this item ships, but for `schema_marker`,
+   which item 3 retires. Today falls short on every count:
+   `request` keeps six header names
+   (`HOISTED_HEADER_NAMES`,
    `api/message-pair.ts:555-558`), `authorization`
    verbatim among them, a body parsed and re-serialized
    with sorted keys, and an `operation-id` line the client
@@ -155,29 +158,40 @@ skew tests, which went with item 8's trio.
    the verbs will. Rides along: the in-band plaintext
    comment at `api/mock-data.ts:145-157`, which still says
    PBKDF2 and names a column that is not there (owner
-   call); and the two ids, without defaults.
-   `operation-id` names one write: every pair a request
-   lands carries it, and it joins a PATCH pair to its
-   revision (`revisionMessagePairIdForPatch`,
-   `api/api.ts:309-328`). It serves no idempotency —
-   nothing looks a request up by it. The caller supplies
-   it and the gate requires it on every mutating request,
-   the two bearer-exempt routes included:
-   `requireOperationId` skips them today
-   (`api/message-pair.ts:161`) and a side channel reads it
-   `?? ''` (`api/api.ts:1634-1636`). `request-id` names
-   one client request across every wire request it makes,
-   so the browser's fault reports and the server's logs
-   meet on one id. The server mints one only for a caller
-   that sends none (`incomingContext`,
-   `api/request-context.ts:66-71`) — a stranger's request
-   still needs a trace — and a malformed one answers 400
-   everywhere: today it answers 400 on an authenticated
-   route (`api/api.ts:443-456`) and is silently replaced
-   on the two exempt routes. Three client call sites send
-   neither id, each a raw `fetch` of
-   `POST authentication/token` with `Content-Type` alone:
-   `postCookieRefresh`
+   call); and the two ids, each with one source.
+   `request-id` names one wire request: the server mints
+   it, always, returns it in every response, and accepts
+   none — a `request-id` a client sends is one more stored
+   header line, read by nothing. Today the server takes
+   the client's when it is valid and mints one otherwise
+   (`incomingContext`, `api/request-context.ts:66-71`),
+   answers 400 to a malformed one on an authenticated
+   route alone (`api/api.ts:443-456`), returns it in no
+   response, and reads it at two error-log sites and
+   nowhere else (`api/api.ts:346-352`, `:2062-2068`).
+   `operation-id` names one client operation: the client
+   mints it, always, and it rides every request the
+   operation makes, reads included, and lands on every
+   pair those requests write — so a login's authorize and
+   token pairs, or a 401 with its refresh, its exchange,
+   and its resend, read as one operation in the ledger and
+   in the logs, which carry both ids. The gate requires it
+   on every request but `/status` (item 4): today it skips
+   reads and the two bearer-exempt routes
+   (`requireOperationId`, `api/message-pair.ts:156-189`),
+   and a side channel reads it `?? ''`
+   (`api/api.ts:1634-1636`). It stops naming one write,
+   and one reader depended on that: the join from a PATCH
+   pair to its revision (`revisionMessagePairIdForPatch`,
+   `api/api.ts:309-328`), there only to attach the
+   revision's ETag — its replay caller (`api/api.ts:981`)
+   leaves with the dedupe, and its other caller
+   (`api/api.ts:1746`) leaves when item 1 lands both pairs
+   in one statement, the handler having minted both ids.
+   It serves no idempotency: nothing looks a request up by
+   it. Three client call sites send no id at all, each a
+   raw `fetch` of `POST authentication/token` with
+   `Content-Type` alone: `postCookieRefresh`
    (`web-app/app/adapters/http-facade.ts:198-218`,
    `grant_type: 'refresh'`), `postOrganizationExchange`
    (`web-app/app/adapters/http-facade.ts:220-249`,
@@ -185,16 +199,15 @@ skew tests, which went with item 8's trio.
    `probeRefreshSession`
    (`web-app/app/apex-destination.ts:25-40`,
    `grant_type: 'refresh'` again, a second copy of the
-   first). Each sends both: a fresh `operation-id`,
-   because a grant is a write, and a `request-id` — that
-   of the request whose 401 started the recovery, so the
-   401, its refresh, its exchange, and its resend read as
-   one request in the logs, or a fresh one where no
-   request exists yet (the apex probe). The client mints
-   `operation-id` in one place and takes none from a
-   caller: five sites mint it unless supplied, and no
-   caller supplies one —
-   `web-app/app/adapters/shared.ts:185-198`;
+   first). Each sends the `operation-id` of the operation
+   whose 401 started the recovery, or a fresh one where no
+   operation exists yet (the apex probe). The client mints
+   `operation-id` in one place, once per operation, and
+   takes none from a caller — its per-context `requestId`
+   (`web-app/app/adapters/shared.ts:184`) already spans an
+   operation's requests and becomes it. Five sites mint
+   one per write unless supplied, and no caller supplies
+   one — `web-app/app/adapters/shared.ts:185-198`;
    `web-app/app/adapters/http-facade.ts:161-166`, behind a
    `write` flag the verb already implies; and the
    in-process facade at `api/api.ts:2204-2207`,
