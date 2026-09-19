@@ -321,10 +321,16 @@ skew tests, which went with item 8's trio.
    it (`server/seed.ts:111`). Follows item 2.
 4. `/status` — `{ up: boolean, components: { postgres:
    boolean } }`, 200 when every component is up and 503
-   when any is not, built for more components. Decide:
-   bearer-exempt or not (Render and compose probe it
-   unauthenticated; `AUTHENTICATION_ROUTES` is the whole
-   exempt set today); what `postgres: true` proves (a
+   when any is not, built for more components.
+   Unauthenticated — Render and compose probe it bare —
+   so it joins the bearer-exempt set
+   (`AUTHENTICATION_ROUTES`, `api/request-auth.ts:39-43`,
+   is the whole set today) and becomes the one path
+   outside authentication an anonymous caller can confirm
+   exists: every other `/api/*` path answers 401 before
+   the no-match 404, by design (`api/api.ts:394-396`). A
+   probe sends no ids; the server mints its `request-id`
+   (item 0). Decide: what `postgres: true` proves (a
    `SELECT 1` on a pooled connection under its own short
    timeout, not the 30 s statement timeout); that a read
    stores no pair; whether the throttle counts it and
