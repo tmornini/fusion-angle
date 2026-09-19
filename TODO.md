@@ -2213,6 +2213,18 @@ Off the critical path; each with its oracle.
   window. Oracle: `tests/api-pii-tombstone.test.ts`
   'erased PII remains in superseded pairs; login is 401'
   inverted for the erased pairs.
+- The reporter — `fa_reporter` reads an envelope-only
+  view: who, what, and when, the three leaf digests, and
+  `pair_hash`, so it verifies the root and sees no bytes,
+  no salts, and no credentials. It cannot log in, and a
+  deployment joins a login to it (product-path item 2's
+  principle, which creates no role before its worker). Its
+  view does not apply item 2's hiding rule: it carries no
+  bytes, so it has nothing to hide, and its counts stay
+  true. Activates with the first worker that needs
+  reports. Oracle: a Postgres test logs in as a member of
+  `fa_reporter`, reads envelopes, verifies a `pair_hash`,
+  and is refused `request`, `response`, and the table.
 
 ## Sequencing
 
