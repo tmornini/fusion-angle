@@ -526,7 +526,21 @@ skew tests, which went with item 8's trio.
    exists. A backup the operator has restored once:
    Render's schedule, a written restore drill, its
    measured duration, and a `schema_marker` that reads
-   present afterward. Cross-environment blocking, so
+   present afterward. `fa_archiver` adds a backup no host
+   owns (item 2's principle): it holds SELECT on a view
+   without the fenced credential column, cannot log in,
+   exports through `COPY`, and restores onto any Postgres
+   — `pg_dump` cannot serve it, because it locks the table
+   and dumps a view as a definition with no rows
+   (measured). A restore must fill the credential column,
+   which is NOT NULL, and zero bytes is the honest fill:
+   `pair_hash` still verifies on every pair, the secret
+   leaf no longer does, and the api runs the same, since
+   it reads no credential back. A full copy for a host
+   move stays the owner's `pg_dump`. The brainstorm
+   settles whether the archiver's view also applies item
+   2's hiding rule, so an archive never holds removed PII.
+   Cross-environment blocking, so
    `./deploy --render TOKEN --postgres mock-data` can
    never wipe the tenant database from a laptop. No
    connection reaches the database from outside its
