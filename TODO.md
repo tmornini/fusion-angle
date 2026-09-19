@@ -1858,13 +1858,26 @@ Off the critical path; each with its oracle.
   `./test-postgres` 52 passed; `./measure --check` green
   against the committed budgets.
 - Cachability — hashed names and gzip sidecars have
-  shipped; `HEAD` reports the same `Content-Length` as
-  GET. Conditional requests (`If-None-Match` / `304`)
-  stay open. Start: `server/http-server.ts` `NO_STORE`
-  and `CONTENT_SECURITY_POLICY`. Oracle: a measured
+  shipped; on the static server `HEAD` reports the same
+  `Content-Length` as GET. The API serves no `HEAD`: its
+  method switch has no case for it
+  (`api/api.ts:1472-1817`), so it answers 405, and that
+  405 carries no `Allow` (`api/api.ts:2004-2013`) —
+  RFC 9110 §9.1 requires GET and HEAD of a
+  general-purpose server and §15.5.6 requires `Allow` on
+  a 405 — while `requireOperationId` already skips a
+  method never served (`api/message-pair.ts:163`). Add
+  `HEAD` to the API: once item 1 makes a document GET the
+  stored bytes with two substitutions, `HEAD` is that
+  function without the body. Conditional requests
+  (`If-None-Match` / `304`) stay open. Start:
+  `server/http-server.ts` `NO_STORE` and
+  `CONTENT_SECURITY_POLICY`. Oracle: a measured
   `./bin/measure` repeat-load delta naming the header
   that earned it; hashed assets carry
-  `HASHED_CACHE_CONTROL`.
+  `HASHED_CACHE_CONTROL`; an API `HEAD` answers its GET's
+  status and headers with no body, and a 405 carries
+  `Allow`.
 - Genericity — DRY, even once (the indulgence); spec
   away every nit. Merged: `putRecordInstance` PATCHes
   (name lie —
