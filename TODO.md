@@ -600,6 +600,39 @@ Off the critical path; each with its oracle.
   panel under Auto Fit and switch it back off; zoom
   in once and click empty canvas — each red today,
   green once its door resets the save
+- The API client, packageable — `web-app/app/adapters/` is
+  the client in all but boundary: one transport facade
+  (`http-facade.ts`), a `RequestContext` passed first
+  (`shared.ts`), and per-noun adapters named by HTTP verb,
+  57 files and about 10,000 lines. Three couplings keep it
+  inside the app. It imports the server: 37 of the 57
+  files reach into `api/` for types, errors, and header
+  names — `OPERATION_ID_HEADER` from
+  `api/message-pair.ts`, `REQUEST_ID_HEADER` from
+  `api/request-context.ts`, `MissingTableError` from
+  `api/db.ts` — so the wire contract moves to `shared/`,
+  which never imports `api/`. It imports the app: 24 files
+  reach into `web-app/app/` — the facade navigates to the
+  login page on a failed refresh
+  (`web-app/app/adapters/http-facade.ts:286-292`), and
+  `shared.ts` redirects, logs, and records page request
+  profiles — so navigation, logging, and profiling are
+  handed in at construction. It holds a singleton:
+  `facade-holder.ts` keeps one module-level facade, so two
+  origins or two sessions cannot coexist; the facade
+  becomes an instance its caller owns. The barrel
+  (`web-app/app/adapters/index.ts`) re-exports API nouns
+  beside clipboard, viewport, location, and
+  resize-observer adapters; the client's barrel exports
+  the client alone. Three raw fetches bypass the facade
+  (item 0's rides-along names them), and auth recovery
+  lives at two layers (the retries bullet below). Item 1
+  rebuilds the facade to keep each response whole, which
+  is the moment to draw the boundary: the rebuilt client
+  imports nothing from `api/` or the app. Oracle: a test
+  that walks the client entry point's import graph and
+  finds no module outside the client's directory and
+  `shared/`
 
 ## Later work
 
