@@ -107,7 +107,22 @@ skew tests, which went with item 8's trio.
    multi-row INSERT; the bell rings from the same
    statement (`RETURNING` into `pg_notify`). `transaction`
    and `writeLocks` leave `DbAdapter`; item 13's "advisory
-   locks already cluster-wide" loses its referent. The
+   locks already cluster-wide" loses its referent. A seed
+   is the one transaction left, and it needs no adapter
+   primitive: it opens on the client beneath the adapter
+   and holds the DDL, the root row, and every pair, in
+   multi-row INSERTs batched far below the 65,535
+   parameters Postgres allows a statement, because the
+   seed will grow. A failed seed leaves nothing, not even
+   a table — DDL, role switches, and batches roll back
+   together (measured, 18.6) — and every pair is formed
+   and every credential hashed before it opens. Today a
+   seed commits three times and then stamps
+   `schema_marker`: the DDL outside any transaction
+   (`api/backend-postgres.ts:86`), the dataset
+   (`api/mock-data.ts:358`), the credentials
+   (`api/mock-data.ts:285`), the marker
+   (`api/backend-postgres.ts:107-113`). The
    brainstorm settles: the response credential header's
    name; the root's values (it must satisfy every CHECK);
    whether `supersedes` is a column or a succession join
@@ -124,11 +139,16 @@ skew tests, which went with item 8's trio.
    server-minted `request_id`, the per-request key
    `operation_id` stops being; whether an in-order PUT
    whose state is already the head answers 2xx, as
-   RFC 9110 §13.1.1 permits, or 412; and which secrets
+   RFC 9110 §13.1.1 permits, or 412; which secrets
    still ride a body (the token request's `code` and
    `code_verifier`, the token exchange's `subject_token`
    and `actor_token`, any password a body still carries)
-   and whether each moves to a credential line. The DDL is
+   and whether each moves to a credential line; and the
+   seed's batch size, a named constant measured against
+   the statement cap — the driver's multi-row helper
+   already serves under item 2's `fetch_types: false`
+   (measured: 5,000 pairs in ten statements, and a failed
+   batch left no table). The DDL is
    final when this item ships, but for `schema_marker`,
    which item 3 retires. Today falls short on every count:
    `request` keeps six header names
