@@ -325,7 +325,29 @@ skew tests, which went with item 8's trio.
    response whole, and pages and presenters read from the
    unit they were given; the packageable-client bullet on
    the critical functionality path draws its boundary in
-   this rebuild. A per-route audit proves each PUT
+   this rebuild. ARCHITECTURE.md gains a NAMED COVENANT,
+   `## A response is one unit`, in the commit that makes
+   it true and not before — that file states only what is,
+   and today the facade's `GETWithEtag` and `PUTWithEtag`
+   twins and `unwrapResponse` part every response
+   (`web-app/app/adapters/http-facade.ts:32,44,80`). Its
+   approved wording: "The API, the client, and the
+   application treat a response — status line, headers,
+   and body — as one unit. A stored response is the
+   message handed to the wire. A read serves those stored
+   bytes with exactly two substitutions, the status line
+   and `date`, made by ONE function on the head; the body
+   bytes are never touched. A list is whole responses:
+   `multipart/mixed` of
+   `application/http; msgtype=response` parts, each the
+   unit a document GET serves. Nothing parts a response
+   into a body plus picked headers. The client keeps each
+   response whole, and pages and presenters read from the
+   unit they were given. The application derives from
+   `response` only, never from `request`." The landing
+   commit adds the file references: the one read function
+   and the client's splitter. A per-route audit proves
+   each PUT
    response carries what its readers need; a gap closes by
    the response saying more — the mock data already shows
    one: a record instance's revisions store `{}` as their
