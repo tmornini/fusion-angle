@@ -2321,6 +2321,32 @@ Off the critical path; each with its oracle.
   reports. Oracle: a Postgres test logs in as a member of
   `fa_reporter`, reads envelopes, verifies a `pair_hash`,
   and is refused `request`, `response`, and the table.
+- Table migrations — deferred by decision: product-path
+  item 0 holds the table's DDL final, and item 3 ships
+  everything a change to the fence needs. Activates on the
+  first change to the table once a tenant's data exists
+  and a wipe is no longer possible. The pieces already
+  stand (item 3, measured): a migration is an in-order PUT
+  of the definition document by the owner's verb, its SQL
+  the `request` and the new digest the `response`; item
+  0's index orders runners with no lock and no migrations
+  table; and the DDL and the PUT commit or roll back
+  together. What is missing is the path: a digest names a
+  state, so the binary carries steps keyed by the
+  definition they start from, and a rollback lands a
+  successor, never a rewind. Named limits: a large index
+  cannot ride the one-transaction step and needs two,
+  build then record; boot's strict equality needs a
+  declared set of digests once item 13 runs two processes;
+  and pairs are hashed and never rewritten, so a new
+  envelope column sits outside every old `pair_hash`.
+  Never a route that executes a body's SQL (item 3). The
+  scripture names this gap among its unwritten scrolls.
+  Oracle: a Postgres test starts two runners from one
+  version and finds one successor, one set of changes, and
+  the loser's DDL gone; a second applies a table step to a
+  database seeded from an older definition, and the new
+  binary boots.
 
 ## Sequencing
 
