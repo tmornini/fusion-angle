@@ -636,8 +636,8 @@ skew tests, which went with item 8's trio.
 6. Operable — what a pilot tenant's data needs before it
    exists. A backup the operator has restored once:
    Render's schedule, a written restore drill, its
-   measured duration, and a `schema_marker` that reads
-   present afterward. `fa_archiver` adds a backup no host
+   measured duration, and item 3's full check passing
+   afterward. `fa_archiver` adds a backup no host
    owns (item 2's principle): it holds SELECT on a view
    without the fenced credential column, cannot log in,
    exports through `COPY`, and restores onto any Postgres
