@@ -834,12 +834,13 @@ skew tests, which went with item 8's trio.
 
 Off the critical path; each with its oracle.
 
-- An inner pair of a composed operation skipped while
-  the top-level pair landed answers 201;
+- An inner pair of a composed operation skipped while the
+  top-level pair landed answers 201;
   `appendMessagePairOnce` returns void and the gate never
-  holds inner hashes (`api/message-pair.ts:675-686`).
-  Oracle: a composed create whose inner hash collides
-  with an earlier pair
+  holds inner hashes (`api/message-pair.ts:718-729`).
+  Product-path item 0 removes that dedupe, and this closes
+  with it. Oracle: a composed create whose inner hash
+  collides with an earlier pair
 - The run-four remediation's remaining seams — R6 and
   R7. R6 holds in a stronger form: no picker renders for
   `select`. R7's primary clause is false: `regex` is
