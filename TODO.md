@@ -485,25 +485,101 @@ skew tests, which went with item 8's trio.
    (`tests/api-shadow-ledger-auth.test.ts` 'live secrets
    land in the auth-flow ledger rows'). Follows items 0
    and 1.
-3. Retire `schema_marker` for a definition check — the
-   marker (`api/schema-postgres.ts:26-29`) proves only
-   that a seed once finished; it cannot tell an
-   unwiped database with the old `text` stamp columns
-   from a correct one (SCHEMA.md § Operator tools).
-   Boot reads the live definition from the catalog —
-   `information_schema.columns`, `pg_get_constraintdef`,
-   `pg_get_indexdef`, and the root row — and compares
-   it to what the DDL declares, naming the drift; the
-   expected list lives beside the DDL, and `SCHEMA.svg`
-   goes from two tables to one. Item 0 made a seed one
-   statement, so a failed seed leaves nothing and the
-   last-stamp trick has no purpose; non-empty means a
-   pair beyond the root. Item 6's restore drill checks
-   the definition instead of the marker. Today: boot
-   gates on the marker row (`assertSchemaMarker`,
-   `server/postgres-gate.ts:28`), the seed stamps it
-   last (`api/backend-postgres.ts:110`) and refuses on
-   it (`server/seed.ts:111`). Follows item 2.
+3. Retire `schema_marker` for a definition the ledger
+   holds — the marker (`api/schema-postgres.ts:26-29`)
+   proves only that a seed once finished; it cannot tell
+   an unwiped database with the old `text` stamp columns
+   from a correct one (SCHEMA.md § Operator tools). The
+   definition becomes a document like any other — the same
+   canonical form, hash tree, succession index, and head
+   read (item 0) — that the owner writes and no route
+   serves. Each version's `request` is the SQL that ran —
+   the whole definition at genesis, the drops and the new
+   fence for a later release — and its `response` is the
+   digest of the definition's fixed SQL, DDL and DML
+   alike: the root row's insert and the grants count, and
+   a seed's data pairs, which are parameters and vary by
+   mode, do not. Item 2's fence does the rest: `fa_api`
+   reads the digest and is refused the SQL, as it is every
+   `request` (measured), so the catalog reads item 2
+   closed stay closed. The stored SQL is a receipt, never
+   an input: nothing executes SQL read from the ledger,
+   and every step comes from the compiled binary, as
+   `api/schema-postgres.ts:1-2` already rules for the DDL.
+   No route ever executes a body's SQL: that would put the
+   owner's credential in the serving process and turn
+   every authorization mistake into the owner's SQL. Seed
+   lands the first version, superseding the root, in its
+   one transaction (item 0). A later release is one owner
+   transaction — the change, the full check, and a
+   successor naming the version it was built on: an
+   in-order PUT, landed by the owner's verb through the
+   API's own dispatch in-process (`handleRequest`,
+   `api/api.ts:387`). Item 0's index orders migrations
+   with no lock and no migrations table: of two runners
+   built on one version, one commits and the other is
+   refused and rolls back, its DDL included, and a failed
+   step leaves the old fence and the old digest (both
+   measured, 18.6). Only the owner writes the document:
+   item 2's insert policy refuses its path to the view's
+   owner with one predicate, so a wire request cannot land
+   one, and a table's owner is exempt from its policies
+   (measured). After launch the fence is what changes —
+   item 0 holds the table's DDL final — and views,
+   policies, and grants hold no data, so the owner
+   rebuilds them whole and needs no path from one
+   definition to the next. Boot — `serve`, as `fa_api`,
+   where the marker gate runs today (`server/boot.ts:106`)
+   — does two small things. It asks what it holds itself
+   through the privilege functions, which answer with
+   catalog reads revoked (measured), and refuses to serve
+   if it can read `request`, touch the table, update, or
+   make temporary objects. And it compares the
+   definition's head with the digest of its own compiled
+   SQL, refusing to serve on a mismatch and naming both.
+   The digest is of text, so a cosmetic edit forces a run
+   of the owner's verb, which rebuilds only the fence and
+   never alters the table: "the head equals mine" means an
+   owner's verb of this exact build verified this database
+   and recorded it. The full check runs as `fa_owner`,
+   never at boot: it reads the live definition from the
+   catalog — `information_schema.columns`,
+   `pg_get_constraintdef`, `pg_get_indexdef`, the root
+   row, and item 2's objects: the roles, the api's view
+   and its column grants, the helper view, the row
+   policies, the view's owner, and what PUBLIC holds —
+   compares it to what the definition's SQL declares, and
+   names the drift. The expected list lives beside the
+   DDL, and a digest lands only after the check passes, in
+   the same transaction, so every seed proves the list
+   current. Drift made by hand afterwards is the full
+   check's to find, not boot's (measured: the head reads
+   the same after a column is added by hand). `SCHEMA.svg`
+   loses `schema_marker`. A seed is one transaction (item
+   0), so a failed seed leaves nothing and the last-stamp
+   trick has no purpose; a seed refuses a database that
+   holds our table at all, since one lands it whole or not
+   at all. Item 6's restore drill runs the full check
+   instead of reading the marker. Limits, named for the
+   table-migrations bullet in `## Later work`: a digest
+   names a state, not a path; boot's strict equality
+   refuses an old binary that restarts after the change,
+   which item 13's two processes must plan for; and a
+   large index cannot ride the one-transaction step —
+   built inside it, it holds `ShareLock` on the table
+   until commit, and `CREATE INDEX CONCURRENTLY` is
+   refused inside a transaction (measured). The document's
+   body stays open to grow: it has succession, so a later
+   system adds a version number or a step log without
+   touching old versions. The brainstorm settles: the
+   document's path and name; the digest's exact input;
+   whether the full check on demand is a verb of its own;
+   and the names item 2 left open. Today: boot gates on
+   the marker row (`assertSchemaMarker`,
+   `server/postgres-gate.ts:67`, called at
+   `server/boot.ts:106`), and the seed stamps it last
+   (`api/backend-postgres.ts:107-113`) and refuses on it
+   (`server/seed.ts:100-117`). Follows item 2.
 4. `/status` — `{ up: boolean, components: { postgres:
    boolean } }`, 200 when every component is up and 503
    when any is not, built for more components.
