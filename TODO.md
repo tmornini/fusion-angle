@@ -2368,21 +2368,22 @@ Off the critical path; each with its oracle.
 
 - The examination report
   (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`)
-  → 2, 5, 8, 10, 12 (its findings are their oracles)
-- 2 → 4, 5 (no credential is written or backed up in
-  the clear)
-- 3 → 5 → 12 (the health probe, then per process)
-- 6 → 10, 11 (the designer roster and AI seats read the
+  → 0–2, 6, 9, 11, 13 (its findings are their oracles)
+- 0–2 → 5 (its link token is a secret at rest: item 0
+  hoists it, item 2 fences it); item 2 no longer orders
+  item 6, since a backup carries the table whole
+- 4 → 6 → 13 (the health probe, then per process)
+- 7 → 11, 12 (the designer roster and AI seats read the
   profile)
-- 7 closed; 10 retires flows' event walk with the
+- 8 closed; 11 retires flows' event walk with the
   rewrite
-- 8 → 9 → 10 → 11 (the bell, then chats, then
+- 9 → 10 → 11 → 12 (the bell, then chats, then
   processes, then the worker)
-- Items 2, 5, 8, and 12, and the later-work XSS
-  bullet, close KNOWN seams — the closer removes the
+- Items 6, 9, and 13, and the later-work XSS bullet,
+  close KNOWN seams — the closer removes the
   ARCHITECTURE.md bullet and this file's line in one
-  commit
-- Item 6 precedes routing the roster through the
+  commit; item 2 rewords two and closes none
+- Item 7 precedes routing the roster through the
   profile
 - `api/derive-states.ts:517-529` (claim-expiry as its
   own event) lands before any multi-process deployment
