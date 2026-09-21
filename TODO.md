@@ -62,7 +62,33 @@ skew tests, which went with item 8's trio.
    both sides of the fence, so sorting by name merges the
    hoisted lines back and rebuilds each message exactly:
    every byte stays stored. SCHEMA.md's secrets section
-   takes that rule when this ships. Idempotency is the
+   takes that rule when this ships. Moving the `code`
+   breaks the one reader of response bodies, so this item
+   carries the repair: the grant finds a code today by
+   searching authorize responses for it
+   (`getAllWhereBody`, `api/authentication.ts:1253-1254`,
+   its only caller; GIN `message_pairs_body` — examination
+   report) and reads `client_id` and `code_challenge` from
+   that pair's request (`:1257`). Authorize lands a PUT
+   document named `sha256(code)`
+   (`deriveAuthorizationCodeId`) holding `client_id` and
+   `code_challenge`, in the same multi-row INSERT as its
+   own pair; the grant reads it by name and takes the
+   issue instant from that pair's own response stamp —
+   today's grant reads the pair's arrival stamp
+   (`api/authentication.ts:1269-1273`) — because a copy in
+   the document would be a second source on a second
+   clock. Redeeming a code lands a successor to its
+   document in the grant's statement, so the one-successor
+   index below lets one redemption win and refuses the
+   rest, where a spent marker re-checked inside a
+   transaction does today (`authorizationCodeSpent`,
+   `api/authentication.ts:1288-1300`). The body search,
+   its index, and `message_body`
+   (`api/schema-postgres.ts:31-46`, `:55-57`) lose their
+   last reader and retire here, which keeps the DDL claim
+   below true; item 1 makes such pairs the rule.
+   Idempotency is the
    verb's (RFC 9110 §9.2.2): a PUT or DELETE that would
    leave the head's state unchanged lands nothing, and a
    repeated POST or PATCH is a new request that runs again
@@ -269,19 +295,8 @@ skew tests, which went with item 8's trio.
    conversion, nothing item 11 will add; claim expiry
    stays decided at read time
    (`api/derive-states.ts:517-529`), recording it is item
-   13's. Authorize lands a PUT document named
-   `sha256(code)` (`deriveAuthorizationCodeId`) holding
-   `client_id` and `code_challenge`; the grant reads it by
-   name and takes the issue instant from that pair's own
-   response stamp — today's grant reads the pair's arrival
-   stamp (`api/authentication.ts:1269-1273`) — because a
-   copy in the document would be a second source on a
-   second clock. Redeeming a code lands a successor to its
-   document in the grant's statement, so item 0's
-   one-successor index lets one redemption win and refuses
-   the rest, where a spent marker re-checked inside a
-   transaction does today (`authorizationCodeSpent`,
-   `api/authentication.ts:1288-1300`). Flows keep their
+   13's. The login code's document is already such a pair
+   (item 0). Flows keep their
    event walk until item 11. A read hands out the stored
    response whole: a document GET is the stored bytes with
    two substitutions — the status line (201 → 200) and
@@ -318,15 +333,12 @@ skew tests, which went with item 8's trio.
    tests pin the headers a read serves and the headers it
    must not. Today: the five work-order operations answer
    204 and keep their state in their own request bodies
-   alone (`api/derive-states.ts:1023-1043`, `:1245`); the
-   authorize grant finds a code by body search
-   (`getAllWhereBody`, `api/authentication.ts:1254`, GIN
-   `message_pairs_body` — examination report); derivation
-   reads the request body at five seams
+   alone (`api/derive-states.ts:1023-1043`, `:1245`);
+   derivation reads the request body at four seams
    (`api/derive-documents.ts:95,159`,
    `api/document-family.ts:396,473`,
-   `api/routes.ts:5088,5303`, `api/api.ts:1341`,
-   `api/authentication.ts:1257`); a document GET parses
+   `api/routes.ts:5088,5303`, `api/api.ts:1341`), item 0
+   having closed the grant's; a document GET parses
    the stored response, keeps the body, and rebuilds three
    headers (`streamGetFromStored`); a collection GET
    dismantles every head into an array of bodies
