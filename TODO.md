@@ -401,7 +401,10 @@ skew tests, which went with item 8's trio.
    table grants, the policy applies to that role, and a
    helper view of the PII DELETE pairs keeps the policy
    from reading its own table, which Postgres refuses as
-   recursion (measured). A table's owner is exempt from
+   recursion (measured). Row security refuses that role's
+   inserts until a second policy admits them (measured),
+   and item 3 narrows that policy to keep its definition
+   document the owner's. A table's owner is exempt from
    its policies, so later views `fa_owner` owns still see
    the hidden pairs the eraser needs. Measured on 262,000
    rows against the owner reading the bare table: at
