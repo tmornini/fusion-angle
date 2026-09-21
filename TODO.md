@@ -559,8 +559,11 @@ skew tests, which went with item 8's trio.
    0), so a failed seed leaves nothing and the last-stamp
    trick has no purpose; a seed refuses a database that
    holds our table at all, since one lands it whole or not
-   at all. Item 6's restore drill runs the full check
-   instead of reading the marker. Limits, named for the
+   at all. The full check is also a verb of its own, with
+   an exit status for scripts — one check function with
+   three callers: seed, a release's step, and the verb —
+   and item 6's restore drill runs it instead of reading
+   the marker. Limits, named for the
    table-migrations bullet in `## Later work`: a digest
    names a state, not a path; boot's strict equality
    refuses an old binary that restarts after the change,
@@ -572,9 +575,9 @@ skew tests, which went with item 8's trio.
    body stays open to grow: it has succession, so a later
    system adds a version number or a step log without
    touching old versions. The brainstorm settles: the
-   document's path and name; the digest's exact input;
-   whether the full check on demand is a verb of its own;
-   and the names item 2 left open. Today: boot gates on
+   document's path and name; the digest's exact input; the
+   check verb's name; and the names item 2 left open.
+   Today: boot gates on
    the marker row (`assertSchemaMarker`,
    `server/postgres-gate.ts:67`, called at
    `server/boot.ts:106`), and the seed stamps it last
