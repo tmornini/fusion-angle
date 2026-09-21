@@ -612,7 +612,7 @@ skew tests, which went with item 8's trio.
    stores no pair; whether the throttle counts it and
    whether it logs. Replaces the compose healthcheck's
    `fetch('/')`, which proves static serving only. Item
-   5's health probe; item 13 answers it per process.
+   6's health probe; item 13 answers it per process.
 5. A person's first sign-in — no page mints a human
    credential: the seed does
    (`api/mock-data/seed-message-pairs.ts:2609`), only
