@@ -21,6 +21,8 @@ skew tests, which went with item 8's trio.
    It ships as three specs in order, each its own
    worktree, master green at Layer 1 between them and
    deployed with items 1–3: the store — the final DDL,
+   its table `fa_message_pairs` and its indexes named
+   after it under the naming bullet's prefix,
    the root, succession, the hash tree, one statement per
    write, locks and `transaction` out of `DbAdapter`; the
    message plane — the canonical form, credential lines,
@@ -1199,8 +1201,10 @@ Off the critical path; each with its oracle.
   system makes what is ours trivial to find:
   `env | grep FA_` lists every variable the system needs.
   Every environment variable the system reads becomes
-  `FA_*`, and every Postgres role and login `fa_*` (item 2
-  creates its roles under the prefix). Product code reads
+  `FA_*`, and every Postgres role, login, table, index,
+  and view `fa_*` (item 0 renames the table and its
+  indexes; item 2 creates its roles and views under the
+  prefix). Product code reads
   six names, and every reader is ours — `POSTGRES_URL`,
   `JWT_HMAC_SIGNING_KEY`, `PORT`, and `TRUSTED_PROXY_HOPS`
   (`server/boot.ts:59-72`; the URL again at
