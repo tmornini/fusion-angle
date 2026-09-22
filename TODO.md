@@ -51,7 +51,13 @@ skew tests, which went with item 8's trio.
    nothing was received (item 1's sibling PUTs) stores
    zero request bytes. `response` holds the entire
    response as sent, less its credential lines: the status
-   actually sent (201 on a first write, 204 on DELETE),
+   actually sent — 201 for every PUT that lands, a
+   genesis, a successor, or a PUT after a DELETE alike,
+   as today (`api/message-pair.ts:649-651`), a sibling
+   PUT's line included; 200 for a blind PUT that lands
+   nothing
+   because its state is already the head, a replay,
+   answered with the head's unit; and 204 on DELETE —
    and `date`, `etag`, `operation-id`, and `request-id` as
    the wire carries them; item 1 says how a read serves
    these bytes. A runtime orders and cases the lines it
