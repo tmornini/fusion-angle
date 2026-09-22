@@ -2565,6 +2565,11 @@ Off the critical path; each with its oracle.
 - 0–2 → 5 (its link token is a secret at rest: item 0
   hoists it, item 2 fences it); item 2 no longer orders
   item 6, since a backup carries the table whole
+- 0 → 2's advisory-lock revoke, which waits on item 0
+  removing the product's last use
+  (`api/backend-postgres.ts:286`)
+- The naming bullet (`fa_`) lands no later than the
+  deploy of items 0–3, so operators rename once
 - 4 → 6 → 13 (the health probe, then per process)
 - 7 → 11, 12 (the designer roster and AI seats read the
   profile)
