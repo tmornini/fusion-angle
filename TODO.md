@@ -46,7 +46,9 @@ skew tests, which went with item 8's trio.
    to it — same lines, same values, same body bytes — and
    the runtime must keep a `date` it is given
    (`Deno.serve` does: measured, 2.9.6), so the stamp
-   Postgres mints is the `date` the wire carries. Secrets
+   Postgres mints is the `date` the wire carries. A
+   sibling PUT (item 1) sends nothing; its `response` is
+   the message a read of it serves. Secrets
    move to credential lines: the password rides
    `Authorization: Basic`, no longer the authorize body,
    and the authorize `code` and the token grant's
@@ -319,8 +321,17 @@ skew tests, which went with item 8's trio.
    response body against the head's response body — never
    on the stored request bodies the check reads today
    (`api/api.ts:1341`). A sibling PUT is synthesized —
-   nothing was received for it — so its `request` is zero
-   bytes, and the handler mints both ids, so nothing looks
+   nothing was received for it and nothing sent — so its
+   `request` is zero bytes and its `response` is the
+   message a read of it will serve, formed by the handler
+   in the same statement: its own status line, `date`
+   spliced from its own stamp as every pair's is, `etag`
+   naming itself, the two ids, and the state as body —
+   for a PATCH usually the wire's own bytes, for
+   authorize's code document (item 0) and the token
+   grant's `tokens/:jti` a message the wire never
+   carried; and the handler mints both ids, so nothing
+   looks
    the sibling up afterward (item 0 retires
    `revisionMessagePairIdForPatch`). The PATCH revision
    and the token grant's `tokens/:jti` pair become such
@@ -374,8 +385,11 @@ skew tests, which went with item 8's trio.
    (`web-app/app/adapters/http-facade.ts:32,44,80`). Its
    approved wording: "The API, the client, and the
    application treat a response — status line, headers,
-   and body — as one unit. A stored response is the
-   message handed to the wire. A read serves those stored
+   and body — as one unit. A stored response is a
+   response message: for a received request, the message
+   handed to the wire; for a sibling PUT, which received
+   nothing and sent nothing, the message a read of it
+   serves. A read serves those stored
    bytes with exactly three substitutions — the status
    line, `date`, and `request-id`, the lines that describe
    this transmission — made by ONE function on the head;
