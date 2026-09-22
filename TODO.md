@@ -114,7 +114,18 @@ skew tests, which went with item 8's trio.
    splices it in as `date`, and computes every hash with
    Postgres's `sha256` over the bytes it stores — the
    stamp and the hashes are made where the row is made, on
-   the one clock. The stamp also obeys the succession the
+   the one clock. `request_at` leaves the row: it is the
+   app's clock (`nowUtc()`, `incomingContext`), a second
+   clock beside the stamp, a sibling PUT and a seed pair
+   received nothing to stamp, and after this item and
+   item 1 nothing reads it — the grant's `issuedAt`
+   (`api/authentication.ts:1273`) moves to the response
+   stamp above, the flow undo's join
+   (`api/derive-flows.ts:289-302`) moves to
+   `operation_id`, and the logs read the context. A
+   received request's arrival stays a log fact, joined to
+   its pair by `request-id`. The stamp also obeys the
+   succession the
    index enforces: the INSERT takes the later of
    `clock_timestamp()` and its predecessor's stamp plus
    one microsecond — a stored row whose stamp the api may
@@ -374,7 +385,12 @@ skew tests, which went with item 8's trio.
    (`api/derive-states.ts:517-529`), recording it is item
    13's. The login code's document is already such a pair
    (item 0). Flows keep their
-   event walk until item 11. A read hands out the stored
+   event walk until item 11, and the undo's join of an
+   undo pair to its document pair moves from equal
+   `request_at`, which item 0 drops, to the
+   `operation_id` both carry
+   (`api/derive-flows.ts:257-263`, `:289-302`). A read
+   hands out the stored
    response whole: a document GET is the stored bytes with
    three substitutions — the status line (201 → 200),
    `date`, and `request-id`, the lines that describe this
