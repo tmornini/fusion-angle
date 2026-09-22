@@ -373,7 +373,25 @@ skew tests, which went with item 8's trio.
    list-heavy pages adds both sets of numbers to the
    history, gating nothing. Derivation is head selection;
    whatever still needs a body reads it in place from the
-   unit, never from `request`. The API client keeps each
+   unit, never from `request`. A collection's heads come
+   from a skip walk of `message_pairs_document` — a
+   recursive query that asks the index for the next name
+   after the last, then one head read per name — one
+   probe per document, where today's `DISTINCT ON`
+   (`api/backend-postgres.ts:523-547`) reads every entry
+   at the path, so its cost is every version of every
+   document there. Measured on 18.6, owner on the bare
+   table, 300-byte responses, medians of seven: 200
+   documents at 10 / 250 / 2,500 versions read 0.51 /
+   30.63 / 130.71 ms today and 1.11 / 1.43 / 1.93 ms by
+   the walk, 2.15 ms through item 2's fence; the walk
+   loses where documents are many and shallow — 10,000
+   of one version, 4.54 ms today against 39.48 — and
+   breaks even near 15 to 20 versions a document, a
+   depth documents are expected to pass. Both reads use
+   the index item 0 freezes; `EXPLAIN` pins the plan and
+   the memory backend is untouched. The API client keeps
+   each
    response whole, and pages and presenters read from the
    unit they were given; the packageable-client bullet on
    the critical functionality path draws its boundary in
