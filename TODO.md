@@ -88,7 +88,9 @@ skew tests, which went with item 8's trio.
    document named `sha256(code)`
    (`deriveAuthorizationCodeId`) holding `client_id` and
    `code_challenge`, in the same multi-row INSERT as its
-   own pair; the grant reads it by name and takes the
+   own pair — its `request` zero bytes, its state in
+   `response`, the message `fa_api` may read (item 2);
+   the grant reads it by name and takes the
    issue instant from that pair's own response stamp —
    today's grant reads the pair's arrival stamp
    (`api/authentication.ts:1269-1273`) — because a copy in
@@ -200,7 +202,9 @@ skew tests, which went with item 8's trio.
    statement (`RETURNING` into `pg_notify`). `transaction`
    and `writeLocks` leave `DbAdapter`; item 13's "advisory
    locks already cluster-wide" loses its referent. A seed
-   is the one transaction left, and it needs no adapter
+   is one of the two transactions left — item 3's release
+   is the other, on the same owner-side writer — and it
+   needs no adapter
    primitive: it opens on the client beneath the adapter
    and holds the DDL, the root row, and every pair, in
    multi-row INSERTs batched far below the 65,535
@@ -272,7 +276,15 @@ skew tests, which went with item 8's trio.
    request-hash dedupe that answers a byte-identical
    request from the first (`appendMessagePairOnce`,
    `api/message-pair.ts:718-729`) guard what one index and
-   the verbs will. Rides along: the in-band plaintext
+   the verbs will. Each lock has its successor: the
+   request lock leaves with the dedupe; the document lock
+   and the `FOR UPDATE` latch with its fresh head read
+   (`api/message-pair.ts:769-790`) become the index and
+   the predecessor-as-head statement; and the assertion
+   jti's document lock (`api/authentication.ts:1152-1172`)
+   guards a genesis at `authentication/assertion-jtis/`,
+   which the index refuses a second time. Rides along:
+   the in-band plaintext
    comment at `api/mock-data.ts:145-157`, which still says
    PBKDF2 and names a column that is not there (owner
    call); and the two ids, each with one source.
