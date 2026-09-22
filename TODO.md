@@ -337,11 +337,14 @@ skew tests, which went with item 8's trio.
    (item 0). Flows keep their
    event walk until item 11. A read hands out the stored
    response whole: a document GET is the stored bytes with
-   two substitutions — the status line (201 → 200) and
-   `date` — made by ONE function on the head, the body
+   three substitutions — the status line (201 → 200),
+   `date`, and `request-id`, the lines that describe this
+   transmission; `etag`, `content-type`, the body, and the
+   `operation-id` of the write that made the state stay —
+   made by ONE function on the head, the body
    bytes untouched; a collection GET is `multipart/mixed`,
    each part an `application/http; msgtype=response` unit
-   with the same two substitutions, so one head is one
+   with the same three substitutions, so one head is one
    unit from either source. The boundary is a fresh
    identifier per response, so no part can contain it, and
    the client's rebuild owns the splitter. Measured on the
@@ -373,8 +376,11 @@ skew tests, which went with item 8's trio.
    application treat a response — status line, headers,
    and body — as one unit. A stored response is the
    message handed to the wire. A read serves those stored
-   bytes with exactly two substitutions, the status line
-   and `date`, made by ONE function on the head; the body
+   bytes with exactly three substitutions — the status
+   line, `date`, and `request-id`, the lines that describe
+   this transmission — made by ONE function on the head;
+   `etag` and `operation-id` stay, naming the state and
+   the write that made it; the body
    bytes are never touched. A list is whole responses:
    `multipart/mixed` of
    `application/http; msgtype=response` parts, each the
@@ -400,7 +406,9 @@ skew tests, which went with item 8's trio.
    `api/routes.ts:5088,5303`, `api/api.ts:1341`), item 0
    having closed the grant's; a document GET parses
    the stored response, keeps the body, and rebuilds three
-   headers (`streamGetFromStored`); a collection GET
+   headers, dropping `Operation-ID` on purpose
+   (`streamGetFromStored`,
+   `api/message-pair.ts:606-636`); a collection GET
    dismantles every head into an array of bodies
    (`entitiesOf`, `api/message-store.ts:57-66`); and the
    client receives bare JSON. Follows item 0.
@@ -2253,7 +2261,7 @@ Off the critical path; each with its oracle.
   a 405 — while `requireOperationId` already skips a
   method never served (`api/message-pair.ts:163`). Add
   `HEAD` to the API: once item 1 makes a document GET the
-  stored bytes with two substitutions, `HEAD` is that
+  stored bytes with three substitutions, `HEAD` is that
   function without the body. Conditional requests
   (`If-None-Match` / `304`) stay open. Start:
   `server/http-server.ts` `NO_STORE` and
