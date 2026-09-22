@@ -2518,6 +2518,17 @@ Off the critical path; each with its oracle.
   window. Oracle: `tests/api-pii-tombstone.test.ts`
   'erased PII remains in superseded pairs; login is 401'
   inverted for the erased pairs.
+- The code's word `erased` follows the page's "removed"
+  (product-path item 2) in a change of its own: the PII
+  union's discriminant (`api/types.ts:627-636`) and the
+  stem's 76 occurrences in 17 product files, 80 in 14
+  test files. It touches no stored byte — the client
+  builds the flag from a 404
+  (`web-app/app/adapters/identities.ts:152`) — so it has
+  no deadline, and it retires when the eraser ships and
+  the word becomes true. Oracle: the stem appears in
+  `api/`, `server/`, `shared/`, and `web-app/` only where
+  the eraser bullet's own words do.
 - The reporter — `fa_reporter` reads an envelope-only
   view: who, what, and when, the three leaf digests, and
   `pair_hash`, so it verifies the root and sees no bytes,
