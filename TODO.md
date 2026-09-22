@@ -180,8 +180,13 @@ skew tests, which went with item 8's trio.
    pair it supersedes; a genesis supersedes the ROOT, one
    row seeded with the schema under the nil UUID, so the
    column is NOT NULL and no sentinel exists. A received
-   POST or PATCH supersedes nothing — its sibling PUT
-   supersedes the head. `supersedes` is not an enforced
+   POST or PATCH names the head its `If-Match` named —
+   the state it acted on — and a creating POST the root,
+   as its sibling genesis does, so the column means one
+   thing on every pair; the sibling PUT supersedes that
+   head, and the index, over PUT and DELETE alone, sees
+   the sibling and never the pair beside it.
+   `supersedes` is not an enforced
    reference: the physical eraser in `## Later work` must
    be able to remove a superseded pair, and nothing may
    rewrite its successor, whose root covers `supersedes`;
@@ -234,10 +239,7 @@ skew tests, which went with item 8's trio.
    (`api/backend-postgres.ts:107-113`). The
    brainstorm settles: the response credential header's
    name; the root's values (it must satisfy every CHECK);
-   what a POST or PATCH pair, which supersedes nothing,
-   writes in `supersedes` — the eraser stays unblocked
-   and the root covers the succession either way; one
-   fenced column or one per
+   one fenced column or one per
    message, since a reader must tell which message a
    hoisted line left; the salts — how many, where each is
    stored, and what mints them (core Postgres has
