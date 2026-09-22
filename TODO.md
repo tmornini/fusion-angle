@@ -1584,7 +1584,10 @@ Off the critical path; each with its oracle.
   but this branch saw `tests/ideas-empty-subscribe.test.ts`
   fail three times under `--parallel` (the file itself
   untouched; `BroadcastChannel` is process-global) and
-  `tests/adapters-flow-stats.test.ts` fail once, so the
+  `tests/adapters-flow-stats.test.ts` fail once, and
+  `ledger-decisions` saw the ideas file fail a fourth
+  time, TODO.md its only change and a second gate
+  running beside it, so the
   fixed count still proves less than it reads as proving;
   the ideas comment still says its drain matches the
   post-bell assert, which 90f5c722 turned into a deadline
