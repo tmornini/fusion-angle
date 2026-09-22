@@ -201,6 +201,17 @@ skew tests, which went with item 8's trio.
    table: this index needs `path`, `name`, and the
    predecessor in one relation, and a join table could
    hold them only by copying the two names in.
+   The root is a real pair, `/migrations/0000-root` —
+   item 3's collection, the owner's alone — a PUT that
+   names itself: `request` zero bytes, `response` a 201
+   whose body is the digest of zero bytes, `fa_owner`
+   its requester, the seed's `operation-id` its
+   operation; it passes every CHECK as any pair does,
+   its own index entry,
+   `('/migrations/', '0000-root', nil)`, is the slot a
+   successor would need, so the index refuses one
+   forever, and boot counts it as the zeroth name of
+   the set it compares (item 3).
    The index cannot tell a predecessor from an invented
    id or another document's pair, so the INSERT selects
    its predecessor as this document's head — the newest
@@ -238,8 +249,7 @@ skew tests, which went with item 8's trio.
    (`api/mock-data.ts:285`), the marker
    (`api/backend-postgres.ts:107-113`). The
    brainstorm settles: the response credential header's
-   name; the root's values (it must satisfy every CHECK);
-   one fenced column or one per
+   name; one fenced column or one per
    message, since a reader must tell which message a
    hoisted line left; the salts — how many, where each is
    stored, and what mints them (core Postgres has
@@ -723,7 +733,8 @@ skew tests, which went with item 8's trio.
    canonical form, hash tree, succession index, and head
    read (item 0) — in the collection `/migrations/`, named
    for what it does behind a four-digit order,
-   `0001-bootstrap` first, that the owner writes and no
+   `0000-root` (item 0's root) then `0001-bootstrap`,
+   that the owner writes and no
    route serves; one document with successors would hold
    the same history under a name that hides it. A
    migration's `request` is the SQL that ran —
@@ -742,7 +753,7 @@ skew tests, which went with item 8's trio.
    No route ever executes a body's SQL: that would put the
    owner's credential in the serving process and turn
    every authorization mistake into the owner's SQL. Seed
-   lands `0001-bootstrap`, a genesis, in its
+   lands the root and `0001-bootstrap`, a genesis, in its
    one transaction (item 0). A later migration is one
    owner transaction — the change, the full check, and
    the genesis of its own document, in item 0's
@@ -2606,7 +2617,7 @@ Off the critical path; each with its oracle.
   and a wipe is no longer possible. The pieces already
   stand (item 3, measured): a migration is the genesis of
   its own document in `/migrations/`, named for what it
-  does behind a four-digit order, `0001-bootstrap` first,
+  does behind a four-digit order after item 0's root,
   landed by `migrate` with its SQL the `request` and
   its digest the `response`; names order migrations and
   item 0's index refuses a second runner, with no lock
