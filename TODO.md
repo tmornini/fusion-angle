@@ -310,7 +310,22 @@ skew tests, which went with item 8's trio.
    changes state and is stored in PATCH's style; the other
    only reads — a convenience over GET, joined or computed
    by the database or the server — and stores nothing, as
-   a GET stores nothing. A PATCH or POST that would leave
+   a GET stores nothing. A write that derives its state
+   from a head is in-order: a PATCH or a state-changing
+   POST carries `If-Match` naming the head it read, its
+   sibling names that head, a missing latch answers 428
+   at the gate (RFC 6585 §3), and a refused sibling — the
+   index's, when two derive from one head — refuses the
+   whole statement and answers 412, after which the
+   client resends from a fresh read, as the retries
+   bullet permits; nothing re-fills `supersedes` around
+   a stale body, which would drop the winner's change,
+   and only the blind PUT retries on the server, since it
+   derives nothing. A POST that creates a document is a
+   genesis and carries no latch; two creates of one name
+   are refused by the index and answer 409. Every unit a
+   client reads carries its `etag`, so the client always
+   holds the latch. A PATCH or POST that would leave
    the head's state unchanged stores nothing at all, as
    item 0's PUT does: neither its own pair nor a sibling
    lands. Today a no-op claim still stores its pair
