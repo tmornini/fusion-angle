@@ -84,7 +84,8 @@ skew tests, which went with item 8's trio.
    (`getAllWhereBody`, `api/authentication.ts:1253-1254`,
    its only caller; GIN `message_pairs_body` — examination
    report) and reads `client_id` and `code_challenge` from
-   that pair's request (`:1257`). Authorize lands a PUT
+   that pair's request (`:1257-1268`). Authorize lands a
+   PUT
    document named `sha256(code)`
    (`deriveAuthorizationCodeId`) holding `client_id` and
    `code_challenge`, in the same multi-row INSERT as its
@@ -273,9 +274,10 @@ skew tests, which went with item 8's trio.
    `transaction(…)` sites, three lock primitives — two
    advisory labels and a `FOR UPDATE`
    (`api/backend-postgres.ts:220-246`) — and a
-   request-hash dedupe that answers a byte-identical
-   request from the first (`appendMessagePairOnce`,
-   `api/message-pair.ts:718-729`) guard what one index and
+   request-hash dedupe (`appendMessagePairOnce`,
+   `api/message-pair.ts:718-729`), behind which
+   `api/api.ts:968-974` answers a byte-identical request
+   from the first, guard what one index and
    the verbs will. Each lock has its successor: the
    request lock leaves with the dedupe; the document lock
    and the `FOR UPDATE` latch with its fresh head read
@@ -321,9 +323,9 @@ skew tests, which went with item 8's trio.
    it. Three client call sites send no id at all, each a
    raw `fetch` of `POST authentication/token` with
    `Content-Type` alone: `postCookieRefresh`
-   (`web-app/app/adapters/http-facade.ts:198-218`,
+   (`web-app/app/adapters/http-facade.ts:199-220`,
    `grant_type: 'refresh'`), `postOrganizationExchange`
-   (`web-app/app/adapters/http-facade.ts:220-249`,
+   (`web-app/app/adapters/http-facade.ts:222-249`,
    `grant_type: 'token-exchange'`), and
    `probeRefreshSession`
    (`web-app/app/apex-destination.ts:25-40`,
@@ -372,9 +374,9 @@ skew tests, which went with item 8's trio.
    the head's state unchanged stores nothing at all, as
    item 0's PUT does: neither its own pair nor a sibling
    lands. Today a no-op claim still stores its pair
-   (`api/routes.ts:1853-1857`) and a no-op PATCH appends a
+   (`api/routes.ts:1919-1923`) and a no-op PATCH appends a
    version and answers 201
-   (`tests/api-instances-create.test.ts:585-586`).
+   (`tests/api-instances-create.test.ts:578-614`).
    Sameness is judged on responses — the candidate
    response body against the head's response body — never
    on the stored request bodies the check reads today
@@ -393,15 +395,18 @@ skew tests, which went with item 8's trio.
    the sibling up afterward (item 0 retires
    `revisionMessagePairIdForPatch`). The PATCH revision
    and the token grant's `tokens/:jti` pair become such
-   pairs; the revision's `If-Match`-only synthesized
-   request (`api/routes.ts:3724-3743`) retires with them.
+   pairs; the revision's synthesized request
+   (`api/routes.ts:3724-3743`) — `If-Match`,
+   `operation-id`, and the body's framing lines, not the
+   `[]` its comment claims — retires with them.
    Work-order create and transition (POST), claim and
    binding (PUT), and release (DELETE) each land a PUT of
    `work-orders/:id`, derive reads the head, and
    `replayWorkOrderOperations` retires — a faithful
    conversion, nothing item 11 will add; claim expiry
    stays decided at read time
-   (`api/derive-states.ts:517-529`), recording it is item
+   (`isExpiredAsOf`, `api/derive-states.ts:658`, applied
+   at `:754` and `:850`), recording it is item
    13's. The login code's document is already such a pair
    (item 0). Flows keep their
    event walk until item 11, and the undo's join of an
@@ -494,18 +499,21 @@ skew tests, which went with item 8's trio.
    tests pin the headers a read serves and the headers it
    must not. Today: the five work-order operations answer
    204 and keep their state in their own request bodies
-   alone (`api/derive-states.ts:1023-1043`, `:1245`);
-   derivation reads the request body at four seams
+   alone (`api/routes.ts:3001-3014`, `api/api.ts:880-881`;
+   `api/derive-states.ts:605-629`);
+   derivation reads the request body at five seams
    (`api/derive-documents.ts:95,159`,
    `api/document-family.ts:396,473`,
-   `api/routes.ts:5088,5303`, `api/api.ts:1341`), item 0
+   `api/routes.ts:5088,5303`, `api/api.ts:1341`, and the
+   work-order decoder `api/derive-states.ts:615-617`
+   behind seven callers), item 0
    having closed the grant's; a document GET parses
    the stored response, keeps the body, and rebuilds three
    headers, dropping `Operation-ID` on purpose
    (`streamGetFromStored`,
    `api/message-pair.ts:606-636`); a collection GET
    dismantles every head into an array of bodies
-   (`entitiesOf`, `api/message-store.ts:57-66`); and the
+   (`entitiesOf`, `api/message-store.ts:59-68`); and the
    client receives bare JSON. Follows item 0.
 2. The ledger fenced — roles, views, and a row policy, on
    a table items 0 and 1 have finished. Designed to stock
@@ -644,10 +652,11 @@ skew tests, which went with item 8's trio.
    `fa_reporter` (its bullet in `## Later work`). Until
    the eraser ships, the page says the personal
    information is removed from the application, never
-   erased or deleted: today the button, the dialog, and
-   its sentence say "Erase"
-   (`web-app/app/presenters/identity-detail.ts:284-292`,
-   `web-app/identities/detail.html:3-28`), and the code's
+   erased or deleted: today the button
+   (`web-app/app/presenters/identity-detail.ts:284-292`)
+   and the dialog and its sentence
+   (`web-app/identities/detail.html:3-28`) say "Erase",
+   and the code's
    own word `erased` follows in a change of its own. Every
    byte stays recorded; roles fence live readers only, so
    a dump or backup carries the table whole, and item 6 no
@@ -787,7 +796,7 @@ skew tests, which went with item 8's trio.
    `server/postgres-gate.ts:67`, called at
    `server/boot.ts:106`), and the seed stamps it last
    (`api/backend-postgres.ts:107-113`) and refuses on it
-   (`server/seed.ts:100-117`). Follows item 2.
+   (`server/seed.ts:119-125`). Follows item 2.
 4. `/status` — `{ up: boolean, components: { postgres:
    boolean } }`, 200 when every component is up and 503
    when any is not, built for more components.
@@ -797,7 +806,7 @@ skew tests, which went with item 8's trio.
    is the whole set today) and becomes the one path
    outside authentication an anonymous caller can confirm
    exists: every other `/api/*` path answers 401 before
-   the no-match 404, by design (`api/api.ts:394-396`). A
+   the no-match 404, by design (`api/api.ts:437-467`). A
    probe sends no ids; the server mints its `request-id`
    (item 0). Decide: what `postgres: true` proves (a
    `SELECT 1` on a pooled connection under its own short
@@ -858,8 +867,9 @@ skew tests, which went with item 8's trio.
    `bin/postgres-wipe:127-130`). Item 2 refuses a foreign
    login — one that belongs to none of our roles — and
    this keeps the port out of its reach. Request and
-   error logs as one JSON object per line — `api/api.ts:
-   347` and `:2076-2082` print a label, an object, and an
+   error logs as one JSON object per line —
+   `api/api.ts:346-352` and `:2062-2068` print a label, an
+   object, and an
    error as three values (the Office of Structured
    Observability wants one document with level, message,
    and request identity). One request clock, read once
@@ -1142,7 +1152,8 @@ Off the critical path; each with its oracle.
   (`web-app/app/adapters/http-facade.ts:276-297`), while
   `withAuthRecovery` does the same above it through
   `postSessionRefresh`
-  (`web-app/app/adapters/shared.ts:175`, `:498`); boot
+  (`web-app/app/adapters/shared.ts:374`, called at
+  `:175`); boot
   refreshes twice more (`web-app/app/app-boot.ts:250`,
   `:366`), and an accepted invitation re-mints its claims
   in two attempts, no loop (`remintSessionClaims`,
@@ -1179,13 +1190,17 @@ Off the critical path; each with its oracle.
   Every environment variable the system reads becomes
   `FA_*`, and every Postgres role and login `fa_*` (item 2
   creates its roles under the prefix). Product code reads
-  four names, and every reader is ours — `POSTGRES_URL`,
+  six names, and every reader is ours — `POSTGRES_URL`,
   `JWT_HMAC_SIGNING_KEY`, `PORT`, and `TRUSTED_PROXY_HOPS`
   (`server/boot.ts:59-72`; the URL again at
   `server/postgres-seed.ts:68` and
   `server/postgres-wipe.ts:60`; the key again at
   `api/access-token.ts:36`, through the `process` global a
-  search for `Deno.env` misses) — so the app reads
+  search for `Deno.env` misses), and the tooling's
+  `MEASURE_PASSWORD` (`web-app/app/measure.ts:368-370`,
+  with the URL and the key again at `:430-433`) and
+  `CHROME` (`web-app/app/cdp-client.ts:39`) — so the app
+  reads
   `FA_POSTGRES_URL` directly and nothing translates. Names
   others dictate stay at two edges: the Postgres image's
   `POSTGRES_USER`, `POSTGRES_DB`, and `POSTGRES_PASSWORD`,
@@ -2374,7 +2389,7 @@ Off the critical path; each with its oracle.
   shipped; on the static server `HEAD` reports the same
   `Content-Length` as GET. The API serves no `HEAD`: its
   method switch has no case for it
-  (`api/api.ts:1472-1817`), so it answers 405, and that
+  (`api/api.ts:1471-2014`), so it answers 405, and that
   405 carries no `Allow` (`api/api.ts:2004-2013`) —
   RFC 9110 §9.1 requires GET and HEAD of a
   general-purpose server and §15.5.6 requires `Allow` on
