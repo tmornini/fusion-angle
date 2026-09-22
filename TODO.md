@@ -2554,18 +2554,12 @@ Off the critical path; each with its oracle.
   Oracle: the stem appears in `api/`, `server/`,
   `shared/`, and `web-app/` only where the eraser
   bullet's own words do.
-- The reporter — `fa_reporter` reads an envelope-only
-  view: who, what, and when, the three leaf digests, and
-  `pair_hash`, so it verifies the root and sees no bytes,
-  no salts, and no credentials. It cannot log in, and a
-  deployment joins a login to it (product-path item 2's
-  principle, which creates no role before its worker). Its
-  view does not apply item 2's hiding rule: it carries no
-  bytes, so it has nothing to hide, and its counts stay
-  true. Activates with the first worker that needs
-  reports. Oracle: a Postgres test logs in as a member of
-  `fa_reporter`, reads envelopes, verifies a `pair_hash`,
-  and is refused `request`, `response`, and the table.
+- The reporter — `fa_reporter`, named in product-path
+  item 2 only as an example of its principle: a role
+  created with its first worker, never before. Nothing
+  about it is defined yet — its view, its grants, and
+  whether it sees hidden pairs are its own brainstorm's.
+  Activates with the first worker that needs reports.
 - Table migrations — deferred by decision: product-path
   item 0 holds the table's DDL final, and item 3 ships
   everything a change to the fence needs. Activates on the
