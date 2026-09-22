@@ -586,8 +586,8 @@ skew tests, which went with item 8's trio.
    rights, the owner is exempt, and the planner still
    inlines it. Row security refuses `fa_api`'s
    inserts until a second policy admits them (measured),
-   and item 3 narrows that policy to keep its definition
-   document the owner's. A table's owner is exempt from
+   and item 3 narrows that policy to keep `/migrations/`
+   the owner's. A table's owner is exempt from
    its policies, so views `fa_owner` owns still see
    the hidden pairs the eraser needs. Measured on 262,000
    rows against the owner reading the bare table: at
@@ -636,11 +636,11 @@ skew tests, which went with item 8's trio.
    that are absent — roles belong to the cluster — and
    revokes CONNECT and TEMPORARY from PUBLIC on the
    database, which outlives a wipe; where our table
-   exists it rebuilds the helper view, the policies, and
-   every
-   schema grant whole, runs item 3's full check, and lands
-   the definition's successor, which item 0's PUT rule
-   lands only when the digest changed; where it does not,
+   exists it applies, in name order, each migration its
+   binary carries and the database lacks — every one an
+   owner transaction of its change, item 3's full check,
+   and its document's genesis — and lands nothing where
+   the two sets already match; where it does not,
    it says seed is next; and it says which steps it lacked
    the power for. The schema's objects die with the
    schema, so seed builds the fence inside its one
@@ -696,18 +696,22 @@ skew tests, which went with item 8's trio.
    (`tests/api-shadow-ledger-auth.test.ts` 'live secrets
    land in the auth-flow ledger rows'). Follows items 0
    and 1.
-3. Retire `schema_marker` for a definition the ledger
+3. Retire `schema_marker` for migrations the ledger
    holds — the marker (`api/schema-postgres.ts:26-29`)
    proves only that a seed once finished; it cannot tell
    an unwiped database with the old `text` stamp columns
-   from a correct one (SCHEMA.md § Operator tools). The
-   definition becomes a document like any other — the same
+   from a correct one (SCHEMA.md § Operator tools). Each
+   migration becomes a document like any other — the same
    canonical form, hash tree, succession index, and head
-   read (item 0) — that the owner writes and no route
-   serves. Each version's `request` is the SQL that ran —
-   the whole definition at genesis, the drops and the new
-   fence for a later release — and its `response` is the
-   digest of the definition's fixed SQL, DDL and DML
+   read (item 0) — in the collection `/migrations/`, named
+   for what it does behind a four-digit order,
+   `0001-bootstrap` first, that the owner writes and no
+   route serves; one document with successors would hold
+   the same history under a name that hides it. A
+   migration's `request` is the SQL that ran —
+   the whole definition for `0001-bootstrap`, the drops
+   and the new fence for a later one — and its `response`
+   is the digest of its fixed SQL, DDL and DML
    alike: the root row's insert and the grants count, and
    a seed's data pairs, which are parameters and vary by
    mode, do not. Item 2's fence does the rest: `fa_api`
@@ -720,51 +724,58 @@ skew tests, which went with item 8's trio.
    No route ever executes a body's SQL: that would put the
    owner's credential in the serving process and turn
    every authorization mistake into the owner's SQL. Seed
-   lands the first version, superseding the root, in its
-   one transaction (item 0). A later release is one owner
-   transaction — the change, the full check, and a
-   successor naming the version it was built on: an
-   in-order PUT in item 0's one-statement shape, landed
-   by the owner's verb beneath the adapter, where the
+   lands `0001-bootstrap`, a genesis, in its
+   one transaction (item 0). A later migration is one
+   owner transaction — the change, the full check, and
+   the genesis of its own document, in item 0's
+   one-statement shape, landed
+   by the owner verb beneath the adapter, where the
    seed lands every pair (item 0) — one owner-side writer
-   for seed and release, and `handleRequest`
-   (`api/api.ts:387`) stays the api's. Item 2's insert
+   for seed and migration, and `handleRequest`
+   (`api/api.ts:387`) stays the api's. Names order
+   migrations, bytewise: the verb applies its binary's
+   migrations in name order and refuses one whose
+   predecessors lack a head. Item 2's insert
    policy binds `fa_api`, which the adapter's fixed SQL
    runs as, and a table's owner is exempt from its
-   policies, so the definition path is refused to the
+   policies, so `/migrations/` is refused to the
    api and open to the owner's writer (measured, 18.6).
    What
    the verb forgoes is the route layer's validation of
    that one PUT; the canonical form and the hash tree
    come from `shared/http-message` and the INSERT, which
-   the seed uses there already. Item 0's index orders
-   migrations
-   with no lock and no migrations table: of two runners
-   built on one version, one commits and the other is
-   refused and rolls back, its DDL included, and a failed
-   step leaves the old fence and the old digest (both
-   measured, 18.6). Only the owner writes the document:
+   the seed uses there already. Item 0's index refuses a
+   second genesis
+   with no lock and no migrations table of its own: of
+   two runners applying one migration, one commits and
+   the other is refused and rolls back, its DDL included,
+   and a failed step leaves the old fence and no document
+   (both measured, 18.6, on a successor; a genesis is the
+   same index's other case). Only the owner writes a
+   migration:
    item 2's insert policy refuses its path to `fa_api`
    with one predicate, so a wire request cannot land
    one, and a table's owner is exempt from its policies
    (measured). After launch the fence is what changes —
    item 0 holds the table's DDL final — and views,
-   policies, and grants hold no data, so the owner
+   policies, and grants hold no data, so a migration
    rebuilds them whole and needs no path from one
-   definition to the next. Boot — `serve`, as `fa_api`,
+   fence to the next. Boot — `serve`, as `fa_api`,
    where the marker gate runs today (`server/boot.ts:106`)
    — does two small things. It asks what it holds itself
    through the privilege functions, which answer with
    catalog reads revoked (measured), and refuses to serve
    if it can read `request` or the credential column,
    update, delete, or
-   make temporary objects. And it compares the
-   definition's head with the digest of its own compiled
-   SQL, refusing to serve on a mismatch and naming both.
-   The digest is of text, so a cosmetic edit forces a run
-   of the owner's verb, which rebuilds only the fence and
-   never alters the table: "the head equals mine" means an
-   owner's verb of this exact build verified this database
+   make temporary objects. And it reads the
+   `/migrations/` heads — a collection read (item 1) — and
+   compares their names and digests with the migrations
+   its binary carries, refusing to serve on any
+   difference either way and naming it. The digest is of
+   text, so a landed migration's SQL is never edited: the
+   binary carries it verbatim, and a change is the next
+   migration. "The sets are equal" means an owner verb of
+   this exact build verified this database
    and recorded it. The full check runs as `fa_owner`,
    never at boot: it reads the live definition from the
    catalog — `information_schema.columns`,
@@ -772,7 +783,8 @@ skew tests, which went with item 8's trio.
    row, and item 2's objects: the roles, `fa_api`'s
    column grants, the helper view, the row
    policies, and what PUBLIC holds —
-   compares it to what the definition's SQL declares, and
+   compares it to what the binary's migrations, applied
+   in name order, declare, and
    names the drift, and walks every succession to name a
    pair stamped before its predecessor (item 0). The
    expected list lives beside the
@@ -792,18 +804,19 @@ skew tests, which went with item 8's trio.
    verb's release, and the check verb — and the drill runs
    it instead of reading
    the marker. Limits, named for the
-   table-migrations bullet in `## Later work`: a digest
-   names a state, not a path; boot's strict equality
+   table-migrations bullet in `## Later work`: boot's
+   strict equality
    refuses an old binary that restarts after the change,
    which item 13's two processes must plan for; and a
    large index cannot ride the one-transaction step —
    built inside it, it holds `ShareLock` on the table
    until commit, and `CREATE INDEX CONCURRENTLY` is
-   refused inside a transaction (measured). The document's
-   body stays open to grow: it has succession, so a later
-   system adds a version number or a step log without
-   touching old versions. The brainstorm settles: the
-   document's path and name; the digest's exact input; the
+   refused inside a transaction (measured). A migration's
+   document has succession like any other, so a rollback
+   can land as its DELETE head and a later system can
+   annotate it without rewriting it — that bullet's to
+   settle. The brainstorm settles: the digest's exact
+   input; the
    check verb's name; and the names item 2 left open.
    Today: boot gates on
    the marker row (`assertSchemaMarker`,
@@ -2573,15 +2586,18 @@ Off the critical path; each with its oracle.
   everything a change to the fence needs. Activates on the
   first change to the table once a tenant's data exists
   and a wipe is no longer possible. The pieces already
-  stand (item 3, measured): a migration is an in-order PUT
-  of the definition document by the owner's verb, its SQL
-  the `request` and the new digest the `response`; item
-  0's index orders runners with no lock and no migrations
-  table; and the DDL and the PUT commit or roll back
-  together. What is missing is the path: a digest names a
-  state, so the binary carries steps keyed by the
-  definition they start from, and a rollback lands a
-  successor, never a rewind. Named limits: a large index
+  stand (item 3, measured): a migration is the genesis of
+  its own document in `/migrations/`, named for what it
+  does behind a four-digit order, `0001-bootstrap` first,
+  landed by the owner verb with its SQL the `request` and
+  its digest the `response`; names order migrations and
+  item 0's index refuses a second runner, with no lock
+  and no migrations table of its own; and the DDL and the
+  genesis commit or roll back together. What is missing
+  is only the table steps themselves, and whether a
+  rollback lands as the migration's DELETE head or as a
+  migration of its own — never a rewind. Named limits: a
+  large index
   cannot ride the one-transaction step and needs two,
   build then record; boot's strict equality needs a
   declared set of digests once item 13 runs two processes;
@@ -2589,10 +2605,10 @@ Off the critical path; each with its oracle.
   envelope column sits outside every old `pair_hash`.
   Never a route that executes a body's SQL (item 3). The
   scripture names this gap among its unwritten scrolls.
-  Oracle: a Postgres test starts two runners from one
-  version and finds one successor, one set of changes, and
-  the loser's DDL gone; a second applies a table step to a
-  database seeded from an older definition, and the new
+  Oracle: a Postgres test starts two runners on one
+  migration and finds one document, one set of changes,
+  and the loser's DDL gone; a second applies a table step
+  to a database seeded from an older binary, and the new
   binary boots.
 
 ## Sequencing
