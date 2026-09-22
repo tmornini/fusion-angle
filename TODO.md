@@ -102,7 +102,11 @@ skew tests, which went with item 8's trio.
    its index, and `message_body`
    (`api/schema-postgres.ts:31-46`, `:55-57`) lose their
    last reader and retire here, which keeps the DDL claim
-   below true; item 1 makes such pairs the rule.
+   below true; item 1 makes such pairs the rule. So does
+   `message_pairs_replay`
+   (`api/schema-postgres.ts:53-54`), whose two readers
+   (`api/message-pair.ts:456`, `:723`) leave with the
+   dedupe below.
    Idempotency is the
    verb's (RFC 9110 §9.2.2): a PUT or DELETE that would
    leave the head's state unchanged lands nothing, and a
