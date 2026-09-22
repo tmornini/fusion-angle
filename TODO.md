@@ -192,6 +192,10 @@ skew tests, which went with item 8's trio.
    pairs: one successor per predecessor within a
    document, so the root, named by every genesis, has one
    successor per document and no document two geneses.
+   `supersedes` is a column of the pair, never a join
+   table: this index needs `path`, `name`, and the
+   predecessor in one relation, and a join table could
+   hold them only by copying the two names in.
    The index cannot tell a predecessor from an invented
    id or another document's pair, so the INSERT selects
    its predecessor as this document's head — the newest
@@ -230,11 +234,10 @@ skew tests, which went with item 8's trio.
    (`api/backend-postgres.ts:107-113`). The
    brainstorm settles: the response credential header's
    name; the root's values (it must satisfy every CHECK);
-   whether `supersedes` is a column or a succession join
-   table (a data-modifying CTE keeps one statement either
-   way) and how a pair that supersedes nothing is written
-   — either way the eraser stays unblocked and the root
-   covers the succession; one fenced column or one per
+   what a POST or PATCH pair, which supersedes nothing,
+   writes in `supersedes` — the eraser stays unblocked
+   and the root covers the succession either way; one
+   fenced column or one per
    message, since a reader must tell which message a
    hoisted line left; the salts — how many, where each is
    stored, and what mints them (core Postgres has
