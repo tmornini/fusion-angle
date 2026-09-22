@@ -18,6 +18,19 @@ skew tests, which went with item 8's trio.
 
 0. The table, right — what a pair stores and what the
    store guarantees, before anything reads it differently.
+   It ships as three specs in order, each its own
+   worktree, master green at Layer 1 between them and
+   deployed with items 1–3: the store — the final DDL,
+   the root, succession, the hash tree, one statement per
+   write, locks and `transaction` out of `DbAdapter`; the
+   message plane — the canonical form, credential lines,
+   the two ids, the code document and the body search's
+   retirement; and the seed — one transaction beneath the
+   adapter, its batches and chain order. The store goes
+   first because its DDL is what the other two fill: the
+   credential column holds zero bytes until the message
+   plane hoists into it, and the INSERT hashes whatever
+   bytes it is given.
    Every stored message is in one canonical form: field
    names lowercase; one line per name, repeats joined with
    `, ` in the order received, `set-cookie` alone never
