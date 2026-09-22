@@ -657,7 +657,9 @@ skew tests, which went with item 8's trio.
    and the dialog and its sentence
    (`web-app/identities/detail.html:3-28`) say "Erase",
    and the code's
-   own word `erased` follows in a change of its own. Every
+   own word `erased` becomes `deleted`, HTTP's verb for
+   the DELETE head that made the state, in a change of
+   its own. Every
    byte stays recorded; roles fence live readers only, so
    a dump or backup carries the table whole, and item 6 no
    longer orders this item. This item changes no row and
@@ -2533,17 +2535,19 @@ Off the critical path; each with its oracle.
   window. Oracle: `tests/api-pii-tombstone.test.ts`
   'erased PII remains in superseded pairs; login is 401'
   inverted for the erased pairs.
-- The code's word `erased` follows the page's "removed"
-  (product-path item 2) in a change of its own: the PII
+- The code's word `erased` becomes `deleted`: this is an
+  HTTP application, and the state it names is a DELETE
+  head at `identities/:id/pii`. Its own change: the PII
   union's discriminant (`api/types.ts:627-636`) and the
   stem's 76 occurrences in 17 product files, 80 in 14
-  test files. It touches no stored byte — the client
-  builds the flag from a 404
+  test files. It is a field, never a column, and touches
+  no stored byte — the client builds the flag from a 404
   (`web-app/app/adapters/identities.ts:152`) — so it has
-  no deadline, and it retires when the eraser ships and
-  the word becomes true. Oracle: the stem appears in
-  `api/`, `server/`, `shared/`, and `web-app/` only where
-  the eraser bullet's own words do.
+  no deadline. The page keeps "removed" (product-path
+  item 2) until the eraser ships; the code speaks HTTP.
+  Oracle: the stem appears in `api/`, `server/`,
+  `shared/`, and `web-app/` only where the eraser
+  bullet's own words do.
 - The reporter — `fa_reporter` reads an envelope-only
   view: who, what, and when, the three leaf digests, and
   `pair_hash`, so it verifies the root and sees no bytes,
