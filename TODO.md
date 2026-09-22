@@ -610,9 +610,21 @@ skew tests, which went with item 8's trio.
    one transaction (item 0). A later release is one owner
    transaction — the change, the full check, and a
    successor naming the version it was built on: an
-   in-order PUT, landed by the owner's verb through the
-   API's own dispatch in-process (`handleRequest`,
-   `api/api.ts:387`). Item 0's index orders migrations
+   in-order PUT in item 0's one-statement shape, landed
+   by the owner's verb beneath the adapter, where the
+   seed lands every pair (item 0) — one owner-side writer
+   for seed and release, and `handleRequest`
+   (`api/api.ts:387`) stays the api's. A view runs under
+   its owner's row policies for every caller, `fa_owner`
+   included, so the definition path is refused through
+   the api's view and lands on the table (measured,
+   18.6): the adapter's fixed SQL names the api's view
+   alone, and the owner's writer names the table. What
+   the verb forgoes is the route layer's validation of
+   that one PUT; the canonical form and the hash tree
+   come from `shared/http-message` and the INSERT, which
+   the seed uses there already. Item 0's index orders
+   migrations
    with no lock and no migrations table: of two runners
    built on one version, one commits and the other is
    refused and rolls back, its DDL included, and a failed
