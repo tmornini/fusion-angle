@@ -227,7 +227,10 @@ skew tests, which went with item 8's trio.
    stored, and what mints them (core Postgres has
    `gen_random_uuid()`; `gen_random_bytes` is an
    extension); the byte encoding of the envelope under
-   `pair_hash`; whether the envelope gains the
+   `pair_hash`; the hash columns' type — `sha256()`
+   yields `bytea`, today's are hex `text` under a `{64}`
+   check (`api/schema-postgres.ts:17-19`); whether the
+   envelope gains the
    server-minted `request_id`, the per-request key
    `operation_id` stops being; whether an in-order PUT
    whose state is already the head answers 2xx, as
