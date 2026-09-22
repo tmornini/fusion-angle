@@ -528,21 +528,32 @@ skew tests, which went with item 8's trio.
    arrays today. After the reduction a member of `fa_api`
    connects, uses the schema, inserts through its view,
    reads its unfenced columns, and may LISTEN and NOTIFY,
-   which are commands and not grants — nothing else. A new
-   verb in the executable prepares a cluster as
-   `fa_owner`: fixed SQL beside the DDL, no input, safe to
-   run again; it creates the `fa_` roles that are absent
-   and says which steps it lacked the power for. Then seed
-   builds the schema, and wipe drops it and leaves the
-   roles. Two steps stay with the host's first login:
+   which are commands and not grants — nothing else. One
+   owner verb makes a cluster and its database match this
+   build's fence, as `fa_owner`: fixed SQL beside the DDL,
+   no input, safe to run again. It creates the `fa_` roles
+   that are absent — roles belong to the cluster — and
+   revokes CONNECT and TEMPORARY from PUBLIC on the
+   database, which outlives a wipe; where our table
+   exists it rebuilds the views, the policies, and every
+   schema grant whole, runs item 3's full check, and lands
+   the definition's successor, which item 0's PUT rule
+   lands only when the digest changed; where it does not,
+   it says seed is next; and it says which steps it lacked
+   the power for. The schema's objects die with the
+   schema, so seed builds the fence inside its one
+   transaction — one fence function, two callers — and
+   wipe drops it and leaves the roles. Two steps stay with
+   the host's first login:
    creating `fa_owner`, its login, and the database it
    owns, and the four superuser revokes; the container
    image's `POSTGRES_USER` is always a superuser
    (measured), so compose has such a login and `fa_api`
    must never be it. Each verb reads `FA_POSTGRES_URL`
    from its own environment and only the value differs:
-   `serve` gets a member of `fa_api`; seed, wipe, and the
-   new verb get a member of `fa_owner`. The product never
+   `serve` gets a member of `fa_api`; seed, wipe, check,
+   and the owner verb get a member of `fa_owner`. The
+   product never
    creates a login and never handles a database password.
    This item creates the roles whose workers exist —
    `fa_owner`, `fa_api`, and the view's owner — and names
@@ -670,10 +681,12 @@ skew tests, which went with item 8's trio.
    0), so a failed seed leaves nothing and the last-stamp
    trick has no purpose; a seed refuses a database that
    holds our table at all, since one lands it whole or not
-   at all. The full check is also a verb of its own, with
-   an exit status for scripts — one check function with
-   three callers: seed, a release's step, and the verb —
-   and item 6's restore drill runs it instead of reading
+   at all. The full check is also a verb of its own, which
+   changes nothing and exits nonzero on drift, because
+   item 6's restore drill must verify and never repair —
+   one check function with three callers: seed, the owner
+   verb's release, and the check verb — and the drill runs
+   it instead of reading
    the marker. Limits, named for the
    table-migrations bullet in `## Later work`: a digest
    names a state, not a path; boot's strict equality
