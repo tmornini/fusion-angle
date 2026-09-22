@@ -522,7 +522,20 @@ skew tests, which went with item 8's trio.
    `api/message-pair.ts:606-636`); a collection GET
    dismantles every head into an array of bodies
    (`entitiesOf`, `api/message-store.ts:59-68`); and the
-   client receives bare JSON. Follows item 0.
+   client receives bare JSON. The brainstorm settles:
+   whether the packageable client ships inside this item
+   or as its bullet after, since this item rebuilds the
+   facade either way; the per-route audit — which POSTs
+   change state and gain `If-Match`, which are read-only
+   conveniences, and what each PUT response must say for
+   its readers; the sibling messages the wire never
+   carried, the token grant's `tokens/:jti` and
+   authorize's code document; the multipart boundary's
+   form and the client splitter's home; and the
+   collection read's order — the skip walk yields names
+   in name order, today's read orders heads by stamp
+   (`api/backend-postgres.ts:545`), and pages may lean on
+   either. Follows item 0.
 2. The ledger fenced — roles, grants, and row policies, on
    a table items 0 and 1 have finished. Designed to stock
    Postgres and measured on 18.6, which compose runs; a
