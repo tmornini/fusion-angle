@@ -630,7 +630,8 @@ skew tests, which went with item 8's trio.
    connects, uses the schema, inserts through its view,
    reads its unfenced columns, and may LISTEN and NOTIFY,
    which are commands and not grants — nothing else. One
-   owner verb makes a cluster and its database match this
+   owner verb, `migrate`, makes a cluster and its database
+   match this
    build's fence, as `fa_owner`: fixed SQL beside the DDL,
    no input, safe to run again. It creates the `fa_` roles
    that are absent — roles belong to the cluster — and
@@ -654,8 +655,8 @@ skew tests, which went with item 8's trio.
    and `fa_api`
    must never be it. Each verb reads `FA_POSTGRES_URL`
    from its own environment and only the value differs:
-   `serve` gets a member of `fa_api`; seed, wipe, check,
-   and the owner verb get a member of `fa_owner`. The
+   `serve` gets a member of `fa_api`; `seed`, `wipe`,
+   `migrate`, and `check` get a member of `fa_owner`. The
    product never
    creates a login and never handles a database password.
    This item creates the roles whose workers exist —
@@ -683,8 +684,7 @@ skew tests, which went with item 8's trio.
    verbatim auth messages" and "Erased PII persists as
    superseded pairs" are reworded, not closed: the bytes
    persist in the owner-only ledger, and `fa_api` reads
-   none of them. The brainstorm settles: the
-   verb's name;
+   none of them. The brainstorm settles:
    whether the four superuser revokes are the verb's or
    the deployment's; and what boot does on a host that
    offered no superuser for them. Today: one role,
@@ -729,7 +729,7 @@ skew tests, which went with item 8's trio.
    owner transaction — the change, the full check, and
    the genesis of its own document, in item 0's
    one-statement shape, landed
-   by the owner verb beneath the adapter, where the
+   by `migrate` beneath the adapter, where the
    seed lands every pair (item 0) — one owner-side writer
    for seed and migration, and `handleRequest`
    (`api/api.ts:387`) stays the api's. Names order
@@ -797,11 +797,12 @@ skew tests, which went with item 8's trio.
    0), so a failed seed leaves nothing and the last-stamp
    trick has no purpose; a seed refuses a database that
    holds our table at all, since one lands it whole or not
-   at all. The full check is also a verb of its own, which
+   at all. The full check is also a verb of its own,
+   `check`, which
    changes nothing and exits nonzero on drift, because
    item 6's restore drill must verify and never repair —
-   one check function with three callers: seed, the owner
-   verb's release, and the check verb — and the drill runs
+   one check function with three callers: `seed`,
+   `migrate`, and `check` — and the drill runs
    it instead of reading
    the marker. Limits, named for the
    table-migrations bullet in `## Later work`: boot's
@@ -816,8 +817,7 @@ skew tests, which went with item 8's trio.
    can land as its DELETE head and a later system can
    annotate it without rewriting it — that bullet's to
    settle. The brainstorm settles: the digest's exact
-   input; the
-   check verb's name; and the names item 2 left open.
+   input; and what item 2 left open.
    Today: boot gates on
    the marker row (`assertSchemaMarker`,
    `server/postgres-gate.ts:67`, called at
@@ -2589,7 +2589,7 @@ Off the critical path; each with its oracle.
   stand (item 3, measured): a migration is the genesis of
   its own document in `/migrations/`, named for what it
   does behind a four-digit order, `0001-bootstrap` first,
-  landed by the owner verb with its SQL the `request` and
+  landed by `migrate` with its SQL the `request` and
   its digest the `response`; names order migrations and
   item 0's index refuses a second runner, with no lock
   and no migrations table of its own; and the DDL and the
