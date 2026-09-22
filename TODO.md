@@ -550,7 +550,8 @@ skew tests, which went with item 8's trio.
    `fa_api` — today's `fusion` split in two with
    `fa_owner` — holds INSERT on its view and SELECT on
    that view's unfenced columns, and nothing on the table:
-   one view carries every column in both directions, so
+   one view, `fa_message_pairs_api`, carries every column
+   in both directions, so
    `RETURNING` hands item 0's minted `date` back, which
    INSERT on the table beside SELECT on a second view
    cannot — Postgres wants SELECT on every column
@@ -576,7 +577,8 @@ skew tests, which went with item 8's trio.
    row policy on the table, not the view's WHERE: a role
    that cannot log in owns the api's view and holds the
    table grants, the policy applies to that role, and a
-   helper view of the PII DELETE pairs keeps the policy
+   helper view of the PII DELETE pairs, `fa_pii_deletes`,
+   keeps the policy
    from reading its own table, which Postgres refuses as
    recursion (measured). Row security refuses that role's
    inserts until a second policy admits them (measured),
@@ -643,7 +645,8 @@ skew tests, which went with item 8's trio.
    creating `fa_owner`, its login, and the database it
    owns, and the four superuser revokes; the container
    image's `POSTGRES_USER` is always a superuser
-   (measured), so compose has such a login and `fa_api`
+   (measured), so compose has such a login, `fa_root`,
+   and `fa_api`
    must never be it. Each verb reads `FA_POSTGRES_URL`
    from its own environment and only the value differs:
    `serve` gets a member of `fa_api`; seed, wipe, check,
@@ -676,8 +679,8 @@ skew tests, which went with item 8's trio.
    superseded pairs" are reworded, not closed: the bytes
    persist in the owner-only ledger, and `fa_api` reads
    none of them. The brainstorm settles: the name of the
-   role that owns the api's view; the view names; the
-   verb's name; the name of compose's first login; how the
+   role that owns the api's view; the
+   verb's name; how the
    view's owner comes to own the view (measured: a schema
    CREATE granted for that one statement, then revoked);
    whether the four superuser revokes are the verb's or
