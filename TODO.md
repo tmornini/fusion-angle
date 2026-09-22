@@ -148,12 +148,24 @@ skew tests, which went with item 8's trio.
    erased, and the ROOT row keeps that the only meaning.
    One unique index carries the invariants —
    `UNIQUE (path, name, supersedes)` over PUT and DELETE
-   pairs: one successor per head, one genesis per
-   document. An in-order PUT (`If-Match`) fills
-   `supersedes` from the client and answers 412 on
-   rejection; a blind PUT fills it from the head and
-   retries, bounded; the memory backend raises the same
-   rejection in TypeScript. Composed writes are one
+   pairs: one successor per predecessor within a
+   document, so the root, named by every genesis, has one
+   successor per document and no document two geneses.
+   The index cannot tell a predecessor from an invented
+   id or another document's pair, so the INSERT selects
+   its predecessor as this document's head — the newest
+   PUT or DELETE at `(path, name)` — and an in-order PUT
+   (`If-Match`) adds `head.id = If-Match`: a stale,
+   foreign, or invented latch selects no row and lands
+   nothing, which answers 412, and the index refuses the
+   second of two writers who read one head, which answers
+   412 too — what `lockHead` and a fresh head read do
+   today (`api/message-pair.ts:779-790`). A blind PUT
+   selects the head without the predicate and retries,
+   bounded, when the index refuses it; a genesis selects
+   the root where no head exists. The memory backend
+   raises the same rejections in TypeScript. Composed
+   writes are one
    multi-row INSERT; the bell rings from the same
    statement (`RETURNING` into `pg_notify`). `transaction`
    and `writeLocks` leave `DbAdapter`; item 13's "advisory
