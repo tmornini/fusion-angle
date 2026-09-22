@@ -99,7 +99,31 @@ skew tests, which went with item 8's trio.
    splices it in as `date`, and computes every hash with
    Postgres's `sha256` over the bytes it stores — the
    stamp and the hashes are made where the row is made, on
-   the one clock. The hashes form a tree. Each leaf —
+   the one clock. The stamp also obeys the succession the
+   index enforces: the INSERT takes the later of
+   `clock_timestamp()` and its predecessor's stamp plus
+   one microsecond — a stored row whose stamp the api may
+   read (item 2) — so a document's stamp order never
+   contradicts its succession, and every read keeps the
+   stamp: the head is the newest stamp at the document
+   (`api/backend-postgres.ts:477-547`), as today.
+   Measured, 18.6: with the bare clock, a step back
+   leaves a successor stamped before its predecessor,
+   reads serve the predecessor, every blind PUT names it
+   and is refused, for good, and under item 2's policy a
+   re-added PII pair is refused or lands hidden as a head;
+   with the rule the successor lands one microsecond after
+   its predecessor and, after a step back of N, that
+   document's stamps and its `date` run up to N ahead of
+   the clock until it catches up. Inside one statement the
+   clock never steps back but ties — 149,680 of 200,000
+   minimal rows, 0 of 200,000 rows carrying 300 bytes and
+   two uuids — and a predecessor landing in the same
+   statement is not visible to it, so a seed's chains
+   take their order from more than the clock. Item 3's
+   full check walks every succession and names a pair
+   stamped before its predecessor. The hashes form a
+   tree. Each leaf —
    `request_hash`, `secret_hash`, `response_hash` — is
    `sha256(salt ‖ bytes)`, its salt stored and fenced with
    the bytes it hides: a bare digest of guessable bytes is
@@ -174,7 +198,9 @@ skew tests, which went with item 8's trio.
    the statement cap — the driver's multi-row helper
    already serves under item 2's `fetch_types: false`
    (measured: 5,000 pairs in ten statements, and a failed
-   batch left no table). The DDL is
+   batch left no table); and how a seed keeps a chain's
+   order — members in successive batches, or a rank on
+   the one clock. The DDL is
    final when this item ships, but for `schema_marker`,
    which item 3 retires. Today falls short on every count:
    `request` keeps six header names
@@ -586,7 +612,9 @@ skew tests, which went with item 8's trio.
    and its column grants, the helper view, the row
    policies, the view's owner, and what PUBLIC holds —
    compares it to what the definition's SQL declares, and
-   names the drift. The expected list lives beside the
+   names the drift, and walks every succession to name a
+   pair stamped before its predecessor (item 0). The
+   expected list lives beside the
    DDL, and a digest lands only after the check passes, in
    the same transaction, so every seed proves the list
    current. Drift made by hand afterwards is the full
