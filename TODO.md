@@ -523,14 +523,18 @@ skew tests, which went with item 8's trio.
    dismantles every head into an array of bodies
    (`entitiesOf`, `api/message-store.ts:59-68`); and the
    client receives bare JSON. Follows item 0.
-2. The ledger fenced — roles, views, and a row policy, on
+2. The ledger fenced — roles, grants, and row policies, on
    a table items 0 and 1 have finished. Designed to stock
    Postgres and measured on 18.6, which compose runs; a
    host is measured against the design afterwards, and a
    shortfall is that host's recorded seam or a reason to
    leave it, never a change to the application. Every
-   worker gets its own role and its own view, holding only
-   its verbs. Product roles cannot log in and hold every
+   worker gets its own role, holding only its verbs on
+   the columns it needs — grants and policies bind the
+   role that queries, so the table itself is the place
+   for them, and a view is only ever a device (measured:
+   the whole fence below holds on the table with two
+   roles). Product roles cannot log in and hold every
    grant; a deployment supplies logins under its own names
    and joins each to one role — a grant only the role's
    creator or a superuser may make (measured), so it runs
@@ -550,15 +554,13 @@ skew tests, which went with item 8's trio.
    becomes `fa_owner`, which also makes `fa_owner`, not
    the login, the owner of what it creates (measured).
    `fa_api` — today's `fusion` split in two with
-   `fa_owner` — holds INSERT on its view and SELECT on
-   that view's unfenced columns, and nothing on the table:
-   one view, `fa_message_pairs_api`, carries every column
-   in both directions, so
-   `RETURNING` hands item 0's minted `date` back, which
-   INSERT on the table beside SELECT on a second view
-   cannot — Postgres wants SELECT on every column
-   `RETURNING` names (measured). The column fence is the
-   grant on that view: `fa_api` never reads back
+   `fa_owner` — holds INSERT on the table and SELECT on
+   its unfenced columns, and no other right on it:
+   Postgres wants SELECT on every column `RETURNING`
+   names (measured), and a column grant is exactly that,
+   so item 0's one statement hands its minted `date` back
+   with no view between. The column fence is that
+   grant: `fa_api` never reads back
    `request`, the fenced credential column, or the request
    and secret salts; it reads the response, the response
    salt, and all four digests, so it verifies `pair_hash`
@@ -576,17 +578,17 @@ skew tests, which went with item 8's trio.
    finds the head, and an in-order PUT that names a hidden
    pair is refused by item 0's index and answers 412:
    nothing needs a hidden pair back. The hiding rule is a
-   row policy on the table, not the view's WHERE: a role
-   that cannot log in owns the api's view and holds the
-   table grants, the policy applies to that role, and a
+   row policy on the table bound to `fa_api`, and a
    helper view of the PII DELETE pairs, `fa_pii_deletes`,
-   keeps the policy
+   owned by `fa_owner`, keeps the policy
    from reading its own table, which Postgres refuses as
-   recursion (measured). Row security refuses that role's
+   recursion (measured): the view runs with its owner's
+   rights, the owner is exempt, and the planner still
+   inlines it. Row security refuses `fa_api`'s
    inserts until a second policy admits them (measured),
    and item 3 narrows that policy to keep its definition
    document the owner's. A table's owner is exempt from
-   its policies, so later views `fa_owner` owns still see
+   its policies, so views `fa_owner` owns still see
    the hidden pairs the eraser needs. Measured on 262,000
    rows against the owner reading the bare table: at
    50,000 versions a head read through the policy costs
@@ -634,7 +636,8 @@ skew tests, which went with item 8's trio.
    that are absent — roles belong to the cluster — and
    revokes CONNECT and TEMPORARY from PUBLIC on the
    database, which outlives a wipe; where our table
-   exists it rebuilds the views, the policies, and every
+   exists it rebuilds the helper view, the policies, and
+   every
    schema grant whole, runs item 3's full check, and lands
    the definition's successor, which item 0's PUT rule
    lands only when the digest changed; where it does not,
@@ -656,7 +659,7 @@ skew tests, which went with item 8's trio.
    product never
    creates a login and never handles a database password.
    This item creates the roles whose workers exist —
-   `fa_owner`, `fa_api`, and the view's owner — and names
+   `fa_owner` and `fa_api` — and names
    the next users of the principle, each created by the
    item that builds its worker: `fa_archiver` (item 6),
    `fa_eraser` (the physical-erasure bullet), and
@@ -680,11 +683,8 @@ skew tests, which went with item 8's trio.
    verbatim auth messages" and "Erased PII persists as
    superseded pairs" are reworded, not closed: the bytes
    persist in the owner-only ledger, and `fa_api` reads
-   none of them. The brainstorm settles: the name of the
-   role that owns the api's view; the
-   verb's name; how the
-   view's owner comes to own the view (measured: a schema
-   CREATE granted for that one statement, then revoked);
+   none of them. The brainstorm settles: the
+   verb's name;
    whether the four superuser revokes are the verb's or
    the deployment's; and what boot does on a host that
    offered no superuser for them. Today: one role,
@@ -728,12 +728,12 @@ skew tests, which went with item 8's trio.
    by the owner's verb beneath the adapter, where the
    seed lands every pair (item 0) — one owner-side writer
    for seed and release, and `handleRequest`
-   (`api/api.ts:387`) stays the api's. A view runs under
-   its owner's row policies for every caller, `fa_owner`
-   included, so the definition path is refused through
-   the api's view and lands on the table (measured,
-   18.6): the adapter's fixed SQL names the api's view
-   alone, and the owner's writer names the table. What
+   (`api/api.ts:387`) stays the api's. Item 2's insert
+   policy binds `fa_api`, which the adapter's fixed SQL
+   runs as, and a table's owner is exempt from its
+   policies, so the definition path is refused to the
+   api and open to the owner's writer (measured, 18.6).
+   What
    the verb forgoes is the route layer's validation of
    that one PUT; the canonical form and the hash tree
    come from `shared/http-message` and the INSERT, which
@@ -744,8 +744,8 @@ skew tests, which went with item 8's trio.
    refused and rolls back, its DDL included, and a failed
    step leaves the old fence and the old digest (both
    measured, 18.6). Only the owner writes the document:
-   item 2's insert policy refuses its path to the view's
-   owner with one predicate, so a wire request cannot land
+   item 2's insert policy refuses its path to `fa_api`
+   with one predicate, so a wire request cannot land
    one, and a table's owner is exempt from its policies
    (measured). After launch the fence is what changes —
    item 0 holds the table's DDL final — and views,
@@ -756,7 +756,8 @@ skew tests, which went with item 8's trio.
    — does two small things. It asks what it holds itself
    through the privilege functions, which answer with
    catalog reads revoked (measured), and refuses to serve
-   if it can read `request`, touch the table, update, or
+   if it can read `request` or the credential column,
+   update, delete, or
    make temporary objects. And it compares the
    definition's head with the digest of its own compiled
    SQL, refusing to serve on a mismatch and naming both.
@@ -768,9 +769,9 @@ skew tests, which went with item 8's trio.
    never at boot: it reads the live definition from the
    catalog — `information_schema.columns`,
    `pg_get_constraintdef`, `pg_get_indexdef`, the root
-   row, and item 2's objects: the roles, the api's view
-   and its column grants, the helper view, the row
-   policies, the view's owner, and what PUBLIC holds —
+   row, and item 2's objects: the roles, `fa_api`'s
+   column grants, the helper view, the row
+   policies, and what PUBLIC holds —
    compares it to what the definition's SQL declares, and
    names the drift, and walks every succession to name a
    pair stamped before its predecessor (item 0). The
