@@ -427,7 +427,9 @@ skew tests, which went with item 8's trio.
    from a head is in-order: a PATCH or a state-changing
    POST carries `If-Match` naming the head it read, its
    sibling names that head, a missing latch answers 428
-   at the gate (RFC 6585 §3), and a refused sibling — the
+   at the gate (RFC 6585 §3), a field its writer may not
+   change (`api/attribute-acl.ts:43`) answers 403 at the
+   gate and lands nothing, and a refused sibling — the
    index's, when two derive from one head — refuses the
    whole statement and answers 412, after which the
    client resends from a fresh read, as the retries
@@ -447,19 +449,29 @@ skew tests, which went with item 8's trio.
    version and answers 201
    (`tests/api-instances-create.test.ts:578-614`).
    Sameness is judged on responses — the candidate
-   response body against the head's response body — never
+   response body against the head's response body, whole
+   against whole, never a projection — never
    on the stored request bodies the check reads today
    (`api/api.ts:1341`). A sibling PUT is synthesized —
    nothing was received for it and nothing sent — so its
    `request` is zero bytes and its `response` is the
-   message a read of it will serve, formed by the handler
+   message a read of it will serve, formed whole by the
+   handler
    in the same statement: its own status line, `date`
    spliced from its own stamp as every pair's is, `etag`
-   naming itself, the two ids, and the state as body —
-   for a PATCH usually the wire's own bytes, for
-   authorize's code document (item 0) and the token
-   grant's `tokens/:jti` a message the wire never
-   carried; and the handler mints both ids, so nothing
+   naming itself, the two ids, `content-type` and
+   `content-length`, and the WHOLE state as body — every
+   field, whatever its writer may read, as the
+   document's validator orders it with `id` last, so a
+   read adds nothing — for a PATCH usually the wire's
+   own bytes, for authorize's code document (item 0)
+   and the token grant's `tokens/:jti` a message the
+   wire never carried, the token document's issued,
+   rotated, and revoked events each landing the whole
+   state so the fold that resolves them
+   (`api/derive-identity-tokens.ts:14-26`) retires; the
+   requester's own response is that message projected
+   (below); and the handler mints both ids, so nothing
    looks
    the sibling up afterward (item 0 retires
    `revisionMessagePairIdForPatch`). The PATCH revision
@@ -490,9 +502,18 @@ skew tests, which went with item 8's trio.
    transmission; `etag`, `content-type`, the body, and the
    `operation-id` of the write that made the state stay —
    made by ONE function on the head, the body
-   bytes untouched; a collection GET is `multipart/mixed`,
+   bytes untouched but for one projection: a document
+   whose fields carry read roles
+   (`api/attribute-acl.ts:33`) is served with the fields
+   this reader may read, by that same function, the
+   only place a body is ever transformed, and every
+   projection of one head carries the head's `etag`,
+   which names the state the client acted on — what
+   `If-Match` needs — and is safe under `no-store`;
+   a collection GET is `multipart/mixed`,
    each part an `application/http; msgtype=response` unit
-   with the same three substitutions, so one head is one
+   with the same three substitutions and the same
+   projection, so one head is one
    unit from either source. The boundary is a fresh
    identifier per response, so no part can contain it, and
    the client's rebuild owns the splitter. Measured on the
@@ -581,7 +602,11 @@ skew tests, which went with item 8's trio.
    this transmission — made by ONE function on the head;
    `etag` and `operation-id` stay, naming the state and
    the write that made it; the body
-   bytes are never touched. A list is whole responses:
+   bytes are never touched, except that a document
+   whose fields carry read roles is projected to the
+   fields the reader may see, by that same function,
+   the only place a body is ever transformed. A list is
+   whole responses:
    `multipart/mixed` of
    `application/http; msgtype=response` parts, each the
    unit a document GET serves. Nothing parts a response
@@ -620,9 +645,7 @@ skew tests, which went with item 8's trio.
    response must say for its readers — is the spec's
    first section, written from the code as item 0
    leaves it. The brainstorm settles:
-   the sibling messages the wire never
-   carried, the token grant's `tokens/:jti` and
-   authorize's code document; the multipart boundary's
+   the multipart boundary's
    form and the client splitter's home; and the
    collection read's order — the skip walk yields names
    in name order, today's read orders heads by stamp
