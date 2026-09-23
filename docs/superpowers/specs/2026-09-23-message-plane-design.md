@@ -132,12 +132,14 @@ else fills it.
    (`web-app/app/adapters/flow-mutations.ts:516-556`,
    `web-app/app/flow-operations.ts:726-768`). The
    401 resend precedes any write. No `fetch`
-   carries a timeout (`TODO.md:1313-1324`), and the
-   one retry policy those lines open inherits this
-   case when a client first resends after a lost
-   response. Answering 200 when the head supersedes
-   the latch is refused for now: it widens both head
-   reads and must be matched at the gate
+   carries a timeout (`TODO.md:1313-1324`). The
+   latched-write bullet (`TODO.md:1340`) inherits
+   this case, and lands no later than the one retry
+   policy those lines open, which first resends
+   after a lost response. Answering 200 when the
+   head supersedes the latch is refused for now: it
+   widens both head reads and must be matched at
+   the gate
    (`api/api.ts:1009-1050`) and in the handler
    (`api/routes.ts:1552-1566`), for a request
    nothing sends.
@@ -880,7 +882,9 @@ edge's two refusals that carry no `request-id`.
 
 Later work inherits:
 
-- The one retry policy inherits Decision 2.
+- The latched-write bullet (`TODO.md:1340`)
+  inherits Decision 2. It lands no later than the
+  one retry policy.
 - The cross-party delegation ledger inherits
   Decision 4.
 - `FA_GIT_SHA` names what the client sends as
