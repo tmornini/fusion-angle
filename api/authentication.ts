@@ -1455,30 +1455,40 @@ async function grantAuthorizationCode(
             action: 'issued', chain_id: chainId, at,
         }, messagePair.operationId,
     );
-    if (await adapter.readTransaction(
-        (view) => authorizationCodeSpent(
-            view, derivedId, issuer.identityId,
-        ),
-    )) {
-        return invalid;
-    }
-    const pairs = [
-        markerMessagePair,
-        eventMessagePair,
-        messagePair,
-    ];
-    const written = await runWrite(
-        adapter, attemptFor(pairs), pairs,
+    // The spend check and the marker write share one
+    // client. A later grant then observes the marker and
+    // 401s, instead of both reading unspent and both
+    // minting. openClient still fails a row that does
+    // not land.
+    const backed = backedWrite(adapter);
+    const spent = await backed.backend.transaction(
+        'readwrite',
+        async (tx) => {
+            const view = backed.openClient(tx);
+            if (await authorizationCodeSpent(
+                view, derivedId, issuer.identityId,
+            )) {
+                return true;
+            }
+            const pairs = [
+                markerMessagePair,
+                eventMessagePair,
+                messagePair,
+            ];
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
+            return false;
+        },
     );
-    return written.outcome === 'land'
-        ? {
-            ok: true,
-            response,
-            refreshToken: minted.refreshToken,
-            messagePairId: messagePair.id,
-            wire: ownWireOf(messagePair),
-        }
-        : invalid;
+    if (spent) return invalid;
+    return {
+        ok: true,
+        response,
+        refreshToken: minted.refreshToken,
+        messagePairId: messagePair.id,
+        wire: ownWireOf(messagePair),
+    };
 }
 
 // Dispatch on grant_type. Single-grant primitives are added one
