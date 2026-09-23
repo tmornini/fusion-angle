@@ -1207,7 +1207,7 @@ skew tests, which went with item 8's trio.
     loop guard and a spend ceiling for a cycle whose
     every node is an AI seat; record content treated as
     data, never as instruction. Consumes items 9, 10, and
-    10. Merged: roster seat naming an AI agent
+    11. Merged: roster seat naming an AI agent
     (`tests/family-registry.test.ts:111-119`);
     FLOW-CANVAS.md's display-only AI checkboxes
     (`## Members and attributes`).
