@@ -78,7 +78,10 @@ skew tests, which went with item 8's trio.
    precedent, and the departure from RFC 6749 §5.1 is
    accepted: both clients are ours. Credential lines are
    hoisted whole — name and value — out of `request` and
-   `response` into a fenced column: `authorization` and
+   `response` into one fenced column, `secret`, named
+   for its leaf and salt, which holds them in canonical
+   order joined by CRLF with none trailing, zero bytes
+   when there are none: `authorization` and
    `cookie` from a request, `set-cookie` and the new
    header from a response — HTTP's own credential fields,
    not a list that grows with our routes. No name sits on
@@ -273,9 +276,7 @@ skew tests, which went with item 8's trio.
    (`api/mock-data.ts:285`), the marker
    (`api/backend-postgres.ts:107-113`). The
    brainstorm settles: the response credential header's
-   name; one fenced column or one per
-   message, since a reader must tell which message a
-   hoisted line left; whether an in-order PUT
+   name; whether an in-order PUT
    whose state is already the head answers 2xx, as
    RFC 9110 §13.1.1 permits, or 412; which secrets
    still ride a body (the token request's `code` and
