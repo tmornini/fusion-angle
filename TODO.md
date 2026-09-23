@@ -1628,7 +1628,7 @@ Off the critical path; each with its oracle.
   messages where they are stored and verifies them;
   signing is what remains. The dropped `version` column
   hashed on write and was never checked on read —
-  `SCHEMA.md` item 4
+  `docs/superpowers/specs/2026-08-24-etag-is-the-pair-id-design.md`
 - ACL-editing UI for record attributes (`read_roles` /
   `write_roles`) — R21's restricted branches are
   seed-produced today; setting an ACL is
