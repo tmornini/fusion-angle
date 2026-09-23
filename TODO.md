@@ -544,7 +544,7 @@ skew tests, which went with item 8's trio.
    history, gating nothing. Derivation is head selection;
    whatever still needs a body reads it in place from the
    unit, never from `request`. A collection's heads come
-   from a skip walk of `message_pairs_document` — a
+   from a skip walk of `fa_message_pairs_document` — a
    recursive query that asks the index for the next name
    after the last, then one head read per name — one
    probe per document, where today's `DISTINCT ON`
@@ -742,7 +742,8 @@ skew tests, which went with item 8's trio.
    SQL (measured). The mock data cannot judge this: 577 of
    its 578 documents have one version. `EXPLAIN` and
    `./bin/measure` prove the head read stays on
-   `message_pairs_document`. The memory backend hides the
+   `fa_message_pairs_document`. The memory backend hides
+   the
    same pairs in TypeScript. Item 7's profile can be
    removed on its own only as its own document: keys on
    the seat body would hide the seat's whole history. The
