@@ -78,6 +78,25 @@ Run from the repository root under the memory backend.
 - `versions.ts` — item 2: the mock ledger's version depth
   per document.
 
+## store/ (2026-09-23)
+
+Item 0's write-enforcement figure. Postgres 18.6 in a
+container named `fa-store-probe`, database `probe`, tmpfs
+on `/var/lib/postgresql`, the compose shape. `setup.sql`
+loads the 262,000-row table three times. `time.sh` reports
+the median of seven `EXPLAIN ANALYZE` execution times
+after one warmup. `checks.sql` is the refusal each shape
+makes.
+
+- `setup.sql`, `none.sql`, `omit.sql`, `time.sh` — the
+  bare INSERT that mints in the statement, the same write
+  with a `BEFORE INSERT` trigger owned by `fa_owner`, and
+  column grants that omit the minted columns. The figure
+  the store spec cites.
+- `checks.sql` — naming `response_at` under the grant is
+  refused, and an invented `supersedes` raises in the
+  trigger.
+
 ## serve/ (2026-09-18, 2026-09-22)
 
 - `serve-probe.ts` — item 0: `Deno.serve` keeps a `date` it
