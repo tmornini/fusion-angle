@@ -775,8 +775,11 @@ skew tests, which went with item 8's trio.
    owner transaction of its change, item 3's full check,
    and its document's genesis — and lands nothing where
    the two sets already match; where it does not,
-   it says seed is next; and it says which steps it lacked
-   the power for. The schema's objects die with the
+   it says seed is next; and, as `check` does, it
+   verifies the four superuser revokes below and names
+   which PUBLIC still holds — information, never drift,
+   since the owner cannot make them. The schema's
+   objects die with the
    schema, so seed builds the fence inside its one
    transaction — one fence function, two callers — and
    wipe drops it and leaves the roles. Two steps stay with
@@ -786,7 +789,10 @@ skew tests, which went with item 8's trio.
    image's `POSTGRES_USER` is always a superuser
    (measured), so compose has such a login, `fa_root`,
    and `fa_api`
-   must never be it. Each verb reads `FA_POSTGRES_URL`
+   must never be it; a host that offers no superuser
+   keeps the four as its recorded seam, since none of
+   them touches what the fence guarantees, and serves.
+   Each verb reads `FA_POSTGRES_URL`
    from its own environment and only the value differs:
    `serve` gets a member of `fa_api`; `seed`, `wipe`,
    `migrate`, and `check` get a member of `fa_owner`. The
@@ -817,10 +823,7 @@ skew tests, which went with item 8's trio.
    verbatim auth messages" and "Erased PII persists as
    superseded pairs" are reworded, not closed: the bytes
    persist in the owner-only ledger, and `fa_api` reads
-   none of them. The brainstorm settles:
-   whether the four superuser revokes are the verb's or
-   the deployment's; and what boot does on a host that
-   offered no superuser for them. Today: one role,
+   none of them. Today: one role,
    `fusion`, owns and reads everything, and compose,
    `./deploy --local`, `bin/test-postgres`, and the tests
    all assume that one login (`compose.yaml:2,8`,
@@ -901,7 +904,9 @@ skew tests, which went with item 8's trio.
    catalog reads revoked (measured), and refuses to serve
    if it can read `request` or the credential column,
    update, delete, or
-   make temporary objects. And it reads the
+   make temporary objects — the rights the owner
+   controls; the four superuser revokes it never
+   checks. And it reads the
    `/migrations/` heads — a collection read (item 1) — and
    compares their names and digests with the migrations
    its binary carries, refusing to serve on any
