@@ -151,7 +151,13 @@ skew tests, which went with item 8's trio.
    `message_pairs_replay`
    (`api/schema-postgres.ts:53-54`), whose two readers
    (`api/message-pair.ts:456`, `:723`) leave with the
-   dedupe below.
+   dedupe below, and with them the eleven callers of the
+   first: the replay (`api/api.ts:968`) and four
+   invitation replays (`api/invitations-domain.ts:473`,
+   `:665`, `:770`, `:852`), dedupes all, and six
+   post-dispatch readbacks (`api/api.ts:1450`, `:1639`,
+   `:1725`, `:1792`, `:1972`, `api/message-pair.ts:688`),
+   which the INSERT's `RETURNING` replaces.
    Idempotency is the
    verb's (RFC 9110 §9.2.2): a PUT or DELETE that would
    leave the head's state unchanged lands nothing, and a
