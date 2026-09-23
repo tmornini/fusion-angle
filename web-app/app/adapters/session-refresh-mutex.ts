@@ -52,8 +52,10 @@ export function runSingleFlightRefresh(
         return inFlight;
     }
     const pending = runLocked(refresh).finally(() => {
-        inFlight = null;
-        peerAccess = undefined;
+        if (inFlight === pending) {
+            inFlight = null;
+            peerAccess = undefined;
+        }
     });
     inFlight = pending;
     return pending;

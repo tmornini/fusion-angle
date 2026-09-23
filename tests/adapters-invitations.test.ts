@@ -985,6 +985,7 @@ Deno.test('a failed re-mint after accept surfaces, seat kept',
 Deno.test('the remint waits for an in-flight facade refresh',
 () => withLocalStorageAsync(freshStorage(), async () => {
     setCookieSession(true);
+    let releaseFlight = (): void => {};
     try {
         const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -998,11 +999,17 @@ Deno.test('the remint waits for an in-flight facade refresh',
             'toccYYkLEABmlbpHJalgtQ',
             ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw'],
         );
-        let settleFacade!: () => void;
+        // The resolver exists before the flight is
+        // latched. The lock callback runs later, and a
+        // throw before it starts must still settle the
+        // grant or the process-wide lock stays held.
+        const gate = new Promise<string | null>(
+            (resolve) => {
+                releaseFlight = () => resolve(minted);
+            },
+        );
         const facadeFlight = runSingleFlightRefresh(
-            () => new Promise<string | null>((resolve) => {
-                settleFacade = () => resolve(minted);
-            }),
+            () => gate,
         );
         const refreshBodies: unknown[] = [];
         const recording: RequestContext = {
@@ -1033,12 +1040,13 @@ Deno.test('the remint waits for an in-flight facade refresh',
             'the remint must not present a jti while a'
             + ' refresh is in flight',
         );
-        settleFacade();
+        releaseFlight();
         await facadeFlight;
         await accepting;
         assertStrictEquals(refreshBodies.length, 1);
         assertStrictEquals(getSessionToken(), minted);
     } finally {
+        releaseFlight();
         setCookieSession(false);
         deleteSessionToken();
         deleteRefreshChannel();
