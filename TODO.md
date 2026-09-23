@@ -1594,7 +1594,8 @@ Off the critical path; each with its oracle.
   untouched; `BroadcastChannel` is process-global) and
   `tests/adapters-flow-stats.test.ts` fail once, and
   `ledger-decisions` saw the ideas file fail a fourth
-  time, TODO.md its only change and a second gate
+  and a fifth time, TODO.md its only change and a
+  second gate
   running beside it, so the
   fixed count still proves less than it reads as proving;
   the ideas comment still says its drain matches the
