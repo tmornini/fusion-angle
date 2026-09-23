@@ -77,7 +77,8 @@ skew tests, which went with item 8's trio.
    (`Deno.serve` does: measured, 2.9.6), so the stamp
    Postgres mints is the `date` the wire carries. A
    sibling PUT (item 1) sends nothing; its `response` is
-   the message a read of it serves. Secrets
+   the message a read of it serves before the read's
+   three substitutions. Secrets
    move to credential lines: every secret a request
    presents rides `Authorization` — `Basic` where an
    identifier and its proof travel together: the
@@ -466,7 +467,8 @@ skew tests, which went with item 8's trio.
    handler
    in the same statement: its own status line, `date`
    spliced from its own stamp as every pair's is, `etag`
-   naming itself, the two ids, `content-type` and
+   naming itself, its `request-id` and `operation-id`,
+   `content-type` and
    `content-length`, and the WHOLE state as body — every
    field, whatever its writer may read, as the
    document's validator orders it with `id` last, so a
@@ -478,7 +480,8 @@ skew tests, which went with item 8's trio.
    state so the fold that resolves them
    (`api/derive-identity-tokens.ts:14-26`) retires; the
    requester's own response is that message projected
-   (below); and the handler mints both ids, so nothing
+   (below); and the handler mints both pairs' ids, so
+   nothing
    looks
    the sibling up afterward (item 0 retires
    `revisionMessagePairIdForPatch`). The PATCH revision
@@ -612,7 +615,8 @@ skew tests, which went with item 8's trio.
    response message: for a received request, the message
    handed to the wire; for a sibling PUT, which received
    nothing and sent nothing, the message a read of it
-   serves. A read serves those stored
+   serves before the substitutions below. A read serves
+   those stored
    bytes with exactly three substitutions — the status
    line, `date`, and `request-id`, the lines that describe
    this transmission — made by ONE function on the head;
