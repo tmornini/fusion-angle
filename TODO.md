@@ -174,6 +174,17 @@ skew tests, which went with item 8's trio.
    columns and the three leaves, so every reader verifies
    the root from what it may see, and a reader who sees a
    leaf's bytes and salt verifies that leaf too. The
+   root's input is fixed by the design, never by a
+   session's `DateStyle`, `TimeZone`, or `bytea_output`:
+   each envelope column — `id`, `path`, `name`,
+   `supersedes`, `requester_identity_id`, `operation_id`,
+   `method`, `response_at` — then each leaf, in DDL
+   order, as a netstring (`length:bytes,`) of its
+   canonical text — a uuid as Postgres prints it, the
+   stamp RFC 3339 zulu with six sub-second digits, a
+   digest hex — all concatenated and hashed as UTF-8,
+   the same string built in TypeScript for the memory
+   backend. The
    three salts, `request_salt`, `secret_salt`, and
    `response_salt`, are 16 random bytes each, minted by
    the handler (`crypto.getRandomValues`) — one minting
@@ -264,8 +275,7 @@ skew tests, which went with item 8's trio.
    brainstorm settles: the response credential header's
    name; one fenced column or one per
    message, since a reader must tell which message a
-   hoisted line left; the envelope's byte encoding under
-   `pair_hash`; whether the
+   hoisted line left; whether the
    envelope gains the
    server-minted `request_id`, the per-request key
    `operation_id` stops being; whether an in-order PUT
