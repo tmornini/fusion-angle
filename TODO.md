@@ -614,11 +614,13 @@ skew tests, which went with item 8's trio.
    `api/message-pair.ts:606-636`); a collection GET
    dismantles every head into an array of bodies
    (`entitiesOf`, `api/message-store.ts:59-68`); and the
-   client receives bare JSON. The brainstorm settles:
-   the per-route audit — which POSTs
-   change state and gain `If-Match`, which are read-only
-   conveniences, and what each PUT response must say for
-   its readers; the sibling messages the wire never
+   client receives bare JSON. The per-route audit —
+   which POSTs change state and gain `If-Match`, which
+   are read-only conveniences, and what each PUT
+   response must say for its readers — is the spec's
+   first section, written from the code as item 0
+   leaves it. The brainstorm settles:
+   the sibling messages the wire never
    carried, the token grant's `tokens/:jti` and
    authorize's code document; the multipart boundary's
    form and the client splitter's home; and the
