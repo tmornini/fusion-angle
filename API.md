@@ -62,54 +62,66 @@ path is never exempt.
 
 ## Wire contract
 
-The response is rebuilt from the stored row
-(`responseFromStored` in `api/message-pair.ts`). Three
-headers (`wireHeadersFor`): Date, ETag (quoted
-message-pair identifier), Operation-ID. A document PUT's
-ETag is its pair id, the same value a later GET advertises.
-A byte-identical replay answers 200 with the original —
-ETag and Date. If-Match is the sole conflict
-mechanism: exactly one strong validator (`"<identifier>"`);
-`*`, weak, lists, unquoted, or 64-hex yield 400.
-
-`sendWriteResponse` sets send-time status: 201 if this
-request appended a pair (PUT/PATCH/POST), 200 if it
-stored nothing (a same-body PUT, or a replay served from
-the ledger), DELETE 204. The stored start-line stays
-GET-shaped 200 / DELETE 204.
+A landed answer is the stored response bytes
+(`responseFromLatin1` in `api/message-pair.ts`). The
+statement splices the date, and the status line in
+those bytes is the status on the wire. PUT, PATCH, and
+POST store 201. DELETE stores 204. The stored message
+carries Date, ETag (quoted message-pair identifier),
+and Operation-ID. A document PUT's ETag is its pair id,
+the same value a later GET advertises. A matched body
+answers 200 with the head's stored response and stores
+nothing. If-Match is exactly one strong validator
+(`"<identifier>"`); `*`, weak, lists, unquoted, or
+64-hex yield 400.
 
 Status ladder:
 
-- **200** — same-body document PUT (no append); a
-  byte-identical replay of any PUT/PATCH/POST; stored
-  PUT start-line
-- **201** — first append of PUT/PATCH/POST
-- **204** — DELETE success (live or already-gone)
+- **200** — a matched body: the head's stored response,
+  and nothing stored
+- **201** — a landed PUT, PATCH, or POST: the stored
+  response bytes
+- **204** — DELETE success (landed, or already-gone)
 - **400** — bad JSON / Request-ID / Operation-ID /
   If-Match / validators
 - **404** — authenticated unmatched; DELETE
   never-written; genuine absence
 - **405** — no handler; public instance PUT
 - **409** — domain conflict (rebind, invitation not
-  pending, instance tombstone create without pin)
-- **412** — stale If-Match
+  pending, instance tombstone create without pin); a
+  second genesis (`Document already exists at <path><name>`);
+  a blind PUT that loses three times
+  (`Document remained contended at <path><name>`)
+- **412** — a stale If-Match:
+  `If-Match does not match the current document at <path><name>`
 - **428** — missing If-Match over live locked PUT,
   live instance PATCH / value-bearing transition, or a
   latched operation over a live parent document
 
-409 is domain; 412 is concurrency.
+409 remains the home of domain conflict and holds the
+two store sentences above. 412 is a stale If-Match.
 
 ## Two PUT classes
 
 `concurrency` on `FAMILY_REGISTRY`
 (`api/family-registry.ts`), plus instance PATCH:
 
-- **simple** — same-body as live head → 200, no append;
-  first append 201; byte-identical replay → 200
-- **locked** — live family is flows only. If-Match
-  quoted identifier. live+absent → 428; live+≠ head → 412;
-  genesis with no If-Match → 201; byte-identical replay →
-  200 before the ladder
+- **simple** — a matched body answers 200 with the
+  head's stored response and stores nothing. A landed
+  write answers with the stored response bytes (201).
+  A second genesis answers 409
+  (`Document already exists at <path><name>`). A blind
+  PUT that loses three times answers 409
+  (`Document remained contended at <path><name>`)
+- **locked** — live family is flows only. If-Match is
+  one quoted identifier. A live document with no
+  If-Match answers 428. A stale If-Match answers 412
+  (`If-Match does not match the current document at <path><name>`).
+  A genesis with no If-Match stores 201. A second
+  genesis answers 409
+  (`Document already exists at <path><name>`). A
+  matched body answers 200 with the head's stored
+  response and stores nothing
 - **latched operation** — a sub-resource POST that acts
   ON its parent document (flow undo today,
   `LATCHED_OPERATION_ROUTE_PATTERNS`). If-Match pins the

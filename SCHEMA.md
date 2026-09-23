@@ -18,56 +18,67 @@ documents, a word (`pii`, `default-organization`, `binding`)
 for the singleton sub-documents, and empty for an
 operation. The ledger stores writes only — no GET rows. The
 table is named once, here, and anchored to `TABLE_NAMES` in
-`api/db.ts` (length 1). Today that name is `message_pairs`.
+`api/db.ts` (length 1). The name is `fa_message_pairs`.
 
 The memory backend (`api/backend-memory.ts`) holds the
 same rows in an in-process Map keyed by table name.
 
 ## What the DDL buys you
 
-1. **`message_body` plus the GIN index** —
-   `POSTGRES_MESSAGE_BODY_FUNCTION` and `message_pairs_body`
-   → `getAllWhereBody` (`api/db.ts`).
-2. **`timestamptz` plus the formatter** — `request_at` and
-   `response_at` are `timestamptz NOT NULL`; the type is the
-   storage-edge validator (a month-13 stamp is rejected where
-   the old regex accepted it), and every read formats them
-   back to six-digit zulu text with `to_char(… AT TIME ZONE
-   'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
-   (`api/backend-postgres.ts`), so the native `(response_at,
-   id)` order and the seam's lexical order agree.
-3. **`message_pairs_document`** — head and history for
-   free (`path`, `name`, `response_at`, `id`). The seam
-   promises `(response_at, id)` order on every read, on
-   both backends; nothing above it re-sorts rows.
+1. **`fa_message_body` and `fa_message_pairs_body`** —
+   `POSTGRES_MESSAGE_BODY_FUNCTION` and the GIN index
+   → `getAllWhereBody` (`api/db.ts`). Both stay until
+   the message-plane spec retires code-document search.
+2. **One stamp, `response_at`** — `timestamptz NOT
+   NULL`. `request_at` is gone. The type is the
+   storage-edge validator (a month-13 stamp is rejected
+   where the old regex accepted it), and every read
+   formats the stamp back to six-digit zulu with
+   `to_char(… AT TIME ZONE 'UTC',
+   'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
+   (`api/backend-postgres.ts`), so the native
+   `(response_at, id)` order and the seam's lexical
+   order agree.
+3. **`fa_message_pairs_document`** — head and history
+   for free (`path`, `name`, `response_at`, `id`). The
+   seam promises `(response_at, id)` order on every
+   read, on both backends; nothing above it re-sorts
+   rows.
 4. **The pair `id` is the ETag** — If-Match names that
-   identifier; integrity is `request_hash`; lineage is
-   the latched head (`api/message-pair.ts`). No chain.
-5. **`message_pairs_replay`** — idempotent replay on
-   `request_hash` (`shared/digest.ts` `sha256HexOfBytes`).
-6. **The CHECK constraints** — Postgres as the storage-edge
-   validator (`message_pairs_*_chk` in
-   `api/schema-postgres.ts`).
-7. **`schema_marker` stamped last** —
-   `POSTGRES_SCHEMA_MARKER_TABLE`; seed stamps it last so a
-   failed seed reads as empty (`./bin/postgres-seed`).
-8. **Tenancy rides `path`** — the store is
+   identifier. Integrity is the hash tree
+   (`fa_pair_root` in `api/schema-postgres.ts`;
+   `pairRootHex` in `shared/pair-root.ts`). Lineage is
+   `supersedes`. The nil root is the predecessor of a
+   genesis. No chain.
+5. **`fa_message_pairs_succession` is the only write
+   enforcement** — unique on `(path, name,
+   supersedes)` where the method is `PUT` or `DELETE`.
+   The replay index is gone.
+6. **The CHECK constraints** — Postgres as the
+   storage-edge validator, named `fa_message_pairs_*`
+   in `api/schema-postgres.ts`.
+7. **`schema_marker` stays** —
+   `POSTGRES_SCHEMA_MARKER_TABLE`; seed stamps it last
+   so a failed seed reads as empty
+   (`./bin/postgres-seed`).
+8. **Tenancy rides `path`** — unchanged. The store is
    global; the fence and the write authorizer
    (`api/write-authorizer.ts`) enforce organization.
-9. **`operation_id` groups one client operation** — wire
-   `Operation-ID`; the server never mints it for a public
-   write.
-10. **`requester_identity_id` is authorship.** Writes
-    `pg_notify('fusion_events', …)`
-    (`api/backend-postgres.ts`). There is no LISTEN and no
-    SSE client. The memory backend simulates the same
-    transaction semantics (`api/backend-memory.ts`).
-11. **Three reads over the ledger** — `messageStore(db)`
-    (`api/message-store.ts`): `getDocumentHead(path, name)`
-    is the live PUT head pair or `null`;
-    `getDocumentHistory(path, name)` is every pair at the
-    document, in seam order; `getCollection(path)` is the
-    live documents as entities.
+9. **`operation_id` groups one client operation** —
+   unchanged. Wire `Operation-ID`; the server never
+   mints it for a public write.
+10. **The bell is `pg_notify('fusion_events', …)`**
+    from the statement (`api/ledger-statement-sql.ts`),
+    and only for a row that inserted. There is no
+    LISTEN and no SSE client.
+11. **`fa_message_pairs_collection` remains** —
+    `(path, response_at, id)`, until the next spec's
+    walk is the collection read.
+12. **`fa_request_id_of` and
+    `fa_message_pairs_request_id` exist** — the
+    function reads a `request-id` line; the index is
+    on `fa_request_id_of(response)`. Nothing reads
+    them yet.
 
 ## Document bodies
 
@@ -83,10 +94,11 @@ contract — `tests/flow-graph-roundtrip.test.ts`.
 
 Every timestamp crosses the seam as RFC-3339 zulu at exactly
 six fraction digits; the validation gate rejects any other
-width. Postgres holds the two envelope stamps as `timestamptz`
-and formats them back on every read (`tests/timestamps.test.ts`
-pins the mint; the Postgres acceptance suite pins the round
-trip). Render to local time for display only.
+width. Postgres holds `response_at`, the one envelope
+stamp, as `timestamptz` and formats it back on every
+read (`tests/timestamps.test.ts` pins the mint; the
+Postgres acceptance suite pins the round trip). Render
+to local time for display only.
 
 ## Secrets
 
