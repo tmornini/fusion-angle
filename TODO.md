@@ -867,7 +867,8 @@ skew tests, which went with item 8's trio.
    migration's `request` is the SQL that ran —
    the whole definition for `0001-bootstrap`, the drops
    and the new fence for a later one — as the body of a
-   PUT whose `user-agent` line names the build that ran
+   PUT `fa_owner` writes, its requester as the root's,
+   whose `user-agent` line names the build that ran
    it, `fusion-angle/<sha>` (RFC 9110 §10.1.5; the SHA
    `FA_GIT_SHA` supplies, its bullet in `## Later work`),
    provenance the owner's `check` can report and
