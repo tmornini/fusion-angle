@@ -275,10 +275,7 @@ skew tests, which went with item 8's trio.
    brainstorm settles: the response credential header's
    name; one fenced column or one per
    message, since a reader must tell which message a
-   hoisted line left; whether the
-   envelope gains the
-   server-minted `request_id`, the per-request key
-   `operation_id` stops being; whether an in-order PUT
+   hoisted line left; whether an in-order PUT
    whose state is already the head answers 2xx, as
    RFC 9110 §13.1.1 permits, or 412; which secrets
    still ride a body (the token request's `code` and
@@ -337,7 +334,16 @@ skew tests, which went with item 8's trio.
    and lands nothing, on every route, so no client's id
    is ever answered with another in silence — the gate
    refuses what it will not honor, as it requires the
-   `operation-id` only the client mints. Today the
+   `operation-id` only the client mints. The store ships
+   `fa_request_id_of(response)`, an `IMMUTABLE` extractor
+   of the `request-id` line — a function of the bytes,
+   as `message_body` is today
+   (`api/schema-postgres.ts:31-46`) — and an index over
+   it, `fa_message_pairs_request_id`, so a pair is found
+   by `request-id` through the index with the id in one
+   place, under the root through its leaf, and no
+   column repeats it; nothing reads it yet, and item 6's
+   log join is its first reader. Today the
    server takes
    the client's when it is valid and mints one otherwise
    (`incomingContext`, `api/request-context.ts:66-71`),
