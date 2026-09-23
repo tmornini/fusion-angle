@@ -158,8 +158,9 @@ skew tests, which went with item 8's trio.
    repeated POST or PATCH is a new request that runs again
    — its own pair and a sibling PUT, or nothing when the
    head already holds its state (item 1). Nothing
-   dedupes requests. Every write is ONE statement, guarded
-   by a constraint, never by a transaction or a lock: the
+   dedupes requests. Every write the api makes is ONE
+   statement, guarded by a constraint, never by a
+   transaction or a lock: the
    INSERT mints `response_at` from `clock_timestamp()`,
    splices it in as `date`, and computes every hash with
    Postgres's `sha256` over the bytes it stores — the
