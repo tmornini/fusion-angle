@@ -509,7 +509,11 @@ skew tests, which went with item 8's trio.
    `operation_id` both carry
    (`api/derive-flows.ts:257-263`, `:289-302`). A read
    hands out the stored
-   response whole: a document GET is the stored bytes with
+   response whole, and a DELETE head answers a document
+   GET 404 and yields no part, as today's
+   `WHERE method = 'PUT'` already does
+   (`api/backend-postgres.ts:544`): a document GET is the
+   stored bytes with
    three substitutions — the status line (201 → 200),
    `date`, and `request-id`, the lines that describe this
    transmission; `etag`, `content-type`, the body, and the
