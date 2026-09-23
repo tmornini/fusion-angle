@@ -802,15 +802,19 @@ export async function handleRequest(
                 && wiring !== undefined
                 && familyRegistration(wiring.family)
                     ?.concurrency === 'locked';
-            // Advertised ETag is the live PUT's pair id.
-            // DELETE heads have no If-Match target
-            // (documentHeadMessagePairId skips them).
-            // Same-body no-append uses this for both PUT
-            // kinds (simple and locked).
-            const livePut = isDocumentPut
-                ? await documentHeadMessagePairId(
+            // Advertised ETag is the live PUT pair id.
+            // A DELETE head is not live, so If-Match is
+            // not required, and the PUT is not genesis.
+            // Same-body no-append uses livePut for both
+            // PUT kinds (simple and locked).
+            const head = isDocumentPut
+                ? await documentHeadAt(
                     effective, canonicalPrefix, name,
                 )
+                : null;
+            const livePut = head !== null
+                && head.method === 'PUT'
+                ? head.id
                 : undefined;
             const advertised = livePut;
             // The hoisted echo: read If-Match directly so
@@ -922,7 +926,7 @@ export async function handleRequest(
                 organization,
                 operationId,
                 responseStatus: spec.status,
-                ...(isDocumentPut && livePut === undefined
+                ...(isDocumentPut && head === null
                     ? { genesis: true as const }
                     : {}),
                 responseBody: method === 'PUT'
