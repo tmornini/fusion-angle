@@ -332,9 +332,13 @@ skew tests, which went with item 8's trio.
    PBKDF2 and names a column that is not there (owner
    call); and the two ids, each with one source.
    `request-id` names one wire request: the server mints
-   it, always, returns it in every response, and accepts
-   none — a `request-id` a client sends is one more stored
-   header line, read by nothing. Today the server takes
+   it, always, returns it in every response, and refuses
+   one: a request that carries `request-id` answers 400
+   and lands nothing, on every route, so no client's id
+   is ever answered with another in silence — the gate
+   refuses what it will not honor, as it requires the
+   `operation-id` only the client mints. Today the
+   server takes
    the client's when it is valid and mints one otherwise
    (`incomingContext`, `api/request-context.ts:66-71`),
    answers 400 to a malformed one on an authenticated
