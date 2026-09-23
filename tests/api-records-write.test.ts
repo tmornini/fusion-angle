@@ -61,7 +61,7 @@ Deno.test(
             id: string;
             name: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN);
+            + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN, operationIdHeader());
         assertStrictEquals(record.name, 'Quarterly Renewals');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
@@ -69,13 +69,14 @@ Deno.test(
         const history = await GET<{
             state: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + 'rbfHGatkwQzGZJVXKJEeyw/versions/', DEV_TOKEN);
+            + 'rbfHGatkwQzGZJVXKJEeyw/versions/', DEV_TOKEN,
+                operationIdHeader());
         assertStrictEquals(history.length, 1);
         assertStrictEquals(history[0]!.state, 'active');
         const attrs = await GET<unknown[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN,
-        );
+                operationIdHeader());
         assertStrictEquals(attrs.length, 1);
     },
 );
@@ -103,7 +104,7 @@ Deno.test(
         const record = await GET<{ name: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rcaSzEaORBkezCxyhLhecA', DEV_TOKEN,
-        );
+                operationIdHeader());
         assertStrictEquals(record.name, 'Empty');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7).
@@ -111,7 +112,8 @@ Deno.test(
             state: string;
             member_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + 'rcaSzEaORBkezCxyhLhecA/versions/', DEV_TOKEN);
+            + 'rcaSzEaORBkezCxyhLhecA/versions/', DEV_TOKEN,
+                operationIdHeader());
         assertStrictEquals(history.length, 1);
         assertStrictEquals(history[0]!.state, 'active');
         assertStrictEquals(typeof history[0]!.member_id, 'string');
@@ -161,7 +163,7 @@ Deno.test(
             name: string;
             description: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN);
+            + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN, operationIdHeader());
         assertStrictEquals(record.name, 'After');
         assertStrictEquals(
             record.description, 'updated',
@@ -169,7 +171,7 @@ Deno.test(
         const after = await GET<{ state: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN,
-        );
+                operationIdHeader());
         assertStrictEquals(
             after.state, 'active',
             'edit must not change state',
@@ -239,7 +241,8 @@ Deno.test(
             id: string;
             name: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN);
+            + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN,
+                operationIdHeader());
         assertStrictEquals(all.length, 1);
         assertStrictEquals(all[0]!.id, newAttrId);
         assertStrictEquals(all[0]!.name, 'New');
@@ -309,7 +312,7 @@ Deno.test(
                 + 'rbfHGatkwQzGZJVXKJEeyw'
             + '/attributes/UQBiHFcwJeCDSnmkPBoYRA',
             DEV_TOKEN,
-        );
+            operationIdHeader());
         assertStrictEquals(stored.name, 'Renamed');
         assertStrictEquals(
             stored.attribute_type, 'number',
@@ -522,7 +525,7 @@ Deno.test(
         const rec = await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + recId, DEV_TOKEN,
-        );
+                operationIdHeader());
         assertStrictEquals(rec.id, recId);
     },
 );

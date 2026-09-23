@@ -36,6 +36,7 @@ import { deriveOrganization } from
     '../api/derive-organizations.ts';
 import {
     apiRequest,
+    framedRequest,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -194,7 +195,7 @@ async () => {
 
 Deno.test('the facade requires a bearer token', async () => {
     const { db, organizationA } = await twoOrganizations();
-    const res = await handleRequest(db, new Request(
+    const res = await handleRequest(db, framedRequest(
         `${BASE}/organizations/` + organizationA + '/ideas'));
     assertStrictEquals(res.status, 401);
 });

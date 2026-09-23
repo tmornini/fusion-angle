@@ -34,7 +34,7 @@ Deno.test(
     async () => {
         const db = await freshDb();
         const out =
-            await GET<unknown[]>(db, TYPES, DEV_TOKEN);
+            await GET<unknown[]>(db, TYPES, DEV_TOKEN, operationIdHeader());
         assertEquals(out, []);
     },
 );
@@ -58,7 +58,7 @@ Deno.test(
             description: string;
             position: number;
             state: string;
-        }>(db, TYPE, DEV_TOKEN);
+        }>(db, TYPE, DEV_TOKEN, operationIdHeader());
         assertStrictEquals(stored.id, 'rbfHGatkwQzGZJVXKJEeyw');
         assertStrictEquals(stored.name, 'Customer');
         assertStrictEquals(stored.position, 1);
@@ -83,7 +83,7 @@ Deno.test(
         await DELETE(db, TYPE, DEV_TOKEN,
             operationIdHeader());
         await assertRejects(
-            () => GET(db, TYPE, DEV_TOKEN),
+            () => GET(db, TYPE, DEV_TOKEN, operationIdHeader()),
         );
     },
 );
@@ -105,7 +105,7 @@ Deno.test(
             operationIdHeader());
         const out = await GET<unknown[]>(
             db, ATTRS, DEV_TOKEN,
-        );
+            operationIdHeader());
         assertEquals(out, []);
     },
 );
@@ -137,7 +137,7 @@ Deno.test(
             id: string;
             record_type_id: string;
             attribute_type: string;
-        }>(db, ATTR, DEV_TOKEN);
+        }>(db, ATTR, DEV_TOKEN, operationIdHeader());
         assertStrictEquals(stored.id, 'UQBiHFcwJeCDSnmkPBoYRA');
         assertStrictEquals(stored.record_type_id, 'rbfHGatkwQzGZJVXKJEeyw');
         assertStrictEquals(
@@ -172,7 +172,7 @@ Deno.test(
         await DELETE(db, ATTR, DEV_TOKEN,
             operationIdHeader());
         await assertRejects(
-            () => GET(db, ATTR, DEV_TOKEN),
+            () => GET(db, ATTR, DEV_TOKEN, operationIdHeader()),
         );
     },
 );
@@ -187,7 +187,7 @@ Deno.test(
         const out = await GET<unknown[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/records/', DEV_TOKEN,
-        );
+                operationIdHeader());
         assertEquals(out, []);
     },
 );
@@ -221,7 +221,7 @@ Deno.test(
             record_id: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aEsGMmBEFaVdWihhHXwCbw/records/dCnpryxCNwuTnCrBBDIMOw'
-            , DEV_TOKEN);
+            , DEV_TOKEN, operationIdHeader());
         assertStrictEquals(stored.flow_id, 'aEsGMmBEFaVdWihhHXwCbw');
         assertStrictEquals(stored.record_id, 'rbfHGatkwQzGZJVXKJEeyw');
     },
@@ -259,7 +259,7 @@ Deno.test(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + 'aEsGMmBEFaVdWihhHXwCbw/records/'
                     + 'dCnpryxCNwuTnCrBBDIMOw', DEV_TOKEN,
-            ),
+                    operationIdHeader()),
         );
     },
 );

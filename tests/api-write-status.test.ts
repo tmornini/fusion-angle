@@ -9,6 +9,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
     pairIdOf,
+    framedRequest,
 } from './http-fixtures.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
@@ -172,7 +173,7 @@ async () => {
     assertStrictEquals(before, 1);
     const second = await handleRequest(
         db,
-        new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        framedRequest('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/yjsYYXruOryrZjnfLsgSJg', {
             method: 'PUT',
             headers: {
@@ -284,7 +285,7 @@ async () => {
     assertStrictEquals(before, 2);
     const second = await handleRequest(
         db,
-        new Request(
+        framedRequest(
             'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             + 'yPsWmFGqnMtjifSSmvZrUw',
             {
@@ -332,7 +333,7 @@ async () => {
     const token = await organizationToken();
     const res = await handleRequest(
         db,
-        new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        framedRequest('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/yXVKeCiguypnNcNelXVldQ', {
             method: 'PUT',
             headers: {

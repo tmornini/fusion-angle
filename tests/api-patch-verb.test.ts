@@ -10,6 +10,7 @@ import {
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
+    framedRequest,
 } from './http-fixtures.ts';
 import { writeAuthorizerFor } from
     '../api/write-authorizer.ts';
@@ -118,7 +119,7 @@ Deno.test('writeAuthorizerFor includes PATCH on organizations/:id/ideas/:id',
 Deno.test('IF_MATCH_HEADER is if-match and is hoisted',
 () => {
     assertStrictEquals(IF_MATCH_HEADER, 'if-match');
-    const request = new Request('http://x/', {
+    const request = framedRequest('http://x/', {
         headers: { 'if-match': '"pair-head-1"' },
     });
     const fields = hoistedHeaderFields(request);

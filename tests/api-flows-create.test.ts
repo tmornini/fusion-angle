@@ -102,7 +102,7 @@ Deno.test(
             name: string;
             organization_id: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'aEsGMmBEFaVdWihhHXwCbw', DEV_TOKEN);
+            + 'aEsGMmBEFaVdWihhHXwCbw', DEV_TOKEN, operationIdHeader());
         assertStrictEquals(flow.name, 'My Flow');
         // The fence stamped the bound org — never the body.
         assertStrictEquals(flow.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
@@ -114,7 +114,8 @@ Deno.test(
             project_id: string;
             flow_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
-            + 'pnXmXrxOWayANgDLdCjuBw/flows/', DEV_TOKEN);
+            + 'pnXmXrxOWayANgDLdCjuBw/flows/', DEV_TOKEN,
+                operationIdHeader());
         assertStrictEquals(links.length, 1);
         assertStrictEquals(links[0]!.id, body.projectFlowId);
         assertStrictEquals(links[0]!.project_id, 'pnXmXrxOWayANgDLdCjuBw');
@@ -149,7 +150,7 @@ Deno.test(
         const flow = await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw', DEV_TOKEN,
-        );
+                operationIdHeader());
         assertStrictEquals(flow.id, 'aEsGMmBEFaVdWihhHXwCbw');
         const flowEvents = await deriveFlowStateHistory(
             db, 'AjdvjuECVZEgZoFajaIEkg', 'aEsGMmBEFaVdWihhHXwCbw',
@@ -179,7 +180,7 @@ Deno.test(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
             DEV_TOKEN,
-        );
+            operationIdHeader());
         assertStrictEquals(events.length, 1);
         assertStrictEquals(events[0]!.at, AT);
     },

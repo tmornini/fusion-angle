@@ -12,6 +12,7 @@ import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-06-04T00:00:00.000000Z';
@@ -43,7 +44,7 @@ async function join(
 }
 
 function getSeats(token: string, organization: string) {
-    return new Request(
+    return framedRequest(
         `${BASE}/organizations/${organization}/members/`,
         {
             headers: {
@@ -57,7 +58,7 @@ function getSeats(token: string, organization: string) {
 function putDefaultOrganization(
     token: string, identityId: string, organization: string,
 ) {
-    return new Request(
+    return framedRequest(
         `${BASE}/identities/${identityId}`
             + '/default-organization', {
             method: 'PUT',

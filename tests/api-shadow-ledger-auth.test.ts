@@ -13,8 +13,10 @@ import { MemoryStorageBackend } from '../api/backend-memory.ts';
 import type { GuardedDbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import { requestHashOfStored } from './ledger-row.ts';
-import { NIL_IDENTIFIER } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    NIL_IDENTIFIER,
+} from '../shared/identifier.ts';
 import { testHashPassword } from './mock-seed.ts';
 import {
     seedRootAdmin, seedSeat,
@@ -26,7 +28,6 @@ import {
     makeAssertionSigner,
 } from './client-assertion-fixtures.ts';
 import type { NotificationEvent } from '../api/notifications.ts';
-import { REQUEST_ID_HEADER } from '../api/request-context.ts';
 import {
     seedClientRegistration,
     seedIdentityCredential,
@@ -36,6 +37,7 @@ import {
     pairIdOf,
     refreshTokenFromSetCookie,
     setCookieHeader,
+    framedRequest,
 } from './http-fixtures.ts';
 
 // C1 discharge under the verbatim-storage contract: the
@@ -55,15 +57,18 @@ const PASSWORD = 'hunter2-s3cret';
 function jsonPost(
     path: string,
     body: unknown,
-    extraHeaders: Record<string, string> = {},
 ): Request {
-    return new Request(`${BASE}/${path}`, {
+    const raw = JSON.stringify(body);
+    return framedRequest(`${BASE}/${path}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            ...extraHeaders,
+            'content-length': String(
+                new TextEncoder().encode(raw).byteLength,
+            ),
+            'operation-id': generateIdentifier(),
         },
-        body: JSON.stringify(body),
+        body: raw,
     });
 }
 
@@ -316,17 +321,15 @@ async () => {
     await seedRootAdmin(db);
     const { code } = await fullLoginFlow(db);
     const before = (await db.messagePairs.getAll()).length;
-    // A distinguishing header keeps this replay from being
-    // byte-identical to the original exchange — otherwise
-    // appendMessagePairOnce's same-hash dedup (message-pair.ts)
-    // would mask a regression that mistakenly appended a pair
-    // on a failing branch: the row counts below would stay
-    // flat whether or not a stray append fired.
+    // jsonPost mints a fresh operation-id, so this replay
+    // is not byte-identical to the original exchange.
+    // Otherwise same-hash dedup would mask a regression
+    // that appended a pair on a failing branch.
     const replay = await handleRequest(db, jsonPost(
         'authentication/token', {
             grant_type: 'authorization_code', code,
             client_id: 'web',
-        }, { [REQUEST_ID_HEADER]: 'replay-attemptAAAAAAAAAw' }));
+        }));
     assertStrictEquals(replay.status, 401);
     assertStrictEquals((await db.messagePairs.getAll()).length, before);
     assertStrictEquals(
@@ -578,7 +581,7 @@ Deno.test('an Authorization header sent alongside the token grant is'
     const { code } = await authorizeRes.json() as {
         code: string;
     };
-    const req = new Request(`${BASE}/authentication/token`, {
+    const req = framedRequest(`${BASE}/authentication/token`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -619,15 +622,14 @@ Deno.test('a reused (already-rotated-away) refresh token grant is a'
         r => r.path === '/authentication/token/'
             && r.name === '',
     ).length;
-    // Same reasoning as the double-spent-code test above: a
-    // distinguishing header keeps this reuse attempt from
-    // being byte-identical to the rotation that already
-    // stored a pair with the same body.
+    // Same reasoning as the double-spent-code test above:
+    // a fresh operation-id keeps this reuse from being
+    // byte-identical to the rotation already stored.
     const reused = await handleRequest(db, jsonPost(
         'authentication/token', {
             grant_type: 'refresh',
             refresh_token: first.refresh_token,
-        }, { [REQUEST_ID_HEADER]: 'replay-attemptAAAAAAAAAw' }));
+        }));
     assertStrictEquals(reused.status, 401);
     const requests = await db.messagePairs.getAll();
 

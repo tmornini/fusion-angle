@@ -30,6 +30,7 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 function messagePairJsonOf(message: string): {
     readonly body: Record<string, unknown>;
@@ -53,7 +54,7 @@ function req(
     path: string,
     token: string,
 ): Request {
-    return new Request(BASE + path, {
+    return framedRequest(BASE + path, {
         method,
         headers: {
             Authorization: 'Bearer ' + token,

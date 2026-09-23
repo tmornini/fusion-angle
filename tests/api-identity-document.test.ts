@@ -440,7 +440,7 @@ async () => {
         department: string;
         strengths: string[];
         team_dimensions: Record<string, number>;
-    }>(db, 'identities/' + id, DEV_TOKEN);
+    }>(db, 'identities/' + id, DEV_TOKEN, operationIdHeader());
     assertStrictEquals(got.id, id);
     assertStrictEquals(got.kind, 'person');
     assertStrictEquals(got.title, profile.title);
@@ -487,12 +487,12 @@ async () => {
     );
     const pii = await GET<Record<string, unknown>>(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA/pii', DEV_TOKEN,
-    );
+        operationIdHeader());
     assertStrictEquals(pii['name'], 'Ada');
     assertStrictEquals('title' in pii, false);
     const identity = await GET<Record<string, unknown>>(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA', DEV_TOKEN,
-    );
+        operationIdHeader());
     assertStrictEquals(identity['title'], 'CEO');
     assertStrictEquals('name' in identity, false);
 });

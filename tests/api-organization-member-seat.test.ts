@@ -27,6 +27,7 @@ import {
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    framedRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -160,7 +161,7 @@ Deno.test('mint bakes claim roles from a seat, not a'
         messagePair,
     );
 
-    const tokenRequest = new Request(
+    const tokenRequest = framedRequest(
         'http://localhost/authentication/token', {
             method: 'POST',
             headers: {
@@ -239,7 +240,7 @@ async function mintedOrganizations(
     identity: string,
 ): Promise<readonly string[] | undefined> {
     const minted = await handleRequest(
-        db, new Request(
+        db, framedRequest(
             'http://localhost/authentication/token', {
                 method: 'POST',
                 headers: {

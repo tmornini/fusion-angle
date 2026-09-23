@@ -41,6 +41,47 @@ export function refreshTokenFromSetCookie(
     return match[1]!.trim();
 }
 
+// In-process tests build Request directly. The gate
+// requires operation-id, and a body requires the
+// UTF-8 content-length fetch would have set. A
+// header the caller already set is left alone.
+export function framedRequest(
+    input: string | URL,
+    init?: RequestInit,
+): Request {
+    const headers = new Headers(init?.headers);
+    const body = init?.body;
+    if (
+        body !== undefined
+        && body !== null
+        && !headers.has('content-length')
+    ) {
+        const length = bodyByteLength(body);
+        if (length !== undefined) {
+            headers.set('content-length', String(length));
+        }
+    }
+    if (!headers.has('operation-id')) {
+        headers.set('operation-id', generateIdentifier());
+    }
+    return new Request(input, {
+        ...init,
+        headers,
+        ...(body !== undefined ? { body } : {}),
+    });
+}
+
+function bodyByteLength(body: BodyInit): number | undefined {
+    if (typeof body === 'string') {
+        return new TextEncoder().encode(body).byteLength;
+    }
+    if (body instanceof Uint8Array) return body.byteLength;
+    if (body instanceof ArrayBuffer) return body.byteLength;
+    if (ArrayBuffer.isView(body)) return body.byteLength;
+    if (body instanceof Blob) return body.size;
+    return undefined;
+}
+
 export function apiRequest(input: {
     readonly method: string;
     readonly path: string;
@@ -49,8 +90,6 @@ export function apiRequest(input: {
     readonly operationId?: string;
     readonly headers?: Readonly<Record<string, string>>;
 }): Request {
-    const write = input.method !== 'GET'
-        && input.method !== 'HEAD';
     const headers: Record<string, string> = {
         ...(input.headers ?? {}),
     };
@@ -58,10 +97,15 @@ export function apiRequest(input: {
         headers['Authorization'] =
             'Bearer ' + input.token;
     }
+    let body: string | undefined;
     if (input.body !== undefined) {
         headers['Content-Type'] = 'application/json';
+        body = JSON.stringify(input.body);
+        headers['content-length'] = String(
+            new TextEncoder().encode(body).byteLength,
+        );
     }
-    if (write && headers['operation-id'] === undefined) {
+    if (headers['operation-id'] === undefined) {
         headers['operation-id'] =
             input.operationId
             ?? generateIdentifier();
@@ -69,9 +113,7 @@ export function apiRequest(input: {
     return new Request(BASE + input.path, {
         method: input.method,
         headers,
-        ...(input.body !== undefined
-            ? { body: JSON.stringify(input.body) }
-            : {}),
+        ...(body !== undefined ? { body } : {}),
     });
 }
 

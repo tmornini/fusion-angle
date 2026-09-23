@@ -139,7 +139,7 @@ Deno.test(
             'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + WO_ID,
             DEV_TOKEN,
-        );
+            operationIdHeader());
         assertStrictEquals(wo.display_id, 'abcd');
         assertStrictEquals(wo.position, 1);
         // The fence stamped the bound org — never the body.
@@ -153,7 +153,8 @@ Deno.test(
             flow_id: string;
             work_order_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'ZOousbbnzpqlxJExVAruYQ/work-orders/', DEV_TOKEN);
+            + 'ZOousbbnzpqlxJExVAruYQ/work-orders/', DEV_TOKEN,
+                operationIdHeader());
         assertStrictEquals(links.length, 1);
         assertStrictEquals(links[0]!.id, FWO_ID);
         assertStrictEquals(links[0]!.flow_id, 'ZOousbbnzpqlxJExVAruYQ');
@@ -227,7 +228,7 @@ Deno.test(
         const wo = await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + WO_ID, DEV_TOKEN,
-        );
+                operationIdHeader());
         assertStrictEquals(wo.id, WO_ID);
         const woEvents = await workOrderLifecycleStatesFor(
             db, 'AjdvjuECVZEgZoFajaIEkg', WO_ID,

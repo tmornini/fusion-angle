@@ -57,7 +57,7 @@ Deno.test(
             organization_id: string;
             state?: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
-            , DEV_TOKEN);
+            , DEV_TOKEN, operationIdHeader());
         assertStrictEquals(objective.position, 1);
         // The fence stamped the bound org — never the body.
         assertStrictEquals(
@@ -73,7 +73,7 @@ Deno.test(
             objective_id: string;
             name: string;
         }>>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
-            + '/revisions/', DEV_TOKEN);
+            + '/revisions/', DEV_TOKEN, operationIdHeader());
         const revision = revisions.find(
             r => r.id === 'sVWUntTCtQYFCpONjkzAKg');
         assert(revision);
@@ -108,7 +108,7 @@ Deno.test(
             () => GET(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
                     + id, DEV_TOKEN,
-            ),
+                    operationIdHeader()),
         );
     },
 );

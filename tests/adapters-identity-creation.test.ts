@@ -1,3 +1,4 @@
+import { operationIdHeader } from './operation-id-header.ts';
 import {
     assert,
     assertNotStrictEquals,
@@ -46,7 +47,7 @@ Deno.test('postIdentityCreation mints a person identity'
     });
     const identity = await GET<{ kind: string }>(
         db, 'identities/fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
-    );
+        operationIdHeader());
     assertStrictEquals(identity.kind, 'person');
     const pii = await deriveIdentityPii(db, 'fndCYAsXazdzMUlEGMNIZw');
     assertStrictEquals(pii.email, 'pat@example.com');
@@ -62,7 +63,7 @@ Deno.test('postIdentityCreation mints a service identity'
     });
     const identity = await GET<{ kind: string }>(
         db, 'identities/syWUUcdBSbBgMwBiCrgbDw', DEV_TOKEN,
-    );
+        operationIdHeader());
     assertStrictEquals(identity.kind, 'service');
     const creds = await deriveCredentialsFor(db, 'syWUUcdBSbBgMwBiCrgbDw');
     const cred = creds.find(r => r.kind === 'client_secret');
@@ -92,7 +93,7 @@ async () => {
     // Message-plane document at identities/:id is one head.
     const identity = await GET<{ kind: string }>(
         db, 'identities/fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
-    );
+        operationIdHeader());
     assertStrictEquals(identity.kind, 'person');
     const pii = await deriveIdentityPii(db, 'fndCYAsXazdzMUlEGMNIZw');
     assertStrictEquals(pii.email, 'a@example.com');

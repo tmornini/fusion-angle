@@ -166,7 +166,7 @@ Deno.test(
             organization_id: string;
             state: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
-            + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN);
+            + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN, operationIdHeader());
         assertStrictEquals(project.title, 'Promoted Project');
         // The fence stamped the bound org — never the body.
         assertStrictEquals(project.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
@@ -180,7 +180,8 @@ Deno.test(
             id: string;
             state: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'gVvtDIaqhnkXZQcxZeSuiw/versions/', DEV_TOKEN);
+            + 'gVvtDIaqhnkXZQcxZeSuiw/versions/', DEV_TOKEN,
+                operationIdHeader());
         const ideaCurrent = ideaHistory[0]!;
         assertStrictEquals(ideaCurrent.id, 'gVvtDIaqhnkXZQcxZeSuiw');
         assertStrictEquals(ideaCurrent.state, 'promoted');
@@ -191,7 +192,8 @@ Deno.test(
             state: string;
             member_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
-            + 'pnXmXrxOWayANgDLdCjuBw/versions/', DEV_TOKEN);
+            + 'pnXmXrxOWayANgDLdCjuBw/versions/', DEV_TOKEN,
+                operationIdHeader());
         assertStrictEquals(projectVersions.length, 1);
         assertStrictEquals(
             projectVersions[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
@@ -204,7 +206,7 @@ Deno.test(
             'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/',
             DEV_TOKEN,
-        );
+            operationIdHeader());
         assertStrictEquals(mine.length, 2);
         const byObj = new Map(
             mine.map(b => [b.objective_id, b.score]),
@@ -405,12 +407,12 @@ Deno.test(
         const project = await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN,
-        );
+                operationIdHeader());
         assertStrictEquals(project.id, 'pnXmXrxOWayANgDLdCjuBw');
         const ideaHistory = await GET<{ state: string }[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'gVvtDIaqhnkXZQcxZeSuiw/versions/', DEV_TOKEN,
-        );
+                operationIdHeader());
         // Family history is DESC — index 0 is current.
         const ideaCurrent = ideaHistory[0]!;
         assertStrictEquals(ideaCurrent.state, 'promoted');

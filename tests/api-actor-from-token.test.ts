@@ -50,7 +50,7 @@ Deno.test(
         );
         const seats = await GET<{ id: string }[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', token,
-        );
+            operationIdHeader());
         assert(seats.some(s => s.id === 'alice'));
     },
 );

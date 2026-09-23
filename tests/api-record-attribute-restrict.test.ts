@@ -260,7 +260,7 @@ Deno.test(
         await assertRejects(
             () => GET(
                 db, ATTR1_PATH, DEV_TOKEN,
-            ),
+                operationIdHeader()),
         );
     },
 );
@@ -286,7 +286,7 @@ Deno.test(
             operationIdHeader());
         const before = await GET<{
             organization_id: string;
-        }>(db, ATTR_PAIR_PATH, DEV_TOKEN);
+        }>(db, ATTR_PAIR_PATH, DEV_TOKEN, operationIdHeader());
         assertStrictEquals(before.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
         await DELETE(
             db, ATTR_PAIR_PATH, DEV_TOKEN,
@@ -294,7 +294,7 @@ Deno.test(
         await assertRejects(
             () => GET(
                 db, ATTR_PAIR_PATH, DEV_TOKEN,
-            ),
+                operationIdHeader()),
         );
         // Phase Final Stage B: record_attributes table retired.
     },
@@ -336,7 +336,7 @@ Deno.test(
         // RESTRICT 409: attribute still served on message plane.
         const still = await GET<{ id: string }>(
             db, ATTR1_PATH, DEV_TOKEN,
-        );
+            operationIdHeader());
         assertStrictEquals(still.id, 'VXTdVVRluJDRBqbXWZBntA');
     },
 );
@@ -398,7 +398,7 @@ Deno.test(
         await assertRejects(
             () => GET(
                 db, ATTR1_PATH, DEV_TOKEN,
-            ),
+                operationIdHeader()),
         );
     },
 );
@@ -567,11 +567,11 @@ Deno.test(
         // survives and zero pairs append
         const record = await GET<{ name: string }>(
             db, TYPE_PATH, DEV_TOKEN,
-        );
+            operationIdHeader());
         assertStrictEquals(record.name, 'Asset');
         const attr = await GET<{ id: string }>(
             db, ATTR1_PATH, DEV_TOKEN,
-        );
+            operationIdHeader());
         assertStrictEquals(attr.id, 'VXTdVVRluJDRBqbXWZBntA');
         // pair-balance: the whole bundle is pairs-or-nothing,
         // so a 409 rollback appends NEITHER table any rows.

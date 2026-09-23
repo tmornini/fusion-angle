@@ -10,6 +10,8 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { GET, handleRequest } from '../api/api.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import { canonicalPath } from '../api/message-pair.ts';
 import {
     setPasswordHasher,
@@ -32,6 +34,8 @@ import {
     scryptDerive,
 } from '../server/scrypt-hash.ts';
 import { testHashPassword } from './mock-seed.ts';
+import { framedRequest } from './http-fixtures.ts';
+import { operationIdHeader } from './operation-id-header.ts';
 
 const BASE = 'http://localhost';
 
@@ -45,10 +49,17 @@ Deno.test.beforeEach(() => {
 });
 
 function jsonPost(path: string, body: unknown): Request {
-    return new Request(`${BASE}/${path}`, {
+    const raw = JSON.stringify(body);
+    return framedRequest(`${BASE}/${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        headers: {
+            'Content-Type': 'application/json',
+            'content-length': String(
+                new TextEncoder().encode(raw).byteLength,
+            ),
+            'operation-id': generateIdentifier(),
+        },
+        body: raw,
     });
 }
 
@@ -127,7 +138,7 @@ async () => {
     const body = await tok.json() as { access_token: string };
     assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , body.access_token)));
+            , body.access_token, operationIdHeader())));
 });
 
 // authorization_code TTL: a code older than

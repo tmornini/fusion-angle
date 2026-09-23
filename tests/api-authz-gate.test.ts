@@ -5,6 +5,8 @@ import { devToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { framedRequest } from './http-fixtures.ts';
+import { operationIdHeader } from './operation-id-header.ts';
 
 const BASE = 'http://localhost';
 
@@ -17,7 +19,7 @@ async function freshDb() {
 Deno.test('deny-by-default: a roleless principal is forbidden',
 async () => {
     const db = await freshDb();   // no role granted
-    const res = await handleRequest(db, new Request(
+    const res = await handleRequest(db, framedRequest(
         `${BASE}/identities/`, {
             headers: {
                 'Authorization': 'Bearer ' + await devToken(),
@@ -32,14 +34,14 @@ Deno.test('an admin is permitted', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + '', await devToken());
+        + '', await devToken(), operationIdHeader());
     assert(Array.isArray(rows));   // 200, not 403
 });
 
 Deno.test('role-grants routes are retired (404)', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
-    const res = await handleRequest(db, new Request(
+    const res = await handleRequest(db, framedRequest(
         `${BASE}/role-grants/rOEPOcVMQdJiiiMuiiEhlg`, {
             method: 'PUT',
             headers: {
@@ -61,7 +63,7 @@ Deno.test('role-grants routes are retired (404)', async () => {
 Deno.test('admin may write a membership type', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
-    const res = await handleRequest(db, new Request(
+    const res = await handleRequest(db, framedRequest(
         `${BASE}/organizations/`
             + 'AjdvjuECVZEgZoFajaIEkg/members/'
             + 'prBESZPjJDiuXCeZLmbiVw', {
@@ -83,6 +85,6 @@ Deno.test('authentication precedes authorization (401 first)',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(
-        db, new Request(`${BASE}/members`));
+        db, framedRequest(`${BASE}/members`));
     assertStrictEquals(res.status, 401);   // no token, not 403
 });

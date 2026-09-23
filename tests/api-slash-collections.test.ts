@@ -6,6 +6,7 @@ import { seedAdminSchema } from
     './test-fixtures.ts';
 import { organizationToken } from
     './token-fixtures.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 
@@ -15,7 +16,7 @@ async () => {
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db,
-        new Request(BASE + '/identities/', {
+        framedRequest(BASE + '/identities/', {
             headers: {
                 Authorization: 'Bearer ' + token,
             },
@@ -31,7 +32,7 @@ async () => {
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db,
-        new Request(BASE + '/identities', {
+        framedRequest(BASE + '/identities', {
             headers: {
                 Authorization: 'Bearer ' + token,
             },
@@ -46,7 +47,7 @@ async () => {
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db,
-        new Request(
+        framedRequest(
             BASE + '/identities/oHNDEvvUUwOvzRwyvbnjag/', {
             headers: {
                 Authorization: 'Bearer ' + token,

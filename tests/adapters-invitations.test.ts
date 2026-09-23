@@ -70,6 +70,7 @@ import {
     runSingleFlightRefresh,
     deleteRefreshChannel,
 } from '../web-app/app/adapters/session-refresh-mutex.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -271,7 +272,7 @@ async function eraseIdentityPii(
     target: string,
 ): Promise<void> {
     const token = await organizationToken(actor, organization);
-    const response = await handleRequest(db, new Request(
+    const response = await handleRequest(db, framedRequest(
         `http://localhost/identities/${target}/pii`,
         {
             method: 'DELETE',

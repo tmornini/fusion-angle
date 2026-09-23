@@ -99,7 +99,7 @@ async () => {
         await GETWithEtag<{
             id: string; title: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + ideaId, token);
+            + ideaId, token, operationIdHeader());
     assertStrictEquals(body.title, 'Plain');
     assert(etag !== undefined && isIdentifier(etag));
 });
@@ -118,12 +118,12 @@ async () => {
     const viaGet = await GET<{ id: string; title: string }>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId, token,
-    );
+            operationIdHeader());
     const { body: viaGetWithEtag } =
         await GETWithEtag<{
             id: string; title: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + ideaId, token);
+            + ideaId, token, operationIdHeader());
     assertEquals(viaGetWithEtag, viaGet);
 });
 

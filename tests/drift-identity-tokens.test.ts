@@ -27,6 +27,7 @@ import {
     storedMessageBodyText,
     storedPutBodyText,
     refreshTokenFromSetCookie,
+    framedRequest,
 } from './http-fixtures.ts';
 import {
     deriveIdentityToken,
@@ -102,7 +103,7 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 function tokenGrant(
     db: DbAdapter, body: unknown,
 ): Promise<Response> {
-    return handleRequest(db, new Request(
+    return handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -129,7 +130,7 @@ async function s256Fields(): Promise<{
 function authorize(
     db: DbAdapter, body: unknown,
 ): Promise<Response> {
-    return handleRequest(db, new Request(
+    return handleRequest(db, framedRequest(
         `${BASE}/authentication/authorize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

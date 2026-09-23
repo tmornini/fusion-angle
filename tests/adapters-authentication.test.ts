@@ -26,6 +26,7 @@ import {
 import { sha256Bytes } from '../shared/digest.ts';
 import { bytesToBase64Url } from '../shared/base64url.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { operationIdHeader } from './operation-id-header.ts';
 
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 
@@ -95,7 +96,7 @@ async () => {
     assert(creds);
     assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , creds.accessToken)));
+            , creds.accessToken, operationIdHeader())));
 });
 
 Deno.test('postPasswordLogin issues a 30-day refresh token',

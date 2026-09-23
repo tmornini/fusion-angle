@@ -64,7 +64,7 @@ async () => {
             'identities/' + generateIdentifier()
                 + '/registration',
             'not-a-token',
-        ),
+            operationIdHeader()),
         UnauthorizedError,
     );
 });
@@ -134,7 +134,7 @@ Deno.test('PUT registers; GET reads it back; a second PUT'
     assertEquals(put, { id: 'uWzjNIEeEtVWqZoJMLeYpw', ...REGISTRATION });
     const got = await GET<Record<string, unknown>>(
         db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration', DEV_TOKEN,
-    );
+        operationIdHeader());
     assertEquals(got, { id: 'uWzjNIEeEtVWqZoJMLeYpw', ...REGISTRATION });
     const rotated = {
         ...REGISTRATION, jwks: '{"keys":[{"kty":"EC"}]}',
@@ -144,7 +144,7 @@ Deno.test('PUT registers; GET reads it back; a second PUT'
         operationIdHeader());
     const reread = await GET<{ jwks: string }>(
         db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration', DEV_TOKEN,
-    );
+        operationIdHeader());
     assertStrictEquals(reread.jwks, rotated.jwks);
 });
 
@@ -154,7 +154,7 @@ Deno.test('GET with no registration yet is 404 (identity'
     await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
     await rejectsWithStatus(
         () => GET(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-            DEV_TOKEN),
+            DEV_TOKEN, operationIdHeader()),
         404,
     );
 });
@@ -191,7 +191,7 @@ async () => {
     );
     await rejectsWithStatus(
         () => GET(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-            DEV_TOKEN),
+            DEV_TOKEN, operationIdHeader()),
         404,
     );
 });

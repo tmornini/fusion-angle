@@ -15,6 +15,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
     storedPutBodyText,
+    framedRequest,
 } from './http-fixtures.ts';
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
@@ -212,7 +213,7 @@ async () => {
     // so this is same-body, not replay.
     const second = await handleRequest(
         db,
-        new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        framedRequest('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/tmPPRaXkMetWxTSisIPFLA', {
             method: 'PUT',
             headers: {

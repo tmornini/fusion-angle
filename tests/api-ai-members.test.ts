@@ -49,7 +49,7 @@ Deno.test('PUT /ai-agents/:id writes the agent', async () => {
     assert(put.status === 201 || put.status === 200);
     const got = await GET<{ name: string }>(
         db, 'ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
-    );
+        operationIdHeader());
     assertStrictEquals(got.name, 'Claude');
 });
 

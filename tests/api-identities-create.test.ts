@@ -84,7 +84,8 @@ Deno.test(
         }, DEV_TOKEN,
             operationIdHeader());
         const identity = await GET<{ kind: string }>(
-            db, 'identities/pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN);
+            db, 'identities/pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN,
+                operationIdHeader());
         assertStrictEquals(identity.kind, 'person');
         // No PII yet — create body no longer carries pii.
         // Phase Final Task 2: identity spine ROW halves stripped.
@@ -116,7 +117,8 @@ Deno.test(
         }, DEV_TOKEN,
             operationIdHeader());
         const identity = await GET<{ kind: string }>(
-            db, 'identities/syWUUcdBSbBgMwBiCrgbDw', DEV_TOKEN);
+            db, 'identities/syWUUcdBSbBgMwBiCrgbDw', DEV_TOKEN,
+                operationIdHeader());
         assertStrictEquals(identity.kind, 'service');
         const creds = await deriveCredentialsFor(db
             , 'syWUUcdBSbBgMwBiCrgbDw');
@@ -153,7 +155,8 @@ Deno.test(
         );
         // The unexpected `pii` key 400s before any facet lands.
         await assertRejects(
-            () => GET(db, 'identities/' + doomed, DEV_TOKEN));
+            () => GET(db, 'identities/' + doomed, DEV_TOKEN,
+                operationIdHeader()));
         await assertRejects(
             () => deriveIdentityPii(db, doomed));
     },
@@ -181,7 +184,7 @@ Deno.test(
         );
         // The identity survives; it simply carries no PII yet.
         const identity = await GET<{ kind: string }>(
-            db, 'identities/' + torn, DEV_TOKEN);
+            db, 'identities/' + torn, DEV_TOKEN, operationIdHeader());
         assertStrictEquals(identity.kind, 'person');
         await assertRejects(
             () => deriveIdentityPii(db, torn));
@@ -210,7 +213,8 @@ Deno.test(
                 operationIdHeader()),
         );
         await assertRejects(
-            () => GET(db, 'identities/' + doomed, DEV_TOKEN));
+            () => GET(db, 'identities/' + doomed, DEV_TOKEN,
+                operationIdHeader()));
         const creds = await deriveCredentialsFor(db, doomed);
         assertStrictEquals(creds.length, 0);
     },
@@ -241,7 +245,8 @@ Deno.test(
         // The denied member wrote nothing on the message plane
         // — no identities/prBESZPjJDiuXCeZLmbiVw document.
         await assertRejects(
-            () => GET(memberDb, 'identities/prBESZPjJDiuXCeZLmbiVw', token),
+            () => GET(memberDb, 'identities/prBESZPjJDiuXCeZLmbiVw', token,
+                operationIdHeader()),
         );
     },
 );

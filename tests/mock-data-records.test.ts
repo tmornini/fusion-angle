@@ -38,6 +38,7 @@ import {
     projectBriefRecordId,
 } from '../api/mock-data/records.ts';
 import { seededMockDb } from './mock-seed.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 // Phase Final Task 2: records(+attributes+flow_records) seed
 // row halves stripped — assertions ride the message plane.
@@ -97,7 +98,7 @@ async function allAttributes(
         );
         const typesRes = await handleRequest(
             db,
-            new Request(
+            framedRequest(
                 'http://localhost/organizations/'
                 + organization + '/record-types/',
                 {
@@ -112,7 +113,7 @@ async function allAttributes(
         for (const type of types) {
             const res = await handleRequest(
                 db,
-                new Request(
+                framedRequest(
                     'http://localhost/organizations/'
                     + organization + '/record-types/'
                     + type.id + '/attributes/',
@@ -256,7 +257,7 @@ Deno.test(
         const token = await organizationToken();
         const woRes = await handleRequest(
             db,
-            new Request(
+            framedRequest(
                 'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'work-orders/' + woId,
                 {
@@ -360,7 +361,7 @@ Deno.test(
         ): Promise<void> {
             const res = await handleRequest(
                 db,
-                new Request(
+                framedRequest(
                     'http://localhost/organizations/'
                     + organization + '/flows/',
                     {
@@ -377,7 +378,7 @@ Deno.test(
             for (const flow of flows) {
                 const detail = await handleRequest(
                     db,
-                    new Request(
+                    framedRequest(
                         'http://localhost/organizations/'
                         + organization + '/flows/'
                         + flow.id,

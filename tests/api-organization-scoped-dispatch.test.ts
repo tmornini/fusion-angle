@@ -57,7 +57,8 @@ async () => {
     const db = await twoOrganizationIdeas();
     const rows = await GET<{ id: string }[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            , await organizationToken('AjdvjuECVZEgZoFajaIEkg'));
+            , await organizationToken('AjdvjuECVZEgZoFajaIEkg'),
+                operationIdHeader());
     assertEquals(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
 });
 
@@ -66,7 +67,7 @@ async () => {
     const db = await twoOrganizationIdeas();
     const rows = await GET<{ id: string }[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            , await organizationToken(''));
+            , await organizationToken(''), operationIdHeader());
     // No honest unscoped default since SP-6: the token
     // resolves to org 'AjdvjuECVZEgZoFajaIEkg', so the org '7' idea stays
     // hidden.

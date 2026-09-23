@@ -13,6 +13,7 @@ import { handleRequest } from '../api/api.ts';
 import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
 import {
     apiRequest, pairIdOf, storedPutBodyText,
+    framedRequest,
 } from './http-fixtures.ts';
 import {
     deriveIdentityPii,
@@ -96,7 +97,7 @@ async function loginPassword(
     db: MemoryDbAdapter,
     username: string,
 ): Promise<Response> {
-    return handleRequest(db, new Request(
+    return handleRequest(db, framedRequest(
         BASE + '/authentication/authorize', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

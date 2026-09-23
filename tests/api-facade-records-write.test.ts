@@ -12,6 +12,7 @@ import {
 } from './test-fixtures.ts';
 import {
     apiRequest,
+    framedRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -141,7 +142,7 @@ async () => {
     const { db } = await oneOrganization();
     const res = await handleRequest(
         db,
-        new Request(`${BASE}/records`, { method: 'GET' }),
+        framedRequest(`${BASE}/records`, { method: 'GET' }),
     );
     assertStrictEquals(res.status, 401);
 });

@@ -21,6 +21,7 @@ import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 
 Deno.test('SYSTEM_MEMBER_ID is NIL_IDENTIFIER', () => {
@@ -106,7 +107,7 @@ Deno.test('PUT then GET an identity round-trips', async () => {
         operationIdHeader());
     const got = await GET<{ id: string; kind: string }>(
         db, 'identities/' + id, DEV_TOKEN,
-    );
+        operationIdHeader());
     assertEquals(got, { id, kind: 'person' });
 });
 
@@ -117,10 +118,11 @@ async () => {
         await import('../api/mock-data.ts');
     await postBootstrap(db);
     const sys = await GET<{ kind: string }>(
-        db, 'identities/' + SYSTEM_MEMBER_ID, DEV_TOKEN);
+        db, 'identities/' + SYSTEM_MEMBER_ID, DEV_TOKEN, operationIdHeader());
     assertStrictEquals(sys.kind, 'service');
     const cur = await GET<{ kind: string }>(
-        db, 'identities/XXZruirZyAOoRpNxaDnpSA', DEV_TOKEN);
+        db, 'identities/XXZruirZyAOoRpNxaDnpSA', DEV_TOKEN,
+            operationIdHeader());
     assertStrictEquals(cur.kind, 'person');
 });
 
@@ -178,7 +180,7 @@ function piiReq(
     method: string, path: string, token: string,
     body?: unknown,
 ): Request {
-    return new Request('http://localhost' + path, {
+    return framedRequest('http://localhost' + path, {
         method,
         headers: {
             'Content-Type': 'application/json',
@@ -192,7 +194,7 @@ Deno.test('a member reads its own pii on the subtree', async () => {
     const db = await dbWithMember();
     const pii = await GET<{ name: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ/pii'
-            , await devToken('toccYYkLEABmlbpHJalgtQ'));
+            , await devToken('toccYYkLEABmlbpHJalgtQ'), operationIdHeader());
     assertStrictEquals(pii.name, 'Sarah');
 });
 
@@ -231,7 +233,7 @@ Deno.test('a member writes its own pii', async () => {
         operationIdHeader());
     const pii = await GET<{ name: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ/pii'
-            , await devToken('toccYYkLEABmlbpHJalgtQ'));
+            , await devToken('toccYYkLEABmlbpHJalgtQ'), operationIdHeader());
     assertStrictEquals(pii.name, 'Sarah Lee');
 });
 
@@ -242,7 +244,7 @@ Deno.test('an admin writes another identity pii', async () => {
         operationIdHeader());
     const pii = await GET<{ name: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ/pii'
-            , await devToken('toccYYkLEABmlbpHJalgtQ'));
+            , await devToken('toccYYkLEABmlbpHJalgtQ'), operationIdHeader());
     assertStrictEquals(pii.name, 'By Admin');
 });
 
@@ -265,6 +267,7 @@ async () => {
         await devToken('toccYYkLEABmlbpHJalgtQ')));
     assertStrictEquals(gone.status, 404);
     const id = await GET<{ id: string }>(
-        db, 'identities/toccYYkLEABmlbpHJalgtQ', DEV_TOKEN);
+        db, 'identities/toccYYkLEABmlbpHJalgtQ', DEV_TOKEN,
+            operationIdHeader());
     assertStrictEquals(id.id, 'toccYYkLEABmlbpHJalgtQ');
 });

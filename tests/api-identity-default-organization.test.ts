@@ -13,6 +13,7 @@ import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-06-04T00:00:00.000000Z';
@@ -50,7 +51,7 @@ function putDefaultOrganization(
     identityId: string,
     organization: string,
 ) {
-    return new Request(
+    return framedRequest(
         `${BASE}/identities/${identityId}`
             + '/default-organization', {
             method: 'PUT',
@@ -66,7 +67,7 @@ function putDefaultOrganization(
 }
 
 function getDefaultOrganization(token: string, identityId: string) {
-    return new Request(
+    return framedRequest(
         `${BASE}/identities/${identityId}`
             + '/default-organization', {
             headers: { 'Authorization': 'Bearer ' + token },
@@ -158,7 +159,7 @@ Deno.test('PUT without organization_id returns 400', async () => {
         , 'AjdvjuECVZEgZoFajaIEkg');
     const token = await devToken();
     const res = await handleRequest(
-        db, new Request(
+        db, framedRequest(
             `${BASE}/identities/XXZruirZyAOoRpNxaDnpSA/default-organization`
                 , {
                 method: 'PUT',
@@ -183,7 +184,7 @@ async () => {
         , 'BBjWJsjYIDkTRKIIPrzWRw');
     const token = await devToken();
     const put = await handleRequest(
-        db, new Request(
+        db, framedRequest(
             `${BASE}/identities/XXZruirZyAOoRpNxaDnpSA/default-organization`
                 , {
                 method: 'PUT',
@@ -200,7 +201,7 @@ async () => {
     );
     assertStrictEquals(put.status, 201);
     const revoked = await handleRequest(
-        db, new Request(
+        db, framedRequest(
             `${BASE}/organizations/`
                 + 'BBjWJsjYIDkTRKIIPrzWRw/members/'
                 + 'XXZruirZyAOoRpNxaDnpSA', {
@@ -218,7 +219,7 @@ async () => {
     );
     assertStrictEquals(revoked.status, 204);
     const got = await handleRequest(
-        db, new Request(
+        db, framedRequest(
             `${BASE}/identities/XXZruirZyAOoRpNxaDnpSA/default-organization`
                 , {
                 headers: {

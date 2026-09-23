@@ -48,6 +48,8 @@ import {
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { framedRequest } from './http-fixtures.ts';
+import { operationIdHeader } from './operation-id-header.ts';
 
 const BASE = 'http://localhost';
 
@@ -130,7 +132,7 @@ async function seedMembershipMessagePair(
 }
 
 function tokenRequest(body: Record<string, unknown>): Request {
-    return new Request(`${BASE}/authentication/token`, {
+    return framedRequest(`${BASE}/authentication/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -140,7 +142,7 @@ function tokenRequest(body: Record<string, unknown>): Request {
 Deno.test('a missing bearer is 401 invalid_token', async () => {
     const db = await freshDb();
     const res = await handleRequest(
-        db, new Request(`${BASE}/members`));
+        db, framedRequest(`${BASE}/members`));
     assertStrictEquals(res.status, 401);
     assertEquals(
         await res.json(), { error: 'invalid_token' });
@@ -375,7 +377,7 @@ async () => {
     );
     // the minted access token passes the SP-3 gate
     const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + '', body.access_token);
+        + '', body.access_token, operationIdHeader());
     assert(Array.isArray(rows));
 });
 
@@ -580,7 +582,7 @@ async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const pair1 = await initialPair(db);
-    const res = await handleRequest(db, new Request(
+    const res = await handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
             headers: {
@@ -599,7 +601,7 @@ async () => {
         await GET(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
             body['access_token'] as string,
-        )));
+            operationIdHeader())));
 });
 
 Deno.test('stale body refresh_token loses to a live Cookie',
@@ -613,7 +615,7 @@ async () => {
     }));
     assertStrictEquals(rotated.status, 201);
     const liveCookie = refreshTokenFromSetCookie(rotated);
-    const res = await handleRequest(db, new Request(
+    const res = await handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
             headers: {
@@ -631,7 +633,7 @@ async () => {
     };
     assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , body.access_token)));
+            , body.access_token, operationIdHeader())));
 });
 
 Deno.test('refresh rotates to a new pair', async () => {
@@ -650,7 +652,7 @@ Deno.test('refresh rotates to a new pair', async () => {
         refreshTokenFromSetCookie(res), pair1.refresh_token);
     assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , pair2.access_token)));
+            , pair2.access_token, operationIdHeader())));
 });
 
 Deno.test('replaying a rotated refresh token revokes the chain',
@@ -787,7 +789,7 @@ async () => {
     // the delegated token passes the gate (current = admin)
     assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , body.access_token)));
+            , body.access_token, operationIdHeader())));
 });
 
 Deno.test('token-exchange 201 has no refresh Set-Cookie',
@@ -795,7 +797,7 @@ async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const pair = await initialPair(db);
-    const rotated = await handleRequest(db, new Request(
+    const rotated = await handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
             headers: {
@@ -973,7 +975,7 @@ Deno.test('client_credentials issues a gate-valid token', async () => {
     const body = await res.json() as { access_token: string };
     assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , body.access_token)));
+            , body.access_token, operationIdHeader())));
     assertNotStrictEquals(
         decodeAccessToken(body.access_token).jti, 'assert-1',
     );
@@ -1258,7 +1260,7 @@ async () => {
     const challenge = await s256Challenge(verifier);
     const authorized = await handleRequest(
         db,
-        new Request(`${BASE}/authentication/authorize`, {
+        framedRequest(`${BASE}/authentication/authorize`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1297,7 +1299,7 @@ async () => {
     assertStrictEquals(
         exchangedClaims.organizations, undefined,
     );
-    const seats = await handleRequest(db, new Request(
+    const seats = await handleRequest(db, framedRequest(
         `${BASE}/identities/` + UNSEATED
             + '/organizations/',
         {
@@ -1312,7 +1314,7 @@ async () => {
     const refreshToken =
         refreshTokenFromSetCookie(exchanged);
     const refreshed = await handleRequest(
-        db, new Request(
+        db, framedRequest(
             `${BASE}/authentication/token`, {
                 method: 'POST',
                 headers: {
@@ -1345,7 +1347,7 @@ async () => {
         organizations: [starkOrganization],
         roles: ['admin:' + starkOrganization],
     });
-    const granted = await handleRequest(db, new Request(
+    const granted = await handleRequest(db, framedRequest(
         `${BASE}/organizations/` + starkOrganization
             + '/invitations/',
         {
@@ -1364,7 +1366,7 @@ async () => {
         },
     ));
     assertStrictEquals(granted.status, 200);
-    const pending = await handleRequest(db, new Request(
+    const pending = await handleRequest(db, framedRequest(
         `${BASE}/identities/` + UNSEATED
             + '/invitations/',
         {

@@ -27,6 +27,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 
 async function freshDb() {
@@ -38,7 +39,7 @@ async function freshDb() {
 Deno.test('GET on unknown route throws', async () => {
     const db = await freshDb();
     const err = await assertRejects(
-        () => GET(db, 'nonexistent-table', DEV_TOKEN),
+        () => GET(db, 'nonexistent-table', DEV_TOKEN, operationIdHeader()),
     ) as Error;
     assertMatch(
         err.message, /Route not found|404|not found/i,
@@ -49,7 +50,7 @@ Deno.test('GET ideas returns array', async () => {
     const db = await freshDb();
     const ideas =
         await GET<unknown[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + '', DEV_TOKEN);
+            + '', DEV_TOKEN, operationIdHeader());
     assertEquals(ideas, []);
 });
 
@@ -59,7 +60,7 @@ Deno.test('GET organizations/:id/ideas/:id throws on missing', async () => {
         () => GET(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + generateIdentifier()
-            , DEV_TOKEN),
+            , DEV_TOKEN, operationIdHeader()),
     ) as Error;
     assertMatch(err.message, /Not found|404/);
 });
@@ -86,7 +87,7 @@ Deno.test('PUT then GET round-trips an entity', async () => {
         await GET<{ title: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
-        );
+                operationIdHeader());
     assertStrictEquals(fetched.title, 'Test');
 });
 
@@ -115,7 +116,7 @@ Deno.test('GET organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
     const db = await freshDb();
     const result =
         await GET<unknown[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + '', DEV_TOKEN);
+            + '', DEV_TOKEN, operationIdHeader());
     assertEquals(result, []);
 });
 
@@ -128,7 +129,7 @@ Deno.test(
         const members =
             await GET<{ id: string }[]>(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
-                await organizationToken());
+                await organizationToken(), operationIdHeader());
         assert(
             members.some(row => row.id === humanId),
         );
@@ -144,7 +145,7 @@ Deno.test(
         );
         const ais =
             await GET<unknown[]>(
-                db, 'ai-agents/', DEV_TOKEN);
+                db, 'ai-agents/', DEV_TOKEN, operationIdHeader());
         assertStrictEquals(ais.length, 1);
     },
 );
@@ -202,7 +203,7 @@ Deno.test(
                 'members/' + generateIdentifier()
                     + '/extra',
                 DEV_TOKEN,
-            ),
+                operationIdHeader()),
         ) as Error;
         assertMatch(err.message, /not found|404/i);
     },
@@ -215,7 +216,7 @@ Deno.test(
         const db = await freshDb();
         const response = await handleRequest(
             db,
-            new Request(
+            framedRequest(
                 'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                     + 'fndCYAsXazdzMUlEGMNIZw',
                 {
@@ -249,7 +250,7 @@ Deno.test(
         const db = await freshDb();
         const response = await handleRequest(
             db,
-            new Request(
+            framedRequest(
                 'http://localhost/identities/',
                 {
                     method: 'POST',
@@ -309,11 +310,13 @@ Deno.test(
                 'error',
                 () => handleRequest(
                     db,
-                    new Request('http://localhost/organizations/'
+                    framedRequest('http://localhost/organizations/'
                         + 'AjdvjuECVZEgZoFajaIEkg/ideas/', {
                         headers: {
                             'Authorization':
                                 'Bearer ' + DEV_TOKEN,
+                            'operation-id':
+                                generateIdentifier(),
                         },
                     }),
                 ),
@@ -343,7 +346,7 @@ Deno.test(
         ]) {
             const response = await handleRequest(
                 db,
-                new Request(
+                framedRequest(
                     'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
                         + 'ideas/fndCYAsXazdzMUlEGMNIZw',
                     {

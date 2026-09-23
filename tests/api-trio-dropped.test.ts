@@ -1,3 +1,4 @@
+import { operationIdHeader } from './operation-id-header.ts';
 import { assert, assertStrictEquals } from '@std/assert';
 import { seededMockDb } from './mock-seed.ts';
 import { GET } from '../api/api.ts';
@@ -32,7 +33,7 @@ Deno.test('idea JSON has no state_at or'
         db,
         nest('ideas', idea.id),
         token,
-    );
+        operationIdHeader());
     assertStrictEquals('state_at' in row, false);
     assertStrictEquals('state_event_id' in row, false);
     assertStrictEquals(typeof row.state, 'string');
@@ -49,7 +50,7 @@ Deno.test('GET idea versions/ is collection item'
         db,
         nest('ideas', idea.id) + '/versions/',
         token,
-    );
+        operationIdHeader());
     assert(rows.length >= 1);
     const first = rows[0]!;
     assertStrictEquals('state_at' in first, false);
@@ -66,7 +67,7 @@ Deno.test('project JSON has no state_at or'
         db,
         nest('projects', project.id),
         token,
-    );
+        operationIdHeader());
     assertStrictEquals('state_at' in row, false);
     assertStrictEquals('state_event_id' in row, false);
     assertStrictEquals(typeof row.state, 'string');
@@ -84,7 +85,7 @@ Deno.test('GET project versions/ is collection item'
         nest('projects', project.id)
             + '/versions/',
         token,
-    );
+        operationIdHeader());
     assert(rows.length >= 1);
     const first = rows[0]!;
     assertStrictEquals('state_at' in first, false);
@@ -101,7 +102,7 @@ Deno.test('objective JSON has no state_at or'
         db,
         nest('objectives', objective.id),
         token,
-    );
+        operationIdHeader());
     assertStrictEquals('state_at' in row, false);
     assertStrictEquals('state_event_id' in row, false);
     assertStrictEquals(typeof row.state, 'string');
@@ -119,7 +120,7 @@ Deno.test('GET objective versions/ is collection'
         nest('objectives', objective.id)
             + '/versions/',
         token,
-    );
+        operationIdHeader());
     assert(rows.length >= 1);
     const first = rows[0]!;
     assertStrictEquals('state_at' in first, false);
@@ -136,7 +137,7 @@ Deno.test('record-type JSON has no state_at or'
         db,
         nest('record-types', record.id),
         token,
-    );
+        operationIdHeader());
     assertStrictEquals('state_at' in row, false);
     assertStrictEquals('state_event_id' in row, false);
     assertStrictEquals(typeof row.state, 'string');
@@ -154,7 +155,7 @@ Deno.test('GET record-type versions/ is collection'
         nest('record-types', record.id)
             + '/versions/',
         token,
-    );
+        operationIdHeader());
     assert(rows.length >= 1);
     const first = rows[0]!;
     assertStrictEquals('state_at' in first, false);

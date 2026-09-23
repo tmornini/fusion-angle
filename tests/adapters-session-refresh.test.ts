@@ -21,7 +21,8 @@ import {
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
-import { refreshTokenFromSetCookie } from './http-fixtures.ts';
+import { refreshTokenFromSetCookie, framedRequest } from './http-fixtures.ts';
+import { operationIdHeader } from './operation-id-header.ts';
 
 const BASE = 'http://localhost';
 
@@ -72,7 +73,7 @@ async function issuePair(db: MemoryDbAdapter): Promise<{
     access_token: string; refresh_token: string;
 }> {
     await seedAuthorizationCodeMessagePair(db, 'the-code');
-    const res = await handleRequest(db, new Request(
+    const res = await handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -99,7 +100,7 @@ async () => {
     assertNotStrictEquals(creds.refreshToken, pair.refresh_token);
     assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , creds.accessToken)));
+            , creds.accessToken, operationIdHeader())));
 });
 
 Deno.test('a garbage refresh token throws UnauthorizedError',

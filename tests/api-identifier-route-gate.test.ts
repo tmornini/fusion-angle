@@ -11,6 +11,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     apiRequest,
+    framedRequest,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -180,34 +181,36 @@ async () => {
 });
 
 Deno.test('incomingContext mints when request-id is absent',
-() => {
+async () => {
     const db = memoryDbAdapter();
-    const ctx = incomingContext(
+    const ctx = await incomingContext(
         db,
-        new Request('http://localhost/ideas/'),
+        framedRequest('http://localhost/ideas/'),
     );
     assertStrictEquals(isIdentifier(ctx.requestId), true);
 });
 
-Deno.test('incomingContext echoes a canonical request-id',
-() => {
+Deno.test(
+    'incomingContext mints past a carried request-id',
+async () => {
     const db = memoryDbAdapter();
     const id = generateIdentifier();
-    const ctx = incomingContext(
+    const ctx = await incomingContext(
         db,
-        new Request('http://localhost/ideas/', {
+        framedRequest('http://localhost/ideas/', {
             headers: { [REQUEST_ID_HEADER]: id },
         }),
     );
-    assertStrictEquals(ctx.requestId, id);
+    assertStrictEquals(isIdentifier(ctx.requestId), true);
+    assertNotStrictEquals(ctx.requestId, id);
 });
 
 Deno.test('incomingContext mints a malformed request-id',
-() => {
+async () => {
     const db = memoryDbAdapter();
-    const ctx = incomingContext(
+    const ctx = await incomingContext(
         db,
-        new Request('http://localhost/ideas/', {
+        framedRequest('http://localhost/ideas/', {
             headers: {
                 [REQUEST_ID_HEADER]: 'not-an-identifier',
             },
@@ -219,7 +222,7 @@ Deno.test('incomingContext mints a malformed request-id',
     );
 });
 
-Deno.test('malformed Request-ID after auth is 400',
+Deno.test('a carried Request-ID is 400 before auth',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -239,18 +242,18 @@ async () => {
     const body = await res.json() as { error: string };
     assertStrictEquals(
         body.error,
-        'Request-ID must be a 22-character identifier',
+        'Request-ID is minted by the server',
     );
 });
 
-Deno.test('unauthenticated malformed Request-ID is 401',
+Deno.test('unauthenticated carried Request-ID is 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const org = 'AjdvjuECVZEgZoFajaIEkg';
     const res = await handleRequest(
         db,
-        new Request(
+        framedRequest(
             'http://localhost/organizations/'
                 + org + '/ideas/',
             {
@@ -261,7 +264,12 @@ async () => {
             },
         ),
     );
-    assertStrictEquals(res.status, 401);
+    assertStrictEquals(res.status, 400);
+    const body = await res.json() as { error: string };
+    assertStrictEquals(
+        body.error,
+        'Request-ID is minted by the server',
+    );
 });
 
 Deno.test('present transition instance_id must be an'

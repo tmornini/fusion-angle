@@ -10,6 +10,7 @@ import {
     GET, UnauthorizedError, RequestError,
 } from '../api/api.ts';
 import { devToken, expiredToken } from './token-fixtures.ts';
+import { operationIdHeader } from './operation-id-header.ts';
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -25,7 +26,8 @@ Deno.test('a 401 through a verb is an UnauthorizedError', async () => {
     const db = await freshDb();
     const tok = await expiredToken();
     const err = await assertRejects(
-        () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tok),
+        () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tok,
+            operationIdHeader()),
     ) as UnauthorizedError;
     assertInstanceOf(err, UnauthorizedError);
     assertInstanceOf(err, Error);
@@ -42,7 +44,8 @@ async () => {
     const db = await freshDb();   // no role granted
     const tok = await devToken();
     const err = await assertRejects(
-        () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tok),
+        () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tok,
+            operationIdHeader()),
     ) as RequestError;
     assertInstanceOf(err, RequestError);
     assertInstanceOf(err, Error);
@@ -59,7 +62,7 @@ async () => {
     const db = await freshDb();
     const tok = await devToken();
     const err = await assertRejects(
-        () => GET(db, 'no-such-resource', tok),
+        () => GET(db, 'no-such-resource', tok, operationIdHeader()),
     ) as RequestError;
     assertInstanceOf(err, RequestError);
     assertInstanceOf(err, Error);

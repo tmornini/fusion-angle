@@ -23,6 +23,8 @@ import {
 } from '../server/http-server.ts';
 import { fetchDiscardingBody } from
     './fixtures/fetch-discarding-body.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 async function gzipBytes(
     text: string,
@@ -292,6 +294,11 @@ async () => {
         const res = await fetchDiscardingBody(
             base
             + '/api/organizations/AjdvjuECVZEgZoFajaIEkg/ideas?secret=1',
+            {
+                headers: {
+                    'operation-id': generateIdentifier(),
+                },
+            },
         );
         assertStrictEquals(res.status, HTTP_UNAUTHORIZED);
         const last = logs[logs.length - 1];

@@ -65,12 +65,13 @@ Deno.test(
         );
         const row = await GET<{
             kind: string; title: string;
-        }>(db, 'identities/xdaJyuuPyHfffCGLhqDrOQ', token);
+        }>(db, 'identities/xdaJyuuPyHfffCGLhqDrOQ', token,
+            operationIdHeader());
         assertStrictEquals(row.kind, 'person');
         assertStrictEquals(row.title, 'Engineer');
         const seats = await GET<{ id: string }[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', token,
-        );
+            operationIdHeader());
         assert(seats.some(s => s.id === 'xdaJyuuPyHfffCGLhqDrOQ'));
     },
 );
@@ -123,7 +124,7 @@ Deno.test(
         assert(second.status === 201 || second.status === 200);
         const row = await GET<{ strengths: string[] }>(
             db, 'identities/xdaJyuuPyHfffCGLhqDrOQ', token,
-        );
+            operationIdHeader());
         assertEquals(row.strengths, [
             'Strategic Planning',
             'Stakeholder Management',

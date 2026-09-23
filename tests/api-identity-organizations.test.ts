@@ -1,3 +1,4 @@
+import { operationIdHeader } from './operation-id-header.ts';
 import { assertEquals, assertStrictEquals } from '@std/assert';
 import { GET, handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
@@ -14,6 +15,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { buildMembers } from '../api/mock-data/members.ts';
 import type { OrganizationEntity } from '../api/types.ts';
 import { seededMockDb } from './mock-seed.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 
@@ -37,7 +39,7 @@ Deno.test('GET /identities/:id/organizations/ lists'
         db,
         'identities/' + identityId + '/organizations/',
         await devToken(identityId),
-    );
+        operationIdHeader());
     assertStrictEquals(rows.length, 1);
 });
 
@@ -52,7 +54,7 @@ async () => {
     ]) {
         const res = await handleRequest(
             db,
-            new Request(BASE + path, {
+            framedRequest(BASE + path, {
                 headers: {
                     Authorization: 'Bearer ' + token,
                 },
@@ -68,7 +70,7 @@ Deno.test('GET identities/:id/organizations/ is self or'
     const otherId = buildMembers()[0]!.id;
     const res = await handleRequest(
         db,
-        new Request(
+        framedRequest(
             BASE + '/identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
             {
                 headers: {
@@ -99,7 +101,7 @@ async () => {
                 'admin:BBjWJsjYIDkTRKIIPrzWRw',
             ],
         }),
-    );
+        operationIdHeader());
     assertStrictEquals(rows.length, 1);
 });
 
@@ -111,6 +113,6 @@ Deno.test('org-less GET identities/:id/organizations/'
         db,
         'identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
         await devToken(),
-    );
+        operationIdHeader());
     assertEquals(rows, []);
 });

@@ -33,6 +33,7 @@ import type { DbAdapter } from '../api/db.ts';
 import {
     apiRequest,
     pairIdOf,
+    framedRequest,
 } from './http-fixtures.ts';
 import {
     makeAssertionSigner,
@@ -431,7 +432,7 @@ Deno.test('a reused rotation 409s and a token-revocations PUT'
 function postToken(
     db: MemoryDbAdapter, body: unknown,
 ): Promise<Response> {
-    return handleRequest(db, new Request(
+    return handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

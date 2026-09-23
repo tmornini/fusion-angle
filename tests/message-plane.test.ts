@@ -1,10 +1,15 @@
 import {
+    assertNotStrictEquals,
     assertStrictEquals,
     assertThrows,
 } from '@std/assert';
 import type { DbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
+import {
+    incomingContext,
+    REQUEST_ID_HEADER,
+} from '../api/request-context.ts';
 import {
     mergeSecret,
     REQUEST_CREDENTIAL_NAMES,
@@ -32,8 +37,10 @@ import {
 } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
 import { sha256HexOfBytes } from '../shared/digest.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
 import { apiRequest } from './http-fixtures.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
@@ -568,5 +575,227 @@ Deno.test(
             keptRequest,
             raw('nocolon\r\n\r\n'),
         ));
+    },
+);
+
+const LENGTH_REQUIRED =
+    'A request body requires Content-Length';
+
+async function gateOutcome(request: Request): Promise<{
+    readonly status: number;
+    readonly error: string;
+    readonly requestId: string | null;
+    readonly landed: boolean;
+}> {
+    const db = memoryDbAdapter();
+    await db.postSchemaCreation();
+    const before = (await db.messagePairs.getAll()).length;
+    const response = await handleRequest(db, request);
+    const body = await response.json() as {
+        error?: string;
+    };
+    const after = (await db.messagePairs.getAll()).length;
+    return {
+        status: response.status,
+        error: body.error ?? '',
+        requestId: response.headers.get('request-id'),
+        landed: after !== before,
+    };
+}
+
+function byteCount(text: string): string {
+    return String(
+        new TextEncoder().encode(text).byteLength,
+    );
+}
+
+Deno.test(
+    'transfer-encoding answers 411 and lands nothing',
+    async () => {
+        const body = '{"a":1}';
+        const outcome = await gateOutcome(new Request(
+            'http://localhost/authentication/token',
+            {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    'content-length': byteCount(body),
+                    'transfer-encoding': 'chunked',
+                    'operation-id': generateIdentifier(),
+                },
+                body,
+            },
+        ));
+        assertStrictEquals(outcome.status, 411);
+        assertStrictEquals(outcome.error, LENGTH_REQUIRED);
+        assertStrictEquals(
+            isIdentifier(outcome.requestId ?? ''),
+            true,
+        );
+        assertStrictEquals(outcome.landed, false);
+    },
+);
+
+Deno.test(
+    'a body without content-length answers 411',
+    async () => {
+        const outcome = await gateOutcome(new Request(
+            'http://localhost/authentication/token',
+            {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    'operation-id': generateIdentifier(),
+                },
+                body: '{"a":1}',
+            },
+        ));
+        assertStrictEquals(outcome.status, 411);
+        assertStrictEquals(outcome.error, LENGTH_REQUIRED);
+        assertStrictEquals(outcome.landed, false);
+    },
+);
+
+Deno.test(
+    'a mismatched content-length answers 400',
+    async () => {
+        const outcome = await gateOutcome(new Request(
+            'http://localhost/authentication/token',
+            {
+                method: 'POST',
+                headers: {
+                    'content-length': '1',
+                    'operation-id': generateIdentifier(),
+                },
+                body: '{"a":1}',
+            },
+        ));
+        assertStrictEquals(outcome.status, 400);
+        assertStrictEquals(
+            outcome.error,
+            'Content-Length does not match the body',
+        );
+        assertStrictEquals(outcome.landed, false);
+    },
+);
+
+Deno.test(
+    'GET without Operation-ID is required',
+    async () => {
+        const token = await organizationToken();
+        const outcome = await gateOutcome(new Request(
+            'http://localhost/organizations/'
+                + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
+            {
+                headers: {
+                    authorization: 'Bearer ' + token,
+                },
+            },
+        ));
+        assertStrictEquals(outcome.status, 400);
+        assertStrictEquals(
+            outcome.error,
+            'Operation-ID is required',
+        );
+        assertStrictEquals(outcome.landed, false);
+    },
+);
+
+Deno.test(
+    'each door without Operation-ID is required',
+    async () => {
+        for (const path of [
+            '/authentication/authorize',
+            '/authentication/token',
+        ]) {
+            const outcome = await gateOutcome(new Request(
+                'http://localhost' + path,
+                { method: 'POST' },
+            ));
+            assertStrictEquals(outcome.status, 400);
+            assertStrictEquals(
+                outcome.error,
+                'Operation-ID is required',
+            );
+            assertStrictEquals(outcome.landed, false);
+        }
+    },
+);
+
+Deno.test(
+    'a carried request-id is 400 and lands nothing',
+    async () => {
+        const token = await organizationToken();
+        const carried = generateIdentifier();
+        const operationId = generateIdentifier();
+        const ideas = 'http://localhost/organizations/'
+            + 'AjdvjuECVZEgZoFajaIEkg/ideas/';
+        const requests = [
+            new Request(ideas, {
+                headers: {
+                    authorization: 'Bearer ' + token,
+                    'operation-id': operationId,
+                    [REQUEST_ID_HEADER]: carried,
+                },
+            }),
+            new Request(
+                'http://localhost/authentication/authorize',
+                {
+                    method: 'POST',
+                    headers: {
+                        'operation-id': operationId,
+                        [REQUEST_ID_HEADER]: carried,
+                    },
+                },
+            ),
+            new Request(
+                'http://localhost/authentication/token',
+                {
+                    method: 'POST',
+                    headers: {
+                        'operation-id': operationId,
+                        [REQUEST_ID_HEADER]: carried,
+                    },
+                },
+            ),
+            new Request(ideas, {
+                headers: {
+                    'operation-id': operationId,
+                    [REQUEST_ID_HEADER]: carried,
+                },
+            }),
+        ];
+        for (const request of requests) {
+            const outcome = await gateOutcome(request);
+            assertStrictEquals(outcome.status, 400);
+            assertStrictEquals(
+                outcome.error,
+                'Request-ID is minted by the server',
+            );
+            assertStrictEquals(outcome.landed, false);
+            assertNotStrictEquals(
+                outcome.requestId, carried,
+            );
+        }
+    },
+);
+
+Deno.test(
+    'incomingContext mints past a carried request-id',
+    async () => {
+        const db = memoryDbAdapter();
+        const carried = generateIdentifier();
+        const ctx = await incomingContext(
+            db,
+            new Request('http://localhost/ideas/', {
+                headers: {
+                    [REQUEST_ID_HEADER]: carried,
+                },
+            }),
+        );
+        assertStrictEquals(
+            isIdentifier(ctx.requestId), true,
+        );
+        assertNotStrictEquals(ctx.requestId, carried);
     },
 );

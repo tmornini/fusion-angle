@@ -20,6 +20,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
     apiRequest, storedPutBodyText,
+    framedRequest,
 } from './http-fixtures.ts';
 import {
     deriveTokenRevocation,
@@ -298,7 +299,7 @@ async () => {
     assertStrictEquals(still.status, 200);
     const refresh = await handleRequest(
         db,
-        new Request('http://localhost/authentication/token', {
+        framedRequest('http://localhost/authentication/token', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

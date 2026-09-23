@@ -34,7 +34,6 @@ import {
     streamGetFromStored,
     parseIfMatch,
     LATCHED_OPERATION_ROUTE_PATTERNS,
-    requireOperationId,
     OPERATION_ID_HEADER,
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
@@ -106,6 +105,7 @@ import {
     HTTP_FORBIDDEN,
     HTTP_PRECONDITION_FAILED,
     HTTP_PRECONDITION_REQUIRED,
+    errorJson,
 } from './http-errors.ts';
 import {
     AUTHENTICATION_ROUTES,
@@ -128,8 +128,10 @@ import {
 } from './routes.ts';
 
 import {
+    framingRefusal,
     incomingContext,
     REQUEST_ID_HEADER,
+    type FramedContext,
     type IncomingContext,
 } from './request-context.ts';
 import {
@@ -377,11 +379,60 @@ function rejectMalformedIdentifierParams(
     return undefined;
 }
 
+function finish(
+    ctx: IncomingContext,
+    response: Response,
+): Response {
+    response.headers.set(
+        REQUEST_ID_HEADER, ctx.requestId,
+    );
+    return response;
+}
+
 export async function handleRequest(
     adapter: GuardedDbAdapter,
     request: Request,
 ): Promise<Response> {
-    const ctx = incomingContext(adapter, request);
+    const ctx = await incomingContext(adapter, request);
+    const response = await dispatched(ctx, request);
+    return finish(ctx, response);
+}
+
+async function dispatched(
+    arrived: IncomingContext,
+    request: Request,
+): Promise<Response> {
+    const framing = framingRefusal(
+        request.headers, arrived.bodyBytes,
+    );
+    if (framing !== undefined) return framing;
+    if (request.headers.has(REQUEST_ID_HEADER)) {
+        return errorJson(
+            'Request-ID is minted by the server',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    const operationId = request.headers.get(
+        OPERATION_ID_HEADER,
+    );
+    if (operationId === null || operationId === '') {
+        return errorJson(
+            'Operation-ID is required',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    if (!isIdentifier(operationId)) {
+        return errorJson(
+            'Operation-ID must be a 22-'
+                + 'character identifier',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    const ctx: FramedContext = {
+        ...arrived,
+        operationId,
+    };
+    const adapter = ctx.base;
     const { method, pathname } = ctx;
     const pathSegments = pathSegmentsOf(pathname);
     // Match first (pure, no I/O). Authentication runs before
@@ -432,20 +483,6 @@ export async function handleRequest(
             await authenticateRequest(ctx, request);
         if (typeof authed === 'string') {
             return unauthorizedBearerResponse(authed);
-        }
-        const rawRequestId =
-            request.headers.get(REQUEST_ID_HEADER);
-        if (
-            rawRequestId !== null
-            && !isIdentifier(rawRequestId)
-        ) {
-            return Response.json(
-                {
-                    error: 'Request-ID must be a 22-'
-                        + 'character identifier',
-                },
-                { status: HTTP_BAD_REQUEST },
-            );
         }
         // Auth first; only then admit an unmatched path as
         // 404 (bytes unchanged for authenticated callers).
@@ -628,11 +665,6 @@ export async function handleRequest(
     const { route: matched, params } = match;
     const routePattern = matched.segments.join('/');
 
-    const denied = requireOperationId(
-        request, method, bearerExempt,
-    );
-    if (denied !== undefined) return denied;
-
     // Parse the request body when the method
     // has one. A malformed or non-object JSON
     // body is a client error (400), not a
@@ -645,8 +677,8 @@ export async function handleRequest(
         || method === 'PATCH'
     ) {
         const parse = method === 'PUT'
-            ? await parsePutBody(request)
-            : await parseObjectBody(request);
+            ? parsePutBody(ctx.bodyBytes)
+            : parseObjectBody(ctx.bodyBytes);
         if (!parse.ok) {
             return Response.json(
                 {
@@ -883,16 +915,6 @@ export async function handleRequest(
                     + routePattern,
                 );
             }
-            const operationId = request.headers.get(
-                OPERATION_ID_HEADER,
-            );
-            if (
-                operationId === null || operationId === ''
-            ) {
-                throw new Error(
-                    'Operation-ID missing after require',
-                );
-            }
             // DELETE table: never-written 404 stores nothing;
             // already-gone 204 no append; live PUT proceeds.
             if (method === 'DELETE') {
@@ -909,7 +931,7 @@ export async function handleRequest(
                     return new Response(null, {
                         status: HTTP_NO_CONTENT,
                         headers: {
-                            'Operation-ID': operationId,
+                            'Operation-ID': ctx.operationId,
                         },
                     });
                 }
@@ -923,7 +945,7 @@ export async function handleRequest(
                 requesterIdentityId: actor,
                 requestAt: ctx.requestAt,
                 organization,
-                operationId,
+                operationId: ctx.operationId,
                 responseStatus: spec.status,
                 ...(isDocumentPut && head === null
                     ? { genesis: true as const }
@@ -2001,6 +2023,10 @@ async function bodyWriteResponse(
     for (const [name, value] of headerFields ?? []) {
         headers[name] = value;
     }
+    const body = JSON.stringify(payload);
+    headers['content-length'] = String(
+        new TextEncoder().encode(body).byteLength,
+    );
     return handleRequest(
         adapter,
         new Request(
@@ -2008,7 +2034,7 @@ async function bodyWriteResponse(
             {
                 method,
                 headers,
-                body: JSON.stringify(payload),
+                body,
             },
         ),
     );
@@ -2292,6 +2318,10 @@ export async function POST<T>(
     for (const [name, value] of headerFields ?? []) {
         headers[name] = value;
     }
+    const body = JSON.stringify(payload);
+    headers['content-length'] = String(
+        new TextEncoder().encode(body).byteLength,
+    );
     return unwrapResponse<T>(
         await handleRequest(
             adapter,
@@ -2300,7 +2330,7 @@ export async function POST<T>(
                 {
                     method: 'POST',
                     headers,
-                    body: JSON.stringify(payload),
+                    body,
                 },
             ),
         ),

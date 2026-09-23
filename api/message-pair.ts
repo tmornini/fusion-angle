@@ -28,7 +28,7 @@ import {
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
 } from './family-registry.ts';
 import {
-    HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT, HTTP_BAD_REQUEST,
+    HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT,
     errorJson,
 } from './http-errors.ts';
 import type { NotificationEvent } from
@@ -172,41 +172,6 @@ export function canonicalPath(
 }
 
 export const OPERATION_ID_HEADER = 'operation-id';
-
-export function requireOperationId(
-    request: Request,
-    method: string,
-    bearerExempt: boolean,
-): Response | undefined {
-    if (bearerExempt) return undefined;
-    if (
-        method === 'GET' || method === 'HEAD'
-    ) {
-        return undefined;
-    }
-    const value = request.headers.get(
-        OPERATION_ID_HEADER,
-    );
-    if (value === null || value === '') {
-        return Response.json(
-            {
-                error: 'Operation-ID is required on '
-                    + method,
-            },
-            { status: HTTP_BAD_REQUEST },
-        );
-    }
-    if (!isIdentifier(value)) {
-        return Response.json(
-            {
-                error: 'Operation-ID must be a 22-'
-                    + 'character identifier',
-            },
-            { status: HTTP_BAD_REQUEST },
-        );
-    }
-    return undefined;
-}
 
 function headerFieldsWithOperationId(
     fields: readonly FieldLine[],

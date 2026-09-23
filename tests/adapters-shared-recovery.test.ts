@@ -65,6 +65,7 @@ import {
 import {
     apiRequest,
     refreshTokenFromSetCookie,
+    framedRequest,
 } from './http-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
@@ -161,7 +162,7 @@ async function issuePair(db: MemoryDbAdapter): Promise<{
     access_token: string; refresh_token: string;
 }> {
     await seedAuthorizationCodeMessagePair(db, 'the-code');
-    const res = await handleRequest(db, new Request(
+    const res = await handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -232,7 +233,7 @@ async function seedOrganizationAdmin(
 async function seedOrganizationDocument(
     db: MemoryDbAdapter, organization: string,
 ): Promise<void> {
-    await handleRequest(db, new Request(
+    await handleRequest(db, framedRequest(
         `${BASE}/organizations/${organization}`, {
             method: 'PUT',
             headers: {
