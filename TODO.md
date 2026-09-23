@@ -1479,18 +1479,6 @@ Off the critical path; each with its oracle.
   37-38`; examination report). Oracle: the sort
   helper takes the same string the keyed path does;
   a missing stamp throws
-- Gate Operation-ID non-reuse. The client mints one
-  Operation-ID per write (`writeHeaders` in
-  `web-app/app/adapters/shared.ts`); API.md item 3
-  says an Operation-ID names one write and is never
-  reused except a byte-identical retry. The server
-  does not enforce it: `operation_id uuid NOT NULL`
-  has no uniqueness (`api/schema-postgres.ts:23`),
-  and a read by operation id is neither a collection
-  nor a document read. Oracle: a second, different
-  request with a spent Operation-ID is 400; a
-  byte-identical retry still 200s; a PATCH and its
-  revision pair still share one id
 - Wipe and reseed live databases onto the exact-read
   shapes. Spec Decision 8: invitation `state` on the
   head, PII at `('/identities/<id>/', 'pii')`, token
