@@ -8,7 +8,10 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
-import { subscribeOnce } from '../app/channels.ts';
+import {
+    bindCrossTab,
+    subscribeOnce,
+} from '../app/channels.ts';
 import { handlePageLoadError } from '../app/page-loader.ts';
 import {
     ICON_SIZE,
@@ -41,6 +44,7 @@ let listEl: HTMLElement | null = null;
 let badgesEl: HTMLElement | null = null;
 
 export async function init(): Promise<void> {
+    const listen = bindCrossTab();
     const teamListEl = $required(
         '#ideas-list', document,
     );
@@ -66,9 +70,15 @@ export async function init(): Promise<void> {
                 $(
                     '#create-idea-btn', document,
                 )?.classList.add('hidden');
+                // Same-tab notify() paints subscribers of
+                // subscribeIdeaChanges. An empty list
+                // waits for another tab's bell instead,
+                // so a write in this tab does not wake it.
                 subscribeOnce(
-                    subscribeIdeaChanges, init,
-                    err => handlePageLoadError('ideas', err),
+                    listen, init,
+                    err => handlePageLoadError(
+                        'ideas', err,
+                    ),
                 );
             },
         },

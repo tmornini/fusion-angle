@@ -1,5 +1,6 @@
 import {
     postNotificationEvent,
+    subscribeNamedNotificationEvents,
     subscribeNotificationEvents,
 } from './adapters/broadcast-channel.ts';
 import {
@@ -74,55 +75,56 @@ function eventForThisTab(): NotificationEvent {
     }
 }
 
+// A full event always matches. A scoped event matches this
+// tab's active organization, a reachable org on a flat
+// session, or this tab's own identity. Unseeded means
+// neither org-scoped nor authenticated, so it cannot match;
+// return before the token read that would otherwise throw.
+function notificationMatchesSession(
+    event: NotificationEvent,
+): boolean {
+    if (event.kind === 'full') return true;
+    if (!sessionTokenIsSeeded()) return false;
+    try {
+        const principal =
+            principalFromToken(getSessionToken());
+        // Active org claim wins when present
+        // (post-exchange). A flat login token has only
+        // `organizations`; the message-plane fence still
+        // serves the default org, so match any
+        // reachable org the event names.
+        const organizationHit =
+            principal.organization !== undefined
+                ? event.organizationIds.includes(
+                    principal.organization,
+                )
+                : sessionIsAuthenticated()
+                    && (principal.organizations ?? [])
+                        .some(id =>
+                            event.organizationIds
+                                .includes(id));
+        const identityHit =
+            sessionIsAuthenticated()
+            && event.identityIds.includes(
+                principal.id,
+            );
+        return organizationHit || identityHit;
+    } catch {
+        return false;
+    }
+}
+
 export function createSubscriptionChannel(
 ): SubscriptionChannel {
     const channel = createChannel<void>();
-    // A full-refresh event always fires; otherwise a scoped
-    // event fires when it names this tab's active organization,
-    // a reachable org on a flat (un-exchanged) session, or this
-    // tab's own identity — the poster's own tab never hears the
-    // message, so it does not double-refresh. This subscription
-    // is wired at module load, before boot has seeded the
-    // session token — a scoped event from another tab can arrive
-    // first. Unseeded means neither org-scoped nor authenticated,
-    // so it cannot match; return before the token read that
-    // would otherwise throw.
+    // Wired at module load, before boot has seeded the
+    // session token — a scoped event from another tab can
+    // arrive first. The poster's own tab never hears its
+    // BroadcastChannel message, so notify() also sends
+    // locally; that local send is the same-tab paint.
     subscribeNotificationEvents((event) => {
-        if (event.kind === 'full') {
+        if (notificationMatchesSession(event)) {
             channel.send();
-            return;
-        }
-        if (!sessionTokenIsSeeded()) {
-            return;
-        }
-        try {
-            const principal =
-                principalFromToken(getSessionToken());
-            // Active org claim wins when present
-            // (post-exchange). A flat login token has only
-            // `organizations`; the message-plane fence still
-            // serves the default org, so match any
-            // reachable org the event names.
-            const organizationHit =
-                principal.organization !== undefined
-                    ? event.organizationIds.includes(
-                        principal.organization,
-                    )
-                    : sessionIsAuthenticated()
-                        && (principal.organizations ?? [])
-                            .some(id =>
-                                event.organizationIds
-                                    .includes(id));
-            const identityHit =
-                sessionIsAuthenticated()
-                && event.identityIds.includes(
-                    principal.id,
-                );
-            if (organizationHit || identityHit) {
-                channel.send();
-            }
-        } catch {
-            return;
         }
     });
     return {
@@ -133,6 +135,46 @@ export function createSubscriptionChannel(
         subscribe: (fn) =>
             channel.subscribe(fn),
     };
+}
+
+// A shimmed window may name a private bus. Absent, the
+// shared fusion-angle:data channel is the product bus.
+function privateDataChannel(): string | undefined {
+    if (typeof window === 'undefined') return undefined;
+    const name = (window as {
+        fusionAngleDataChannel?: unknown;
+    }).fusionAngleDataChannel;
+    return typeof name === 'string' && name !== ''
+        ? name
+        : undefined;
+}
+
+function crossTabSubscribe(
+    name: string | undefined,
+): (fn: () => void) => () => void {
+    return (fn) => {
+        const deliver = (
+            event: NotificationEvent,
+        ): void => {
+            if (notificationMatchesSession(event)) {
+                fn();
+            }
+        };
+        if (name === undefined) {
+            return subscribeNotificationEvents(deliver);
+        }
+        return subscribeNamedNotificationEvents(
+            name, deliver,
+        );
+    };
+}
+
+// Captures the bus synchronously. A later await must
+// not retarget the empty list onto another file's
+// window. Same-tab notify() is not on this bus.
+export function bindCrossTab(
+): (fn: () => void) => () => void {
+    return crossTabSubscribe(privateDataChannel());
 }
 
 // One-shot subscription: the first event tears the
