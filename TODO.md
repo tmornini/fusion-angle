@@ -75,7 +75,10 @@ skew tests, which went with item 8's trio.
    to it — same lines, same values, same body bytes — and
    the runtime must keep a `date` it is given
    (`Deno.serve` does: measured, 2.9.6), so the stamp
-   Postgres mints is the `date` the wire carries. A
+   Postgres mints is the `date` the wire carries — an
+   IMF-fixdate (RFC 9110 §5.6.7), the stamp at second
+   resolution, so the microsecond order lives in
+   `response_at` alone. A
    sibling PUT (item 1) sends nothing; its `response` is
    the message a read of it serves before the read's
    three substitutions. Secrets
