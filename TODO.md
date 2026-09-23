@@ -49,7 +49,13 @@ skew tests, which went with item 8's trio.
    and recomputed. `request` holds the entire request as
    received — start line, every header, and the body bytes
    exactly as received, never re-serialized — less its
-   credential lines, hoisted as below. A pair for which
+   credential lines, hoisted as below; the client sends
+   `user-agent: fusion-angle/<sha>` on every API request
+   — the build embeds the SHA in the bundle as in the
+   binary — so the ledger names the build that made each
+   request, and a browser that keeps its own token
+   instead (Layer 2 measures which) leaves that token
+   stored as received. A pair for which
    nothing was received (item 1's sibling PUTs) stores
    zero request bytes. `response` holds the entire
    response as sent, less its credential lines: the status
@@ -847,9 +853,20 @@ skew tests, which went with item 8's trio.
    the same history under a name that hides it. A
    migration's `request` is the SQL that ran —
    the whole definition for `0001-bootstrap`, the drops
-   and the new fence for a later one — and its `response`
+   and the new fence for a later one — as the body of a
+   PUT whose `user-agent` line names the build that ran
+   it, `fusion-angle/<sha>` (RFC 9110 §10.1.5; the build
+   embeds `git rev-parse HEAD`, having refused a dirty
+   tree), provenance the owner's `check` can report and
+   never the key; and its `response`
    is the digest of its fixed SQL, DDL and DML
-   alike: the root row's insert and the grants count, and
+   alike — `sha256` over the request body alone, the SQL
+   exactly as the binary holds it, UTF-8, statements in
+   run order joined as the module joins them, no
+   normalization, hex in the response body, so boot
+   digests its own strings the same way and the root's
+   is the digest of zero bytes —
+   the root row's insert and the grants count, and
    a seed's data pairs, which are parameters and vary by
    mode, do not. Item 2's fence does the rest: `fa_api`
    reads the digest and is refused the SQL, as it is every
@@ -955,8 +972,7 @@ skew tests, which went with item 8's trio.
    document has succession like any other, so a rollback
    can land as its DELETE head and a later system can
    annotate it without rewriting it — that bullet's to
-   settle. The brainstorm settles: the digest's exact
-   input; and what item 2 left open.
+   settle.
    Today: boot gates on
    the marker row (`assertSchemaMarker`,
    `server/postgres-gate.ts:67`, called at
