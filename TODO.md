@@ -543,7 +543,11 @@ skew tests, which went with item 8's trio.
    probe per document, where today's `DISTINCT ON`
    (`api/backend-postgres.ts:523-547`) reads every entry
    at the path, so its cost is every version of every
-   document there. Measured on 18.6, owner on the bare
+   document there. The walked heads are then sorted by
+   `response_at, id`, the order today's read serves
+   (`api/backend-postgres.ts:545`) — a small set — so the
+   contract and the memory backend stay as they are.
+   Measured on 18.6, owner on the bare
    table, 300-byte responses, medians of seven: 200
    documents at 10 / 250 / 2,500 versions read 0.51 /
    30.63 / 130.71 ms today and 1.11 / 1.43 / 1.93 ms by
@@ -649,11 +653,7 @@ skew tests, which went with item 8's trio.
    are read-only conveniences, and what each PUT
    response must say for its readers — is the spec's
    first section, written from the code as item 0
-   leaves it. The brainstorm settles: the
-   collection read's order — the skip walk yields names
-   in name order, today's read orders heads by stamp
-   (`api/backend-postgres.ts:545`), and pages may lean on
-   either. Merged: the API client, packageable (the
+   leaves it. Merged: the API client, packageable (the
    critical functionality path), which keeps its
    oracle. Follows item 0.
 2. The ledger fenced — roles, grants, and row policies, on
