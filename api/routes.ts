@@ -1085,9 +1085,19 @@ async function recordRowsToSubmit(
             changedPuts.push(pair);
         }
     }
+    // A DELETE whose head is already DELETE matches and
+    // would drop the puts beside it. Leave that one out
+    // when another row changes. A pure resend still
+    // submits it, so the statement matches.
+    const pendingDeletes: MessagePair[] = [];
+    for (const pair of formed.attributeDeletes) {
+        if (!(await deleteAlreadyApplied(db, pair))) {
+            pendingDeletes.push(pair);
+        }
+    }
     const hasChange = recordChanged
         || changedPuts.length > 0
-        || formed.attributeDeletes.length > 0;
+        || pendingDeletes.length > 0;
     const rows = [formed.operation];
     if (recordChanged || !hasChange) {
         rows.push(formed.document);
@@ -1095,8 +1105,20 @@ async function recordRowsToSubmit(
     rows.push(...(hasChange
         ? changedPuts
         : formed.attributePuts));
-    rows.push(...formed.attributeDeletes);
+    rows.push(...(hasChange
+        ? pendingDeletes
+        : formed.attributeDeletes));
     return rows;
+}
+
+async function deleteAlreadyApplied(
+    db: DbAdapter,
+    pair: MessagePair,
+): Promise<boolean> {
+    const head = await db.messagePairs.getHeadPair(
+        pair.path, pair.name,
+    );
+    return head !== null && head.method === 'DELETE';
 }
 
 // Record creation or edit, discriminated by payload.kind.
@@ -1458,6 +1480,29 @@ export interface FlowCreationMessagePairs {
 // route uses (Decision 6's below-facade carve-out). `messagePairs`
 // is optional so the seed's below-facade call keeps
 // compiling; the route always supplies the triple.
+// An unchanged document is left out when the join
+// changes. A resend of every body is what matches.
+async function flowRowsToSubmit(
+    db: DbAdapter,
+    formed: FlowCreationMessagePairs,
+): Promise<MessagePair[]> {
+    const documentChanged = await requestDiffers(
+        db, formed.document,
+    );
+    const joinChanged = await requestDiffers(
+        db, formed.join,
+    );
+    const hasChange = documentChanged || joinChanged;
+    const rows = [formed.operation];
+    if (documentChanged || !hasChange) {
+        rows.push(formed.document);
+    }
+    if (joinChanged || !hasChange) {
+        rows.push(formed.join);
+    }
+    return rows;
+}
+
 export async function postFlowCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
@@ -1465,21 +1510,13 @@ export async function postFlowCreationOp(
     messagePairs?: FlowCreationMessagePairs,
 ): Promise<void> {
     validateFlowCreateBody(body);
+    const rows = messagePairs === undefined
+        ? undefined
+        : await flowRowsToSubmit(db, messagePairs);
     return db.transaction(async (view) => {
-            // Three pairs or none (Atomicity): the operation
-            // message pair (the gate's own), the synthesized
-            // document message pair, and the synthesized join
-            // pair — appended in that order, LAST, so the
-            // document message pair's response `at` strictly
-            // follows the operation message pair's.
-            if (messagePairs !== undefined) {
-                const pairs = [
-                    messagePairs.operation,
-                    messagePairs.document,
-                    messagePairs.join,
-                ];
+            if (rows !== undefined) {
                 await runWrite(
-                    view, attemptFor(pairs), pairs,
+                    view, attemptFor(rows), rows,
                 );
             }
         },
@@ -1945,10 +1982,9 @@ export interface WorkOrderCreationMessagePairs {
 // postFlowWorkOrderDocumentOp instead; states traces stay
 // direct until the states-trace group. The route always
 // supplies the triple and forms all three pairs pre-tx.
-// A second create keeps the first document when that
-// body is unchanged, and still submits the new join
-// and the new claim. A resend of every body submits
-// them, matches, and stores nothing.
+// An unchanged document, join, or claim is left out
+// when another row changes. A resend of every body
+// is what matches, and the statement stores nothing.
 async function workOrderRowsToSubmit(
     db: DbAdapter,
     formed: WorkOrderCreationMessagePairs,
@@ -3234,7 +3270,13 @@ export const WRITE_RESPONSE_SPECS:
                 body: withoutId(body ?? {}),
             }),
     },
-    'organizations/:id/flows/': { status: HTTP_NO_CONTENT },
+    'organizations/:id/flows/': {
+        status: HTTP_NO_CONTENT,
+        // The receipt shares the document name. An empty
+        // body matches a DELETE tombstone, so a recreate
+        // would store nothing.
+        successBody: (_params, body) => body ?? {},
+    },
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody — see the ideas/:id
     // entry above for the shared rationale. flows/:id is the
@@ -3252,6 +3294,10 @@ export const WRITE_RESPONSE_SPECS:
     // (Phase 15 Task 7): ZERO seed pairs at those documents.
     'organizations/:id/work-orders/': {
         status: HTTP_NO_CONTENT,
+        // The receipt shares the document name. An empty
+        // body matches a DELETE tombstone, so a recreate
+        // would store nothing.
+        successBody: (_params, body) => body ?? {},
     },
     'organizations/:id/work-orders/:id':
         documentWriteResponseSpec(WORK_ORDERS_WIRING),
@@ -3282,6 +3328,10 @@ export const WRITE_RESPONSE_SPECS:
     // document + attribute pairs form at nested documents.
     [RECORD_TYPES_COLLECTION_PATTERN]: {
         status: HTTP_NO_CONTENT,
+        // The receipt shares the document name. An empty
+        // body matches a DELETE tombstone, so a recreate
+        // would store nothing.
+        successBody: (_params, body) => body ?? {},
     },
     // Nested record-types detail (Task 3): put-only per-verb
     // entry. Id is param 1 (:record-type-id); organization_id

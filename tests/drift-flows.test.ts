@@ -857,6 +857,57 @@ async () => {
     );
 });
 
+Deno.test('duplicate-create with an unchanged document'
++ ' keeps one head and lands the new join', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const flowId = generateIdentifier();
+    const projectId = l2cProjectId;
+    const pfidA = generateIdentifier();
+    const pfidB = generateIdentifier();
+    const eventId = generateIdentifier();
+
+    const first = await createFlow(
+        db, token, flowId, pfidA, projectId, eventId,
+    );
+    assertStrictEquals(first.status, 201);
+    const second = await createFlow(
+        db, token, flowId, pfidB, projectId, eventId,
+    );
+    assertStrictEquals(second.status, 201);
+
+    const flowPrefix = '/organizations/'
+        + STARK_ORGANIZATION + '/flows/';
+    const documents = (await db.messagePairs.getAll())
+        .filter((row) =>
+            row.path === flowPrefix
+            && row.name === flowId
+            && row.method === 'PUT'
+        );
+    assertStrictEquals(documents.length, 1);
+    assertStrictEquals(
+        (await deriveFlowStateHistory(
+            db, STARK_ORGANIZATION, flowId,
+        )).length,
+        1,
+    );
+
+    const joinsRes = await handleRequest(db, req(
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + projectId + '/flows/', token,
+    ));
+    const wireJoins = (await joinsRes.json() as {
+        id: string;
+    }[]).filter(
+        (row) => row.id === pfidA || row.id === pfidB,
+    );
+    const derivedJoins = (await deriveProjectFlows(
+        db, STARK_ORGANIZATION, projectId,
+    )).filter((row) => row.id === pfidA || row.id === pfidB);
+    assertStrictEquals(wireJoins.length, 2);
+    assertStrictEquals(derivedJoins.length, 2);
+});
+
 // -- 9. the create-op POST pair is never the derived head -----
 
 Deno.test('the create-op POST pair is not read as a document'
