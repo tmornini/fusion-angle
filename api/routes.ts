@@ -1008,6 +1008,97 @@ export function nestedAttributeWireOf(
     };
 }
 
+// One formed row against the document already stored.
+// No head means the row is new. Field equality is the
+// caller's edit, read before the statement opens.
+async function requestDiffers(
+    db: DbAdapter,
+    pair: MessagePair,
+): Promise<boolean> {
+    const head = await messageStore(db).getDocumentHead(
+        pair.path, pair.name,
+    );
+    if (head === null) return true;
+    return !sameValue(
+        requestBodyOf(head.request),
+        requestBodyOf(pair.requestMessage),
+    );
+}
+
+function sameValue(left: unknown, right: unknown): boolean {
+    if (Object.is(left, right)) return true;
+    if (
+        typeof left !== 'object'
+        || typeof right !== 'object'
+        || left === null
+        || right === null
+    ) {
+        return false;
+    }
+    if (Array.isArray(left) || Array.isArray(right)) {
+        if (
+            !Array.isArray(left)
+            || !Array.isArray(right)
+        ) {
+            return false;
+        }
+        if (left.length !== right.length) return false;
+        for (let i = 0; i < left.length; i++) {
+            if (!sameValue(left[i], right[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+    const leftRecord = left as Record<string, unknown>;
+    const rightRecord = right as Record<string, unknown>;
+    const keys = Object.keys(leftRecord);
+    if (keys.length !== Object.keys(rightRecord).length) {
+        return false;
+    }
+    for (const key of keys) {
+        if (!Object.hasOwn(rightRecord, key)) {
+            return false;
+        }
+        if (!sameValue(leftRecord[key], rightRecord[key])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// The statement stores nothing when any submitted row
+// matches. Submit the record document only when its
+// fields differ, and an attribute put only when that
+// attribute differs. A resend submits the unchanged
+// rows, matches, and stores nothing.
+async function recordRowsToSubmit(
+    db: DbAdapter,
+    formed: RecordWriteMessagePairs,
+): Promise<MessagePair[]> {
+    const recordChanged = await requestDiffers(
+        db, formed.document,
+    );
+    const changedPuts: MessagePair[] = [];
+    for (const pair of formed.attributePuts) {
+        if (await requestDiffers(db, pair)) {
+            changedPuts.push(pair);
+        }
+    }
+    const hasChange = recordChanged
+        || changedPuts.length > 0
+        || formed.attributeDeletes.length > 0;
+    const rows = [formed.operation];
+    if (recordChanged || !hasChange) {
+        rows.push(formed.document);
+    }
+    rows.push(...(hasChange
+        ? changedPuts
+        : formed.attributePuts));
+    rows.push(...formed.attributeDeletes);
+    return rows;
+}
+
 // Record creation or edit, discriminated by payload.kind.
 // Phase Final Task 2: records + record_attributes ROW halves
 // stripped — attributes/record body ride the operation +
@@ -1034,9 +1125,11 @@ export async function postRecordWriteOp(
         body.kind === 'edit'
             ? body.removedAttributeIds
             : [];
-    // State event + RESTRICT + pairs commit as one
-    // transaction. Attribute bodies live only on the
-    // message plane (attributePuts/attributeDeletes).
+    // Choose rows before the transaction. RESTRICT and
+    // the statement then commit as one transaction.
+    const rows = messagePairs === undefined
+        ? undefined
+        : await recordRowsToSubmit(db, messagePairs);
     await db.transaction(async (view) => {
             // Phase Final Task 2: states ROW half stripped —
             // document/attribute pairs alone carry truth.
@@ -1066,22 +1159,9 @@ export async function postRecordWriteOp(
                     }
                 }
             }
-            // The whole bundle or none (Atomicity): the
-            // operation message pair, the document message pair, N attribute-
-            // PUT pairs, and M attribute-DELETE pairs — appended
-            // LAST, in that order, so each pair's response `at`
-            // strictly follows the one before it (nowUtc
-            // monotonicity) and the document message pair becomes the
-            // shared document's head.
-            if (messagePairs !== undefined) {
-                const pairs = [
-                    messagePairs.operation,
-                    messagePairs.document,
-                    ...messagePairs.attributePuts,
-                    ...messagePairs.attributeDeletes,
-                ];
+            if (rows !== undefined) {
                 await runWrite(
-                    view, attemptFor(pairs), pairs,
+                    view, attemptFor(rows), rows,
                 );
             }
         },
@@ -1865,6 +1945,39 @@ export interface WorkOrderCreationMessagePairs {
 // postFlowWorkOrderDocumentOp instead; states traces stay
 // direct until the states-trace group. The route always
 // supplies the triple and forms all three pairs pre-tx.
+// A second create keeps the first document when that
+// body is unchanged, and still submits the new join
+// and the new claim. A resend of every body submits
+// them, matches, and stores nothing.
+async function workOrderRowsToSubmit(
+    db: DbAdapter,
+    formed: WorkOrderCreationMessagePairs,
+): Promise<MessagePair[]> {
+    const documentChanged = await requestDiffers(
+        db, formed.document,
+    );
+    const joinChanged = await requestDiffers(
+        db, formed.join,
+    );
+    const claimChanged = await requestDiffers(
+        db, formed.claim,
+    );
+    const hasChange = documentChanged
+        || joinChanged
+        || claimChanged;
+    const rows = [formed.operation];
+    if (documentChanged || !hasChange) {
+        rows.push(formed.document);
+    }
+    if (joinChanged || !hasChange) {
+        rows.push(formed.join);
+    }
+    if (claimChanged || !hasChange) {
+        rows.push(formed.claim);
+    }
+    return rows;
+}
+
 export async function postWorkOrderCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
@@ -1872,23 +1985,16 @@ export async function postWorkOrderCreationOp(
     messagePairs?: WorkOrderCreationMessagePairs,
 ): Promise<void> {
     validateWorkOrderCreateBody(body);
+    const rows = messagePairs === undefined
+        ? undefined
+        : await workOrderRowsToSubmit(db, messagePairs);
     return db.transaction(
         // Phase Final Task 2: work_orders + flow_work_orders
         // ROW halves stripped.
         async (view) => {
-            // Four pairs or none (Atomicity): operation,
-            // document, join, and the genesis claim
-            // document so DELETE /claim can release the
-            // creation-time claim.
-            if (messagePairs !== undefined) {
-                const pairs = [
-                    messagePairs.operation,
-                    messagePairs.document,
-                    messagePairs.join,
-                    messagePairs.claim,
-                ];
+            if (rows !== undefined) {
                 await runWrite(
-                    view, attemptFor(pairs), pairs,
+                    view, attemptFor(rows), rows,
                 );
             }
         },

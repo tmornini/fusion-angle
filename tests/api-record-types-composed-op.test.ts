@@ -335,8 +335,8 @@ async () => {
     );
 });
 
-Deno.test('composed edit with an unchanged record '
-+ 'stores nothing',
+Deno.test('composed edit carries each stored ACL forward '
++ '— a rename never resets a restriction',
 async () => {
     const { db, adminToken } = await adminDb();
     const attr2Id = generateIdentifier();
@@ -372,11 +372,6 @@ async () => {
     ));
     assertStrictEquals(restrict.status, 201);
 
-    // The record body is the head. Priority's stored
-    // ACL, the Notes rename, and Serial's genesis are
-    // siblings of that match.
-    const before =
-        (await db.messagePairs.getAll()).length;
     const edit = await handleRequest(db, apiRequest({
         method: 'POST',
         path: COLLECTION,
@@ -427,17 +422,7 @@ async () => {
             removedAttributeIds: [],
         },
     }));
-    assertStrictEquals(edit.status, 200);
-    const answered: unknown = await edit.json();
-    assertStrictEquals(
-        (await db.messagePairs.getAll()).length,
-        before,
-    );
-    const typeGet = await handleRequest(db, req(
-        'GET', DETAIL, adminToken,
-    ));
-    assertStrictEquals(typeGet.status, 200);
-    assertEquals(answered, await typeGet.json());
+    assertStrictEquals(edit.status, 201);
 
     const restricted = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
@@ -455,21 +440,45 @@ async () => {
         restrictedRow.write_roles, ['admin'],
     );
 
-    const notes = await handleRequest(db, req(
+    const renamed = await handleRequest(db, req(
         'GET',
         DETAIL + '/attributes/' + attr2Id,
         adminToken,
     ));
-    assertStrictEquals(notes.status, 200);
-    const notesRow = await notes.json() as {
+    assertStrictEquals(renamed.status, 200);
+    const renamedRow = await renamed.json() as {
         name: string;
+        read_roles: string[];
+        write_roles: string[];
     };
-    assertStrictEquals(notesRow.name, 'Notes');
+    assertStrictEquals(renamedRow.name, 'Notes v2');
+    assertEquals(
+        renamedRow.read_roles,
+        ['member', 'admin'],
+    );
+    assertEquals(
+        renamedRow.write_roles,
+        ['member', 'admin'],
+    );
 
     const born = await handleRequest(db, req(
         'GET',
         DETAIL + '/attributes/' + attr3Id,
         adminToken,
     ));
-    assertStrictEquals(born.status, 404);
+    assertStrictEquals(born.status, 200);
+    const bornRow = await born.json() as {
+        name: string;
+        read_roles: string[];
+        write_roles: string[];
+    };
+    assertStrictEquals(bornRow.name, 'Serial');
+    assertEquals(
+        bornRow.read_roles,
+        ['member', 'admin'],
+    );
+    assertEquals(
+        bornRow.write_roles,
+        ['member', 'admin'],
+    );
 });

@@ -121,19 +121,16 @@ Deno.test(
 );
 
 Deno.test(
-    'postRecordChange edit of an unchanged'
-    + ' record stores nothing',
+    'postRecordChange edit replaces removed'
+    + ' attributes with new ones',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(
-            db, await organizationToken(),
-        );
-        const recordId = 'rbfHGatkwQzGZJVXKJEeyw';
+        const ctx = createRequestContext(db, await organizationToken());
         const oldAttrId = generateIdentifier();
         const newAttrId = generateIdentifier();
-        await postRecordChange(ctx, recordId, {
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
                 name: 'R', description: '',
@@ -142,7 +139,7 @@ Deno.test(
             attributes: [
                 {
                     id: oldAttrId,
-                    record_id: recordId,
+                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
                     name: 'Old',
                     attribute_type: 'text',
                     sort_order: 0,
@@ -152,13 +149,10 @@ Deno.test(
             ],
             initialState: 'active',
         });
-        // Echo the create's own known head. The new
-        // attribute and the removal are siblings of
-        // that match, so the statement stores nothing.
-        const head = await getRecordModel(ctx, recordId);
-        const before =
-            (await db.messagePairs.getAll()).length;
-        await postRecordChange(ctx, recordId, {
+        // Echo the create's own known head from the GET row
+        // — never a fresh mint (RecordChangeEdit).
+        const head = await getRecordModel(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'edit',
             record: {
                 name: 'R', description: '',
@@ -167,7 +161,7 @@ Deno.test(
             attributes: [
                 {
                     id: newAttrId,
-                    record_id: recordId,
+                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
                     name: 'New',
                     attribute_type: 'text',
                     sort_order: 0,
@@ -178,26 +172,15 @@ Deno.test(
             state: head.stateValue(),
             removedAttributeIds: [oldAttrId],
         });
-        assertStrictEquals(
-            (await db.messagePairs.getAll()).length,
-            before,
-        );
-        const after = await getRecord(ctx, recordId);
-        assertStrictEquals(after.name, 'R');
-        assertStrictEquals(after.description, '');
-        assertStrictEquals(
-            after.state, head.stateValue(),
-        );
         const attrs = await ctx.GET<
-            { id: string; name: string }[]
+            { id: string }[]
         >(
-            'organizations/AjdvjuECVZEgZoFajaIEkg'
-                + '/record-types/' + recordId
-                + '/attributes/',
+            'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                + 'rbfHGatkwQzGZJVXKJEeyw'
+            + '/attributes/',
         );
         assertStrictEquals(attrs.length, 1);
-        assertStrictEquals(attrs[0]!.id, oldAttrId);
-        assertStrictEquals(attrs[0]!.name, 'Old');
+        assertStrictEquals(attrs[0]!.id, newAttrId);
     },
 );
 
