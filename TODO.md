@@ -1084,7 +1084,9 @@ skew tests, which went with item 8's trio.
    object, and an
    error as three values (the Office of Structured
    Observability wants one document with level, message,
-   and request identity). One request clock, read once
+   and request identity, and never a credential line:
+   item 0's hoist is the store's rule, and the log is a
+   second writer). One request clock, read once
    at arrival and carried in the context: the request
    log stamps `Date.now()` at accept
    (`server/http-server.ts`) while `request_at` is
