@@ -87,7 +87,7 @@ export function organizationItem(
 }
 
 export interface RequestContext {
-    readonly requestId: string;
+    readonly operationId: string;
     readonly identity: Principal;
     GET<T>(resource: string): Promise<T>;
     // Body plus strong ETag (quotes stripped) for If-Match.
@@ -163,6 +163,19 @@ function makeRequestContext(
     token: string,
     recover: boolean,
 ): RequestContext {
+    // One id for this operation. Recovery reuses it;
+    // no other site mints one.
+    return openRequestContext(
+        adapter, token, recover, generateIdentifier(),
+    );
+}
+
+function openRequestContext(
+    adapter: ClientFacade,
+    token: string,
+    recover: boolean,
+    operationId: string,
+): RequestContext {
     const identity = token === ''
         ? guestPrincipal()
         : principalFromToken(token);
@@ -173,15 +186,11 @@ function makeRequestContext(
     ): Promise<T> {
         return recover
             ? withAuthRecovery(
-                adapter, token, identity.organization, make)
+                adapter, token, identity.organization,
+                operationId, make)
             : make(token);
     }
 
-    // One vessel id for the whole client request: reportFault
-    // logs it, and every wire verb carries it as
-    // REQUEST_ID_HEADER so the server gate reuses it instead
-    // of minting a second, unrelated trace.
-    const requestId = generateIdentifier();
     function writeHeaders(
         extra?:
             readonly (readonly [string, string])[],
@@ -192,27 +201,29 @@ function makeRequestContext(
             return extra;
         }
         return [
-            [OPERATION_ID_HEADER, generateIdentifier()],
+            [OPERATION_ID_HEADER, operationId],
             ...(extra ?? []),
         ];
     }
     const ctx: RequestContext = {
-        requestId,
+        operationId,
         identity,
         GET: <T>(resource: string) => {
             recordApiRequest('GET', resource);
+            const headers = writeHeaders();
             return run<T>(tok => verbs.GET<T>(
-                resource, tok, requestId,
+                resource, tok, headers,
             ));
         },
         GETWithEtag: <T>(resource: string) => {
             recordApiRequest('GET', resource);
+            const headers = writeHeaders();
             return run<{
                 body: T;
                 etag: string | undefined;
             }>(
                 tok => verbs.GETWithEtag<T>(
-                    resource, tok, requestId,
+                    resource, tok, headers,
                 ),
             );
         },
@@ -226,8 +237,7 @@ function makeRequestContext(
             const headers = writeHeaders(headerFields);
             return run<T>(
                 tok => verbs.PUT<T>(
-                    resource, body, tok,
-                    headers, requestId,
+                    resource, body, tok, headers,
                 ));
         },
         PUTWithEtag: <T>(
@@ -243,8 +253,7 @@ function makeRequestContext(
                 etag: string | undefined;
             }>(
                 tok => verbs.PUTWithEtag<T>(
-                    resource, body, tok,
-                    headers, requestId,
+                    resource, body, tok, headers,
                 ),
             );
         },
@@ -258,8 +267,7 @@ function makeRequestContext(
             const headers = writeHeaders(headerFields);
             return run<T>(
                 tok => verbs.PATCH<T>(
-                    resource, body, tok,
-                    headers, requestId,
+                    resource, body, tok, headers,
                 ));
         },
         PATCHWithEtag: <T>(
@@ -275,8 +283,7 @@ function makeRequestContext(
                 etag: string | undefined;
             }>(
                 tok => verbs.PATCHWithEtag<T>(
-                    resource, body, tok,
-                    headers, requestId,
+                    resource, body, tok, headers,
                 ),
             );
         },
@@ -285,8 +292,7 @@ function makeRequestContext(
             const headers = writeHeaders();
             return run<void>(
                 tok => verbs.DELETE(
-                    resource, tok, requestId,
-                    headers,
+                    resource, tok, headers,
                 ));
         },
         POST: <T>(
@@ -297,8 +303,7 @@ function makeRequestContext(
             const headers = writeHeaders();
             return run<T>(
                 tok => verbs.POST<T>(
-                    resource, body, tok,
-                    requestId, headers,
+                    resource, body, tok, headers,
                 ));
         },
         POSTWithHeaders: <T>(
@@ -311,8 +316,7 @@ function makeRequestContext(
             const headers = writeHeaders(headerFields);
             return run<T>(
                 tok => verbs.POST<T>(
-                    resource, body, tok,
-                    requestId, headers,
+                    resource, body, tok, headers,
                 ));
         },
     };
@@ -355,8 +359,11 @@ let recoveryInFlight: Promise<string | null> | null = null;
 function sharedRecovery(
     adapter: ClientFacade,
     requestOrganization: Id | undefined,
+    operationId: string,
 ): Promise<string | null> {
-    recoveryInFlight ??= recoverSession(adapter, requestOrganization)
+    recoveryInFlight ??= recoverSession(
+        adapter, requestOrganization, operationId,
+    )
         .finally(() => {
             recoveryInFlight = null;
         });
@@ -375,6 +382,7 @@ async function withAuthRecovery<T>(
     adapter: ClientFacade,
     token: string,
     requestOrganization: Id | undefined,
+    operationId: string,
     make: (tok: string) => Promise<T>,
 ): Promise<T> {
     try {
@@ -383,8 +391,9 @@ async function withAuthRecovery<T>(
         if (!(err instanceof UnauthorizedError)) {
             throw err;
         }
-        const recovered =
-            await sharedRecovery(adapter, requestOrganization);
+        const recovered = await sharedRecovery(
+            adapter, requestOrganization, operationId,
+        );
         if (recovered === null) {
             throw err;   // unrefreshable — already redirected
         }
@@ -408,6 +417,7 @@ async function withAuthRecovery<T>(
 async function recoverSession(
     adapter: ClientFacade,
     requestOrganization: Id | undefined,
+    operationId: string,
 ): Promise<string | null> {
     let creds: SessionCredentials | null;
     try {
@@ -434,7 +444,8 @@ async function recoverSession(
     // recoverable unscoped read.
     if (decision.kind === 'install') {
         return installAndScope(
-            adapter, decision.accessToken, requestOrganization);
+            adapter, decision.accessToken,
+            requestOrganization, operationId);
     }
     if (isCookieSession()) {
         // HttpFacade already single-flights the cookie
@@ -449,12 +460,12 @@ async function recoverSession(
         return null;
     }
     const access = await refreshCredentials(
-        adapter, decision.refreshToken);
+        adapter, decision.refreshToken, operationId);
     if (access === null) {
         return null;
     }
     return installAndScope(
-        adapter, access, requestOrganization);
+        adapter, access, requestOrganization, operationId);
 }
 
 // Install a flat token as the session and re-scope it to the active
@@ -470,11 +481,13 @@ async function installAndScope(
     adapter: ClientFacade,
     flatToken: string,
     requestOrganization: Id | undefined,
+    operationId: string,
 ): Promise<string | null> {
     putSessionToken(flatToken);
     try {
         await rescopeToActiveOrganization(
-            adapter, flatToken, requestOrganization);
+            adapter, flatToken, requestOrganization,
+            operationId);
     } catch (err) {
         if (err instanceof UnauthorizedError) {
             deleteSessionCredentials();
@@ -488,15 +501,20 @@ async function installAndScope(
 
 // Run the refresh grant on a recovery-FREE context: a refresh
 // that itself 401s (reuse/expiry) is terminal and must not
-// recurse. A dead refresh scrubs the session and bounces.
+// recurse. The free context reuses the failing operation id
+// rather than minting another. A dead refresh scrubs the
+// session and bounces.
 async function refreshCredentials(
     adapter: ClientFacade,
     refreshToken: string,
+    operationId: string,
 ): Promise<string | null> {
     const token = sessionTokenIsSeeded()
         ? getSessionToken()
         : '';
-    const free = createRequestContext(adapter, token);
+    const free = openRequestContext(
+        adapter, token, false, operationId,
+    );
     try {
         const access = await runSingleFlightRefresh(
             async () => {
@@ -543,8 +561,11 @@ async function rescopeToActiveOrganization(
     adapter: ClientFacade,
     flatToken: string,
     requestOrganization: Id | undefined,
+    operationId: string,
 ): Promise<void> {
-    const ctx = createRequestContext(adapter, flatToken);
+    const ctx = openRequestContext(
+        adapter, flatToken, false, operationId,
+    );
     // Overlap independent rescope reads. Named delta: the
     // default-organization read now fires (and can surface
     // errors)

@@ -20,6 +20,9 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const BASE = 'http://localhost';
 
@@ -117,7 +120,7 @@ async () => {
             at: '2021-01-01T00:00:00.000000Z',
         },
         await devToken(),
-    );
+        operationIdHeader());
     // Still admitted — revocation bites at next mint/exchange.
     assertEquals(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', live),
@@ -145,7 +148,7 @@ Deno.test('a token minted within a revocation second still'
             + 'rOEPOcVMQdJiiiMuiiEhlg',
         { identity_id: 'XXZruirZyAOoRpNxaDnpSA', at: revokedAt },
         await devToken(),
-    );
+        operationIdHeader());
     const rows = await GET<unknown[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', sameSecond,
     );
@@ -166,7 +169,7 @@ Deno.test('a jti revoked in the ledger still admits the access'
             at: '2026-01-01T00:00:00.000000Z',
         },
         await devToken(),
-    );
+        operationIdHeader());
     await PUT(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + revokedJti,
         {
@@ -176,7 +179,7 @@ Deno.test('a jti revoked in the ledger still admits the access'
             at: '2026-02-01T00:00:00.000000Z',
         },
         await devToken(),
-    );
+        operationIdHeader());
     const rows = await GET<unknown[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', await devToken(),
     );

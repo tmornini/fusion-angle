@@ -8,6 +8,9 @@ import { firstProviderModel } from './member-fixtures.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 function req(
     method: string, path: string, token: string,
@@ -66,7 +69,8 @@ Deno.test('a flow write with an AI agent id in memberIds'
     const db = await freshDb();
     const token = await organizationToken();
     await PUT(db, 'ai-agents/UuvoBhQJUSEsiJwscXPkUg',
-        agentFields('Bot'), token);
+        agentFields('Bot'), token,
+        operationIdHeader());
     const { DEFAULT_LOCK_TIMEOUT } = await import(
         '../api/types.ts'
     );

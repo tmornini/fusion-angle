@@ -37,6 +37,9 @@ import {
 } from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const FIELD_VALUE_ID = generateIdentifier();
 const CLAIM_EVENT_ID = generateIdentifier();
@@ -80,7 +83,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             position: 1,
         },
         DEV_TOKEN,
-    );
+        operationIdHeader());
     return db;
 }
 
@@ -137,7 +140,7 @@ Deno.test(
                 transitionAt: nowUtc(),
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         const events = await eventsFor(db);
         assertStrictEquals(events.length, 1);
         assertStrictEquals(events[0]!.state, 'n-next');
@@ -163,7 +166,7 @@ Deno.test(
                 state: 'active',
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         await PUT(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rbfHGatkwQzGZJVXKJEeyw'
@@ -177,7 +180,7 @@ Deno.test(
                 write_roles: ['member', 'admin'],
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         await appendLegacyTransition(db, {
             transitionEventId: TRANSITION_EVENT_ID,
             targetState: 'n-next',
@@ -233,7 +236,7 @@ Deno.test(
                 expireAt: claimAt,
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         // Mint transitionAt before release.at so the
         // at-ordered log matches route post order.
         const transitionAt = nowUtc();
@@ -251,7 +254,7 @@ Deno.test(
                 transitionAt,
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         const events = await eventsFor(db);
         assertEquals(
             events.map(ev => ev.state),
@@ -276,7 +279,7 @@ Deno.test(
                 transitionAt: nowUtc(),
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         const events = await eventsFor(db);
         assertStrictEquals(events.length, 1);
         assertStrictEquals(
@@ -351,7 +354,7 @@ Deno.test(
                     surprise: true,
                 },
                 DEV_TOKEN,
-            ),
+                operationIdHeader()),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 400);
@@ -378,7 +381,7 @@ Deno.test(
                 state: 'active',
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         await PUT(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rbfHGatkwQzGZJVXKJEeyw'
@@ -392,7 +395,7 @@ Deno.test(
                 write_roles: ['member', 'admin'],
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         await assertRejects(
             () => appendLegacyTransition(db, {
                 transitionEventId: 'te1',
@@ -463,7 +466,7 @@ Deno.test(
                 transitionAt: callerAt,
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         const events = await eventsFor(db);
         assertStrictEquals(events.length, 1);
         assertStrictEquals(events[0]!.state, 'n-next');
@@ -486,7 +489,7 @@ Deno.test(
                 expireAt: claimAt,
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         // Far-future values to distinguish caller-minted
         // from a server-generated nowUtc().
         const transitionAt = '2099-01-01T00:00:00.000000Z';
@@ -504,7 +507,7 @@ Deno.test(
                 transitionAt,
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         const events = await eventsFor(db);
         // events: claimed, n-next, claim_released
         assertStrictEquals(events[1]!.state, 'n-next');

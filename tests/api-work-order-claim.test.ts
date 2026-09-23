@@ -33,6 +33,9 @@ import { workOrderClaimHistoryFor } from
     '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 function req(
     method: string,
@@ -90,7 +93,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             position: 1,
         },
         DEV_TOKEN,
-    );
+        operationIdHeader());
     return db;
 }
 
@@ -124,7 +127,7 @@ Deno.test('a fresh claim appends one claimed event', async () => {
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim',
         freshClaimBody(), DEV_TOKEN,
-    );
+        operationIdHeader());
     const events = await claimEventsFor(db);
     assertStrictEquals(events.length, 1);
     assertStrictEquals(events[0]!.state, 'claimed');
@@ -139,12 +142,12 @@ Deno.test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             freshClaimBody(), DEV_TOKEN,
-        );
+            operationIdHeader());
         await PUT(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             freshClaimBody(), DEV_TOKEN,
-        );
+            operationIdHeader());
         const events = await claimEventsFor(db);
         assertStrictEquals(events.length, 1);
         assertStrictEquals(events[0]!.state, 'claimed');
@@ -164,13 +167,13 @@ Deno.test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             freshClaimBody(), await devToken(OTHER),
-        );
+            operationIdHeader());
         const err = await assertRejects(
             () => PUT(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                     + 'yNSSnbrpacodQTzUEcdEVA/claim',
                 freshClaimBody(), DEV_TOKEN,
-            ),
+                operationIdHeader()),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);
@@ -199,12 +202,12 @@ Deno.test(
                 expireAt: '2020-01-01T00:00:00.000000Z',
             },
             await devToken(OTHER),
-        );
+            operationIdHeader());
         await PUT(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             freshClaimBody(), DEV_TOKEN,
-        );
+            operationIdHeader());
         const events = await claimEventsFor(db);
         assertEquals(
             events.map(ev => ev.state),
@@ -235,12 +238,12 @@ Deno.test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             freshClaimBody(), await devToken(OTHER),
-        );
+            operationIdHeader());
         await DELETE(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             await devToken(OTHER),
-        );
+            operationIdHeader());
         // 'XXZruirZyAOoRpNxaDnpSA's fresh claim succeeds THROUGH THE LIVE
         // GATE — a foreign live claim would 409 here (see the
         // sibling test above), so success alone proves the
@@ -249,7 +252,7 @@ Deno.test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             freshClaimBody(), DEV_TOKEN,
-        );
+            operationIdHeader());
         const events = await claimEventsFor(db);
         assertEquals(
             events.map(ev => ev.state),
@@ -279,7 +282,7 @@ Deno.test(
                 expireAt,
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         const events = await claimEventsFor(db);
         assertStrictEquals(events.length, 1);
         const ev = events[0]!;
@@ -307,7 +310,7 @@ Deno.test(
                 expireAt: '2020-01-01T00:00:00.000000Z',
             },
             await devToken(PRIOR_HOLDER),
-        );
+            operationIdHeader());
         const claimEventId = generateIdentifier();
         const claimAt = '2099-01-01T00:00:01.000000Z';
         const expireEventId = generateIdentifier();
@@ -322,7 +325,7 @@ Deno.test(
                 expireAt,
             },
             DEV_TOKEN,
-        );
+            operationIdHeader());
         const events = await claimEventsFor(db);
         // prior seeded event + expire + new claim = 3.
         assertStrictEquals(events.length, 3);
@@ -443,7 +446,7 @@ async () => {
             ...freshClaimBody(),
             expires_at: expiresAt,
         }, DEV_TOKEN,
-    );
+        operationIdHeader());
     const live = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', DEV_TOKEN,
@@ -463,7 +466,7 @@ async () => {
             position: 2,
         },
         DEV_TOKEN,
-    );
+        operationIdHeader());
     await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNXXsTEwShOozlQCEWKIIw/claim', {
@@ -474,7 +477,7 @@ async () => {
             expires_at: '2020-01-01T00:05:00.000000Z',
         },
         await devToken(STALE),
-    );
+        operationIdHeader());
     const expired = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNXXsTEwShOozlQCEWKIIw/claim', DEV_TOKEN,
@@ -496,7 +499,7 @@ Deno.test('DELETE claim releases; GET then 404s', async () => {
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim',
         freshClaimBody(), DEV_TOKEN,
-    );
+        operationIdHeader());
     const del = await handleRequest(db, req(
         'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', DEV_TOKEN,

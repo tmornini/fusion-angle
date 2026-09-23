@@ -7,6 +7,9 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -48,7 +51,8 @@ Deno.test(
             email: 'alice@example.com',
             phone: '',
             bio: '',
-        }, token);
+        }, token,
+            operationIdHeader());
         const seat = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
                 + 'xdaJyuuPyHfffCGLhqDrOQ', token, {

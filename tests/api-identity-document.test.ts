@@ -39,6 +39,9 @@ import {
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // Phase 10 Task 4 (twelfth registered family): PUT
 // /identities/:id takes `kind` plus, for a person, the
@@ -178,10 +181,10 @@ Deno.test('a byte-identical PUT resend to identities/:id converges'
     const id = generateIdentifier();
     const first = await PUT(
         db, 'identities/' + id, body, DEV_TOKEN,
-    );
+        operationIdHeader());
     const second = await PUT(
         db, 'identities/' + id, body, DEV_TOKEN,
-    );
+        operationIdHeader());
     assertEquals(first, second);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
@@ -321,7 +324,7 @@ Deno.test('documentWriteResponseSpec(IDENTITIES_WIRING) emits'
     const id = generateIdentifier();
     const written = await PUT<Record<string, unknown>>(
         db, 'identities/' + id, body, DEV_TOKEN,
-    );
+        operationIdHeader());
     assertEquals(
         Object.keys(written).sort(),
         ['id', 'kind'],

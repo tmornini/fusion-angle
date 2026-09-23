@@ -28,6 +28,9 @@ import { workOrderLifecycleStatesFor } from
 import {
     apiRequest,
 } from './http-fixtures.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // Task 8 CUT — hard-cut at the gate for the legacy
 // fieldValues transition wire. Spec W2 / plan Task 8:
@@ -102,7 +105,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             position: 1,
         },
         DEV_TOKEN,
-    );
+        operationIdHeader());
     return db;
 }
 

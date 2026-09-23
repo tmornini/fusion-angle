@@ -40,9 +40,9 @@ export function shouldSurfaceFault(
 let pageUnloading = false;
 
 // One voice for a failed gesture: log the fault bound to the
-// request's trace id, then toast the gesture's name with the
-// fault's message. `message` names the WHOLE gesture ('Failed
-// to save member'), never just the first call inside it.
+// operation, then toast the gesture's name with the fault's
+// message. `message` names the WHOLE gesture ('Failed to
+// save member'), never just the first call inside it.
 export function reportFault(
     ctx: RequestContext,
     message: string,
@@ -51,7 +51,7 @@ export function reportFault(
     if (!shouldSurfaceFault(err, pageUnloading)) {
         return;
     }
-    log.with(ctx.requestId)
+    log.with(ctx.operationId)
         .error(message, undefined, err);
     showToast(
         `${message}: ${extractErrorMessage(err)}`,

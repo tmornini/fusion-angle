@@ -7,6 +7,9 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -44,7 +47,8 @@ Deno.test(
             revisionId: 'sVWUntTCtQYFCpONjkzAKg',
             revision: revisionFields(id, 'Revenue'),
             initialState: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         // Phase Final Task 2: row halves stripped — GET is
         // pair-derived.
         const objective = await GET<{
@@ -97,7 +101,8 @@ Deno.test(
                 revisionId: generateIdentifier(),
                 revision: revisionFields(id, ''),
                 initialState: 'active',
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
         );
         await assertRejects(
             () => GET(

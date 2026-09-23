@@ -10,6 +10,9 @@ import {
     TOKEN_AUDIENCE,
 } from '../api/access-token.ts';
 import { ideaBody, seedAdminSchema } from './test-fixtures.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // A real signed token for `current` (admin, via seedRootAdmin)
 // carrying claim roles + organizations + an active `org` —
@@ -44,7 +47,8 @@ async function twoOrganizationIdeas(): Promise<MemoryDbAdapter> {
         + 'UQTJZvCoKlFjEoDlDUwekw', {
         ...a1Fields,
         state: 'active',
-    }, await organizationToken('AjdvjuECVZEgZoFajaIEkg'));
+    }, await organizationToken('AjdvjuECVZEgZoFajaIEkg'),
+        operationIdHeader());
     return db;
 }
 

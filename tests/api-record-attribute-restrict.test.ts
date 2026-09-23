@@ -28,6 +28,9 @@ import type { AttributeReferrers } from
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // Destroying a record attribute is RESTRICT, not cascade:
 // while a live flow-node-attribute relation row binds it, a
@@ -69,7 +72,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     await PUT(db, TYPE_PATH, {
         name: 'Asset', description: 'd', position: 1,
         state: 'active',
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     await PUT(db, ATTR1_PATH, {
         name: 'Priority',
         attribute_type: 'text',
@@ -78,7 +82,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
         constraints: [],
         read_roles: ['member', 'admin'],
         write_roles: ['member', 'admin'],
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     return db;
 }
 
@@ -152,7 +157,8 @@ async function seedFlowNodeAttribute(
                 ...extraAttributeEvents,
             ],
         },
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
 }
 
 function workOrderNodeBinding(
@@ -247,7 +253,7 @@ Deno.test(
         // appends a tombstone pair (table retired).
         await DELETE(
             db, ATTR1_PATH, DEV_TOKEN,
-        );
+            operationIdHeader());
         assertStrictEquals(
             (await db.messagePairs.getAll()).length, before + 1,
         );
@@ -276,14 +282,15 @@ Deno.test(
             constraints: [],
             read_roles: ['member', 'admin'],
             write_roles: ['member', 'admin'],
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const before = await GET<{
             organization_id: string;
         }>(db, ATTR_PAIR_PATH, DEV_TOKEN);
         assertStrictEquals(before.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
         await DELETE(
             db, ATTR_PAIR_PATH, DEV_TOKEN,
-        );
+            operationIdHeader());
         await assertRejects(
             () => GET(
                 db, ATTR_PAIR_PATH, DEV_TOKEN,
@@ -305,7 +312,7 @@ async function seedInstanceReferrer(
         db, TYPE_PATH + '/instances/' + INSTANCE_ID,
         { set: [{ attribute_id: attributeId, value }] },
         DEV_TOKEN,
-    );
+        operationIdHeader());
 }
 
 Deno.test(
@@ -319,7 +326,7 @@ Deno.test(
             () => DELETE(
                 db, ATTR1_PATH,
                 DEV_TOKEN,
-            ),
+                operationIdHeader()),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);
@@ -347,7 +354,7 @@ Deno.test(
             () => DELETE(
                 db, ATTR1_PATH,
                 DEV_TOKEN,
-            ),
+                operationIdHeader()),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);
@@ -383,7 +390,7 @@ Deno.test(
         const before = (await db.messagePairs.getAll()).length;
         await DELETE(
             db, ATTR1_PATH, DEV_TOKEN,
-        );
+            operationIdHeader());
         // Phase Final Stage B: tombstone pair lands; GET 404s.
         assertStrictEquals(
             (await db.messagePairs.getAll()).length, before + 1,
@@ -425,7 +432,7 @@ Deno.test(
             () => DELETE(
                 db, ATTR1_PATH,
                 DEV_TOKEN,
-            ),
+                operationIdHeader()),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);
@@ -474,7 +481,8 @@ Deno.test(
                 memberEvents: [],
                 attributeEvents: [],
             },
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', {
             id: 'yNSSnbrpacodQTzUEcdEVA',
             workOrder: {
@@ -502,12 +510,13 @@ Deno.test(
             ],
             stateEventAts: [AT, AT, AT],
             states: [NODE_HOST, NODE_HOST, 'claimed'],
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const err = await assertRejects(
             () => DELETE(
                 db, ATTR1_PATH,
                 DEV_TOKEN,
-            ),
+                operationIdHeader()),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);
@@ -549,7 +558,8 @@ Deno.test(
                 // not validation.
                 state: 'active',
                 removedAttributeIds: ['VXTdVVRluJDRBqbXWZBntA'],
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);

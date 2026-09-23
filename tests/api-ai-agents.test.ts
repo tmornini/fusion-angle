@@ -11,6 +11,9 @@ import {
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -133,7 +136,8 @@ Deno.test('a flow write with an AI member id in memberIds'
         description: '',
         skill_focus: '',
         model: firstProviderModel().id,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'

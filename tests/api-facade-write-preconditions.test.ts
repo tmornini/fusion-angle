@@ -14,6 +14,9 @@ import {
     generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // Facade plumbing that carries the C6 retry loop's If-Match
 // echo (web-app/app/adapters/flow-mutations.ts). Ideas/:id is
@@ -56,7 +59,7 @@ async () => {
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId,
         ideaPutBody(ideaId, 'Headers'), token,
-        [['if-match', '"probe-value-123"']],
+        operationIdHeader([['if-match', '"probe-value-123"']]),
     );
     const stored = (await db.messagePairs.getAll())
         .find(r => r.name === ideaId);
@@ -68,8 +71,8 @@ async () => {
     );
 });
 
-Deno.test('PUT with no headerFields behaves exactly as before —'
-+ ' the parameter is purely additive', async () => {
+Deno.test('PUT with only operation-id still returns'
++ ' the written body', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const ideaId = generateIdentifier();
@@ -77,7 +80,7 @@ Deno.test('PUT with no headerFields behaves exactly as before —'
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId,
         ideaPutBody(ideaId, 'No Headers'), token,
-    );
+        operationIdHeader());
     assertStrictEquals(written.title, 'No Headers');
 });
 
@@ -91,7 +94,7 @@ async () => {
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId,
         ideaPutBody(ideaId, 'Plain'), token,
-    );
+        operationIdHeader());
     const { body, etag } =
         await GETWithEtag<{
             id: string; title: string;
@@ -111,7 +114,7 @@ async () => {
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId,
         ideaPutBody(ideaId, 'Agree'), token,
-    );
+        operationIdHeader());
     const viaGet = await GET<{ id: string; title: string }>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId, token,

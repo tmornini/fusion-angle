@@ -195,7 +195,7 @@ function installFaultDom(): {
 }
 
 const faultCtx = {
-    requestId: 'rid',
+    operationId: 'rid',
 } as unknown as RequestContext;
 
 Deno.test(

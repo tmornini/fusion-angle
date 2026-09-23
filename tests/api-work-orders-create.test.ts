@@ -17,6 +17,9 @@ import type {
 } from '../api/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const WO_ID = generateIdentifier();
 const FWO_ID = generateIdentifier();
@@ -123,7 +126,8 @@ Deno.test(
         const db = await freshDb();
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             , createBody(),
-            DEV_TOKEN);
+            DEV_TOKEN,
+            operationIdHeader());
 
         const wo = await GET<{
             id: string;
@@ -180,7 +184,8 @@ Deno.test(
         const db = await freshDb();
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             , createBody(),
-            DEV_TOKEN);
+            DEV_TOKEN,
+            operationIdHeader());
 
         const events = await workOrderLifecycleStatesFor(db
             , 'AjdvjuECVZEgZoFajaIEkg', WO_ID);
@@ -218,7 +223,7 @@ Deno.test(
         await POST(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 , createBody(), DEV_TOKEN,
-        );
+            operationIdHeader());
         const wo = await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + WO_ID, DEV_TOKEN,

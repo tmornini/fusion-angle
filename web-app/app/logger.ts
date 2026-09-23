@@ -52,12 +52,12 @@ function isPlainFields(
 function buildFields(
     level: Level,
     context: string | undefined,
-    requestId: string | undefined,
+    operationId: string | undefined,
     extra: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
     // Extras first; envelope keys win so a
     // caller cannot overwrite ts/level/
-    // context/requestId via the fields bag.
+    // context/operationId via the fields bag.
     const fields: Record<string, unknown> = {
         ...(extra ?? {}),
         ts: logTimestamp(),
@@ -68,10 +68,10 @@ function buildFields(
     } else {
         delete fields['context'];
     }
-    if (requestId !== undefined) {
-        fields.requestId = requestId;
+    if (operationId !== undefined) {
+        fields.operationId = operationId;
     } else {
-        delete fields['requestId'];
+        delete fields['operationId'];
     }
     return fields;
 }
@@ -91,7 +91,7 @@ interface BoundLogger {
 
 function makeLogMethod(
     level: Level,
-    requestId?: string,
+    operationId?: string,
 ): LogMethod {
     return function (
         message: string,
@@ -106,7 +106,7 @@ function makeLogMethod(
             rest = data.slice(1);
         }
         const fields = buildFields(
-            level, context, requestId, extra,
+            level, context, operationId, extra,
         );
         switch (level) {
             case 'debug':
@@ -134,21 +134,21 @@ function makeLogMethod(
 }
 
 function makeLogger(
-    requestId?: string,
+    operationId?: string,
 ): BoundLogger {
     return {
-        debug: makeLogMethod('debug', requestId),
-        info: makeLogMethod('info', requestId),
-        warn: makeLogMethod('warn', requestId),
+        debug: makeLogMethod('debug', operationId),
+        info: makeLogMethod('info', operationId),
+        warn: makeLogMethod('warn', operationId),
         error: makeLogMethod(
-            'error', requestId,
+            'error', operationId,
         ),
     };
 }
 
 export const log = {
     ...makeLogger(),
-    with(requestId: string): BoundLogger {
-        return makeLogger(requestId);
+    with(operationId: string): BoundLogger {
+        return makeLogger(operationId);
     },
 };

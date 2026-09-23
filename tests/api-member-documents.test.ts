@@ -37,6 +37,9 @@ import {
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // Members are a lifecycle-trio family (states-document
 // retirement): PUT /members/:id carries {type} plus the trio
@@ -406,7 +409,7 @@ async () => {
         () => PUT(
             db, 'members/' + generateIdentifier(), memberFields(),
             DEV_TOKEN,
-        ),
+            operationIdHeader()),
         Error,
         'Not found',
     );
@@ -420,7 +423,7 @@ async () => {
         () => PUT(
             db, 'ai-members/' + generateIdentifier(),
             aiMemberFields(), DEV_TOKEN,
-        ),
+            operationIdHeader()),
         Error,
         'Not found',
     );

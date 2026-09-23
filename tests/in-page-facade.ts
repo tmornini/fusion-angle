@@ -22,52 +22,47 @@ export function wrapInPageAdapter(
     adapter: ClientFacadeAdapter,
 ): HttpFacade {
     return {
-        GET: (resource, token, requestId) =>
-            httpGet(adapter, resource, token, requestId),
-        GETWithEtag: (resource, token, requestId) =>
+        GET: (resource, token, headerFields) =>
+            httpGet(
+                adapter, resource, token, headerFields,
+            ),
+        GETWithEtag: (resource, token, headerFields) =>
             httpGetWithEtag(
-                adapter, resource, token, requestId,
+                adapter, resource, token, headerFields,
             ),
         PUT: (
-            resource, payload, token,
-            headerFields, requestId,
+            resource, payload, token, headerFields,
         ) => httpPut(
             adapter, resource, payload, token,
-            headerFields, requestId,
-        ),
-        PUTWithEtag: (
-            resource, payload, token,
-            headerFields, requestId,
-        ) => httpPutWithEtag(
-            adapter, resource, payload, token,
-            headerFields, requestId,
-        ),
-        PATCH: (
-            resource, payload, token,
-            headerFields, requestId,
-        ) => httpPatch(
-            adapter, resource, payload, token,
-            headerFields, requestId,
-        ),
-        PATCHWithEtag: (
-            resource, payload, token,
-            headerFields, requestId,
-        ) => httpPatchWithEtag(
-            adapter, resource, payload, token,
-            headerFields, requestId,
-        ),
-        DELETE: (
-            resource, token, requestId, headerFields,
-        ) => httpDelete(
-            adapter, resource, token, requestId,
             headerFields,
         ),
+        PUTWithEtag: (
+            resource, payload, token, headerFields,
+        ) => httpPutWithEtag(
+            adapter, resource, payload, token,
+            headerFields,
+        ),
+        PATCH: (
+            resource, payload, token, headerFields,
+        ) => httpPatch(
+            adapter, resource, payload, token,
+            headerFields,
+        ),
+        PATCHWithEtag: (
+            resource, payload, token, headerFields,
+        ) => httpPatchWithEtag(
+            adapter, resource, payload, token,
+            headerFields,
+        ),
+        DELETE: (resource, token, headerFields) =>
+            httpDelete(
+                adapter, resource, token, headerFields,
+            ),
         POST: (
-            resource, payload, token,
-            requestId, headerFields,
+            resource, payload, token, headerFields,
         ) => httpPost(
             adapter, resource, payload, token,
-            requestId, headerFields,
+            headerFields,
         ),
     };
 }

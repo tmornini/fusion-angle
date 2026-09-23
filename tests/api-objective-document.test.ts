@@ -39,6 +39,9 @@ import {
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // Objectives are the FIFTH family (states-document
 // retirement): PUT
@@ -257,12 +260,12 @@ Deno.test('a byte-identical PUT resend to'
     const first = await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + id, body, DEV_TOKEN,
-    );
+        operationIdHeader());
     const second = await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + id
             , body, DEV_TOKEN,
-    );
+        operationIdHeader());
     assertEquals(first, second);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);

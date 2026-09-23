@@ -7,6 +7,9 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // Nested record-types + attributes (Task 23);
 // organizations/:id/flows/:id/records
@@ -47,7 +50,8 @@ Deno.test(
             description: 'A customer record',
             position: 1,
             state: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const stored = await GET<{
             id: string;
             name: string;
@@ -74,8 +78,10 @@ Deno.test(
             description: '',
             position: 1,
             state: 'active',
-        }, DEV_TOKEN);
-        await DELETE(db, TYPE, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
+        await DELETE(db, TYPE, DEV_TOKEN,
+            operationIdHeader());
         await assertRejects(
             () => GET(db, TYPE, DEV_TOKEN),
         );
@@ -95,7 +101,8 @@ Deno.test(
             description: '',
             position: 1,
             state: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const out = await GET<unknown[]>(
             db, ATTRS, DEV_TOKEN,
         );
@@ -114,7 +121,8 @@ Deno.test(
             description: '',
             position: 1,
             state: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         await PUT(db, ATTR, {
             name: 'Email',
             attribute_type: 'text',
@@ -123,7 +131,8 @@ Deno.test(
             constraints: [],
             read_roles: ['member', 'admin'],
             write_roles: ['member', 'admin'],
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const stored = await GET<{
             id: string;
             record_type_id: string;
@@ -148,7 +157,8 @@ Deno.test(
             description: '',
             position: 1,
             state: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         await PUT(db, ATTR, {
             name: 'X',
             attribute_type: 'text',
@@ -157,8 +167,10 @@ Deno.test(
             constraints: [],
             read_roles: ['member', 'admin'],
             write_roles: ['member', 'admin'],
-        }, DEV_TOKEN);
-        await DELETE(db, ATTR, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
+        await DELETE(db, ATTR, DEV_TOKEN,
+            operationIdHeader());
         await assertRejects(
             () => GET(db, ATTR, DEV_TOKEN),
         );
@@ -192,7 +204,8 @@ Deno.test(
             description: '',
             position: 1,
             state: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         await PUT(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aEsGMmBEFaVdWihhHXwCbw/records/dCnpryxCNwuTnCrBBDIMOw', {
@@ -200,7 +213,8 @@ Deno.test(
             flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: '2026-05-01T00:00:00.000000Z',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const stored = await GET<{
             id: string;
             flow_id: string;
@@ -224,7 +238,8 @@ Deno.test(
             description: '',
             position: 1,
             state: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         await PUT(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aEsGMmBEFaVdWihhHXwCbw/records/dCnpryxCNwuTnCrBBDIMOw', {
@@ -232,12 +247,13 @@ Deno.test(
             flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: '2026-05-01T00:00:00.000000Z',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         await DELETE(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/records/dCnpryxCNwuTnCrBBDIMOw'
                 , DEV_TOKEN,
-        );
+            operationIdHeader());
         await assertRejects(
             () => GET(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'

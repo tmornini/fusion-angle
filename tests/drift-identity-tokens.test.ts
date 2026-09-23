@@ -41,6 +41,9 @@ import {
     authorizationCodeSpent,
     deriveAuthorizationCodeId,
 } from '../api/authentication.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const JTI_ORDER = generateIdentifier();
 const CHAIN_ORDER = generateIdentifier();
@@ -156,7 +159,8 @@ async () => {
         + JTI_ORDER, {
         jti: JTI_ORDER, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_ORDER, at: AT,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
 
     const derived = await deriveIdentityToken(
         db, 'XXZruirZyAOoRpNxaDnpSA', JTI_ORDER,
@@ -265,22 +269,26 @@ async () => {
         + JTI_W3, {
         jti: JTI_W3, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_W3, at: AT,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
         + JTI_W1, {
         jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_W, at: AT,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
         + JTI_W2, {
         jti: JTI_W2, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_W2, at: AT,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
         + JTI_W1, {
         jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'rotated', chain_id: CHAIN_W, at: AT2,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
 
     // The literal id-LAST reconstruction of each document's
     // HEAD body, identifier order (byIdAscending — the
@@ -353,12 +361,14 @@ Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
         + JTI_TX, {
         jti: JTI_TX, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_TX, at: AT,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
         + JTI_TX, {
         jti: JTI_TX, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'rotated', chain_id: CHAIN_TX, at: AT2,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
 
     const preTx = await deriveIdentityTokenEventsForJti(
         db, JTI_TX, 'XXZruirZyAOoRpNxaDnpSA',

@@ -6,6 +6,9 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import { seedOrganizationMember } from
     './root-admin-fixture.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 Deno.test(
     'a person identity write is authored by the token',
@@ -19,7 +22,8 @@ Deno.test(
             department: 'Product',
             strengths: [],
             team_dimensions: {},
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const requests = await db.messagePairs.getAll();
         const row = requests.find(r =>
             r.path === '/identities/'

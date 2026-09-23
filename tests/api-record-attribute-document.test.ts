@@ -25,6 +25,9 @@ import {
 } from '../api/derive-documents.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const RECORD_ID = generateIdentifier();
 const ATTRIBUTE_ID = generateIdentifier();
@@ -181,7 +184,8 @@ async () => {
             + RECORD_ID, {
         name: 'Fixture', description: '', position: 1,
         state: 'active',
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     const body = {
         name: 'Priority',
         attribute_type: 'text',
@@ -198,13 +202,13 @@ async () => {
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + RECORD_ID + '/attributes/rTiMgnMtYSIDYKegGxixMA',
         body, DEV_TOKEN,
-        opHeaders,
+        operationIdHeader(opHeaders),
     );
     const second = await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + RECORD_ID + '/attributes/rTiMgnMtYSIDYKegGxixMA',
         body, DEV_TOKEN,
-        opHeaders,
+        operationIdHeader(opHeaders),
     );
     assertEquals(first, second);
     // seedAdminSchema + parent type + 2 attribute PUTs

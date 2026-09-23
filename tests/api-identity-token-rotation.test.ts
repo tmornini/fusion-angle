@@ -23,6 +23,9 @@ import {
 } from '../api/derive-identity-tokens.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // POST identity-tokens/:jti/rotation decides and appends in
 // ONE transaction: a live jti returns its successor; a
@@ -48,7 +51,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
         jti: ROOT_JTI, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: ROOT_CHAIN,
         at: '2026-06-01T00:00:00.000000Z',
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     return db;
 }
 
@@ -59,7 +63,7 @@ function rotate(
     return POST(
         db, `identities/XXZruirZyAOoRpNxaDnpSA/tokens/${jti}/rotation`, {},
         DEV_TOKEN,
-    );
+        operationIdHeader());
 }
 
 Deno.test(
@@ -126,7 +130,7 @@ Deno.test(
             db, `identities/XXZruirZyAOoRpNxaDnpSA/tokens/${next}/revocation`,
             {},
             DEV_TOKEN,
-        );
+            operationIdHeader());
         const rows = await deriveIdentityTokensFor(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );
@@ -146,7 +150,7 @@ Deno.test(
                 + generateIdentifier() + '/revocation',
             {},
             DEV_TOKEN,
-        );
+            operationIdHeader());
         const rows = await deriveIdentityTokensFor(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );
@@ -175,7 +179,7 @@ Deno.test(
                     + `${ROOT_JTI}/rotation`,
                 {},
                 DEV_TOKEN,
-            ),
+                operationIdHeader()),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);
@@ -199,7 +203,7 @@ Deno.test(
                 + `${ROOT_JTI}/revocation`,
             {},
             DEV_TOKEN,
-        );
+            operationIdHeader());
         const rows = await deriveIdentityTokensFor(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );

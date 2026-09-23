@@ -14,6 +14,9 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -52,7 +55,8 @@ Deno.test(
                 },
             ],
             initialState: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const record = await GET<{
             id: string;
             name: string;
@@ -94,7 +98,8 @@ Deno.test(
             },
             attributes: [],
             initialState: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const record = await GET<{ name: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rcaSzEaORBkezCxyhLhecA', DEV_TOKEN,
@@ -134,7 +139,8 @@ Deno.test(
             },
             attributes: [],
             initialState: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'edit',
             id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -149,7 +155,8 @@ Deno.test(
             // that an edit does not change it.
             state: 'active',
             removedAttributeIds: [],
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const record = await GET<{
             name: string;
             description: string;
@@ -200,7 +207,8 @@ Deno.test(
                 },
             ],
             initialState: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'edit',
             id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -225,7 +233,8 @@ Deno.test(
             // Echoed from the create's own known head above.
             state: 'active',
             removedAttributeIds: [oldAttrId],
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const all = await GET<{
             id: string;
             name: string;
@@ -264,7 +273,8 @@ Deno.test(
                 },
             ],
             initialState: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'edit',
             id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -288,7 +298,8 @@ Deno.test(
             // Echoed from the create's own known head above.
             state: 'active',
             removedAttributeIds: [],
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const stored = await GET<{
             name: string;
             attribute_type: string;
@@ -337,7 +348,8 @@ Deno.test(
                     },
                 ],
                 initialState: 'active',
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
             Error,
             'must be non-empty',
         );
@@ -374,7 +386,8 @@ Deno.test(
                     },
                 ],
                 initialState: 'active',
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
             Error,
             'record_id must match top-level id',
         );
@@ -398,7 +411,8 @@ Deno.test(
                     position: 1,
                 },
                 attributes: [],
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
             Error,
             'RecordWriteBody kind',
         );
@@ -423,7 +437,8 @@ Deno.test(
                 },
                 attributes: [],
                 initialState: 'pending',
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
             Error,
             'expected RecordState',
         );
@@ -449,7 +464,8 @@ Deno.test(
                 attributes: [],
                 initialState: 'active',
                 extra: 'forbidden',
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
             Error,
             'unexpected key',
         );
@@ -473,7 +489,8 @@ Deno.test(
                     position: 1,
                 },
                 attributes: [],
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
             Error,
             'missing required key',
         );
@@ -500,7 +517,8 @@ Deno.test(
             },
             attributes: [],
             initialState: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const rec = await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + recId, DEV_TOKEN,

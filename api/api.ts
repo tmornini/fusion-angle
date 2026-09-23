@@ -133,7 +133,6 @@ import {
     type IncomingContext,
 } from './request-context.ts';
 import {
-    generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
 
@@ -1942,29 +1941,18 @@ async function unwrapResponse<T>(
     );
 }
 
-// Wire-side Authorization (+ optional Content-Type) plus the
-// client vessel's requestId. Absent requestId keeps the prior
-// mint-on-gate path (direct test callers); the client facade
-// always supplies the vessel id so reportFault and the server
-// trace share one identity.
+// Authorization and Content-Type only. operation-id is a
+// caller header. request-id is the server's; this function
+// neither copies nor mints one.
 function facadeHeaders(
     token: string,
-    requestId: string | undefined,
     contentType: boolean,
-    write = false,
 ): Record<string, string> {
     const headers: Record<string, string> = {
         'Authorization': 'Bearer ' + token,
     };
     if (contentType) {
         headers['Content-Type'] = 'application/json';
-    }
-    if (requestId !== undefined) {
-        headers[REQUEST_ID_HEADER] = requestId;
-    }
-    if (write) {
-        headers[OPERATION_ID_HEADER] =
-            generateIdentifier();
     }
     return headers;
 }
@@ -1979,18 +1967,19 @@ async function getResponse(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
-    requestId?: string,
+    headerFields?:
+        readonly (readonly [string, string])[],
 ): Promise<Response> {
     await adapter.simulateLatency();
+    const headers = facadeHeaders(token, false);
+    for (const [name, value] of headerFields ?? []) {
+        headers[name] = value;
+    }
     return handleRequest(
         adapter,
         new Request(
             `${BASE_URL}/${resource}`,
-            {
-                headers: facadeHeaders(
-                    token, requestId, false,
-                ),
-            },
+            { headers },
         ),
     );
 }
@@ -2006,18 +1995,11 @@ async function bodyWriteResponse(
     payload: Record<string, unknown>,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
-    requestId?: string,
 ): Promise<Response> {
     await adapter.simulateLatency();
-    const headers = facadeHeaders(
-        token, requestId, true, true,
-    );
+    const headers = facadeHeaders(token, true);
     for (const [name, value] of headerFields ?? []) {
         headers[name] = value;
-    }
-    if (headers[OPERATION_ID_HEADER] === undefined) {
-        headers[OPERATION_ID_HEADER] =
-            generateIdentifier();
     }
     return handleRequest(
         adapter,
@@ -2178,11 +2160,12 @@ export async function GET<T>(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
-    requestId?: string,
+    headerFields?:
+        readonly (readonly [string, string])[],
 ): Promise<T> {
     return unwrapResponse<T>(
         await getResponse(
-            adapter, resource, token, requestId,
+            adapter, resource, token, headerFields,
         ),
     );
 }
@@ -2193,10 +2176,11 @@ export async function GETWithEtag<T>(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
-    requestId?: string,
+    headerFields?:
+        readonly (readonly [string, string])[],
 ): Promise<{ body: T; etag: string | undefined }> {
     const response = await getResponse(
-        adapter, resource, token, requestId,
+        adapter, resource, token, headerFields,
     );
     const body = await unwrapResponse<T>(response);
     return {
@@ -2211,12 +2195,11 @@ export async function PUT<T>(
     payload: Record<string, unknown>,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
-    requestId?: string,
 ): Promise<T> {
     return unwrapResponse<T>(
         await bodyWriteResponse(
             adapter, 'PUT', resource, payload, token,
-            headerFields, requestId,
+            headerFields,
         ),
     );
 }
@@ -2227,11 +2210,10 @@ export async function PUTWithEtag<T>(
     payload: Record<string, unknown>,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
-    requestId?: string,
 ): Promise<{ body: T; etag: string | undefined }> {
     const response = await bodyWriteResponse(
         adapter, 'PUT', resource, payload, token,
-        headerFields, requestId,
+        headerFields,
     );
     const body = await unwrapResponse<T>(response);
     return {
@@ -2246,12 +2228,11 @@ export async function PATCH<T>(
     payload: Record<string, unknown>,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
-    requestId?: string,
 ): Promise<T> {
     return unwrapResponse<T>(
         await bodyWriteResponse(
             adapter, 'PATCH', resource, payload, token,
-            headerFields, requestId,
+            headerFields,
         ),
     );
 }
@@ -2262,11 +2243,10 @@ export async function PATCHWithEtag<T>(
     payload: Record<string, unknown>,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
-    requestId?: string,
 ): Promise<{ body: T; etag: string | undefined }> {
     const response = await bodyWriteResponse(
         adapter, 'PATCH', resource, payload, token,
-        headerFields, requestId,
+        headerFields,
     );
     const body = await unwrapResponse<T>(response);
     return {
@@ -2279,19 +2259,12 @@ export async function DELETE(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
-    requestId?: string,
     headerFields?: readonly (readonly [string, string])[],
 ): Promise<void> {
     await adapter.simulateLatency();
-    const headers = facadeHeaders(
-        token, requestId, false, true,
-    );
+    const headers = facadeHeaders(token, false);
     for (const [name, value] of headerFields ?? []) {
         headers[name] = value;
-    }
-    if (headers[OPERATION_ID_HEADER] === undefined) {
-        headers[OPERATION_ID_HEADER] =
-            generateIdentifier();
     }
     await unwrapResponse(
         await handleRequest(
@@ -2312,19 +2285,12 @@ export async function POST<T>(
     resource: string,
     payload: Record<string, unknown>,
     token: string,
-    requestId?: string,
     headerFields?: readonly (readonly [string, string])[],
 ): Promise<T> {
     await adapter.simulateLatency();
-    const headers = facadeHeaders(
-        token, requestId, true, true,
-    );
+    const headers = facadeHeaders(token, true);
     for (const [name, value] of headerFields ?? []) {
         headers[name] = value;
-    }
-    if (headers[OPERATION_ID_HEADER] === undefined) {
-        headers[OPERATION_ID_HEADER] =
-            generateIdentifier();
     }
     return unwrapResponse<T>(
         await handleRequest(

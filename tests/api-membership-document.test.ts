@@ -21,6 +21,9 @@ import {
 import {
     seatDocumentMessagePair,
 } from './root-admin-fixture.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // Seat document body is type + at. Privilege type (admin|
 // member) bakes into claims at mint. Leftover /memberships
@@ -129,11 +132,11 @@ Deno.test('a byte-identical PUT resend to a seat converges'
     const first = await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             + 'toccYYkLEABmlbpHJalgtQ', body, DEV_TOKEN,
-    );
+        operationIdHeader());
     const second = await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             + 'toccYYkLEABmlbpHJalgtQ', body, DEV_TOKEN,
-    );
+        operationIdHeader());
     assertEquals(first, second);
     // seedAdminSchema: org + current seat; one unique
     // toccYYkLEABmlbpHJalgtQ seat PUT. Byte-identical resend dedups.

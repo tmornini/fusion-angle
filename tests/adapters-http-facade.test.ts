@@ -10,6 +10,7 @@ import {
     createHttpFacade,
 } from '../web-app/app/adapters/http-facade.ts';
 import {
+    createRecoveringRequestContext,
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { OPERATION_ID_HEADER } from
@@ -51,11 +52,14 @@ Deno.test(
         let url = '';
         let credentials: RequestCredentials | undefined;
         let operationId: string | null = null;
+        let requestId: string | null = null;
+        const sent = 'abcdefghijklmnopqrstug';
         await withMockFetch(async (input, init) => {
             url = String(input);
             credentials = init?.credentials;
-            operationId = new Headers(init?.headers)
-                .get(OPERATION_ID_HEADER);
+            const headers = new Headers(init?.headers);
+            operationId = headers.get(OPERATION_ID_HEADER);
+            requestId = headers.get('request-id');
             return new Response('{}', { status: 200 });
         }, async () => {
             const facade = createHttpFacade(
@@ -63,7 +67,9 @@ Deno.test(
             );
             await facade.PUT(
                 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                    + 'AjdvjuECVZEgZoFajaIEkg', { name: 'x' }, 'tok',
+                    + 'AjdvjuECVZEgZoFajaIEkg', { name: 'x' },
+                'tok',
+                [[OPERATION_ID_HEADER, sent]],
             );
         });
         assertStrictEquals(
@@ -72,17 +78,30 @@ Deno.test(
                 + 'ideas/AjdvjuECVZEgZoFajaIEkg',
         );
         assertStrictEquals(credentials, 'same-origin');
-        assert(operationId !== null);
-        assertStrictEquals(isIdentifier(operationId), true);
+        assertStrictEquals(operationId, sent);
+        assertStrictEquals(requestId, null);
+        assertStrictEquals(isIdentifier(sent), true);
     },
 );
 
 Deno.test(
     'cookie refresh posts under the /api/ mount',
     async () => {
-        const urls: string[] = [];
-        await withMockFetch(async (input) => {
-            urls.push(String(input));
+        const seen: {
+            url: string;
+            operationId: string | null;
+            requestId: string | null;
+        }[] = [];
+        let ideas = 0;
+        await withMockFetch(async (input, init) => {
+            const headers = new Headers(init?.headers);
+            seen.push({
+                url: String(input),
+                operationId: headers.get(
+                    OPERATION_ID_HEADER,
+                ),
+                requestId: headers.get('request-id'),
+            });
             if (String(input).endsWith(
                 '/authentication/token',
             )) {
@@ -93,31 +112,52 @@ Deno.test(
                     { status: 200 },
                 );
             }
-            return new Response(
-                JSON.stringify({
-                    error: 'invalid_token',
-                }),
-                { status: 401 },
-            );
+            ideas += 1;
+            if (ideas === 1) {
+                return new Response(
+                    JSON.stringify({
+                        error: 'invalid_token',
+                    }),
+                    { status: 401 },
+                );
+            }
+            return new Response('[]', { status: 200 });
         }, async () => {
-            const facade = createHttpFacade(
-                'http://example.test',
+            const ctx =
+                createRecoveringRequestContext(
+                    createHttpFacade(
+                        'http://example.test',
+                    ),
+                    '',
+                );
+            await ctx.GET(
+                'organizations/'
+                + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
             );
-            await assertRejects(
-                () => facade.GET(
-                    'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', 'dead',
-                ),
-                UnauthorizedError,
-            );
+            assertStrictEquals(seen.length, 3);
+            for (const row of seen) {
+                assertStrictEquals(
+                    row.operationId, ctx.operationId,
+                );
+                assertStrictEquals(
+                    row.requestId, null,
+                );
+            }
         });
         assertStrictEquals(
-            urls[0],
-            'http://example.test/api/organizations/AjdvjuECVZEgZoFajaIEkg/'
-                + 'ideas/',
+            seen[0]!.url,
+            'http://example.test/api/organizations/'
+            + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
         );
         assertStrictEquals(
-            urls[1],
-            'http://example.test/api/authentication/token',
+            seen[1]!.url,
+            'http://example.test/api/'
+            + 'authentication/token',
+        );
+        assertStrictEquals(
+            seen[2]!.url,
+            'http://example.test/api/organizations/'
+            + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
         );
     },
 );
@@ -125,21 +165,44 @@ Deno.test(
 Deno.test(
     'createRequestContext accepts the fetch facade',
     async () => {
-        let operationId: string | null = null;
+        const operationIds: (string | null)[] = [];
+        const requestIds: (string | null)[] = [];
         await withMockFetch(async (_input, init) => {
-            operationId = new Headers(init?.headers)
-                .get(OPERATION_ID_HEADER);
+            const headers = new Headers(init?.headers);
+            operationIds.push(
+                headers.get(OPERATION_ID_HEADER),
+            );
+            requestIds.push(headers.get('request-id'));
             return new Response('{}', { status: 200 });
         }, async () => {
             const ctx = createRequestContext(
                 createHttpFacade('http://example.test'),
                 DEV_TOKEN,
             );
-            await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                + 'AjdvjuECVZEgZoFajaIEkg', { name: 'x' });
+            await ctx.GET(
+                'organizations/'
+                + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
+            );
+            await ctx.PUT(
+                'organizations/'
+                + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'AjdvjuECVZEgZoFajaIEkg',
+                { name: 'x' },
+            );
+            assertStrictEquals(operationIds.length, 2);
+            assertStrictEquals(
+                operationIds[0], ctx.operationId,
+            );
+            assertStrictEquals(
+                operationIds[1], ctx.operationId,
+            );
         });
-        assert(operationId !== null);
-        assertStrictEquals(isIdentifier(operationId), true);
+        assertStrictEquals(requestIds[0], null);
+        assertStrictEquals(requestIds[1], null);
+        assert(operationIds[0] !== null);
+        assertStrictEquals(
+            isIdentifier(operationIds[0]!), true,
+        );
     },
 );
 

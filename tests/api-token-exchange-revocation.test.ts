@@ -23,6 +23,9 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { seedOrganizationDocument } from
     './test-fixtures.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const USER_1 = generateIdentifier();
 const USER_2 = generateIdentifier();
@@ -113,7 +116,7 @@ async function seedTokenRevocationPair(
         'identities/' + identityId + '/token-revocations/' + id,
         { identity_id: identityId, at },
         await devToken(),
-    );
+        operationIdHeader());
 }
 
 async function revokedDb(): Promise<MemoryDbAdapter> {
@@ -207,7 +210,8 @@ Deno.test(
             action: 'revoked',
             chain_id: generateIdentifier(),
             at: nowUtc(),
-        }, await devToken());
+        }, await devToken(),
+            operationIdHeader());
         const res = await postToken(db, {
             grant_type: 'token-exchange',
             subject_token: subject,
@@ -250,7 +254,8 @@ Deno.test('refresh on a logged-out but live jti is the'
         jti: LIVE_JTI, identity_id: USER_1,
         action: 'issued', chain_id: 'WeXjAaAxGSpLpamfEuvcww',
         at: '2019-01-01T00:00:00.000000Z',
-    }, await devToken());
+    }, await devToken(),
+        operationIdHeader());
     const iat = Math.floor(
         Date.parse('2019-01-01T00:00:00.000000Z') / 1000);
     const token = await mintAccessToken({

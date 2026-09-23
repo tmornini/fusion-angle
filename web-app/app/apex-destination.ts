@@ -3,6 +3,14 @@
 // see it. The existing refresh grant is the
 // probe — not a new door.
 
+import {
+    RequestError,
+    UnauthorizedError,
+} from '../../api/http-errors.ts';
+import { createRequestContext } from
+    './adapters/shared.ts';
+import { getClientFacade } from
+    './adapters/facade-holder.ts';
 import { runSingleFlightRefresh } from
     './adapters/session-refresh-mutex.ts';
 
@@ -24,27 +32,32 @@ export async function resolveApexLocation(
 
 export async function probeRefreshSession(
 ): Promise<boolean> {
-    const access = await runSingleFlightRefresh(async () => {
-        const response = await fetch(
-            '/api/authentication/token',
-            {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    grant_type: 'refresh',
-                }),
-            },
-        );
-        if (!response.ok) return null;
-        const body = await response.json() as {
-            access_token?: unknown;
-        };
-        return typeof body.access_token === 'string'
-            ? body.access_token
-            : null;
-    });
+    const ctx = createRequestContext(
+        getClientFacade(), '',
+    );
+    const access = await runSingleFlightRefresh(
+        async () => {
+            try {
+                const body = await ctx.POST<{
+                    access_token?: unknown;
+                }>(
+                    'authentication/token',
+                    { grant_type: 'refresh' },
+                );
+                return typeof body.access_token
+                    === 'string'
+                    ? body.access_token
+                    : null;
+            } catch (err) {
+                if (
+                    err instanceof UnauthorizedError
+                    || err instanceof RequestError
+                ) {
+                    return null;
+                }
+                throw err;
+            }
+        },
+    );
     return access !== null;
 }

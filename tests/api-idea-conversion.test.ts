@@ -15,6 +15,9 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 function pairJsonOf(message: string): {
     readonly body: Record<string, unknown>;
@@ -101,7 +104,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
         + 'gVvtDIaqhnkXZQcxZeSuiw', {
         ...ideaFields('Source Idea'),
         state: 'approved',
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     // Phase Final Stage B: objectives table retired — seed
     // through the live document PUT (states-document
     // retirement) so the message plane owns it.
@@ -110,13 +114,15 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             + OBJ_1, {
         position: 1,
         state: 'active',
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     await PUT(db,
         'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + OBJ_2, {
         position: 2,
         state: 'active',
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     return db;
 }
 
@@ -152,7 +158,8 @@ Deno.test(
                     fields: baselineFields(OBJ_2, -25),
                 },
             ],
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
 
         const project = await GET<{
             title: string;
@@ -235,7 +242,8 @@ Deno.test(
                     fields: baselineFields(OBJ_2, -5),
                 },
             ],
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
 
         // Balance invariant: the wire-seeded idea genesis PUT
         // (1) + two objective document PUTs (Stage B: message
@@ -391,7 +399,8 @@ Deno.test(
                     fields: baselineFields(OBJ_1, 50),
                 },
             ],
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
 
         const project = await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'

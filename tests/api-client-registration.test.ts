@@ -27,6 +27,9 @@ import {
 } from '../api/derive-identity-spine.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const REGISTRATION = {
     grant_types: 'client_credentials',
@@ -75,7 +78,8 @@ async () => {
     const memberToken = await devToken(peonId);
     await rejectsWithStatus(
         () => PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-            { ...REGISTRATION }, memberToken),
+            { ...REGISTRATION }, memberToken,
+            operationIdHeader()),
         403,
     );
 });
@@ -88,7 +92,7 @@ Deno.test('an absent identity is 404', async () => {
             'identities/' + generateIdentifier()
                 + '/registration',
             { ...REGISTRATION }, DEV_TOKEN,
-        ),
+            operationIdHeader()),
         404,
     );
 });
@@ -101,7 +105,8 @@ Deno.test("a kind-'person' identity is 400", async () => {
     });
     await rejectsWithStatus(
         () => PUT(db, 'identities/pjQzgITAPDQVyvCVpzpIfQ/registration',
-            { ...REGISTRATION }, DEV_TOKEN),
+            { ...REGISTRATION }, DEV_TOKEN,
+            operationIdHeader()),
         400,
     );
 });
@@ -112,7 +117,8 @@ async () => {
     await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
     await rejectsWithStatus(
         () => PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-            { ...REGISTRATION, rogue: 'x' }, DEV_TOKEN),
+            { ...REGISTRATION, rogue: 'x' }, DEV_TOKEN,
+            operationIdHeader()),
         400,
     );
 });
@@ -124,7 +130,7 @@ Deno.test('PUT registers; GET reads it back; a second PUT'
     const put = await PUT<Record<string, unknown>>(
         db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
         { ...REGISTRATION }, DEV_TOKEN,
-    );
+        operationIdHeader());
     assertEquals(put, { id: 'uWzjNIEeEtVWqZoJMLeYpw', ...REGISTRATION });
     const got = await GET<Record<string, unknown>>(
         db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration', DEV_TOKEN,
@@ -134,7 +140,8 @@ Deno.test('PUT registers; GET reads it back; a second PUT'
         ...REGISTRATION, jwks: '{"keys":[{"kty":"EC"}]}',
     };
     await PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-        { ...rotated }, DEV_TOKEN);
+        { ...rotated }, DEV_TOKEN,
+        operationIdHeader());
     const reread = await GET<{ jwks: string }>(
         db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration', DEV_TOKEN,
     );
@@ -157,14 +164,16 @@ async () => {
     const db = await freshDb();
     await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
     await PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-        { ...REGISTRATION }, DEV_TOKEN);
+        { ...REGISTRATION }, DEV_TOKEN,
+        operationIdHeader());
     const prefix = '/identities/uWzjNIEeEtVWqZoJMLeYpw/registration/';
     const afterPut = (await db.messagePairs.getAll()).filter(
         (row) => row.path === prefix,
     );
     assertStrictEquals(afterPut.length, 1);
     await DELETE(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-        DEV_TOKEN);
+        DEV_TOKEN,
+        operationIdHeader());
     const afterDel = (await db.messagePairs.getAll()).filter(
         (row) => row.path === prefix,
     );

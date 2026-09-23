@@ -25,6 +25,9 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -77,7 +80,8 @@ Deno.test('PUT then GET round-trips an entity', async () => {
     };
     await PUT(db
         , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-        + 'fndCYAsXazdzMUlEGMNIZw', payload, DEV_TOKEN);
+        + 'fndCYAsXazdzMUlEGMNIZw', payload, DEV_TOKEN,
+        operationIdHeader());
     const fetched =
         await GET<{ title: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -98,7 +102,8 @@ Deno.test(
                 entity_id: 'YiJPbufDpkyrZcZCYbUJpg',
                 state: 'active',
                 at: '2026-01-01T00:00:00.000000Z',
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 404);
@@ -152,7 +157,8 @@ Deno.test(
             () => PUT(db, 'ai-agents/'
                 + generateIdentifier(), {
                 rogue_field: 'extra',
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
         ) as Error;
         assertMatch(err.message, /unexpected key|missing/);
     },
@@ -165,7 +171,8 @@ Deno.test(
         const db = await freshDb();
         const err = await assertRejects(
             () => POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
-                , {}, DEV_TOKEN),
+                , {}, DEV_TOKEN,
+                operationIdHeader()),
         ) as Error;
         assertMatch(err.message, /not allowed/i);
     },
@@ -178,7 +185,7 @@ Deno.test(
         const err = await assertRejects(
             () => POST(
                 db, 'no-such-resource', {}, DEV_TOKEN,
-            ),
+                operationIdHeader()),
         ) as Error;
         assertMatch(err.message, /not found|404/i);
     },

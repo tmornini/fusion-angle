@@ -19,6 +19,9 @@ import {
 } from './test-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 Deno.test('SYSTEM_MEMBER_ID is NIL_IDENTIFIER', () => {
     assertStrictEquals(SYSTEM_MEMBER_ID, NIL_IDENTIFIER);
@@ -99,7 +102,8 @@ Deno.test('PUT then GET an identity round-trips', async () => {
     const db = await freshDb();
     const id = generateIdentifier();
     await PUT(
-        db, 'identities/' + id, { kind: 'person' }, DEV_TOKEN);
+        db, 'identities/' + id, { kind: 'person' }, DEV_TOKEN,
+        operationIdHeader());
     const got = await GET<{ id: string; kind: string }>(
         db, 'identities/' + id, DEV_TOKEN,
     );
@@ -223,7 +227,8 @@ Deno.test('a member writes its own pii', async () => {
     const db = await dbWithMember();
     await PUT(db, 'identities/toccYYkLEABmlbpHJalgtQ/pii',
         { ...PII, name: 'Sarah Lee' }
-            , await devToken('toccYYkLEABmlbpHJalgtQ'));
+            , await devToken('toccYYkLEABmlbpHJalgtQ'),
+        operationIdHeader());
     const pii = await GET<{ name: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ/pii'
             , await devToken('toccYYkLEABmlbpHJalgtQ'));
@@ -233,7 +238,8 @@ Deno.test('a member writes its own pii', async () => {
 Deno.test('an admin writes another identity pii', async () => {
     const db = await dbWithMember();
     await PUT(db, 'identities/toccYYkLEABmlbpHJalgtQ/pii',
-        { ...PII, name: 'By Admin' }, DEV_TOKEN);
+        { ...PII, name: 'By Admin' }, DEV_TOKEN,
+        operationIdHeader());
     const pii = await GET<{ name: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ/pii'
             , await devToken('toccYYkLEABmlbpHJalgtQ'));
@@ -252,7 +258,8 @@ async () => {
 Deno.test('deleting pii on the subtree leaves the identity',
 async () => {
     const db = await dbWithMember();
-    await DELETE(db, 'identities/toccYYkLEABmlbpHJalgtQ/pii', DEV_TOKEN);
+    await DELETE(db, 'identities/toccYYkLEABmlbpHJalgtQ/pii', DEV_TOKEN,
+        operationIdHeader());
     const gone = await handleRequest(db, piiReq(
         'GET', '/identities/toccYYkLEABmlbpHJalgtQ/pii',
         await devToken('toccYYkLEABmlbpHJalgtQ')));

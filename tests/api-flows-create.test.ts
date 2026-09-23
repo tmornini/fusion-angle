@@ -15,6 +15,9 @@ import type {
 } from '../api/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -91,7 +94,8 @@ Deno.test(
         const db = await freshDb();
         const body = createBody();
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            , body, DEV_TOKEN);
+            , body, DEV_TOKEN,
+            operationIdHeader());
 
         const flow = await GET<{
             id: string;
@@ -140,7 +144,8 @@ Deno.test(
         // on states/:id PUT).
     // Phase Final Stage B: states table retired.
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            , createBody(), DEV_TOKEN);
+            , createBody(), DEV_TOKEN,
+            operationIdHeader());
         const flow = await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw', DEV_TOKEN,
@@ -166,7 +171,8 @@ Deno.test(
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/', {
             ...createBody(),
             initialStateAt: AT,
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
 
         const events = await GET<StateEntity[]>(
             db,

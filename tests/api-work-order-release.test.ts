@@ -24,6 +24,9 @@ import { workOrderClaimHistoryFor } from
     '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const WO_ID = 'yNSSnbrpacodQTzUEcdEVA';
 
@@ -68,7 +71,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             position: 1,
         },
         DEV_TOKEN,
-    );
+        operationIdHeader());
     return db;
 }
 
@@ -109,7 +112,7 @@ Deno.test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
             freshClaimBody(), DEV_TOKEN,
-        );
+            operationIdHeader());
         const res = await handleRequest(db, req(
             'DELETE',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
@@ -142,7 +145,7 @@ Deno.test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
             freshClaimBody(), DEV_TOKEN,
-        );
+            operationIdHeader());
         const first = await handleRequest(db, req(
             'DELETE',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
@@ -177,7 +180,7 @@ Deno.test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
             freshClaimBody(), await devToken(OTHER),
-        );
+            operationIdHeader());
         const res = await handleRequest(db, req(
             'DELETE',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
