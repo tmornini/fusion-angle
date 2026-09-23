@@ -160,8 +160,9 @@ async () => {
     }]);
     assertStrictEquals(await isDatabaseEmpty(empty.sql), true);
     assertMatch(
-        empty.texts[0] ?? '', /FROM message_pairs/,
+        empty.texts[0] ?? '', /FROM fa_message_pairs/,
     );
+    assertMatch(empty.texts[0] ?? '', /0000-root/);
     assertMatch(empty.texts[0] ?? '', /schema_marker/);
 });
 

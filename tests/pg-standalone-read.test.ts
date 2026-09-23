@@ -4,6 +4,7 @@ import { connectPostgres } from
 import { PostgresBackend } from
     '../api/backend-postgres.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
+import { ledgerFields } from './ledger-row.ts';
 
 // Live pin: a standalone store read issues one SELECT
 // with no BEGIN. Skip when POSTGRES_URL is unset so
@@ -68,24 +69,29 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await backend.ensureTable();
         await backend.transaction(
             'readwrite',
-            tx => tx.append({
-                id: 'aaaaaaaaaaaaaaaaaaaaaA',
-                path: '/x/',
-                name: 'n',
-                requester_identity_id:
-                    'WOTMsfERBVJEuTRTgrQptQ',
-                method: 'PUT',
-                request_at:
-                    '2026-01-01T00:00:00.000000Z',
-                request_hash: 'a'.repeat(64),
-                request:
-                    'PUT /x/n HTTP/1.1\r\n\r\n',
-                response_at:
-                    '2026-01-01T00:00:00.000000Z',
-                response: 'HTTP/1.1 200 OK\r\n\r\n',
-                operation_id:
-                    'WvNiHVgksjrlfhPfdgfcyQ',
-            }),
+            async (tx) => {
+                const id = 'aaaaaaaaaaaaaaaaaaaaaA';
+                await tx.append({
+                    id,
+                    ...await ledgerFields({
+                        id,
+                        path: '/x/',
+                        name: 'n',
+                        requester_identity_id:
+                            'WOTMsfERBVJEuTRTgrQptQ',
+                        method: 'PUT',
+                        response_at:
+                            '2026-01-01T00:00:00.000000Z',
+                        request:
+                            'PUT /x/n HTTP/1.1\r\n\r\n',
+                        response:
+                            'HTTP/1.1 200 OK\r\n\r\n',
+                        operation_id:
+                            'WvNiHVgksjrlfhPfdgfcyQ',
+                        supersedes: id,
+                    }),
+                });
+            },
         );
     });
 

@@ -156,6 +156,9 @@ function orderRow(
             + 'x-n: ' + String(n) + '\r\n\r\n',
         response: 'HTTP/1.1 200 OK\r\n\r\n',
         operation_id: ORDER_OPERATION,
+        // Distinct supersedes: one PUT or DELETE per
+        // (path, name, supersedes).
+        supersedes: id,
     });
 }
 
@@ -168,6 +171,7 @@ function pairRow(
     method: string,
     responseAt: string,
     n: number,
+    supersedes?: string,
 ): Promise<Omit<MessagePairEntity, 'id'>> {
     return ledgerFields({
         id,
@@ -181,6 +185,9 @@ function pairRow(
             + 'x-n: ' + String(n) + '\r\n\r\n',
         response: 'HTTP/1.1 200 OK\r\n\r\n',
         operation_id: ORDER_OPERATION,
+        // Distinct supersedes: one PUT or DELETE per
+        // (path, name, supersedes).
+        supersedes: supersedes ?? id,
     });
 }
 
@@ -547,8 +554,12 @@ export function defineStoreAcceptance(
         const first = await pairRow(
             id, HEAD_PATH, 'once', 'PUT', stamp(1), 1,
         );
+        // A different predecessor so only the primary
+        // key conflicts. ON CONFLICT (id) does not
+        // cover the succession index.
         const second = await pairRow(
             id, HEAD_PATH, 'once', 'PUT', stamp(2), 2,
+            generateIdentifier(),
         );
         assertStrictEquals(
             await db.messagePairs.append(id, first), true,

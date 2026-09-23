@@ -125,7 +125,18 @@ export class PostgresBackend implements StorageBackend {
             ? this.#sql
             : clientOf(tx);
         try {
-            return await queryStatement(sql, attempt, rows);
+            // A 23505 aborts the surrounding transaction,
+            // and postgres.js rethrows that error after
+            // the caller catches it. A savepoint keeps
+            // the refusal on the statement.
+            if (tx === undefined) {
+                return await queryStatement(
+                    sql, attempt, rows,
+                );
+            }
+            return await sql.begin((sp) =>
+                queryStatement(sp, attempt, rows),
+            );
         } catch (error) {
             throw mapStatementError(error);
         }

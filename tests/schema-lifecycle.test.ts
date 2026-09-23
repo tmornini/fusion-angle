@@ -145,7 +145,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     });
 
     Deno.test(
-        'message_pairs.id and message_pairs.operation_id are uuid',
+        'fa_message_pairs.id and operation_id are uuid',
         async () => {
             const rows = await sql.query<{
                 column_name: string;
@@ -154,7 +154,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 SELECT column_name, data_type
                 FROM information_schema.columns
                 WHERE table_schema = current_schema()
-                  AND table_name = 'message_pairs'
+                  AND table_name = 'fa_message_pairs'
                   AND column_name IN (
                       'id', 'operation_id',
                       'name',
@@ -179,7 +179,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     );
 
     Deno.test(
-        'the two stamps are timestamptz with no CHECK',
+        'response_at is timestamptz and request_at is gone',
         async () => {
             const columns = await sql.query<{
                 column_name: string;
@@ -188,24 +188,26 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 SELECT column_name, data_type
                 FROM information_schema.columns
                 WHERE table_schema = current_schema()
-                  AND table_name = 'message_pairs'
+                  AND table_name = 'fa_message_pairs'
                   AND column_name IN (
                       'request_at', 'response_at'
                   )
                 ORDER BY column_name
             `;
             assertEquals(
+                columns.map((row) => row.column_name),
+                ['response_at'],
+            );
+            assertEquals(
                 columns.map((row) => row.data_type),
-                [
-                    'timestamp with time zone',
-                    'timestamp with time zone',
-                ],
+                ['timestamp with time zone'],
             );
             const checks = await sql.query<{
                 conname: string;
             }>`
                 SELECT conname FROM pg_constraint
-                WHERE conrelid = 'message_pairs'::regclass
+                WHERE conrelid =
+                    'fa_message_pairs'::regclass
                   AND conname LIKE '%_at_chk'
             `;
             // .length, not a bare array compare: npm:postgres

@@ -59,6 +59,8 @@ function identifierForPrefix(ch: string): string {
         A: 0, a: 26, 0: 52, '-': 62, _: 63,
     };
     bytes[0] = digit[ch]! << 2;
+    // The nil root already owns the all-zero id.
+    bytes[15] = 1;
     return encodeIdentifier(bytes);
 }
 
@@ -82,6 +84,7 @@ async function putPair(
             + ' HTTP/1.1\r\n\r\n',
         response: 'HTTP/1.1 200 OK\r\n\r\n',
         operation_id: '0123456789ABCDEFGHIJKw',
+        supersedes: id,
     }));
 }
 

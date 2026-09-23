@@ -33,8 +33,8 @@ import {
     HTTP_INTERNAL_ERROR,
 } from '../api/http-errors.ts';
 
-// Live Postgres races: first-writer, If-Match, hash
-// dedup, deadlock 500, timeout 504.
+// Live Postgres races: first-writer, If-Match, a
+// second genesis, deadlock 500, timeout 504.
 // Skip when POSTGRES_URL is unset so ./validate stays
 // Postgres-free.
 
@@ -294,10 +294,9 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 statuses.filter((s) => s === 201).length,
                 1,
             );
-            assert(
-                statuses.some((s) =>
-                    s === 412 || s === 428,
-                ),
+            assertStrictEquals(
+                statuses.filter((s) => s === 409).length,
+                1,
             );
             assertStrictEquals(
                 await putHeadsAt(db, FLOW_PREFIX, id),
@@ -343,7 +342,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         try {
             await holder.begin(async (tx) => {
                 await tx.query`
-                    SELECT id FROM message_pairs
+                    SELECT id FROM fa_message_pairs
                     WHERE id = ${uuidTextOfIdentifier(
                         liveHead.id,
                     )}
@@ -389,7 +388,8 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         }
     });
 
-    Deno.test('exact-hash dedup keeps one pair', async () => {
+    Deno.test('a second genesis keeps one pair',
+    async () => {
         const token = await organizationToken();
         const body = ideaDocument('Dedup');
         const op = generateIdentifier();
@@ -411,7 +411,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             1,
         );
         assertStrictEquals(
-            statuses.filter((s) => s === 200).length,
+            statuses.filter((s) => s === 409).length,
             1,
         );
         assertStrictEquals(

@@ -99,13 +99,18 @@ export function parseSeedArgv(
 export async function isDatabaseEmpty(
     sql: SqlClient,
 ): Promise<boolean> {
+    // The nil root is schema genesis, not seeded data.
     const rows = await sql.query<{
         message_pairs: boolean;
         marker: boolean;
     }>`
         SELECT
             EXISTS (
-                SELECT 1 FROM message_pairs
+                SELECT 1 FROM fa_message_pairs
+                WHERE NOT (
+                    path = '/migrations/'
+                    AND name = '0000-root'
+                )
             ) AS message_pairs,
             EXISTS (
                 SELECT 1 FROM schema_marker

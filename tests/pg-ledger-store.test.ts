@@ -1,4 +1,19 @@
-import { assertEquals } from '@std/assert';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+} from '@std/assert';
+import postgres from 'postgres';
+import { FUSION_EVENTS_CHANNEL } from
+    '../api/advisory-lock.ts';
+import { BackedDbAdapter } from '../api/db-backed.ts';
+import { DATE_PLACEHOLDER } from '../api/ledger-root.ts';
+import { statementText } from
+    '../api/ledger-statement-sql.ts';
+import { runLedgerStatement } from
+    '../api/ledger-statement.ts';
+import { PostgresBackend } from
+    '../api/backend-postgres.ts';
 import { connectPostgres } from
     '../api/postgres-client.ts';
 import {
@@ -8,16 +23,25 @@ import {
     POSTGRES_FA_REQUEST_ID_OF_FUNCTION,
 } from '../api/schema-postgres.ts';
 import {
+    generateIdentifier,
+    uuidTextOfIdentifier,
+} from '../shared/identifier.ts';
+import type { StatementBind } from
+    '../shared/ledger-statement.ts';
+import {
     leafHashHex,
+    microsOf,
     pairRootHex,
     secretHashHex,
+    stampOfMicros,
 } from '../shared/pair-root.ts';
 
-// Live pins for the ledger SQL functions. Skip when
-// POSTGRES_URL is unset so ./test validate stays
-// Postgres-free. One scratch schema; do not share it.
-// The session zone is not UTC, so a function that
-// follows TimeZone or DateStyle cannot match.
+// Live pins for the ledger functions and the table.
+// Skip when POSTGRES_URL is unset so ./test validate
+// stays Postgres-free. One scratch schema; do not
+// share it. The session zone is not UTC, so a
+// function that follows TimeZone or DateStyle
+// cannot match.
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -104,6 +128,200 @@ function only<T>(rows: readonly T[]): T {
     return row;
 }
 
+function bytesFromHex(hex: string): Uint8Array {
+    const out = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < out.length; i++) {
+        out[i] = Number.parseInt(
+            hex.slice(i * 2, i * 2 + 2), 16,
+        );
+    }
+    return out;
+}
+
+function faultOf(error: unknown): {
+    code: string,
+    constraint: string,
+} {
+    if (error === null || typeof error !== 'object') {
+        throw new Error('expected a postgres fault');
+    }
+    const rec = error as {
+        code?: unknown,
+        constraint?: unknown,
+        constraint_name?: unknown,
+    };
+    const code = rec.code;
+    const named = typeof rec.constraint === 'string'
+        ? rec.constraint
+        : rec.constraint_name;
+    if (
+        typeof code !== 'string'
+        || typeof named !== 'string'
+    ) {
+        throw error;
+    }
+    return { code, constraint: named };
+}
+
+function splitResponse(body: string): {
+    prefix: Uint8Array,
+    suffix: Uint8Array,
+} {
+    const wire = 'HTTP/1.1 201 \r\n'
+        + 'content-length: ' + String(body.length)
+        + '\r\n'
+        + 'date: ' + DATE_PLACEHOLDER + '\r\n'
+        + '\r\n'
+        + body;
+    const mark = '\r\ndate: ';
+    const valueAt = wire.indexOf(mark) + mark.length;
+    const bytes = new TextEncoder().encode(wire);
+    const width = DATE_PLACEHOLDER.length;
+    return {
+        prefix: bytes.slice(0, valueAt),
+        suffix: bytes.slice(valueAt + width),
+    };
+}
+
+function bindOf(fields: {
+    id: string,
+    operationId: string,
+    path: string,
+    name: string,
+    method: string,
+    body: string,
+    notify: string,
+}): StatementBind {
+    const split = splitResponse(fields.body);
+    const salt = new Uint8Array(16);
+    return {
+        id: fields.id,
+        operationId: fields.operationId,
+        path: fields.path,
+        name: fields.name,
+        requesterIdentityId: 'fa_owner',
+        method: fields.method,
+        request: new Uint8Array(0),
+        requestSalt: salt,
+        secret: new Uint8Array(0),
+        responsePrefix: split.prefix,
+        responseSuffix: split.suffix,
+        responseSalt: salt.slice(),
+        ifMatch: null,
+        notify: fields.notify,
+    };
+}
+
+function parametersOf(
+    attempt: string,
+    row: StatementBind,
+): unknown[] {
+    return [
+        attempt,
+        uuidTextOfIdentifier(row.id),
+        uuidTextOfIdentifier(row.operationId),
+        row.path,
+        row.name,
+        row.requesterIdentityId,
+        row.method,
+        row.request,
+        row.requestSalt,
+        row.secret,
+        row.responsePrefix,
+        row.responseSuffix,
+        row.responseSalt,
+        row.ifMatch === null
+            ? null
+            : uuidTextOfIdentifier(row.ifMatch),
+        row.notify,
+    ];
+}
+
+const LAND_WAIT_MS = 900;
+const MATCH_WAIT_MS = 400;
+
+function listenFor(url: string): {
+    opened: () => Promise<void>,
+    expect: (
+        token: string,
+        ms: number,
+    ) => Promise<string | null>,
+    pendingCount: (token: string) => number,
+    close: () => Promise<void>,
+} {
+    const pending: string[] = [];
+    const waiters: Array<(payload: string) => void> = [];
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const sql = postgres(url, {
+        max: 1,
+        onnotice: () => {},
+    });
+    let unlisten: (() => Promise<void>) | undefined;
+    const ready = sql.listen(
+        FUSION_EVENTS_CHANNEL,
+        (payload) => {
+            let taken = false;
+            for (const waiter of [...waiters]) {
+                const before = waiters.length;
+                waiter(payload);
+                if (waiters.length !== before) {
+                    taken = true;
+                    break;
+                }
+            }
+            if (!taken) pending.push(payload);
+        },
+    ).then((subscription) => {
+        unlisten = () => subscription.unlisten();
+    });
+    return {
+        opened: () => ready.then(() => undefined),
+        pendingCount: (token) => pending.filter(
+            (payload) => payload === token,
+        ).length,
+        expect: (token, ms) => {
+            const at = pending.indexOf(token);
+            if (at >= 0) {
+                pending.splice(at, 1);
+                return Promise.resolve(token);
+            }
+            return new Promise((resolve) => {
+                const timer = setTimeout(() => {
+                    drop();
+                    resolve(null);
+                }, ms);
+                timers.push(timer);
+                const waiter = (payload: string) => {
+                    if (payload !== token) return;
+                    clearTimeout(timer);
+                    drop();
+                    resolve(token);
+                };
+                function drop(): void {
+                    const index = waiters.indexOf(waiter);
+                    if (index >= 0) {
+                        waiters.splice(index, 1);
+                    }
+                }
+                waiters.push(waiter);
+            });
+        },
+        close: async () => {
+            for (const timer of timers) {
+                clearTimeout(timer);
+            }
+            try {
+                await ready;
+                if (unlisten !== undefined) {
+                    await unlisten();
+                }
+            } finally {
+                await sql.end();
+            }
+        },
+    };
+}
+
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     Deno.test(
         'postgres ledger store skipped without'
@@ -116,6 +334,15 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     const sql = connectPostgres(
         urlWithSearchPath(POSTGRES_URL, schema),
     );
+    const backend = new PostgresBackend(sql);
+    const adapter = new BackedDbAdapter(
+        backend,
+        async () => {},
+        async () => {},
+        () => {},
+    );
+    const landToken = schema + '-land';
+    const matchToken = schema + '-match';
     let requestHash = '';
     let secretHash = '';
     let responseHash = '';
@@ -137,12 +364,14 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.unsafe(
             POSTGRES_FA_REQUEST_ID_OF_FUNCTION,
         );
+        await backend.ensureTable();
         const placed = await sql.query<{ nsp: string }>`
             SELECT n.nspname AS nsp
             FROM pg_proc AS p
             JOIN pg_namespace AS n
                 ON n.oid = p.pronamespace
-            WHERE p.proname IN (
+            WHERE n.nspname = ${schema}
+              AND p.proname IN (
                 'fa_imf_fixdate',
                 'fa_pair_root',
                 'fa_message_body_bytes',
@@ -361,6 +590,550 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             assertEquals(row.octets, 5);
             assertEquals(row.matches, true);
             assertEquals(row.bare_octets, 0);
+        },
+    );
+
+    function executeRaw(
+        attempt: string,
+        row: StatementBind,
+    ): Promise<{ outcome: string }[]> {
+        return sql.unsafe(
+            statementText(1),
+            parametersOf(attempt, row),
+        );
+    }
+
+    type CheckRow = {
+        path: string,
+        name: string,
+        method: string,
+        requestSalt: Uint8Array,
+        requestHash: Uint8Array,
+        secretHash: Uint8Array,
+        responseSalt: Uint8Array,
+        responseHash: Uint8Array,
+        pairHash: Uint8Array,
+    };
+
+    function validCheckRow(name: string): CheckRow {
+        const salt = new Uint8Array(16);
+        const hash = new Uint8Array(32);
+        return {
+            path: '/checks/',
+            name,
+            method: 'PUT',
+            requestSalt: salt,
+            requestHash: hash,
+            secretHash: hash.slice(),
+            responseSalt: salt.slice(),
+            responseHash: hash.slice(),
+            pairHash: hash.slice(),
+        };
+    }
+
+    function insertCheckRow(row: CheckRow): Promise<unknown> {
+        return sql.query`
+            INSERT INTO fa_message_pairs (
+                id, operation_id, path, name, supersedes,
+                requester_identity_id, method, response_at,
+                request, request_salt, request_hash,
+                secret, secret_hash,
+                response, response_salt, response_hash,
+                pair_hash
+            ) VALUES (
+                gen_random_uuid(),
+                ${OPERATION_ID}::uuid,
+                ${row.path},
+                ${row.name},
+                ${NIL_UUID}::uuid,
+                ${'fa_owner'},
+                ${row.method},
+                clock_timestamp(),
+                ${new Uint8Array(0)},
+                ${row.requestSalt},
+                ${row.requestHash},
+                ${new Uint8Array(0)},
+                ${row.secretHash},
+                ${new Uint8Array(0)},
+                ${row.responseSalt},
+                ${row.responseHash},
+                ${row.pairHash}
+            )
+        `;
+    }
+
+    async function assertCheck(
+        constraint: string,
+        row: CheckRow,
+    ): Promise<void> {
+        const error = await assertRejects(
+            () => insertCheckRow(row),
+        );
+        assertEquals(
+            [
+                faultOf(error).code,
+                faultOf(error).constraint,
+            ],
+            ['23514', constraint],
+        );
+    }
+
+    Deno.test(
+        'the root occupies the nil slot and matches'
+            + ' the twin',
+        async () => {
+            const row = only(await sql.query<{
+                id: string;
+                operation_id: string;
+                path: string;
+                name: string;
+                supersedes: string;
+                requester_identity_id: string;
+                method: string;
+                stamp: string;
+                request_octets: number;
+                secret_octets: number;
+                request_salt: string;
+                response_salt: string;
+                request_hash: string;
+                secret_hash: string;
+                response_hash: string;
+                pair_hash: string;
+                response_hex: string;
+                request_id: string | null;
+            }>`
+                SELECT id::text AS id,
+                    operation_id::text AS operation_id,
+                    path,
+                    name,
+                    supersedes::text AS supersedes,
+                    requester_identity_id,
+                    method,
+                    to_char(
+                        response_at AT TIME ZONE 'UTC',
+                        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+                    ) AS stamp,
+                    octet_length(request) AS request_octets,
+                    octet_length(secret) AS secret_octets,
+                    encode(request_salt, 'hex')
+                        AS request_salt,
+                    encode(response_salt, 'hex')
+                        AS response_salt,
+                    encode(request_hash, 'hex')
+                        AS request_hash,
+                    encode(secret_hash, 'hex')
+                        AS secret_hash,
+                    encode(response_hash, 'hex')
+                        AS response_hash,
+                    encode(pair_hash, 'hex') AS pair_hash,
+                    encode(response, 'hex') AS response_hex,
+                    fa_request_id_of(response) AS request_id
+                FROM fa_message_pairs
+                WHERE id = ${NIL_UUID}::uuid
+            `);
+            const salt = new Uint8Array(16);
+            const empty = new Uint8Array(0);
+            const requestDigest = await leafHashHex(
+                salt, empty,
+            );
+            const secretDigest = await secretHashHex(
+                empty,
+            );
+            const responseDigest = await leafHashHex(
+                salt, bytesFromHex(row.response_hex),
+            );
+            const pairDigest = await pairRootHex({
+                id: row.id,
+                operationId: row.operation_id,
+                path: row.path,
+                name: row.name,
+                supersedes: row.supersedes,
+                requesterIdentityId:
+                    row.requester_identity_id,
+                method: row.method,
+                responseAt: row.stamp,
+                requestHashHex: requestDigest,
+                secretHashHex: secretDigest,
+                responseHashHex: responseDigest,
+            });
+            assertEquals(row.id, NIL_UUID);
+            assertEquals(row.path, '/migrations/');
+            assertEquals(row.name, '0000-root');
+            assertEquals(row.supersedes, NIL_UUID);
+            assertEquals(row.method, 'PUT');
+            assertEquals(
+                row.requester_identity_id, 'fa_owner',
+            );
+            assertEquals(row.request_octets, 0);
+            assertEquals(row.secret_octets, 0);
+            assertEquals(
+                row.request_salt, '00'.repeat(16),
+            );
+            assertEquals(
+                row.response_salt, '00'.repeat(16),
+            );
+            assertEquals(row.request_id, null);
+            assertEquals(row.request_hash, requestDigest);
+            assertEquals(row.secret_hash, secretDigest);
+            assertEquals(
+                row.response_hash, responseDigest,
+            );
+            assertEquals(row.pair_hash, pairDigest);
+        },
+    );
+
+    Deno.test(
+        'fa_message_pairs_request_salt_chk rejects'
+            + ' a short salt',
+        async () => {
+            const row = validCheckRow('request-salt');
+            row.requestSalt = new Uint8Array(15);
+            await assertCheck(
+                'fa_message_pairs_request_salt_chk',
+                row,
+            );
+        },
+    );
+
+    Deno.test(
+        'fa_message_pairs_response_salt_chk rejects'
+            + ' a short salt',
+        async () => {
+            const row = validCheckRow('response-salt');
+            row.responseSalt = new Uint8Array(15);
+            await assertCheck(
+                'fa_message_pairs_response_salt_chk',
+                row,
+            );
+        },
+    );
+
+    Deno.test(
+        'fa_message_pairs_request_hash_chk rejects'
+            + ' a short digest',
+        async () => {
+            const row = validCheckRow('request-hash');
+            row.requestHash = new Uint8Array(31);
+            await assertCheck(
+                'fa_message_pairs_request_hash_chk',
+                row,
+            );
+        },
+    );
+
+    Deno.test(
+        'fa_message_pairs_secret_hash_chk rejects'
+            + ' a short digest',
+        async () => {
+            const row = validCheckRow('secret-hash');
+            row.secretHash = new Uint8Array(31);
+            await assertCheck(
+                'fa_message_pairs_secret_hash_chk',
+                row,
+            );
+        },
+    );
+
+    Deno.test(
+        'fa_message_pairs_response_hash_chk rejects'
+            + ' a short digest',
+        async () => {
+            const row = validCheckRow('response-hash');
+            row.responseHash = new Uint8Array(31);
+            await assertCheck(
+                'fa_message_pairs_response_hash_chk',
+                row,
+            );
+        },
+    );
+
+    Deno.test(
+        'fa_message_pairs_pair_hash_chk rejects'
+            + ' a short digest',
+        async () => {
+            const row = validCheckRow('pair-hash');
+            row.pairHash = new Uint8Array(31);
+            await assertCheck(
+                'fa_message_pairs_pair_hash_chk',
+                row,
+            );
+        },
+    );
+
+    Deno.test(
+        'fa_message_pairs_method_chk rejects'
+            + ' a lowercase method',
+        async () => {
+            const row = validCheckRow('method');
+            row.method = 'put';
+            await assertCheck(
+                'fa_message_pairs_method_chk',
+                row,
+            );
+        },
+    );
+
+    Deno.test(
+        'fa_message_pairs_path_chk rejects'
+            + ' a path that is not slash-bounded',
+        async () => {
+            const row = validCheckRow('path');
+            row.path = '/checks';
+            await assertCheck(
+                'fa_message_pairs_path_chk',
+                row,
+            );
+        },
+    );
+
+    Deno.test(
+        'a second put or delete at the root slot is'
+            + ' 23505 and a post inserts',
+        async () => {
+            // The root already holds (path, name, nil).
+            // A blind PUT or DELETE supersedes that
+            // head, so it asks for the same slot.
+            // POST is outside the index.
+            const putError = await assertRejects(() =>
+                executeRaw('blind', bindOf({
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    path: '/migrations/',
+                    name: '0000-root',
+                    method: 'PUT',
+                    body: 'again',
+                    notify: schema + '-put',
+                })),
+            );
+            assertEquals(
+                [
+                    faultOf(putError).code,
+                    faultOf(putError).constraint,
+                ],
+                ['23505', 'fa_message_pairs_succession'],
+            );
+            const deleteError = await assertRejects(
+                () => executeRaw('blind', bindOf({
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    path: '/migrations/',
+                    name: '0000-root',
+                    method: 'DELETE',
+                    body: 'gone',
+                    notify: schema + '-delete',
+                })),
+            );
+            assertEquals(
+                [
+                    faultOf(deleteError).code,
+                    faultOf(deleteError).constraint,
+                ],
+                ['23505', 'fa_message_pairs_succession'],
+            );
+            const posted = only(await executeRaw(
+                'blind',
+                bindOf({
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    path: '/migrations/',
+                    name: '0000-root',
+                    method: 'POST',
+                    body: 'post',
+                    notify: schema + '-post',
+                }),
+            ));
+            assertEquals(posted.outcome, 'land');
+            const count = only(await sql.query<{
+                n: number;
+            }>`
+                SELECT count(*)::int AS n
+                FROM fa_message_pairs
+                WHERE path = '/migrations/'
+                  AND name = '0000-root'
+                  AND supersedes = ${NIL_UUID}::uuid
+                  AND method = 'POST'
+            `);
+            assertEquals(count.n, 1);
+        },
+    );
+
+    Deno.test(
+        'a successor stamp is the predecessor plus'
+            + ' one microsecond',
+        async () => {
+            const headId = generateIdentifier();
+            await runLedgerStatement(adapter, 'blind', [
+                bindOf({
+                    id: headId,
+                    operationId: generateIdentifier(),
+                    path: '/pins/',
+                    name: 'stamp',
+                    method: 'PUT',
+                    body: 'old',
+                    notify: schema + '-stamp-head',
+                }),
+            ]);
+            const moved = only(await sql.query<{
+                stamp: string;
+            }>`
+                UPDATE fa_message_pairs
+                SET response_at = clock_timestamp()
+                    + interval '1 minute'
+                WHERE id = ${uuidTextOfIdentifier(
+                    headId,
+                )}::uuid
+                RETURNING to_char(
+                    response_at AT TIME ZONE 'UTC',
+                    'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+                ) AS stamp
+            `);
+            const answer = only(
+                await runLedgerStatement(
+                    adapter, 'blind', [
+                        bindOf({
+                            id: generateIdentifier(),
+                            operationId: generateIdentifier(),
+                            path: '/pins/',
+                            name: 'stamp',
+                            method: 'PUT',
+                            body: 'new',
+                            notify: schema + '-stamp-next',
+                        }),
+                    ],
+                ),
+            );
+            assertEquals(answer.outcome, 'land');
+            assertEquals(
+                answer.stamp,
+                stampOfMicros(microsOf(moved.stamp) + 1n),
+            );
+        },
+    );
+
+    Deno.test(
+        'a land notifies once and a match is silent',
+        async () => {
+            const ear = listenFor(POSTGRES_URL);
+            try {
+                await ear.opened();
+                const heard = ear.expect(
+                    landToken, LAND_WAIT_MS,
+                );
+                const landed = only(
+                    await runLedgerStatement(
+                        adapter, 'blind', [
+                            bindOf({
+                                id: generateIdentifier(),
+                                operationId:
+                                    generateIdentifier(),
+                                path: '/pins/',
+                                name: 'bell',
+                                method: 'PUT',
+                                body: 'hello',
+                                notify: landToken,
+                            }),
+                        ],
+                    ),
+                );
+                assertEquals(landed.outcome, 'land');
+                assertEquals(await heard, landToken);
+                assertEquals(
+                    ear.pendingCount(landToken), 0,
+                );
+                const quiet = ear.expect(
+                    matchToken, MATCH_WAIT_MS,
+                );
+                const matched = only(
+                    await runLedgerStatement(
+                        adapter, 'blind', [
+                            bindOf({
+                                id: generateIdentifier(),
+                                operationId:
+                                    generateIdentifier(),
+                                path: '/pins/',
+                                name: 'bell',
+                                method: 'PUT',
+                                body: 'hello',
+                                notify: matchToken,
+                            }),
+                        ],
+                    ),
+                );
+                assertEquals(matched.outcome, 'matched');
+                assertEquals(matched.inserted, false);
+                assertEquals(await quiet, null);
+                assertEquals(
+                    ear.pendingCount(landToken), 0,
+                );
+            } finally {
+                await ear.close();
+            }
+        },
+    );
+
+    Deno.test(
+        'the head read is an index scan on'
+            + ' fa_message_pairs_document',
+        async () => {
+            await sql.query`
+                INSERT INTO fa_message_pairs (
+                    id, operation_id, path, name,
+                    supersedes,
+                    requester_identity_id, method,
+                    response_at,
+                    request, request_salt, request_hash,
+                    secret, secret_hash,
+                    response, response_salt,
+                    response_hash, pair_hash
+                )
+                SELECT
+                    gen_random_uuid(),
+                    ${OPERATION_ID}::uuid,
+                    '/explain-fill/',
+                    gs::text,
+                    ${NIL_UUID}::uuid,
+                    'fa_owner',
+                    'PUT',
+                    clock_timestamp(),
+                    ''::bytea,
+                    decode(repeat('00', 16), 'hex'),
+                    decode(repeat('00', 32), 'hex'),
+                    ''::bytea,
+                    decode(repeat('00', 32), 'hex'),
+                    ''::bytea,
+                    decode(repeat('00', 16), 'hex'),
+                    decode(repeat('00', 32), 'hex'),
+                    decode(repeat('00', 32), 'hex')
+                FROM generate_series(1, 2000) AS gs
+            `;
+            await sql.query`ANALYZE fa_message_pairs`;
+            const plans = await sql.query<
+                Record<string, unknown>
+            >`
+                EXPLAIN
+                SELECT id, response_at, response
+                FROM fa_message_pairs
+                WHERE path = ${'/migrations/'}
+                  AND name = ${'0000-root'}
+                  AND method IN ('PUT', 'DELETE')
+                ORDER BY response_at DESC, id DESC
+                LIMIT 1
+            `;
+            const text = plans.map((plan) => {
+                const line = plan['QUERY PLAN'];
+                return typeof line === 'string'
+                    ? line
+                    : '';
+            }).join('\n');
+            assert(
+                text.includes('fa_message_pairs_document'),
+                'expected fa_message_pairs_document in\n'
+                    + text,
+            );
+            assert(
+                text.includes('Index Scan'),
+                'expected an index scan in\n' + text,
+            );
         },
     );
 }

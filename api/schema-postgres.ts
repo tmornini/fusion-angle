@@ -44,22 +44,36 @@ export const POSTGRES_SCHEMA_MARKER_TABLE =
     "only" boolean PRIMARY KEY CHECK ("only")
 );`;
 
+// Non-JSON is not a containment fact. The cast must
+// not abort the insert: the GIN index evaluates this
+// on every row, and the root body is a hex digest.
 export const POSTGRES_MESSAGE_BODY_FUNCTION =
     String.raw`CREATE OR REPLACE FUNCTION fa_message_body(message bytea)
 RETURNS jsonb
 IMMUTABLE STRICT PARALLEL SAFE LANGUAGE sql
-RETURN CASE
-    WHEN position(E'\r\n\r\n'::bytea IN message) = 0
-        THEN NULL
-    WHEN substring(message FROM
-         position(E'\r\n\r\n'::bytea IN message) + 4)
-         = ''::bytea
-        THEN NULL
-    ELSE convert_from(
-         substring(message FROM
-         position(E'\r\n\r\n'::bytea IN message) + 4),
-         'UTF8')::jsonb
-END;`;
+RETURN (
+    SELECT CASE
+        WHEN body = ''::bytea THEN NULL
+        WHEN NOT pg_input_is_valid(
+            convert_from(body, 'UTF8'), 'jsonb'
+        )
+            THEN NULL
+        ELSE convert_from(body, 'UTF8')::jsonb
+    END
+    FROM (
+        SELECT CASE
+            WHEN split_at = 0 THEN ''::bytea
+            ELSE substring(
+                message FROM split_at + 4
+            )
+        END AS body
+        FROM (
+            SELECT position(
+                E'\r\n\r\n'::bytea IN message
+            ) AS split_at
+        ) AS located
+    ) AS extracted
+);`;
 
 // Weekday and month are fixed English. to_char
 // Dy and Mon follow lc_time, so those fields are

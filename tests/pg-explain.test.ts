@@ -14,6 +14,7 @@ import { Octets } from
     '../shared/http-message/octets.ts';
 import { decodeIdentifier } from
     '../shared/identifier.ts';
+import { ledgerFields } from './ledger-row.ts';
 
 // Live EXPLAIN pins for schema indexes. ./validate stays
 // Postgres-free: skip when POSTGRES_URL is unset. Private
@@ -88,10 +89,6 @@ function uuidTextOfIdentifier(id: string): string {
     );
 }
 
-function hex64(n: number): string {
-    return n.toString(16).padStart(64, '0');
-}
-
 function atStamp(n: number): string {
     return '2026-01-01T00:00:00.'
         + n.toString(10).padStart(6, '0')
@@ -125,6 +122,34 @@ function jsonWire(body: unknown): string {
     });
 }
 
+async function storedRow(
+    n: number,
+    collection: string,
+    name: string,
+    request: string,
+    response: string,
+    method: string,
+): Promise<{ id: string } & Record<string, string>> {
+    const id = id22(n);
+    return {
+        id,
+        ...await ledgerFields({
+            id,
+            path: collection,
+            name,
+            requester_identity_id: REQUESTER,
+            method,
+            response_at: atStamp(n),
+            request,
+            response,
+            operation_id: OPERATION,
+            // Distinct supersedes: one PUT or DELETE
+            // per (path, name, supersedes).
+            supersedes: id,
+        }),
+    };
+}
+
 async function appendRow(
     tx: Tx,
     n: number,
@@ -133,21 +158,9 @@ async function appendRow(
     message: string,
     method: string,
 ): Promise<void> {
-    const id = id22(n);
-    const at = atStamp(n);
-    await tx.append({
-        id,
-        path: collection,
-        name: name,
-        requester_identity_id: REQUESTER,
-        method,
-        request_at: at,
-        request_hash: hex64(n),
-        request: message,
-        response_at: at,
-        response: message,
-        operation_id: OPERATION,
-    });
+    await tx.append(await storedRow(
+        n, collection, name, message, message, method,
+    ));
 }
 
 async function putAuthorize(
@@ -155,23 +168,15 @@ async function putAuthorize(
     n: number,
     code: string,
 ): Promise<void> {
-    const id = id22(n);
-    const at = atStamp(n);
-    await tx.append({
-        id,
-        path: AUTH_COLLECTION,
-        name: '',
-        requester_identity_id: REQUESTER,
-        method: 'GET',
-        request_at: at,
-        request_hash: hex64(n),
-        request:
-            'GET /authentication/authorize/'
+    await tx.append(await storedRow(
+        n,
+        AUTH_COLLECTION,
+        '',
+        'GET /authentication/authorize/'
             + ' HTTP/1.1\r\n\r\n',
-        response_at: at,
-        response: jsonWire({ code }),
-        operation_id: OPERATION,
-    });
+        jsonWire({ code }),
+        'GET',
+    ));
 }
 
 async function seedRows(
@@ -203,7 +208,7 @@ async function seedRows(
             }
             // Fat document (81 pairs at one name):
             // document ORDER BY prefers
-            // message_pairs_document.
+            // fa_message_pairs_document.
             // Keep /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/ small for the
             // collection pin.
             await appendRow(
@@ -301,7 +306,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     );
     const backend = new PostgresBackend(sql);
     const ideaId = id22(IDEA_N);
-    const ideaHash = hex64(IDEA_N);
 
     Deno.test.beforeAll(async () => {
         await sql.unsafe(
@@ -309,7 +313,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
         await backend.ensureTable();
         await seedRows(backend);
-        await sql.query`ANALYZE message_pairs`;
+        await sql.query`ANALYZE fa_message_pairs`;
     });
 
     Deno.test.afterAll(async () => {
@@ -324,17 +328,17 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         }
     });
 
-    Deno.test('pk uses message_pairs_pkey', async () => {
+    Deno.test('pk uses fa_message_pairs_pkey', async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM message_pairs
+            SELECT * FROM fa_message_pairs
             WHERE id = ${uuidTextOfIdentifier(ideaId)}
         `;
         assertIndexPlan(
             explainText(plans),
-            ['message_pairs_pkey'],
+            ['fa_message_pairs_pkey'],
         );
     });
 
@@ -344,28 +348,32 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM message_pairs
+            SELECT * FROM fa_message_pairs
             WHERE path = ${IDEA_COLLECTION}
             ORDER BY response_at, id
         `;
         assertIndexPlan(
             explainText(plans),
-            ['message_pairs_collection'],
+            ['fa_message_pairs_collection'],
         );
     });
 
-    Deno.test('request_hash uses message_pairs_replay', async () => {
+    Deno.test('request_hash has no replay index',
+    async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM message_pairs
-            WHERE request_hash = ${ideaHash}
+            SELECT id FROM fa_message_pairs
+            WHERE request_hash = decode(
+                ${'ab'.repeat(32)}, 'hex'
+            )
         `;
-        assertIndexPlan(
-            explainText(plans),
-            ['message_pairs_replay'],
+        const text = explainText(plans);
+        assertMatch(
+            text, /Seq Scan on fa_message_pairs/,
         );
+        assertNotMatch(text, /replay/);
     });
 
     Deno.test('document read uses the document index',
@@ -374,32 +382,32 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM message_pairs
+            SELECT * FROM fa_message_pairs
             WHERE path = ${VERSION_COLLECTION}
               AND name = ${VERSION_NAME}
             ORDER BY response_at, id
         `;
         assertIndexPlan(
             explainText(plans),
-            ['message_pairs_document'],
+            ['fa_message_pairs_document'],
         );
     });
 
-    Deno.test('body containment uses message_pairs_body',
+    Deno.test('body containment uses fa_message_pairs_body',
     async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM message_pairs
+            SELECT * FROM fa_message_pairs
             WHERE path = ${AUTH_COLLECTION}
-              AND message_body(response) @>
+              AND fa_message_body(response) @>
                   ${AUTH_CONTAINMENT}::jsonb
             ORDER BY response_at, id
         `;
         assertIndexPlan(
             explainText(plans),
-            ['message_pairs_body'],
+            ['fa_message_pairs_body'],
         );
     });
 
@@ -410,7 +418,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         >`
             EXPLAIN
             SELECT id, method
-            FROM message_pairs
+            FROM fa_message_pairs
             WHERE path = ${VERSION_COLLECTION}
               AND name = ${VERSION_NAME}
               AND method IN ('PUT', 'DELETE')
@@ -420,11 +428,11 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const text = explainText(plans);
         assertNotMatch(text, /requests_pkey/);
         assertNotMatch(text, /Join/);
-        assertIndexPlan(text, ['message_pairs_document']);
+        assertIndexPlan(text, ['fa_message_pairs_document']);
         assertMatch(text, /Limit/);
         assertMatch(
             text,
-            /Index Scan Backward using message_pairs_document/,
+            /Index Scan Backward using fa_message_pairs_document/,
         );
         assertNotMatch(text, /Sort/);
     });
@@ -437,7 +445,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             EXPLAIN
             SELECT * FROM (
                 SELECT DISTINCT ON (name) *
-                FROM message_pairs
+                FROM fa_message_pairs
                 WHERE path = ${IDEA_COLLECTION}
                   AND method IN ('PUT', 'DELETE')
                 ORDER BY name DESC, response_at DESC, id DESC
@@ -449,7 +457,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assertMatch(text, /Unique/);
         assertMatch(
             text,
-            /Index Scan Backward using message_pairs_document/,
+            /Index Scan Backward using fa_message_pairs_document/,
         );
         assertNoSortBeneath(text, 'Unique');
         assertNotMatch(text, /Seq Scan/);
@@ -461,7 +469,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM message_pairs
+            SELECT * FROM fa_message_pairs
             WHERE path = ${VERSION_COLLECTION}
               AND name = ${VERSION_NAME}
               AND method IN ('PUT', 'DELETE')
@@ -472,7 +480,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assertMatch(text, /Limit/);
         assertMatch(
             text,
-            /Index Scan Backward using message_pairs_document/,
+            /Index Scan Backward using fa_message_pairs_document/,
         );
         assertNotMatch(text, /Sort/);
     });
@@ -484,12 +492,12 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 Record<string, unknown>
             >`
                 EXPLAIN
-                SELECT * FROM message_pairs
+                SELECT * FROM fa_message_pairs
                 ORDER BY response_at, id
             `;
             const text = explainText(plans);
             assertMatch(text, /Sort/);
-            assertMatch(text, /Seq Scan on message_pairs/);
+            assertMatch(text, /Seq Scan on fa_message_pairs/);
         },
     );
 
@@ -500,46 +508,70 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 Record<string, unknown>
             >`
                 EXPLAIN
-                SELECT id FROM message_pairs
+                SELECT id FROM fa_message_pairs
                 WHERE id = ${uuidTextOfIdentifier(ideaId)}
                 FOR UPDATE
             `;
             const text = explainText(plans);
             assertMatch(text, /LockRows/);
-            assertIndexPlan(text, ['message_pairs_pkey']);
+            assertIndexPlan(text, ['fa_message_pairs_pkey']);
         },
     );
 
-    Deno.test('insert resolves an id conflict by doing nothing',
-    async () => {
-        const wire = Octets.fromLatin1(
-            putWire(IDEA_COLLECTION + '9', ''),
-        ).asBytes();
-        const plans = await sql.query<
-            Record<string, unknown>
-        >`
-            EXPLAIN
-            INSERT INTO message_pairs (
-                id, path, name,
-                requester_identity_id, method,
-                request_at, request_hash, request,
-                response_at, response,
-                operation_id
-            ) VALUES (
-                ${uuidTextOfIdentifier(id22(EXPLAIN_INSERT_N))},
-                ${IDEA_COLLECTION}, ${'9'},
-                ${REQUESTER}, ${'PUT'},
-                ${atStamp(EXPLAIN_INSERT_N)},
-                ${hex64(EXPLAIN_INSERT_N)}, ${wire},
-                ${atStamp(EXPLAIN_INSERT_N)}, ${wire},
-                ${uuidTextOfIdentifier(OPERATION)}
-            )
-            ON CONFLICT (id) DO NOTHING
-        `;
-        const text = explainText(plans);
-        assertMatch(text, /Conflict Resolution: NOTHING/);
-        assertMatch(
-            text, /Conflict Arbiter Indexes: message_pairs_pkey/,
-        );
-    });
+    Deno.test(
+        'insert resolves an id conflict by doing nothing',
+        async () => {
+            const wire = Octets.fromLatin1(
+                putWire(IDEA_COLLECTION + '9', ''),
+            ).asBytes();
+            const nil =
+                '00000000-0000-0000-0000-000000000000';
+            const salt = '00'.repeat(16);
+            const hash = 'ab'.repeat(32);
+            const plans = await sql.query<
+                Record<string, unknown>
+            >`
+                EXPLAIN
+                INSERT INTO fa_message_pairs (
+                    id, operation_id, path, name,
+                    supersedes,
+                    requester_identity_id, method,
+                    response_at,
+                    request, request_salt, request_hash,
+                    secret, secret_hash,
+                    response, response_salt,
+                    response_hash, pair_hash
+                ) VALUES (
+                    ${uuidTextOfIdentifier(
+                        id22(EXPLAIN_INSERT_N),
+                    )}::uuid,
+                    ${uuidTextOfIdentifier(OPERATION)}
+                        ::uuid,
+                    ${IDEA_COLLECTION}, ${'9'},
+                    ${nil}::uuid,
+                    ${REQUESTER}, ${'PUT'},
+                    ${atStamp(EXPLAIN_INSERT_N)}
+                        ::text::timestamptz,
+                    ${wire},
+                    decode(${salt}, 'hex'),
+                    decode(${hash}, 'hex'),
+                    ${new Uint8Array(0)},
+                    decode(${hash}, 'hex'),
+                    ${wire},
+                    decode(${salt}, 'hex'),
+                    decode(${hash}, 'hex'),
+                    decode(${hash}, 'hex')
+                )
+                ON CONFLICT (id) DO NOTHING
+            `;
+            const text = explainText(plans);
+            assertMatch(
+                text, /Conflict Resolution: NOTHING/,
+            );
+            assertMatch(
+                text,
+                /Conflict Arbiter Indexes: fa_message_pairs_pkey/,
+            );
+        },
+    );
 }
