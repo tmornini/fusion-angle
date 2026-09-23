@@ -46,11 +46,12 @@ skew tests, which went with item 8's trio.
    and serializes exactly this form, request and response
    alike, and keeps every received line: `content-length`
    is checked against the body at the gate, never stripped
-   and recomputed. `request` holds the entire request as
-   received — start line, every header, and the body bytes
-   exactly as received, never re-serialized — less its
-   credential lines, hoisted as below; the client sends
-   `user-agent: fusion-angle/<sha>` on every API request
+   and recomputed. `request` holds the entire request —
+   its start line and header lines in the canonical form,
+   its body bytes exactly as received, never re-serialized
+   — less its credential lines, hoisted as below; the
+   client sends `user-agent: fusion-angle/<sha>` on every
+   API request
    — the SHA `FA_GIT_SHA` supplies, its bullet in
    `## Later work` — so the ledger names the build that
    made each
