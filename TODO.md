@@ -173,7 +173,14 @@ skew tests, which went with item 8's trio.
    undercut it. `pair_hash` is `sha256` over the envelope
    columns and the three leaves, so every reader verifies
    the root from what it may see, and a reader who sees a
-   leaf's bytes and salt verifies that leaf too. All
+   leaf's bytes and salt verifies that leaf too. The
+   three salts, `request_salt`, `secret_salt`, and
+   `response_salt`, are 16 random bytes each, minted by
+   the handler (`crypto.getRandomValues`) — one minting
+   site for both backends — held in a `bytea` column
+   beside the leaf's bytes under
+   `CHECK (octet_length(x) = 16)`, and handed to the
+   INSERT as parameters, like the bytes themselves. All
    four digests are `bytea` under
    `CHECK (octet_length(x) = 32)` — what `sha256()`
    returns, stored as is; hex appears only where a
@@ -257,10 +264,7 @@ skew tests, which went with item 8's trio.
    brainstorm settles: the response credential header's
    name; one fenced column or one per
    message, since a reader must tell which message a
-   hoisted line left; the salts — how many, where each is
-   stored, and what mints them (core Postgres has
-   `gen_random_uuid()`; `gen_random_bytes` is an
-   extension); the byte encoding of the envelope under
+   hoisted line left; the envelope's byte encoding under
    `pair_hash`; whether the
    envelope gains the
    server-minted `request_id`, the per-request key
