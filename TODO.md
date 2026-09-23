@@ -1086,7 +1086,10 @@ skew tests, which went with item 8's trio.
    contractor seat elsewhere appears there as
    "contractor": the document shape (keys on the seat
    body, or a nested facet under the seat mirroring
-   `identities/:id/pii` — the brainstorm decides), its
+   `identities/:id/pii` — the brainstorm decides, under
+   item 2's rule that a profile removable on its own is
+   its own document, since keys on the seat body would
+   hide the seat's whole history), its
    validator, derive, seed, the roster and detail reads,
    and the Members page's edit. Replaces the
    one-profile-per-identity covenant at
