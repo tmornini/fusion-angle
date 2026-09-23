@@ -176,8 +176,8 @@ skew tests, which went with item 8's trio.
    leaf's bytes and salt verifies that leaf too. The
    root's input is fixed by the design, never by a
    session's `DateStyle`, `TimeZone`, or `bytea_output`:
-   each envelope column — `id`, `path`, `name`,
-   `supersedes`, `requester_identity_id`, `operation_id`,
+   each envelope column — `id`, `operation_id`, `path`,
+   `name`, `supersedes`, `requester_identity_id`,
    `method`, `response_at` — then each leaf, in DDL
    order, as a netstring (`length:bytes,`) of its
    canonical text — a uuid as Postgres prints it, the
