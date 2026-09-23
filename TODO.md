@@ -71,8 +71,18 @@ skew tests, which went with item 8's trio.
    Postgres mints is the `date` the wire carries. A
    sibling PUT (item 1) sends nothing; its `response` is
    the message a read of it serves. Secrets
-   move to credential lines: the password rides
-   `Authorization: Basic`, no longer the authorize body,
+   move to credential lines: every secret a request
+   presents rides `Authorization` — `Basic` where an
+   identifier and its proof travel together: the
+   password, no longer the authorize body, and the token
+   request's `code` with its `code_verifier`; `Bearer`
+   where the credential is a token: the exchange's
+   `subject_token` and `actor_token`, and the
+   `client_credentials` grant's `client_assertion`
+   (`api/authentication.ts:1066-1067`) — so no stored
+   request body holds a secret and `secret` is the one
+   column of secrets, the message plane naming each
+   grant's line;
    and the authorize `code` and the token grant's
    `access_token` leave the response body for
    `Authentication-Info` (RFC 9110 §11.6.3), the field
@@ -284,11 +294,7 @@ skew tests, which went with item 8's trio.
    (`api/mock-data.ts:358`), the credentials
    (`api/mock-data.ts:285`), the marker
    (`api/backend-postgres.ts:107-113`). The
-   brainstorm settles: which secrets
-   still ride a body (the token request's `code` and
-   `code_verifier`, the token exchange's `subject_token`
-   and `actor_token`, any password a body still carries)
-   and whether each moves to a credential line; and the
+   brainstorm settles: the
    seed's batch size, a named constant measured against
    the statement cap — the driver's multi-row helper
    already serves under item 2's `fetch_types: false`
