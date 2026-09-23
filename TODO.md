@@ -282,9 +282,15 @@ skew tests, which went with item 8's trio.
    needs no adapter
    primitive: it opens on the client beneath the adapter
    and holds the DDL, the root row, and every pair, in
-   multi-row INSERTs batched far below the 65,535
-   parameters Postgres allows a statement, because the
-   seed will grow. A failed seed leaves nothing, not even
+   multi-row INSERTs batched at half the 65,535
+   parameters Postgres allows a statement — rows per
+   statement `floor(65535 / 2 / n)`, `n` the INSERT's
+   own parameters per row, both named, no number picked
+   by hand — because the
+   seed will grow; the driver's multi-row helper serves
+   under item 2's `fetch_types: false` (measured: 5,000
+   pairs in ten statements, and a failed batch left no
+   table). A failed seed leaves nothing, not even
    a table — DDL, role switches, and batches roll back
    together (measured, 18.6) — and every pair is formed
    and every credential hashed before it opens. Today a
@@ -294,12 +300,7 @@ skew tests, which went with item 8's trio.
    (`api/mock-data.ts:358`), the credentials
    (`api/mock-data.ts:285`), the marker
    (`api/backend-postgres.ts:107-113`). The
-   brainstorm settles: the
-   seed's batch size, a named constant measured against
-   the statement cap — the driver's multi-row helper
-   already serves under item 2's `fetch_types: false`
-   (measured: 5,000 pairs in ten statements, and a failed
-   batch left no table); and how a seed keeps a chain's
+   brainstorm settles: how a seed keeps a chain's
    order — members in successive batches, or a rank on
    the one clock. The DDL is
    final when this item ships, but for `schema_marker`,
