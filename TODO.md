@@ -56,9 +56,10 @@ skew tests, which went with item 8's trio.
    actually sent — 201 for every PUT that lands, a
    genesis, a successor, or a PUT after a DELETE alike,
    as today (`api/message-pair.ts:649-651`), a sibling
-   PUT's line included; 200 for a blind PUT that lands
-   nothing
-   because its state is already the head, a replay,
+   PUT's line included; 200 for a PUT that lands nothing
+   because its state is already the head — blind, or
+   in-order with a latch that held (RFC 9110 §13.1.1) —
+   a replay,
    answered with the head's unit; and 204 on DELETE —
    and `date`, `etag`, `operation-id`, and `request-id` as
    the wire carries them; item 1 says how a read serves
@@ -276,9 +277,7 @@ skew tests, which went with item 8's trio.
    (`api/mock-data.ts:285`), the marker
    (`api/backend-postgres.ts:107-113`). The
    brainstorm settles: the response credential header's
-   name; whether an in-order PUT
-   whose state is already the head answers 2xx, as
-   RFC 9110 §13.1.1 permits, or 412; which secrets
+   name; which secrets
    still ride a body (the token request's `code` and
    `code_verifier`, the token exchange's `subject_token`
    and `actor_token`, any password a body still carries)
@@ -425,7 +424,8 @@ skew tests, which went with item 8's trio.
    holds the latch. A PATCH or POST that would leave
    the head's state unchanged stores nothing at all, as
    item 0's PUT does: neither its own pair nor a sibling
-   lands. Today a no-op claim still stores its pair
+   lands, and it answers 200 with the head's unit, as that
+   PUT does. Today a no-op claim still stores its pair
    (`api/routes.ts:1919-1923`) and a no-op PATCH appends a
    version and answers 201
    (`tests/api-instances-create.test.ts:578-614`).
