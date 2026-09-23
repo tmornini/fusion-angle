@@ -156,7 +156,8 @@ skew tests, which went with item 8's trio.
    verb's (RFC 9110 §9.2.2): a PUT or DELETE that would
    leave the head's state unchanged lands nothing, and a
    repeated POST or PATCH is a new request that runs again
-   — its only write is its sibling PUT (item 1). Nothing
+   — its own pair and a sibling PUT, or nothing when the
+   head already holds its state (item 1). Nothing
    dedupes requests. Every write is ONE statement, guarded
    by a constraint, never by a transaction or a lock: the
    INSERT mints `response_at` from `clock_timestamp()`,
