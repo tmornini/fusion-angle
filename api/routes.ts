@@ -3830,16 +3830,7 @@ async function postInstanceCreateOp(
     const pairs = [
         messagePair, revisionMessagePair,
     ];
-    // A create. A raced second create loses the
-    // succession slot; the route's ladder is 428.
-    const answer = await runWrite(db, 'genesis', pairs);
-    if (answer.outcome === 'refused') {
-        throw new ApiError(
-            'If-Match is required to PATCH '
-                + pathname,
-            HTTP_PRECONDITION_REQUIRED,
-        );
-    }
+    await runWrite(db, attemptFor(pairs), pairs);
 }
 
 // Instance PATCH two-pair append (Task 17 / R5 / R9).

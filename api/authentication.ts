@@ -1180,10 +1180,8 @@ async function grantClientCredentials(
         eventMessagePair,
         messagePair,
     ];
-    // The ticket is a create. A second grant of the
-    // same jti loses the succession slot.
     const written = await runWrite(
-        adapter, 'genesis', pairs,
+        adapter, attemptFor(pairs), pairs,
     );
     return written.outcome === 'land'
         ? {
@@ -1429,10 +1427,8 @@ async function grantAuthorizationCode(
         eventMessagePair,
         messagePair,
     ];
-    // The marker is a create. A raced redeem loses
-    // the succession slot and stores nothing.
     const written = await runWrite(
-        adapter, 'genesis', pairs,
+        adapter, attemptFor(pairs), pairs,
     );
     return written.outcome === 'land'
         ? {

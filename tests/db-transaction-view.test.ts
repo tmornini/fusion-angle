@@ -57,4 +57,35 @@ Deno.test(
     },
 );
 
+Deno.test(
+    'nested readTransaction inside transaction re-enters',
+    async () => {
+        const db = memoryDbAdapter();
+        await db.postSchemaCreation();
+        const seen = await db.backend.transaction(
+            'readwrite',
+            async (tx) => {
+                const view = db.openClient(tx);
+                await view.messagePairs.append(
+                    PAIR_ID, aMessagePair,
+                );
+                // The nested read joins the open client,
+                // so the uncommitted append is visible.
+                return view.readTransaction(
+                    (inner) => inner.messagePairs
+                        .getCollectionPairs(
+                            aMessagePair.path,
+                        ),
+                );
+            },
+        );
+        assertStrictEquals(seen.length, 1);
+        assertStrictEquals(seen[0]!.id, PAIR_ID);
+        assertStrictEquals(
+            (await db.messagePairs.getById(PAIR_ID)).id,
+            PAIR_ID,
+        );
+    },
+);
+
 
