@@ -659,8 +659,9 @@ async () => {
 
 // -- 5. live-write chain on wire + derive ------------------------
 
-Deno.test('live-write chain: create, edit, RESTRICT 409, echoed'
-+ ' state, archive, delete, physical DELETE',
+Deno.test('live-write chain: create, unchanged edit'
++ ' stores nothing, RESTRICT 409, echoed state,'
++ ' archive, delete, physical DELETE',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -733,7 +734,10 @@ async () => {
     await assertAttributeWire(attrB);
     // Phase Final Stage B: records table retired.
 
-    // Step 2: edit — add attrC, remove attrA.
+    // Step 2: the record body is the create's head.
+    // Attr C and the removal of Attr A do not land.
+    const beforeEdit =
+        (await db.messagePairs.getAll()).length;
     const edited = await handleRequest(db, req(
         'POST', '/organizations/' + STARK_ORGANIZATION
             + '/record-types/', token,
@@ -748,11 +752,20 @@ async () => {
             'active',
         ),
     ));
-    assertStrictEquals(edited.status, 201);
+    assertStrictEquals(edited.status, 200);
+    const answered: unknown = await edited.json();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length,
+        beforeEdit,
+    );
     await assertRecordWire();
-    await assertAttributeAbsent(attrA);
+    const derivedHead = await derivedRecord(
+        db, STARK_ORGANIZATION, recordId,
+    );
+    assertEquals(answered, derivedHead);
+    await assertAttributeWire(attrA);
     await assertAttributeWire(attrB);
-    await assertAttributeWire(attrC);
+    await assertAttributeAbsent(attrC);
 
     // Step 3: referenced-attribute removal 409s; zero new pairs.
     const beforeRequestCount =

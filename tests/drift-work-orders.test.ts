@@ -754,9 +754,9 @@ async () => {
 
 // -- 6. duplicate-create multiset -------------------------------
 
-Deno.test('duplicate-create: two creates, same work-order id, fresh'
-+ ' join id + fresh event ids/ats on the second — ONE document'
-+ ' head; TWO join pairs; SIX birth state events', async () => {
+Deno.test('duplicate-create: an unchanged document'
++ ' stores nothing — one head, the first join,'
++ ' the first birth events', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const workOrderId = generateIdentifier();
@@ -786,6 +786,8 @@ Deno.test('duplicate-create: two creates, same work-order id, fresh'
         ),
     ));
     assertStrictEquals(first.status, 201);
+    const afterFirst =
+        (await db.messagePairs.getAll()).length;
 
     const second = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
@@ -807,39 +809,44 @@ Deno.test('duplicate-create: two creates, same work-order id, fresh'
             '2026-05-02T00:00:01.000000Z',
         ),
     ));
-    // The create op holds no echo of its own — a duplicate
-    // create succeeds outright, never 412ing.
-    assertStrictEquals(second.status, 201);
+    // The document body already is the head. One
+    // match stores nothing, join included, and
+    // answers 200 with that head.
+    assertStrictEquals(second.status, 200);
+    const answered: unknown = await second.json();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length,
+        afterFirst,
+    );
 
     const entityRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + workOrderId, token),
     );
     assertStrictEquals(entityRes.status, 200);
+    const entityText = await entityRes.text();
     const derivedEntity = await derivedWorkOrder(
         db, STARK_ORGANIZATION, workOrderId,
     );
     assertStrictEquals(
-        await entityRes.text(),
+        entityText,
         JSON.stringify(derivedEntity),
     );
+    assertEquals(answered, JSON.parse(entityText));
     // Phase Final Stage B: work_orders table retired.
 
     assertStrictEquals(
         (await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
         )).length,
-        6,
+        3,
     );
 
     const derivedJoins = (await deriveFlowWorkOrders(
         db, STARK_ORGANIZATION, flowId,
     )).filter((row) => row.id === pfidA || row.id === pfidB);
-    assertStrictEquals(derivedJoins.length, 2);
-    assertEquals(
-        sortById(derivedJoins).map(r => r.id),
-        [pfidA, pfidB].sort(),
-    );
+    assertStrictEquals(derivedJoins.length, 1);
+    assertStrictEquals(derivedJoins[0]!.id, pfidA);
 });
 
 // -- 7. document supersession (plain, NOT skew) -----------------

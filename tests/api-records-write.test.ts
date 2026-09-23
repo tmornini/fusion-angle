@@ -1,9 +1,11 @@
 import {
+    assertEquals,
     assertNotStrictEquals,
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { GET, POST } from '../api/api.ts';
+import { GET, handleRequest, POST } from '../api/api.ts';
+import { apiRequest } from './http-fixtures.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     seedCurrentMember,
@@ -171,16 +173,20 @@ Deno.test(
 );
 
 Deno.test(
-    'POST nested record-types edit removes'
-    + ' attributes by id and adds new ones',
+    'POST nested record-types edit with an'
+    + ' unchanged record stores nothing',
     async () => {
         const db = await freshDb();
         const oldAttrId = generateIdentifier();
         const newAttrId = generateIdentifier();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
+        const collection =
+            '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/record-types/';
+        const recordId = 'rbfHGatkwQzGZJVXKJEeyw';
+        await POST(db, collection.slice(1), {
             kind: 'create',
-            id: 'rbfHGatkwQzGZJVXKJEeyw',
+            id: recordId,
             record: {
                 organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'R',
@@ -191,7 +197,7 @@ Deno.test(
                 {
                     id: oldAttrId,
                     organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
+                    record_id: recordId,
                     name: 'Old',
                     attribute_type: 'text',
                     sort_order: 0,
@@ -201,51 +207,82 @@ Deno.test(
             ],
             initialState: 'active',
         }, DEV_TOKEN);
-        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
-            kind: 'edit',
-            id: 'rbfHGatkwQzGZJVXKJEeyw',
-            record: {
-                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-                name: 'R',
-                description: '',
-                position: 1,
-            },
-            attributes: [
-                {
-                    id: newAttrId,
-                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
-                    name: 'New',
-                    attribute_type: 'text',
-                    sort_order: 0,
-                    options: [],
-                    constraints: [],
+        // The record body is the head. The new attribute
+        // and the removal are siblings of that match.
+        const before =
+            (await db.messagePairs.getAll()).length;
+        const edit = await handleRequest(db, apiRequest({
+            method: 'POST',
+            path: collection,
+            token: DEV_TOKEN,
+            body: {
+                kind: 'edit',
+                id: recordId,
+                record: {
+                    organization_id:
+                        'AjdvjuECVZEgZoFajaIEkg',
+                    name: 'R',
+                    description: '',
+                    position: 1,
                 },
-            ],
-            // Echoed from the create's own known head above.
-            state: 'active',
-            removedAttributeIds: [oldAttrId],
-        }, DEV_TOKEN);
+                attributes: [
+                    {
+                        id: newAttrId,
+                        organization_id:
+                            'AjdvjuECVZEgZoFajaIEkg',
+                        record_id: recordId,
+                        name: 'New',
+                        attribute_type: 'text',
+                        sort_order: 0,
+                        options: [],
+                        constraints: [],
+                    },
+                ],
+                state: 'active',
+                removedAttributeIds: [oldAttrId],
+            },
+        }));
+        assertStrictEquals(edit.status, 200);
+        const answered: unknown = await edit.json();
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length,
+            before,
+        );
+        const head = await handleRequest(db, apiRequest({
+            method: 'GET',
+            path: collection + recordId,
+            token: DEV_TOKEN,
+        }));
+        assertStrictEquals(head.status, 200);
+        assertEquals(answered, await head.json());
         const all = await GET<{
             id: string;
             name: string;
-        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN);
+        }[]>(
+            db,
+            collection.slice(1) + recordId + '/attributes/',
+            DEV_TOKEN,
+        );
         assertStrictEquals(all.length, 1);
-        assertStrictEquals(all[0]!.id, newAttrId);
-        assertStrictEquals(all[0]!.name, 'New');
+        assertStrictEquals(all[0]!.id, oldAttrId);
+        assertStrictEquals(all[0]!.name, 'Old');
     },
 );
 
 Deno.test(
-    'POST nested record-types edit updates an'
-    + ' existing attribute by upsert',
+    'POST nested record-types edit that resends'
+    + ' the record stores nothing',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
+        const collection =
+            '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/record-types/';
+        const recordId = 'rbfHGatkwQzGZJVXKJEeyw';
+        const attrId = 'UQBiHFcwJeCDSnmkPBoYRA';
+        await POST(db, collection.slice(1), {
             kind: 'create',
-            id: 'rbfHGatkwQzGZJVXKJEeyw',
+            id: recordId,
             record: {
                 organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'R', description: '',
@@ -253,9 +290,9 @@ Deno.test(
             },
             attributes: [
                 {
-                    id: 'UQBiHFcwJeCDSnmkPBoYRA',
+                    id: attrId,
                     organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
+                    record_id: recordId,
                     name: 'Initial',
                     attribute_type: 'text',
                     sort_order: 0,
@@ -265,43 +302,65 @@ Deno.test(
             ],
             initialState: 'active',
         }, DEV_TOKEN);
-        await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
-            kind: 'edit',
-            id: 'rbfHGatkwQzGZJVXKJEeyw',
-            record: {
-                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-                name: 'R', description: '',
-                position: 1,
-            },
-            attributes: [
-                {
-                    id: 'UQBiHFcwJeCDSnmkPBoYRA',
-                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-                    record_id: 'rbfHGatkwQzGZJVXKJEeyw',
-                    name: 'Renamed',
-                    attribute_type: 'number',
-                    sort_order: 0,
-                    options: [],
-                    constraints: [],
+        // The record body is the head. The renamed
+        // attribute is a sibling of that match.
+        const before =
+            (await db.messagePairs.getAll()).length;
+        const edit = await handleRequest(db, apiRequest({
+            method: 'POST',
+            path: collection,
+            token: DEV_TOKEN,
+            body: {
+                kind: 'edit',
+                id: recordId,
+                record: {
+                    organization_id:
+                        'AjdvjuECVZEgZoFajaIEkg',
+                    name: 'R', description: '',
+                    position: 1,
                 },
-            ],
-            // Echoed from the create's own known head above.
-            state: 'active',
-            removedAttributeIds: [],
-        }, DEV_TOKEN);
+                attributes: [
+                    {
+                        id: attrId,
+                        organization_id:
+                            'AjdvjuECVZEgZoFajaIEkg',
+                        record_id: recordId,
+                        name: 'Renamed',
+                        attribute_type: 'number',
+                        sort_order: 0,
+                        options: [],
+                        constraints: [],
+                    },
+                ],
+                state: 'active',
+                removedAttributeIds: [],
+            },
+        }));
+        assertStrictEquals(edit.status, 200);
+        const answered: unknown = await edit.json();
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length,
+            before,
+        );
+        const head = await handleRequest(db, apiRequest({
+            method: 'GET',
+            path: collection + recordId,
+            token: DEV_TOKEN,
+        }));
+        assertStrictEquals(head.status, 200);
+        assertEquals(answered, await head.json());
         const stored = await GET<{
             name: string;
             attribute_type: string;
         }>(
             db,
-            'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-                + 'rbfHGatkwQzGZJVXKJEeyw'
-            + '/attributes/UQBiHFcwJeCDSnmkPBoYRA',
+            collection.slice(1) + recordId
+                + '/attributes/' + attrId,
             DEV_TOKEN,
         );
-        assertStrictEquals(stored.name, 'Renamed');
+        assertStrictEquals(stored.name, 'Initial');
         assertStrictEquals(
-            stored.attribute_type, 'number',
+            stored.attribute_type, 'text',
         );
     },
 );

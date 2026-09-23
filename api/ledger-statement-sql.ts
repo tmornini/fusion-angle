@@ -185,9 +185,9 @@ export function statementText(rowCount: number): string {
         '    RETURNING id',
         '),',
         'notified AS (',
-        '    SELECT count(pg_notify(',
+        '    SELECT pg_notify(',
         "        'fusion_events', src.notify",
-        '    )) AS n',
+        '    ) AS sent',
         '    FROM inserted ins',
         '    JOIN input src ON src.id = ins.id',
         ')',
@@ -214,7 +214,9 @@ export function statementText(rowCount: number): string {
         "    encode(rep.pair_hash, 'hex')",
         '        AS pair_hash',
         'FROM reported rep',
-        'CROSS JOIN notified',
+        'CROSS JOIN (',
+        '    SELECT count(*) AS n FROM notified',
+        ')',
         'ORDER BY rep.ord',
     ].join('\n');
 }

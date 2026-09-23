@@ -96,7 +96,6 @@ import {
     documentHeadAt,
     formWriteMessagePair,
     messagePairResponseBody,
-    responseBodyText,
     ifMatchFromMessagePair,
     rawIfMatchFromMessagePair,
     parseIfMatch,
@@ -1075,15 +1074,12 @@ export async function postRecordWriteOp(
             // monotonicity) and the document message pair becomes the
             // shared document's head.
             if (messagePairs !== undefined) {
-                const pairs = await rowsExceptMatchedHeads(
-                    view,
-                    [
-                        messagePairs.operation,
-                        messagePairs.document,
-                        ...messagePairs.attributePuts,
-                        ...messagePairs.attributeDeletes,
-                    ],
-                );
+                const pairs = [
+                    messagePairs.operation,
+                    messagePairs.document,
+                    ...messagePairs.attributePuts,
+                    ...messagePairs.attributeDeletes,
+                ];
                 await runWrite(
                     view, attemptFor(pairs), pairs,
                 );
@@ -1869,36 +1865,6 @@ export interface WorkOrderCreationMessagePairs {
 // postFlowWorkOrderDocumentOp instead; states traces stay
 // direct until the states-trace group. The route always
 // supplies the triple and forms all three pairs pre-tx.
-// A row whose response already is the head is not a
-// change. Leaving it in the statement matches the whole
-// call and drops the siblings that do differ.
-async function rowsExceptMatchedHeads(
-    view: DbAdapter,
-    rows: readonly MessagePair[],
-): Promise<MessagePair[]> {
-    const kept: MessagePair[] = [];
-    for (const row of rows) {
-        if (
-            row.method !== 'PUT'
-            && row.method !== 'DELETE'
-        ) {
-            kept.push(row);
-            continue;
-        }
-        const head = await messageStore(view)
-            .getDocumentHead(row.path, row.name);
-        if (
-            head !== null
-            && responseBodyText(row.responseMessage)
-                === responseBodyText(head.response)
-        ) {
-            continue;
-        }
-        kept.push(row);
-    }
-    return kept;
-}
-
 export async function postWorkOrderCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
@@ -1915,15 +1881,12 @@ export async function postWorkOrderCreationOp(
             // document so DELETE /claim can release the
             // creation-time claim.
             if (messagePairs !== undefined) {
-                const pairs = await rowsExceptMatchedHeads(
-                    view,
-                    [
-                        messagePairs.operation,
-                        messagePairs.document,
-                        messagePairs.join,
-                        messagePairs.claim,
-                    ],
-                );
+                const pairs = [
+                    messagePairs.operation,
+                    messagePairs.document,
+                    messagePairs.join,
+                    messagePairs.claim,
+                ];
                 await runWrite(
                     view, attemptFor(pairs), pairs,
                 );
