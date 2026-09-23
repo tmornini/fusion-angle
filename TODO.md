@@ -292,11 +292,10 @@ skew tests, which went with item 8's trio.
    writes are one
    multi-row INSERT; the bell rings from the same
    statement (`RETURNING` into `pg_notify`). `transaction`
-   and `writeLocks` leave `DbAdapter`; item 13's "advisory
-   locks already cluster-wide" loses its referent. A seed
-   is one of the two transactions left — item 3's release
-   is the other, on the same owner-side writer — and it
-   needs no adapter
+   and `writeLocks` leave `DbAdapter`. A seed is one of
+   the two transactions left — item 3's release is the
+   other, on the same owner-side writer — and it needs no
+   adapter
    primitive: it opens on the client beneath the adapter
    and holds the DDL, the root row, and every pair, in
    multi-row INSERTs batched at half the 65,535
@@ -1220,10 +1219,10 @@ skew tests, which went with item 8's trio.
     the comment there when done). Then two replicas
     behind Render's balancer, each answering item 4's
     probe; LISTEN in each (item 9 is per process by
-    construction); advisory locks already cluster-wide;
-    the throttle's per-process counters named as a known
-    cost or moved to the store; a Postgres plan with a
-    standby and a rehearsed failover. Closes KNOWN seam
+    construction); the throttle's per-process counters
+    named as a known cost or moved to the store; a
+    Postgres plan with a standby and a rehearsed
+    failover. Closes KNOWN seam
     "Single mint process" and retires ARCHITECTURE.md's
     "do not run two replicas". Consumes items 4, 6, 9,
     and the examination report's lock and growth findings
