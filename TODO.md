@@ -515,8 +515,13 @@ skew tests, which went with item 8's trio.
    with the same three substitutions and the same
    projection, so one head is one
    unit from either source. The boundary is a fresh
-   identifier per response, so no part can contain it, and
-   the client's rebuild owns the splitter. Measured on the
+   UUID minted per response — 36 characters of
+   RFC 2046 §5.1.1's alphabet, under its 70 — so no part
+   can contain it, and the joiner and the splitter live
+   in `shared/http-message`, beside the parser every
+   part goes through: one library for both sides, and
+   the client's only dependency outside its own
+   directory. Measured on the
    mock data against today's arrays of bare bodies, a part
    costs 293 bytes, 215 of them the stored response's own
    lines: lists grow 33% in all — a tenth for large
@@ -644,9 +649,7 @@ skew tests, which went with item 8's trio.
    are read-only conveniences, and what each PUT
    response must say for its readers — is the spec's
    first section, written from the code as item 0
-   leaves it. The brainstorm settles:
-   the multipart boundary's
-   form and the client splitter's home; and the
+   leaves it. The brainstorm settles: the
    collection read's order — the skip walk yields names
    in name order, today's read orders heads by stamp
    (`api/backend-postgres.ts:545`), and pages may lean on
