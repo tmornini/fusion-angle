@@ -1376,7 +1376,7 @@ Off the critical path; each with its oracle.
   and view `fa_*` (item 0 renames the table and its
   indexes; item 2 creates its roles and views under the
   prefix). Product code reads
-  six names, and every reader is ours — `POSTGRES_URL`,
+  six names of its own — `POSTGRES_URL`,
   `JWT_HMAC_SIGNING_KEY`, `PORT`, and `TRUSTED_PROXY_HOPS`
   (`server/boot.ts:59-72`; the URL again at
   `server/postgres-seed.ts:68` and
@@ -1394,6 +1394,13 @@ Off the critical path; each with its oracle.
   Render CLI's `RENDER_API_KEY`, which `deploy:191` and
   `bin/postgres-seed:154` fill from their own argument; a
   dependency that ever dictates a name gets its adapter.
+  One dictates today: postgres.js reads sixteen `PG*`
+  names as option defaults — `PGPORT`, `PGSSL`,
+  `PGIDLE_TIMEOUT`, and their kin — and `bin/build:100-104`
+  grants the binary exactly those, so not every reader is
+  ours until `api/postgres-client.ts` passes every option
+  and the grants go, or `PG*` is named a third edge — the
+  brainstorm settles which.
   Today's role and database are both `fusion`
   (`compose.yaml:2,8-9`, `deploy:171`,
   `bin/test-postgres:22`). Ships no later than the deploy
@@ -1401,8 +1408,13 @@ Off the critical path; each with its oracle.
   configure, so they rename once. The brainstorm settles
   how far "infrastructure" reaches: the database name,
   compose's service and container names, the hosted
-  service names, and the test-only `CHROME` and
-  `CHROME_DEBUG_URL`. Oracle: `env | grep FA_` lists
+  service names, the test-only `CHROME` and
+  `CHROME_DEBUG_URL`, and the scripts' and tests'
+  `FUSION_ANGLE_STATIC_ROOT` (`bin/test-browser:38`,
+  `tests/browser/fixtures.ts:58`),
+  `MOST_RECENTLY_VALIDATED_SHA_PATH`, and
+  `WORKING_TREE_PORCELAIN` (`test:239`, `:243`), which
+  the oracle reaches. Oracle: `env | grep FA_` lists
   everything the system needs, and a test finds every
   environment read in product code and scripts and fails
   on a name without the prefix outside the two edges
