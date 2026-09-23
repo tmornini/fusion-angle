@@ -766,7 +766,7 @@ skew tests, which went with item 8's trio.
    (measured, postgres.js 3.4.9), so
    `api/postgres-client.ts` sets it; product SQL passes no
    arrays today. After the reduction a member of `fa_api`
-   connects, uses the schema, inserts through its view,
+   connects, uses the schema, inserts into the table,
    reads its unfenced columns, and may LISTEN and NOTIFY,
    which are commands and not grants — nothing else. One
    owner verb, `migrate`, makes a cluster and its database
