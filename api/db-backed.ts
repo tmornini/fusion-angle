@@ -24,6 +24,8 @@ import type {
 } from './notifications.ts';
 import { HistoryEntityStore }
     from './store-history-entity.ts';
+import { SuccessionConflict } from
+    './ledger-statement.ts';
 import {
     validateMessagePairEntity,
 } from './validators.ts';
@@ -119,7 +121,17 @@ export class BackedDbAdapter
         const client = this.#viewForTx(tx);
         const run = client.executeLedger.bind(client);
         client.executeLedger = async (attempt, rows, now) => {
-            const stated = await run(attempt, rows, now);
+            let stated;
+            try {
+                stated = await run(attempt, rows, now);
+            } catch (error) {
+                if (error instanceof SuccessionConflict) {
+                    throw new Error(
+                        'seed statement returned refused',
+                    );
+                }
+                throw error;
+            }
             for (const row of stated) {
                 if (row.outcome !== 'land') {
                     throw new Error(

@@ -133,14 +133,19 @@ import {
 // A missing pair here is a pass-1/pass-2 wiring bug (a dropped
 // or mis-keyed invocation), never an expected condition — crash
 // loud rather than silently write the row with no pair.
-function writeSeedPair(
+export async function writeSeedPair(
     adapter: DbAdapter,
     pair: MessagePair,
     now?: string,
-): Promise<unknown> {
-    return runWrite(
+): Promise<void> {
+    const answer = await runWrite(
         adapter, attemptFor([pair]), [pair], now,
     );
+    if (answer.outcome !== 'land') {
+        throw new Error(
+            'seed statement returned ' + answer.outcome,
+        );
+    }
 }
 
 function requireMessagePair(
@@ -518,9 +523,15 @@ async function postMockDataLoadIn(
                     ),
                 ),
             ];
-            await runWrite(
+            const answer = await runWrite(
                 adapter, attemptFor(pairs), pairs,
             );
+            if (answer.outcome !== 'land') {
+                throw new Error(
+                    'seed statement returned '
+                        + answer.outcome,
+                );
+            }
         })(),
         // Role grants retired: membership `type` (admin for
         // current, member otherwise) seeds privilege; mint
