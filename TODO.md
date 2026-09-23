@@ -2653,17 +2653,17 @@ Off the critical path; each with its oracle.
   above the budgets' noise — the item activates on that
   number, not before.
 - Simulated latency by environment — when
-  `FUSION_ANGLE_ENVIRONMENT` is exactly `local` and
-  `FUSION_ANGLE_LATENCY` is a millisecond count,
+  `FA_ENVIRONMENT` is exactly `local` and
+  `FA_LATENCY` is a millisecond count,
   both present and non-empty, every API request
   takes the existing log-normal sampler
   (`api/latency.ts:18-40`) with
-  `mu = ln(FUSION_ANGLE_LATENCY)`; otherwise the
+  `mu = ln(FA_LATENCY)`; otherwise the
   no-op. Merged: the shim's "both presets pass a
   no-op today" (`api/latency.ts:1-5`,
   `api/db-backed.ts:31-32` — revise both comments when
   done). Oracle:
-  `FUSION_ANGLE_LATENCY=200` under `local` lifts every
+  `FA_LATENCY=200` under `local` lifts every
   `./bin/measure` median by about 200 ms; unset leaves
   the no-op.
 - GPU flag in the Layer 2 launcher — `launchChrome`
