@@ -173,7 +173,13 @@ skew tests, which went with item 8's trio.
    undercut it. `pair_hash` is `sha256` over the envelope
    columns and the three leaves, so every reader verifies
    the root from what it may see, and a reader who sees a
-   leaf's bytes and salt verifies that leaf too. Row
+   leaf's bytes and salt verifies that leaf too. All
+   four digests are `bytea` under
+   `CHECK (octet_length(x) = 32)` — what `sha256()`
+   returns, stored as is; hex appears only where a
+   message body carries a digest (item 3). Today's
+   `request_hash` is hex `text` under a `{64}` check
+   (`api/schema-postgres.ts:17-19`). Row
    hashes stay independent — no chain: the root covers the
    `supersedes` id, never a predecessor's hash — so
    erasure stays possible. Every PUT and DELETE names the
@@ -255,9 +261,7 @@ skew tests, which went with item 8's trio.
    stored, and what mints them (core Postgres has
    `gen_random_uuid()`; `gen_random_bytes` is an
    extension); the byte encoding of the envelope under
-   `pair_hash`; the hash columns' type — `sha256()`
-   yields `bytea`, today's are hex `text` under a `{64}`
-   check (`api/schema-postgres.ts:17-19`); whether the
+   `pair_hash`; whether the
    envelope gains the
    server-minted `request_id`, the per-request key
    `operation_id` stops being; whether an in-order PUT
