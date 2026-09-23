@@ -1574,20 +1574,6 @@ Off the critical path; each with its oracle.
   with no identity document 404s, and
   `tests/drift-identities.test.ts`'s orphan-slot pin
   becomes unreachable by construction, not by fixture
-- Name the authorization_code chain root by its jti.
-  Spec § 6 keeps the root's document named by the
-  code's sha256 spend marker, so the root's 'issued'
-  event lives at the marker document while its later
-  'rotated' / 'revoked' events land at the jti's own
-  document: once that root rotates,
-  `deriveIdentityTokensFor` returns two heads carrying
-  one jti (safe — every fold groups by jti and resolves
-  by `at`, fail-closed), and `GET identities/:id/tokens/`
-  and the Tokens page show one phantom 'issued' row
-  for it forever. The fix is a spec change: name the
-  root by its jti and spend-mark by a separate document
-  (`authorizationCodeSpent` keeps its own exact read).
-  Oracle: one head per jti on every chain kind
 - Split the `default-organization` singleton the way PII
   split. Exact-read spec Defers: the SET document is
   still a collection-shaped path with empty name (`path
