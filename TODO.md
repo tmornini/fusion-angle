@@ -530,9 +530,40 @@ skew tests, which went with item 8's trio.
    the memory backend is untouched. The API client keeps
    each
    response whole, and pages and presenters read from the
-   unit they were given; the packageable-client bullet on
-   the critical functionality path draws its boundary in
-   this rebuild. ARCHITECTURE.md gains a NAMED COVENANT,
+   unit they were given; the packageable client closes
+   in this rebuild, since the rebuild touches every file
+   its three couplings name: `web-app/app/adapters/` is
+   the client in all but boundary — one transport facade
+   (`http-facade.ts`), a `RequestContext` passed first
+   (`shared.ts`), per-noun adapters named by HTTP verb,
+   57 files and about 10,000 lines — and it imports the
+   server (37 files reach into `api/` for types, errors,
+   and header names — `OPERATION_ID_HEADER` from
+   `api/message-pair.ts`, `REQUEST_ID_HEADER` from
+   `api/request-context.ts`, `MissingTableError` from
+   `api/db.ts` — so the wire contract moves to
+   `shared/`, which never imports `api/`), imports the
+   app (24 files reach into `web-app/app/` — the facade
+   navigates to the login page on a failed refresh
+   (`web-app/app/adapters/http-facade.ts:286-292`), and
+   `shared.ts` redirects, logs, and records page request
+   profiles — so navigation, logging, and profiling are
+   handed in at construction), and holds a singleton
+   (`facade-holder.ts` keeps one module-level facade, so
+   two origins or two sessions cannot coexist; the
+   facade becomes an instance its caller owns); the
+   barrel (`web-app/app/adapters/index.ts`) re-exports
+   API nouns beside clipboard, viewport, location, and
+   resize-observer adapters, and the client's barrel
+   exports the client alone; three raw fetches bypass
+   the facade (item 0's rides-along names them), and
+   auth recovery lives at two layers (the retries
+   bullet on the critical functionality path); the
+   rebuilt client imports nothing from `api/` or the
+   app, and its oracle is a test that walks the client
+   entry point's import graph and finds no module
+   outside the client's directory and `shared/`.
+   ARCHITECTURE.md gains a NAMED COVENANT,
    `## A response is one unit`, in the commit that makes
    it true and not before — that file states only what is,
    and today the facade's `GETWithEtag` and `PUTWithEtag`
@@ -584,9 +615,7 @@ skew tests, which went with item 8's trio.
    dismantles every head into an array of bodies
    (`entitiesOf`, `api/message-store.ts:59-68`); and the
    client receives bare JSON. The brainstorm settles:
-   whether the packageable client ships inside this item
-   or as its bullet after, since this item rebuilds the
-   facade either way; the per-route audit — which POSTs
+   the per-route audit — which POSTs
    change state and gain `If-Match`, which are read-only
    conveniences, and what each PUT response must say for
    its readers; the sibling messages the wire never
@@ -596,7 +625,9 @@ skew tests, which went with item 8's trio.
    collection read's order — the skip walk yields names
    in name order, today's read orders heads by stamp
    (`api/backend-postgres.ts:545`), and pages may lean on
-   either. Follows item 0.
+   either. Merged: the API client, packageable (the
+   critical functionality path), which keeps its
+   oracle. Follows item 0.
 2. The ledger fenced — roles, grants, and row policies, on
    a table items 0 and 1 have finished. Designed to stock
    Postgres and measured on 18.6, which compose runs; a
@@ -1206,39 +1237,6 @@ Off the critical path; each with its oracle.
   panel under Auto Fit and switch it back off; zoom
   in once and click empty canvas — each red today,
   green once its door resets the save
-- The API client, packageable — `web-app/app/adapters/` is
-  the client in all but boundary: one transport facade
-  (`http-facade.ts`), a `RequestContext` passed first
-  (`shared.ts`), and per-noun adapters named by HTTP verb,
-  57 files and about 10,000 lines. Three couplings keep it
-  inside the app. It imports the server: 37 of the 57
-  files reach into `api/` for types, errors, and header
-  names — `OPERATION_ID_HEADER` from
-  `api/message-pair.ts`, `REQUEST_ID_HEADER` from
-  `api/request-context.ts`, `MissingTableError` from
-  `api/db.ts` — so the wire contract moves to `shared/`,
-  which never imports `api/`. It imports the app: 24 files
-  reach into `web-app/app/` — the facade navigates to the
-  login page on a failed refresh
-  (`web-app/app/adapters/http-facade.ts:286-292`), and
-  `shared.ts` redirects, logs, and records page request
-  profiles — so navigation, logging, and profiling are
-  handed in at construction. It holds a singleton:
-  `facade-holder.ts` keeps one module-level facade, so two
-  origins or two sessions cannot coexist; the facade
-  becomes an instance its caller owns. The barrel
-  (`web-app/app/adapters/index.ts`) re-exports API nouns
-  beside clipboard, viewport, location, and
-  resize-observer adapters; the client's barrel exports
-  the client alone. Three raw fetches bypass the facade
-  (item 0's rides-along names them), and auth recovery
-  lives at two layers (the retries bullet below). Item 1
-  rebuilds the facade to keep each response whole, which
-  is the moment to draw the boundary: the rebuilt client
-  imports nothing from `api/` or the app. Oracle: a test
-  that walks the client entry point's import graph and
-  finds no module outside the client's directory and
-  `shared/`
 - API retries, unified — the client resends by two
   unrelated mechanisms spread across its files, and leaves
   the commonest failures unhandled. Contention: flow PUT
