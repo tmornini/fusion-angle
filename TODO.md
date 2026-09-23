@@ -1386,6 +1386,46 @@ Off the critical path; each with its oracle.
   `Retry-After`, a 503, an HTML 502 — asserting the
   attempts, the delays, and that a POST with an unknown
   outcome is never resent
+- A latched write aligned to RFC 9110 §13.1.1. When
+  its `If-Match` fails, the RFC lets the origin answer
+  2xx if it can verify that the requested state change
+  has already succeeded: a lost response, or a
+  compatible change by another agent. Otherwise it
+  answers 412. The statement decides stale before
+  matched (`shared/ledger-statement.ts:224-237`,
+  `api/ledger-statement-sql.ts:126-147`), pinned at
+  `tests/ledger-store.test.ts:279-320`. The
+  message-plane spec keeps that (Decision 2,
+  `docs/superpowers/specs/2026-09-23-message-plane-design.md`),
+  so a resent in-order PUT whose latch names the
+  head's predecessor answers 412 even when that head
+  is its own first attempt and holds its state. No
+  client sends one today: the 412 loops read a fresh
+  head and latch, and no `fetch` times out. The
+  retries bullet above makes it reachable, because a
+  PUT resent after an unknown outcome would answer
+  412 to its own success. How far to align is this
+  bullet's brainstorm to decide.
+  - The narrowest reading answers 200 with the head's
+    response when the head supersedes the latch and
+    holds the request's state.
+  - The widest answers 200 whenever the head holds
+    the state. It hides an intervening writer, and it
+    answers an invented or foreign latch with 200.
+  Either way, both head reads gain what they compare:
+  `headed` (`api/ledger-statement-sql.ts:60-75`) and
+  the memory `Head` (`shared/ledger-statement.ts:62-68`,
+  filled by `headsOf`, `api/backend-memory.ts:280-318`).
+  The gate's latch check (`api/api.ts:1009-1050`) and
+  the flow handler's re-check
+  (`api/routes.ts:1552-1566`) refuse the same latch
+  before the statement runs, so they move with it or
+  retire into it. The statement keeps its fourteen
+  parameters. Lands no later than the retries bullet.
+  Oracle: a Layer 1 test resends a landed in-order
+  PUT with its original `If-Match` and gets 200 with
+  the landed pair's `etag`, and `./test postgres`
+  pins the same on the table
 - Everything we own, named `fa_` — so that operating the
   system makes what is ours trivial to find:
   `env | grep FA_` lists every variable the system needs.
