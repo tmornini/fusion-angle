@@ -74,17 +74,25 @@ skew tests, which went with item 8's trio.
    move to credential lines: the password rides
    `Authorization: Basic`, no longer the authorize body,
    and the authorize `code` and the token grant's
-   `access_token` leave the response body for a response
-   header; the refresh token's `Set-Cookie` is the
+   `access_token` leave the response body for
+   `Authentication-Info` (RFC 9110 §11.6.3), the field
+   HTTP defines for what a server says once credentials
+   are accepted, as `#auth-param`: authorize answers
+   `code="…"`, the grant `access_token="…"`, and a
+   field that is no secret stays in the body; the
+   refresh token's `Set-Cookie` is the
    precedent, and the departure from RFC 6749 §5.1 is
    accepted: both clients are ours. Credential lines are
    hoisted whole — name and value — out of `request` and
    `response` into one fenced column, `secret`, named
    for its leaf and salt, which holds them in canonical
    order joined by CRLF with none trailing, zero bytes
-   when there are none: `authorization` and
-   `cookie` from a request, `set-cookie` and the new
-   header from a response — HTTP's own credential fields,
+   when there are none: `authorization`,
+   `proxy-authorization`, and `cookie` from a request,
+   `set-cookie`, `authentication-info`, and
+   `proxy-authentication-info` from a response — every
+   credential-carrying field HTTP defines (RFC 9110 §11,
+   RFC 6265),
    not a list that grows with our routes. No name sits on
    both sides of the fence, so sorting by name merges the
    hoisted lines back and rebuilds each message exactly:
@@ -276,8 +284,7 @@ skew tests, which went with item 8's trio.
    (`api/mock-data.ts:358`), the credentials
    (`api/mock-data.ts:285`), the marker
    (`api/backend-postgres.ts:107-113`). The
-   brainstorm settles: the response credential header's
-   name; which secrets
+   brainstorm settles: which secrets
    still ride a body (the token request's `code` and
    `code_verifier`, the token exchange's `subject_token`
    and `actor_token`, any password a body still carries)
