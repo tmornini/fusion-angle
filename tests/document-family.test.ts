@@ -273,32 +273,31 @@ async function testDocumentOp(
     _actor: Id,
     messagePair?: MessagePair,
 ): Promise<unknown> {
-    return db.transaction(async (view) => {
-            if (messagePair !== undefined) {
-                const latchedId = messagePair.latchedHeadMessagePairId;
-                const latest = (await messageStore(view).getDocumentHead(
-                    messagePair.path, messagePair.name,
-                ))?.id;
-                if (
-                    latchedId !== undefined
-                    && latest !== latchedId
-                ) {
-                    throw new ApiError(
-                        'If-Match does not match the current'
-                        + ' document at /'
-                        + TEST_FAMILY + '/' + id,
-                        HTTP_PRECONDITION_FAILED,
-                    );
-                }
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
+    if (messagePair !== undefined) {
+        const latchedId = messagePair.latchedHeadMessagePairId;
+        if (latchedId !== undefined) {
+            const latest = await db.readTransaction(
+                async (view) =>
+                    (await messageStore(view).getDocumentHead(
+                        messagePair.path, messagePair.name,
+                    ))?.id,
+            );
+            if (latest !== latchedId) {
+                throw new ApiError(
+                    'If-Match does not match the current'
+                    + ' document at /'
+                    + TEST_FAMILY + '/' + id,
+                    HTTP_PRECONDITION_FAILED,
                 );
             }
-            return { id, ...body };
-        },
-    );
+        }
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return { id, ...body };
 }
 
 function testEntityOf(
@@ -673,11 +672,11 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         responseBody: { v: 'genesis' },
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => runWrite(
-        view,
+    await runWrite(
+        db,
         attemptFor([genesis]),
         [genesis],
-    ));
+    )
     // Two writers both observed the SAME head (genesis.id)
     // before either committed — the race the pre-check alone
     // cannot close; the in-tx head re-read closes it.
@@ -854,11 +853,11 @@ async function putStatelessDocumentMessagePair(
         responseBody: { id, ...body },
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => runWrite(
-        view,
+    await runWrite(
+        db,
         attemptFor([messagePair]),
         [messagePair],
-    ));
+    )
 }
 
 async function deleteStatelessDocumentMessagePair(
@@ -877,11 +876,11 @@ async function deleteStatelessDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => runWrite(
-        view,
+    await runWrite(
+        db,
         attemptFor([messagePair]),
         [messagePair],
-    ));
+    )
 }
 
 Deno.test('stateless lifecycle: a stateless document PUT derives'

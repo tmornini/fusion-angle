@@ -1200,7 +1200,7 @@ export async function handleRequest(
                     );
                     if (octetsEqual(liveOctets, newOctets)) {
                         const raced =
-                            await effective.transaction(async (view) => {
+                            await effective.readTransaction(async (view) => {
                                     const latest =
                                         await documentHeadMessagePairId(
                                             view,
@@ -1247,33 +1247,31 @@ export async function handleRequest(
                 && messagePair !== undefined
             ) {
                 const emptyMessagePair = messagePair;
-                await effective.transaction(async (view) => {
-                        const latchedId =
-                            emptyMessagePair
-                                .latchedHeadMessagePairId;
-                        if (latchedId !== undefined) {
-                            const latest =
-                                await documentHeadMessagePairId(
+                const latchedId =
+                    emptyMessagePair.latchedHeadMessagePairId;
+                if (latchedId !== undefined) {
+                    const latest =
+                        await effective.readTransaction(
+                            (view) =>
+                                documentHeadMessagePairId(
                                     view,
-                                    emptyMessagePair
-                                        .path,
+                                    emptyMessagePair.path,
                                     emptyMessagePair.name,
-                                );
-                            if (latest !== latchedId) {
-                                throw new ApiError(
-                                    'If-Match does not match'
-                                    + ' the current document'
-                                    + ' at ' + pathname,
-                                    HTTP_PRECONDITION_FAILED,
-                                );
-                            }
-                        }
-                        await runWrite(
-                            view,
-                            attemptFor([emptyMessagePair]),
-                            [emptyMessagePair],
+                                ),
                         );
-                    },
+                    if (latest !== latchedId) {
+                        throw new ApiError(
+                            'If-Match does not match'
+                            + ' the current document'
+                            + ' at ' + pathname,
+                            HTTP_PRECONDITION_FAILED,
+                        );
+                    }
+                }
+                await runWrite(
+                    effective,
+                    attemptFor([emptyMessagePair]),
+                    [emptyMessagePair],
                 );
                 const written = writeAnswerOf(
                     emptyMessagePair,

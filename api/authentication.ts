@@ -455,15 +455,12 @@ async function issueTokenPair(
             action: 'issued', chain_id: chainId, at,
         }, operationId,
     );
-    await adapter.transaction(async (view) => {
-            const pairs = [eventMessagePair];
-            if (messagePair !== undefined) {
-                pairs.push(messagePair);
-            }
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-        },
+    const pairs = [eventMessagePair];
+    if (messagePair !== undefined) {
+        pairs.push(messagePair);
+    }
+    await runWrite(
+        adapter, attemptFor(pairs), pairs,
     );
     return {
         response,
@@ -698,56 +695,55 @@ export async function rotateRefreshJti(
             operationId,
         );
         try {
-            return await adapter.transaction(async (view) => {
-                    const events =
-                        await deriveIdentityTokenEventsForJti(
-                            view, presentedJti, identityId,
-                        );
-                    const latest = latestActionForJti(
-                        events, presentedJti,
+            await adapter.readTransaction(async (view) => {
+                const events =
+                    await deriveIdentityTokenEventsForJti(
+                        view, presentedJti, identityId,
                     );
-                    const rows =
-                        latest === 'issued' || latest === null
-                            ? events
-                            : (await readTokenChainFromLedger(
-                                view, identityId,
-                                presentedJti,
-                            )).rows;
-                    const freshPlan = planRotation(
-                        rows, presentedJti, newJti, nowUtc(),
-                    );
-                    const freshAppends =
-                        freshPlan.kind === 'unknown'
-                            ? [] : freshPlan.appends;
-                    if (!jtiSetsEqual(
-                        freshAppends.map(a => a.jti),
-                        provisional.writes.map(w => w.event.jti),
-                    )) {
-                        throw new TokenPlanDivergedError();
-                    }
-                    const pairs = provisional.writes.map(
-                        (write) => write.messagePair,
-                    );
-                    if (
-                        provisional.plan.kind === 'rotate'
-                        && messagePair !== undefined
-                    ) {
-                        pairs.push(messagePair);
-                    }
-                    if (pairs.length > 0) {
-                        await runWrite(
-                            view, attemptFor(pairs), pairs,
-                        );
-                    }
-                    if (provisional.plan.kind === 'rotate') {
-                        return {
-                            kind: 'rotate' as const,
-                            newJti: provisional.plan.newJti,
-                        };
-                    }
-                    return { kind: 'fail' as const };
-                },
+                const latest = latestActionForJti(
+                    events, presentedJti,
+                );
+                const rows =
+                    latest === 'issued' || latest === null
+                        ? events
+                        : (await readTokenChainFromLedger(
+                            view, identityId,
+                            presentedJti,
+                        )).rows;
+                const freshPlan = planRotation(
+                    rows, presentedJti, newJti, nowUtc(),
+                );
+                const freshAppends =
+                    freshPlan.kind === 'unknown'
+                        ? [] : freshPlan.appends;
+                if (!jtiSetsEqual(
+                    freshAppends.map(a => a.jti),
+                    provisional.writes.map(w => w.event.jti),
+                )) {
+                    throw new TokenPlanDivergedError();
+                }
+            });
+            const pairs = provisional.writes.map(
+                (write) => write.messagePair,
             );
+            if (
+                provisional.plan.kind === 'rotate'
+                && messagePair !== undefined
+            ) {
+                pairs.push(messagePair);
+            }
+            if (pairs.length > 0) {
+                await runWrite(
+                    adapter, attemptFor(pairs), pairs,
+                );
+            }
+            if (provisional.plan.kind === 'rotate') {
+                return {
+                    kind: 'rotate' as const,
+                    newJti: provisional.plan.newJti,
+                };
+            }
+            return { kind: 'fail' as const };
         } catch (e) {
             if (!(e instanceof TokenPlanDivergedError)) throw e;
         }
@@ -820,37 +816,36 @@ export async function revokeTokenChain(
             adapter, identityId, jti, operationId,
         );
         try {
-            await adapter.transaction(async (view) => {
-                    const { chainId, rows } =
-                        await readTokenChainFromLedger(
-                            view, identityId, jti,
-                        );
-                    const freshAppends =
-                        chainId === null
-                            ? []
-                            : revocationAppends(
-                                rows, chainId, identityId,
-                                nowUtc(),
-                            );
-                    if (!jtiSetsEqual(
-                        freshAppends.map(a => a.jti),
-                        provisional.writes.map(w => w.event.jti),
-                    )) {
-                        throw new TokenPlanDivergedError();
-                    }
-                    const pairs = provisional.writes.map(
-                        (write) => write.messagePair,
+            await adapter.readTransaction(async (view) => {
+                const { chainId, rows } =
+                    await readTokenChainFromLedger(
+                        view, identityId, jti,
                     );
-                    if (messagePair !== undefined) {
-                        pairs.push(messagePair);
-                    }
-                    if (pairs.length > 0) {
-                        await runWrite(
-                            view, attemptFor(pairs), pairs,
+                const freshAppends =
+                    chainId === null
+                        ? []
+                        : revocationAppends(
+                            rows, chainId, identityId,
+                            nowUtc(),
                         );
-                    }
-                },
+                if (!jtiSetsEqual(
+                    freshAppends.map(a => a.jti),
+                    provisional.writes.map(w => w.event.jti),
+                )) {
+                    throw new TokenPlanDivergedError();
+                }
+            });
+            const pairs = provisional.writes.map(
+                (write) => write.messagePair,
             );
+            if (messagePair !== undefined) {
+                pairs.push(messagePair);
+            }
+            if (pairs.length > 0) {
+                await runWrite(
+                    adapter, attemptFor(pairs), pairs,
+                );
+            }
             return;
         } catch (e) {
             if (!(e instanceof TokenPlanDivergedError)) throw e;
@@ -1173,33 +1168,24 @@ async function grantClientCredentials(
         responseBody: ticketBody,
         operationId: messagePair.operationId,
     });
-    const consumed = await adapter.transaction(async (view) => {
-            const locks = view.writeLocks;
-            if (locks !== undefined) {
-                await locks.lockDocument(
-                    '/authentication/assertion-jtis/',
-                    verdict.jti,
-                );
-            }
-            const existing = await messageStore(view).getDocumentHead(
-                '/authentication/assertion-jtis/',
-                verdict.jti,
-            );
-            if (existing !== null) {
-                return false;
-            }
-            const pairs = [
-                ticketMessagePair,
-                eventMessagePair,
-                messagePair,
-            ];
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-            return true;
-        },
+    const existing = await adapter.readTransaction(
+        async (view) => messageStore(view).getDocumentHead(
+            '/authentication/assertion-jtis/',
+            verdict.jti,
+        ),
     );
-    return consumed
+    if (existing !== null) return replay;
+    const pairs = [
+        ticketMessagePair,
+        eventMessagePair,
+        messagePair,
+    ];
+    // The ticket is a create. A second grant of the
+    // same jti loses the succession slot.
+    const written = await runWrite(
+        adapter, 'genesis', pairs,
+    );
+    return written.outcome === 'land'
         ? {
             ok: true,
             response,
@@ -1431,24 +1417,24 @@ async function grantAuthorizationCode(
             action: 'issued', chain_id: chainId, at,
         }, messagePair.operationId,
     );
-    const consumed = await adapter.transaction(async (view) => {
-            if (await authorizationCodeSpent(
-                view, derivedId, issuer.identityId,
-            )) {
-                return false;
-            }
-            const pairs = [
-                markerMessagePair,
-                eventMessagePair,
-                messagePair,
-            ];
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-            return true;
-        },
+    if (await adapter.readTransaction(
+        (view) => authorizationCodeSpent(
+            view, derivedId, issuer.identityId,
+        ),
+    )) {
+        return invalid;
+    }
+    const pairs = [
+        markerMessagePair,
+        eventMessagePair,
+        messagePair,
+    ];
+    // The marker is a create. A raced redeem loses
+    // the succession slot and stores nothing.
+    const written = await runWrite(
+        adapter, 'genesis', pairs,
     );
-    return consumed
+    return written.outcome === 'land'
         ? {
             ok: true,
             response,
@@ -1671,14 +1657,11 @@ async function authorizePassword(
             operationId: messagePair.operationId,
         });
     }
-    await adapter.transaction(async (view) => {
-            const pairs = rehashMessagePair === undefined
-                ? [messagePair]
-                : [rehashMessagePair, messagePair];
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-        },
+    const pairs = rehashMessagePair === undefined
+        ? [messagePair]
+        : [rehashMessagePair, messagePair];
+    await runWrite(
+        adapter, attemptFor(pairs), pairs,
     );
     return {
         ok: true,

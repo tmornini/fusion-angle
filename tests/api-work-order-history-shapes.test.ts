@@ -179,11 +179,11 @@ async function appendTransitionPair(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => runWrite(
-        view,
+    await runWrite(
+        db,
         attemptFor([messagePair]),
         [messagePair],
-    ));
+    )
     return messagePair.id;
 }
 

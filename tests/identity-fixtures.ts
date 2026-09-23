@@ -295,13 +295,10 @@ export async function seedClientRegistration(
     const messagePair = await clientRegistrationDocumentMessagePair(
         id, fields, nowUtc(),
     );
-    await db.transaction(async (view) => {
-            await runWrite(
-                view,
-                attemptFor([messagePair]),
-                [messagePair],
-            );
-        },
+    await runWrite(
+        db,
+        attemptFor([messagePair]),
+        [messagePair],
     );
 }
 
@@ -327,12 +324,9 @@ export async function seedClientRegistrationTombstone(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(async (view) => {
-            await runWrite(
-                view,
-                attemptFor([messagePair]),
-                [messagePair],
-            );
-        },
+    await runWrite(
+        db,
+        attemptFor([messagePair]),
+        [messagePair],
     );
 }

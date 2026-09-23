@@ -219,7 +219,7 @@ async () => {
     const preTx = await workOrderDocumentHeadFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    const inTx = await db.transaction(
+    const inTx = await db.readTransaction(
         (view) => workOrderDocumentHeadFor(
             view, STARK_ORGANIZATION, workOrderId,
         ),
@@ -233,7 +233,7 @@ async () => {
     const preTxMissing = await workOrderDocumentHeadFor(
         db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
     );
-    const inTxMissing = await db.transaction(
+    const inTxMissing = await db.readTransaction(
         (view) => workOrderDocumentHeadFor(
             view, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
         ),
@@ -321,7 +321,7 @@ async () => {
     const preTx = await workOrderDocumentHeadFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    const inTx = await db.transaction(
+    const inTx = await db.readTransaction(
         (view) => workOrderDocumentHeadFor(
             view, STARK_ORGANIZATION, workOrderId,
         ),
@@ -366,7 +366,7 @@ async () => {
     const preMissing = await workOrderDocumentHeadFor(
         db, STARK_ORGANIZATION, missingId,
     );
-    const inMissing = await db.transaction(
+    const inMissing = await db.readTransaction(
         (view) => workOrderDocumentHeadFor(
             view, STARK_ORGANIZATION, missingId,
         ),
@@ -457,7 +457,7 @@ Deno.test('flowGraphBindingsFromMessagePairs: seed attribute + member'
     const preTx = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
     );
-    const inTx = await db.transaction(
+    const inTx = await db.readTransaction(
         (view) => flowGraphBindingsFromMessagePairs(
             view, STARK_ORGANIZATION,
         ),
@@ -1395,7 +1395,7 @@ async () => {
     const preTx = await collectAttributeReferrers(
         db, STARK_ORGANIZATION, attributeIds, 'seed-type',
     );
-    const inTx = await db.transaction(
+    const inTx = await db.readTransaction(
         // Stage B: roster +
         // organizations/AjdvjuECVZEgZoFajaIEkg/objectives/records retired.
         (view) => collectAttributeReferrers(
@@ -1535,7 +1535,7 @@ async () => {
         db, STARK_ORGANIZATION, [attrId], 'rOEPOcVMQdJiiiMuiiEhlg',
     );
     // Pre-tx vs in-tx parity (message plane only).
-    const inTx = await db.transaction(
+    const inTx = await db.readTransaction(
         // Stage B: roster + records/work_orders retired.
         (view) => collectAttributeReferrers(
             view,

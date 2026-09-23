@@ -83,11 +83,11 @@ async function appendInstancePair(
             : body,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => runWrite(
-        view,
+    await runWrite(
+        db,
         attemptFor([messagePair]),
         [messagePair],
-    ));
+    )
     return messagePair.id;
 }
 

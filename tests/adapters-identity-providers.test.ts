@@ -225,13 +225,10 @@ async () => {
         }),
         operationId: generateIdentifier(),
     });
-    await db.transaction(async (view) => {
-            await runWrite(
-                view,
-                attemptFor([messagePair]),
-                [messagePair],
-            );
-        },
+    await runWrite(
+        db,
+        attemptFor([messagePair]),
+        [messagePair],
     );
     const rows = await deriveIdentityProvidersFor(db
         , 'prBESZPjJDiuXCeZLmbiVw');
@@ -272,13 +269,10 @@ async () => {
         }),
         operationId: generateIdentifier(),
     });
-    await db.transaction(async (view) => {
-            await runWrite(
-                view,
-                attemptFor([flatPair]),
-                [flatPair],
-            );
-        },
+    await runWrite(
+        db,
+        attemptFor([flatPair]),
+        [flatPair],
     );
     await seedIdentityProvider(db, 'prBESZPjJDiuXCeZLmbiVw', id, {
         ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw',

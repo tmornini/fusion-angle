@@ -363,7 +363,7 @@ Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
     const preTx = await deriveIdentityTokenEventsForJti(
         db, JTI_TX, 'XXZruirZyAOoRpNxaDnpSA',
     );
-    const inTx = await db.transaction(
+    const inTx = await db.readTransaction(
         (view) => deriveIdentityTokenEventsForJti(
             view, JTI_TX, 'XXZruirZyAOoRpNxaDnpSA',
         ),
@@ -376,7 +376,7 @@ Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
     const preTxMissing = await deriveIdentityTokenEventsForJti(
         db, GHOST_JTI, 'XXZruirZyAOoRpNxaDnpSA',
     );
-    const inTxMissing = await db.transaction(
+    const inTxMissing = await db.readTransaction(
         (view) => deriveIdentityTokenEventsForJti(
             view, GHOST_JTI, 'XXZruirZyAOoRpNxaDnpSA',
         ),
@@ -508,7 +508,7 @@ Deno.test('authorizationCodeSpent: byte-identical pre-tx (the plain'
     const preTxBefore = await authorizationCodeSpent(
         db, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
     );
-    const inTxBefore = await db.transaction(
+    const inTxBefore = await db.readTransaction(
         (view) => authorizationCodeSpent(
             view, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
         ),
@@ -526,7 +526,7 @@ Deno.test('authorizationCodeSpent: byte-identical pre-tx (the plain'
     const preTxAfter = await authorizationCodeSpent(
         db, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
     );
-    const inTxAfter = await db.transaction(
+    const inTxAfter = await db.readTransaction(
         (view) => authorizationCodeSpent(
             view, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
         ),

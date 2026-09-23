@@ -293,11 +293,11 @@ async function putDocumentMessagePair(
         responseStatus: 200, responseBody: body,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => runWrite(
-        view,
+    await runWrite(
+        db,
         attemptFor([messagePair]),
         [messagePair],
-    ));
+    )
 }
 
 async function deleteDocumentMessagePair(
@@ -318,11 +318,11 @@ async function deleteDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => runWrite(
-        view,
+    await runWrite(
+        db,
         attemptFor([messagePair]),
         [messagePair],
-    ));
+    )
 }
 
 Deno.test('a PUT chain at one objective document Supersedes-chains,'

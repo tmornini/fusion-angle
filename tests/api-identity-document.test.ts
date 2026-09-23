@@ -217,11 +217,11 @@ async function putDocumentMessagePair(
         responseBody: body,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => runWrite(
-        view,
+    await runWrite(
+        db,
         attemptFor([messagePair]),
         [messagePair],
-    ));
+    )
     return messagePair.id;
 }
 
@@ -243,11 +243,11 @@ async function deleteDocumentMessagePair(
         responseStatus: 204, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => runWrite(
-        view,
+    await runWrite(
+        db,
         attemptFor([messagePair]),
         [messagePair],
-    ));
+    )
 }
 
 Deno.test('a PUT chain Supersedes-chains and the head derives the'

@@ -125,10 +125,7 @@ export async function putIdentityDefaultOrganization(
             HTTP_BAD_REQUEST,
         );
     }
-    await db.transaction(async (view) => {
-            if (pair !== undefined) {
-                await runWrite(view, attemptFor([pair]), [pair]);
-            }
-        },
-    );
+    if (pair !== undefined) {
+        await runWrite(db, attemptFor([pair]), [pair]);
+    }
 }

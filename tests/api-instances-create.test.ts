@@ -516,13 +516,10 @@ async () => {
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(async (view) => {
-            await runWrite(
-                view,
-                attemptFor([tombstone]),
-                [tombstone],
-            );
-        },
+    await runWrite(
+        db,
+        attemptFor([tombstone]),
+        [tombstone],
     );
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,

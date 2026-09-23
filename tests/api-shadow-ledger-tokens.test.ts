@@ -862,25 +862,21 @@ Deno.test('revokeTokenChain racing a concurrent rotateRefreshJti on'
 // ── fault discrimination — the retry catch names ONLY the
 // divergence sentinel (TokenPlanDivergedError, module-private to
 // authentication.ts). Any OTHER thrown error — a genuine store
-// fault, driven here behaviorally by faulting adapter.transaction
-// itself, rather than exporting the sentinel class — must
-// propagate on attempt 1: never retried (the Greedy Catch
-// abomination this task's brief named explicitly), never
-// swallowed, never converted into the operation's own ordinary
-// failure shape (rotation's 409 outcome / revocation's silent
-// void success).
+// fault, driven here by faulting the ledger statement, rather
+// than exporting the sentinel class — must propagate on attempt
+// 1: never retried, never swallowed, never converted into the
+// operation's own ordinary failure shape (rotation's 409
+// outcome / revocation's silent void success).
 
-function adapterWithFaultingTransaction(
+function adapterWithFaultingStatement(
     real: MemoryDbAdapter, fault: Error,
 ): { readonly adapter: DbAdapter; readonly calls: () => number } {
     let calls = 0;
-    (real as unknown as {
-        transaction: () => Promise<never>;
-    }).transaction = async () => {
+    real.executeLedger = () => {
         calls += 1;
-        throw fault;
+        return Promise.reject(fault);
     };
-    return { adapter: real as unknown as DbAdapter, calls: () => calls };
+    return { adapter: real, calls: () => calls };
 }
 
 Deno.test('rotateRefreshJti propagates a non-divergence transaction'
@@ -888,7 +884,7 @@ Deno.test('rotateRefreshJti propagates a non-divergence transaction'
 + ' to the 409 outcome', async () => {
     const db = await seededDb();
     const fault = new Error('store exploded');
-    const faulting = adapterWithFaultingTransaction(db, fault);
+    const faulting = adapterWithFaultingStatement(db, fault);
     await assertRejects(
         () => rotateRefreshJti(
             faulting.adapter, CURRENT_ID, ROOT_JTI,
@@ -905,7 +901,7 @@ Deno.test('revokeTokenChain propagates a non-divergence transaction'
 + ' success', async () => {
     const db = await seededDb();
     const fault = new Error('store exploded');
-    const faulting = adapterWithFaultingTransaction(db, fault);
+    const faulting = adapterWithFaultingStatement(db, fault);
     await assertRejects(
         () => revokeTokenChain(
             faulting.adapter, CURRENT_ID, ROOT_JTI,

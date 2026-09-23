@@ -3,12 +3,11 @@ import {
     ambientRunner,
 } from './db.ts';
 import type {
+    DbAdapter,
     GuardedDbAdapter,
     StorageBackend,
     Tx,
-    TxMode,
     TxRunner,
-    WriteLocks,
 } from './db.ts';
 import type {
     MessagePairEntity,
@@ -108,39 +107,45 @@ export class BackedDbAdapter
         return this.#backend.deleteSchema();
     }
 
-    async transaction<R>(
-        fn: (view: GuardedDbAdapter) => Promise<R>,
-    ): Promise<R> {
-        return this.#transaction('readwrite', fn);
+    get backend(): StorageBackend {
+        return this.#backend;
+    }
+
+    // A view whose statement joins an already-open client.
+    // The seed opens backend.transaction and writes through
+    // this view. A matched or stale row fails the phase:
+    // the seed meant every row to land.
+    openClient(tx: Tx): DbAdapter {
+        const client = this.#viewForTx(tx);
+        const run = client.executeLedger.bind(client);
+        client.executeLedger = async (attempt, rows, now) => {
+            const stated = await run(attempt, rows, now);
+            for (const row of stated) {
+                if (row.outcome !== 'land') {
+                    throw new Error(
+                        'seed statement returned '
+                            + row.outcome,
+                    );
+                }
+            }
+            return stated;
+        };
+        return client;
     }
 
     async readTransaction<R>(
         fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R> {
-        return this.#transaction('readonly', fn);
-    }
-
-    #transaction<R>(
-        mode: TxMode,
-        fn: (view: GuardedDbAdapter) => Promise<R>,
-    ): Promise<R> {
         return this.#backend.transaction(
-            mode,
+            'readonly',
             (tx) => fn(this.#viewForTx(tx)),
         );
     }
 
-    #viewForTx(
-        tx: Tx,
-    ): GuardedDbAdapter {
-        // Nested transaction / readTransaction both re-enter
-        // the open view: the outer mode is already fixed, so
-        // a nested read inside a write joins the write tx
-        // (read-your-writes).
-        const reenter = <R>(
-            fn: (view: GuardedDbAdapter) => Promise<R>,
-        ): Promise<R> => fn(view);
-        const locks = writeLocksOf(tx);
+    #viewForTx(tx: Tx): GuardedDbAdapter {
+        // Nested readTransaction re-enters the open client.
+        // The outer mode is already fixed, so a read inside
+        // a seed phase sees that phase's uncommitted rows.
         const stores = this.#buildStores(
             ambientRunner(tx),
         );
@@ -149,7 +154,8 @@ export class BackedDbAdapter
             initialize: () => this.initialize(),
             deleteSchema: () => this.deleteSchema(),
             hasSchema: () => this.hasSchema(),
-            postSchemaCreation: () => this.postSchemaCreation(),
+            postSchemaCreation: () =>
+                this.postSchemaCreation(),
             ensureTable: () => this.ensureTable(),
             executeLedger: (attempt, rows, now) =>
                 this.#backend.executeLedger(
@@ -157,11 +163,7 @@ export class BackedDbAdapter
                 ),
             postNotification: (e) =>
                 this.postNotification(e),
-            ...(locks === undefined
-                ? {}
-                : { writeLocks: locks }),
-            transaction: reenter,
-            readTransaction: reenter,
+            readTransaction: (fn) => fn(view),
         };
         return view;
     }
@@ -180,26 +182,4 @@ export class BackedDbAdapter
             ),
         };
     }
-}
-
-function writeLocksOf(tx: Tx): WriteLocks | undefined {
-    const lockRequest = tx.lockRequest;
-    const lockDocument = tx.lockDocument;
-    const lockHead = tx.lockHead;
-    const notify = tx.notify;
-    if (
-        lockRequest === undefined
-        || lockDocument === undefined
-        || lockHead === undefined
-        || notify === undefined
-    ) {
-        return undefined;
-    }
-    return {
-        lockRequest,
-        lockDocument,
-        lockHead,
-        getHead: (path, name) => tx.getHead(path, name),
-        notify,
-    };
 }

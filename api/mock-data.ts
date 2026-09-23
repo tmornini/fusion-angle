@@ -1,4 +1,5 @@
 import type { DbAdapter } from './db.ts';
+import type { BackedDbAdapter } from './db-backed.ts';
 
 import {
     postIdeaDocumentOp,
@@ -258,7 +259,7 @@ type PasswordHasher = (
 ) => Promise<string>;
 
 export async function seedHumanCredentials(
-    adapter: DbAdapter,
+    adapter: BackedDbAdapter,
     recipients: readonly CredentialRecipient[],
     hashPasswordFn: PasswordHasher = hashPassword,
 ): Promise<SeededCredentials> {
@@ -295,7 +296,10 @@ export async function seedHumanCredentials(
     // the identity_credentials ROW half).
     // postIdentityCredential DocumentOp is the SAME op
     // every live PUT identities/:id/credentials/:cid rides.
-    await adapter.transaction(async (view) => {
+    await adapter.backend.transaction(
+        'readwrite',
+        async (tx) => {
+            const view = adapter.openClient(tx);
             await Promise.all([
                 ...planned.map(cred =>
                     postIdentityCredentialDocumentOp(
@@ -349,7 +353,7 @@ export type PostMockDataLoadOptions = {
 };
 
 export async function postMockDataLoad(
-    adapter: DbAdapter,
+    adapter: BackedDbAdapter,
     options?: PostMockDataLoadOptions,
 ): Promise<SeededCredentials> {
     // Pass 1 (no tx): every pair-wired op-invocation's message
@@ -368,8 +372,11 @@ export async function postMockDataLoad(
     // so a failed seed leaves hasSchema() false: the datastore
     // reads as empty and the seed can be retried cleanly.
     await adapter.ensureTable();
-    await adapter.transaction(
-        (view) => postMockDataLoadIn(view, messagePairs),
+    await adapter.backend.transaction(
+        'readwrite',
+        (tx) => postMockDataLoadIn(
+            adapter.openClient(tx), messagePairs,
+        ),
     );
     // Task 1(d): same buildMembers (+ the unaffiliated
     // identity) enumeration that pass 2 used for PII — no
@@ -1119,7 +1126,7 @@ async function postMockDataLoadIn(
 }
 
 export async function postBootstrap(
-    adapter: DbAdapter,
+    adapter: BackedDbAdapter,
     options?: PostMockDataLoadOptions,
 ): Promise<SeededCredentials> {
     // Pass 1 (no tx): the lone 'XXZruirZyAOoRpNxaDnpSA' human-member create's
@@ -1160,10 +1167,15 @@ export async function postBootstrap(
     // The schema marker stamps LAST so a failed bootstrap leaves
     // the anonymous plane open for retry.
     await adapter.ensureTable();
-    await adapter.transaction((view) => postBootstrapIn(
-            view, identityMessagePair, seatMessagePair, piiMessagePair,
+    await adapter.backend.transaction(
+        'readwrite',
+        (tx) => postBootstrapIn(
+            adapter.openClient(tx),
+            identityMessagePair, seatMessagePair,
+            piiMessagePair,
             systemIdentityMessagePair,
-            defaultOrganizationMessagePair, organizationMessagePair,
+            defaultOrganizationMessagePair,
+            organizationMessagePair,
         ),
     );
     // Task 1(d): bootstrap's lone human is 'XXZruirZyAOoRpNxaDnpSA' with

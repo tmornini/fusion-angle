@@ -1147,47 +1147,44 @@ export async function postRecordWriteOp(
         body.kind === 'edit'
             ? body.removedAttributeIds
             : [];
-    // Choose rows before the transaction. RESTRICT and
-    // the statement then commit as one transaction.
+    // Choose rows before the read. RESTRICT runs first;
+    // the statement is the write.
     const rows = messagePairs === undefined
         ? undefined
         : await recordRowsToSubmit(db, messagePairs);
-    await db.transaction(async (view) => {
-            // Phase Final Task 2: states ROW half stripped —
-            // document/attribute pairs alone carry truth.
-            if (removedIds.length > 0) {
-                // Prefer the verified token claim; fall back to
-                // the body's stamped organization_id only for
-                // below-facade callers that omit organization
-                // (seed never removes referenced attributes).
-                const boundOrganization = requireOrganization(
-                    organization ?? body.record.organization_id,
+    // Phase Final Task 2: states ROW half stripped —
+    // document/attribute pairs alone carry truth.
+    if (removedIds.length > 0) {
+        // Prefer the verified token claim; fall back to
+        // the body's stamped organization_id only for
+        // below-facade callers that omit organization
+        // (seed never removes referenced attributes).
+        const boundOrganization = requireOrganization(
+            organization ?? body.record.organization_id,
+        );
+        await db.readTransaction(async (view) => {
+            // Flat window: body.id is the record (type)
+            // id; fourth-leg instance scan scopes there.
+            const referrers =
+                await collectAttributeReferrers(
+                    view,
+                    boundOrganization,
+                    removedIds,
+                    body.id,
                 );
-                // Flat window: body.id is the record (type)
-                // id; fourth-leg instance scan scopes there.
-                const referrers =
-                    await collectAttributeReferrers(
-                        view,
-                        boundOrganization,
-                        removedIds,
-                        body.id,
+            for (const [id, refs] of referrers) {
+                if (hasReferrers(refs)) {
+                    throw new ApiError(
+                        describeReferrers(id, refs),
+                        HTTP_CONFLICT,
                     );
-                for (const [id, refs] of referrers) {
-                    if (hasReferrers(refs)) {
-                        throw new ApiError(
-                            describeReferrers(id, refs),
-                            HTTP_CONFLICT,
-                        );
-                    }
                 }
             }
-            if (rows !== undefined) {
-                await runWrite(
-                    view, attemptFor(rows), rows,
-                );
-            }
-        },
-    );
+        });
+    }
+    if (rows !== undefined) {
+        await runWrite(db, attemptFor(rows), rows);
+    }
 }
 
 // Phase Final Task 2: writeFlowGraphDelta RETIRED. The four
@@ -1243,17 +1240,14 @@ export async function postIdeaDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<IdeaEntity, 'id'>;
-    return db.transaction(async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return { id, ...entity };
-        },
-    );
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return { id, ...entity };
 }
 
 // Project document write (Decision 7): ONE shape serves
@@ -1281,20 +1275,16 @@ export async function postProjectDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<ProjectEntity, 'id'>;
-    return db.transaction(
-        // Phase Final Task 2: projects ROW half stripped;
-        // states ROW half stripped (message plane only).
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return { id, ...entity };
-        },
-    );
+    // Phase Final Task 2: projects ROW half stripped;
+    // states ROW half stripped (message plane only).
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return { id, ...entity };
 }
 
 // Record document write (Decision 7, the fifth family): ONE
@@ -1324,20 +1314,16 @@ export async function postRecordDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<RecordEntity, 'id'>;
-    return db.transaction(
-        // Phase Final Task 2: records ROW half stripped;
-        // states ROW half stripped (message plane only).
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return { id, ...entity };
-        },
-    );
+    // Phase Final Task 2: records ROW half stripped;
+    // states ROW half stripped (message plane only).
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return { id, ...entity };
 }
 
 // Record attribute document write — the sixth family, and the
@@ -1363,20 +1349,16 @@ export async function postRecordAttributeDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<RecordAttributeEntity, 'id'>;
-    return db.transaction(
-        // Phase Final Task 2: record_attributes ROW half
-        // stripped.
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return { id, ...entity };
-        },
-    );
+    // Phase Final Task 2: record_attributes ROW half
+    // stripped.
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return { id, ...entity };
 }
 
 // Idea submission write: a genesis-only document (an
@@ -1404,17 +1386,14 @@ export async function postIdeaSubmissionOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    return db.transaction(async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // The create's synthesized document body (Task 5): the SAME
@@ -1513,14 +1492,12 @@ export async function postFlowCreationOp(
     const rows = messagePairs === undefined
         ? undefined
         : await flowRowsToSubmit(db, messagePairs);
-    return db.transaction(async (view) => {
-            if (rows !== undefined) {
-                await runWrite(
-                    view, attemptFor(rows), rows,
-                );
-            }
-        },
-    );
+    if (rows !== undefined) {
+        await runWrite(
+            db, attemptFor(rows), rows,
+        );
+    }
+    return;
 }
 
 // Flow document write (Decision 7, the LOCKED class). Phase
@@ -1564,36 +1541,34 @@ export async function postFlowDocumentOp(
         ...documentOperationOrganization(body),
     } as unknown as Omit<FlowEntity, 'id'>;
     const latchedId = messagePair?.latchedHeadMessagePairId;
-    return db.transaction(
-        // Phase Final Task 2: flows + graph ROW halves
-        // stripped; states ROW half stripped (message plane only).
-        async (view) => {
-            // Revival states events dual-write until the
-            // states-trace strip; pair body also carries
-            // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
-            if (messagePair !== undefined) {
-                const latest = (await messageStore(view).getDocumentHead(
-                    messagePair.path, messagePair.name,
-                ))?.id;
-                if (
-                    latchedId !== undefined
-                    && latest !== latchedId
-                ) {
-                    throw new ApiError(
-                        'If-Match does not match the current'
-                        + ' document at /flows/' + id,
-                        HTTP_PRECONDITION_FAILED,
-                    );
-                }
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
+    // Phase Final Task 2: flows + graph ROW halves
+    // stripped; states ROW half stripped (message plane only).
+    // Revival states events dual-write until the
+    // states-trace strip; pair body also carries
+    // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
+    if (messagePair !== undefined) {
+        if (latchedId !== undefined) {
+            const latest = await db.readTransaction(
+                async (view) =>
+                    (await messageStore(view).getDocumentHead(
+                        messagePair.path, messagePair.name,
+                    ))?.id,
+            );
+            if (latest !== latchedId) {
+                throw new ApiError(
+                    'If-Match does not match the current'
+                    + ' document at /flows/' + id,
+                    HTTP_PRECONDITION_FAILED,
                 );
             }
-            return { id, ...entity };
-        },
-    );
+        }
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return { id, ...entity };
 }
 
 // Undo-as-replay (Phase 14 Task 8): given a resolution
@@ -1623,14 +1598,12 @@ export async function postFlowUndoOp(
         // document message pair, no domain writes — a genuine no-op a
         // LATER resolution walk correctly ignores (it carries no
         // correlated document message pair to displace anything).
-        return db.transaction(async (view) => {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            },
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
         );
+        return;
     }
     const currentGraph = asStoredGraph(
         current.body['graph'],
@@ -1689,36 +1662,34 @@ export async function postFlowUndoOp(
         organization,
         latchedHeadMessagePairId: current.id,
     });
-    return db.transaction(
-        // Phase Final Task 2: flows + graph ROW halves stripped.
-        async (view) => {
-            const latest = (await messageStore(view).getDocumentHead(
+    // Phase Final Task 2: flows + graph ROW halves stripped.
+    const latest = await db.readTransaction(
+        async (view) =>
+            (await messageStore(view).getDocumentHead(
                 documentMessagePair.path,
                 documentMessagePair.name,
-            ))?.id;
-            // The CLIENT's pin, not this walk's own read:
-            // the gate proved it matched the head before
-            // dispatch, so a mismatch here means a racer
-            // committed in between — a real conflict, never
-            // a scheduling artifact of our own resolution.
-            const pinned =
-                messagePair.pinnedDocumentMessagePairId
-                    ?? current.id;
-            if (latest !== pinned) {
-                throw new ApiError(
-                    'If-Match does not match the current'
-                    + ' document at /flows/' + id,
-                    HTTP_PRECONDITION_FAILED,
-                );
-            }
-            const pairs = [
-                messagePair, documentMessagePair,
-            ];
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-        },
+            ))?.id,
     );
+    // The CLIENT's pin, not this walk's own read:
+    // the gate proved it matched the head before
+    // dispatch, so a mismatch here means a racer
+    // committed in between — a real conflict, never
+    // a scheduling artifact of our own resolution.
+    const pinned =
+        messagePair.pinnedDocumentMessagePairId
+            ?? current.id;
+    if (latest !== pinned) {
+        throw new ApiError(
+            'If-Match does not match the current'
+            + ' document at /flows/' + id,
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    const pairs = [
+        messagePair, documentMessagePair,
+    ];
+    await runWrite(db, attemptFor(pairs), pairs);
+    return;
 }
 
 // The three pairs a live POST /objectives forms (Task 3): the
@@ -1797,22 +1768,19 @@ export async function postObjectiveCreationOp(
     messagePairs?: ObjectiveCreationMessagePairs,
 ): Promise<void> {
     validateObjectiveCreateBody(body);
-    return db.transaction(
-        // Phase Final Task 2: objectives +
-        // objective_revisions ROW halves stripped.
-        async (view) => {
-            if (messagePairs !== undefined) {
-                const pairs = [
-                    messagePairs.operation,
-                    messagePairs.document,
-                    messagePairs.revision,
-                ];
-                await runWrite(
-                    view, attemptFor(pairs), pairs,
-                );
-            }
-        },
-    );
+    // Phase Final Task 2: objectives +
+    // objective_revisions ROW halves stripped.
+    if (messagePairs !== undefined) {
+        const pairs = [
+            messagePairs.operation,
+            messagePairs.document,
+            messagePairs.revision,
+        ];
+        await runWrite(
+            db, attemptFor(pairs), pairs,
+        );
+    }
+    return;
 }
 
 // Objective document write — the fifth lifecycle-state family
@@ -1840,19 +1808,15 @@ export async function postObjectiveDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<ObjectiveEntity, 'id'>;
-    return db.transaction(
-        // Phase Final Task 2: objectives ROW half stripped.
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return { id, ...entity };
-        },
-    );
+    // Phase Final Task 2: objectives ROW half stripped.
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return { id, ...entity };
 }
 
 // The wire body a synthesized PUT identities/:id carries:
@@ -1910,26 +1874,23 @@ export async function postIdentityCreationOp(
     messagePairs?: IdentityWriteMessagePairs,
 ): Promise<void> {
     validateIdentityCreateBody(body);
-    return db.transaction(
-        // Phase Final Task 2: identities + identity_credentials
-        // ROW halves stripped.
-        async (view) => {
-            if (messagePairs !== undefined) {
-                const pairs = [
-                    messagePairs.operation,
-                    messagePairs.identityDocument,
-                ];
-                if (messagePairs.kind === 'service') {
-                    pairs.push(
-                        messagePairs.credentialDocument,
-                    );
-                }
-                await runWrite(
-                    view, attemptFor(pairs), pairs,
-                );
-            }
-        },
-    );
+    // Phase Final Task 2: identities + identity_credentials
+    // ROW halves stripped.
+    if (messagePairs !== undefined) {
+        const pairs = [
+            messagePairs.operation,
+            messagePairs.identityDocument,
+        ];
+        if (messagePairs.kind === 'service') {
+            pairs.push(
+                messagePairs.credentialDocument,
+            );
+        }
+        await runWrite(
+            db, attemptFor(pairs), pairs,
+        );
+    }
+    return;
 }
 
 // The create's synthesized document body (Task 3, the
@@ -2024,17 +1985,14 @@ export async function postWorkOrderCreationOp(
     const rows = messagePairs === undefined
         ? undefined
         : await workOrderRowsToSubmit(db, messagePairs);
-    return db.transaction(
-        // Phase Final Task 2: work_orders + flow_work_orders
-        // ROW halves stripped.
-        async (view) => {
-            if (rows !== undefined) {
-                await runWrite(
-                    view, attemptFor(rows), rows,
-                );
-            }
-        },
-    );
+    // Phase Final Task 2: work_orders + flow_work_orders
+    // ROW halves stripped.
+    if (rows !== undefined) {
+        await runWrite(
+            db, attemptFor(rows), rows,
+        );
+    }
+    return;
 }
 
 // Claim a work order. The read of the prior claim and
@@ -2076,72 +2034,58 @@ export async function postWorkOrderClaimOp(
     organization: Id,
     messagePair?: MessagePair,
 ): Promise<void> {
-    return db.transaction(
-        // Phase Final Task 2: work_orders ROW half stripped.
-        async (view) => {
-            validateWorkOrderClaimBody(body);
-            const wo = await workOrderDocumentHeadFor(
-                view, organization, workOrderId,
+    validateWorkOrderClaimBody(body);
+    // Phase Final Task 2: work_orders ROW half stripped.
+    // claim_expired + claimed live on the operation
+    // message pair body (workOrderClaimHistoryFor reads
+    // them back).
+    const claimed = await db.readTransaction(async (view) => {
+        const wo = await workOrderDocumentHeadFor(
+            view, organization, workOrderId,
+        );
+        if (wo === null) {
+            throw await missedReadError(
+                view, workOrderId, organization,
+                'work_orders',
             );
-            if (wo === null) {
-                throw await missedReadError(
-                    view, workOrderId, organization,
-                    'work_orders',
+        }
+        const graph = asWorkOrderFlowGraph(
+            wo.flow_graph,
+            'work_orders.flow_graph',
+        );
+        const events = await workOrderClaimHistoryFor(
+            view, organization, workOrderId,
+        );
+        const prior = latestClaimEvent(
+            events, workOrderId,
+        );
+        const claimDoc = await workOrderClaimDocumentFor(
+            view, organization, workOrderId,
+        );
+        const priorExpired = claimDoc !== null
+            ? isExpiresAtPassed(claimDoc.expiresAt)
+            : prior !== null
+                && isClaimEventExpired(
+                    prior, graph.lockTimeout,
                 );
-            }
-            const graph =
-                asWorkOrderFlowGraph(
-                    wo.flow_graph,
-                    'work_orders.flow_graph',
-                );
-            const events = await workOrderClaimHistoryFor(
-                view, organization, workOrderId,
-            );
-            const prior = latestClaimEvent(
-                events, workOrderId,
-            );
-            const claimDoc = await workOrderClaimDocumentFor(
-                view, organization, workOrderId,
-            );
-            const priorExpired = claimDoc !== null
-                ? isExpiresAtPassed(claimDoc.expiresAt)
-                : prior !== null
-                    && isClaimEventExpired(
-                        prior, graph.lockTimeout,
-                    );
-            const priorLive = prior !== null
-                && prior.state === 'claimed'
-                && !priorExpired;
-            if (priorLive) {
-                if (prior.member_id === actor) {
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
-                    return;
-                }
-                throw new ApiError(
-                    'work order is already'
-                        + ' claimed',
-                    HTTP_CONFLICT,
-                );
-            }
-            // Phase Final Task 2: states ROW half stripped —
-            // claim_expired + claimed live on the
-            // operation message pair body
-            // (workOrderClaimHistoryFor reads them back).
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-        },
-    );
+        return prior !== null
+            && prior.state === 'claimed'
+            && !priorExpired
+            && prior.member_id !== actor;
+    });
+    if (claimed) {
+        throw new ApiError(
+            'work order is already claimed',
+            HTTP_CONFLICT,
+        );
+    }
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
 }
 
 // DELETE work-orders/:id/claim — tombstone the claim
@@ -2157,16 +2101,14 @@ export async function deleteWorkOrderClaimOp(
     _organization: Id,
     messagePair?: MessagePair,
 ): Promise<void> {
-    return db.transaction(async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-        },
-    );
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return;
 }
 
 // Current node id from lifecycle ASC + frozen graph.
@@ -2317,16 +2259,14 @@ export async function postWorkOrderTransitionOp(
         // Below-facade tier (seed): no gate, no fence —
         // validate + append, the WO-create precedent.
         // Historical seed moves are not re-gated (W10).
-        return db.transaction(async (view) => {
-                if (messagePair !== undefined) {
-                    await runWrite(
-                        view,
-                        attemptFor([messagePair]),
-                        [messagePair],
-                    );
-                }
-            },
-        );
+        if (messagePair !== undefined) {
+            await runWrite(
+                db,
+                attemptFor([messagePair]),
+                [messagePair],
+            );
+        }
+        return;
     }
     const valueBearing =
         validated.kind === 'instance'
@@ -2361,16 +2301,14 @@ export async function postWorkOrderTransitionOp(
             wo.flow_graph,
             { set: [], clear: [] },
         );
-        return db.transaction(async (view) => {
-                if (messagePair !== undefined) {
-                    await runWrite(
-                        view,
-                        attemptFor([messagePair]),
-                        [messagePair],
-                    );
-                }
-            },
-        );
+        if (messagePair !== undefined) {
+            await runWrite(
+                db,
+                attemptFor([messagePair]),
+                [messagePair],
+            );
+        }
+        return;
     }
     // Value-bearing instance-kind. PRE-TX after fence
     // (instance-PATCH shape: tx wraps only the appends).
@@ -2513,38 +2451,35 @@ export async function postWorkOrderTransitionOp(
         }],
     });
     const latchedMessagePairId = head.messagePairId;
-    await db.transaction(async (view) => {
-            const liveWo =
-                await workOrderDocumentHeadFor(
-                    view, organization, workOrderId,
-                );
-            if (liveWo === null) {
-                throw await missedReadError(
-                    view, workOrderId, organization,
-                    'work_orders',
-                );
-            }
-            // R9: lock head must still be the latched pair
-            // id.
-            const latest = (await messageStore(view).getDocumentHead(
+    await db.readTransaction(async (view) => {
+        const liveWo =
+            await workOrderDocumentHeadFor(
+                view, organization, workOrderId,
+            );
+        if (liveWo === null) {
+            throw await missedReadError(
+                view, workOrderId, organization,
+                'work_orders',
+            );
+        }
+        // The latched pair must still be the head.
+        const latest = (await messageStore(view)
+            .getDocumentHead(
                 revisionMessagePair.path,
                 revisionMessagePair.name,
             ))?.id;
-            if (latest !== latchedMessagePairId) {
-                throw new ApiError(
-                    'If-Match does not match the current '
-                        + 'instance at ' + pathname,
-                    HTTP_PRECONDITION_FAILED,
-                );
-            }
-            const pairs = [
-                messagePair, revisionMessagePair,
-            ];
-            await runWrite(
-                view, attemptFor(pairs), pairs,
+        if (latest !== latchedMessagePairId) {
+            throw new ApiError(
+                'If-Match does not match the current '
+                    + 'instance at ' + pathname,
+                HTTP_PRECONDITION_FAILED,
             );
-        },
-    );
+        }
+    });
+    const pairs = [
+        messagePair, revisionMessagePair,
+    ];
+    await runWrite(db, attemptFor(pairs), pairs);
 }
 
 // Bind a work order to one org-owned instance of one
@@ -2564,71 +2499,69 @@ export async function postWorkOrderBindingOp(
     organization: Id,
     messagePair?: MessagePair,
 ): Promise<void> {
-    return db.transaction(async (view) => {
-            const wo = await workOrderDocumentHeadFor(
+    await db.readTransaction(async (view) => {
+        const wo = await workOrderDocumentHeadFor(
+            view, organization, workOrderId,
+        );
+        if (wo === null) {
+            throw await missedReadError(
+                view, workOrderId, organization,
+                'work_orders',
+            );
+        }
+        const bind = validateWorkOrderBindingBody(body);
+        // Instance miss is EntityNotFoundError (404)
+        // — never missedReadError (would 403 foreign
+        // and create an existence oracle; W1 / W7).
+        const head = await deriveInstanceHead(
+            view, organization,
+            bind.recordTypeId, bind.instanceId,
+        );
+        if (head === undefined) {
+            throw new EntityNotFoundError(
+                'record_instances',
+                bind.instanceId,
+            );
+        }
+        const chain =
+            await recordTypeIdsForWorkOrder(
                 view, organization, workOrderId,
             );
-            if (wo === null) {
-                throw await missedReadError(
-                    view, workOrderId, organization,
-                    'work_orders',
-                );
-            }
-            const bind =
-                validateWorkOrderBindingBody(body);
-            // Instance miss is EntityNotFoundError (404)
-            // — never missedReadError (would 403 foreign
-            // and create an existence oracle; W1 / W7).
-            const head = await deriveInstanceHead(
-                view, organization,
-                bind.recordTypeId, bind.instanceId,
+        if (
+            chain === null
+            || !chain.recordTypeIds.includes(
+                bind.recordTypeId,
+            )
+        ) {
+            throw new ValidationError(
+                'record_type_id is not joined to'
+                + ' the work order\'s flow',
             );
-            if (head === undefined) {
-                throw new EntityNotFoundError(
-                    'record_instances',
-                    bind.instanceId,
-                );
-            }
-            const chain =
-                await recordTypeIdsForWorkOrder(
-                    view, organization, workOrderId,
-                );
-            if (
-                chain === null
-                || !chain.recordTypeIds.includes(
-                    bind.recordTypeId,
-                )
-            ) {
-                throw new ValidationError(
-                    'record_type_id is not joined to'
-                    + ' the work order\'s flow',
-                );
-            }
-            const prior = await workOrderBindingFor(
-                view, organization, workOrderId,
+        }
+        const prior = await workOrderBindingFor(
+            view, organization, workOrderId,
+        );
+        if (
+            prior !== null
+            && (prior.instanceId
+                    !== bind.instanceId
+                || prior.recordTypeId
+                    !== bind.recordTypeId)
+        ) {
+            throw new ApiError(
+                'work order is already bound to'
+                + ' a different instance',
+                HTTP_CONFLICT,
             );
-            if (
-                prior !== null
-                && (prior.instanceId
-                        !== bind.instanceId
-                    || prior.recordTypeId
-                        !== bind.recordTypeId)
-            ) {
-                throw new ApiError(
-                    'work order is already bound to'
-                    + ' a different instance',
-                    HTTP_CONFLICT,
-                );
-            }
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-        },
-    );
+        }
+    });
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
 }
 
 // Work-order document write — the fourth family's evidence for
@@ -2658,19 +2591,15 @@ export async function postWorkOrderDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<WorkOrderEntity, 'id'>;
-    return db.transaction(
-        // Phase Final Task 2: work_orders ROW half stripped.
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    // Phase Final Task 2: work_orders ROW half stripped.
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // Flow work-order join document write. Phase Final Task 2:
@@ -2692,19 +2621,15 @@ export async function postFlowWorkOrderDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    return db.transaction(
-        // Phase Final Task 2: flow_work_orders ROW half stripped.
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    // Phase Final Task 2: flow_work_orders ROW half stripped.
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // Flow record join document write. Phase Final Task 2: the
@@ -2730,34 +2655,32 @@ export async function postFlowRecordDocumentOp(
         body: withoutId(body),
     });
     const recordsPrefix = recordTypesUriPrefix(organization);
-    return db.transaction(
-        // Phase Final Task 2: flow_records ROW half stripped.
-        async (view) => {
-            // Record miss is EntityNotFoundError (404) —
-            // never missedReadError (would 403 foreign and
-            // create an existence oracle; W1 / W7), the
-            // work-order binding's instance-probe posture.
-            const recordHead = deriveDocumentsAt(
-                await view.messagePairs.getDocumentHistory(
-                    recordsPrefix, entity.record_id,
-                ),
-                recordsPrefix,
-            ).get(entity.record_id);
-            if (recordHead === undefined) {
-                throw new EntityNotFoundError(
-                    'records', entity.record_id,
-                );
-            }
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
+    // Phase Final Task 2: flow_records ROW half stripped.
+    // Record miss is EntityNotFoundError (404) —
+    // never missedReadError (would 403 foreign and
+    // create an existence oracle; W1 / W7), the
+    // work-order binding's instance-probe posture.
+    const recordHead = await db.readTransaction(
+        async (view) => deriveDocumentsAt(
+            await view.messagePairs.getDocumentHistory(
+                recordsPrefix, entity.record_id,
+            ),
+            recordsPrefix,
+        ).get(entity.record_id),
     );
+    if (recordHead === undefined) {
+        throw new EntityNotFoundError(
+            'records', entity.record_id,
+        );
+    }
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // Flow tag document write — the codebase's FIRST message-plane-ONLY
@@ -2775,16 +2698,14 @@ export async function postFlowTagDocumentOp(
     db: DbAdapter,
     messagePair?: MessagePair,
 ): Promise<void> {
-    return db.transaction(async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-        },
-    );
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return;
 }
 
 // Objective baseline-score document write. Phase Final Task 2:
@@ -2811,17 +2732,14 @@ export async function postBaselineScoreDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    return db.transaction(async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // Objective actual-score document write. Phase Final Task 2:
@@ -2842,17 +2760,14 @@ export async function postActualScoreDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    return db.transaction(async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // Membership document write — Phase Final Task 2: the
@@ -2871,19 +2786,15 @@ export async function postMembershipDocumentOp(
 ): Promise<Omit<MembershipEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<MembershipEntity, 'id'>;
-    return db.transaction(
-        // Phase Final Task 2: memberships ROW half stripped.
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    // Phase Final Task 2: memberships ROW half stripped.
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // Member document write — Phase Final Task 2: the members
@@ -2902,19 +2813,15 @@ export async function postMemberDocumentOp(
 ): Promise<Omit<MemberEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<MemberEntity, 'id'>;
-    return db.transaction(
-        // Phase Final Task 2: members ROW half stripped.
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    // Phase Final Task 2: members ROW half stripped.
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // AI-member document write — Phase Final Task 2: the
@@ -2931,19 +2838,15 @@ export async function postAiMemberDocumentOp(
 ): Promise<Omit<AIMemberEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<AIMemberEntity, 'id'>;
-    return db.transaction(
-        // Phase Final Task 2: ai_members ROW half stripped.
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    // Phase Final Task 2: ai_members ROW half stripped.
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // Human-member document write — Phase Final Task 2: the
@@ -2961,19 +2864,15 @@ export async function postHumanMemberDocumentOp(
 ): Promise<Omit<HumanMemberEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<HumanMemberEntity, 'id'>;
-    return db.transaction(
-        // Phase Final Task 2: human_members ROW half stripped.
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    // Phase Final Task 2: human_members ROW half stripped.
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // Identity PII document write — Phase Final Task 2: the
@@ -2994,19 +2893,15 @@ export async function postIdentityPiiDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    return db.transaction(
-        // Phase Final Task 2: identity_pii ROW half stripped.
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    // Phase Final Task 2: identity_pii ROW half stripped.
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // Identity document write — Phase Final Task 2: the
@@ -3023,19 +2918,15 @@ export async function postIdentityDocumentOp(
 ): Promise<IdentityEntityFields> {
     const entity = withoutId(body) as unknown as
         IdentityEntityFields;
-    return db.transaction(
-        // Phase Final Task 2: identities ROW half stripped.
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    // Phase Final Task 2: identities ROW half stripped.
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // AI-agent document write — message-plane only. Not a
@@ -3050,17 +2941,14 @@ export async function postAiAgentDocumentOp(
 ): Promise<Omit<AIAgentEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<AIAgentEntity, 'id'>;
-    return db.transaction(async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // Identity credential document write — Phase Final Task 2:
@@ -3076,20 +2964,16 @@ export async function postIdentityCredentialDocumentOp(
 ): Promise<Omit<IdentityCredentialEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<IdentityCredentialEntity, 'id'>;
-    return db.transaction(
-        // Phase Final Task 2: identity_credentials ROW half
-        // stripped.
-        async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    // Phase Final Task 2: identity_credentials ROW half
+    // stripped.
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // Client-registration document write (clients elimination) —
@@ -3112,17 +2996,14 @@ export async function postClientRegistrationDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    return db.transaction(async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // The registration facet's kind gate (validators at the
@@ -3179,17 +3060,14 @@ export async function postIdentityProviderDocumentOp(
         method: 'PUT',
         body: stamped,
     });
-    return db.transaction(async (view) => {
-            if (messagePair !== undefined) {
-                await runWrite(
-                    view,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
-    );
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
 }
 
 // The pre-tx response body for each pair-wired write —
@@ -3773,39 +3651,38 @@ export async function postInstanceDeleteOp(
             db, instanceId, org, 'record_instances',
         );
     }
-    await db.transaction(async (view) => {
-            // R9: re-probe spent inside the append tx so a
-            // concurrent writer cannot leave us appending a
-            // tombstone onto a virgin document, and so a
-            // concurrent tombstone still lets us append
-            // (tombstone-wins / ledger-complete).
-            const spent = await instanceDocumentSpent(
-                view, prefix, instanceId,
+    // Re-probe spent before the statement so a
+    // concurrent writer cannot leave us appending a
+    // tombstone onto a virgin document.
+    await db.readTransaction(async (view) => {
+        const spent = await instanceDocumentSpent(
+            view, prefix, instanceId,
+        );
+        if (!spent) {
+            throw await missedReadError(
+                view, instanceId, org,
+                'record_instances',
             );
-            if (!spent) {
-                throw await missedReadError(
-                    view, instanceId, org,
-                    'record_instances',
-                );
-            }
-            // W5: RESTRICT while any bind is in-flight
-            // (non-terminal current node on that WO's
-            // frozen graph). Terminal + unbound free.
-            const blockers =
-                await inFlightPlacementBlockersFor(
-                    view, org, instanceId,
-                );
-            if (blockers.length > 0) {
-                throw new ApiError(
-                    'record instance ' + instanceId
-                    + ' is placed in-flight on work'
-                    + ' order(s) '
-                    + blockers.join(', '),
-                    HTTP_CONFLICT,
-                );
-            }
-            await runWrite(view, attemptFor([messagePair]), [messagePair]);
-        },
+        }
+        // W5: RESTRICT while any bind is in-flight
+        // (non-terminal current node on that WO's
+        // frozen graph). Terminal + unbound free.
+        const blockers =
+            await inFlightPlacementBlockersFor(
+                view, org, instanceId,
+            );
+        if (blockers.length > 0) {
+            throw new ApiError(
+                'record instance ' + instanceId
+                + ' is placed in-flight on work'
+                + ' order(s) '
+                + blockers.join(', '),
+                HTTP_CONFLICT,
+            );
+        }
+    });
+    await runWrite(
+        db, attemptFor([messagePair]), [messagePair],
     );
 }
 
@@ -3931,32 +3808,38 @@ async function postInstanceCreateOp(
         headerFields: [],
     });
     const prefix = instancesUriPrefix(org, typeId);
-    await db.transaction(async (view) => {
-            const latest = await documentHeadAt(
-                view, prefix, instanceId,
+    await db.readTransaction(async (view) => {
+        const latest = await documentHeadAt(
+            view, prefix, instanceId,
+        );
+        if (latest?.method === 'DELETE') {
+            throw new ApiError(
+                'instance already exists at '
+                    + pathname,
+                HTTP_CONFLICT,
             );
-            if (latest?.method === 'DELETE') {
-                throw new ApiError(
-                    'instance already exists at '
-                        + pathname,
-                    HTTP_CONFLICT,
-                );
-            }
-            if (latest?.method === 'PUT') {
-                throw new ApiError(
-                    'If-Match is required to PATCH '
-                        + pathname,
-                    HTTP_PRECONDITION_REQUIRED,
-                );
-            }
-            const pairs = [
-                messagePair, revisionMessagePair,
-            ];
-            await runWrite(
-                view, attemptFor(pairs), pairs,
+        }
+        if (latest?.method === 'PUT') {
+            throw new ApiError(
+                'If-Match is required to PATCH '
+                    + pathname,
+                HTTP_PRECONDITION_REQUIRED,
             );
-        },
-    );
+        }
+    });
+    const pairs = [
+        messagePair, revisionMessagePair,
+    ];
+    // A create. A raced second create loses the
+    // succession slot; the route's ladder is 428.
+    const answer = await runWrite(db, 'genesis', pairs);
+    if (answer.outcome === 'refused') {
+        throw new ApiError(
+            'If-Match is required to PATCH '
+                + pathname,
+            HTTP_PRECONDITION_REQUIRED,
+        );
+    }
 }
 
 // Instance PATCH two-pair append (Task 17 / R5 / R9).
@@ -4052,28 +3935,24 @@ export async function postInstancePatchOp(
         }],
     });
     const latchedMessagePairId = head.messagePairId;
-    await db.transaction(async (view) => {
-            // R9: lock head must still be the latched pair
-            // id.
-            const latest = (await messageStore(view).getDocumentHead(
+    const latest = await db.readTransaction(
+        async (view) => (await messageStore(view)
+            .getDocumentHead(
                 revisionMessagePair.path,
                 revisionMessagePair.name,
-            ))?.id;
-            if (latest !== latchedMessagePairId) {
-                throw new ApiError(
-                    'If-Match does not match the current '
-                        + 'instance at ' + pathname,
-                    HTTP_PRECONDITION_FAILED,
-                );
-            }
-            const pairs = [
-                messagePair, revisionMessagePair,
-            ];
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-        },
+            ))?.id,
     );
+    if (latest !== latchedMessagePairId) {
+        throw new ApiError(
+            'If-Match does not match the current '
+                + 'instance at ' + pathname,
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    const pairs = [
+        messagePair, revisionMessagePair,
+    ];
+    await runWrite(db, attemptFor(pairs), pairs);
 }
 
 // Offer only: the dedicated arm in handleRequest
@@ -4265,17 +4144,14 @@ export const routes: Route[] = [
             postIdentityPiiDocumentOp(
                 db, param(p, 0), body, actor, messagePair,
             ),
-        delete: (db, _p, _actor, messagePair) => {
-            return db.transaction(async (view) => {
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
-                },
-            );
+        delete: async (db, _p, _actor, messagePair) => {
+            if (messagePair !== undefined) {
+                await runWrite(
+                    db,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
+            }
         },
     }),
     // Credentials nest under their parent identity: the identity
@@ -4413,16 +4289,14 @@ export const routes: Route[] = [
         },
         delete: async (db, p, _actor, messagePair) => {
             await requireServiceIdentity(db, param(p, 0));
-            return db.transaction(async (view) => {
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
-                },
-            );
+            if (messagePair !== undefined) {
+                await runWrite(
+                    db,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
+            }
+            return;
         },
     }),
     // Nested token-revocations (tokens/providers shape). No
@@ -4438,7 +4312,7 @@ export const routes: Route[] = [
             deriveTokenRevocation(
                 db, param(p, 0), param(p, 1),
             ),
-        put: (db, p, body, _actor, messagePair) => {
+        put: async (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const id = param(p, 1);
             const raw = withoutId(body);
@@ -4460,17 +4334,14 @@ export const routes: Route[] = [
                 method: 'PUT',
                 body: stamped,
             });
-            return db.transaction(async (view) => {
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
-                    return entity;
-                },
-            );
+            if (messagePair !== undefined) {
+                await runWrite(
+                    db,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
+            }
+            return entity;
         },
     }),
     // Nested token events (credentials/providers shape).
@@ -4492,7 +4363,7 @@ export const routes: Route[] = [
             deriveIdentityToken(
                 db, param(p, 0), param(p, 1),
             ),
-        put: (db, p, body, _actor, messagePair) => {
+        put: async (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const jti = param(p, 1);
             const raw = withoutId(body);
@@ -4520,17 +4391,14 @@ export const routes: Route[] = [
                 method: 'PUT',
                 body: stamped,
             });
-            return db.transaction(async (view) => {
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
-                    return entity;
-                },
-            );
+            if (messagePair !== undefined) {
+                await runWrite(
+                    db,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
+            }
+            return entity;
         },
     }),
     // Rotate a refresh jti. The path identity's own tokens
@@ -4781,23 +4649,21 @@ export const routes: Route[] = [
             // halves stripped; only states events + pairs remain
             // (states row half strips with the states-trace
             // group).
-            return db.transaction(async (view) => {
-                    const pairs = [
-                        ...(messagePair !== undefined
-                            ? [messagePair] : []),
-                        ...(projectMessagePair !== undefined
-                            ? [projectMessagePair] : []),
-                        ...(ideaMessagePair !== undefined
-                            ? [ideaMessagePair] : []),
-                        ...baselineMessagePairs,
-                    ];
-                    if (pairs.length > 0) {
-                        await runWrite(
-                            view, attemptFor(pairs), pairs,
-                        );
-                    }
-                },
-            );
+            const pairs = [
+                ...(messagePair !== undefined
+                    ? [messagePair] : []),
+                ...(projectMessagePair !== undefined
+                    ? [projectMessagePair] : []),
+                ...(ideaMessagePair !== undefined
+                    ? [ideaMessagePair] : []),
+                ...baselineMessagePairs,
+            ];
+            if (pairs.length > 0) {
+                await runWrite(
+                    db, attemptFor(pairs), pairs,
+                );
+            }
+            return;
         },
     }),
     // GET is FLIPPED (Phase 3 Task 6): the list derives from
@@ -4985,7 +4851,7 @@ export const routes: Route[] = [
         // Phase Final Task 2: project_flows ROW half stripped —
         // pure message-plane write (join derives from the ledger).
         // G6: reconstructed return is projectFlowEntityOf.
-        put: (db, p, body, _actor, messagePair) => {
+        put: async (db, p, body, _actor, messagePair) => {
             const pfid = param(p, 2);
             const entity = projectFlowEntityOf({
                 name: pfid,
@@ -4993,29 +4859,23 @@ export const routes: Route[] = [
                 method: 'PUT',
                 body: withoutId(body),
             });
-            return db.transaction(async (view) => {
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
-                    return entity;
-                },
-            );
+            if (messagePair !== undefined) {
+                await runWrite(
+                    db,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
+            }
+            return entity;
         },
-        delete: (db, _p, _actor, messagePair) => {
-            return db.transaction(async (view) => {
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
-                },
-            );
+        delete: async (db, _p, _actor, messagePair) => {
+            if (messagePair !== undefined) {
+                await runWrite(
+                    db,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
+            }
         },
     }),
     // GET list: generic documentCollectionGetHandler rows
@@ -5366,26 +5226,25 @@ export const routes: Route[] = [
                 param(params, 0),
             );
             const id = param(params, 1);
-            await db.transaction(async (view) => {
-                    const refs =
-                        await collectRecordTypeReferrers(
-                            view, organization, id,
-                        );
-                    if (hasTypeReferrers(refs)) {
-                        throw new ApiError(
-                            describeTypeReferrers(id, refs),
-                            HTTP_CONFLICT,
-                        );
-                    }
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
-                },
-            );
+            await db.readTransaction(async (view) => {
+                const refs =
+                    await collectRecordTypeReferrers(
+                        view, organization, id,
+                    );
+                if (hasTypeReferrers(refs)) {
+                    throw new ApiError(
+                        describeTypeReferrers(id, refs),
+                        HTTP_CONFLICT,
+                    );
+                }
+            });
+            if (messagePair !== undefined) {
+                await runWrite(
+                    db,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
+            }
         },
     }),
     route(RECORD_TYPE_VERSIONS_PATTERN, {
@@ -5492,16 +5351,14 @@ export const routes: Route[] = [
             const typeId = param(p, 1);
             await requireRecordTypeExists(db, org, typeId);
             validateAttributeDocument(withoutId(body));
-            return db.transaction(async (view) => {
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
-                },
-            );
+            if (messagePair !== undefined) {
+                await runWrite(
+                    db,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
+            }
+            return;
         },
         delete: async (db, p, _actor, messagePair) => {
             const org = param(p, 0);
@@ -5524,16 +5381,15 @@ export const routes: Route[] = [
                     db, attrId, org, 'record_attributes',
                 );
             }
-            return db.transaction(async (view) => {
-                    await deleteRecordAttributeSafe(
-                        view, org, attrId, typeId,
-                    );
-                    await runWrite(
-                        view,
-                        attemptFor([messagePair]),
-                        [messagePair],
-                    );
-                },
+            await db.readTransaction(async (view) => {
+                await deleteRecordAttributeSafe(
+                    view, org, attrId, typeId,
+                );
+            });
+            await runWrite(
+                db,
+                attemptFor([messagePair]),
+                [messagePair],
             );
         },
     }),
@@ -5741,17 +5597,14 @@ export const routes: Route[] = [
             ),
         // Phase Final Task 2: flow_records ROW half stripped —
         // DELETE is a pure message-plane tombstone append.
-        delete: (db, _p, _actor, messagePair) => {
-            return db.transaction(async (view) => {
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
-                },
-            );
+        delete: async (db, _p, _actor, messagePair) => {
+            if (messagePair !== undefined) {
+                await runWrite(
+                    db,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
+            }
         },
     }),
     // Flow tags: the codebase's FIRST message-plane-ONLY document
@@ -5817,7 +5670,7 @@ export const routes: Route[] = [
     // bytes via organizationEntityOf (id-last; GET wins).
     route('organizations/:id', {
         get: (db, p) => deriveOrganization(db, param(p, 0)),
-        put: (db, p, body, _actor, messagePair) => {
+        put: async (db, p, body, _actor, messagePair) => {
             const id = param(p, 0);
             const entity = organizationEntityOf({
                 name: id,
@@ -5825,20 +5678,16 @@ export const routes: Route[] = [
                 method: 'PUT',
                 body: withoutId(body),
             });
-            return db.transaction(
-                // Phase Final Task 2: organizations ROW half
-                // stripped.
-                async (view) => {
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
-                    return entity;
-                },
-            );
+            // Phase Final Task 2: organizations ROW half
+            // stripped.
+            if (messagePair !== undefined) {
+                await runWrite(
+                    db,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
+            }
+            return entity;
         },
     }),
     route('organizations/:id/versions/', {
@@ -5944,33 +5793,29 @@ export const routes: Route[] = [
         ) => {
             const fenced = requireOrganization(organization);
             const identityId = param(p, 1);
-            let lastAdmin = false;
-            await db.transaction(async (view) => {
+            const lastAdmin = await db.readTransaction(
+                async (view) => {
                     const admins = (
                         await deriveOrganizationMemberSeats(
                             view, fenced,
                         )
                     ).filter(seat => seat.type === 'admin');
-                    if (
-                        admins.length === 1
-                        && admins[0]!.identity_id === identityId
-                    ) {
-                        lastAdmin = true;
-                        return;
-                    }
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
+                    return admins.length === 1
+                        && admins[0]!.identity_id
+                            === identityId;
                 },
             );
             if (lastAdmin) {
                 throw new ApiError(
                     'the last admin seat cannot be removed',
                     HTTP_CONFLICT,
+                );
+            }
+            if (messagePair !== undefined) {
+                await runWrite(
+                    db,
+                    attemptFor([messagePair]),
+                    [messagePair],
                 );
             }
         },
@@ -6145,7 +5990,7 @@ export const routes: Route[] = [
     // the wire bytes; the reconstructed return is for type
     // parity with the former store put.
     route('organizations/:id/objectives/:id/revisions/:rid', {
-        put: (db, p, body, _actor, messagePair) => {
+        put: async (db, p, body, _actor, messagePair) => {
             const id = param(p, 2);
             const entity = objectiveRevisionEntityOf({
                 name: id,
@@ -6153,20 +5998,16 @@ export const routes: Route[] = [
                 method: 'PUT',
                 body: withoutId(body),
             });
-            return db.transaction(
-                // Phase Final Task 2: objective_revisions ROW
-                // half stripped.
-                async (view) => {
-                    if (messagePair !== undefined) {
-                        await runWrite(
-                            view,
-                            attemptFor([messagePair]),
-                            [messagePair],
-                        );
-                    }
-                    return entity;
-                },
-            );
+            // Phase Final Task 2: objective_revisions ROW
+            // half stripped.
+            if (messagePair !== undefined) {
+                await runWrite(
+                    db,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
+            }
+            return entity;
         },
     }),
     // Objective baseline scores nest under their parent

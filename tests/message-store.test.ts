@@ -50,11 +50,11 @@ async function writePair(
             : input.responseBody,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => runWrite(
-        view,
+    await runWrite(
+        db,
         attemptFor([messagePair]),
         [messagePair],
-    ));
+    )
     return {
         id: messagePair.id,
     };

@@ -485,30 +485,27 @@ async function grantInvitation(
             },
         )
         : undefined;
-    await db.transaction(async (view) => {
-            const outcome = await grantOutcomeFor(
-                view, organization, identityId);
-            const agrees = outcome.kind === preOutcome.kind
-                && (outcome.kind !== 'existing'
-                    || (preOutcome.kind === 'existing'
-                        && outcome.id === preOutcome.id));
-            if (!agrees) {
-                throw new Error(
-                    'grantInvitation: the duplicate-grant'
-                    + ' check raced between its pre-tx read'
-                    + ' and its transaction — retry the'
-                    + ' request',
-                );
-            }
-            const pairs = [messagePair];
-            if (document !== undefined) {
-                pairs.push(document);
-            }
-            await runWrite(
-                view, attemptFor(pairs), pairs,
+    await db.readTransaction(async (view) => {
+        const outcome = await grantOutcomeFor(
+            view, organization, identityId);
+        const agrees = outcome.kind === preOutcome.kind
+            && (outcome.kind !== 'existing'
+                || (preOutcome.kind === 'existing'
+                    && outcome.id === preOutcome.id));
+        if (!agrees) {
+            throw new Error(
+                'grantInvitation: the duplicate-grant'
+                + ' check raced between its pre-tx read'
+                + ' and its transaction — retry the'
+                + ' request',
             );
-        },
-    );
+        }
+    });
+    const pairs = [messagePair];
+    if (document !== undefined) {
+        pairs.push(document);
+    }
+    await runWrite(db, attemptFor(pairs), pairs);
     if (preOutcome.kind === 'fresh') {
         db.postNotification({
             kind: 'scoped',
@@ -691,29 +688,33 @@ async function acceptInvitation(
     });
     let conflict = false;
     let committed = false;
-    await db.transaction(async (view) => {
-            const state = await currentInvitationState(view, id);
+    const acceptPairs = await db.readTransaction(
+        async (view) => {
+            const state = await currentInvitationState(
+                view, id,
+            );
             // Already accepted: no-op. Declined/revoked: 409.
-            if (state === 'accepted') {
-                return;
-            }
+            if (state === 'accepted') return null;
             if (state !== 'pending') {
                 conflict = true;
-                return;
+                return null;
             }
             const already = await membershipExistsFor(
-                view, inv.organization_id, actor);
-            const pairs = [
+                view, inv.organization_id, actor,
+            );
+            return [
                 ...(already ? [] : [seatDocument]),
                 messagePair,
                 terminal,
             ];
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-            committed = true;
         },
     );
+    if (acceptPairs !== null) {
+        await runWrite(
+            db, attemptFor(acceptPairs), acceptPairs,
+        );
+        committed = true;
+    }
     if (conflict) {
         throw new ApiError(
             'invitation is not pending', HTTP_CONFLICT);
@@ -778,23 +779,21 @@ async function declineInvitation(
     );
     let conflict = false;
     let committed = false;
-    await db.transaction(async (view) => {
-            const state = await currentInvitationState(view, id);
-            // Already declined: no-op. Accepted/revoked: 409.
-            if (state === 'declined') {
-                return;
-            }
-            if (state !== 'pending') {
-                conflict = true;
-                return;
-            }
-            const pairs = [messagePair, terminal];
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-            committed = true;
-        },
-    );
+    const decline = await db.readTransaction(async (view) => {
+        const state = await currentInvitationState(view, id);
+        // Already declined: no-op. Accepted/revoked: 409.
+        if (state === 'declined') return false;
+        if (state !== 'pending') {
+            conflict = true;
+            return false;
+        }
+        return true;
+    });
+    if (decline) {
+        const pairs = [messagePair, terminal];
+        await runWrite(db, attemptFor(pairs), pairs);
+        committed = true;
+    }
     if (conflict) {
         throw new ApiError(
             'invitation is not pending', HTTP_CONFLICT);
@@ -857,31 +856,31 @@ async function revokeInvitation(
     );
     let conflict = false;
     let committed = false;
-    await db.transaction(async (view) => {
-            const state = await currentInvitationState(view, id);
-            // The same revocation body is a no-op.
-            // A different body against a revoked
-            // invitation is 409.
-            if (state === 'revoked') {
-                if (await revocationIsReplay(
-                    view, id, transition,
-                )) {
-                    return;
-                }
-                conflict = true;
-                return;
+    const revoke = await db.readTransaction(async (view) => {
+        const state = await currentInvitationState(view, id);
+        // The same revocation body is a no-op.
+        // A different body against a revoked
+        // invitation is 409.
+        if (state === 'revoked') {
+            if (await revocationIsReplay(
+                view, id, transition,
+            )) {
+                return false;
             }
-            if (state !== 'pending') {
-                conflict = true;
-                return;
-            }
-            const pairs = [messagePair, terminal];
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-            committed = true;
-        },
-    );
+            conflict = true;
+            return false;
+        }
+        if (state !== 'pending') {
+            conflict = true;
+            return false;
+        }
+        return true;
+    });
+    if (revoke) {
+        const pairs = [messagePair, terminal];
+        await runWrite(db, attemptFor(pairs), pairs);
+        committed = true;
+    }
     if (conflict) {
         throw new ApiError(
             'invitation is not pending', HTTP_CONFLICT);

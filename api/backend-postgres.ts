@@ -1,8 +1,7 @@
 // Fourth StorageBackend. postgres.js stays behind
-// postgres-client. Write lock order is request, document,
-// then FOR UPDATE. Notify is in-transaction. The write
-// appends: `ON CONFLICT (id) DO NOTHING`, the row count is
-// the report.
+// postgres-client. A statement inside an open client
+// runs in a savepoint so a succession 23505 does not
+// abort the caller. Notify stays on the write client.
 
 import {
     type StorageBackend,
@@ -18,7 +17,6 @@ import type { NotificationEvent } from
     './notifications.ts';
 import {
     FUSION_EVENTS_CHANNEL,
-    advisoryKey,
     notifyPayload,
 } from './advisory-lock.ts';
 import {
@@ -48,9 +46,6 @@ export interface PostgresTx extends Tx {
         path: string,
         name: string,
     ): Promise<T[]>;
-    lockRequest(hash: string): Promise<void>;
-    lockDocument(path: string, name: string): Promise<void>;
-    lockHead(id: string): Promise<void>;
     getHead(path: string, name: string): Promise<{
         readonly id: string;
         readonly method: string;
@@ -178,8 +173,8 @@ export class PostgresBackend implements StorageBackend {
     }
 }
 
-// Lock methods need an open transaction. Standalone
-// read passes false; transaction() passes true.
+// Notify needs an open write client. Standalone read
+// passes false; transaction() passes true.
 const clients = new WeakMap<Tx, SqlClient>();
 
 function clientOf(tx: Tx): SqlClient {
@@ -272,33 +267,6 @@ function postgresTx(
         },
         ...(coordination
             ? {
-                async lockRequest(
-                    hash: string,
-                ): Promise<void> {
-                    await advisoryLock(
-                        sql, 'fusion.dedup.' + hash,
-                    );
-                },
-                async lockDocument(
-                    path: string,
-                    name: string,
-                ): Promise<void> {
-                    await advisoryLock(
-                        sql,
-                        'fusion.document.' + path + name,
-                    );
-                },
-                async lockHead(
-                    id: string,
-                ): Promise<void> {
-                    await sql.query`
-                        SELECT id FROM fa_message_pairs
-                        WHERE id = ${
-                            uuidTextOfIdentifier(id)
-                        }
-                        FOR UPDATE
-                    `;
-                },
                 async notify(
                     event: NotificationEvent,
                 ): Promise<void> {
@@ -332,16 +300,6 @@ function postgresTx(
     };
     clients.set(tx, sql);
     return tx;
-}
-
-async function advisoryLock(
-    sql: SqlClient,
-    label: string,
-): Promise<void> {
-    const key = Number(await advisoryKey(label));
-    await sql.query`
-        SELECT pg_advisory_xact_lock(${key})
-    `;
 }
 
 function entityOf<T extends { id: string }>(

@@ -86,23 +86,12 @@ Deno.test(
 );
 
 Deno.test(
-    'read handle has no lock methods',
+    'read handle does not notify',
     async () => {
         const backend = new MemoryStorageBackend();
         await backend.ensureTable();
         await backend.read(async (tx) => {
-            assertStrictEquals(
-                tx.lockRequest, undefined,
-            );
-            assertStrictEquals(
-                tx.lockDocument, undefined,
-            );
-            assertStrictEquals(
-                tx.lockHead, undefined,
-            );
-            assertStrictEquals(
-                tx.notify, undefined,
-            );
+            assertStrictEquals(tx.notify, undefined);
         });
     },
 );

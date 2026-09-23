@@ -164,11 +164,11 @@ Deno.test('append then head-read round-trips', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const messagePair = await formWriteMessagePair({ ...INPUT });
-    await db.transaction((view) => runWrite(
-        view,
+    await runWrite(
+        db,
         attemptFor([messagePair]),
         [messagePair],
-    ));
+    )
     assertStrictEquals(
         (await messageStore(db).getDocumentHead(
             '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42',
@@ -191,18 +191,15 @@ Deno.test('a same-body re-append writes nothing', async () => {
         ...messagePair,
         id: generateIdentifier(),
     };
-    await db.transaction(async (view) => {
-            await runWrite(
-                view,
-                attemptFor([messagePair]),
-                [messagePair],
-            );
-            await runWrite(
-                view,
-                attemptFor([replay]),
-                [replay],
-            );
-        },
+    await runWrite(
+        db,
+        attemptFor([messagePair]),
+        [messagePair],
+    );
+    await runWrite(
+        db,
+        attemptFor([replay]),
+        [replay],
     );
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, 2,

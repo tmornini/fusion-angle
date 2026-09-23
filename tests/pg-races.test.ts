@@ -1,15 +1,11 @@
 import {
     assert,
-    assertInstanceOf,
-    assertRejects,
     assertStrictEquals,
 } from '@std/assert';
 import { connectPostgres } from
     '../api/postgres-client.ts';
-import {
-    PostgresBackend,
-    type PostgresTx,
-} from '../api/backend-postgres.ts';
+import { PostgresBackend } from
+    '../api/backend-postgres.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import type { DbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
@@ -27,16 +23,10 @@ import {
     advisoryKey,
     POOL_MAX,
 } from '../api/advisory-lock.ts';
-import {
-    ApiError,
-    HTTP_GATEWAY_TIMEOUT,
-    HTTP_INTERNAL_ERROR,
-} from '../api/http-errors.ts';
 
-// Live Postgres races: first-writer, If-Match, a
-// second genesis, deadlock 500, timeout 504.
-// Skip when POSTGRES_URL is unset so ./validate stays
-// Postgres-free.
+// Live Postgres races: first-writer, If-Match, and a
+// second genesis. Skip when POSTGRES_URL is unset so
+// ./validate stays Postgres-free.
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -420,96 +410,5 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             ),
             1,
         );
-    });
-
-    Deno.test('live deadlock maps to loud 500',
-    { timeout: 8000 },
-    async () => {
-        const leftHeld = Promise.withResolvers<void>();
-        const rightHeld = Promise.withResolvers<void>();
-        const left = backend.transaction('readonly',
-            async (tx) => {
-                const pg = tx as PostgresTx;
-                await pg.lockDocument(
-                    '/fusion-test/deadlock/', 'l',
-                );
-                leftHeld.resolve();
-                await rightHeld.promise;
-                await pg.lockDocument(
-                    '/fusion-test/deadlock/', 'r',
-                );
-            },
-        );
-        const right = backend.transaction('readonly',
-            async (tx) => {
-                const pg = tx as PostgresTx;
-                await pg.lockDocument(
-                    '/fusion-test/deadlock/', 'r',
-                );
-                rightHeld.resolve();
-                await leftHeld.promise;
-                await pg.lockDocument(
-                    '/fusion-test/deadlock/', 'l',
-                );
-            },
-        );
-        const settled = await Promise.allSettled([
-            left, right,
-        ]);
-        const rejected = settled.filter(
-            (row) => row.status === 'rejected',
-        );
-        assert(rejected.length >= 1);
-        const error = rejected[0]?.reason;
-        assert(error instanceof ApiError);
-        assertStrictEquals(error.status, HTTP_INTERNAL_ERROR);
-        assertStrictEquals(error.message, 'deadlock');
-    });
-
-    Deno.test('live statement timeout maps to 504',
-    async () => {
-        const holder = connectPostgres(
-            urlWithSearchPath(POSTGRES_URL, schema),
-        );
-        const tightUrl = new URL(
-            urlWithSearchPath(POSTGRES_URL, schema),
-        );
-        tightUrl.searchParams.set(
-            'statement_timeout', '500',
-        );
-        const tightSql = connectPostgres(tightUrl.href);
-        const tight = new PostgresBackend(tightSql);
-        const label = 'fusion.document./fusion-test/timeout/x';
-        try {
-            await holder.begin(async (tx) => {
-                await tx.query`
-                    SELECT pg_advisory_xact_lock(
-                        ${Number(await advisoryKey(
-                            label,
-                        ))}
-                    )
-                `;
-                const error = await assertRejects(
-                    () => tight.transaction('readonly',
-                        (txn) => (
-                            txn as PostgresTx
-                        ).lockDocument(
-                            '/fusion-test/timeout/',
-                            'x',
-                        ),
-                    ),
-                ) as ApiError;
-                assertInstanceOf(error, ApiError);
-                assertStrictEquals(
-                    error.status, HTTP_GATEWAY_TIMEOUT,
-                );
-                assertStrictEquals(
-                    error.message, 'gateway timeout',
-                );
-            });
-        } finally {
-            await holder.end();
-            await tightSql.end();
-        }
     });
 }

@@ -81,13 +81,10 @@ async function seedDefaultOrganizationEvent(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(async (view) => {
-            await runWrite(
-                view,
-                attemptFor([messagePair]),
-                [messagePair],
-            );
-        },
+    await runWrite(
+        db,
+        attemptFor([messagePair]),
+        [messagePair],
     );
 }
 
@@ -212,13 +209,10 @@ Deno.test(
             responseBody: undefined,
             operationId: generateIdentifier(),
         });
-        await db.transaction(async (view) => {
-                await runWrite(
-                    view,
-                    attemptFor([tombstone]),
-                    [tombstone],
-                );
-            },
+        await runWrite(
+            db,
+            attemptFor([tombstone]),
+            [tombstone],
         );
         assertStrictEquals(
             await identityDefaultOrganization(

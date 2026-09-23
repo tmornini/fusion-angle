@@ -96,15 +96,11 @@ export async function seedOrganizationDocument(
         ),
         operationId: generateIdentifier(),
     });
-    await db.transaction(
-        // Phase Final Task 2: organizations ROW half stripped.
-        async (view) => {
-            await runWrite(
-                view,
-                attemptFor([messagePair]),
-                [messagePair],
-            );
-        },
+    // Phase Final Task 2: organizations ROW half stripped.
+    await runWrite(
+        db,
+        attemptFor([messagePair]),
+        [messagePair],
     );
 }
 

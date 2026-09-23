@@ -2,7 +2,8 @@
 // database and print credentials once. Non-empty
 // refuses. formSeedMessagePair already mints operation_id.
 
-import type { DbAdapter } from '../api/db.ts';
+import type { BackedDbAdapter } from
+    '../api/db-backed.ts';
 import {
     postBootstrap,
     postMockDataLoad,
@@ -170,7 +171,7 @@ export function writeSeededCredentials(
 }
 
 export async function seedEmptyDatabase(
-    adapter: DbAdapter,
+    adapter: BackedDbAdapter,
     mode: SeedMode,
     options?: { readonly hashPassword?: SeedPasswordHasher },
 ): Promise<SeededCredentials> {
@@ -188,7 +189,7 @@ export async function seedEmptyDatabase(
 
 export async function seedPostgres(
     sql: SqlClient,
-    adapter: DbAdapter,
+    adapter: BackedDbAdapter,
     mode: SeedMode,
     options: SeedRunOptions,
 ): Promise<void> {
