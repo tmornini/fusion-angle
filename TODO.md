@@ -965,8 +965,14 @@ skew tests, which went with item 8's trio.
    policies, and what PUBLIC holds —
    compares it to what the binary's migrations, applied
    in name order, declare, and
-   names the drift, and walks every succession to name a
-   pair stamped before its predecessor (item 0). The
+   names the drift; walks every succession to name a
+   pair stamped before its predecessor (item 0) and a
+   `supersedes` that names no row — none until the
+   eraser ships, and each one an erasure pair must name
+   after; and recomputes every root and every leaf the
+   owner can see, to name a pair whose digests no longer
+   match — a digest no reader recomputes is the dropped
+   `version` column again (the signed-ledger bullet). The
    expected list lives beside the
    DDL, and a digest lands only after the check passes, in
    the same transaction, so every seed proves the list
