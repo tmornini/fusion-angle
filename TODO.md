@@ -355,7 +355,7 @@ skew tests, which went with item 8's trio.
    the verbs will. Each lock has its successor: the
    request lock leaves with the dedupe; the document lock
    and the `FOR UPDATE` latch with its fresh head read
-   (`api/message-pair.ts:769-790`) become the index and
+   (`api/message-pair.ts:771-790`) become the index and
    the predecessor-as-head statement; and the assertion
    jti's document lock (`api/authentication.ts:1152-1172`)
    guards a genesis at `authentication/assertion-jtis/`,
@@ -423,13 +423,17 @@ skew tests, which went with item 8's trio.
    `operation-id` in one place, once per operation, and
    takes none from a caller — its per-context `requestId`
    (`web-app/app/adapters/shared.ts:184`) already spans an
-   operation's requests and becomes it. Five sites mint
-   one per write unless supplied, and no caller supplies
-   one — `web-app/app/adapters/shared.ts:185-198`;
+   operation's requests and becomes it. Three sites mint
+   one per write unless supplied —
+   `web-app/app/adapters/shared.ts:185-198`, whose
+   callers supply none;
    `web-app/app/adapters/http-facade.ts:161-166`, behind a
-   `write` flag the verb already implies; and the
-   in-process facade at `api/api.ts:2204-2207`,
-   `:2478-2481`, and `:2511-2514`. Meets the JSON
+   `write` flag the verb already implies, a fallback the
+   first has always satisfied; and the in-process
+   facade's `facadeHeaders` (`api/api.ts:2151-2154`),
+   whose three guards at `:2204-2207`, `:2478-2481`, and
+   `:2511-2514` never run, each behind a call that set
+   the id. Meets the JSON
    parse/stringify bullet in `## Later work` and the
    hash-and-verify half of its verifiable-ledger bullet;
    the brainstorm says what is left of each.
@@ -518,9 +522,10 @@ skew tests, which went with item 8's trio.
    (`api/derive-flows.ts:257-263`, `:289-302`). A read
    hands out the stored
    response whole, and a DELETE head answers a document
-   GET 404 and yields no part, as today's
-   `WHERE method = 'PUT'` already does
-   (`api/backend-postgres.ts:544`): a document GET is the
+   GET 404 and yields no part, as today's head read and
+   `WHERE method = 'PUT'` already do
+   (`api/backend-postgres.ts:493-517`, `:544`): a
+   document GET is the
    stored bytes with
    three substitutions — the status line (201 → 200),
    `date`, and `request-id`, the lines that describe this
@@ -600,7 +605,7 @@ skew tests, which went with item 8's trio.
    `api/request-context.ts`, `MissingTableError` from
    `api/db.ts` — so the wire contract moves to
    `shared/`, which never imports `api/`), imports the
-   app (24 files reach into `web-app/app/` — the facade
+   app (25 files reach into `web-app/app/` — the facade
    navigates to the login page on a failed refresh
    (`web-app/app/adapters/http-facade.ts:286-292`), and
    `shared.ts` redirects, logs, and records page request
@@ -623,9 +628,10 @@ skew tests, which went with item 8's trio.
    ARCHITECTURE.md gains a NAMED COVENANT,
    `## A response is one unit`, in the commit that makes
    it true and not before — that file states only what is,
-   and today the facade's `GETWithEtag` and `PUTWithEtag`
-   twins and `unwrapResponse` part every response
-   (`web-app/app/adapters/http-facade.ts:32,44,80`). Its
+   and today the facade's `GETWithEtag`, `PUTWithEtag`,
+   and `PATCHWithEtag` and `unwrapResponse` part every
+   response
+   (`web-app/app/adapters/http-facade.ts:32,44,58,80`). Its
    approved wording: "The API, the client, and the
    application treat a response — status line, headers,
    and body — as one unit. A stored response is a
@@ -668,7 +674,7 @@ skew tests, which went with item 8's trio.
    `api/document-family.ts:396,473`,
    `api/routes.ts:5088,5303`, `api/api.ts:1341`, and the
    work-order decoder `api/derive-states.ts:615-617`
-   behind seven callers), item 0
+   behind five call sites), item 0
    having closed the grant's; a document GET parses
    the stored response, keeps the body, and rebuilds three
    headers, dropping `Operation-ID` on purpose
@@ -856,9 +862,12 @@ skew tests, which went with item 8's trio.
    `fusion`, owns and reads everything, and compose,
    `./deploy --local`, `bin/test-postgres`, and the tests
    all assume that one login (`compose.yaml:2,8`,
-   `deploy:171`, `bin/test-postgres:22`); every write
+   `deploy:171-172`, `bin/test-postgres:22-23`); every
+   write
    pair's `request` holds `Authorization:` verbatim
-   (`tests/api-shadow-ledger-auth.test.ts` 'live secrets
+   (`tests/shadow-ledger-invariants.test.ts` 'stored
+   request messages carry the live bearer JWT';
+   `tests/api-shadow-ledger-auth.test.ts` 'live secrets
    land in the auth-flow ledger rows'). Follows items 0
    and 1.
 3. Retire `schema_marker` for migrations the ledger
@@ -1029,11 +1038,11 @@ skew tests, which went with item 8's trio.
    6's health probe; item 13 answers it per process.
 5. A person's first sign-in — no page mints a human
    credential: the seed does
-   (`api/mock-data/seed-message-pairs.ts:2609`), only
+   (`api/mock-data/seed-message-pairs.ts:2503`), only
    services get a secret from the UI
    (`web-app/app/adapters/identities.ts:293`), and
    `postHumanMemberCreation`
-   (`web-app/app/adapters/members.ts:222`) creates a
+   (`web-app/app/adapters/members.ts:212`) creates a
    member who cannot sign in. One primitive, two flows:
    a single-use, expiring, emailed link whose holder
    sets a password — sent on invitation grant (whether
@@ -1112,7 +1121,7 @@ skew tests, which went with item 8's trio.
    validator, derive, seed, the roster and detail reads,
    and the Members page's edit. Replaces the
    one-profile-per-identity covenant at
-   `api/types.ts:1303-1304`; the seed already carries
+   `api/types.ts:1342-1343`; the seed already carries
    the contradiction (the admin holds two seats with one
    title). Lands before items 11 and 12, whose designer
    roster and AI seats read it, and replaces the
@@ -1198,7 +1207,7 @@ skew tests, which went with item 8's trio.
     (`api/derive-flows.ts:108` — the client's
     approximation, read by no route; the undo route
     walks the stack itself and its bottom-of-stack 201
-    is the documented no-op, `api/types.ts:1043-1051`,
+    is the documented no-op, `api/types.ts:1082-1090`,
     which TEST-PLAN F36/F45 call PASS — the brainstorm
     decides whether that stays); rotation only on the
     toggle path (`web-app/app/flow-layout.ts:1032-1037`);
@@ -1266,7 +1275,7 @@ Off the critical path; each with its oracle.
   `select`. R7's primary clause is false: `regex` is
   always offered and a second pick adds a second row
   (`web-app/app/presenters/record-detail.ts:838-871,
-  901-909`; `api/validators.ts:2759-2775` accepts
+  901-909`; `api/validators.ts:2767-2783` accepts
   duplicates). The walk decides whether that is a
   defect; the pin
   (`tests/presenter-record-detail.test.ts`) makes any
@@ -1402,8 +1411,8 @@ Off the critical path; each with its oracle.
   and the grants go, or `PG*` is named a third edge — the
   brainstorm settles which.
   Today's role and database are both `fusion`
-  (`compose.yaml:2,8-9`, `deploy:171`,
-  `bin/test-postgres:22`). Ships no later than the deploy
+  (`compose.yaml:2,8-9`, `deploy:171-172`,
+  `bin/test-postgres:22-23`). Ships no later than the deploy
   of items 0–3, which already changes what operators
   configure, so they rename once. The brainstorm settles
   how far "infrastructure" reaches: the database name,
@@ -2703,10 +2712,12 @@ Off the critical path; each with its oracle.
   HTTP application, and the state it names is a DELETE
   head at `identities/:id/pii`. Its own change: the PII
   union's discriminant (`api/types.ts:627-636`) and the
-  stem's 76 occurrences in 17 product files, 80 in 14
+  stem `eras`, any case: 76 occurrences in 17 product
+  files, 80 in 14
   test files. It is a field, never a column, and touches
   no stored byte — the client builds the flag from a 404
-  (`web-app/app/adapters/identities.ts:152`) — so it has
+  or 403 (`web-app/app/adapters/identities.ts:150-152`) —
+  so it has
   no deadline. The page keeps "removed" (product-path
   item 2) until the eraser ships; the code speaks HTTP.
   Oracle: the stem appears in `api/`, `server/`,
