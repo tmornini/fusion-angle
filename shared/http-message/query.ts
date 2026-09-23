@@ -1,5 +1,4 @@
 import { FieldValue } from './field-value.ts';
-import { CONTENT_LENGTH, TRANSFER_ENCODING } from './framing.ts';
 import { kindOf } from './field-registry.ts';
 import { navigateValue } from './navigate.ts';
 import type { BodyRegistry } from './media-registry.ts';
@@ -19,8 +18,8 @@ import type {
 
 // Resolve a dotted key against a message, returning a FieldValue
 // (never null/undefined). Start-line fields are top-level roots;
-// header/trailer descend into the field sections. The derived
-// framing fields are synthesized here from the body and trailer.
+// header/trailer descend into the stored field lines.
+// content-length and transfer-encoding are not invented.
 
 const START_LINE_ROOTS: ReadonlySet<string> = new Set([
     'method', 'target', 'version', 'status', 'reason',
@@ -101,20 +100,6 @@ function queryHeader(
 ): FieldValue {
     const name = rest[0];
     if (name === undefined) return FieldValue.absent();
-    // Mirror the serializer's framing rule exactly: a trailer
-    // means chunked framing (no Content-Length); otherwise a
-    // body is Content-Length framed.
-    if (name === CONTENT_LENGTH) {
-        return model.body !== undefined
-            && model.trailer === undefined
-            ? FieldValue.present(model.body.byteLength())
-            : FieldValue.absent();
-    }
-    if (name === TRANSFER_ENCODING) {
-        return model.trailer !== undefined
-            ? FieldValue.present('chunked')
-            : FieldValue.absent();
-    }
     return resolveField(name, model.fields, rest.slice(1));
 }
 

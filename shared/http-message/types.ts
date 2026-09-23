@@ -3,9 +3,8 @@ import type { Octets } from './octets.ts';
 // The canonical in-memory model. Request and response are
 // COMPOSED from shared parts and distinguished only by the
 // start-line's self-disclosing `kind` — never an inheritance
-// hierarchy. Framing fields (Content-Length, Transfer-Encoding)
-// are NOT stored: they are derived from the body octets and the
-// presence of a trailer (derive from the ledger).
+// hierarchy. content-length is a stored field.
+// transfer-encoding is transport and is never a field.
 
 export interface RequestLine {
     readonly kind: 'request';

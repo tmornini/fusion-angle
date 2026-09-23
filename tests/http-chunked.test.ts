@@ -2,16 +2,25 @@ import { assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { HttpMessageError } from '../shared/http-message/types.ts';
 
-Deno.test('round-trips a chunked response carrying a trailer', () => {
-    const wire =
+Deno.test('serializes a trailer without transfer-encoding', () => {
+    const message = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
         'transfer-encoding: chunked\r\n' +
         '\r\n' +
         '5\r\nhello\r\n' +
         '0\r\n' +
         'x-checksum: abc\r\n' +
-        '\r\n';
-    assertStrictEquals(HttpMessage.fromWire(wire).toWire(), wire);
+        '\r\n',
+    );
+    assertStrictEquals(
+        message.toWire(),
+        'HTTP/1.1 200 OK\r\n' +
+        '\r\n' +
+        '5\r\nhello\r\n' +
+        '0\r\n' +
+        'x-checksum: abc\r\n' +
+        '\r\n',
+    );
 });
 
 Deno.test('collapses multiple chunks into one canonical chunk', () => {
@@ -28,7 +37,6 @@ Deno.test('collapses multiple chunks into one canonical chunk', () => {
     assertStrictEquals(
         message.toWire(),
         'HTTP/1.1 200 OK\r\n' +
-        'transfer-encoding: chunked\r\n' +
         '\r\n' +
         '5\r\nhello\r\n' +
         '0\r\n' +
@@ -37,7 +45,7 @@ Deno.test('collapses multiple chunks into one canonical chunk', () => {
     );
 });
 
-Deno.test('collapses chunked without a trailer to length', () => {
+Deno.test('decoded chunked body keeps no content-length', () => {
     const message = HttpMessage.fromWire(
         'POST / HTTP/1.1\r\n' +
         'transfer-encoding: chunked\r\n' +
@@ -48,7 +56,6 @@ Deno.test('collapses chunked without a trailer to length', () => {
     assertStrictEquals(
         message.toWire(),
         'POST / HTTP/1.1\r\n' +
-        'content-length: 5\r\n' +
         '\r\n' +
         'hello',
     );
