@@ -9,6 +9,7 @@ import { createSerializer } from './store-serializer.ts';
 import { mintRootBind } from './ledger-root.ts';
 import { SuccessionConflict }
     from './ledger-statement.ts';
+import { nowUtc } from './types.ts';
 import {
     classifyStatement,
 } from '../shared/ledger-statement.ts';
@@ -20,7 +21,6 @@ import type {
 } from '../shared/ledger-statement.ts';
 import { compareIdentifiers }
     from '../shared/identifier.ts';
-import { stampOfMicros } from '../shared/pair-root.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
 
@@ -33,11 +33,6 @@ export class MemoryStorageBackend
     #rows: { id: string }[] | undefined;
     #refusals = 0;
     #executions = 0;
-    // Date.now is a millisecond. Two statements in
-    // that millisecond must not share a stamp: a
-    // claim reads the document head strictly before
-    // its own stamp.
-    #lastMicros = 0n;
     // Orders whole transactions within this backend
     // instance — global ordering, stronger than the
     // per-store mutex it replaces (A2). Cross-process
@@ -61,14 +56,12 @@ export class MemoryStorageBackend
         return this.#executions;
     }
 
+    // One mint with the event times callers stamp.
+    // An injected stamp still wins, so a successor
+    // pin can sit behind the head.
     #clock(now: string | undefined): string {
         if (now !== undefined) return now;
-        const observed = BigInt(Date.now()) * 1000n;
-        const next = observed > this.#lastMicros
-            ? observed
-            : this.#lastMicros + 1n;
-        this.#lastMicros = next;
-        return stampOfMicros(next);
+        return nowUtc();
     }
 
     // Simulated transaction: copy the table, serve every
