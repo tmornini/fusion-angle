@@ -5,6 +5,13 @@ import {
 import type { DbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
+import {
+    mergeSecret,
+    REQUEST_CREDENTIAL_NAMES,
+    RESPONSE_CREDENTIAL_NAMES,
+    secretBytes,
+    splitCredentials,
+} from '../shared/http-message/credentials.ts';
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { parseJson } from
@@ -24,6 +31,7 @@ import {
     runWrite,
 } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
+import { sha256HexOfBytes } from '../shared/digest.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { apiRequest } from './http-fixtures.ts';
@@ -384,5 +392,181 @@ Deno.test(
             JSON.stringify(root.body),
             '{"a":1}',
         );
+    },
+);
+
+const EMPTY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb924'
+    + '27ae41e4649b934ca495991b7852b855';
+
+const FOUR_NAMES = [
+    'authentication-info',
+    'authorization',
+    'cookie',
+    'set-cookie',
+];
+
+Deno.test(
+    'credential lines split into a secret and merge back',
+    async () => {
+        assertStrictEquals(
+            REQUEST_CREDENTIAL_NAMES.join(','),
+            'authorization,proxy-authorization,cookie',
+        );
+        assertStrictEquals(
+            RESPONSE_CREDENTIAL_NAMES.join(','),
+            'set-cookie,authentication-info,'
+                + 'proxy-authentication-info',
+        );
+        const proxy = splitCredentials([
+            {
+                name: 'proxy-authorization',
+                value: 'Basic p',
+            },
+            {
+                name: 'proxy-authentication-info',
+                value: 'a=1',
+            },
+            { name: 'accept', value: 'text/plain' },
+        ]);
+        assertStrictEquals(proxy.kept.length, 1);
+        assertStrictEquals(
+            proxy.kept[0]?.name,
+            'accept',
+        );
+        assertStrictEquals(proxy.hoisted.length, 2);
+
+        const requestWire = 'POST /token HTTP/1.0\r\n'
+            + 'Cookie: refresh_token=r\r\n'
+            + 'Content-Type: text/plain\r\n'
+            + 'Authorization: Basic abc\r\n'
+            + 'Content-Length: 2\r\n'
+            + '\r\n'
+            + 'hi';
+        const responseWire = 'HTTP/1.0 200 OK\r\n'
+            + 'Content-Type: text/plain\r\n'
+            + 'Set-Cookie: refresh_token=r; HttpOnly\r\n'
+            + 'Authentication-Info: code="c"\r\n'
+            + '\r\n';
+        const request = parseWire(requestWire);
+        const response = parseWire(responseWire);
+        const requestSplit = splitCredentials(
+            request.fields,
+        );
+        const responseSplit = splitCredentials(
+            response.fields,
+        );
+        const keptRequest = serializeWire({
+            ...request,
+            fields: requestSplit.kept,
+        });
+        const keptResponse = serializeWire({
+            ...response,
+            fields: responseSplit.kept,
+        });
+        for (const name of FOUR_NAMES) {
+            assertStrictEquals(
+                keptRequest.includes(name),
+                false,
+            );
+            assertStrictEquals(
+                keptResponse.includes(name),
+                false,
+            );
+        }
+        const secret = secretBytes([
+            ...requestSplit.hoisted,
+            ...responseSplit.hoisted,
+        ]);
+        assertStrictEquals(
+            new TextDecoder().decode(secret),
+            'authorization: Basic abc\r\n'
+                + 'cookie: refresh_token=r\r\n'
+                + '\r\n'
+                + 'authentication-info: code="c"\r\n'
+                + 'set-cookie: refresh_token=r; HttpOnly\r\n',
+        );
+        assertStrictEquals(
+            new TextDecoder().decode(secretBytes([{
+                name: 'authorization',
+                value: 'Basic abc',
+            }])),
+            'authorization: Basic abc\r\n\r\n',
+        );
+        assertStrictEquals(
+            new TextDecoder().decode(secretBytes([{
+                name: 'set-cookie',
+                value: 'a=1',
+            }])),
+            '\r\nset-cookie: a=1\r\n',
+        );
+        assertStrictEquals(
+            mergeSecret(keptRequest, secret),
+            serializeWire(request),
+        );
+        assertStrictEquals(
+            mergeSecret(keptResponse, secret),
+            serializeWire(response),
+        );
+
+        const bare = parseWire(
+            'GET / HTTP/1.1\r\n'
+                + 'accept: text/plain\r\n'
+                + '\r\n',
+        );
+        const empty = secretBytes(
+            splitCredentials(bare.fields).hoisted,
+        );
+        assertStrictEquals(empty.length, 0);
+        assertStrictEquals(
+            await sha256HexOfBytes(empty),
+            EMPTY_SHA256,
+        );
+
+        assertStrictEquals(
+            mergeSecret(
+                keptRequest,
+                secretBytes([{
+                    name: 'set-cookie',
+                    value: 'refresh_token=r; HttpOnly',
+                }]),
+            ),
+            keptRequest,
+        );
+        assertStrictEquals(
+            mergeSecret(
+                keptResponse,
+                secretBytes([{
+                    name: 'authorization',
+                    value: 'Basic abc',
+                }]),
+            ),
+            keptResponse,
+        );
+        const raw = (text: string): Uint8Array =>
+            new TextEncoder().encode(text);
+        assertThrows(() => mergeSecret(
+            keptRequest,
+            raw('authorization: Basic abc\r\n'),
+        ));
+        assertThrows(() => mergeSecret(
+            keptRequest,
+            raw('set-cookie: a=1'),
+        ));
+        assertThrows(() => mergeSecret(
+            keptRequest,
+            raw('\r\nauthorization: Basic abc\r\n'),
+        ));
+        assertThrows(() => mergeSecret(
+            keptRequest,
+            raw('set-cookie: a=1\r\n\r\n'),
+        ));
+        assertThrows(() => mergeSecret(
+            keptRequest,
+            raw('x-trace: no\r\n\r\n'),
+        ));
+        assertThrows(() => mergeSecret(
+            keptRequest,
+            raw('nocolon\r\n\r\n'),
+        ));
     },
 );
