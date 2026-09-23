@@ -51,8 +51,9 @@ skew tests, which went with item 8's trio.
    exactly as received, never re-serialized — less its
    credential lines, hoisted as below; the client sends
    `user-agent: fusion-angle/<sha>` on every API request
-   — the build embeds the SHA in the bundle as in the
-   binary — so the ledger names the build that made each
+   — the SHA `FA_GIT_SHA` supplies, its bullet in
+   `## Later work` — so the ledger names the build that
+   made each
    request, and a browser that keeps its own token
    instead (Layer 2 measures which) leaves that token
    stored as received. A pair for which
@@ -855,9 +856,9 @@ skew tests, which went with item 8's trio.
    the whole definition for `0001-bootstrap`, the drops
    and the new fence for a later one — as the body of a
    PUT whose `user-agent` line names the build that ran
-   it, `fusion-angle/<sha>` (RFC 9110 §10.1.5; the build
-   embeds `git rev-parse HEAD`, having refused a dirty
-   tree), provenance the owner's `check` can report and
+   it, `fusion-angle/<sha>` (RFC 9110 §10.1.5; the SHA
+   `FA_GIT_SHA` supplies, its bullet in `## Later work`),
+   provenance the owner's `check` can report and
    never the key; and its `response`
    is the digest of its fixed SQL, DDL and DML
    alike — `sha256` over the request body alone, the SQL
@@ -2736,6 +2737,21 @@ Off the critical path; each with its oracle.
   and the loser's DDL gone; a second applies a table step
   to a database seeded from an older binary, and the new
   binary boots.
+- `FA_GIT_SHA` — the commit that built the running
+  binary, supplied by the environment as every `FA_`
+  value is and never defaulted, read once at boot and
+  carried in the context so every log line names the
+  build (the Office of Structured Observability), and
+  the one source of the `<sha>` in the `user-agent`
+  token items 0 and 3 send. `./deploy` fills it from
+  `git rev-parse HEAD`, exact because the build refuses
+  a dirty tree; on Render from the host's commit
+  variable (`RENDER_GIT_COMMIT`), a name that stays at
+  the edge (the naming bullet). How the page bundle
+  learns it — embedded at build, or served — is this
+  bullet's to settle. Oracle: a boot without it refuses,
+  as a boot without `FA_POSTGRES_URL` does, and a
+  request log line carries it
 
 ## Sequencing
 
