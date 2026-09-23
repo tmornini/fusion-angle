@@ -293,7 +293,7 @@ skew tests, which went with item 8's trio.
    multi-row INSERT; the bell rings from the same
    statement (`RETURNING` into `pg_notify`). `transaction`
    and `writeLocks` leave `DbAdapter`. A seed is one of
-   the two transactions left — item 3's release is the
+   the two transactions left — item 3's `migrate` is the
    other, on the same owner-side writer — and it needs no
    adapter
    primitive: it opens on the client beneath the adapter
