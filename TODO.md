@@ -183,7 +183,13 @@ skew tests, which went with item 8's trio.
    minimal rows, 0 of 200,000 rows carrying 300 bytes and
    two uuids — and a predecessor landing in the same
    statement is not visible to it, so a seed's chains
-   take their order from more than the clock. Item 3's
+   take their order from more than the clock: the seed
+   lands by depth — every genesis, then every second
+   version, then every third, each statement seeing the
+   last one's rows inside the one transaction — with the
+   one INSERT text the api and `migrate` use, so the
+   index and the head selection guard the seed as they
+   guard the api. Item 3's
    full check walks every succession and names a pair
    stamped before its predecessor. The hashes form a
    tree. Each leaf —
@@ -299,10 +305,7 @@ skew tests, which went with item 8's trio.
    (`api/backend-postgres.ts:86`), the dataset
    (`api/mock-data.ts:358`), the credentials
    (`api/mock-data.ts:285`), the marker
-   (`api/backend-postgres.ts:107-113`). The
-   brainstorm settles: how a seed keeps a chain's
-   order — members in successive batches, or a rank on
-   the one clock. The DDL is
+   (`api/backend-postgres.ts:107-113`). The DDL is
    final when this item ships, but for `schema_marker`,
    which item 3 retires. Today falls short on every count:
    `request` keeps six header names
