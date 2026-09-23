@@ -99,9 +99,10 @@ export class BackedDbAdapter
         attempt: Attempt,
         rows: readonly StatementBind[],
         now?: string,
+        tx?: Tx,
     ): Promise<StatementAnswer[]> {
         return this.#backend.executeLedger(
-            attempt, rows, now, undefined,
+            attempt, rows, now, tx,
         );
     }
 
@@ -170,9 +171,7 @@ export class BackedDbAdapter
                 this.postSchemaCreation(),
             ensureTable: () => this.ensureTable(),
             executeLedger: (attempt, rows, now) =>
-                this.#backend.executeLedger(
-                    attempt, rows, now, tx,
-                ),
+                this.executeLedger(attempt, rows, now, tx),
             postNotification: (e) =>
                 this.postNotification(e),
             readTransaction: (fn) => fn(view),

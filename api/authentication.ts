@@ -3,6 +3,8 @@ import {
 } from './db.ts';
 import type {
     DbAdapter,
+    StorageBackend,
+    Tx,
 } from './db.ts';
 import {
     verifyClientAssertion,
@@ -672,10 +674,14 @@ async function planRotationAttempt(
 // set — never `kind` alone (two 'replay' plans can carry
 // DIFFERENT append sets if a sibling rotation grew the chain
 // between reads). Equal → commit the PRE-TX-prepared writes
-// (never the fresh re-plan's own appends: its `at` would desync
-// the already-formed event pairs' stored messages from the rows
-// they describe — its ONLY job is the equality check). Diverged
-// → abort the transaction and retry with a wholly fresh attempt.
+// in this same transaction (never the fresh re-plan's own
+// appends: its `at` would desync the already-formed event
+// pairs' stored messages from the rows they describe — its
+// ONLY job is the equality check). The re-read and the
+// statement share the client, so the next rotation observes
+// this write. Diverged → abort and retry fresh. The view is
+// openClient, so a row that does not land still fails the
+// body.
 export async function rotateRefreshJti(
     adapter: DbAdapter,
     identityId: Id,
@@ -685,6 +691,7 @@ export async function rotateRefreshJti(
 ): Promise<RotationOutcome> {
     const operationId = messagePair?.operationId
         ?? generateIdentifier();
+    const backed = backedWrite(adapter);
     for (
         let attempt = 0;
         attempt < MAX_TOKEN_WRITE_ATTEMPTS;
@@ -695,48 +702,56 @@ export async function rotateRefreshJti(
             operationId,
         );
         try {
-            await adapter.readTransaction(async (view) => {
-                const events =
-                    await deriveIdentityTokenEventsForJti(
-                        view, presentedJti, identityId,
+            await backed.backend.transaction(
+                'readwrite',
+                async (tx) => {
+                    const view = backed.openClient(tx);
+                    const events =
+                        await deriveIdentityTokenEventsForJti(
+                            view, presentedJti, identityId,
+                        );
+                    const latest = latestActionForJti(
+                        events, presentedJti,
                     );
-                const latest = latestActionForJti(
-                    events, presentedJti,
-                );
-                const rows =
-                    latest === 'issued' || latest === null
-                        ? events
-                        : (await readTokenChainFromLedger(
-                            view, identityId,
-                            presentedJti,
-                        )).rows;
-                const freshPlan = planRotation(
-                    rows, presentedJti, newJti, nowUtc(),
-                );
-                const freshAppends =
-                    freshPlan.kind === 'unknown'
-                        ? [] : freshPlan.appends;
-                if (!jtiSetsEqual(
-                    freshAppends.map(a => a.jti),
-                    provisional.writes.map(w => w.event.jti),
-                )) {
-                    throw new TokenPlanDivergedError();
-                }
-            });
-            const pairs = provisional.writes.map(
-                (write) => write.messagePair,
+                    const rows =
+                        latest === 'issued'
+                            || latest === null
+                            ? events
+                            : (await readTokenChainFromLedger(
+                                view, identityId,
+                                presentedJti,
+                            )).rows;
+                    const freshPlan = planRotation(
+                        rows, presentedJti, newJti,
+                        nowUtc(),
+                    );
+                    const freshAppends =
+                        freshPlan.kind === 'unknown'
+                            ? [] : freshPlan.appends;
+                    if (!jtiSetsEqual(
+                        freshAppends.map(a => a.jti),
+                        provisional.writes.map(
+                            w => w.event.jti,
+                        ),
+                    )) {
+                        throw new TokenPlanDivergedError();
+                    }
+                    const pairs = provisional.writes.map(
+                        (write) => write.messagePair,
+                    );
+                    if (
+                        provisional.plan.kind === 'rotate'
+                        && messagePair !== undefined
+                    ) {
+                        pairs.push(messagePair);
+                    }
+                    if (pairs.length > 0) {
+                        await runWrite(
+                            view, attemptFor(pairs), pairs,
+                        );
+                    }
+                },
             );
-            if (
-                provisional.plan.kind === 'rotate'
-                && messagePair !== undefined
-            ) {
-                pairs.push(messagePair);
-            }
-            if (pairs.length > 0) {
-                await runWrite(
-                    adapter, attemptFor(pairs), pairs,
-                );
-            }
             if (provisional.plan.kind === 'rotate') {
                 return {
                     kind: 'rotate' as const,
@@ -745,10 +760,35 @@ export async function rotateRefreshJti(
             }
             return { kind: 'fail' as const };
         } catch (e) {
-            if (!(e instanceof TokenPlanDivergedError)) throw e;
+            if (!(e instanceof TokenPlanDivergedError)) {
+                throw e;
+            }
         }
     }
     return { kind: 'fail' as const };
+}
+
+// Rotation opens the client beneath the adapter. A view
+// has no backend of its own; callers pass the backed
+// adapter the route already holds.
+function backedWrite(
+    adapter: DbAdapter,
+): {
+    readonly backend: StorageBackend;
+    readonly openClient: (tx: Tx) => DbAdapter;
+} {
+    if (
+        !('backend' in adapter)
+        || !('openClient' in adapter)
+    ) {
+        throw new Error(
+            'token write requires a backed adapter',
+        );
+    }
+    return adapter as DbAdapter & {
+        backend: StorageBackend;
+        openClient: (tx: Tx) => DbAdapter;
+    };
 }
 
 // One revocation attempt's PRE-TX groundwork: the provisional
