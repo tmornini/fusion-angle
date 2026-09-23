@@ -22,8 +22,8 @@ import {
     notifyPayload,
 } from './advisory-lock.ts';
 import {
-    decodeIdentifier,
-    encodeIdentifier,
+    identifierOfUuidText,
+    uuidTextOfIdentifier,
 } from '../shared/identifier.ts';
 
 export const POSTGRES_DROP_SCHEMA =
@@ -285,31 +285,6 @@ async function advisoryLock(
     await sql.query`
         SELECT pg_advisory_xact_lock(${key})
     `;
-}
-
-function uuidTextOfIdentifier(id: string): string {
-    const bytes = decodeIdentifier(id);
-    let hex = '';
-    for (const b of bytes) {
-        hex += b.toString(16).padStart(2, '0');
-    }
-    return (
-        hex.slice(0, 8) + '-'
-        + hex.slice(8, 12) + '-'
-        + hex.slice(12, 16) + '-'
-        + hex.slice(16, 20) + '-'
-        + hex.slice(20)
-    );
-}
-
-function identifierOfUuidText(uuid: string): string {
-    const hex = uuid.replaceAll('-', '');
-    const bytes = new Uint8Array(16);
-    for (let i = 0; i < 16; i++) {
-        bytes[i] = Number.parseInt(
-            hex.slice(i * 2, i * 2 + 2), 16);
-    }
-    return encodeIdentifier(bytes);
 }
 
 function entityOf<T extends { id: string }>(

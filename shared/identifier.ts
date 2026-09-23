@@ -48,6 +48,31 @@ export function decodeIdentifier(
     return base64UrlToBytes(text);
 }
 
+export function uuidTextOfIdentifier(id: string): string {
+    const bytes = decodeIdentifier(id);
+    let hex = '';
+    for (const b of bytes) {
+        hex += b.toString(16).padStart(2, '0');
+    }
+    return (
+        hex.slice(0, 8) + '-'
+        + hex.slice(8, 12) + '-'
+        + hex.slice(12, 16) + '-'
+        + hex.slice(16, 20) + '-'
+        + hex.slice(20)
+    );
+}
+
+export function identifierOfUuidText(uuid: string): string {
+    const hex = uuid.replaceAll('-', '');
+    const bytes = new Uint8Array(16);
+    for (let i = 0; i < 16; i++) {
+        bytes[i] = Number.parseInt(
+            hex.slice(i * 2, i * 2 + 2), 16);
+    }
+    return encodeIdentifier(bytes);
+}
+
 export function generateIdentifier(): string {
     const bytes = new Uint8Array(IDENTIFIER_BYTE_LENGTH);
     let text: string;
