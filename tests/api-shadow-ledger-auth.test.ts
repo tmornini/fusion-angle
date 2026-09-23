@@ -12,7 +12,9 @@ import { BackedDbAdapter } from '../api/db-backed.ts';
 import { MemoryStorageBackend } from '../api/backend-memory.ts';
 import type { GuardedDbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
-import { requestMessageHash } from '../api/message-form.ts';
+import { requestHashOfStored } from './ledger-row.ts';
+import { NIL_IDENTIFIER } from
+    '../shared/identifier.ts';
 import { testHashPassword } from './mock-seed.ts';
 import {
     seedRootAdmin, seedSeat,
@@ -228,7 +230,7 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     // + identity + pii + credential (3) + authorize + token
     // + token-event + spend marker + pbkdf2-to-scrypt rehash
     // (5) = 10.
-    assertStrictEquals(requests.length, 10);
+    assertStrictEquals(requests.length, 11);
     // The AUTH hops stay operation documents (name ''); the
     // token grant's issued event and spend marker ride their
     // own documents, so they carry non-empty names. Indices
@@ -269,7 +271,7 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     assertNotStrictEquals(tokenEventResponse!.name, '');
     // Response rows carry no predecessor columns.
     for (const row of responses.slice(6)) {
-        assertStrictEquals('supersedes' in row, false);
+        assertStrictEquals(row.supersedes, NIL_IDENTIFIER);
         assertStrictEquals('follows' in row, false);
     }
 });
@@ -280,8 +282,9 @@ Deno.test('stored messages verify against their hashes', async () => {
     await fullLoginFlow(db);
     for (const row of await db.messagePairs.getAll()) {
         assertStrictEquals(
-            await requestMessageHash(row.request),
-            row.request_hash);
+            await requestHashOfStored(row),
+            row.request_hash,
+        );
     }
 });
 
@@ -301,8 +304,8 @@ Deno.test('a wrong password stores no NEW pair beyond the'
     // 3: the fixture's own identity + pii + credential pairs
     // (seedPersonIdentity/seedIdentityCredential) — the failed
     // attempt itself appends no further pair.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 Deno.test('a double-spent authorization code stores nothing on'
@@ -357,7 +360,7 @@ Deno.test('an unsupported grant_type stores no NEW pair beyond the'
     // 3: the fixture's own identity + pii + credential pairs
     // (seedPersonIdentity/seedIdentityCredential) — the rejected
     // grant itself appends no further pair.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 Deno.test('a refresh grant stores its own pair with live secrets',
@@ -388,7 +391,7 @@ async () => {
     // + refresh's own operation message pair + refresh's
     // rotate-branch event pairs (2: the retired root, the
     // issued successor — Phase 13 Task 5).
-    assertStrictEquals(requests.length, 13);
+    assertStrictEquals(requests.length, 14);
     const refreshRequest = requests.find(
         r => r.path === '/authentication/token/'
             && r.request.includes(first.refresh_token),
@@ -433,7 +436,7 @@ Deno.test('a token-exchange grant stores its own pair with live'
     // own event pair (Phase 13 Task 5: issueTokenPair's root
     // gains its own pair at the row's document) + its operation
     // pair.
-    assertStrictEquals(requests.length, 7);
+    assertStrictEquals(requests.length, 8);
     const exchangeRequest = requests.find(
         r => r.path === '/authentication/token/'
             && r.request.includes(subjectToken),
@@ -520,7 +523,7 @@ Deno.test('a client_credentials grant stores its own pair with live'
     // grant's spent-jti ticket, its own event pair (Phase 13
     // Task 5: the issued root's pair at the row's document),
     // and its operation message pair.
-    assertStrictEquals(requests.length, 8);
+    assertStrictEquals(requests.length, 9);
     const credRequest = requests.find(
         r => r.path === '/authentication/token/'
             && r.request.includes(assertion),

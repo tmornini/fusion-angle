@@ -161,7 +161,7 @@ async () => {
         headerFields: [], body,
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseStatus: 200, responseBody: body,
         operationId: generateIdentifier(),
     });
     const written = await postRecordDocumentOp(
@@ -202,7 +202,7 @@ Deno.test('postRecordDocumentOp with a new state writes a'
         headerFields: [], body: firstBody,
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseStatus: 200, responseBody: firstBody,
         operationId: generateIdentifier(),
     });
     await postRecordDocumentOp(
@@ -225,7 +225,7 @@ Deno.test('postRecordDocumentOp with a new state writes a'
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-02T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseStatus: 200, responseBody: secondBody,
         operationId: generateIdentifier(),
     });
     await postRecordDocumentOp(
@@ -276,6 +276,6 @@ Deno.test('a byte-identical resend replays the stored response:'
             token, body, operationId,
         ),
     );
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });

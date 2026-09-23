@@ -3,7 +3,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { requestMessageHash } from '../api/message-form.ts';
+import { requestHashOfStored } from './ledger-row.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import {
     STARK_ORGANIZATION,
@@ -414,7 +414,7 @@ Deno.test('every stored request message re-hashes to its own'
     assert(requests.length > 0);
     for (const row of requests) {
         assertStrictEquals(
-            await requestMessageHash(row.request),
+            await requestHashOfStored(row),
             row.request_hash,
             'requests row ' + row.id + ' hash mismatch',
         );
@@ -448,30 +448,15 @@ async () => {
 const RFC3339_ZULU_MICROS =
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 
-Deno.test('every pair\'s envelope timestamps are RFC-3339 zulu'
-+ ' with 6-digit sub-second precision, and the request'
-+ ' strictly precedes its own response', async () => {
+Deno.test('every pair\'s response_at is RFC-3339 zulu'
++ ' with 6-digit sub-second precision', async () => {
     const db = await seededWithMixedBatch();
-    const requests = await db.messagePairs.getAll();
-    const responsesById = new Map(
-        (await db.messagePairs.getAll()).map(r => [r.id, r]),
-    );
-    assert(requests.length > 0);
-    for (const request of requests) {
+    const rows = await db.messagePairs.getAll();
+    assert(rows.length > 0);
+    for (const row of rows) {
         assertMatch(
-            request.request_at, RFC3339_ZULU_MICROS,
-            'request ' + request.id + ' at is malformed',
-        );
-        const response = responsesById.get(request.id);
-        assert(response, 'no response for ' + request.id);
-        assertMatch(
-            response!.response_at, RFC3339_ZULU_MICROS,
-            'response ' + request.id + ' at is malformed',
-        );
-        assert(
-            request.request_at < response!.response_at,
-            'pair ' + request.id + ' response at does not'
-                + ' strictly follow its request at',
+            row.response_at, RFC3339_ZULU_MICROS,
+            'pair ' + row.id + ' response_at is malformed',
         );
     }
 });

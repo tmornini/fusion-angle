@@ -17,8 +17,9 @@ import type { DbAdapter } from '../api/db.ts';
 import type { Id } from '../api/types.ts';
 import { handleRequest } from '../api/api.ts';
 import {
+    runWrite,
+    attemptFor,
     formWriteMessagePair,
-    appendMessagePairOnce,
     IF_MATCH_HEADER,
     strongEtagOf,
 } from '../api/message-pair.ts';
@@ -289,7 +290,11 @@ async function testDocumentOp(
                         HTTP_PRECONDITION_FAILED,
                     );
                 }
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return { id, ...body };
         },
@@ -336,7 +341,9 @@ async function withSyntheticLockedFamily<T>(
         // routes.ts's ideas/projects/flows rows).
         lifecycle: 'state',
         notFoundTable: TEST_FAMILY,
-        validateDocument: (body) => body,
+        validateDocument: (body) => ({
+            entity: body,
+        }),
         documentOp: testDocumentOp,
         entityOf: testEntityOf,
     };
@@ -363,7 +370,10 @@ async function withSyntheticLockedFamily<T>(
         Record<string, WriteResponseSpec>;
     mutableSpecs[TEST_PATTERN] =
         documentWriteResponseSpec(wiring);
-    mutableSpecs[CHILD_PATTERN] = { status: 204 };
+    mutableSpecs[CHILD_PATTERN] = {
+        status: 204,
+        successBody: (_params, body) => body ?? {},
+    };
     try {
         return await fn();
     } finally {
@@ -581,17 +591,16 @@ Deno.test('locked arm: a matching echo stores no predecessor'
         const secondId = pairIdOf(second)!;
         const stored = (await db.messagePairs.getAll())
             .find((row) => row.id === secondId);
+        assertStrictEquals(stored !== undefined, true);
+        assertStrictEquals('follows' in stored!, false);
         assertStrictEquals(
-            stored !== undefined
-                && !('follows' in stored)
-                && !('supersedes' in stored),
-            true,
+            stored!.supersedes, pairIdOf(first),
         );
     });
 });
 
-Deno.test('locked arm: byte-identical resend replays the stored'
-+ ' response, headers un-re-minted (fast-path-first ordering)',
+Deno.test('locked arm: a stale If-Match resend answers 412'
++ ' and stores nothing',
 async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -608,19 +617,16 @@ async () => {
         );
         const edit = await handleRequest(db, editRequest.clone());
         assertStrictEquals(edit.status, 201);
-        const editDate = edit.headers.get('Date');
-        // A byte-identical resend of the edit: its echo (firstId)
-        // is now STALE against the new head (the edit's own id),
-        // yet it must replay — never 412 — because the fast path
-        // runs BEFORE the four-outcome table.
+        const afterEdit = (await db.messagePairs.getAll())
+            .length;
+        // The edit's If-Match names the genesis head. A resend
+        // is stale against the edit and stores nothing.
         const resend = await handleRequest(db, editRequest.clone());
-        assertStrictEquals(resend.status, 200);
-        assertStrictEquals(resend.headers.get('Date'), editDate);
+        assertStrictEquals(resend.status, 412);
         assertStrictEquals(
-            pairIdOf(resend),
-            pairIdOf(edit),
+            (await db.messagePairs.getAll()).length,
+            afterEdit,
         );
-        assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     });
 });
 
@@ -664,11 +670,14 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         headerFields: [], body: { v: 'genesis' },
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
         organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
-        responseBody: undefined,
+        responseBody: { v: 'genesis' },
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, genesis),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([genesis]),
+        [genesis],
+    ));
     // Two writers both observed the SAME head (genesis.id)
     // before either committed — the race the pre-check alone
     // cannot close; the in-tx head re-read closes it.
@@ -684,7 +693,7 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         headerFields: [echo], body: { v: 'a' },
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
         organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
-        responseBody: undefined,
+        responseBody: { v: 'a' },
         latchedHeadMessagePairId: genesis.id,
         operationId: generateIdentifier(),
     });
@@ -696,7 +705,7 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         headerFields: [echo], body: { v: 'b' },
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
         organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
-        responseBody: undefined,
+        responseBody: { v: 'b' },
         latchedHeadMessagePairId: genesis.id,
         operationId: generateIdentifier(),
     });
@@ -766,7 +775,7 @@ async () => {
         assertStrictEquals(atPath.length, 2);
         // Genesis + exactly one winner write landed; the
         // loser stored NOTHING — no partial write survives.
-        assertStrictEquals(messagePairs.length, 4);
+        assertStrictEquals(messagePairs.length, 5);
     });
 });
 
@@ -845,8 +854,11 @@ async function putStatelessDocumentMessagePair(
         responseBody: { id, ...body },
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
 }
 
 async function deleteStatelessDocumentMessagePair(
@@ -865,8 +877,11 @@ async function deleteStatelessDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
 }
 
 Deno.test('stateless lifecycle: a stateless document PUT derives'

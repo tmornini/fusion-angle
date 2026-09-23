@@ -2,7 +2,6 @@ import type { DbAdapter } from './db.ts';
 import type {
     Id, IdentityTokenEntity, MessagePairEntity,
 } from './types.ts';
-import { nowUtc } from './types.ts';
 import {
     generateIdentifier,
     isIdentifier,
@@ -30,10 +29,27 @@ import {
 } from './family-registry.ts';
 import {
     HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT, HTTP_BAD_REQUEST,
-    HTTP_PRECONDITION_FAILED, ApiError,
+    errorJson,
 } from './http-errors.ts';
 import type { NotificationEvent } from
     './notifications.ts';
+import { Octets } from
+    '../shared/http-message/octets.ts';
+import type {
+    Attempt,
+    Outcome,
+    StatementAnswer,
+    StatementBind,
+} from '../shared/ledger-statement.ts';
+import {
+    refusalOf,
+} from '../shared/ledger-statement.ts';
+import {
+    SuccessionConflict,
+    runLedgerStatement,
+} from './ledger-statement.ts';
+import { DATE_PLACEHOLDER } from './ledger-root.ts';
+import { notifyPayload } from './advisory-lock.ts';
 
 // The shadow-ledger message pair: one `message_pairs` put. Formed
 // pre-tx — crypto, hashing, and timers never run
@@ -61,6 +77,9 @@ export interface MessagePair {
     readonly responseHash: string;
     readonly method: string;
     readonly operationId: string;
+    // A document create: no head, so the statement is
+    // genesis rather than blind.
+    readonly genesis?: true;
     // Pre-tx lock-head pair id, latched when If-Match
     // matches the advertised ETag. In-tx re-query only.
     readonly latchedHeadMessagePairId?: string;
@@ -116,6 +135,7 @@ export interface WriteMessagePairInput {
     // the hoisted Operation-ID; seed and inner PUTs pass
     // the envelope id here. Never minted for a public write.
     readonly operationId: string;
+    readonly genesis?: true;
 }
 
 const RESPONSE_ID_FIELD = 'response-id';
@@ -265,11 +285,20 @@ export async function formWriteMessagePair(
         fields: headerFields,
         body: input.body,
     });
+    const storedStatus = input.method === 'DELETE'
+        ? HTTP_NO_CONTENT
+        : HTTP_CREATED;
     const responseFields = [
+        { name: 'date', value: DATE_PLACEHOLDER },
+        { name: 'etag', value: strongEtagOf(id) },
+        {
+            name: 'operation-id',
+            value: input.operationId,
+        },
         { name: RESPONSE_ID_FIELD, value: id },
     ];
     const responseModel = buildResponseModel({
-        status: input.responseStatus,
+        status: storedStatus,
         fields: responseFields,
         body: input.responseBody,
     });
@@ -283,11 +312,14 @@ export async function formWriteMessagePair(
         requesterIdentityId: input.requesterIdentityId,
         requestMessage,
         requestHash: await requestMessageHash(requestMessage),
-        responseStatus: input.responseStatus,
+        responseStatus: storedStatus,
         responseMessage,
         responseHash: await requestMessageHash(responseMessage),
         method: input.method,
         operationId: input.operationId,
+        ...(input.genesis === true
+            ? { genesis: true as const }
+            : {}),
         ...(input.latchedHeadMessagePairId !== undefined
             ? { latchedHeadMessagePairId: input.latchedHeadMessagePairId }
             : {}),
@@ -446,18 +478,6 @@ export async function documentHeadAt(
     return db.messagePairs.getHead(path, name);
 }
 
-// The oldest stored pair for this request hash, or
-// undefined — the idempotency fast path and the
-// post-dispatch source of every wire header.
-export async function getPairByRequestHash(
-    db: DbAdapter,
-    requestHash: string,
-): Promise<MessagePairEntity | undefined> {
-    const prior = await db.messagePairs.getPairsByRequestHash(requestHash,
-    );
-    return prior[0];
-}
-
 // The wire rendering of a stored envelope stamp: IMF-fixdate
 // seconds (new Date(at).toUTCString()) — a presentation
 // transform; the column keeps microseconds.
@@ -568,39 +588,38 @@ export function hoistedHeaderFields(request: Request): FieldLine[] {
     return fields;
 }
 
-// The one wire-header voice for both a fresh write and a
-// byte-identical replay — both render from the STORED row,
-// never the in-memory pair, so a concurrent-replay's surviving
-// original pair is what the wire advertises either way.
-export function wireHeadersFor(stored: MessagePairEntity): HeadersInit {
-    const headers: Record<string, string> = {
-        'Date': httpDateOf(stored.response_at),
-        'ETag': strongEtagOf(stored.id),
-        'Operation-ID': stored.operation_id,
-    };
-    return headers;
+// The stored bytes, parsed and returned unchanged.
+// A status override is the matched answer's 200.
+export function responseFromStored(
+    stored: MessagePairEntity,
+): Response {
+    return responseFromLatin1(stored.response);
 }
 
-// Rebuild the wire Response from a stored response row's
-// serializeWire message — the one reconstruction path shared
-// by a fresh write's success return and an idempotent replay's
-// early return.
-export function responseFromStored(stored: MessagePairEntity): Response {
-    const model = parseWire(stored.response);
+export function responseFromLatin1(
+    wire: string,
+    statusOverride?: number,
+): Response {
+    const model = parseWire(wire);
     if (model.startLine.kind !== 'response') {
         throw new Error(
-            'stored response message has no status line: '
-            + stored.id,
+            'stored response message has no status line',
         );
     }
-    const init = {
-        status: model.startLine.status,
-        headers: wireHeadersFor(stored),
-    };
+    const headers = new Headers();
+    for (const field of model.fields) {
+        headers.append(field.name, field.value);
+    }
+    const status = statusOverride
+        ?? model.startLine.status;
     const body = HttpMessage.fromModel(model).body();
-    return body.exists()
-        ? Response.json(JSON.parse(body.toText()), init)
-        : new Response(null, init);
+    if (!body.exists()) {
+        return new Response(null, { status, headers });
+    }
+    return new Response(body.toText(), {
+        status,
+        headers,
+    });
 }
 
 // Stream a stored PUT as this caller's GET: same body
@@ -635,27 +654,6 @@ export function streamGetFromStored(
     return attachEtag(response, stored.id);
 }
 
-// Send-time status: 201 if this request appended a pair
-// (PUT/PATCH/POST), 200 if it stored nothing, DELETE 204.
-// Stored start-line stays GET-shaped 200 / DELETE 204.
-// Operation-ID is added here (wireHeadersFor), never stored
-// on the GET-shaped blob.
-export function sendWriteResponse(
-    stored: MessagePairEntity,
-    method: string,
-    appended: boolean,
-): Response {
-    const rendered = responseFromStored(stored);
-    const status = method === 'DELETE'
-        ? HTTP_NO_CONTENT
-        : appended ? HTTP_CREATED : HTTP_OK;
-    if (status === rendered.status) return rendered;
-    return new Response(rendered.body, {
-        status,
-        headers: rendered.headers,
-    });
-}
-
 // The pre-store body of a just-formed pair's own response
 // message — a handler that must act on a value the gate's
 // successBody resolver already minted (token rotation's
@@ -664,157 +662,404 @@ export function sendWriteResponse(
 export function messagePairResponseBody(
     messagePair: MessagePair,
 ): Record<string, unknown> | undefined {
-    const model = parseWire(messagePair.responseMessage);
+    return responseRecordOf(messagePair.responseMessage);
+}
+
+export function responseBodyText(
+    message: string,
+): string {
+    const model = parseWire(message);
     const body = HttpMessage.fromModel(model).body();
-    return body.exists()
-        ? JSON.parse(body.toText()) as Record<string, unknown>
-        : undefined;
+    return body.exists() ? body.toText() : '';
 }
 
-// The wire response for a wired write, rebuilt from the stored
-// row the transaction just appended — crashes loud if the pair
-// somehow never landed (a wiring bug, never a normal path). The
-// shared post-write voice for both side channels
-// (invitations-domain.ts, organization-requests.ts) — the
-// generic gate inlines the same shape at its own call sites
-// (api.ts) since it also folds in postWriteNotification between
-// the lookup and the response there.
-export async function storedMessagePairResponse(
+export function responseRecordOf(
+    message: string,
+): Record<string, unknown> | undefined {
+    const text = responseBodyText(message);
+    return text === ''
+        ? undefined
+        : JSON.parse(text) as Record<string, unknown>;
+}
+
+// One statement for the rows of one write. Salts and
+// the notify payload are minted here, outside the
+// statement. A blind refusal runs the statement again,
+// up to three times. Postgres ignores `now`.
+export type WriteRow = {
+    readonly id: string,
+    readonly operationId: string,
+    readonly path: string,
+    readonly name: string,
+    readonly requesterIdentityId: string,
+    readonly method: string,
+    readonly request: Uint8Array,
+    readonly requestSalt?: Uint8Array,
+    readonly secret: Uint8Array,
+    readonly response: Uint8Array,
+    readonly responseSalt?: Uint8Array,
+    readonly ifMatch: string | null,
+};
+
+export type WriteAnswer = {
+    readonly response: Response,
+    readonly outcome: Outcome | 'refused',
+    readonly answeredId: string | null,
+    readonly bells: readonly string[],
+    readonly rows: readonly StatementAnswer[],
+};
+
+const answers = new WeakMap<MessagePair, WriteAnswer>();
+const ownWires = new WeakMap<MessagePair, Response>();
+
+export function writeAnswerOf(
+    pair: MessagePair,
+): WriteAnswer | undefined {
+    return answers.get(pair);
+}
+
+export function ownWireOf(
+    pair: MessagePair,
+): Response | undefined {
+    return ownWires.get(pair);
+}
+
+export function attemptFor(
+    pairs: readonly MessagePair[],
+): Attempt {
+    if (pairs.length !== 1) return 'composed';
+    const pair = pairs[0]!;
+    if (pair.genesis === true) return 'genesis';
+    if (pair.latchedHeadMessagePairId !== undefined) {
+        return 'in-order';
+    }
+    if (pair.pinnedDocumentMessagePairId !== undefined) {
+        return 'blind';
+    }
+    if (ifMatchFromMessagePair(pair) !== undefined) {
+        return 'in-order';
+    }
+    return 'blind';
+}
+
+export async function runWrite(
     adapter: DbAdapter,
-    requestHash: string,
-    opName: string,
-    method: string,
-): Promise<Response> {
-    const stored = await getPairByRequestHash(adapter, requestHash);
-    if (stored === undefined) {
+    attempt: Attempt,
+    rows: readonly (WriteRow | MessagePair)[],
+    now?: string,
+): Promise<WriteAnswer> {
+    if (rows.length === 0) {
         throw new Error(
-            opName + ' stored no pair for a wired write',
+            'ledger statement requires a row',
         );
     }
-    return sendWriteResponse(stored, method, true);
-}
-
-// In-tx append keyed by pair id — ids are minted fresh per
-// request, so two byte-identical logins each land.
-// The view parameter is DbAdapter, NOT GuardedDbAdapter: route
-// handlers receive DbAdapter and their transaction callbacks are
-// typed (view: DbAdapter) — the fence spends the guard before
-// handlers run. The put needs only EntityStore put, on the plain
-// contract; GuardedDbAdapter widens cleanly to DbAdapter, so the
-// invitations/auth call sites (which hold ctx.base) work
-// unchanged.
-export async function appendMessagePairAlways(
-    view: DbAdapter,
-    messagePair: MessagePair,
-): Promise<void> {
-    await coordinateWrite(view, messagePair, false);
-    await writeMessagePairRows(view, messagePair);
-    await notifyWrite(view, messagePair);
-}
-
-// In-tx append (row ops only, no crypto): a byte-identical
-// request lands once — skips silently if a pair with the
-// same request_hash is already stored.
-export async function appendMessagePairOnce(
-    view: DbAdapter,
-    messagePair: MessagePair,
-): Promise<void> {
-    await coordinateWrite(view, messagePair, true);
-    const replay = await view.messagePairs.getPairsByRequestHash(
-        messagePair.requestHash,
+    const binds = rows.map((row) => bindOf(attempt, row));
+    const pairs = rows.filter(
+        (row): row is MessagePair =>
+            'requestMessage' in row,
     );
-    if (replay.length > 0) return;
-    await writeMessagePairRows(view, messagePair);
-    await notifyWrite(view, messagePair);
-}
-
-async function writeMessagePairRows(
-    view: DbAdapter,
-    messagePair: MessagePair,
-): Promise<void> {
-    const appended = await view.messagePairs.append(
-        messagePair.id,
-        {
-            path: messagePair.path,
-            name: messagePair.name,
-            requester_identity_id:
-                messagePair.requesterIdentityId,
-            method: messagePair.method,
-            request_at: messagePair.requestAt,
-            request_hash: messagePair.requestHash,
-            request: messagePair.requestMessage,
-            response_at: nowUtc(),
-            response: messagePair.responseMessage,
-            operation_id: messagePair.operationId,
-        },
-    );
-    if (!appended) {
-        throw new Error(
-            'message pair ' + messagePair.id
-            + ' is already stored',
-        );
-    }
-}
-
-// Lock order: request if hash-deduped, document if
-// gated, then FOR UPDATE + a fresh head read.
-async function coordinateWrite(
-    view: DbAdapter,
-    messagePair: MessagePair,
-    hashDeduped: boolean,
-): Promise<void> {
-    const locks = view.writeLocks;
-    if (locks === undefined) return;
-    if (hashDeduped) {
-        await locks.lockRequest(messagePair.requestHash);
-    }
-    const gated = isGatedPath(messagePair.path);
-    if (gated) {
-        await locks.lockDocument(
-            messagePair.path, messagePair.name,
-        );
-    }
-    const latched = messagePair.latchedHeadMessagePairId;
-    if (latched !== undefined) {
-        await locks.lockHead(latched);
-        const latest = await locks.getHead(
-            messagePair.path, messagePair.name,
-        );
-        if (latest === null || latest.id !== latched) {
-            throw new ApiError(
-                'If-Match does not match the current'
-                + ' document at '
-                + messagePair.path + messagePair.name,
-                HTTP_PRECONDITION_FAILED,
+    let conflicts = 0;
+    const document = refusalDocument(rows);
+    for (;;) {
+        try {
+            const stated = await runLedgerStatement(
+                adapter, attempt, binds, now,
             );
+            const answer = answerOf(
+                rows, stated, document,
+            );
+            for (const pair of pairs) {
+                answers.set(pair, answer);
+                ownWires.set(
+                    pair,
+                    wireForPair(pair, stated, answer),
+                );
+            }
+            return answer;
+        } catch (error) {
+            if (!(error instanceof SuccessionConflict)) {
+                throw error;
+            }
+            conflicts += 1;
+            const refusal = refusalOf(
+                attempt,
+                conflicts,
+                document.path,
+                document.name,
+            );
+            if (refusal === 'retry') continue;
+            const answer: WriteAnswer = {
+                response: errorJson(
+                    refusal.error, refusal.status,
+                ),
+                outcome: 'refused',
+                answeredId: null,
+                bells: [],
+                rows: [],
+            };
+            for (const pair of pairs) {
+                answers.set(pair, answer);
+                ownWires.set(pair, answer.response);
+            }
+            return answer;
         }
-        return;
-    }
-    if (!gated) return;
-    const latest = await locks.getHead(
-        messagePair.path, messagePair.name,
-    );
-    if (latest !== null && latest.method === 'PUT') {
-        throw new ApiError(
-            'If-Match does not match the current'
-            + ' document at '
-            + messagePair.path + messagePair.name,
-            HTTP_PRECONDITION_FAILED,
-        );
     }
 }
 
-async function notifyWrite(
-    view: DbAdapter,
-    messagePair: MessagePair,
-): Promise<void> {
-    const notify = view.writeLocks?.notify;
-    if (notify === undefined) return;
-    await notify(eventForMessagePair(messagePair));
+function wireForPair(
+    pair: MessagePair,
+    stated: readonly StatementAnswer[],
+    answer: WriteAnswer,
+): Response {
+    if (answer.outcome !== 'land') return answer.response;
+    const row = stated.find((item) => item.id === pair.id);
+    if (row === undefined) return answer.response;
+    return responseFromLatin1(latin1(row.response));
 }
 
-function eventForMessagePair(
-    messagePair: MessagePair,
+function refusalDocument(
+    rows: readonly (WriteRow | MessagePair)[],
+): { path: string, name: string } {
+    for (const row of rows) {
+        if (row.method === 'PUT' || row.method === 'DELETE') {
+            return { path: row.path, name: row.name };
+        }
+    }
+    const first = rows[0]!;
+    return { path: first.path, name: first.name };
+}
+
+function bindOf(
+    attempt: Attempt,
+    row: WriteRow | MessagePair,
+): StatementBind {
+    const request = requestBytes(row);
+    const response = responseBytes(row);
+    const split = splitDate(response);
+    const secret = secretBytes(row);
+    return {
+        id: row.id,
+        operationId: row.operationId,
+        path: row.path,
+        name: row.name,
+        requesterIdentityId: row.requesterIdentityId,
+        method: row.method,
+        request,
+        requestSalt: saltOf(requestSaltOf(row)),
+        secret,
+        responsePrefix: split.prefix,
+        responseSuffix: split.suffix,
+        responseSalt: saltOf(responseSaltOf(row)),
+        ifMatch: ifMatchOf(attempt, row),
+        notify: notifyPayload(eventForMessagePair({
+            path: row.path,
+            requesterIdentityId: row.requesterIdentityId,
+        })),
+    };
+}
+
+function answerOf(
+    rows: readonly (WriteRow | MessagePair)[],
+    stated: readonly StatementAnswer[],
+    document: { path: string, name: string },
+): WriteAnswer {
+    const outcome = stated[0]!.outcome;
+    if (outcome === 'stale') {
+        return {
+            response: errorJson(
+                'If-Match does not match the current'
+                    + ' document at '
+                    + document.path + document.name,
+                412,
+            ),
+            outcome,
+            answeredId: null,
+            bells: [],
+            rows: stated,
+        };
+    }
+    const index = answerIndex(rows, stated, outcome);
+    const row = stated[index]!;
+    if (outcome === 'matched') {
+        if (row.headResponse === null) {
+            throw new Error('matched row has no head');
+        }
+        return {
+            response: responseFromLatin1(
+                latin1(row.headResponse), 200,
+            ),
+            outcome,
+            answeredId: row.headId,
+            bells: [],
+            rows: stated,
+        };
+    }
+    const bells: string[] = [];
+    for (let i = 0; i < stated.length; i++) {
+        if (!stated[i]!.inserted) continue;
+        const source = rows[i]!;
+        bells.push(notifyPayload(eventForMessagePair({
+            path: source.path,
+            requesterIdentityId: source.requesterIdentityId,
+        })));
+    }
+    return {
+        response: responseFromLatin1(latin1(row.response)),
+        outcome,
+        answeredId: row.id,
+        bells,
+        rows: stated,
+    };
+}
+
+function answerIndex(
+    rows: readonly { method: string }[],
+    stated: readonly StatementAnswer[],
+    outcome: Outcome,
+): number {
+    if (rows.length === 1) return 0;
+    if (outcome === 'matched') {
+        for (let i = 0; i < rows.length; i++) {
+            const method = rows[i]!.method;
+            if (
+                (method === 'PUT' || method === 'DELETE')
+                && stated[i]!.headResponse !== null
+            ) {
+                return i;
+            }
+        }
+    }
+    for (let i = 0; i < rows.length; i++) {
+        const method = rows[i]!.method;
+        if (method === 'PUT' || method === 'DELETE') {
+            return i;
+        }
+    }
+    return 0;
+}
+
+function requestBytes(
+    row: WriteRow | MessagePair,
+): Uint8Array {
+    if ('requestMessage' in row) {
+        return Octets.fromLatin1(
+            row.requestMessage,
+        ).asBytes();
+    }
+    return row.request;
+}
+
+function responseBytes(
+    row: WriteRow | MessagePair,
+): Uint8Array {
+    if (
+        'response' in row
+        && row.response instanceof Uint8Array
+    ) {
+        return row.response;
+    }
+    return Octets.fromLatin1(
+        (row as MessagePair).responseMessage,
+    ).asBytes();
+}
+
+function secretBytes(
+    row: WriteRow | MessagePair,
+): Uint8Array {
+    if (
+        'secret' in row
+        && row.secret instanceof Uint8Array
+    ) {
+        return row.secret;
+    }
+    return new Uint8Array(0);
+}
+
+function requestSaltOf(
+    row: WriteRow | MessagePair,
+): Uint8Array | undefined {
+    if ('requestSalt' in row) return row.requestSalt;
+    return undefined;
+}
+
+function responseSaltOf(
+    row: WriteRow | MessagePair,
+): Uint8Array | undefined {
+    if ('responseSalt' in row) return row.responseSalt;
+    return undefined;
+}
+
+function saltOf(supplied: Uint8Array | undefined): Uint8Array {
+    if (supplied !== undefined) return supplied;
+    const salt = new Uint8Array(16);
+    crypto.getRandomValues(salt);
+    return salt;
+}
+
+function ifMatchOf(
+    attempt: Attempt,
+    row: WriteRow | MessagePair,
+): string | null {
+    if (attempt === 'blind' || attempt === 'genesis') {
+        return null;
+    }
+    if ('requestMessage' in row) {
+        const pair = row;
+        // A composed POST carries the client's If-Match
+        // for the document the handler latches. That
+        // header is not a latch against this row's head.
+        if (
+            attempt === 'composed'
+            && pair.method === 'POST'
+        ) {
+            return null;
+        }
+        if (pair.latchedHeadMessagePairId !== undefined) {
+            return pair.latchedHeadMessagePairId;
+        }
+        if (pair.pinnedDocumentMessagePairId !== undefined) {
+            return null;
+        }
+        return ifMatchFromMessagePair(pair) ?? null;
+    }
+    if (
+        attempt === 'composed'
+        && row.method === 'POST'
+    ) {
+        return null;
+    }
+    return row.ifMatch;
+}
+
+function splitDate(
+    message: Uint8Array,
+): { prefix: Uint8Array, suffix: Uint8Array } {
+    const text = latin1(message);
+    const headerEnd = text.indexOf('\r\n\r\n');
+    const header = headerEnd < 0
+        ? text
+        : text.slice(0, headerEnd);
+    const mark = '\r\ndate: ';
+    const at = header.indexOf(mark);
+    if (at < 0 || header.length < at + mark.length + 29) {
+        throw new Error('response has no date value');
+    }
+    const valueAt = at + mark.length;
+    return {
+        prefix: message.slice(0, valueAt),
+        suffix: message.slice(valueAt + 29),
+    };
+}
+
+function latin1(bytes: Uint8Array): string {
+    return Octets.fromBytes(bytes).toLatin1();
+}
+
+export function eventForMessagePair(
+    messagePair: {
+        readonly path: string,
+        readonly requesterIdentityId: string,
+    },
 ): NotificationEvent {
     const parts = messagePair.path
         .split('/')
@@ -829,18 +1074,6 @@ function eventForMessagePair(
         organizationIds,
         identityIds: [messagePair.requesterIdentityId],
     };
-}
-
-function isGatedPath(path: string): boolean {
-    const parts = path
-        .split('/')
-        .filter((part) => part !== '');
-    const family = parts[0] === 'organizations'
-        ? (parts[2] ?? '')
-        : (parts[0] ?? '');
-    const concurrency = familyRegistration(family)
-        ?.concurrency;
-    return concurrency === 'locked';
 }
 
 // The create-document override table: which body field names

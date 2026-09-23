@@ -37,6 +37,28 @@ export type StatementRow = {
     ifMatch: string | null,
 };
 
+export type StatementBind = StatementRow & {
+    notify: string,
+};
+
+export type StatementAnswer = {
+    id: string,
+    path: string,
+    name: string,
+    method: string,
+    outcome: Outcome,
+    stamp: string,
+    response: Uint8Array,
+    headId: string | null,
+    headResponse: Uint8Array | null,
+    inserted: boolean,
+    supersedes: string,
+    requestHashHex: string,
+    secretHashHex: string,
+    responseHashHex: string,
+    pairHashHex: string,
+};
+
 export type Head = {
     path: string,
     name: string,

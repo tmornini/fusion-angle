@@ -4,6 +4,7 @@ import {
 } from '@std/assert';
 import { memoryDbAdapter } from
     '../api/db-memory.ts';
+import { ledgerFields } from './ledger-row.ts';
 import { connectPostgres } from
     '../api/postgres-client.ts';
 import { PostgresBackend } from
@@ -36,29 +37,32 @@ Deno.test(
     async () => {
         const adapter = memoryDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.messagePairs.append('u1', {
-            path:
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-            name: '42',
-            requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-            method: 'PUT',
-            request_at:
-                '2026-01-01T00:00:00.000000Z',
-            request_hash: 'a'.repeat(64),
-            request:
-                'PUT /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/42'
-                + ' HTTP/1.1\r\n\r\n',
-            response_at:
-                '2026-01-01T00:00:00.000001Z',
-            response:
-                'HTTP/1.1 200 OK\r\n\r\n',
-            operation_id: '0123456789ABCDEFGHIJKw',
-        });
+        await adapter.messagePairs.append(
+            'u1',
+            await ledgerFields({
+                id: 'u1',
+                path:
+                    '/organizations/'
+                    + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
+                name: '42',
+                requester_identity_id:
+                    'XXZruirZyAOoRpNxaDnpSA',
+                method: 'PUT',
+                response_at:
+                    '2026-01-01T00:00:00.000001Z',
+                request:
+                    'PUT /organizations/'
+                    + 'AjdvjuECVZEgZoFajaIEkg/ideas/42'
+                    + ' HTTP/1.1\r\n\r\n',
+                response: 'HTTP/1.1 200 OK\r\n\r\n',
+                operation_id: '0123456789ABCDEFGHIJKw',
+            }),
+        );
         await adapter.postSchemaCreation();
         const requests =
             await adapter.messagePairs.getAll();
         assertStrictEquals(
-            requests.length, 1,
+            requests.length, 2,
             'second postSchemaCreation preserves'
             + ' data',
         );

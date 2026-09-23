@@ -90,11 +90,13 @@ import {
     asObject,
 } from './validators.ts';
 import {
-    appendMessagePairOnce,
+    attemptFor,
+    runWrite,
     canonicalPath,
     documentHeadAt,
     formWriteMessagePair,
     messagePairResponseBody,
+    responseBodyText,
     ifMatchFromMessagePair,
     rawIfMatchFromMessagePair,
     parseIfMatch,
@@ -1073,14 +1075,18 @@ export async function postRecordWriteOp(
             // monotonicity) and the document message pair becomes the
             // shared document's head.
             if (messagePairs !== undefined) {
-                await appendMessagePairOnce(view, messagePairs.operation);
-                await appendMessagePairOnce(view, messagePairs.document);
-                for (const p of messagePairs.attributePuts) {
-                    await appendMessagePairOnce(view, p);
-                }
-                for (const p of messagePairs.attributeDeletes) {
-                    await appendMessagePairOnce(view, p);
-                }
+                const pairs = await rowsExceptMatchedHeads(
+                    view,
+                    [
+                        messagePairs.operation,
+                        messagePairs.document,
+                        ...messagePairs.attributePuts,
+                        ...messagePairs.attributeDeletes,
+                    ],
+                );
+                await runWrite(
+                    view, attemptFor(pairs), pairs,
+                );
             }
         },
     );
@@ -1141,7 +1147,11 @@ export async function postIdeaDocumentOp(
     } as unknown as Omit<IdeaEntity, 'id'>;
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return { id, ...entity };
         },
@@ -1178,7 +1188,11 @@ export async function postProjectDocumentOp(
         // states ROW half stripped (message plane only).
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return { id, ...entity };
         },
@@ -1217,7 +1231,11 @@ export async function postRecordDocumentOp(
         // states ROW half stripped (message plane only).
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return { id, ...entity };
         },
@@ -1252,7 +1270,11 @@ export async function postRecordAttributeDocumentOp(
         // stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return { id, ...entity };
         },
@@ -1286,7 +1308,11 @@ export async function postIdeaSubmissionOp(
     });
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -1371,9 +1397,14 @@ export async function postFlowCreationOp(
             // document message pair's response `at` strictly
             // follows the operation message pair's.
             if (messagePairs !== undefined) {
-                await appendMessagePairOnce(view, messagePairs.operation);
-                await appendMessagePairOnce(view, messagePairs.document);
-                await appendMessagePairOnce(view, messagePairs.join);
+                const pairs = [
+                    messagePairs.operation,
+                    messagePairs.document,
+                    messagePairs.join,
+                ];
+                await runWrite(
+                    view, attemptFor(pairs), pairs,
+                );
             }
         },
     );
@@ -1441,7 +1472,11 @@ export async function postFlowDocumentOp(
                         HTTP_PRECONDITION_FAILED,
                     );
                 }
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return { id, ...entity };
         },
@@ -1476,7 +1511,11 @@ export async function postFlowUndoOp(
         // LATER resolution walk correctly ignores (it carries no
         // correlated document message pair to displace anything).
         return db.transaction(async (view) => {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             },
         );
     }
@@ -1559,8 +1598,12 @@ export async function postFlowUndoOp(
                     HTTP_PRECONDITION_FAILED,
                 );
             }
-            await appendMessagePairOnce(view, messagePair);
-            await appendMessagePairOnce(view, documentMessagePair);
+            const pairs = [
+                messagePair, documentMessagePair,
+            ];
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
         },
     );
 }
@@ -1646,9 +1689,14 @@ export async function postObjectiveCreationOp(
         // objective_revisions ROW halves stripped.
         async (view) => {
             if (messagePairs !== undefined) {
-                await appendMessagePairOnce(view, messagePairs.operation);
-                await appendMessagePairOnce(view, messagePairs.document);
-                await appendMessagePairOnce(view, messagePairs.revision);
+                const pairs = [
+                    messagePairs.operation,
+                    messagePairs.document,
+                    messagePairs.revision,
+                ];
+                await runWrite(
+                    view, attemptFor(pairs), pairs,
+                );
             }
         },
     );
@@ -1683,7 +1731,11 @@ export async function postObjectiveDocumentOp(
         // Phase Final Task 2: objectives ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return { id, ...entity };
         },
@@ -1750,15 +1802,18 @@ export async function postIdentityCreationOp(
         // ROW halves stripped.
         async (view) => {
             if (messagePairs !== undefined) {
-                await appendMessagePairOnce(view, messagePairs.operation);
-                await appendMessagePairOnce(
-                    view, messagePairs.identityDocument,
-                );
+                const pairs = [
+                    messagePairs.operation,
+                    messagePairs.identityDocument,
+                ];
                 if (messagePairs.kind === 'service') {
-                    await appendMessagePairOnce(
-                        view, messagePairs.credentialDocument,
+                    pairs.push(
+                        messagePairs.credentialDocument,
                     );
                 }
+                await runWrite(
+                    view, attemptFor(pairs), pairs,
+                );
             }
         },
     );
@@ -1814,6 +1869,36 @@ export interface WorkOrderCreationMessagePairs {
 // postFlowWorkOrderDocumentOp instead; states traces stay
 // direct until the states-trace group. The route always
 // supplies the triple and forms all three pairs pre-tx.
+// A row whose response already is the head is not a
+// change. Leaving it in the statement matches the whole
+// call and drops the siblings that do differ.
+async function rowsExceptMatchedHeads(
+    view: DbAdapter,
+    rows: readonly MessagePair[],
+): Promise<MessagePair[]> {
+    const kept: MessagePair[] = [];
+    for (const row of rows) {
+        if (
+            row.method !== 'PUT'
+            && row.method !== 'DELETE'
+        ) {
+            kept.push(row);
+            continue;
+        }
+        const head = await messageStore(view)
+            .getDocumentHead(row.path, row.name);
+        if (
+            head !== null
+            && responseBodyText(row.responseMessage)
+                === responseBodyText(head.response)
+        ) {
+            continue;
+        }
+        kept.push(row);
+    }
+    return kept;
+}
+
 export async function postWorkOrderCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
@@ -1830,10 +1915,18 @@ export async function postWorkOrderCreationOp(
             // document so DELETE /claim can release the
             // creation-time claim.
             if (messagePairs !== undefined) {
-                await appendMessagePairOnce(view, messagePairs.operation);
-                await appendMessagePairOnce(view, messagePairs.document);
-                await appendMessagePairOnce(view, messagePairs.join);
-                await appendMessagePairOnce(view, messagePairs.claim);
+                const pairs = await rowsExceptMatchedHeads(
+                    view,
+                    [
+                        messagePairs.operation,
+                        messagePairs.document,
+                        messagePairs.join,
+                        messagePairs.claim,
+                    ],
+                );
+                await runWrite(
+                    view, attemptFor(pairs), pairs,
+                );
             }
         },
     );
@@ -1917,8 +2010,10 @@ export async function postWorkOrderClaimOp(
             if (priorLive) {
                 if (prior.member_id === actor) {
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(
-                            view, messagePair,
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
                         );
                     }
                     return;
@@ -1934,7 +2029,11 @@ export async function postWorkOrderClaimOp(
             // operation message pair body
             // (workOrderClaimHistoryFor reads them back).
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
         },
     );
@@ -1955,7 +2054,11 @@ export async function deleteWorkOrderClaimOp(
 ): Promise<void> {
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
         },
     );
@@ -2111,7 +2214,11 @@ export async function postWorkOrderTransitionOp(
         // Historical seed moves are not re-gated (W10).
         return db.transaction(async (view) => {
                 if (messagePair !== undefined) {
-                    await appendMessagePairOnce(view, messagePair);
+                    await runWrite(
+                        view,
+                        attemptFor([messagePair]),
+                        [messagePair],
+                    );
                 }
             },
         );
@@ -2151,7 +2258,11 @@ export async function postWorkOrderTransitionOp(
         );
         return db.transaction(async (view) => {
                 if (messagePair !== undefined) {
-                    await appendMessagePairOnce(view, messagePair);
+                    await runWrite(
+                        view,
+                        attemptFor([messagePair]),
+                        [messagePair],
+                    );
                 }
             },
         );
@@ -2321,8 +2432,12 @@ export async function postWorkOrderTransitionOp(
                     HTTP_PRECONDITION_FAILED,
                 );
             }
-            await appendMessagePairOnce(view, messagePair);
-            await appendMessagePairOnce(view, revisionMessagePair);
+            const pairs = [
+                messagePair, revisionMessagePair,
+            ];
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
         },
     );
 }
@@ -2401,7 +2516,11 @@ export async function postWorkOrderBindingOp(
                 );
             }
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
         },
     );
@@ -2438,7 +2557,11 @@ export async function postWorkOrderDocumentOp(
         // Phase Final Task 2: work_orders ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2468,7 +2591,11 @@ export async function postFlowWorkOrderDocumentOp(
         // Phase Final Task 2: flow_work_orders ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2517,7 +2644,11 @@ export async function postFlowRecordDocumentOp(
                 );
             }
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2541,7 +2672,11 @@ export async function postFlowTagDocumentOp(
 ): Promise<void> {
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
         },
     );
@@ -2573,7 +2708,11 @@ export async function postBaselineScoreDocumentOp(
     });
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2600,7 +2739,11 @@ export async function postActualScoreDocumentOp(
     });
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2627,7 +2770,11 @@ export async function postMembershipDocumentOp(
         // Phase Final Task 2: memberships ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2654,7 +2801,11 @@ export async function postMemberDocumentOp(
         // Phase Final Task 2: members ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2679,7 +2830,11 @@ export async function postAiMemberDocumentOp(
         // Phase Final Task 2: ai_members ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2705,7 +2860,11 @@ export async function postHumanMemberDocumentOp(
         // Phase Final Task 2: human_members ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2734,7 +2893,11 @@ export async function postIdentityPiiDocumentOp(
         // Phase Final Task 2: identity_pii ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2759,7 +2922,11 @@ export async function postIdentityDocumentOp(
         // Phase Final Task 2: identities ROW half stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2780,7 +2947,11 @@ export async function postAiAgentDocumentOp(
         Omit<AIAgentEntity, 'id'>;
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2805,7 +2976,11 @@ export async function postIdentityCredentialDocumentOp(
         // stripped.
         async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2834,7 +3009,11 @@ export async function postClientRegistrationDocumentOp(
     });
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -2897,7 +3076,11 @@ export async function postIdentityProviderDocumentOp(
     });
     return db.transaction(async (view) => {
             if (messagePair !== undefined) {
-                await appendMessagePairOnce(view, messagePair);
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
             }
             return entity;
         },
@@ -3005,6 +3188,10 @@ export const WRITE_RESPONSE_SPECS:
         documentWriteResponseSpec(WORK_ORDERS_WIRING),
     'organizations/:id/work-orders/:id/claim': {
         status: HTTP_NO_CONTENT,
+        // The response is the claim document. An empty
+        // body matches every other empty claim, so a
+        // new claim would store nothing.
+        successBody: (_params, body) => body ?? {},
     },
     'organizations/:id/work-orders/:id/transition': {
         status: HTTP_NO_CONTENT,
@@ -3498,7 +3685,7 @@ export async function postInstanceDeleteOp(
                     HTTP_CONFLICT,
                 );
             }
-            await appendMessagePairOnce(view, messagePair);
+            await runWrite(view, attemptFor([messagePair]), [messagePair]);
         },
     );
 }
@@ -3643,8 +3830,12 @@ async function postInstanceCreateOp(
                     HTTP_PRECONDITION_REQUIRED,
                 );
             }
-            await appendMessagePairOnce(view, messagePair);
-            await appendMessagePairOnce(view, revisionMessagePair);
+            const pairs = [
+                messagePair, revisionMessagePair,
+            ];
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
         },
     );
 }
@@ -3756,8 +3947,12 @@ export async function postInstancePatchOp(
                     HTTP_PRECONDITION_FAILED,
                 );
             }
-            await appendMessagePairOnce(view, messagePair);
-            await appendMessagePairOnce(view, revisionMessagePair);
+            const pairs = [
+                messagePair, revisionMessagePair,
+            ];
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
         },
     );
 }
@@ -3954,8 +4149,10 @@ export const routes: Route[] = [
         delete: (db, _p, _actor, messagePair) => {
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(
-                            view, messagePair,
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
                         );
                     }
                 },
@@ -4099,7 +4296,11 @@ export const routes: Route[] = [
             await requireServiceIdentity(db, param(p, 0));
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
+                        );
                     }
                 },
             );
@@ -4142,7 +4343,11 @@ export const routes: Route[] = [
             });
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
+                        );
                     }
                     return entity;
                 },
@@ -4198,7 +4403,11 @@ export const routes: Route[] = [
             });
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
+                        );
                     }
                     return entity;
                 },
@@ -4454,22 +4663,18 @@ export const routes: Route[] = [
             // (states row half strips with the states-trace
             // group).
             return db.transaction(async (view) => {
-                    if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
-                    }
-                    if (projectMessagePair !== undefined) {
-                        await appendMessagePairOnce(
-                            view, projectMessagePair,
-                        );
-                    }
-                    if (ideaMessagePair !== undefined) {
-                        await appendMessagePairOnce(
-                            view, ideaMessagePair,
-                        );
-                    }
-                    for (const baselineMessagePair of baselineMessagePairs) {
-                        await appendMessagePairOnce(
-                            view, baselineMessagePair,
+                    const pairs = [
+                        ...(messagePair !== undefined
+                            ? [messagePair] : []),
+                        ...(projectMessagePair !== undefined
+                            ? [projectMessagePair] : []),
+                        ...(ideaMessagePair !== undefined
+                            ? [ideaMessagePair] : []),
+                        ...baselineMessagePairs,
+                    ];
+                    if (pairs.length > 0) {
+                        await runWrite(
+                            view, attemptFor(pairs), pairs,
                         );
                     }
                 },
@@ -4671,7 +4876,11 @@ export const routes: Route[] = [
             });
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
+                        );
                     }
                     return entity;
                 },
@@ -4680,7 +4889,11 @@ export const routes: Route[] = [
         delete: (db, _p, _actor, messagePair) => {
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
+                        );
                     }
                 },
             );
@@ -5046,7 +5259,11 @@ export const routes: Route[] = [
                         );
                     }
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
+                        );
                     }
                 },
             );
@@ -5158,7 +5375,11 @@ export const routes: Route[] = [
             validateAttributeDocument(withoutId(body));
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
+                        );
                     }
                 },
             );
@@ -5188,7 +5409,11 @@ export const routes: Route[] = [
                     await deleteRecordAttributeSafe(
                         view, org, attrId, typeId,
                     );
-                    await appendMessagePairOnce(view, messagePair);
+                    await runWrite(
+                        view,
+                        attemptFor([messagePair]),
+                        [messagePair],
+                    );
                 },
             );
         },
@@ -5400,7 +5625,11 @@ export const routes: Route[] = [
         delete: (db, _p, _actor, messagePair) => {
             return db.transaction(async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
+                        );
                     }
                 },
             );
@@ -5482,7 +5711,11 @@ export const routes: Route[] = [
                 // stripped.
                 async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
+                        );
                     }
                     return entity;
                 },
@@ -5607,7 +5840,11 @@ export const routes: Route[] = [
                         return;
                     }
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
+                        );
                     }
                 },
             );
@@ -5802,7 +6039,11 @@ export const routes: Route[] = [
                 // half stripped.
                 async (view) => {
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
+                        await runWrite(
+                            view,
+                            attemptFor([messagePair]),
+                            [messagePair],
+                        );
                     }
                     return entity;
                 },

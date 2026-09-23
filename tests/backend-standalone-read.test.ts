@@ -6,6 +6,8 @@ import {
 import { MemoryStorageBackend }
     from '../api/backend-memory.ts';
 import { MissingTableError } from '../api/db.ts';
+import { NIL_IDENTIFIER } from
+    '../shared/identifier.ts';
 
 interface Row { id: string; n: number }
 
@@ -69,7 +71,7 @@ Deno.test(
         );
         assertEquals(
             seen.map(r => r.id).sort(),
-            ['c'],
+            [NIL_IDENTIFIER, 'c'],
         );
         hold.resolve();
         await write;
@@ -78,7 +80,7 @@ Deno.test(
         );
         assertEquals(
             after.map(r => r.id).sort(),
-            ['c', 'u'],
+            [NIL_IDENTIFIER, 'c', 'u'],
         );
     },
 );

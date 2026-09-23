@@ -16,8 +16,9 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import {
+    runWrite,
+    attemptFor,
     formWriteMessagePair,
-    appendMessagePairOnce,
     IF_MATCH_HEADER,
 } from '../api/message-pair.ts';
 import {
@@ -516,7 +517,11 @@ async () => {
         operationId: generateIdentifier(),
     });
     await db.transaction(async (view) => {
-            await appendMessagePairOnce(view, tombstone);
+            await runWrite(
+                view,
+                attemptFor([tombstone]),
+                [tombstone],
+            );
         },
     );
     const res = await handleRequest(db, req(
@@ -532,7 +537,8 @@ async () => {
     });
 });
 
-Deno.test('byte-identical PATCH create resend → 200 replay',
+Deno.test('a create resend without If-Match is 428'
++ ' and stores nothing',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -547,23 +553,17 @@ async () => {
         undefined, operationId,
     ));
     assertStrictEquals(first.status, 201);
-    const originalId = pairIdOf(first)!;
-    const originalEtag = first.headers.get('ETag');
-    const originalBody = await first.json();
     const second = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         undefined, operationId,
     ));
-    assertStrictEquals(second.status, 200);
+    // A live instance without If-Match is 428. The
+    // first create's rows stay stored.
+    assertStrictEquals(second.status, 428);
     assertStrictEquals(
-        pairIdOf(second),
-        originalId,
+        (await second.json()).error,
+        'If-Match is required to PATCH ' + INSTANCE_DETAIL,
     );
-    assertStrictEquals(
-        second.headers.get('ETag'),
-        originalEtag,
-    );
-    assertEquals(await second.json(), originalBody);
     const responses = await db.messagePairs.getCollectionPairs(
         '/organizations/' + ORGANIZATION
             + '/record-types/' + TYPE_ID
@@ -575,8 +575,8 @@ async () => {
     assertStrictEquals(pairsAt.length, 2);
 });
 
-Deno.test('same-body instance PATCH with new Operation-ID'
-+ ' still appends 201',
+Deno.test('same response body with a fresh If-Match is'
++ ' 200 and stores nothing',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -603,13 +603,13 @@ async () => {
             'operation-id': generateIdentifier(),
         },
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     const after = (await db.messagePairs.getCollectionPairs(prefix,
     )).filter((row) => row.name === INSTANCE_ID);
     assertStrictEquals(
         after.length,
-        before.length + 2,
-        'same-body PATCH still appends wire + revision',
+        before.length,
+        'same response body stores nothing',
     );
 });
 

@@ -24,8 +24,9 @@ import {
     formDocumentMessagePairFor,
 } from '../api/routes.ts';
 import {
+    runWrite,
+    attemptFor,
     formWriteMessagePair,
-    appendMessagePairOnce,
     IF_MATCH_HEADER,
     strongEtagOf,
     parseIfMatch,
@@ -238,11 +239,16 @@ async function appendInstanceMessagePair(
         requestAt,
         organization,
         responseStatus: method === 'DELETE' ? 204 : 200,
-        responseBody: undefined,
+        responseBody: method === 'DELETE'
+            ? undefined
+            : (body ?? {}),
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
     return messagePair.id;
 }
 
@@ -402,13 +408,10 @@ async () => {
         { set: [{ attribute_id: ATTR_ID, value: 'x' }] },
     ));
     assertStrictEquals(res.status, 428);
-    const body = await res.json() as {
-        id: string;
-        error?: string;
-    };
-    assertStrictEquals(body.error, undefined);
-    assertStrictEquals(body.id, INSTANCE_ID);
-    assert(res.headers.get('ETag'));
+    assertStrictEquals(
+        (await res.json()).error,
+        'If-Match is required to PATCH ' + INSTANCE_DETAIL,
+    );
 });
 
 Deno.test('PATCH stale If-Match → 412; re-GET + retry → 200',
@@ -435,13 +438,11 @@ async () => {
         { [IF_MATCH_HEADER]: e0 },
     ));
     assertStrictEquals(stale.status, 412);
-    const staleBody = await stale.json() as {
-        id: string;
-        error?: string;
-    };
-    assertStrictEquals(staleBody.error, undefined);
-    assertStrictEquals(staleBody.id, INSTANCE_ID);
-    assert(stale.headers.get('ETag'));
+    assertStrictEquals(
+        (await stale.json()).error,
+        'If-Match does not match the current '
+            + 'instance at ' + INSTANCE_DETAIL,
+    );
     const freshGet = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
@@ -787,7 +788,7 @@ async () => {
             [IF_MATCH_HEADER]: put.headers.get('ETag')!,
         },
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     const afterHead = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
@@ -796,7 +797,7 @@ async () => {
     ]);
     assertStrictEquals(
         await countInstanceMessagePairs(db),
-        before + 2,
+        before,
     );
 });
 
@@ -848,8 +849,8 @@ async () => {
     assertEquals(body.values, []);
 });
 
-Deno.test('byte-identical PATCH resend → 200 REPLAY; ETag '
-+ 'ORIGINAL even after later revisions',
+Deno.test('a stale If-Match resend of an older PATCH '
++ 'answers 412 and leaves the later head',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -872,7 +873,6 @@ async () => {
     ));
     assertStrictEquals(first.status, 201);
     const originalEtag = first.headers.get('ETag')!;
-    const originalBody = await first.json();
     const originalResponseId =
         pairIdOf(first)!;
     // Later revision advances the head.
@@ -893,27 +893,23 @@ async () => {
         secondWrite.headers.get('ETag'),
         originalEtag,
     );
-    // Byte-identical resend of the FIRST patch (stale If-Match)
-    // must replay BEFORE the outcome ladder.
+    // A resend of the first patch still carries the
+    // genesis If-Match. That latch is stale against the
+    // second revision, so the statement answers 412 and
+    // the head stays the second write.
     const replay = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: e0 },
         operationId,
     ));
-    assertStrictEquals(replay.status, 200);
-    assertStrictEquals(
-        replay.headers.get('ETag'),
-        originalEtag,
-        'replay carries ORIGINAL etag',
+    assertStrictEquals(replay.status, 412);
+    const head = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assertStrictEquals(
-        pairIdOf(replay),
-        originalResponseId,
-    );
-    assertEquals(
-        await replay.json(),
-        originalBody,
-    );
+    assertEquals(head?.values, [
+        { attribute_id: ATTR_ID, value: 'C' },
+    ]);
+    assertNotStrictEquals(head?.messagePairId, originalResponseId);
 });
 
 Deno.test('two writers, same If-Match → first 200, second 412',

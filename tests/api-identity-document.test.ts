@@ -25,8 +25,9 @@ import {
     identityDocumentEntityOf,
 } from '../api/routes.ts';
 import {
+    runWrite,
+    attemptFor,
     formWriteMessagePair,
-    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import {
     documentFamilyWiring,
@@ -163,8 +164,8 @@ async () => {
     );
     assertEquals(written, body);
     // Phase Final Stage B: identity spine tables retired.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) --
@@ -182,8 +183,8 @@ Deno.test('a byte-identical PUT resend to identities/:id converges'
         db, 'identities/' + id, body, DEV_TOKEN,
     );
     assertEquals(first, second);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 // -- 4. below-route via the generic handlers (the drift-file
@@ -212,11 +213,15 @@ async function putDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt,
         organization: undefined,
-        responseStatus: 200, responseBody: undefined,
+        responseStatus: 200,
+        responseBody: body,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
     return messagePair.id;
 }
 
@@ -238,8 +243,11 @@ async function deleteDocumentMessagePair(
         responseStatus: 204, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
 }
 
 Deno.test('a PUT chain Supersedes-chains and the head derives the'
@@ -250,7 +258,7 @@ Deno.test('a PUT chain Supersedes-chains and the head derives the'
     const wiring = documentFamilyWiring('identities')!;
     const first = identityFields();
     const id = generateIdentifier();
-    await putDocumentMessagePair(
+    const firstId = await putDocumentMessagePair(
         db, id, first,
         '2026-02-01T00:00:00.000000Z',
     );
@@ -267,7 +275,7 @@ Deno.test('a PUT chain Supersedes-chains and the head derives the'
         '2026-02-02T00:00:00.000000Z',
     );
     const secondResponse = await db.messagePairs.getById(secondId);
-    assertStrictEquals('supersedes' in secondResponse, false);
+    assertStrictEquals(secondResponse.supersedes, firstId);
 
     const headAfterSecond = await documentGetHandler(wiring)(
         db, [id], 'XXZruirZyAOoRpNxaDnpSA', 'ignored', [],

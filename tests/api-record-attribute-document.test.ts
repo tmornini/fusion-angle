@@ -13,8 +13,9 @@ import {
 } from '../api/validators.ts';
 import { postRecordAttributeDocumentOp } from '../api/routes.ts';
 import {
+    runWrite,
+    attemptFor,
     formWriteMessagePair,
-    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
@@ -142,7 +143,7 @@ Deno.test('postRecordAttributeDocumentOp writes exactly the'
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseStatus: 200, responseBody: body,
         operationId: generateIdentifier(),
     });
     // Phase Final Task 2: record_attributes ROW half stripped
@@ -159,8 +160,8 @@ Deno.test('postRecordAttributeDocumentOp writes exactly the'
         write_roles: ['member', 'admin'],
     } as RecordAttributeEntity);
     // Phase Final Stage B: record_attributes table retired.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
 });
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
@@ -207,8 +208,8 @@ async () => {
     );
     assertEquals(first, second);
     // seedAdminSchema + parent type + 2 attribute PUTs
-    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
 });
 
 // -- 4. the DELETE-head derives absent — below-route via the
@@ -247,11 +248,14 @@ async function putDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseStatus: 200, responseBody: body,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
 }
 
 async function deleteDocumentMessagePair(
@@ -283,8 +287,11 @@ async function deleteDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
 }
 
 Deno.test('a DELETE-head derives absent on the nested attributes'

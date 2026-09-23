@@ -379,7 +379,8 @@ async () => {
             at: existing!.at,
         },
     ));
-    assertStrictEquals(echoPut.status, 201);
+    // Same seat body is 200 and stores nothing.
+    assertStrictEquals(echoPut.status, 200);
 
     const derived = sortById(
         await deriveMembershipsForIdentity(db, davidId),

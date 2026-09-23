@@ -989,16 +989,22 @@ export interface ProjectObjectiveActualScoreEntity {
 // machinery, never a second truth.
 export interface MessagePairEntity {
     id: Id;
+    operation_id: string;
     path: string;
     name: string;
-    requester_identity_id: Id;
+    supersedes: Id;
+    requester_identity_id: string;
     method: string;
-    request_at: string;
-    request_hash: string;
-    request: string;
     response_at: string;
+    request: string;
+    request_salt: string;
+    request_hash: string;
+    secret: string;
+    secret_hash: string;
     response: string;
-    operation_id: string;
+    response_salt: string;
+    response_hash: string;
+    pair_hash: string;
 }
 
 export interface ProjectEntity {

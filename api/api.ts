@@ -20,13 +20,15 @@ import { pathAndNameOf } from './path-and-name.ts';
 import { pathSegmentsOf } from './path-segments.ts';
 import {
     formWriteMessagePair,
-    appendMessagePairOnce,
-    getPairByRequestHash,
     canonicalPath,
     storedPathAndNameOf,
     hoistedHeaderFields,
-    sendWriteResponse,
     documentHeadAt,
+    writeAnswerOf,
+    ownWireOf,
+    responseFromLatin1,
+    attemptFor,
+    runWrite,
     attachEtag,
     attachDate,
     streamGetFromStored,
@@ -35,7 +37,6 @@ import {
     requireOperationId,
     OPERATION_ID_HEADER,
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
-    REPLAY_EXEMPT_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
 } from './message-pair.ts';
 import {
@@ -189,6 +190,20 @@ function isOrganizationDocumentPath(
             === 'organizations/:id/versions/:etag';
 }
 
+function requireWrite(
+    pair: NonNullable<Parameters<typeof writeAnswerOf>[0]>,
+    routePattern: string,
+): NonNullable<ReturnType<typeof writeAnswerOf>> {
+    const written = writeAnswerOf(pair);
+    const wire = ownWireOf(pair);
+    if (written === undefined || wire === undefined) {
+        throw new Error(
+            'wired write stored no pair: ' + routePattern,
+        );
+    }
+    return { ...written, response: wire };
+}
+
 function postWriteNotification(
     adapter: GuardedDbAdapter,
     routePattern: string,
@@ -283,27 +298,6 @@ function limitedHeaders(
     return limited
         ? { 'Authorization-Limited-Attributes': 'true' }
         : {};
-}
-
-// 412 / 428 with a live PUT: this caller's GET of the
-// current head — fresh Date, current ETag, limited
-// header when the projection omits stored attributes.
-function preconditionDocument(
-    status: number,
-    document: unknown,
-    etag: string,
-    limited: boolean,
-): Response {
-    return attachDate(
-        attachEtag(
-            Response.json(document, {
-                status,
-                headers: limitedHeaders(limited),
-            }),
-            etag,
-        ),
-        nowUtc(),
-    );
 }
 
 // The revision pair an instance PATCH wrote beside its wire
@@ -928,6 +922,9 @@ export async function handleRequest(
                 organization,
                 operationId,
                 responseStatus: spec.status,
+                ...(isDocumentPut && livePut === undefined
+                    ? { genesis: true as const }
+                    : {}),
                 responseBody: method === 'PUT'
                     && body === undefined
                     ? undefined
@@ -952,68 +949,6 @@ export async function handleRequest(
                     }
                     : {}),
             });
-            // The pre-tx idempotency fast-path: a byte-
-            // identical resend never reaches the handler and
-            // posts no notification — nothing was written.
-            // Skipped for REPLAY_EXEMPT_ROUTE_PATTERNS: those
-            // routes' own domain guard makes serving the cached
-            // response wrong rather than merely redundant — see
-            // message-pair.ts. ORDERING IS LOAD-BEARING: this
-            // fast path runs BEFORE the locked four-outcome table
-            // below, so a byte-identical resend of an
-            // already-succeeded locked write (whose echo is now
-            // stale against the NEW head) replays instead of
-            // 412ing.
-            if (!REPLAY_EXEMPT_ROUTE_PATTERNS.has(routePattern)) {
-                const replay = await getPairByRequestHash(
-                    effective, messagePair.requestHash,
-                );
-                if (replay !== undefined) {
-                    const response = sendWriteResponse(
-                        replay, method, false,
-                    );
-                    if (
-                        routePattern
-                            === INSTANCE_DETAIL_PATTERN
-                    ) {
-                        if (method === 'PATCH') {
-                            const revisionId =
-                                await revisionMessagePairIdForPatch(
-                                    effective, replay.id,
-                                );
-                            if (
-                                revisionId !== undefined
-                            ) {
-                                return attachEtag(
-                                    response, revisionId,
-                                );
-                            }
-                        }
-                        const advertisedReplay =
-                            await instanceAdvertised(
-                                effective,
-                                param(params, 0),
-                                param(params, 1),
-                                param(params, 2),
-                                roles,
-                            );
-                        if (
-                            advertisedReplay !== undefined
-                        ) {
-                            return attachEtag(
-                                response,
-                                advertisedReplay.tag,
-                            );
-                        }
-                    }
-                    if (isDocumentPut) {
-                        return attachEtag(
-                            response, replay.id,
-                        );
-                    }
-                    return response;
-                }
-            }
             // The latched-operation table, the locked
             // table's sibling for sub-resource writes:
             // absent → 428; malformed → 400; ≠ parent head
@@ -1076,25 +1011,6 @@ export async function handleRequest(
                     livePut !== undefined
                     && rawIfMatch === null
                 ) {
-                    if (matched.get !== undefined) {
-                        try {
-                            return preconditionDocument(
-                                HTTP_PRECONDITION_REQUIRED,
-                                await matched.get(
-                                    effective, params,
-                                    actor, organization,
-                                    roles,
-                                ),
-                                livePut,
-                                false,
-                            );
-                        } catch {
-                            // GET derive may fail on a
-                            // stored shape this caller
-                            // cannot project; status
-                            // still 428.
-                        }
-                    }
                     return Response.json(
                         {
                             error: 'If-Match is required to PUT '
@@ -1123,25 +1039,6 @@ export async function handleRequest(
                     rawIfMatch !== null
                     && !echoMatchesHead
                 ) {
-                    if (
-                        livePut !== undefined
-                        && matched.get !== undefined
-                    ) {
-                        try {
-                            return preconditionDocument(
-                                HTTP_PRECONDITION_FAILED,
-                                await matched.get(
-                                    effective, params,
-                                    actor, organization,
-                                    roles,
-                                ),
-                                livePut,
-                                false,
-                            );
-                        } catch {
-                            // Same fallback as 428.
-                        }
-                    }
                     return Response.json(
                         {
                             error: 'If-Match does not '
@@ -1246,27 +1143,6 @@ export async function handleRequest(
                             roles,
                         );
                     if (raw === null) {
-                        if (
-                            advertisedNow !== undefined
-                            && matched.get !== undefined
-                        ) {
-                            try {
-                                return preconditionDocument(
-                                    HTTP_PRECONDITION_REQUIRED,
-                                    await matched.get(
-                                        effective,
-                                        params,
-                                        actor,
-                                        organization,
-                                        roles,
-                                    ),
-                                    advertisedNow.tag,
-                                    advertisedNow.limited,
-                                );
-                            } catch {
-                                // Status stays 428.
-                            }
-                        }
                         return Response.json(
                             {
                                 error: 'If-Match is '
@@ -1285,27 +1161,6 @@ export async function handleRequest(
                         advertisedNow === undefined
                         || ifMatch !== advertisedNow.tag
                     ) {
-                        if (
-                            advertisedNow !== undefined
-                            && matched.get !== undefined
-                        ) {
-                            try {
-                                return preconditionDocument(
-                                    HTTP_PRECONDITION_FAILED,
-                                    await matched.get(
-                                        effective,
-                                        params,
-                                        actor,
-                                        organization,
-                                        roles,
-                                    ),
-                                    advertisedNow.tag,
-                                    advertisedNow.limited,
-                                );
-                            } catch {
-                                // Status stays 412.
-                            }
-                        }
                         return Response.json(
                             {
                                 error: 'If-Match does '
@@ -1357,35 +1212,6 @@ export async function handleRequest(
                                 },
                             );
                         if (raced) {
-                            const nowLive =
-                                await documentHeadMessagePairId(
-                                    effective,
-                                    canonicalPrefix,
-                                    name,
-                                );
-                            if (
-                                nowLive !== undefined
-                                && matched.get
-                                    !== undefined
-                            ) {
-                                try {
-                                    return preconditionDocument(
-                                        HTTP_PRECONDITION_FAILED,
-                                        await matched.get(
-                                            effective,
-                                            params,
-                                            actor,
-                                            organization,
-                                            roles,
-                                        ),
-                                        nowLive,
-                                        false,
-                                    );
-                                } catch {
-                                    // GET derive failed;
-                                    // no document body.
-                                }
-                            }
                             return Response.json(
                                 {
                                     error: 'If-Match does not '
@@ -1404,8 +1230,8 @@ export async function handleRequest(
                                 .getById(livePut);
                         if (stored !== undefined) {
                             return attachEtag(
-                                sendWriteResponse(
-                                    stored, 'PUT', false,
+                                responseFromLatin1(
+                                    stored.response, 200,
                                 ),
                                 stored.id,
                             );
@@ -1442,30 +1268,29 @@ export async function handleRequest(
                                 );
                             }
                         }
-                        await appendMessagePairOnce(
-                            view, emptyMessagePair,
+                        await runWrite(
+                            view,
+                            attemptFor([emptyMessagePair]),
+                            [emptyMessagePair],
                         );
                     },
                 );
-                const stored = await getPairByRequestHash(
-                    effective, emptyMessagePair.requestHash,
+                const written = writeAnswerOf(
+                    emptyMessagePair,
                 );
-                if (stored === undefined) {
+                if (written === undefined) {
                     throw new Error(
                         'wired write stored no pair: '
                         + routePattern,
                     );
                 }
-                postWriteNotification(
-                    adapter, routePattern, params,
-                    body, organization, actor,
-                );
-                return attachEtag(
-                    sendWriteResponse(
-                        stored, 'PUT', true,
-                    ),
-                    stored.id,
-                );
+                if (written.outcome === 'land') {
+                    postWriteNotification(
+                        adapter, routePattern, params,
+                        body, organization, actor,
+                    );
+                }
+                return written.response;
             }
         }
         switch (method) {
@@ -1636,32 +1461,27 @@ export async function handleRequest(
                         ) ?? '',
                     );
                 if (messagePair !== undefined) {
-                    const stored = await getPairByRequestHash(
-                        effective, messagePair.requestHash,
+                    const written = requireWrite(
+                        messagePair, routePattern,
                     );
-                    if (stored === undefined) {
-                        throw new Error(
-                            'wired write stored no pair: '
-                            + routePattern,
+                    if (written.outcome === 'land') {
+                        postWriteNotification(
+                            adapter, routePattern, params,
+                            body, organization, actor,
                         );
                     }
-                    postWriteNotification(
-                        adapter, routePattern, params,
-                        body, organization, actor,
-                    );
-                    // The pair by hash is THIS request's iff
-                    // its id matches; a concurrent twin that
-                    // landed first leaves this one a 200.
-                    const response = sendWriteResponse(
-                        stored, 'PUT',
-                        stored.id === messagePair.id,
-                    );
+                    if (
+                        written.outcome === 'stale'
+                        || written.outcome === 'refused'
+                    ) {
+                        return written.response;
+                    }
                     if (
                         routePattern
                             === 'identities/:id/token-revocations/:rid'
                     ) {
                         return attachSetCookie(
-                            response,
+                            written.response,
                             refreshClearCookie(request),
                         );
                     }
@@ -1674,12 +1494,14 @@ export async function handleRequest(
                             === documentEntityPattern(
                                 putWiring,
                             )
+                        && written.answeredId !== null
                     ) {
                         return attachEtag(
-                            response, stored.id,
+                            written.response,
+                            written.answeredId,
                         );
                     }
-                    return response;
+                    return written.response;
                 }
                 if (!invitationWriteOwnsNotification(
                     routePattern,
@@ -1722,39 +1544,40 @@ export async function handleRequest(
                         roles,
                     );
                 if (messagePair !== undefined) {
-                    const stored = await getPairByRequestHash(
-                        effective, messagePair.requestHash,
+                    const written = requireWrite(
+                        messagePair, routePattern,
                     );
-                    if (stored === undefined) {
-                        throw new Error(
-                            'wired write stored no pair: '
-                            + routePattern,
+                    if (written.outcome === 'land') {
+                        postWriteNotification(
+                            adapter, routePattern, params,
+                            body, organization, actor,
                         );
                     }
-                    postWriteNotification(
-                        adapter, routePattern, params,
-                        body, organization, actor,
-                    );
-                    const response = sendWriteResponse(
-                        stored, 'PATCH', true,
-                    );
+                    if (
+                        written.outcome === 'stale'
+                        || written.outcome === 'refused'
+                        || written.outcome === 'matched'
+                    ) {
+                        return written.response;
+                    }
                     if (
                         routePattern
                             === INSTANCE_DETAIL_PATTERN
+                        && written.answeredId !== null
                     ) {
                         const revisionId =
                             await revisionMessagePairIdForPatch(
-                                effective, stored.id,
+                                effective, messagePair.id,
                             );
                         if (
                             revisionId !== undefined
                         ) {
                             return attachEtag(
-                                response, revisionId,
+                                written.response, revisionId,
                             );
                         }
                     }
-                    return response;
+                    return written.response;
                 }
                 postWriteNotification(
                     adapter, routePattern, params,
@@ -1789,22 +1612,16 @@ export async function handleRequest(
                     roles,
                 );
                 if (messagePair !== undefined) {
-                    const stored = await getPairByRequestHash(
-                        effective, messagePair.requestHash,
+                    const written = requireWrite(
+                        messagePair, routePattern,
                     );
-                    if (stored === undefined) {
-                        throw new Error(
-                            'wired write stored no pair: '
-                            + routePattern,
+                    if (written.outcome === 'land') {
+                        postWriteNotification(
+                            adapter, routePattern, params,
+                            body, organization, actor,
                         );
                     }
-                    postWriteNotification(
-                        adapter, routePattern, params,
-                        body, organization, actor,
-                    );
-                    return sendWriteResponse(
-                        stored, 'DELETE', true,
-                    );
+                    return written.response;
                 }
                 postWriteNotification(
                     adapter, routePattern, params,
@@ -1893,16 +1710,19 @@ export async function handleRequest(
                             + ' pair: ' + routePattern,
                         );
                     }
-                    const authStored = await effective.messagePairs
-                        .getById(dispatched.messagePairId);
+                    if (dispatched.wire === undefined) {
+                        throw new Error(
+                            'authentication grant stored no'
+                            + ' wire: ' + routePattern,
+                        );
+                    }
                     // authentication/authorize mints an
                     // authorization code, not a session — no UI
                     // subscribes to it, so it posts nothing.
                     // authentication/token mints the session
                     // itself: decode the live response claims so
                     // the identity-tokens page refreshes
-                    // cross-tab. Wire body comes from the stored
-                    // row (stored == wire under verbatim storage).
+                    // cross-tab.
                     if (routePattern === 'authentication/token') {
                         const claims = decodeAccessToken(
                             (dispatched.response as {
@@ -1917,9 +1737,7 @@ export async function handleRequest(
                             ],
                         });
                     }
-                    const written = sendWriteResponse(
-                        authStored, 'POST', true,
-                    );
+                    const written = dispatched.wire;
                     const grantType =
                         typeof body!.grant_type === 'string'
                             ? body!.grant_type
@@ -1969,22 +1787,16 @@ export async function handleRequest(
                     ) ?? '',
                 );
                 if (messagePair !== undefined) {
-                    const stored = await getPairByRequestHash(
-                        effective, messagePair.requestHash,
+                    const written = requireWrite(
+                        messagePair, routePattern,
                     );
-                    if (stored === undefined) {
-                        throw new Error(
-                            'wired write stored no pair: '
-                            + routePattern,
+                    if (written.outcome === 'land') {
+                        postWriteNotification(
+                            adapter, routePattern, params,
+                            body, organization, actor,
                         );
                     }
-                    postWriteNotification(
-                        adapter, routePattern, params,
-                        body, organization, actor,
-                    );
-                    return sendWriteResponse(
-                        stored, 'POST', true,
-                    );
+                    return written.response;
                 }
                 if (!invitationWriteOwnsNotification(
                     routePattern,

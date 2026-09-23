@@ -237,8 +237,8 @@ Deno.test('a byte-identical resend against the LIVE slot replays'
     );
 });
 
-Deno.test('a byte-identical resend AFTER supersession replays'
-+ ' the stored first pair and appends nothing', async () => {
+Deno.test('a superseded body put again stores a new row',
+async () => {
     const db = await freshDb();
     const id = 'uLUQPJnlVuzeGqXLYqCItA';
     const operationId = generateIdentifier();
@@ -260,16 +260,16 @@ Deno.test('a byte-identical resend AFTER supersession replays'
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Erin'), operationId,
     ));
-    assertStrictEquals(resend.status, 200);
-    assertStrictEquals(pairIdOf(resend), firstId);
+    assertStrictEquals(resend.status, 201);
+    assertNotStrictEquals(pairIdOf(resend), firstId);
     assertStrictEquals(
         (await db.messagePairs.getAll()).length,
-        countAfterSecond,
+        countAfterSecond + 1,
     );
     const pairsAt = await pairsAtPii(db, id);
-    assertStrictEquals(pairsAt.length, 2);
+    assertStrictEquals(pairsAt.length, 3);
     const domainRow = await deriveIdentityPii(db, id);
-    assertStrictEquals(domainRow.name, 'Erin Marie');
+    assertStrictEquals(domainRow.name, 'Erin');
 });
 
 // ── 5. Seam: erased PII remains in superseded pairs ──

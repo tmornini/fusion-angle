@@ -15,6 +15,7 @@ import {
 } from '../shared/identifier.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import type { MessagePairEntity } from '../api/types.ts';
+import { ledgerFields } from './ledger-row.ts';
 
 // Parameterized store acceptance. ./test-postgres will
 // invoke this factory; the memory runner keeps ./validate
@@ -138,47 +139,49 @@ const ORDER_REQUESTER = 'XXZruirZyAOoRpNxaDnpSA';
 const ORDER_OPERATION = '0123456789ABCDEFGHIJKw';
 
 function orderRow(
+    id: string,
     name: string,
     responseAt: string,
     n: number,
-): Omit<MessagePairEntity, 'id'> {
-    return {
+): Promise<Omit<MessagePairEntity, 'id'>> {
+    return ledgerFields({
+        id,
         path: ORDER_PATH,
-        name: name,
+        name,
         requester_identity_id: ORDER_REQUESTER,
         method: 'PUT',
-        request_at: responseAt,
-        request_hash: n.toString(16).padStart(64, '0'),
-        request: 'PUT ' + ORDER_PATH + name
-            + ' HTTP/1.1\r\n\r\n',
         response_at: responseAt,
+        request: 'PUT ' + ORDER_PATH + name
+            + ' HTTP/1.1\r\n'
+            + 'x-n: ' + String(n) + '\r\n\r\n',
         response: 'HTTP/1.1 200 OK\r\n\r\n',
         operation_id: ORDER_OPERATION,
-    };
+    });
 }
 
 const HEAD_PATH = '/head-pin/';
 
 function pairRow(
+    id: string,
     path: string,
     name: string,
     method: string,
     responseAt: string,
     n: number,
-): Omit<MessagePairEntity, 'id'> {
-    return {
+): Promise<Omit<MessagePairEntity, 'id'>> {
+    return ledgerFields({
+        id,
         path,
         name,
         requester_identity_id: ORDER_REQUESTER,
         method,
-        request_at: responseAt,
-        request_hash: n.toString(16).padStart(64, '0'),
-        request: method + ' ' + path + name
-            + ' HTTP/1.1\r\n\r\n',
         response_at: responseAt,
+        request: method + ' ' + path + name
+            + ' HTTP/1.1\r\n'
+            + 'x-n: ' + String(n) + '\r\n\r\n',
         response: 'HTTP/1.1 200 OK\r\n\r\n',
         operation_id: ORDER_OPERATION,
-    };
+    });
 }
 
 function stamp(k: number): string {
@@ -308,8 +311,8 @@ export function defineStoreAcceptance(
         );
     });
 
-    Deno.test(name + ': a write carries ETag and no'
-    + ' Response-ID', async () => {
+    Deno.test(name + ': a write carries ETag and the'
+    + ' stored Response-ID', async () => {
         const { db, token } = await ready();
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -317,9 +320,12 @@ export function defineStoreAcceptance(
             ideaDocument('Wire'),
         ));
         assertStrictEquals(put.status, 201);
-        assertStrictEquals(put.headers.get('Response-ID'), null);
         const etag = put.headers.get('ETag');
         assert(etag !== null && etag.startsWith('"'));
+        assertStrictEquals(
+            put.headers.get('Response-ID'),
+            etag.slice(1, -1),
+        );
     });
 
     Deno.test(name + ': document miss is 404', async () => {
@@ -399,13 +405,13 @@ export function defineStoreAcceptance(
         // Appended newest-first, so insertion order
         // disagrees with the promised order on every row.
         await db.messagePairs.append(
-            third, orderRow('doc', late, 3),
+            third, await orderRow(third, 'doc', late, 3),
         );
         await db.messagePairs.append(
-            second, orderRow('doc', early, 2),
+            second, await orderRow(second, 'doc', early, 2),
         );
         await db.messagePairs.append(
-            first, orderRow('doc', early, 1),
+            first, await orderRow(first, 'doc', early, 1),
         );
         const history = await db.messagePairs
             .getDocumentHistory(ORDER_PATH, 'doc');
@@ -444,7 +450,10 @@ export function defineStoreAcceptance(
         ];
         for (const [id, docName, method, k] of rows) {
             await db.messagePairs.append(
-                id, pairRow(HEAD_PATH, docName, method, stamp(k), k),
+                id,
+                await pairRow(
+                    id, HEAD_PATH, docName, method, stamp(k), k,
+                ),
             );
         }
         const heads = await db.messagePairs
@@ -469,7 +478,10 @@ export function defineStoreAcceptance(
         const patch = generateIdentifier();
         const del = generateIdentifier();
         await db.messagePairs.append(
-            put1, pairRow(HEAD_PATH, 'doc', 'PUT', stamp(1), 1),
+            put1,
+            await pairRow(
+                put1, HEAD_PATH, 'doc', 'PUT', stamp(1), 1,
+            ),
         );
         assertStrictEquals(
             (await db.messagePairs.getHeadPair(HEAD_PATH, 'doc'))
@@ -477,13 +489,22 @@ export function defineStoreAcceptance(
             put1,
         );
         await db.messagePairs.append(
-            put2, pairRow(HEAD_PATH, 'doc', 'PUT', stamp(2), 2),
+            put2,
+            await pairRow(
+                put2, HEAD_PATH, 'doc', 'PUT', stamp(2), 2,
+            ),
         );
         await db.messagePairs.append(
-            post, pairRow(HEAD_PATH, 'doc', 'POST', stamp(3), 3),
+            post,
+            await pairRow(
+                post, HEAD_PATH, 'doc', 'POST', stamp(3), 3,
+            ),
         );
         await db.messagePairs.append(
-            patch, pairRow(HEAD_PATH, 'doc', 'PATCH', stamp(4), 4),
+            patch,
+            await pairRow(
+                patch, HEAD_PATH, 'doc', 'PATCH', stamp(4), 4,
+            ),
         );
         const afterOps = await db.messagePairs.getHeadPair(
             HEAD_PATH, 'doc',
@@ -495,7 +516,10 @@ export function defineStoreAcceptance(
             { id: put2, method: 'PUT' },
         );
         await db.messagePairs.append(
-            del, pairRow(HEAD_PATH, 'doc', 'DELETE', stamp(5), 5),
+            del,
+            await pairRow(
+                del, HEAD_PATH, 'doc', 'DELETE', stamp(5), 5,
+            ),
         );
         const afterDelete = await db.messagePairs.getHeadPair(
             HEAD_PATH, 'doc',
@@ -520,8 +544,12 @@ export function defineStoreAcceptance(
     + ' nothing and says so', async () => {
         const { db } = await ready();
         const id = generateIdentifier();
-        const first = pairRow(HEAD_PATH, 'once', 'PUT', stamp(1), 1);
-        const second = pairRow(HEAD_PATH, 'once', 'PUT', stamp(2), 2);
+        const first = await pairRow(
+            id, HEAD_PATH, 'once', 'PUT', stamp(1), 1,
+        );
+        const second = await pairRow(
+            id, HEAD_PATH, 'once', 'PUT', stamp(2), 2,
+        );
         assertStrictEquals(
             await db.messagePairs.append(id, first), true,
         );
@@ -538,20 +566,15 @@ export function defineStoreAcceptance(
     + ' byte', async () => {
         const { db } = await ready();
         const id = generateIdentifier();
-        const row = {
-            ...pairRow(
-                HEAD_PATH, 'stamp', 'PUT',
-                '2026-03-04T05:06:07.100000Z', 1,
-            ),
-            request_at: '2026-03-04T05:06:07.000000Z',
-        };
+        const row = await pairRow(
+            id, HEAD_PATH, 'stamp', 'PUT',
+            '2026-03-04T05:06:07.100000Z', 1,
+        );
         await db.messagePairs.append(id, row);
         const stored = await db.messagePairs.getById(id);
         assertStrictEquals(
-            stored.request_at, '2026-03-04T05:06:07.000000Z',
-        );
-        assertStrictEquals(
-            stored.response_at, '2026-03-04T05:06:07.100000Z',
+            stored.response_at,
+            '2026-03-04T05:06:07.100000Z',
         );
     });
 }

@@ -13,6 +13,11 @@ import type {
 import type {
     MessagePairEntity,
 } from './types.ts';
+import type {
+    Attempt,
+    StatementAnswer,
+    StatementBind,
+} from '../shared/ledger-statement.ts';
 import type { LatencySimulation } from './latency.ts';
 import type {
     NotificationEvent,
@@ -89,6 +94,16 @@ export class BackedDbAdapter
         return this.#backend.ensureTable();
     }
 
+    executeLedger(
+        attempt: Attempt,
+        rows: readonly StatementBind[],
+        now?: string,
+    ): Promise<StatementAnswer[]> {
+        return this.#backend.executeLedger(
+            attempt, rows, now, undefined,
+        );
+    }
+
     deleteSchema(): Promise<void> {
         return this.#backend.deleteSchema();
     }
@@ -136,6 +151,10 @@ export class BackedDbAdapter
             hasSchema: () => this.hasSchema(),
             postSchemaCreation: () => this.postSchemaCreation(),
             ensureTable: () => this.ensureTable(),
+            executeLedger: (attempt, rows, now) =>
+                this.#backend.executeLedger(
+                    attempt, rows, now, tx,
+                ),
             postNotification: (e) =>
                 this.postNotification(e),
             ...(locks === undefined
@@ -155,7 +174,9 @@ export class BackedDbAdapter
     } {
         return {
             messagePairs: new HistoryEntityStore(
-                'message_pairs', run, validateMessagePairEntity,
+                'fa_message_pairs',
+                run,
+                validateMessagePairEntity,
             ),
         };
     }

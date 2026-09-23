@@ -16,6 +16,7 @@ import {
     compareIdentifiers,
     encodeIdentifier,
 } from '../shared/identifier.ts';
+import { ledgerFields } from './ledger-row.ts';
 
 // Live pin: uuid ORDER BY matches compareIdentifiers,
 // not ASCII. Skip when POSTGRES_URL is unset so
@@ -65,7 +66,8 @@ async function putPair(
     adapter: DbAdapter,
     id: string,
 ): Promise<void> {
-    await adapter.messagePairs.append(id, {
+    await adapter.messagePairs.append(id, await ledgerFields({
+        id,
         path:
             '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/',
@@ -73,18 +75,14 @@ async function putPair(
         requester_identity_id:
             'XXZruirZyAOoRpNxaDnpSA',
         method: 'PUT',
-        request_at:
-            '2026-01-01T00:00:00.000000Z',
-        request_hash: 'a'.repeat(64),
+        response_at: '2026-01-01T00:00:00.000000Z',
         request:
             'PUT /organizations/'
             + 'AjdvjuECVZEgZoFajaIEkg/ideas/42'
             + ' HTTP/1.1\r\n\r\n',
-        response_at:
-            '2026-01-01T00:00:00.000000Z',
         response: 'HTTP/1.1 200 OK\r\n\r\n',
         operation_id: '0123456789ABCDEFGHIJKw',
-    });
+    }));
 }
 
 async function idsAtDocument(

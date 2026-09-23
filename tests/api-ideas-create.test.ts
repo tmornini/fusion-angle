@@ -166,8 +166,8 @@ Deno.test(
             pairIdOf(second),
             pairIdOf(first),
         );
-        assertStrictEquals((await db.messagePairs.getAll()).length, 3);
-        assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+        assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+        assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     },
 );
 
@@ -182,6 +182,6 @@ Deno.test(
         ));
         assertStrictEquals(res.status, 405);
         // seedRootAdmin only (org + membership); no write pair.
-        assertStrictEquals((await db.messagePairs.getAll()).length, 2);
+        assertStrictEquals((await db.messagePairs.getAll()).length, 3);
     },
 );

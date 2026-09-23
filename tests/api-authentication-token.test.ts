@@ -25,7 +25,10 @@ import {
 } from './client-assertion-fixtures.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
 import {
-    appendMessagePairAlways, formAuthMessagePair, formWriteMessagePair,
+    runWrite,
+    attemptFor,
+    formAuthMessagePair,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
@@ -90,7 +93,11 @@ async function seedAuthorizationCodeMessagePair(
     const messagePair = await formAuthMessagePair(
         seed, requestBody, identityId, 200, { code },
     );
-    await appendMessagePairAlways(db, messagePair);
+    await runWrite(
+        db,
+        attemptFor([messagePair]),
+        [messagePair],
+    );
 }
 
 // Below-facade pair formation (the member-fixtures.ts idiom):
@@ -1059,7 +1066,11 @@ async () => {
         responseBody: { exp: now - 60 },
         operationId: generateIdentifier(),
     });
-    await appendMessagePairAlways(db, ticket);
+    await runWrite(
+        db,
+        attemptFor([ticket]),
+        [ticket],
+    );
     const assertion = await signer.sign({
         iss: 'uYaHKbNeVUcsFjuooOjMew', sub: 'uYaHKbNeVUcsFjuooOjMew',
         aud: 'fusion-angle',

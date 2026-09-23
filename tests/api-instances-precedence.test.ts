@@ -273,12 +273,10 @@ async () => {
         { not_a_valid_patch: true },
     ));
     assertStrictEquals(res.status, 428);
-    const body = await res.json() as {
-        id: string;
-        error?: string;
-    };
-    assertStrictEquals(body.error, undefined);
-    assertStrictEquals(body.id, INSTANCE_ID);
+    assertStrictEquals(
+        (await res.json()).error,
+        'If-Match is required to PATCH ' + INSTANCE_DETAIL,
+    );
 });
 
 Deno.test('7 PATCH stale If-Match + garbage body → 412 '
@@ -311,12 +309,11 @@ async () => {
         { [IF_MATCH_HEADER]: e0 },
     ));
     assertStrictEquals(res.status, 412);
-    const staleBody = await res.json() as {
-        id: string;
-        error?: string;
-    };
-    assertStrictEquals(staleBody.error, undefined);
-    assertStrictEquals(staleBody.id, INSTANCE_ID);
+    assertStrictEquals(
+        (await res.json()).error,
+        'If-Match does not match the current '
+            + 'instance at ' + INSTANCE_DETAIL,
+    );
 });
 
 // --- Step 8–11: body / ACL / value after fresh match ---
@@ -521,34 +518,24 @@ async () => {
     const firstId = pairIdOf(first)!;
     const YiJPbufDpkyrZcZCYbUJpg = first.headers.get('ETag')!;
     assertNotStrictEquals(YiJPbufDpkyrZcZCYbUJpg, e0);
-    // Same body, fresh If-Match: a NEW message (not a
-    // byte-identical replay of first).
+    // Same response body, current latch: 200, no row.
     const second = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: YiJPbufDpkyrZcZCYbUJpg },
     ));
-    assertStrictEquals(second.status, 201);
-    assertNotStrictEquals(
-        pairIdOf(second),
-        firstId,
-        'different If-Match must not replay first',
-    );
-    assertNotStrictEquals(
+    assertStrictEquals(second.status, 200);
+    assertStrictEquals(
         second.headers.get('ETag'),
         YiJPbufDpkyrZcZCYbUJpg,
     );
-    // Control: byte-identical resend of first still
-    // replays (If-Match is in the hash).
+    // The prior echo no longer names the head.
     const replay = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: e0 },
         operationId,
     ));
-    assertStrictEquals(replay.status, 200);
-    assertStrictEquals(
-        pairIdOf(replay),
-        firstId,
-    );
+    assertStrictEquals(replay.status, 412);
+    assertStrictEquals(pairIdOf(first), firstId);
 });
 
 Deno.test('instance ETag is the head pair id',

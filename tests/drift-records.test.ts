@@ -942,7 +942,8 @@ async () => {
         (r) => r.id === secondDocumentMessagePairId,
     )!;
     assertStrictEquals(
-        'supersedes' in secondDocumentResponseRow, false,
+        secondDocumentResponseRow.supersedes,
+        firstDocumentMessagePairs[0]!.id,
     );
 
     const res = await handleRequest(

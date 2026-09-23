@@ -6,6 +6,8 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
+import { NIL_IDENTIFIER } from
+    '../shared/identifier.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
@@ -1747,8 +1749,13 @@ Deno.test('same-join-id retry: two different work-order creates '
         joinPrefix, sharedFwoId,
     );
     assertStrictEquals(joinResponses.length, 2);
-    for (const response of joinResponses) {
-        assertStrictEquals('supersedes' in response, false);
-        assertStrictEquals('follows' in response, false);
-    }
+    assertStrictEquals(
+        joinResponses[0]!.supersedes, NIL_IDENTIFIER,
+    );
+    assertStrictEquals(
+        joinResponses[1]!.supersedes,
+        joinResponses[0]!.id,
+    );
+    assertStrictEquals('follows' in joinResponses[0]!, false);
+    assertStrictEquals('follows' in joinResponses[1]!, false);
 });

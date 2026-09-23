@@ -27,6 +27,7 @@ import {
 } from './member-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { ledgerFields } from './ledger-row.ts';
 
 const F_LEGACY = generateIdentifier();
 const F_1 = generateIdentifier();
@@ -1287,27 +1288,31 @@ Deno.test(
 
 // --- MessagePairEntity ---
 
-const validMessagePair = {
+const validMessagePair = await ledgerFields({
+    id: 'syWUUcdBSbBgMwBiCrgbDw',
     path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     name: '42',
     requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
     method: 'PUT',
-    request_at: '2026-01-01T00:00:00.000000Z',
-    request_hash: 'a'.repeat(64),
-    request: '{"kind":"request"}',
     response_at: '2026-01-01T00:00:00.000001Z',
+    request: '{"kind":"request"}',
     response: '{"kind":"response"}',
     operation_id: '0123456789ABCDEFGHIJKw',
-};
+});
 
 Deno.test(
     'validateMessagePairEntity accepts a full pair',
     () => {
         const got = validateMessagePairEntity(validMessagePair);
         assertStrictEquals(got.method, 'PUT');
-        assertStrictEquals(got.request_at, validMessagePair.request_at);
+        assertStrictEquals(
+            got.supersedes, validMessagePair.supersedes,
+        );
         assertStrictEquals(
             got.response_at, validMessagePair.response_at,
+        );
+        assertStrictEquals(
+            got.pair_hash, validMessagePair.pair_hash,
         );
     },
 );

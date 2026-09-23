@@ -182,8 +182,8 @@ async () => {
             + 'YIuEjXvCwXAgrpyvcvLJjg', token, body,
             operationId),
     );
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 Deno.test('the pair request body carries domain state;'
@@ -209,8 +209,8 @@ Deno.test('the pair request body carries domain state;'
     assertStrictEquals('state_at' in wire, false);
     const requests = await db.messagePairs.getAll();
     // seedRootAdmin 2 + project PUT 1
-    assertStrictEquals(requests.length, 3);
-    const parsed = messagePairJsonOf(requests[2]!.request) as {
+    assertStrictEquals(requests.length, 4);
+    const parsed = messagePairJsonOf(requests[3]!.request) as {
         body: { state: string };
     };
     assertStrictEquals(parsed.body.state, 'under_review');

@@ -2,9 +2,9 @@ import { assert, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { requestMessageHash } from '../api/message-form.ts';
 import {
+    runWrite,
+    attemptFor,
     formWriteMessagePair,
-    getPairByRequestHash,
-    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import { messageStore } from '../api/message-store.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
@@ -164,34 +164,47 @@ Deno.test('append then head-read round-trips', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const messagePair = await formWriteMessagePair({ ...INPUT });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
     assertStrictEquals(
         (await messageStore(db).getDocumentHead(
             '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42',
         ))?.id,
         messagePair.id,
     );
-    const stored =
-        await getPairByRequestHash(db, messagePair.requestHash);
-    assertStrictEquals(stored?.id, messagePair.id);
-    // Early request, late response: the request row keeps
-    // the arrival stamp verbatim; response_at was minted
-    // at append time, strictly after arrival.
-    const request = await db.messagePairs.getById(messagePair.id);
-    assertStrictEquals(request.request_at, INPUT.requestAt);
-    assert(request.request_at < stored!.response_at);
+    const stored = await db.messagePairs.getById(
+        messagePair.id,
+    );
+    // response_at is minted at the statement, after the
+    // arrival stamp the gate carried in.
+    assert(stored.response_at > INPUT.requestAt);
 });
 
-Deno.test('a same-hash re-append writes nothing', async () => {
+Deno.test('a same-body re-append writes nothing', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const messagePair = await formWriteMessagePair({ ...INPUT });
-    const replay = { ...messagePair, id: 'other-uuidAAAAAAAAAAAAw' };
+    const replay = {
+        ...messagePair,
+        id: generateIdentifier(),
+    };
     await db.transaction(async (view) => {
-            await appendMessagePairOnce(view, messagePair);
-            await appendMessagePairOnce(view, replay);
+            await runWrite(
+                view,
+                attemptFor([messagePair]),
+                [messagePair],
+            );
+            await runWrite(
+                view,
+                attemptFor([replay]),
+                [replay],
+            );
         },
     );
-    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, 2,
+    );
 });

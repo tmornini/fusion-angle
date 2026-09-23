@@ -34,7 +34,10 @@ import { generateSecret } from
     '../shared/secret.ts';
 import { hashPassword } from '../shared/password-hash.ts';
 import type { MessagePair } from './message-pair.ts';
-import { appendMessagePairOnce } from './message-pair.ts';
+import {
+    attemptFor,
+    runWrite,
+} from './message-pair.ts';
 import {
     humanMemberPoolsByOrganization,
     pickHumanMember,
@@ -129,6 +132,16 @@ import {
 // A missing pair here is a pass-1/pass-2 wiring bug (a dropped
 // or mis-keyed invocation), never an expected condition — crash
 // loud rather than silently write the row with no pair.
+function writeSeedPair(
+    adapter: DbAdapter,
+    pair: MessagePair,
+    now?: string,
+): Promise<unknown> {
+    return runWrite(
+        adapter, attemptFor([pair]), [pair], now,
+    );
+}
+
 function requireMessagePair(
     messagePairs: ReadonlyMap<string, MessagePair>, key: string,
 ): MessagePair {
@@ -409,7 +422,7 @@ async function postMockDataLoadIn(
                             ),
                         ),
                     )),
-                appendMessagePairOnce(
+                writeSeedPair(
                     adapter,
                     requireMessagePair(
                         messagePairs,
@@ -482,8 +495,7 @@ async function postMockDataLoadIn(
         (async () => {
             // Live grant order: operation, then document
             // (grantInvitation, invitations-domain.ts).
-            await appendMessagePairOnce(
-                adapter,
+            const pairs = [
                 requireMessagePair(
                     messagePairs,
                     seedMessagePairKey(
@@ -491,9 +503,6 @@ async function postMockDataLoadIn(
                         UNAFFILIATED_INVITATION_ID,
                     ),
                 ),
-            );
-            await appendMessagePairOnce(
-                adapter,
                 requireMessagePair(
                     messagePairs,
                     seedMessagePairKey(
@@ -501,6 +510,9 @@ async function postMockDataLoadIn(
                         UNAFFILIATED_INVITATION_ID,
                     ),
                 ),
+            ];
+            await runWrite(
+                adapter, attemptFor(pairs), pairs,
             );
         })(),
         // Role grants retired: membership `type` (admin for
@@ -540,7 +552,7 @@ async function postMockDataLoadIn(
         // Phase Final Task 2: organizations ROW half stripped —
         // message-plane only (organizationSeedBody still
         // shapes the pair body in seed-message-pairs.ts).
-        appendMessagePairOnce(
+        writeSeedPair(
             adapter,
             requireMessagePair(
                 messagePairs,
@@ -549,7 +561,7 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        appendMessagePairOnce(
+        writeSeedPair(
             adapter,
             requireMessagePair(
                 messagePairs,
@@ -871,34 +883,7 @@ async function postMockDataLoadIn(
         // Review/Complete new-shape ops and revision pairs.
         // Append-only (below-facade) — same as every other
         // seed pair write; chain formed pre-tx.
-        ...[
-            seedMessagePairKey(
-                INSTANCE_DETAIL_PATTERN, SEED_INSTANCE_ID,
-            ),
-            seedMessagePairKey(
-                'work-orders/:id/binding', WO01_ID,
-            ),
-            seedMessagePairKey(
-                'work-orders/:id/transition',
-                WO01_REVIEW_EVENT_ID,
-            ),
-            seedMessagePairKey(
-                INSTANCE_DETAIL_PATTERN,
-                SEED_INSTANCE_ID + '-review',
-            ),
-            seedMessagePairKey(
-                'work-orders/:id/transition',
-                WO01_COMPLETE_EVENT_ID,
-            ),
-            seedMessagePairKey(
-                INSTANCE_DETAIL_PATTERN,
-                SEED_INSTANCE_ID + '-complete',
-            ),
-        ].map((key) =>
-            appendMessagePairOnce(
-                adapter, requireMessagePair(messagePairs, key),
-            ),
-        ),
+
         ...mockRecords.map((r, i) => {
             const genesis = recordGenesisById.get(r.id)!;
             const attributes = mockRecordAttributes.filter(
@@ -944,6 +929,38 @@ async function postMockDataLoadIn(
             );
         }),
     ]);
+
+    // The instance chain shares one document. Write it in
+    // authored order and stamp each pair at its requestAt,
+    // so a later sibling cannot become the head.
+    const instanceChainKeys = [
+        seedMessagePairKey(
+            INSTANCE_DETAIL_PATTERN, SEED_INSTANCE_ID,
+        ),
+        seedMessagePairKey(
+            'work-orders/:id/binding', WO01_ID,
+        ),
+        seedMessagePairKey(
+            'work-orders/:id/transition',
+            WO01_REVIEW_EVENT_ID,
+        ),
+        seedMessagePairKey(
+            INSTANCE_DETAIL_PATTERN,
+            SEED_INSTANCE_ID + '-review',
+        ),
+        seedMessagePairKey(
+            'work-orders/:id/transition',
+            WO01_COMPLETE_EVENT_ID,
+        ),
+        seedMessagePairKey(
+            INSTANCE_DETAIL_PATTERN,
+            SEED_INSTANCE_ID + '-complete',
+        ),
+    ];
+    for (const key of instanceChainKeys) {
+        const pair = requireMessagePair(messagePairs, key);
+        await writeSeedPair(adapter, pair, pair.requestAt);
+    }
 
     // Bindings probe their record inside the write gate
     // (postFlowRecordDocumentOp), so the records above must
@@ -1201,12 +1218,12 @@ export async function postBootstrapIn(
             SYSTEM_MEMBER_ID,
             seatMessagePair,
         ),
-        appendMessagePairOnce(adapter, defaultOrganizationMessagePair),
+        writeSeedPair(adapter, defaultOrganizationMessagePair),
         postIdentityPiiDocumentOp(
             adapter, 'XXZruirZyAOoRpNxaDnpSA'
                 , bootstrapCurrentMemberPiiBody(),
             SYSTEM_MEMBER_ID, piiMessagePair,
         ),
-        appendMessagePairOnce(adapter, organizationMessagePair),
+        writeSeedPair(adapter, organizationMessagePair),
     ]);
 }

@@ -10,8 +10,9 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import {
+    runWrite,
+    attemptFor,
     formWriteMessagePair,
-    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import {
     nowUtc,
@@ -178,8 +179,11 @@ async function appendTransitionPair(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
     return messagePair.id;
 }
 

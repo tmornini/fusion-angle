@@ -2344,7 +2344,7 @@ export async function formInstanceChainMessagePairs():
         requestAt: reviewAt,
         organization: org,
         responseStatus: HTTP_OK,
-        responseBody: {},
+        responseBody: { values: reviewValues },
         operationId: reviewOpId,
     });
 
@@ -2390,7 +2390,7 @@ export async function formInstanceChainMessagePairs():
         requestAt: completeAt,
         organization: org,
         responseStatus: HTTP_OK,
-        responseBody: {},
+        responseBody: { values: completeValues },
         operationId: completeOpId,
     });
 

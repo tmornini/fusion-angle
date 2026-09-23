@@ -12,8 +12,9 @@ import {
     seedOrganizationDocument,
 } from './test-fixtures.ts';
 import {
+    runWrite,
+    attemptFor,
     formWriteMessagePair,
-    appendMessagePairOnce,
     strongEtagOf,
 } from '../api/message-pair.ts';
 import {
@@ -214,11 +215,16 @@ async function appendInstanceMessagePair(
         requestAt,
         organization,
         responseStatus: method === 'DELETE' ? 204 : 200,
-        responseBody: undefined,
+        responseBody: method === 'DELETE'
+            ? undefined
+            : body,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
     return messagePair.id;
 }
 

@@ -5,6 +5,11 @@ import type {
     NotificationEvent,
     NotificationPost,
 } from './notifications.ts';
+import type {
+    Attempt,
+    StatementAnswer,
+    StatementBind,
+} from '../shared/ledger-statement.ts';
 
 export class EntityNotFoundError extends Error {
     readonly table: string;
@@ -82,7 +87,6 @@ export interface EntityStore<
     // path = $1`: every pair of every document in the
     // collection.
     getCollectionPairs(path: string): Promise<T[]>;
-    getPairsByRequestHash(hash: string): Promise<T[]>;
     getDocumentHistory(
         path: string,
         name: string,
@@ -138,9 +142,6 @@ export interface Tx {
     getCollectionPairs<T extends { id: string }>(
         path: string,
     ): Promise<T[]>;
-    getPairsByRequestHash<T extends { id: string }>(
-        hash: string,
-    ): Promise<T[]>;
     getDocumentHistory<T extends { id: string }>(
         path: string,
         name: string,
@@ -169,6 +170,8 @@ export interface Tx {
     lockDocument?(path: string, name: string): Promise<void>;
     lockHead?(id: string): Promise<void>;
     notify?(event: NotificationEvent): Promise<void>;
+    // The open memory buffer, when this handle is one.
+    ledgerBuffer?(): { id: string }[];
 }
 
 export interface WriteLocks {
@@ -197,6 +200,12 @@ export interface StorageBackend {
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R>;
     ensureTable(): Promise<void>;
+    executeLedger(
+        attempt: Attempt,
+        rows: readonly StatementBind[],
+        now: string | undefined,
+        tx: Tx | undefined,
+    ): Promise<StatementAnswer[]>;
     // Schema lifecycle — each backend signals
     // 'schema exists' its own way: memory by table
     // existence, Postgres by the `schema_marker` row.
@@ -248,6 +257,11 @@ export interface DbLifecycle {
     // schema present: the installer primitive for seeds,
     // not snapshot import.
     ensureTable(): Promise<void>;
+    executeLedger(
+        attempt: Attempt,
+        rows: readonly StatementBind[],
+        now?: string,
+    ): Promise<StatementAnswer[]>;
     // The Decision 5 post hook: fired AFTER a write commits,
     // so cross-tab (and future cross-process) subscribers are
     // informed of state changes — never polled. Carried on the
@@ -293,9 +307,9 @@ export interface GuardedDbAdapter
 }
 
 // The tables of the message plane — one,
-// `message_pairs`.
+// `fa_message_pairs`.
 export const TABLE_NAMES = [
-    'message_pairs',
+    'fa_message_pairs',
 ];
 
 // A secondary index is a plain column name, or the object
@@ -328,7 +342,7 @@ export function uniqueColumns(
 // the collection IS its rows.
 export const TABLE_INDEXES:
     Record<string, readonly TableIndexSpec[]> = {
-    message_pairs: [
-        'path', 'request_hash',
+    fa_message_pairs: [
+        'path',
     ],
 };

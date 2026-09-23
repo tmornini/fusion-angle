@@ -112,16 +112,37 @@ export function flowEntityOf(
 // G2 stored PUT: flowEntityOf minus the read-time stamp.
 // hasUndoHistory is COUNT(*) > 1 of PUT+DELETE pairs at the
 // flow document — GET adds it; the stored blob never carries
-// it.
+// it. The lifecycle trio stays, so a state change does not
+// match the previous response and fail to land.
 export function flowStoredEntityOf(
     document: DerivedDocument,
     organization: Id,
-): Omit<FlowWithGraph, 'hasUndoHistory'> {
+): Omit<FlowWithGraph, 'hasUndoHistory'> & {
+    readonly state?: string;
+    readonly state_at?: string;
+    readonly state_event_id?: string;
+} {
     const {
         hasUndoHistory: _hasUndoHistory,
         ...stored
     } = flowEntityOf(document, organization);
-    return stored;
+    const body = document.body;
+    const state = body['state'];
+    const stateAt = body['state_at'];
+    const stateEventId = body['state_event_id'];
+    if (
+        typeof state !== 'string'
+        || typeof stateAt !== 'string'
+        || typeof stateEventId !== 'string'
+    ) {
+        return stored;
+    }
+    return {
+        ...stored,
+        state,
+        state_at: stateAt,
+        state_event_id: stateEventId,
+    };
 }
 
 async function fetchFlowMessagePairs(
@@ -254,13 +275,9 @@ export async function deriveFlow(
 // makes undo-save-undo target the SAVE's own baseline,
 // never a discarded future — see the PINNED Step 0 trace,
 // .superpowers/sdd/phase14-task-8-report.md). Correlation is
-// by the STORED REQUEST `at` (never the response `at` —
-// appendMessagePairOnce mints each pair's own response `at`
-// independently via nowUtc(), so two pairs written in the
-// SAME transaction do not share it; the request `at` DOES,
-// since both the operation message pair and its synthesized
-// document message pair carry the identical
-// `messagePair.requestAt`). `target: undefined` means
+// the shared operation id: the undo operation pair and the
+// document pair of that write copy one operationId.
+// `target: undefined` means
 // exhaustion (no pair exists before the current head); an
 // undefined RETURN means the flow has no document message pairs at
 // all at this document (should never happen for a routed
@@ -286,9 +303,9 @@ export async function resolveFlowUndoTarget(
     const messagePairs = documentMessagePairsAt(stored, prefix);
     const current = messagePairs.at(-1);
     if (current === undefined) return undefined;
-    const undoRequestAts = new Set(
+    const undoOperationIds = new Set(
         undoMessagePairs.map(
-            (messagePair) => messagePair.request_at,
+            (messagePair) => messagePair.operation_id,
         ),
     );
     const storedById = new Map(
@@ -297,8 +314,8 @@ export async function resolveFlowUndoTarget(
     const stack: DocumentMessagePair[] = [];
     let pointer = -1;
     for (const messagePair of messagePairs) {
-        if (undoRequestAts.has(
-            storedById.get(messagePair.id)!.request_at,
+        if (undoOperationIds.has(
+            storedById.get(messagePair.id)!.operation_id,
         )) {
             pointer -= 1;
         } else {

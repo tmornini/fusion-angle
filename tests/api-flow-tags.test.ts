@@ -230,7 +230,7 @@ Deno.test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
     const responses = await db.messagePairs.getAll();
     const secondRow = responses.find(r => r.id === secondId);
     assert(secondRow);
-    assertStrictEquals('supersedes' in secondRow!, false);
+    assertStrictEquals(secondRow!.supersedes, firstId);
     assertStrictEquals('follows' in secondRow!, false);
 });
 
@@ -261,7 +261,7 @@ Deno.test('e2e: DELETE marks the tag — GET 404s after, and the'
     const responses = await db.messagePairs.getAll();
     const delRow = responses.find(r => r.id === delId);
     assert(delRow);
-    assertStrictEquals('supersedes' in delRow!, false);
+    assertStrictEquals(delRow!.supersedes, pairIdOf(put));
 
     const requests = await db.messagePairs.getAll();
     const delRequest = requests.find(r => r.id === delId);

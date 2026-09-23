@@ -2354,20 +2354,73 @@ export function validateActualScoreEntity(
     };
 }
 
-// One stored HTTP pair. `request_hash` is the sha256
-// digest (`shared/digest.ts` sha256Hex) of `request`,
-// hex-encoded lowercase. No status column.
+// One stored HTTP pair. Salts are 32 lowercase hex
+// characters (16 bytes). Digests are 64. `fa_owner`
+// is the root requester; every other requester is
+// an identifier.
 const MESSAGE_HASH = /^[0-9a-f]{64}$/;
+const MESSAGE_SALT = /^[0-9a-f]{32}$/;
 
 const HTTP_METHOD = /^[A-Z]+$/;
 
+const ROOT_REQUESTER = 'fa_owner';
+
 const MESSAGE_PAIR_BODY_KEYS: readonly string[] = [
-    'path', 'name',
+    'operation_id', 'path', 'name', 'supersedes',
     'requester_identity_id', 'method',
-    'request_at', 'request_hash', 'request',
-    'response_at', 'response',
-    'operation_id',
+    'response_at',
+    'request', 'request_salt', 'request_hash',
+    'secret', 'secret_hash',
+    'response', 'response_salt', 'response_hash',
+    'pair_hash',
 ];
+
+function pickDigest(
+    body: Record<string, unknown>,
+    key: string,
+): string {
+    const value = pickString(body, key);
+    if (!MESSAGE_HASH.test(value)) {
+        throw new ValidationError(
+            'MessagePairEntity.' + key
+            + ' must be a 64-character lowercase hex'
+            + ' sha256 digest',
+        );
+    }
+    return value;
+}
+
+function pickSalt(
+    body: Record<string, unknown>,
+    key: string,
+): string {
+    const value = pickString(body, key);
+    if (!MESSAGE_SALT.test(value)) {
+        throw new ValidationError(
+            'MessagePairEntity.' + key
+            + ' must be 32 lowercase hex characters',
+        );
+    }
+    return value;
+}
+
+function pickRequester(
+    body: Record<string, unknown>,
+): string {
+    const value = pickString(
+        body, 'requester_identity_id',
+    );
+    if (
+        value === ROOT_REQUESTER
+        || isIdentifier(value)
+    ) {
+        return value;
+    }
+    throw new ValidationError(
+        'MessagePairEntity.requester_identity_id'
+        + ' must be fa_owner or an identifier',
+    );
+}
 
 export function validateMessagePairEntity(
     body: Record<string, unknown>,
@@ -2381,41 +2434,33 @@ export function validateMessagePairEntity(
             'MessagePairEntity.path must end with "/"',
         );
     }
-    const requestHash = pickString(
-        body, 'request_hash',
-    );
-    if (!MESSAGE_HASH.test(requestHash)) {
-        throw new ValidationError(
-            'MessagePairEntity.request_hash must be a 64-'
-            + 'character lowercase hex sha256 digest',
-        );
-    }
     const method = pickString(body, 'method');
     if (!HTTP_METHOD.test(method)) {
         throw new ValidationError(
             'MessagePairEntity.method must match ^[A-Z]+$',
         );
     }
-    const operationId = pickIdentifier(
-        body, 'operation_id',
-    );
     return {
+        operation_id: pickIdentifier(
+            body, 'operation_id',
+        ),
         path,
         name: pickString(body, 'name'),
-        requester_identity_id: pickIdentifier(
-            body, 'requester_identity_id',
-        ),
+        supersedes: pickIdentifier(body, 'supersedes'),
+        requester_identity_id: pickRequester(body),
         method,
-        request_at: validateTimestampField(
-            body, 'request_at', 'MessagePairEntity',
-        ),
-        request_hash: requestHash,
-        request: pickString(body, 'request'),
         response_at: validateTimestampField(
             body, 'response_at', 'MessagePairEntity',
         ),
+        request: pickString(body, 'request'),
+        request_salt: pickSalt(body, 'request_salt'),
+        request_hash: pickDigest(body, 'request_hash'),
+        secret: pickString(body, 'secret'),
+        secret_hash: pickDigest(body, 'secret_hash'),
         response: pickString(body, 'response'),
-        operation_id: operationId,
+        response_salt: pickSalt(body, 'response_salt'),
+        response_hash: pickDigest(body, 'response_hash'),
+        pair_hash: pickDigest(body, 'pair_hash'),
     };
 }
 

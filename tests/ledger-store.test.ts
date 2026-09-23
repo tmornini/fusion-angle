@@ -1,7 +1,18 @@
 import {
+    assert,
     assertEquals,
     assertNotEquals,
+    assertRejects,
+    assertStrictEquals,
 } from '@std/assert';
+import { BackedDbAdapter } from '../api/db-backed.ts';
+import { MemoryStorageBackend } from
+    '../api/backend-memory.ts';
+import { runWrite } from '../api/message-pair.ts';
+import type { WriteRow } from '../api/message-pair.ts';
+import { DATE_PLACEHOLDER } from '../api/ledger-root.ts';
+import { Octets } from
+    '../shared/http-message/octets.ts';
 import {
     NIL_IDENTIFIER,
     encodeIdentifier,
@@ -572,3 +583,458 @@ Deno.test('a refusal names the document', () => {
         { status: 412, error: mismatch },
     );
 });
+
+function openLedger(): {
+    backend: MemoryStorageBackend,
+    db: BackedDbAdapter,
+} {
+    const backend = new MemoryStorageBackend();
+    const db = new BackedDbAdapter(
+        backend,
+        async () => {},
+        async () => {},
+        () => {},
+    );
+    return { backend, db };
+}
+
+function wireOf(body: string): Uint8Array {
+    return textBytes(
+        'HTTP/1.1 201 \r\n'
+        + 'date: ' + DATE_PLACEHOLDER + '\r\n'
+        + '\r\n'
+        + body,
+    );
+}
+
+function writeRow(fields: {
+    id: string,
+    operationId: string,
+    body: string,
+    ifMatch: string | null,
+    method?: string,
+    name?: string,
+}): WriteRow {
+    return {
+        id: fields.id,
+        operationId: fields.operationId,
+        path: PATH,
+        name: fields.name ?? NAME,
+        requesterIdentityId: 'fa_owner',
+        method: fields.method ?? 'PUT',
+        request: textBytes('req'),
+        secret: new Uint8Array(0),
+        response: wireOf(fields.body),
+        ifMatch: fields.ifMatch,
+    };
+}
+
+async function errorOf(
+    response: Response,
+): Promise<string> {
+    const body = await response.json() as {
+        error: string,
+    };
+    return body.error;
+}
+
+Deno.test(
+    'runWrite stamps a successor one microsecond later',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        const headId = identifierAt(1);
+        await runWrite(db, 'blind', [
+            writeRow({
+                id: headId,
+                operationId: identifierAt(2),
+                body: 'old',
+                ifMatch: null,
+            }),
+        ], HEAD_STAMP);
+        const answer = await runWrite(db, 'blind', [
+            writeRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                body: 'new',
+                ifMatch: null,
+            }),
+        ], EARLY);
+        assertEquals(answer.outcome, 'land');
+        assertEquals(
+            answer.rows[0]!.stamp,
+            '2026-09-23T00:00:00.000006Z',
+        );
+    },
+);
+
+Deno.test(
+    'a matched body answers 200 and rings no bell',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        const headId = identifierAt(1);
+        await runWrite(db, 'blind', [
+            writeRow({
+                id: headId,
+                operationId: identifierAt(2),
+                body: 'hello',
+                ifMatch: null,
+            }),
+        ], HEAD_STAMP);
+        const before = (await db.messagePairs.getAll())
+            .length;
+        const answer = await runWrite(db, 'blind', [
+            writeRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                body: 'hello',
+                ifMatch: null,
+            }),
+        ], LATER);
+        assertStrictEquals(answer.response.status, 200);
+        assertEquals(answer.bells, []);
+        assertStrictEquals(answer.answeredId, headId);
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length,
+            before,
+        );
+    },
+);
+
+Deno.test(
+    'a stale latch answers 412 and drops its sibling',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        const headId = identifierAt(1);
+        await runWrite(db, 'blind', [
+            writeRow({
+                id: headId,
+                operationId: identifierAt(2),
+                body: 'hello',
+                ifMatch: null,
+            }),
+        ], HEAD_STAMP);
+        const sibling = identifierAt(8);
+        const before = (await db.messagePairs.getAll())
+            .length;
+        const answer = await runWrite(db, 'composed', [
+            writeRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                body: 'next',
+                ifMatch: identifierAt(9),
+            }),
+            writeRow({
+                id: sibling,
+                operationId: identifierAt(5),
+                body: 'side',
+                ifMatch: null,
+                method: 'POST',
+                name: 'sibling',
+            }),
+        ], LATER);
+        assertStrictEquals(answer.response.status, 412);
+        assertEquals(
+            await errorOf(answer.response),
+            'If-Match does not match the current'
+                + ' document at ' + PATH + NAME,
+        );
+        assertEquals(answer.bells, []);
+        const rows = await db.messagePairs.getAll();
+        assertStrictEquals(rows.length, before);
+        assertEquals(
+            rows.some((row) => row.id === sibling),
+            false,
+        );
+    },
+);
+
+Deno.test(
+    'a second genesis answers 409 and keeps the head',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        const headId = identifierAt(1);
+        await runWrite(db, 'genesis', [
+            writeRow({
+                id: headId,
+                operationId: identifierAt(2),
+                body: 'rootish',
+                ifMatch: null,
+            }),
+        ], HEAD_STAMP);
+        const answer = await runWrite(db, 'genesis', [
+            writeRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                body: 'again',
+                ifMatch: null,
+            }),
+        ], LATER);
+        assertStrictEquals(answer.response.status, 409);
+        assertEquals(
+            await errorOf(answer.response),
+            'Document already exists at '
+                + PATH + NAME,
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getHeadPair(PATH, NAME))
+                ?.id,
+            headId,
+        );
+    },
+);
+
+Deno.test(
+    'a blind conflict then a match answers 200',
+    async () => {
+        const { backend, db } = openLedger();
+        await db.ensureTable();
+        const headId = identifierAt(1);
+        await runWrite(db, 'blind', [
+            writeRow({
+                id: headId,
+                operationId: identifierAt(2),
+                body: 'hello',
+                ifMatch: null,
+            }),
+        ], HEAD_STAMP);
+        const before = backend.statementExecutions();
+        backend.refuseNextSuccessions(1);
+        const answer = await runWrite(db, 'blind', [
+            writeRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                body: 'hello',
+                ifMatch: null,
+            }),
+        ], LATER);
+        assertStrictEquals(answer.response.status, 200);
+        assertEquals(answer.bells, []);
+        assertStrictEquals(
+            backend.statementExecutions(),
+            before + 2,
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getHeadPair(PATH, NAME))
+                ?.id,
+            headId,
+        );
+    },
+);
+
+Deno.test(
+    'three blind conflicts answer 409 and keep the head',
+    async () => {
+        const { backend, db } = openLedger();
+        await db.ensureTable();
+        const headId = identifierAt(1);
+        await runWrite(db, 'blind', [
+            writeRow({
+                id: headId,
+                operationId: identifierAt(2),
+                body: 'hello',
+                ifMatch: null,
+            }),
+        ], HEAD_STAMP);
+        const before = backend.statementExecutions();
+        backend.refuseNextSuccessions(3);
+        const answer = await runWrite(db, 'blind', [
+            writeRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                body: 'other',
+                ifMatch: null,
+            }),
+        ], LATER);
+        assertStrictEquals(answer.response.status, 409);
+        assertEquals(
+            await errorOf(answer.response),
+            'Document remained contended at '
+                + PATH + NAME,
+        );
+        assertStrictEquals(
+            backend.statementExecutions(),
+            before + 3,
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getHeadPair(PATH, NAME))
+                ?.id,
+            headId,
+        );
+    },
+);
+
+Deno.test(
+    'an in-order conflict answers 412 once',
+    async () => {
+        const { backend, db } = openLedger();
+        await db.ensureTable();
+        const headId = identifierAt(1);
+        await runWrite(db, 'blind', [
+            writeRow({
+                id: headId,
+                operationId: identifierAt(2),
+                body: 'hello',
+                ifMatch: null,
+            }),
+        ], HEAD_STAMP);
+        const before = backend.statementExecutions();
+        backend.refuseNextSuccessions(1);
+        const answer = await runWrite(db, 'in-order', [
+            writeRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                body: 'next',
+                ifMatch: headId,
+            }),
+        ], LATER);
+        assertStrictEquals(answer.response.status, 412);
+        assertEquals(
+            await errorOf(answer.response),
+            'If-Match does not match the current'
+                + ' document at ' + PATH + NAME,
+        );
+        assertStrictEquals(
+            backend.statementExecutions(),
+            before + 1,
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getHeadPair(PATH, NAME))
+                ?.id,
+            headId,
+        );
+    },
+);
+
+Deno.test(
+    'a primary-key collision still throws',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        const id = identifierAt(1);
+        await runWrite(db, 'blind', [
+            writeRow({
+                id,
+                operationId: identifierAt(2),
+                body: 'one',
+                ifMatch: null,
+            }),
+        ], HEAD_STAMP);
+        const error = await assertRejects(
+            () => runWrite(db, 'blind', [
+                writeRow({
+                    id,
+                    operationId: identifierAt(4),
+                    body: 'two',
+                    ifMatch: null,
+                    name: 'other',
+                }),
+            ], LATER),
+            Error,
+            'duplicate primary key',
+        );
+        assertEquals(
+            (error as { constraint?: string }).constraint,
+            'fa_message_pairs_pkey',
+        );
+        assert(
+            (await db.messagePairs.getAll()).some(
+                (row) => row.id === id,
+            ),
+        );
+    },
+);
+
+const REQUEST_HASH_OF_ZERO_SALT =
+    '374708fff7719dd5979ec875d56cd228'
+    + '6f6d3cf7ec317a3b25632aab28ec37bb';
+const SECRET_HASH_OF_EMPTY =
+    'e3b0c44298fc1c149afbf4c8996fb924'
+    + '27ae41e4649b934ca495991b7852b855';
+
+Deno.test(
+    'the root row matches the constant leaves',
+    async () => {
+        const { backend, db } = openLedger();
+        await db.ensureTable();
+        assertStrictEquals(backend.statementExecutions(), 1);
+        await db.ensureTable();
+        assertStrictEquals(backend.statementExecutions(), 1);
+        const rows = await db.messagePairs.getAll();
+        assertStrictEquals(rows.length, 1);
+        const root = rows[0]!;
+        assertStrictEquals(root.id, NIL_IDENTIFIER);
+        assertStrictEquals(root.supersedes, NIL_IDENTIFIER);
+        assertStrictEquals(root.path, '/migrations/');
+        assertStrictEquals(root.name, '0000-root');
+        assertStrictEquals(root.method, 'PUT');
+        assertStrictEquals(
+            root.requester_identity_id, 'fa_owner',
+        );
+        assertStrictEquals(root.request, '');
+        assertStrictEquals(root.secret, '');
+        assertStrictEquals(root.request_salt, '00'.repeat(16));
+        assertStrictEquals(
+            root.response_salt, '00'.repeat(16),
+        );
+        assertStrictEquals(
+            root.request_hash, REQUEST_HASH_OF_ZERO_SALT,
+        );
+        assertStrictEquals(
+            root.secret_hash, SECRET_HASH_OF_EMPTY,
+        );
+        assert(root.response.startsWith('HTTP/1.1 201 '));
+        assert(root.response.includes(
+            'content-length: 64\r\n',
+        ));
+        assert(root.response.includes(
+            'etag: "' + NIL_IDENTIFIER + '"\r\n',
+        ));
+        assert(root.response.includes(
+            'operation-id: ' + root.operation_id + '\r\n',
+        ));
+        assert(root.response.endsWith(
+            '\r\n\r\n' + SECRET_HASH_OF_EMPTY,
+        ));
+        assertEquals(
+            root.response.includes('request-id'),
+            false,
+        );
+        const responseBytes = Octets.fromLatin1(
+            root.response,
+        ).asBytes();
+        const responseHash = await leafHashHex(
+            new Uint8Array(16),
+            responseBytes,
+        );
+        assertStrictEquals(root.response_hash, responseHash);
+        const pairHash = await pairRootHex({
+            id: uuidTextOfIdentifier(root.id),
+            operationId: uuidTextOfIdentifier(
+                root.operation_id,
+            ),
+            path: root.path,
+            name: root.name,
+            supersedes: uuidTextOfIdentifier(
+                root.supersedes,
+            ),
+            requesterIdentityId: root.requester_identity_id,
+            method: root.method,
+            responseAt: root.response_at,
+            requestHashHex: root.request_hash,
+            secretHashHex: root.secret_hash,
+            responseHashHex: root.response_hash,
+        });
+        assertStrictEquals(root.pair_hash, pairHash);
+        assertEquals(
+            imfFixdate(root.response_at),
+            root.response.slice(
+                root.response.indexOf('date: ') + 6,
+                root.response.indexOf('date: ') + 35,
+            ),
+        );
+    },
+);

@@ -1,20 +1,29 @@
 import {
-    assertEquals, assertRejects, assertStrictEquals,
+    assertRejects, assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
+import { ledgerFields } from './ledger-row.ts';
 
-const aMessagePair = {
+const PAIR_ID = 'syWUUcdBSbBgMwBiCrgbDw';
+const aMessagePair = await ledgerFields({
+    id: PAIR_ID,
     path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     name: '42',
     requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
     method: 'PUT',
-    request_at: '2026-01-01T00:00:00.000000Z',
-    request_hash: 'a'.repeat(64),
-    request: '{"kind":"request"}',
     response_at: '2026-01-01T00:00:00.000000Z',
+    request: '{"kind":"request"}',
     response: '{"kind":"response"}',
     operation_id: '0123456789ABCDEFGHIJKw',
-};
+});
+
+function assertOnlyRoot(
+    rows: readonly { path: string, name: string }[],
+): void {
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.path, '/migrations/');
+    assertStrictEquals(rows[0]!.name, '0000-root');
+}
 
 Deno.test(
     'a view commits writes atomically',
@@ -49,8 +58,7 @@ Deno.test(
             ),
             Error, 'boom',
         );
-        const messagePairs = await db.messagePairs.getAll();
-        assertEquals(messagePairs, []);
+        assertOnlyRoot(await db.messagePairs.getAll());
     },
 );
 
@@ -114,9 +122,7 @@ Deno.test(
             ),
             Error, 'boom',
         );
-        assertEquals(
-            await db.messagePairs.getAll(), [],
-        );
+        assertOnlyRoot(await db.messagePairs.getAll());
     },
 );
 
@@ -148,9 +154,7 @@ Deno.test(
             ),
             Error, 'readonly transaction',
         );
-        assertEquals(
-            await db.messagePairs.getAll(), [],
-        );
+        assertOnlyRoot(await db.messagePairs.getAll());
     },
 );
 

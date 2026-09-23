@@ -63,8 +63,9 @@ import {
     findFirstByKey,
 } from '../shared/ledger-reduction.ts';
 import {
-    appendMessagePairOnce,
-    appendMessagePairAlways,
+    attemptFor,
+    runWrite,
+    ownWireOf,
     canonicalPath,
     formAuthMessagePair,
     formAuthorizationCodeMarkerPair,
@@ -128,6 +129,7 @@ export type TokenResult =
         // arm (api.ts) always supplies a seed, so a result it
         // sees always carries one — resolved by getById.
         readonly messagePairId: string | undefined;
+        readonly wire: Response | undefined;
     }
     | {
         readonly ok: false;
@@ -420,6 +422,7 @@ async function issueTokenPair(
     readonly response: TokenResponse;
     readonly refreshToken: string;
     readonly messagePairId: string | undefined;
+    readonly wire: Response | undefined;
 }> {
     const refreshJti = generateIdentifier();
     const chainId = generateIdentifier();
@@ -453,16 +456,22 @@ async function issueTokenPair(
         }, operationId,
     );
     await adapter.transaction(async (view) => {
-            await appendMessagePairOnce(view, eventMessagePair);
+            const pairs = [eventMessagePair];
             if (messagePair !== undefined) {
-                await appendMessagePairAlways(view, messagePair);
+                pairs.push(messagePair);
             }
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
         },
     );
     return {
         response,
         refreshToken: minted.refreshToken,
         messagePairId: messagePair?.id,
+        wire: messagePair === undefined
+            ? undefined
+            : ownWireOf(messagePair),
     };
 }
 
@@ -716,13 +725,21 @@ export async function rotateRefreshJti(
                     )) {
                         throw new TokenPlanDivergedError();
                     }
-                    for (const write of provisional.writes) {
-                        await appendMessagePairOnce(view, write.messagePair);
+                    const pairs = provisional.writes.map(
+                        (write) => write.messagePair,
+                    );
+                    if (
+                        provisional.plan.kind === 'rotate'
+                        && messagePair !== undefined
+                    ) {
+                        pairs.push(messagePair);
+                    }
+                    if (pairs.length > 0) {
+                        await runWrite(
+                            view, attemptFor(pairs), pairs,
+                        );
                     }
                     if (provisional.plan.kind === 'rotate') {
-                        if (messagePair !== undefined) {
-                            await appendMessagePairAlways(view, messagePair);
-                        }
                         return {
                             kind: 'rotate' as const,
                             newJti: provisional.plan.newJti,
@@ -821,11 +838,16 @@ export async function revokeTokenChain(
                     )) {
                         throw new TokenPlanDivergedError();
                     }
-                    for (const write of provisional.writes) {
-                        await appendMessagePairOnce(view, write.messagePair);
-                    }
+                    const pairs = provisional.writes.map(
+                        (write) => write.messagePair,
+                    );
                     if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
+                        pairs.push(messagePair);
+                    }
+                    if (pairs.length > 0) {
+                        await runWrite(
+                            view, attemptFor(pairs), pairs,
+                        );
                     }
                 },
             );
@@ -921,6 +943,7 @@ async function grantRefresh(
             response,
             refreshToken: minted.refreshToken,
             messagePairId: messagePair.id,
+            wire: ownWireOf(messagePair),
         };
     }
     return failure(HTTP_UNAUTHORIZED, 'refresh token reuse or unknown');
@@ -1021,6 +1044,7 @@ async function grantTokenExchange(
         response: issued.response,
         refreshToken: issued.refreshToken,
         messagePairId: issued.messagePairId,
+        wire: issued.wire,
     };
 }
 
@@ -1164,9 +1188,14 @@ async function grantClientCredentials(
             if (existing !== null) {
                 return false;
             }
-            await appendMessagePairAlways(view, ticketMessagePair);
-            await appendMessagePairOnce(view, eventMessagePair);
-            await appendMessagePairAlways(view, messagePair);
+            const pairs = [
+                ticketMessagePair,
+                eventMessagePair,
+                messagePair,
+            ];
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
             return true;
         },
     );
@@ -1176,6 +1205,7 @@ async function grantClientCredentials(
             response,
             refreshToken: minted.refreshToken,
             messagePairId: messagePair.id,
+            wire: ownWireOf(messagePair),
         }
         : replay;
 }
@@ -1266,11 +1296,10 @@ async function authorizeCodeIssuer(
     return {
         identityId: messagePair.requester_identity_id,
         clientId: pickString(requestBody, 'client_id'),
-        // Issue instant = the authorize request pair's `at`
-        // (MessagePairEntity.request_at). Both halves of a
-        // pair carry `at`; the pair is already fetched for
-        // identity/client.
-        issuedAt: messagePair.request_at,
+        // Issue instant is the authorize pair's response
+        // stamp. The pair is already fetched for
+        // identity and client.
+        issuedAt: messagePair.response_at,
         ...(codeChallenge !== undefined
             ? { codeChallenge }
             : {}),
@@ -1408,9 +1437,14 @@ async function grantAuthorizationCode(
             )) {
                 return false;
             }
-            await appendMessagePairOnce(view, markerMessagePair);
-            await appendMessagePairOnce(view, eventMessagePair);
-            await appendMessagePairAlways(view, messagePair);
+            const pairs = [
+                markerMessagePair,
+                eventMessagePair,
+                messagePair,
+            ];
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
             return true;
         },
     );
@@ -1420,6 +1454,7 @@ async function grantAuthorizationCode(
             response,
             refreshToken: minted.refreshToken,
             messagePairId: messagePair.id,
+            wire: ownWireOf(messagePair),
         }
         : invalid;
 }
@@ -1464,6 +1499,7 @@ export type AuthorizeResult =
         readonly ok: true;
         readonly response: AuthorizeResponse;
         readonly messagePairId: string;
+        readonly wire: Response | undefined;
     }
     | {
         readonly ok: false;
@@ -1636,13 +1672,20 @@ async function authorizePassword(
         });
     }
     await adapter.transaction(async (view) => {
-            if (rehashMessagePair !== undefined) {
-                await appendMessagePairOnce(view, rehashMessagePair);
-            }
-            await appendMessagePairAlways(view, messagePair);
+            const pairs = rehashMessagePair === undefined
+                ? [messagePair]
+                : [rehashMessagePair, messagePair];
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
         },
     );
-    return { ok: true, response, messagePairId: messagePair.id };
+    return {
+        ok: true,
+        response,
+        messagePairId: messagePair.id,
+        wire: ownWireOf(messagePair),
+    };
 }
 
 // Interactive front door. The password loop is real; passkey,

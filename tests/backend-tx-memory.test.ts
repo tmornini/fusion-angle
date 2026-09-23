@@ -1,23 +1,25 @@
 import {
-    assertEquals,
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
 import { MemoryStorageBackend }
     from '../api/backend-memory.ts';
 import { MissingTableError } from '../api/db.ts';
+import { NIL_IDENTIFIER } from
+    '../shared/identifier.ts';
 
 interface Row { id: string; n: number }
 
 Deno.test(
-    'ensureTable creates a missing table empty',
+    'ensureTable creates the nil root',
     async () => {
         const backend = new MemoryStorageBackend();
         await backend.ensureTable();
         const rows = await backend.transaction('readonly',
-            tx => tx.getAll<Row>(),
+            tx => tx.getAll<{ id: string }>(),
         );
-        assertEquals(rows, []);
+        assertStrictEquals(rows.length, 1);
+        assertStrictEquals(rows[0]!.id, NIL_IDENTIFIER);
     },
 );
 
@@ -33,8 +35,11 @@ Deno.test(
         const rows = await backend.transaction('readonly',
             tx => tx.getAll<Row>(),
         );
-        assertStrictEquals(rows.length, 1);
-        assertStrictEquals(rows[0]!.id, 'a');
+        assertStrictEquals(rows.length, 2);
+        assertStrictEquals(
+            rows.some((row) => row.id === 'a'),
+            true,
+        );
     },
 );
 
@@ -96,7 +101,8 @@ Deno.test(
         const rows = await backend.transaction('readonly',
             tx => tx.getAll<Row>(),
         );
-        assertEquals(rows, []);
+        assertStrictEquals(rows.length, 1);
+        assertStrictEquals(rows[0]!.id, NIL_IDENTIFIER);
     },
 );
 
@@ -133,6 +139,6 @@ Deno.test(
         const rows = await backend.transaction('readonly',
             tx => tx.getAll<Row>(),
         );
-        assertStrictEquals(rows.length, 2);
+        assertStrictEquals(rows.length, 3);
     },
 );

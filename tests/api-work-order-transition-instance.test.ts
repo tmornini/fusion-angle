@@ -1063,10 +1063,10 @@ async () => {
     );
 });
 
-// --- 9. byte-identical resend ---
+// --- 9. same response body ---
 
-Deno.test('byte-identical resend → 200 replay, no second '
-+ 'revision',
+Deno.test('same response body with the current latch is'
++ ' 200 and stores nothing',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const body = valueBody({
@@ -1078,7 +1078,6 @@ async () => {
             },
         ],
     });
-    // Fix transitionAt so resend is byte-identical.
     body['transitionAt'] =
         '2026-06-01T00:00:00.000000Z';
     const operationId = generateIdentifier();
@@ -1090,9 +1089,14 @@ async () => {
     assertStrictEquals(first.status, 201);
     const afterFirst = await instancePairCount(db);
     const afterFirstReq = await requestCount(db);
+    const head = await handleRequest(db, req(
+        'GET', INSTANCE_DETAIL, adminToken,
+    ));
+    const fresh = head.headers.get('ETag');
+    assert(fresh !== null && fresh !== etag);
     const replay = await handleRequest(db, req(
         'POST', TRANSITION, adminToken, body,
-        { [IF_MATCH_HEADER]: etag },
+        { [IF_MATCH_HEADER]: fresh },
         operationId,
     ));
     assertStrictEquals(replay.status, 200);

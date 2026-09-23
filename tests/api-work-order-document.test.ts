@@ -184,8 +184,8 @@ Deno.test('postWorkOrderDocumentOp returns the entity and the'
         ...documentFields(),
     });
     // Phase Final Stage B: work_orders table retired.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
 });
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
@@ -213,8 +213,8 @@ Deno.test('a byte-identical PUT resend to'
             , body, DEV_TOKEN,
     );
     assertEquals(first, second);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 // -- 4. postWorkOrderCreationOp's synthesized create pairs
@@ -342,7 +342,7 @@ const ENTITY_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/';
 
 Deno.test('a work-order create appends a PUT-shaped document'
 + ' message pair at the WO document and a PUT-shaped join pair'
-+ ' at the join document, all three sharing one requestAt',
++ ' at the join document, all three sharing one operation id',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
@@ -352,7 +352,7 @@ async () => {
     ));
     assertStrictEquals(res.status, 201);
     const messagePairs = await db.messagePairs.getAll();
-    assertStrictEquals(messagePairs.length, 6);
+    assertStrictEquals(messagePairs.length, 7);
 
     const documentRow =
         documentRowAt(messagePairs, ENTITY_PREFIX, WO_C1);
@@ -373,11 +373,11 @@ async () => {
         documentRowAt(messagePairs, joinPrefix, WO_C1_FWO);
     assert(joinRow, 'no join pair at the join document');
 
-    // slice(3): the fixture's own root-admin pairs (organization
-    // document + role grant + membership, Phase 13 Tasks 1 and 3)
-    // precede every test write and carry their OWN requestAt.
+    // slice(4): the nil root, then the fixture's own
+    // root-admin pairs (organization document + role grant
+    // + membership) precede every test write.
     const requestAts = new Set(
-        messagePairs.slice(3).map(r => r.request_at),
+        messagePairs.slice(4).map(r => r.operation_id),
     );
     assertStrictEquals(requestAts.size, 1);
 });
@@ -417,7 +417,8 @@ async () => {
         secondDocumentRow!.id,
     );
     assertStrictEquals(
-        'supersedes' in secondDocumentResponse, false,
+        secondDocumentResponse.supersedes,
+        firstDocumentId,
     );
 
     for (const response of await db.messagePairs.getAll()) {
@@ -425,8 +426,8 @@ async () => {
     }
 });
 
-Deno.test('a duplicate work-order create\'s own OPERATION pair'
-+ ' stores no predecessor column', async () => {
+Deno.test('a duplicate work-order create\'s operation shares'
++ ' the document name and supersedes that head', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -439,10 +440,14 @@ Deno.test('a duplicate work-order create\'s own OPERATION pair'
     );
     assert(firstDocumentRow);
 
+    // A same document body matches and stores nothing.
+    // A different display_id still lands the create.
     const second = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             , DEV_TOKEN,
-        workOrderCreateBody(WO_C3, WO_C3_FWO_B, FLOW_C3),
+        workOrderCreateBody(
+            WO_C3, WO_C3_FWO_B, FLOW_C3, 'wo-c3-revised',
+        ),
     ));
     assertStrictEquals(second.status, 201);
     const secondOperationId = pairIdOf(second);
@@ -451,7 +456,8 @@ Deno.test('a duplicate work-order create\'s own OPERATION pair'
         secondOperationId!,
     );
     assertStrictEquals(
-        'supersedes' in secondOperationResponse, false,
+        secondOperationResponse.supersedes,
+        firstDocumentRow!.id,
     );
 });
 
@@ -472,6 +478,6 @@ Deno.test('a work-order create ignores a raw colliding states'
     assertStrictEquals(res.status, 201);
     // 2 seed pairs (org+membership) + 4 create pairs
     // (operation, document, join, genesis claim).
-    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
 });

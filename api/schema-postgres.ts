@@ -2,25 +2,41 @@
 // Never concatenate request identifiers into these strings.
 
 export const POSTGRES_MESSAGE_PAIRS_TABLE =
-    String.raw`CREATE TABLE IF NOT EXISTS message_pairs (
+    String.raw`CREATE TABLE IF NOT EXISTS fa_message_pairs (
     id uuid PRIMARY KEY,
+    operation_id uuid NOT NULL,
     path text COLLATE "C" NOT NULL
-        CONSTRAINT message_pairs_collection_chk
+        CONSTRAINT fa_message_pairs_path_chk
         CHECK (left(path, 1) = '/'
            AND right(path, 1) = '/'),
     name text COLLATE "C" NOT NULL,
+    supersedes uuid NOT NULL,
     requester_identity_id text COLLATE "C" NOT NULL,
     method text COLLATE "C" NOT NULL
-        CONSTRAINT message_pairs_method_chk
+        CONSTRAINT fa_message_pairs_method_chk
         CHECK (method ~ '^[A-Z]+$'),
-    request_at timestamptz NOT NULL,
-    request_hash text COLLATE "C" NOT NULL
-        CONSTRAINT message_pairs_request_hash_chk
-        CHECK (request_hash ~ '^[0-9a-f]{64}$'),
-    request bytea NOT NULL,
     response_at timestamptz NOT NULL,
+    request bytea NOT NULL,
+    request_salt bytea NOT NULL
+        CONSTRAINT fa_message_pairs_request_salt_chk
+        CHECK (octet_length(request_salt) = 16),
+    request_hash bytea NOT NULL
+        CONSTRAINT fa_message_pairs_request_hash_chk
+        CHECK (octet_length(request_hash) = 32),
+    secret bytea NOT NULL,
+    secret_hash bytea NOT NULL
+        CONSTRAINT fa_message_pairs_secret_hash_chk
+        CHECK (octet_length(secret_hash) = 32),
     response bytea NOT NULL,
-    operation_id uuid NOT NULL
+    response_salt bytea NOT NULL
+        CONSTRAINT fa_message_pairs_response_salt_chk
+        CHECK (octet_length(response_salt) = 16),
+    response_hash bytea NOT NULL
+        CONSTRAINT fa_message_pairs_response_hash_chk
+        CHECK (octet_length(response_hash) = 32),
+    pair_hash bytea NOT NULL
+        CONSTRAINT fa_message_pairs_pair_hash_chk
+        CHECK (octet_length(pair_hash) = 32)
 );`;
 
 export const POSTGRES_SCHEMA_MARKER_TABLE =
@@ -29,7 +45,7 @@ export const POSTGRES_SCHEMA_MARKER_TABLE =
 );`;
 
 export const POSTGRES_MESSAGE_BODY_FUNCTION =
-    String.raw`CREATE OR REPLACE FUNCTION message_body(message bytea)
+    String.raw`CREATE OR REPLACE FUNCTION fa_message_body(message bytea)
 RETURNS jsonb
 IMMUTABLE STRICT PARALLEL SAFE LANGUAGE sql
 RETURN CASE
@@ -211,15 +227,18 @@ RETURN (
 );`;
 
 export const POSTGRES_INDEXES =
-    String.raw`CREATE INDEX IF NOT EXISTS message_pairs_document
-    ON message_pairs (path, name, response_at, id);
-CREATE INDEX IF NOT EXISTS message_pairs_collection
-    ON message_pairs (path, response_at, id);
-CREATE INDEX IF NOT EXISTS message_pairs_replay
-    ON message_pairs (request_hash);
-CREATE INDEX IF NOT EXISTS message_pairs_body
-    ON message_pairs
-    USING gin (message_body(response) jsonb_path_ops);`;
+    String.raw`CREATE INDEX IF NOT EXISTS fa_message_pairs_document
+    ON fa_message_pairs (path, name, response_at, id);
+CREATE INDEX IF NOT EXISTS fa_message_pairs_collection
+    ON fa_message_pairs (path, response_at, id);
+CREATE UNIQUE INDEX IF NOT EXISTS fa_message_pairs_succession
+    ON fa_message_pairs (path, name, supersedes)
+    WHERE method IN ('PUT', 'DELETE');
+CREATE INDEX IF NOT EXISTS fa_message_pairs_request_id
+    ON fa_message_pairs (fa_request_id_of(response));
+CREATE INDEX IF NOT EXISTS fa_message_pairs_body
+    ON fa_message_pairs
+    USING gin (fa_message_body(response) jsonb_path_ops);`;
 
 export const POSTGRES_SCHEMA_STATEMENTS = [
     POSTGRES_MESSAGE_PAIRS_TABLE,

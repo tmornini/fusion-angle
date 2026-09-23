@@ -21,12 +21,16 @@ import {
     validateInvitationTransitionBody,
 } from './validators.ts';
 import {
+    attemptFor,
     formWriteMessagePair,
-    getPairByRequestHash,
-    appendMessagePairOnce,
+    runWrite,
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
 import { formDocumentMessagePairFor } from './routes.ts';
+import { HttpMessage } from
+    '../shared/http-message/http-message.ts';
+import { parseWire } from
+    '../shared/http-message/wire-codec.ts';
 import { ORGANIZATION_MEMBER_DETAIL_PATTERN } from
     './family-registry.ts';
 import {
@@ -470,11 +474,6 @@ async function grantInvitation(
         responseStatus: HTTP_OK, responseBody,
         operationId,
     });
-    const replay = await getPairByRequestHash(
-        db, messagePair.requestHash);
-    if (replay !== undefined) {
-        return responseBody;
-    }
     const document = preOutcome.kind === 'fresh'
         ? await formInvitationDocumentMessagePair(
             actor, requestAt, operationId, invitationId,
@@ -501,10 +500,13 @@ async function grantInvitation(
                     + ' request',
                 );
             }
-            await appendMessagePairOnce(view, messagePair);
+            const pairs = [messagePair];
             if (document !== undefined) {
-                await appendMessagePairOnce(view, document);
+                pairs.push(document);
             }
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
         },
     );
     if (preOutcome.kind === 'fresh') {
@@ -662,11 +664,6 @@ async function acceptInvitation(
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'acceptance');
-    const replay = await getPairByRequestHash(
-        db, messagePair.requestHash);
-    if (replay !== undefined) {
-        return undefined;
-    }
     const terminal = await formInvitationDocumentMessagePair(
         actor, requestAt, operationId, id,
         {
@@ -706,11 +703,14 @@ async function acceptInvitation(
             }
             const already = await membershipExistsFor(
                 view, inv.organization_id, actor);
-            if (!already) {
-                await appendMessagePairOnce(view, seatDocument);
-            }
-            await appendMessagePairOnce(view, messagePair);
-            await appendMessagePairOnce(view, terminal);
+            const pairs = [
+                ...(already ? [] : [seatDocument]),
+                messagePair,
+                terminal,
+            ];
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
             committed = true;
         },
     );
@@ -767,11 +767,6 @@ async function declineInvitation(
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'decline');
-    const replay = await getPairByRequestHash(
-        db, messagePair.requestHash);
-    if (replay !== undefined) {
-        return undefined;
-    }
     const terminal = await formInvitationDocumentMessagePair(
         actor, requestAt, operationId, id,
         {
@@ -793,8 +788,10 @@ async function declineInvitation(
                 conflict = true;
                 return;
             }
-            await appendMessagePairOnce(view, messagePair);
-            await appendMessagePairOnce(view, terminal);
+            const pairs = [messagePair, terminal];
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
             committed = true;
         },
     );
@@ -849,11 +846,6 @@ async function revokeInvitation(
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'revocation');
-    const replay = await getPairByRequestHash(
-        db, messagePair.requestHash);
-    if (replay !== undefined) {
-        return undefined;
-    }
     const terminal = await formInvitationDocumentMessagePair(
         actor, requestAt, operationId, id,
         {
@@ -864,19 +856,38 @@ async function revokeInvitation(
         },
     );
     let conflict = false;
+    let committed = false;
     await db.transaction(async (view) => {
             const state = await currentInvitationState(view, id);
+            // The same revocation body is a no-op.
+            // A different body against a revoked
+            // invitation is 409.
+            if (state === 'revoked') {
+                if (await revocationIsReplay(
+                    view, id, transition,
+                )) {
+                    return;
+                }
+                conflict = true;
+                return;
+            }
             if (state !== 'pending') {
                 conflict = true;
                 return;
             }
-            await appendMessagePairOnce(view, messagePair);
-            await appendMessagePairOnce(view, terminal);
+            const pairs = [messagePair, terminal];
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
+            committed = true;
         },
     );
     if (conflict) {
         throw new ApiError(
             'invitation is not pending', HTTP_CONFLICT);
+    }
+    if (!committed) {
+        return undefined;
     }
     db.postNotification({
         kind: 'scoped',
@@ -884,6 +895,32 @@ async function revokeInvitation(
         identityIds: [inv.identity_id],
     });
     return undefined;
+}
+
+async function revocationIsReplay(
+    view: DbAdapter,
+    id: Id,
+    transition: { readonly eventId: string; readonly at: string },
+): Promise<boolean> {
+    const prefix = '/invitations/' + id + '/revocation/';
+    const stored = await view.messagePairs
+        .getCollectionPairs(prefix);
+    for (const row of stored) {
+        const model = parseWire(row.request);
+        const body = HttpMessage.fromModel(model).body();
+        if (!body.exists()) continue;
+        const parsed = JSON.parse(body.toText()) as {
+            readonly revokeEventId?: string;
+            readonly revokeAt?: string;
+        };
+        if (
+            parsed.revokeEventId === transition.eventId
+            && parsed.revokeAt === transition.at
+        ) {
+            return true;
+        }
+    }
+    return false;
 }
 
 async function loadInvitation(

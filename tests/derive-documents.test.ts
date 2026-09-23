@@ -9,6 +9,7 @@ import type {
 } from '../api/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { ledgerFields } from './ledger-row.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -38,16 +39,18 @@ async function storedMessagePairAt(
     });
     return {
         id: messagePair.id,
-        path: messagePair.path,
-        name: messagePair.name,
-        requester_identity_id: messagePair.requesterIdentityId,
-        method: messagePair.method,
-        request_at: AT,
-        request_hash: messagePair.requestHash,
-        request: messagePair.requestMessage,
-        response_at: AT,
-        response: messagePair.responseMessage,
-        operation_id: messagePair.operationId,
+        ...await ledgerFields({
+            id: messagePair.id,
+            path: messagePair.path,
+            name: messagePair.name,
+            requester_identity_id:
+                messagePair.requesterIdentityId,
+            method: messagePair.method,
+            response_at: AT,
+            request: messagePair.requestMessage,
+            response: messagePair.responseMessage,
+            operation_id: messagePair.operationId,
+        }),
     };
 }
 

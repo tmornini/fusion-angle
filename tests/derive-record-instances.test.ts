@@ -4,8 +4,9 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
+    runWrite,
+    attemptFor,
     formWriteMessagePair,
-    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import {
     revisionValuesOf,
@@ -77,11 +78,16 @@ async function appendInstancePair(
         requestAt,
         organization: ORGANIZATION,
         responseStatus: method === 'DELETE' ? 204 : 200,
-        responseBody: undefined,
+        responseBody: method === 'DELETE'
+            ? undefined
+            : body,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
     return messagePair.id;
 }
 

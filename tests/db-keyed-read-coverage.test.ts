@@ -6,8 +6,9 @@ import { TABLE_INDEXES } from '../api/db.ts';
 // seam's reads are typed, so no column-literal manifest is
 // needed.
 
-Deno.test('message_pairs carry no unique follows index', () => {
-    const cols = TABLE_INDEXES['message_pairs'] ?? [];
+Deno.test('fa_message_pairs carry no unique follows'
++ ' index', () => {
+    const cols = TABLE_INDEXES['fa_message_pairs'] ?? [];
     assertStrictEquals(
         cols.some(
             (spec) =>

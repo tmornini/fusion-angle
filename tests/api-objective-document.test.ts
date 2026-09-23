@@ -25,8 +25,9 @@ import {
 } from '../api/validators.ts';
 import { postObjectiveDocumentOp } from '../api/routes.ts';
 import {
+    runWrite,
+    attemptFor,
     formWriteMessagePair,
-    appendMessagePairOnce,
 } from '../api/message-pair.ts';
 import {
     documentFamilyWiring,
@@ -222,7 +223,7 @@ async () => {
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseStatus: 200, responseBody: body,
         operationId: generateIdentifier(),
     });
     // Phase Final Task 2: objectives ROW half stripped —
@@ -237,8 +238,8 @@ async () => {
         ...entityFields(),
     } as ObjectiveEntity);
     // Phase Final Stage B: objectives table retired.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
 });
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
@@ -263,8 +264,8 @@ Deno.test('a byte-identical PUT resend to'
             , body, DEV_TOKEN,
     );
     assertEquals(first, second);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 // -- 4. below-route via the generic handlers, against the REAL
@@ -289,11 +290,14 @@ async function putDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: at,
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseStatus: 200, responseBody: body,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
 }
 
 async function deleteDocumentMessagePair(
@@ -314,8 +318,11 @@ async function deleteDocumentMessagePair(
         responseStatus: 200, responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
 }
 
 Deno.test('a PUT chain at one objective document Supersedes-chains,'

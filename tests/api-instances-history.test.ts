@@ -12,8 +12,9 @@ import {
     seedOrganizationDocument,
 } from './test-fixtures.ts';
 import {
+    runWrite,
+    attemptFor,
     formWriteMessagePair,
-    appendMessagePairOnce,
     strongEtagOf,
     IF_MATCH_HEADER,
 } from '../api/message-pair.ts';
@@ -221,8 +222,11 @@ async function appendInstancePair(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction((view) => appendMessagePairOnce(view, messagePair),
-    );
+    await db.transaction((view) => runWrite(
+        view,
+        attemptFor([messagePair]),
+        [messagePair],
+    ));
     return messagePair.id;
 }
 

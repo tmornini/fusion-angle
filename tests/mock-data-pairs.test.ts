@@ -12,7 +12,7 @@ import { postBootstrap } from '../api/mock-data.ts';
 import {
     sharedMockDb, testHashPassword,
 } from './mock-seed.ts';
-import { requestMessageHash } from '../api/message-form.ts';
+import { requestHashOfStored } from './ledger-row.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { buildAiMembers } from '../api/mock-data/ai-members.ts';
 import { OBJECTIVE_SEEDS } from '../api/mock-data/objectives.ts';
@@ -159,7 +159,7 @@ function messagePairJsonOf(message: string): {
 // invitation's operation + document,
 // formInvitationSeedMessagePairs). Measure after
 // seed — do not invent. Bootstrap absolute is 8.
-const EXPECTED_MESSAGE_PAIR_COUNT = 1453;
+const EXPECTED_MESSAGE_PAIR_COUNT = 1454;
 
 Deno.test('a mock-data seed populates pairs',
 async () => {
@@ -946,7 +946,7 @@ Deno.test('seed pairs verify against their hashes', async () => {
     const db = await sharedMockDb();
     for (const row of await db.messagePairs.getAll()) {
         assertStrictEquals(
-            await requestMessageHash(row.request),
+            await requestHashOfStored(row),
             row.request_hash,
         );
     }
@@ -960,7 +960,7 @@ Deno.test('a bootstrap seed populates exactly eight balanced,'
         hashPassword: testHashPassword,
     });
     const requests = await db.messagePairs.getAll();
-    assertStrictEquals(requests.length, 8);
+    assertStrictEquals(requests.length, 9);
     const atIdentity = requests.filter(
         r => r.path === '/identities/'
             && r.name === 'XXZruirZyAOoRpNxaDnpSA',
@@ -995,7 +995,7 @@ Deno.test('a bootstrap seed populates exactly eight balanced,'
     assertStrictEquals(atOrganization.length, 1);
     for (const row of requests) {
         assertStrictEquals(
-            await requestMessageHash(row.request),
+            await requestHashOfStored(row),
             row.request_hash,
         );
     }

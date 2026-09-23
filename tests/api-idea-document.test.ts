@@ -186,8 +186,8 @@ async () => {
             + 'YIuEjXvCwXAgrpyvcvLJjg', token, body,
             operationId),
     );
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 Deno.test('same-body second PUT on a simple document is 200'
@@ -256,9 +256,13 @@ Deno.test('the pair request body carries domain state;'
     assertStrictEquals('state_at' in wire, false);
     assertStrictEquals('state_event_id' in wire, false);
     const requests = await db.messagePairs.getAll();
-    // seedRootAdmin 2 + idea PUT 1
-    assertStrictEquals(requests.length, 3);
-    const parsed = messagePairJsonOf(requests[2]!.request) as {
+    // nil root + seedRootAdmin 2 + idea PUT 1
+    assertStrictEquals(requests.length, 4);
+    const idea = requests.find(
+        (row) => row.name === 'YKtyCizelcaUAaHGwetojA',
+    );
+    assert(idea);
+    const parsed = messagePairJsonOf(idea.request) as {
         body: { state: string };
     };
     assertStrictEquals(parsed.body.state, 'in_review');

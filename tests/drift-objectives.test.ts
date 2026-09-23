@@ -893,8 +893,19 @@ Deno.test('live-write chain: create, reposition, revision edit,'
         (r) => !beforeDuplicateIds.has(r.id),
     );
     assertStrictEquals(newRows.length, 2);
+    const priorHead = afterPairsAt
+        .filter((row) =>
+            beforeDuplicateIds.has(row.id)
+            && (
+                row.method === 'PUT'
+                || row.method === 'DELETE'
+            ),
+        )
+        .at(-1)!;
     for (const row of newRows) {
-        assertStrictEquals('supersedes' in row, false);
+        assertStrictEquals(
+            row.supersedes, priorHead.id,
+        );
     }
     const documentMessagePairsAfter = documentMessagePairsAt(
         afterRequests, objectivesPrefix,
@@ -908,8 +919,8 @@ Deno.test('live-write chain: create, reposition, revision edit,'
         (r) => r.id === newestDocumentMessagePair.id,
     )!;
     assertStrictEquals(
-        'supersedes' in newestDocumentResponseRow,
-        false,
+        newestDocumentResponseRow.supersedes,
+        priorHead.id,
     );
 
     const finalGet = await handleRequest(
