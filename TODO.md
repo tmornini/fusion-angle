@@ -689,7 +689,10 @@ skew tests, which went with item 8's trio.
    first section, written from the code as item 0
    leaves it. Merged: the API client, packageable (the
    critical functionality path), which keeps its
-   oracle. Follows item 0.
+   oracle; and the authorization_code chain root named
+   by its jti, from `## Later work`, whose oracle — one
+   head per jti on every chain kind — the token document
+   keeps. Follows item 0.
 2. The ledger fenced — roles, grants, and row policies, on
    a table items 0 and 1 have finished. Designed to stock
    Postgres and measured on 18.6, which compose runs; a
