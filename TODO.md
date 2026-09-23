@@ -535,8 +535,10 @@ skew tests, which went with item 8's trio.
    projection, so one head is one
    unit from either source. The boundary is a fresh
    UUID minted per response — 36 characters of
-   RFC 2046 §5.1.1's alphabet, under its 70 — so no part
-   can contain it, and the joiner and the splitter live
+   RFC 2046 §5.1.1's alphabet, under its 70 — so a part
+   holds it only by chance, one in 2^122 at a position,
+   which no joiner scans for, and the joiner and the
+   splitter live
    in `shared/http-message`, beside the parser every
    part goes through: one library for both sides, and
    the client's only dependency outside its own
