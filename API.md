@@ -25,33 +25,29 @@ Concurrency class is `api/family-registry.ts`.
 3. **Body parse** for PUT/POST/PATCH. Live
    `requireOperationId` runs before body parse. The
    client supplies Operation-ID; the server never
-   mints it for a public write. An Operation-ID names
-   one write and is never reused — a retry or resend of
-   one operation carries the same Operation-ID, which is
-   what makes the resend byte-identical and lets it
-   replay (Step 5). A handler that forms a revision pair
-   beside the wire pair (the instance PUT and PATCH
-   handlers) writes both under that one id, and the
-   PATCH replay finds its revision pair by it.
+   mints it for a public write. An Operation-ID
+   groups the pairs of one operation (an instance
+   PATCH and its revision). It is not a request-hash
+   replay. A resend is idempotent because a matched
+   body answers 200 and stores nothing, not because a
+   request hash is replayed.
 4. **Region B + write authorizer.** Self-only token-
    revocations (member revokes own chain; admin may
    name any identity). `writeAuthorizerFor` on
    org-scoped PUT/DELETE: owner-null is genesis;
    foreign 403 before pair crypto.
 5. **Pair plane.** Wired writes form the pair pre-tx
-   (`formWriteMessagePair`). Replay via
-   `getPairByRequestHash` unless exempt. After miss:
-   If-Match table, instance PATCH table, same-body
-   document PUT (200, no append; octets, not ETag),
-   DELETE never-written 404 (stores nothing) /
+   (`formWriteMessagePair`). A matched body stores
+   nothing and answers 200. A stale If-Match answers
+   412 with `If-Match does not match the current
+   document at <path><name>`; that 412 is not
+   skipped for a byte-identical resend. If-Match
+   table, instance PATCH table, DELETE
+   never-written 404 (stores nothing) /
    already-gone 204 (no append).
 6. **Handler.** Matched verb with `ctx.base`. Auth
    grants intercept into `postToken` / `postAuthorize`.
    Missing verb → 405.
-
-Replay of a locked write runs before the If-Match table
-so a byte-identical resend does not 412 against the new
-head.
 
 ## Bearer-exempt set
 
