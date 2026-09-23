@@ -1995,22 +1995,25 @@ export async function postWorkOrderCreationOp(
     return;
 }
 
-// Claim a work order. The read of the prior claim and
-// the append of the new claim events ride ONE
-// transaction, so two concurrent claims cannot both
-// observe "no live claim" (the duplicate-claim TOCTOU).
-// A live claim by another member is a 409; by the
-// caller, an idempotent no-op. A claim aged past the
-// flow's lockTimeout is superseded: 'claim_expired'
-// (naming the prior claimant) and the new 'claimed'
-// land atomically. Exported so the seed can drive a
-// work-order claim through the same gate the route uses
-// — this is also Phase 1's dual-write insertion seam. `messagePair`
-// is optional, mirroring postWorkOrderCreationOp; it is
-// appended on EVERY exit path (the idempotent re-claim
-// no-op included), since a wired route must never resolve a
-// pair the transaction never stored (the gate crashes loud
-// on that mismatch).
+// Claim a work order. A live claim by another member is
+// a 409 before any write. The same actor's repeat whose
+// body matches answers 200 and stores nothing. A claim
+// aged past the flow's lockTimeout is superseded.
+//
+// The decision read and the write are separate, so two
+// callers can both observe no claim head. That write is
+// genesis: the nil succession slot admits one PUT, and
+// the other answers 409. A present head — expired, the
+// same actor, or a DELETE — is in-order with If-Match
+// set to that head. Stale and succession refusal are the
+// same 409. A reclaim after DELETE matches that DELETE,
+// never a second genesis: the nil slot already holds
+// the first claim.
+//
+// Exported so the seed can drive a claim through the
+// same gate the route uses. `messagePair` is optional.
+// A wired return must run the statement, matched no-op
+// included: the gate crashes when the answer is absent.
 //
 // PHASE 14 TASK 4: the prior-claim decision read is re-
 // anchored onto the message plane (workOrderClaimHistoryFor,
@@ -2039,7 +2042,7 @@ export async function postWorkOrderClaimOp(
     // claim_expired + claimed live on the operation
     // message pair body (workOrderClaimHistoryFor reads
     // them back).
-    const claimed = await db.readTransaction(async (view) => {
+    const claimRead = await db.readTransaction(async (view) => {
         const wo = await workOrderDocumentHeadFor(
             view, organization, workOrderId,
         );
@@ -2068,23 +2071,51 @@ export async function postWorkOrderClaimOp(
                 && isClaimEventExpired(
                     prior, graph.lockTimeout,
                 );
-        return prior !== null
-            && prior.state === 'claimed'
-            && !priorExpired
-            && prior.member_id !== actor;
+        const head = messagePair === undefined
+            ? null
+            : await documentHeadAt(
+                view, messagePair.path, messagePair.name,
+            );
+        return {
+            claimed: prior !== null
+                && prior.state === 'claimed'
+                && !priorExpired
+                && prior.member_id !== actor,
+            headId: head === null ? null : head.id,
+        };
     });
-    if (claimed) {
+    if (claimRead.claimed) {
         throw new ApiError(
             'work order is already claimed',
             HTTP_CONFLICT,
         );
     }
     if (messagePair !== undefined) {
-        await runWrite(
+        // The gate's answer map is keyed by this object,
+        // so the attempt latch has to land on it.
+        if (claimRead.headId === null) {
+            Object.assign(messagePair, {
+                genesis: true as const,
+            });
+        } else {
+            Object.assign(messagePair, {
+                latchedHeadMessagePairId: claimRead.headId,
+            });
+        }
+        const answer = await runWrite(
             db,
             attemptFor([messagePair]),
             [messagePair],
         );
+        if (
+            answer.outcome === 'refused'
+            || answer.outcome === 'stale'
+        ) {
+            throw new ApiError(
+                'work order is already claimed',
+                HTTP_CONFLICT,
+            );
+        }
     }
 }
 
