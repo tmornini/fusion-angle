@@ -1461,16 +1461,6 @@ Off the critical path; each with its oracle.
   insert-threshold behavior on the insert-only table. Oracle:
   numbers in the sweep's JSON and a backup-size line item 6
   can plan against.
-- Schema evolution. `CREATE … IF NOT EXISTS` plus a boolean
-  `schema_marker` is the whole migration story: a DDL change
-  reaches a database only by wipe and reseed, which the
-  `timestamptz` stamps needed and production's mock data
-  allowed. Name how a column change reaches a tenant database
-  that cannot be wiped — a versioned marker and forward-only
-  steps, or a rebuild through the seam's `append` — before the
-  first tenant holds real data. Oracle: a Layer-2 case that
-  boots the executable against a schema one step behind and
-  reads and writes a pair.
 - Stamp parameters stay text until Postgres parses
   them. A stamp bound as `timestamptz` (bare
   placeholder or `::timestamptz`) truncates to
