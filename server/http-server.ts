@@ -19,6 +19,8 @@ import {
 } from '../api/http-errors.ts';
 import { OPERATION_ID_HEADER } from
     '../api/message-pair.ts';
+import { REQUEST_ID_HEADER } from
+    '../api/request-context.ts';
 import {
     createAuthThrottle,
     isAuthThrottlePath,
@@ -450,10 +452,6 @@ function grantTypeOf(
         : undefined;
 }
 
-function isWriteMethod(method: string): boolean {
-    return method !== 'GET' && method !== 'HEAD';
-}
-
 function levelFor(
     status: number,
 ): 'info' | 'warn' | 'error' {
@@ -464,9 +462,7 @@ function levelFor(
 
 function operationIdOf(
     request: Request,
-    method: string,
 ): string | undefined {
-    if (!isWriteMethod(method)) return undefined;
     const raw = request.headers.get(OPERATION_ID_HEADER);
     if (raw === null || raw === '') return undefined;
     return raw;
@@ -485,6 +481,7 @@ function defaultLog(fields: Record<string, unknown>): void {
 function logRequest(
     log: RequestLog,
     request: Request,
+    response: Response | undefined,
     status: number,
     started: number,
 ): void {
@@ -497,9 +494,17 @@ function logRequest(
         status,
         latencyMs: Math.max(0, Date.now() - started),
     };
-    const operationId = operationIdOf(request, method);
+    const operationId = operationIdOf(request);
     if (operationId !== undefined) {
         fields['operationId'] = operationId;
+    }
+    const requestId = response?.headers.get(
+        REQUEST_ID_HEADER,
+    );
+    if (requestId !== undefined
+        && requestId !== null
+        && requestId !== '') {
+        fields['requestId'] = requestId;
     }
     log(fields);
 }
@@ -524,14 +529,16 @@ async function dispatch(
 ): Promise<Response> {
     const started = Date.now();
     let status = HTTP_INTERNAL_ERROR;
+    let response: Response | undefined;
     try {
         const body = await readCappedBody(request);
         if (body.kind === 'too-large') {
             status = HTTP_PAYLOAD_TOO_LARGE;
-            return jsonResponse(
+            response = jsonResponse(
                 HTTP_PAYLOAD_TOO_LARGE,
                 { error: 'payload too large' },
             );
+            return response;
         }
         const url = new URL(request.url);
         const pathname = url.pathname;
@@ -541,13 +548,13 @@ async function dispatch(
                 options.staticRoot, '/index.html',
             );
             if (filePath !== undefined) {
-                const response = await serveStatic(
+                response = await serveStatic(
                     request, filePath,
                 );
                 status = response.status;
                 return response;
             }
-            const response = await serveMiss(
+            response = await serveMiss(
                 request, options.staticRoot,
             );
             status = response.status;
@@ -580,15 +587,16 @@ async function dispatch(
                     ),
                 )) {
                 status = HTTP_TOO_MANY_REQUESTS;
-                return jsonResponse(
+                response = jsonResponse(
                     HTTP_TOO_MANY_REQUESTS,
                     { error: 'too many requests' },
                 );
+                return response;
             }
             const bytes = body.kind === 'bytes'
                 ? body.bytes
                 : undefined;
-            const response = await handle(
+            response = await handle(
                 options.adapter,
                 apiRequest(
                     request,
@@ -611,13 +619,13 @@ async function dispatch(
                 pathname + 'index.html',
             );
             if (filePath !== undefined) {
-                const response = await serveStatic(
+                response = await serveStatic(
                     request, filePath,
                 );
                 status = response.status;
                 return response;
             }
-            const response = await serveMiss(
+            response = await serveMiss(
                 request, options.staticRoot,
             );
             status = response.status;
@@ -628,22 +636,25 @@ async function dispatch(
             options.staticRoot, pathname,
         );
         if (filePath !== undefined) {
-            const response = await serveStatic(
+            response = await serveStatic(
                 request, filePath,
             );
             status = response.status;
             return response;
         }
-        const response = await serveMiss(
+        response = await serveMiss(
             request, options.staticRoot,
         );
         status = response.status;
         return response;
     } catch {
         status = HTTP_INTERNAL_ERROR;
-        return internalError();
+        response = internalError();
+        return response;
     } finally {
-        logRequest(log, request, status, started);
+        logRequest(
+            log, request, response, status, started,
+        );
     }
 }
 

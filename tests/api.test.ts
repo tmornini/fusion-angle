@@ -305,6 +305,7 @@ Deno.test(
             }
             return original(path);
         };
+        const operationId = generateIdentifier();
         const { result: response, calls } =
             await captureConsole(
                 'error',
@@ -315,23 +316,41 @@ Deno.test(
                         headers: {
                             'Authorization':
                                 'Bearer ' + DEV_TOKEN,
-                            'operation-id':
-                                generateIdentifier(),
+                            'operation-id': operationId,
                         },
                     }),
                 ),
             );
         assertStrictEquals(response.status, 500);
+        const requestId = response.headers.get(
+            'request-id',
+        );
         const { error } =
             (await response.json()) as {
                 error: string;
             };
         assertStrictEquals(error, 'internal error');
+        assertStrictEquals(typeof requestId, 'string');
+        const logged = calls.find(args =>
+            args.includes('request failed'));
         assert(
-            calls.some(args =>
-                args.includes('request failed')),
+            logged !== undefined,
             'the domain-boundary catch must keep'
             + ' console evidence',
+        );
+        const fields = logged[1];
+        assert(
+            fields !== null
+            && typeof fields === 'object',
+        );
+        assertStrictEquals(
+            (fields as { requestId?: unknown }).requestId,
+            requestId,
+        );
+        assertStrictEquals(
+            (fields as { operationId?: unknown })
+                .operationId,
+            operationId,
         );
     },
 );

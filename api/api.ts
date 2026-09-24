@@ -311,7 +311,7 @@ function limitedHeaders(
 // the request identity for correlation. A missing table is a
 // failed request; product boot does not recover it.
 function redactedFenceFailure(
-    ctx: IncomingContext,
+    ctx: FramedContext,
     error: unknown,
 ): Response {
     if (error instanceof MissingTableError) {
@@ -319,6 +319,7 @@ function redactedFenceFailure(
     }
     console.error('fence read failed', {
         requestId: ctx.requestId,
+        operationId: ctx.operationId,
         requestAt: ctx.requestAt,
         latencyMs: msSinceUtc(ctx.requestAt),
         method: ctx.method,
@@ -1701,6 +1702,9 @@ async function dispatched(
                             console.warn(
                                 'authentication failed',
                                 {
+                                    requestId: ctx.requestId,
+                                    operationId:
+                                        ctx.operationId,
                                     reason: dispatched.error,
                                 },
                             );
@@ -1879,6 +1883,7 @@ async function dispatched(
         // by the request identity so the story correlates.
         console.error('request failed', {
             requestId: ctx.requestId,
+            operationId: ctx.operationId,
             requestAt: ctx.requestAt,
             latencyMs: msSinceUtc(ctx.requestAt),
             method,

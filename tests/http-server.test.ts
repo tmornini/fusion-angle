@@ -175,7 +175,7 @@ async () => {
         handled += 1;
         return new Response('parsed', { status: 200 });
     };
-    await withServer({}, handle, async (base) => {
+    await withServer({}, handle, async (base, logs) => {
         const res = await fetch(base + '/ideas', {
             method: 'POST',
             headers: {
@@ -193,6 +193,15 @@ async () => {
         };
         assertStrictEquals(body.error, 'payload too large');
         assertStrictEquals(handled, 0);
+        assertStrictEquals(
+            res.headers.get('request-id'), null,
+        );
+        const last = logs[logs.length - 1];
+        assert(last !== undefined);
+        assertStrictEquals(last['requestId'], undefined);
+        assertStrictEquals(
+            last['operationId'], undefined,
+        );
     });
 });
 
@@ -291,16 +300,19 @@ Deno.test('missing static file is 404', async () => {
 Deno.test('API path without a token is 401 before 404',
 async () => {
     await withServer({}, undefined, async (base, logs) => {
+        const operationId = generateIdentifier();
         const res = await fetchDiscardingBody(
             base
-            + '/api/organizations/AjdvjuECVZEgZoFajaIEkg/ideas?secret=1',
+            + '/api/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas?secret=1',
             {
                 headers: {
-                    'operation-id': generateIdentifier(),
+                    'operation-id': operationId,
                 },
             },
         );
         assertStrictEquals(res.status, HTTP_UNAUTHORIZED);
+        const requestId = res.headers.get('request-id');
         const last = logs[logs.length - 1];
         assert(last !== undefined);
         assertStrictEquals(
@@ -314,7 +326,9 @@ async () => {
             String(last['at']),
             /^\d{4}-\d{2}-\d{2}T/,
         );
-        assertStrictEquals(last['operationId'], undefined);
+        assertStrictEquals(typeof requestId, 'string');
+        assertStrictEquals(last['operationId'], operationId);
+        assertStrictEquals(last['requestId'], requestId);
     });
 });
 
