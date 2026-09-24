@@ -229,6 +229,17 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 { pairs: false, marker: false },
             );
             assertStrictEquals(await isDatabaseEmpty(sql), true);
+            await postSeedLanding(backend, seed.rehearsal);
+            assertEquals(
+                await tablesPresent(),
+                { pairs: true, marker: true },
+            );
+            const roots = await sql.query<{ n: number }>`
+                SELECT count(*)::int AS n
+                FROM fa_message_pairs
+                WHERE path = '/migrations/'
+            `;
+            assertStrictEquals(roots[0]?.n, 1);
         },
     );
 
