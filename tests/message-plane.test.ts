@@ -810,6 +810,10 @@ Deno.test(
         ));
         assertStrictEquals(outcome.status, 411);
         assertStrictEquals(outcome.error, LENGTH_REQUIRED);
+        assertStrictEquals(
+            isIdentifier(outcome.requestId ?? ''),
+            true,
+        );
         assertStrictEquals(outcome.landed, false);
     },
 );
@@ -832,6 +836,10 @@ Deno.test(
         assertStrictEquals(
             outcome.error,
             'Content-Length does not match the body',
+        );
+        assertStrictEquals(
+            isIdentifier(outcome.requestId ?? ''),
+            true,
         );
         assertStrictEquals(outcome.landed, false);
     },
