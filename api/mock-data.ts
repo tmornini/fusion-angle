@@ -18,6 +18,8 @@ import {
     postFlowDocumentOp,
     postWorkOrderDocumentOp,
     postWorkOrderTransitionOp,
+    postWorkOrderBindingOp,
+    postInstancePatchOp,
     postFlowWorkOrderDocumentOp,
     postFlowRecordDocumentOp,
     postRecordWriteOp,
@@ -41,6 +43,7 @@ import type {
     RecordWriteMessagePairs,
     ObjectiveCreationMessagePairs,
 } from './routes.ts';
+import type { Id } from './types.ts';
 import {
     SYSTEM_MEMBER_ID,
     nowUtc,
@@ -49,10 +52,6 @@ import { generateSecret } from
     '../shared/secret.ts';
 import { hashPassword } from '../shared/password-hash.ts';
 import type { MessagePair } from './message-pair.ts';
-import {
-    attemptFor,
-    runWrite,
-} from './message-pair.ts';
 import {
     humanMemberPoolsByOrganization,
     pickHumanMember,
@@ -129,21 +128,25 @@ import {
     identityCredentialSeedBody,
     VALUE_BEARING_TRANSITION_EVENT_IDS,
     SEED_INSTANCE_ID,
+    SEED_RECORD_TYPE_ID,
     WO01_ID,
-    WO01_REVIEW_EVENT_ID,
-    WO01_COMPLETE_EVENT_ID,
+    formInstanceChainSeedInput,
+    formInstanceTransitionSeedPair,
     flowRecordOrganizationFor,
     defaultOrganizationSeedBody,
     memberPrimaryOrganization,
     seededOrganizationBody,
     formInvitationGrantSeedInput,
 } from './mock-data/seed-message-pairs.ts';
-import type { InvitationGrantSeedInput } from
-    './mock-data/seed-message-pairs.ts';
+import type {
+    InstanceChainSeedInput,
+    InvitationGrantSeedInput,
+} from './mock-data/seed-message-pairs.ts';
+import { deriveInstanceHead } from
+    './derive-record-instances.ts';
 import { buildSeedScoreRows } from './mock-data/scores.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
-    INSTANCE_DETAIL_PATTERN,
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
     RECORD_TYPES_COLLECTION_PATTERN,
     RECORD_TYPE_DETAIL_PATTERN,
@@ -152,21 +155,6 @@ import {
 // A missing pair here is a pass-1/pass-2 wiring bug (a dropped
 // or mis-keyed invocation), never an expected condition — crash
 // loud rather than silently write the row with no pair.
-export async function writeSeedPair(
-    adapter: DbAdapter,
-    pair: MessagePair,
-    now?: string,
-): Promise<void> {
-    const answer = await runWrite(
-        adapter, attemptFor([pair]), [pair], now,
-    );
-    if (answer.outcome !== 'land') {
-        throw new Error(
-            'seed statement returned ' + answer.outcome,
-        );
-    }
-}
-
 function requireMessagePair(
     messagePairs: ReadonlyMap<string, MessagePair>, key: string,
 ): MessagePair {
@@ -376,11 +364,14 @@ export interface RehearsedSeed {
 }
 
 // Pass 2's input for the mock-data seed: the pass-1 message
-// pairs, keyed as requireMessagePair reads them, and the
-// invitation grant's own live-op input (Decision 8).
+// pairs, keyed as requireMessagePair reads them, the
+// invitation grant's and the instance chain's own live-op
+// inputs (Decision 8), and the seed's shared requestAt.
 export interface MockDataSeedInput {
     readonly messagePairs: ReadonlyMap<string, MessagePair>;
     readonly invitation: InvitationGrantSeedInput;
+    readonly instanceChain: InstanceChainSeedInput;
+    readonly requestAt: string;
 }
 
 // Hash, form, and rehearse (Sequence, steps 1 to 3). The
@@ -411,6 +402,9 @@ export async function rehearseMockData(
     const input: MockDataSeedInput = {
         messagePairs,
         invitation: formInvitationGrantSeedInput(requestAt),
+        instanceChain:
+            await formInstanceChainSeedInput(requestAt),
+        requestAt,
     };
     const statements = await rehearse(
         new MemoryStorageBackend(),
@@ -437,6 +431,66 @@ export async function postMockDataLoad(
     const seed = await rehearseMockData(options);
     await postSeedLanding(adapter.backend, seed.rehearsal);
     return seed.credentials;
+}
+
+// Seat types in Stark, as the fence hands a handler its
+// roles (api/api.ts).
+function starkRolesOf(identityId: Id): readonly string[] {
+    return identityId === 'XXZruirZyAOoRpNxaDnpSA'
+        ? ['admin']
+        : ['member'];
+}
+
+// The WO01 chain through the live ops, after the flow
+// records land: the binding op reads the flow's record
+// joins. Each transition's POST latches the head the
+// previous op wrote.
+async function postInstanceChainIn(
+    adapter: DbAdapter,
+    chain: InstanceChainSeedInput,
+    requestAt: string,
+): Promise<void> {
+    await postInstancePatchOp(
+        adapter,
+        [STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
+            SEED_INSTANCE_ID],
+        { set: [] },
+        SYSTEM_MEMBER_ID,
+        chain.create,
+        STARK_ORGANIZATION,
+        [],
+    );
+    await postWorkOrderBindingOp(
+        adapter,
+        WO01_ID,
+        {
+            instance_id: SEED_INSTANCE_ID,
+            record_type_id: SEED_RECORD_TYPE_ID,
+        },
+        SYSTEM_MEMBER_ID,
+        STARK_ORGANIZATION,
+        chain.binding,
+    );
+    for (const transition of [chain.review, chain.complete]) {
+        const head = await deriveInstanceHead(
+            adapter, STARK_ORGANIZATION,
+            SEED_RECORD_TYPE_ID, SEED_INSTANCE_ID,
+        );
+        if (head === undefined) {
+            throw new Error('the seed instance has no head');
+        }
+        await postWorkOrderTransitionOp(
+            adapter,
+            WO01_ID,
+            transitionSeedBody(transition.event),
+            transition.event.member_id,
+            STARK_ORGANIZATION,
+            starkRolesOf(transition.event.member_id),
+            await formInstanceTransitionSeedPair(
+                transition, head.messagePairId, requestAt,
+            ),
+        );
+    }
 }
 
 async function postMockDataLoadIn(
@@ -843,7 +897,7 @@ async function postMockDataLoadIn(
         // trace drives through the live transition op — body
         // validates via validateWorkOrderTransitionBody. WO-
         // instance SoT Task 6: value-bearing WO01 events leave
-        // this loop (appended with the instance chain below).
+        // this loop (they drive the instance chain below).
         ...mockStateEvents
             .filter((r) =>
                 !VALUE_BEARING_TRANSITION_EVENT_IDS.has(
@@ -928,12 +982,6 @@ async function postMockDataLoadIn(
                     ),
                 ),
             ),
-        // WO-instance SoT Task 6: instance genesis + binding +
-        // Review/Complete new-shape ops and revision pairs.
-        // Append-only (below-facade) — same as every other
-        // seed pair write; chain formed before the
-        // rehearsal's writes.
-
         ...mockRecords.map((r, i) => {
             const genesis = recordGenesisById.get(r.id)!;
             const attributes = mockRecordAttributes.filter(
@@ -980,38 +1028,6 @@ async function postMockDataLoadIn(
         }),
     ]);
 
-    // The instance chain shares one document. Write it in
-    // authored order and stamp each pair at its requestAt,
-    // so a later sibling cannot become the head.
-    const instanceChainKeys = [
-        seedMessagePairKey(
-            INSTANCE_DETAIL_PATTERN, SEED_INSTANCE_ID,
-        ),
-        seedMessagePairKey(
-            'work-orders/:id/binding', WO01_ID,
-        ),
-        seedMessagePairKey(
-            'work-orders/:id/transition',
-            WO01_REVIEW_EVENT_ID,
-        ),
-        seedMessagePairKey(
-            INSTANCE_DETAIL_PATTERN,
-            SEED_INSTANCE_ID + '-review',
-        ),
-        seedMessagePairKey(
-            'work-orders/:id/transition',
-            WO01_COMPLETE_EVENT_ID,
-        ),
-        seedMessagePairKey(
-            INSTANCE_DETAIL_PATTERN,
-            SEED_INSTANCE_ID + '-complete',
-        ),
-    ];
-    for (const key of instanceChainKeys) {
-        const pair = requireMessagePair(messagePairs, key);
-        await writeSeedPair(adapter, pair, pair.requestAt);
-    }
-
     // Bindings probe their record inside the write gate
     // (postFlowRecordDocumentOp), so the records above must
     // have landed first — a second wave, not a spread into
@@ -1032,6 +1048,9 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
+    );
+    await postInstanceChainIn(
+        adapter, input.instanceChain, input.requestAt,
     );
 
     // A score or revision author is always a member of the

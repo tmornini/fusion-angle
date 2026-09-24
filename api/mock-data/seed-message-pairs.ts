@@ -139,7 +139,9 @@ import {
 } from '../types.ts';
 import {
     formWriteMessagePair,
+    IF_MATCH_HEADER,
     OPERATION_ID_HEADER,
+    strongEtagOf,
 } from '../message-pair.ts';
 import type {
     MessagePair,
@@ -174,9 +176,6 @@ import {
     RECORD_TYPES_COLLECTION_PATTERN,
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../family-registry.ts';
-import {
-    mergeInstanceValues,
-} from '../derive-record-instances.ts';
 import {
     MOCK_SEED_TIMESTAMP,
     STARK_ORGANIZATION,
@@ -466,9 +465,9 @@ const fEmployees = 'DfkwfBiyfyCyRHvsHnDiqQ';
 const fReviewerNotes = 'ElVKgkCreTEHQXJZPBJDKw';
 
 // WO01 Review / Complete event ids — the only value-bearing
-// seed transitions (formInstanceChainMessagePairs + transitionSeedBody
-// value-branch). Dropped from the op-driven loop to avoid
-// double-append.
+// seed transitions (transitionSeedBody's value branch). They
+// leave the op-driven loop: in the rehearsal they drive the
+// organization-scoped transition op instead.
 export const WO01_REVIEW_EVENT_ID =
     'YiTfnydHjXVkotLACabXeQ';
 export const WO01_COMPLETE_EVENT_ID =
@@ -1750,11 +1749,10 @@ export function buildMockDataInvocations():
     // ops: the creation gate's exact-3 'claimed'-slot
     // semantics do not match historical traces (zero seeded
     // claim events; the in-flight fixtures are 2- and
-    // 3-event). WO-instance SoT Task 6: WO01's two value-
-    // bearing events leave this loop — formInstanceChainMessagePairs
-    // forms their NEW-shape ops + revision pairs (and the
-    // instance genesis + binding) so they are not double-
-    // appended.
+    // 3-event). WO01's two value-bearing events leave this
+    // loop: formInstanceChainSeedInput carries them to the
+    // rehearsal's organization-scoped transition op, so they
+    // are not double-appended.
     const traceEvents = [
         ...workOrderStateEvents,
         ...leadToCloseWorkload.stateEvents,
@@ -2261,242 +2259,150 @@ export function formInvitationGrantSeedInput(
     };
 }
 
-// The instance chain cannot ride formSeedMessagePair: its
-// revisions share a document and its head depends on
-// (response_at, id) order, made deterministic by forming
-// sequentially — response_at is minted (nowUtc(), at
-// append) in that same order, not by requestAt. This pass
-// also mints its own DISTINCT ascending requestAt values
-// (a named deviation from the seed's shared-arrival-moment
-// covenant), so each revision's arrival stamp reads as its
-// own event. headerFields stays [] for every link
-// — the seed's no-bearer carve-out extends to If-Match
-// on seed revision pairs (never hoist If-Match onto
-// synthetic revisions; the wire operation message pair's
-// hoisted If-Match is what makes resends distinct messages
-// on the live path).
-export async function formInstanceChainMessagePairs():
-    Promise<ReadonlyMap<string, MessagePair>>
-{
+// A value-bearing transition: its event and the id pass 1
+// minted. Its POST is formed in the rehearsal, once the
+// head it latches has landed (Decision 8).
+export interface InstanceTransitionSeedInput {
+    readonly event: StateEntity;
+    readonly operationId: string;
+}
+
+export interface InstanceChainSeedInput {
+    readonly create: MessagePair;
+    readonly binding: MessagePair;
+    readonly review: InstanceTransitionSeedInput;
+    readonly complete: InstanceTransitionSeedInput;
+}
+
+const INSTANCE_PATH_SEGMENTS = [
+    'organizations', STARK_ORGANIZATION,
+    'record-types', SEED_RECORD_TYPE_ID,
+    'instances', SEED_INSTANCE_ID,
+];
+const TRANSITION_ROUTE =
+    'organizations/:id/work-orders/:id/transition';
+
+// The WO01 chain as the app writes it: a PATCH create,
+// the binding PUT, then two value-bearing transitions.
+export async function formInstanceChainSeedInput(
+    requestAt: string,
+): Promise<InstanceChainSeedInput> {
     const events = buildWorkOrderStateEvents();
-    const review = events.find(
-        (event) => event.id === WO01_REVIEW_EVENT_ID,
-    )!;
-    const complete = events.find(
-        (event) => event.id === WO01_COMPLETE_EVENT_ID,
-    )!;
-    // Review at minus one hour — genesis + binding share
-    // this hour; instance revision requestAt values stay
-    // strictly ascending with their parent transitions.
-    const genesisAt = daysFromNow(-13, 13, 30);
-    const reviewAt = review.at;
-    const completeAt = complete.at;
-    const org = STARK_ORGANIZATION;
-    const typeId = SEED_RECORD_TYPE_ID;
-    const instanceId = SEED_INSTANCE_ID;
-    const woId = review.entity_id;
-    const instanceRouteSegments =
-        INSTANCE_DETAIL_PATTERN.split('/');
-    const instancePathSegments = [
-        'organizations', org,
-        'record-types', typeId,
-        'instances', instanceId,
-    ];
-    const instancePathname =
-        '/' + instancePathSegments.join('/');
-
-    // Document-plane genesis: the inner PUT a public
-    // PATCH create would store. Seed writes this one
-    // pair only (1498).
-    const genesisId = generateIdentifier();
-    const genesis = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: instancePathname,
+    const eventOf = (id: string): StateEntity => {
+        const event = events.find((e) => e.id === id);
+        if (event === undefined) {
+            throw new Error('no seeded event ' + id);
+        }
+        return event;
+    };
+    const createBody = { set: [] };
+    const entry = WRITE_RESPONSE_SPECS[INSTANCE_DETAIL_PATTERN];
+    if (entry === undefined || 'status' in entry
+        || entry.patch === undefined) {
+        throw new Error('no PATCH spec for the seed instance');
+    }
+    const createOperationId = generateIdentifier();
+    const create = await formWriteMessagePair({
+        method: 'PATCH',
+        pathname: '/' + INSTANCE_PATH_SEGMENTS.join('/'),
         routePattern: INSTANCE_DETAIL_PATTERN,
-        routeSegments: instanceRouteSegments,
-        pathSegments: instancePathSegments,
+        routeSegments: INSTANCE_DETAIL_PATTERN.split('/'),
+        pathSegments: INSTANCE_PATH_SEGMENTS,
         headerFields: [],
-        body: { values: [] },
+        body: createBody,
         requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: genesisAt,
-        organization: org,
-        responseBody: { values: [] },
-        operationId: genesisId,
-        requestId: genesisId,
+        requestAt,
+        organization: STARK_ORGANIZATION,
+        responseBody: entry.patch.successBody?.(
+            [
+                STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
+                SEED_INSTANCE_ID,
+            ],
+            createBody,
+            SYSTEM_MEMBER_ID,
+            STARK_ORGANIZATION,
+        ),
+        operationId: createOperationId,
+        requestId: createOperationId,
     });
-
-    const bindingId = generateIdentifier();
+    const bindingOperationId = generateIdentifier();
+    const bindingSegments = [
+        'organizations', STARK_ORGANIZATION,
+        'work-orders', WO01_ID, 'binding',
+    ];
     const binding = await formWriteMessagePair({
         method: 'PUT',
-        pathname:
-            '/organizations/' + org
-            + '/work-orders/' + woId + '/binding',
+        pathname: '/' + bindingSegments.join('/'),
         routePattern:
             'organizations/:id/work-orders/:id/binding',
         routeSegments: [
             'organizations', ':id',
             'work-orders', ':id', 'binding',
         ],
-        pathSegments: [
-            'organizations', org,
-            'work-orders', woId, 'binding',
-        ],
+        pathSegments: bindingSegments,
         headerFields: [],
         body: {
-            instance_id: instanceId,
-            record_type_id: typeId,
+            instance_id: SEED_INSTANCE_ID,
+            record_type_id: SEED_RECORD_TYPE_ID,
         },
         requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: genesisAt,
-        organization: org,
+        requestAt,
+        organization: STARK_ORGANIZATION,
         responseBody: undefined,
-        operationId: bindingId,
-        requestId: bindingId,
+        operationId: bindingOperationId,
+        requestId: bindingOperationId,
     });
-
-    const reviewOpId = generateIdentifier();
-    const reviewOp = await formWriteMessagePair({
-        method: 'POST',
-        pathname:
-            '/organizations/' + org
-            + '/work-orders/' + woId + '/transition',
-        routePattern:
-            'organizations/:id/work-orders/:id/transition',
-        routeSegments: [
-            'organizations', ':id',
-            'work-orders', ':id', 'transition',
-        ],
-        pathSegments: [
-            'organizations', org,
-            'work-orders', woId, 'transition',
-        ],
-        headerFields: [],
-        body: transitionSeedBody(review),
-        requesterIdentityId: review.member_id,
-        requestAt: reviewAt,
-        organization: org,
-        responseBody: undefined,
-        operationId: reviewOpId,
-        requestId: reviewOpId,
-    });
-
-    const reviewSet = seedSetFor(review.id);
-    const reviewValues = mergeInstanceValues(
-        [], { set: reviewSet },
-    );
-    const reviewRevision = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: instancePathname,
-        routePattern: INSTANCE_DETAIL_PATTERN,
-        routeSegments: instanceRouteSegments,
-        pathSegments: instancePathSegments,
-        headerFields: [],
-        body: { values: reviewValues },
-        requesterIdentityId: review.member_id,
-        requestAt: reviewAt,
-        organization: org,
-        responseBody: { values: reviewValues },
-        operationId: reviewOpId,
-        requestId: reviewOpId,
-    });
-
-    const completeOpId = generateIdentifier();
-    const completeOp = await formWriteMessagePair({
-        method: 'POST',
-        pathname:
-            '/organizations/' + org
-            + '/work-orders/' + woId + '/transition',
-        routePattern:
-            'organizations/:id/work-orders/:id/transition',
-        routeSegments: [
-            'organizations', ':id',
-            'work-orders', ':id', 'transition',
-        ],
-        pathSegments: [
-            'organizations', org,
-            'work-orders', woId, 'transition',
-        ],
-        headerFields: [],
-        body: transitionSeedBody(complete),
-        requesterIdentityId: complete.member_id,
-        requestAt: completeAt,
-        organization: org,
-        responseBody: undefined,
-        operationId: completeOpId,
-        requestId: completeOpId,
-    });
-
-    const completeSet = seedSetFor(complete.id);
-    const completeValues = mergeInstanceValues(
-        reviewValues, { set: completeSet },
-    );
-    const completeRevision = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: instancePathname,
-        routePattern: INSTANCE_DETAIL_PATTERN,
-        routeSegments: instanceRouteSegments,
-        pathSegments: instancePathSegments,
-        headerFields: [],
-        body: { values: completeValues },
-        requesterIdentityId: complete.member_id,
-        requestAt: completeAt,
-        organization: org,
-        responseBody: { values: completeValues },
-        operationId: completeOpId,
-        requestId: completeOpId,
-    });
-
-    const messagePairs = new Map<string, MessagePair>();
-    messagePairs.set(
-        seedMessagePairKey(
-            INSTANCE_DETAIL_PATTERN, instanceId,
-        ),
-        genesis,
-    );
-    messagePairs.set(
-        seedMessagePairKey(
-            'work-orders/:id/binding', woId,
-        ),
+    return {
+        create,
         binding,
-    );
-    messagePairs.set(
-        seedMessagePairKey(
-            'work-orders/:id/transition', review.id,
-        ),
-        reviewOp,
-    );
-    messagePairs.set(
-        seedMessagePairKey(
-            INSTANCE_DETAIL_PATTERN,
-            instanceId + '-review',
-        ),
-        reviewRevision,
-    );
-    messagePairs.set(
-        seedMessagePairKey(
-            'work-orders/:id/transition',
-            complete.id,
-        ),
-        completeOp,
-    );
-    messagePairs.set(
-        seedMessagePairKey(
-            INSTANCE_DETAIL_PATTERN,
-            instanceId + '-complete',
-        ),
-        completeRevision,
-    );
-    return messagePairs;
+        review: {
+            event: eventOf(WO01_REVIEW_EVENT_ID),
+            operationId: generateIdentifier(),
+        },
+        complete: {
+            event: eventOf(WO01_COMPLETE_EVENT_ID),
+            operationId: generateIdentifier(),
+        },
+    };
+}
+
+// The transition's POST, formed after the head it latches
+// lands: a client reads the etag, then sends If-Match.
+export async function formInstanceTransitionSeedPair(
+    input: InstanceTransitionSeedInput,
+    headMessagePairId: string,
+    requestAt: string,
+): Promise<MessagePair> {
+    const segments = [
+        'organizations', STARK_ORGANIZATION,
+        'work-orders', WO01_ID, 'transition',
+    ];
+    return formWriteMessagePair({
+        method: 'POST',
+        pathname: '/' + segments.join('/'),
+        routePattern: TRANSITION_ROUTE,
+        routeSegments: TRANSITION_ROUTE.split('/'),
+        pathSegments: segments,
+        headerFields: [{
+            name: IF_MATCH_HEADER,
+            value: strongEtagOf(headMessagePairId),
+        }],
+        body: transitionSeedBody(input.event),
+        requesterIdentityId: input.event.member_id,
+        requestAt,
+        organization: STARK_ORGANIZATION,
+        responseBody: undefined,
+        operationId: input.operationId,
+        requestId: input.operationId,
+    });
 }
 
 // Pass 1 for postMockDataLoad: every op-invocation's pair,
-// formed BEFORE the seed's transaction opens. `requestAt` is
+// formed before the rehearsal's writes. `requestAt` is
 // minted once by the caller (the seed's arrival moment) and
-// shared by every pair this seed forms — except the instance
-// chain (formInstanceChainMessagePairs), which mints its own
-// ascending requestAt values and forms them sequentially —
-// response_at, not requestAt, is what makes instance-head
-// order deterministic.
+// shared by every pair this seed forms. The instance chain
+// forms apart, in formInstanceChainSeedInput, with the same
+// requestAt.
 export async function formMockDataMessagePairs(
     requestAt: string,
 ): Promise<ReadonlyMap<string, MessagePair>> {
@@ -2529,13 +2435,6 @@ export async function formMockDataMessagePairs(
                 generateIdentifier(),
             ),
         );
-    }
-    // WO-instance SoT Task 6: instance genesis + binding +
-    // Review/Complete new-shape ops and revision pairs.
-    for (const [key, messagePair] of
-        await formInstanceChainMessagePairs()
-    ) {
-        messagePairs.set(key, messagePair);
     }
     return messagePairs;
 }

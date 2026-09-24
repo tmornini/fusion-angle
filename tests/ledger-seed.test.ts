@@ -58,7 +58,9 @@ import { OBJECTIVE_SEEDS } from
     '../api/mock-data/objectives.ts';
 import {
     mockProjectFlows,
+    SEED_INSTANCE_ID,
     UNAFFILIATED_INVITATION_ID,
+    WO01_ID,
 } from '../api/mock-data/seed-message-pairs.ts';
 import { buildUnaffiliatedIdentity } from
     '../api/mock-data/members.ts';
@@ -689,5 +691,64 @@ Deno.test(
             body['email'], buildUnaffiliatedIdentity().email,
         );
         assertStrictEquals(post.operation_id, put.operation_id);
+    },
+);
+
+Deno.test(
+    'the instance create lands as one PATCH and PUT',
+    async () => {
+        const seed = await rehearseMockData({
+            hashPassword: testHashPassword,
+        });
+        const statements = seed.rehearsal.statements;
+        const create = statements.find((statement) =>
+            statement.rows.some((row) =>
+                row.method === 'PATCH'
+                && row.name === SEED_INSTANCE_ID));
+        assert(create !== undefined);
+        assertEquals(
+            create.rows.map((row) => row.method),
+            ['PATCH', 'PUT'],
+        );
+        assertEquals(create.supersedes, [NIL, NIL]);
+        assertStrictEquals(
+            depthsOf(statements)[statements.indexOf(create)],
+            1,
+        );
+    },
+);
+
+Deno.test(
+    'each value-bearing transition is one latched statement',
+    async () => {
+        const seed = await rehearseMockData({
+            hashPassword: testHashPassword,
+        });
+        const statements = seed.rehearsal.statements;
+        const depths = depthsOf(statements);
+        const transitionPath = '/organizations/'
+            + STARK_ORGANIZATION + '/work-orders/' + WO01_ID
+            + '/transition/';
+        const latched = statements
+            .map((statement, index) => ({
+                statement,
+                depth: depths[index],
+            }))
+            .filter(({ statement }) =>
+                statement.rows.length === 2
+                && statement.rows[0]!.method === 'POST'
+                && statement.rows[0]!.path === transitionPath);
+        assertEquals(
+            latched.map(({ depth }) => depth), [2, 3],
+        );
+        for (const { statement } of latched) {
+            const revision = statement.rows[1]!;
+            assertStrictEquals(revision.method, 'PUT');
+            assertStringIncludes(
+                latin1(revision.request),
+                'if-match: "' + statement.supersedes[1]!
+                    + '"\r\n',
+            );
+        }
     },
 );

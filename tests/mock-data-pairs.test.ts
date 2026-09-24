@@ -140,9 +140,9 @@ function messagePairJsonOf(message: string): {
 // transition operation message pairs (states-document
 // retirement Task 12: 861 traces minus WO01's two
 // value-bearing events, which migrate to the
-// instance chain) + 6 WO-instance SoT chain pairs (Task 6:
-// instance genesis + binding + Review/Complete new-shape ops
-// each with a revision — net +4 vs 1494) + 11 identity-default-
+// instance chain) + 7 WO-instance chain pairs (the PATCH
+// create's PATCH and PUT, the binding, and Review and
+// Complete, each a POST with its revision) + 11 identity-default-
 // organization pairs (Phase 11 Task 8: one event-append pair
 // per seeded human member at its identity-keyed
 // /identities/:id/default-organization/ document; Phase Final
@@ -158,7 +158,7 @@ function messagePairJsonOf(message: string): {
 // invitation's operation + document, granted by
 // postOrganizationInvitationGrant). Measure after
 // seed — do not invent. Bootstrap absolute is 8.
-const EXPECTED_MESSAGE_PAIR_COUNT = 1454;
+const EXPECTED_MESSAGE_PAIR_COUNT = 1455;
 
 Deno.test('a mock-data seed populates pairs',
 async () => {
