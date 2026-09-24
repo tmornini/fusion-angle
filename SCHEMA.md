@@ -57,18 +57,18 @@ same rows in an in-process Map keyed by table name.
 6. **The CHECK constraints** — Postgres as the
    storage-edge validator, named `fa_message_pairs_*`
    in `api/schema-postgres.ts`.
-7. **`schema_marker` stays** —
-   `POSTGRES_SCHEMA_MARKER_TABLE`; seed stamps it last
-   so a failed seed reads as empty
-   (`./bin/postgres-seed`).
+7. **`schema_marker` stays** — `POSTGRES_SCHEMA_MARKER_TABLE`.
+   The seed's one transaction writes it last, after the DDL,
+   the root, and every pair, so a failed seed leaves no
+   table (`./bin/postgres-seed`).
 8. **Tenancy rides `path`** — unchanged. The store is
    global; the fence and the write authorizer
    (`api/write-authorizer.ts`) enforce organization.
 9. **`operation_id` groups one client operation** —
    the client mints operation-id once per operation,
-   on every request, and the server never mints one
-   for a request. The root, a seed write with no
-   supplied id, and a seedless exchange mint an id
+   on every request. The root carries the seed run's id.
+   Every row a seeded operation writes carries that
+   operation's one id. A seedless exchange mints an id,
    because that write is not a client request.
 10. **The bell is `pg_notify('fusion_events', …)`**
     from the statement (`api/ledger-statement-sql.ts`),
@@ -143,17 +143,19 @@ tombstone.
 
 ## Operator tools
 
-`./bin/postgres-seed` (`--bootstrap`, `--mock-data`)
-runs in-process on an empty database and stamps
-`schema_marker` last. Seed refuses a non-empty
-database. `./bin/postgres-wipe` is the public-schema
-reset (`POSTGRES_DROP_SCHEMA`) and does not seed. The
-schema is `CREATE TABLE IF NOT EXISTS` and never alters
-a column, so the deploy that carries the one
-`timestamptz` stamp lands only on a database that was
-wiped (`./bin/postgres-wipe`) and reseeded after it; an
-unwiped database keeps `text` columns and every pair
-read and write then fails.
+`./bin/postgres-seed` (`--bootstrap`, `--mock-data`) runs
+in-process on a database with no `fa_message_pairs`. It
+rehearses the seed on scratch memory, then lands the DDL,
+the root, every pair, and `schema_marker` in one transaction,
+and a failed seed leaves no table. Seed refuses a database
+whose `fa_message_pairs` exists. `./bin/postgres-wipe` is
+the public-schema reset (`POSTGRES_DROP_SCHEMA`) and does not
+seed. The schema is `CREATE TABLE IF NOT EXISTS` and never
+alters a column, so the deploy that carries the one
+`timestamptz` stamp lands only on a database that was wiped
+(`./bin/postgres-wipe`) and reseeded after it; an unwiped
+database keeps `text` columns and every pair read and write
+then fails.
 
 ## How we got here
 

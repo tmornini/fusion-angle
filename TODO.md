@@ -315,9 +315,10 @@ skew tests, which went with item 8's trio.
    and holds the DDL, the root row, and every pair, in
    multi-row INSERTs batched at half the 65,535
    parameters Postgres allows a statement — rows per
-   statement `floor(65535 / 2 / n)`, `n` the INSERT's
-   own parameters per row, both named, no number picked
-   by hand — because the
+   statement `floor((65535 - 1) / 2 / n)`, `1` the
+   statement's leading attempt bind and `n` its own
+   parameters per row, all named, no number picked by
+   hand — because the
    seed will grow; the driver's multi-row helper serves
    under item 2's `fetch_types: false` (measured: 5,000
    pairs in ten statements, and a failed batch left no
