@@ -2832,11 +2832,16 @@ Off the critical path; each with its oracle.
   them. Make the catalog the one list first: the roster
   takes each agent's name from its `model` id, and AA7a
   names the catalog rather than copying it. Then JEV
-  lands as one entry there, its provider and `api_name`
-  supplied, never invented. Oracle: JEV appears in
-  `PROVIDER_MODELS` and in the AI form's Model picker, and
-  no model name is spelled outside `api/provider-models.ts`
-  but in test fixtures
+  lands as one entry there: `provider` `TypeSafe AI`,
+  `name` `JEV` (no catalog name carries its provider;
+  "Claude", "GPT", and "Grok" are families, and the
+  provider rides its own field), and `api_name`
+  supplied, never invented. Wherever an AI model's
+  provider name is stored, JEV's is `TypeSafe AI`.
+  Oracle: JEV appears in `PROVIDER_MODELS` under
+  `TypeSafe AI` and in the AI form's Model picker, and
+  no model name is spelled outside
+  `api/provider-models.ts` but in test fixtures
 
 ## Sequencing
 
