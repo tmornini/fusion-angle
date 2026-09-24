@@ -141,7 +141,11 @@ import {
     formWriteMessagePair,
     OPERATION_ID_HEADER,
 } from '../message-pair.ts';
-import type { MessagePair } from '../message-pair.ts';
+import type {
+    MessagePair,
+    ReceivedRequest,
+} from '../message-pair.ts';
+import { buildRequestModel } from '../message-form.ts';
 import {
     generateIdentifier,
 } from '../../shared/identifier.ts';
@@ -483,9 +487,9 @@ export const SEED_RECORD_TYPE_ID =
 export const WO01_ID = 'xqcXYHXBJJXcLkRYkRngKA';
 
 // The unaffiliated identity's pending Stark invitation —
-// exported so pass 2 (mock-data.ts) appends the SAME two
-// pairs pass 1 forms. Preimages registered in
-// seed-hash-preimage.ts.
+// exported so pass 2 (mock-data.ts) grants it through the
+// live postOrganizationInvitationGrant. Preimages
+// registered in seed-hash-preimage.ts.
 export const UNAFFILIATED_INVITATION_ID =
     seedIdentifier('seed-invitation-riley-stark');
 const UNAFFILIATED_INVITATION_GRANT_EVENT_ID =
@@ -633,6 +637,26 @@ export function organizationSeedBody(
         projects_limit: TIER_PROJECTS_LIMIT,
         ideas_limit: TIER_IDEAS_LIMIT,
     };
+}
+
+// The two seeded organizations' document bodies: one
+// voice for pass 1's invocations and pass 2's op calls.
+export function seededOrganizationBody(
+    organizationId: Id,
+): Record<string, unknown> {
+    if (organizationId === STARK_ORGANIZATION) {
+        return organizationSeedBody(
+            'Stark Industries', 'acmecorp.com',
+            daysFromNow(300, 0, 0),
+        );
+    }
+    if (organizationId === ORGANIZATION_TWO) {
+        return organizationSeedBody(
+            'Wayne Enterprises', 'wayne.example.com',
+            daysFromNow(200, 0, 0),
+        );
+    }
+    throw new Error('no seeded organization ' + organizationId);
 }
 
 // The PII facet a human seed's separate PUT identities/:id/pii
@@ -1453,10 +1477,10 @@ export function buildMockDataInvocations():
     // B25–B29). Its credential is hashed first, in
     // hashSeedCredentials, before pass 1, like every
     // human's.
-    // Its invitation pairs are formed by
-    // formInvitationSeedMessagePairs below — the
-    // invitations side channel has no
-    // WRITE_RESPONSE_SPECS entry, so they cannot ride
+    // Its invitation is granted through the live
+    // postOrganizationInvitationGrant in pass 2
+    // (mock-data.ts) — the invitations side channel has
+    // no WRITE_RESPONSE_SPECS entry, so it cannot ride
     // formSeedMessagePair.
     const unaffiliated = buildUnaffiliatedIdentity();
     const unaffiliatedIdentityKey = seedMessagePairKey(
@@ -1532,10 +1556,7 @@ export function buildMockDataInvocations():
         idParams: [STARK_ORGANIZATION],
         organization: undefined,
         requesterIdentityId: SYSTEM_MEMBER_ID,
-        body: organizationSeedBody(
-            'Stark Industries', 'acmecorp.com',
-            daysFromNow(300, 0, 0),
-        ),
+        body: seededOrganizationBody(STARK_ORGANIZATION),
         operation: starkOrganizationKey,
     });
     const org2OrganizationKey = seedMessagePairKey(
@@ -1547,10 +1568,7 @@ export function buildMockDataInvocations():
         idParams: [ORGANIZATION_TWO],
         organization: undefined,
         requesterIdentityId: SYSTEM_MEMBER_ID,
-        body: organizationSeedBody(
-            'Wayne Enterprises', 'wayne.example.com',
-            daysFromNow(200, 0, 0),
-        ),
+        body: seededOrganizationBody(ORGANIZATION_TWO),
         operation: org2OrganizationKey,
     });
     for (const submission of buildIdeaSubmissions()) {
@@ -2192,91 +2210,55 @@ export async function formDefaultOrganizationSeedMessagePair(
     });
 }
 
-// The seeded pending invitation's own pair former:
-// mirrors grantInvitation's fresh outcome
-// (api/invitations-domain.ts) — the operation message
-// pair at the flat 'invitations' collection (name
-// resolves from the body's invitationId via
-// CREATE_BODY_ID_FIELDS, api/message-pair.ts) and the
-// document message pair at invitations/:id, both HTTP_OK
-// with the live handler's own response bodies, so the
-// stored pair can never drift from what the live grant
-// would have stored for the identical request. The
-// granter is the Stark admin ('XXZruirZyAOoRpNxaDnpSA')
-// — invitationIdentityView resolves invited_by_name from
-// the operation pair's requesterIdentityId. One
-// operationId spans both pairs, exactly as the live
-// grant threads one Operation-ID through its bundle.
-export async function formInvitationSeedMessagePairs(
+// The seeded pending invitation as the organization-scoped
+// grant route receives it: the Stark admin invites the
+// unaffiliated identity by email (Decision 8).
+export interface InvitationGrantSeedInput {
+    readonly organization: Id;
+    readonly granterId: Id;
+    readonly body: Record<string, unknown>;
+    readonly requestAt: string;
+    readonly operationId: string;
+    readonly received: ReceivedRequest;
+}
+
+export function formInvitationGrantSeedInput(
     requestAt: string,
-): Promise<ReadonlyMap<string, MessagePair>> {
-    const invitationId = UNAFFILIATED_INVITATION_ID;
-    const identityId = buildUnaffiliatedIdentity().id;
-    const granterId = 'XXZruirZyAOoRpNxaDnpSA';
-    const grantAt = MOCK_SEED_TIMESTAMP;
+): InvitationGrantSeedInput {
     const operationId = generateIdentifier();
-    const grantEventId =
-        UNAFFILIATED_INVITATION_GRANT_EVENT_ID;
-    const messagePairs = new Map<string, MessagePair>();
-    messagePairs.set(
-        seedMessagePairKey('invitations', invitationId),
-        await formWriteMessagePair({
-            method: 'POST',
-            pathname: '/invitations',
-            routePattern: 'invitations',
-            routeSegments: ['invitations'],
-            pathSegments: ['invitations'],
-            headerFields: [],
-            body: {
-                invitationId,
-                grantEventId,
-                grantAt,
-                identity_id: identityId,
-            },
-            requesterIdentityId: granterId,
-            requestAt,
-            organization: undefined,
-            responseBody: {
-                id: invitationId,
-                organization_id: STARK_ORGANIZATION,
-                identity_id: identityId,
-                at: grantAt,
-                state: 'pending',
-            },
-            operationId,
-            requestId: operationId,
-        }),
-    );
-    const documentBody = {
-        organization_id: STARK_ORGANIZATION,
-        identity_id: identityId,
-        at: grantAt,
-        state: 'pending',
+    const target = '/organizations/' + STARK_ORGANIZATION
+        + '/invitations/';
+    const body = {
+        email: buildUnaffiliatedIdentity().email,
+        invitationId: UNAFFILIATED_INVITATION_ID,
+        grantEventId: UNAFFILIATED_INVITATION_GRANT_EVENT_ID,
+        grantAt: MOCK_SEED_TIMESTAMP,
     };
-    messagePairs.set(
-        seedMessagePairKey(
-            'invitations/:id', invitationId,
-        ),
-        await formWriteMessagePair({
-            method: 'PUT',
-            pathname: '/invitations/' + invitationId,
-            routePattern: 'invitations/:id',
-            routeSegments: ['invitations', ':id'],
-            pathSegments: ['invitations', invitationId],
-            headerFields: [],
-            body: documentBody,
-            requesterIdentityId: granterId,
-            requestAt,
-            organization: undefined,
-            responseBody: {
-                id: invitationId,
-                ...documentBody,
-            },
-            operationId,
+    const model = buildRequestModel({
+        method: 'POST',
+        target,
+        fields: [{
+            name: OPERATION_ID_HEADER,
+            value: operationId,
+        }],
+        body,
+    });
+    if (model.body === undefined) {
+        throw new Error('seed invitation formed no body');
+    }
+    return {
+        organization: STARK_ORGANIZATION,
+        granterId: 'XXZruirZyAOoRpNxaDnpSA',
+        body,
+        requestAt,
+        operationId,
+        received: {
+            target,
+            headerFields: model.fields,
+            bodyBytes: model.body.asBytes(),
             requestId: operationId,
-        }),
-    );
-    return messagePairs;
+        },
+    };
 }
 
 // The instance chain cannot ride formSeedMessagePair: its
@@ -2548,13 +2530,6 @@ export async function formMockDataMessagePairs(
             ),
         );
     }
-    // The unaffiliated identity's pending Stark
-    // invitation (operation + document pairs).
-    for (const [key, messagePair] of
-        await formInvitationSeedMessagePairs(requestAt)
-    ) {
-        messagePairs.set(key, messagePair);
-    }
     // WO-instance SoT Task 6: instance genesis + binding +
     // Review/Complete new-shape ops and revision pairs.
     for (const [key, messagePair] of
@@ -2748,10 +2723,7 @@ export async function formBootstrapMessagePair(
             idParams: [STARK_ORGANIZATION],
             organization: undefined,
             requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: organizationSeedBody(
-                'Stark Industries', 'acmecorp.com',
-                daysFromNow(300, 0, 0),
-            ),
+            body: seededOrganizationBody(STARK_ORGANIZATION),
             operation: organizationKey,
         },
         requestAt,

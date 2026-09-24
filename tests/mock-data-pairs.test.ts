@@ -155,8 +155,8 @@ function messagePairJsonOf(message: string): {
 // identities/:id/pii for the zero-membership identity —
 // no membership, no default-organization pair) + 2
 // invitation pairs (the seeded pending Stark
-// invitation's operation + document,
-// formInvitationSeedMessagePairs). Measure after
+// invitation's operation + document, granted by
+// postOrganizationInvitationGrant). Measure after
 // seed — do not invent. Bootstrap absolute is 8.
 const EXPECTED_MESSAGE_PAIR_COUNT = 1454;
 

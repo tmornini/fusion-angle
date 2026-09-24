@@ -29,8 +29,13 @@ import {
     postIdentityDocumentOp,
     postIdentityCredentialDocumentOp,
     postAiAgentDocumentOp,
+    postOrganizationDocumentOp,
     identityDocumentBodyOf,
 } from './routes.ts';
+import { putIdentityDefaultOrganization } from
+    './organization-requests.ts';
+import { postOrganizationInvitationGrant } from
+    './invitations-domain.ts';
 import type {
     FlowCreationMessagePairs,
     RecordWriteMessagePairs,
@@ -124,12 +129,17 @@ import {
     identityCredentialSeedBody,
     VALUE_BEARING_TRANSITION_EVENT_IDS,
     SEED_INSTANCE_ID,
-    UNAFFILIATED_INVITATION_ID,
     WO01_ID,
     WO01_REVIEW_EVENT_ID,
     WO01_COMPLETE_EVENT_ID,
     flowRecordOrganizationFor,
+    defaultOrganizationSeedBody,
+    memberPrimaryOrganization,
+    seededOrganizationBody,
+    formInvitationGrantSeedInput,
 } from './mock-data/seed-message-pairs.ts';
+import type { InvitationGrantSeedInput } from
+    './mock-data/seed-message-pairs.ts';
 import { buildSeedScoreRows } from './mock-data/scores.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
@@ -365,6 +375,14 @@ export interface RehearsedSeed {
     readonly credentials: SeededCredentials;
 }
 
+// Pass 2's input for the mock-data seed: the pass-1 message
+// pairs, keyed as requireMessagePair reads them, and the
+// invitation grant's own live-op input (Decision 8).
+export interface MockDataSeedInput {
+    readonly messagePairs: ReadonlyMap<string, MessagePair>;
+    readonly invitation: InvitationGrantSeedInput;
+}
+
 // Hash, form, and rehearse (Sequence, steps 1 to 3). The
 // live ops run on scratch memory; nothing touches the
 // target.
@@ -390,10 +408,14 @@ export async function rehearseMockData(
             credentials.humans, credentials.system,
             requestAt,
         );
+    const input: MockDataSeedInput = {
+        messagePairs,
+        invitation: formInvitationGrantSeedInput(requestAt),
+    };
     const statements = await rehearse(
         new MemoryStorageBackend(),
         async (db) => {
-            await postMockDataLoadIn(db, messagePairs);
+            await postMockDataLoadIn(db, input);
             await postSeedCredentialsIn(
                 db, credentials, credentialPairs,
             );
@@ -419,8 +441,9 @@ export async function postMockDataLoad(
 
 async function postMockDataLoadIn(
     adapter: DbAdapter,
-    messagePairs: ReadonlyMap<string, MessagePair>,
+    input: MockDataSeedInput,
 ): Promise<void> {
+    const messagePairs = input.messagePairs;
     const members = buildMembers();
     const unaffiliated = buildUnaffiliatedIdentity();
 
@@ -450,16 +473,6 @@ async function postMockDataLoadIn(
                             ),
                         ),
                     )),
-                writeSeedPair(
-                    adapter,
-                    requireMessagePair(
-                        messagePairs,
-                        seedMessagePairKey(
-                            'identities/:id/default-organization',
-                            member.id,
-                        ),
-                    ),
-                ),
                 postIdentityDocumentOp(
                     adapter,
                     member.id,
@@ -520,39 +533,46 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        (async () => {
-            // Live grant order: operation, then document
-            // (grantInvitation, invitations-domain.ts).
-            const pairs = [
-                requireMessagePair(
-                    messagePairs,
-                    seedMessagePairKey(
-                        'invitations',
-                        UNAFFILIATED_INVITATION_ID,
-                    ),
-                ),
-                requireMessagePair(
-                    messagePairs,
-                    seedMessagePairKey(
-                        'invitations/:id',
-                        UNAFFILIATED_INVITATION_ID,
-                    ),
-                ),
-            ];
-            const answer = await runWrite(
-                adapter, attemptFor(pairs), pairs,
-            );
-            if (answer.outcome !== 'land') {
-                throw new Error(
-                    'seed statement returned '
-                        + answer.outcome,
-                );
-            }
-        })(),
-        // Role grants retired: membership `type` (admin for
-        // current, member otherwise) seeds privilege; mint
-        // bakes claim roles from those memberships.
     ]);
+
+    // The default-organization and invitation handlers
+    // read the seats and PII wave 1 lands (Decision 8).
+    await Promise.all([
+        ...members.map((member, index) =>
+            putIdentityDefaultOrganization(
+                adapter,
+                [member.id],
+                defaultOrganizationSeedBody(
+                    memberPrimaryOrganization(
+                        member.id, index,
+                    ),
+                ),
+                member.id,
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
+                        'identities/:id/default-organization',
+                        member.id,
+                    ),
+                ),
+            )),
+        postOrganizationInvitationGrant(
+            adapter,
+            [input.invitation.organization],
+            input.invitation.body,
+            input.invitation.granterId,
+            undefined,
+            input.invitation.organization,
+            ['admin'],
+            input.invitation.requestAt,
+            input.invitation.operationId,
+            input.invitation.received,
+        ),
+    ]);
+
+    // Role grants retired: membership `type` (admin for
+    // current, member otherwise) seeds privilege; mint
+    // bakes claim roles from those memberships.
 
     const ideas = buildIdeas();
 
@@ -584,26 +604,21 @@ async function postMockDataLoadIn(
             );
         }),
         // Phase Final Task 2: organizations ROW half stripped —
-        // message-plane only (organizationSeedBody still
+        // message-plane only (seededOrganizationBody still
         // shapes the pair body in seed-message-pairs.ts).
-        writeSeedPair(
-            adapter,
-            requireMessagePair(
-                messagePairs,
-                seedMessagePairKey(
-                    'organizations/:id', STARK_ORGANIZATION,
+        ...[STARK_ORGANIZATION, ORGANIZATION_TWO].map(
+            (organization) => postOrganizationDocumentOp(
+                adapter,
+                [organization],
+                seededOrganizationBody(organization),
+                SYSTEM_MEMBER_ID,
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
+                        'organizations/:id', organization,
+                    ),
                 ),
-            ),
-        ),
-        writeSeedPair(
-            adapter,
-            requireMessagePair(
-                messagePairs,
-                seedMessagePairKey(
-                    'organizations/:id', ORGANIZATION_TWO,
-                ),
-            ),
-        ),
+            )),
     ]);
 
     const projects = buildProjects();
@@ -616,8 +631,8 @@ async function postMockDataLoadIn(
     // (route-only) omission. projectGenesis (including the
     // org-2 override's own row) is imported from
     // seed-message-pairs.ts — pass 1 there needs the SAME array
-    // to form each project's pair before this transaction opens.
-    // projectOrg2 extends projects[0] under organization
+    // to form each project's pair before the rehearsal's
+    // writes. projectOrg2 extends projects[0] under organization
     // 'BBjWJsjYIDkTRKIIPrzWRw' —
     // the SAME construction pass 1 uses, so a seeded pair can
     // never drift from what this write actually stores.
@@ -664,7 +679,7 @@ async function postMockDataLoadIn(
     // flow's row and graph delta. flowStateEvents is
     // imported from seed-message-pairs.ts — pass 1
     // there needs the SAME array to form each flow's
-    // pair before this transaction opens.
+    // pair before the rehearsal's writes.
     const flowStateEventByFlowId = new Map(
         flowStateEvents.map(e => [e.entity_id, e]),
     );
@@ -694,7 +709,7 @@ async function postMockDataLoadIn(
     // (pairs + states.postEvent only). recordGenesis
     // is imported from seed-message-pairs.ts — pass 1
     // there needs the SAME array to form each record's
-    // pair before this transaction opens.
+    // pair before the rehearsal's writes.
     const recordGenesisById = new Map(
         recordGenesis.map(g => [g.entityId, g]),
     );
@@ -916,7 +931,8 @@ async function postMockDataLoadIn(
         // WO-instance SoT Task 6: instance genesis + binding +
         // Review/Complete new-shape ops and revision pairs.
         // Append-only (below-facade) — same as every other
-        // seed pair write; chain formed pre-tx.
+        // seed pair write; chain formed before the
+        // rehearsal's writes.
 
         ...mockRecords.map((r, i) => {
             const genesis = recordGenesisById.get(r.id)!;
@@ -1025,14 +1041,16 @@ async function postMockDataLoadIn(
     // then threw when the project-history modal resolved them.
     //
     // The STARK-org objective revisions' author cannot read
-    // memberships back in-tx: its pair was already formed pre-tx
-    // (pass 1, before any membership row existed to read back),
-    // so pass 2 must pick from the SAME pure pool pass 1 used —
-    // see humanMemberPoolsByOrganization's doc comment for why
-    // the two are proven to agree. The baseline/actual-score
+    // memberships back in the rehearsal: its pair was already
+    // formed before the rehearsal's writes (pass 1, before any
+    // membership row existed to read back), so pass 2 must pick
+    // from the SAME pure pool pass 1 used — see
+    // humanMemberPoolsByOrganization's doc comment for why the
+    // two are proven to agree. The baseline/actual-score
     // deferral below (buildSeedScoreRows) draws from this SAME
-    // pool now too — the former in-tx memberFor DB-read retired
-    // once its pick moved onto pickHumanMember (Phase 7 Task 5).
+    // pool now too — the former memberFor DB-read done in the
+    // rehearsal retired once its pick moved onto
+    // pickHumanMember (Phase 7 Task 5).
     // Phase Final Task 2: objectives + objective_revisions
     // ROW halves stripped — seed drives through
     // postObjectiveCreationOp (pairs only).
@@ -1239,12 +1257,26 @@ export async function postBootstrapIn(
             SYSTEM_MEMBER_ID,
             seatMessagePair,
         ),
-        writeSeedPair(adapter, defaultOrganizationMessagePair),
         postIdentityPiiDocumentOp(
             adapter, 'XXZruirZyAOoRpNxaDnpSA'
                 , bootstrapCurrentMemberPiiBody(),
             SYSTEM_MEMBER_ID, piiMessagePair,
         ),
-        writeSeedPair(adapter, organizationMessagePair),
+    ]);
+    await Promise.all([
+        putIdentityDefaultOrganization(
+            adapter,
+            ['XXZruirZyAOoRpNxaDnpSA'],
+            defaultOrganizationSeedBody(STARK_ORGANIZATION),
+            'XXZruirZyAOoRpNxaDnpSA',
+            defaultOrganizationMessagePair,
+        ),
+        postOrganizationDocumentOp(
+            adapter,
+            [STARK_ORGANIZATION],
+            seededOrganizationBody(STARK_ORGANIZATION),
+            SYSTEM_MEMBER_ID,
+            organizationMessagePair,
+        ),
     ]);
 }

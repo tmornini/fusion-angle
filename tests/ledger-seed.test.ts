@@ -1,10 +1,13 @@
 import {
+    assert,
     assertEquals,
     assertRejects,
     assertStrictEquals,
     assertStringIncludes,
     assertThrows,
 } from '@std/assert';
+import { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import {
     LEADING_PARAMETERS,
     PARAMETERS_PER_ROW,
@@ -53,8 +56,12 @@ import {
 } from '../api/mock-data/records.ts';
 import { OBJECTIVE_SEEDS } from
     '../api/mock-data/objectives.ts';
-import { mockProjectFlows } from
-    '../api/mock-data/seed-message-pairs.ts';
+import {
+    mockProjectFlows,
+    UNAFFILIATED_INVITATION_ID,
+} from '../api/mock-data/seed-message-pairs.ts';
+import { buildUnaffiliatedIdentity } from
+    '../api/mock-data/members.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import type { MessagePairEntity } from '../api/types.ts';
@@ -654,5 +661,33 @@ Deno.test(
             );
             assertStrictEquals(row.secret, '');
         }
+    },
+);
+
+Deno.test(
+    'the seeded invitation is the grant route\'s POST',
+    async () => {
+        const rows = await (await sharedMockDb())
+            .messagePairs.getAll();
+        const at = rows.filter((row) =>
+            row.path === '/invitations/'
+            && row.name === UNAFFILIATED_INVITATION_ID);
+        const post = at.find((row) => row.method === 'POST');
+        const put = at.find((row) => row.method === 'PUT');
+        assert(post !== undefined && put !== undefined);
+        assertStrictEquals(
+            post.request.startsWith(
+                'POST /organizations/' + STARK_ORGANIZATION
+                    + '/invitations/ HTTP/1.1\r\n',
+            ),
+            true,
+        );
+        const body = JSON.parse(
+            HttpMessage.fromWire(post.request).body().toText(),
+        ) as Record<string, unknown>;
+        assertStrictEquals(
+            body['email'], buildUnaffiliatedIdentity().email,
+        );
+        assertStrictEquals(post.operation_id, put.operation_id);
     },
 );
