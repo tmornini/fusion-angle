@@ -28,6 +28,8 @@ import {
     storedPutBodyText,
     refreshTokenFromSetCookie,
     framedRequest,
+    presentedFields,
+    withoutCredentialFields,
 } from './http-fixtures.ts';
 import {
     deriveIdentityToken,
@@ -103,11 +105,21 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 function tokenGrant(
     db: DbAdapter, body: unknown,
 ): Promise<Response> {
+    const record = body !== null
+        && typeof body === 'object'
+        && !Array.isArray(body)
+        ? body as Record<string, unknown>
+        : {};
+    const lifted = withoutCredentialFields(record);
+    const raw = JSON.stringify(lifted.body);
     return handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            headers: {
+                'Content-Type': 'application/json',
+                ...lifted.headers,
+            },
+            body: raw,
         },
     ));
 }
@@ -130,11 +142,21 @@ async function s256Fields(): Promise<{
 function authorize(
     db: DbAdapter, body: unknown,
 ): Promise<Response> {
+    const record = body !== null
+        && typeof body === 'object'
+        && !Array.isArray(body)
+        ? body as Record<string, unknown>
+        : {};
+    const lifted = withoutCredentialFields(record);
+    const raw = JSON.stringify(lifted.body);
     return handleRequest(db, framedRequest(
         `${BASE}/authentication/authorize`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            headers: {
+                'Content-Type': 'application/json',
+                ...lifted.headers,
+            },
+            body: raw,
         },
     ));
 }
@@ -430,16 +452,20 @@ Deno.test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
         code_challenge: pkce.code_challenge,
         code_challenge_method: pkce.code_challenge_method,
     });
-    assertStrictEquals(authorizeRes.status, 201);
-    const { code } = await authorizeRes.json() as { code: string };
+    assertStrictEquals(authorizeRes.status, 200);
+    const { code } = await presentedFields(authorizeRes) as {
+        code: string;
+    };
     const grantRes = await tokenGrant(db, {
         grant_type: 'authorization_code', code,
         client_id: 'web',
         code_verifier: pkce.verifier,
     });
-    assertStrictEquals(grantRes.status, 201);
+    assertStrictEquals(grantRes.status, 200);
     const { access_token: accessToken } =
-        await grantRes.json() as { access_token: string };
+        await presentedFields(grantRes) as {
+            access_token: string;
+        };
     const refreshToken = refreshTokenFromSetCookie(grantRes);
     const rootJti = jtiOf(refreshToken);
 
@@ -513,8 +539,10 @@ Deno.test('authorizationCodeSpent: byte-identical pre-tx (the plain'
         code_challenge: pkce.code_challenge,
         code_challenge_method: pkce.code_challenge_method,
     });
-    assertStrictEquals(authorizeRes.status, 201);
-    const { code } = await authorizeRes.json() as { code: string };
+    assertStrictEquals(authorizeRes.status, 200);
+    const { code } = await presentedFields(authorizeRes) as {
+        code: string;
+    };
     const derivedId = await deriveAuthorizationCodeId(code);
 
     const preTxBefore = await authorizationCodeSpent(
@@ -533,7 +561,7 @@ Deno.test('authorizationCodeSpent: byte-identical pre-tx (the plain'
         client_id: 'web',
         code_verifier: pkce.verifier,
     });
-    assertStrictEquals(grantRes.status, 201);
+    assertStrictEquals(grantRes.status, 200);
 
     const preTxAfter = await authorizationCodeSpent(
         db, derivedId, 'XXZruirZyAOoRpNxaDnpSA',

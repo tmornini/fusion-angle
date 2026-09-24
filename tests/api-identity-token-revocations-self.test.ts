@@ -303,10 +303,10 @@ async () => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                cookie: 'refresh_token=' + memberToken,
             },
             body: JSON.stringify({
                 grant_type: 'refresh',
-                refresh_token: memberToken,
             }),
         }),
     );

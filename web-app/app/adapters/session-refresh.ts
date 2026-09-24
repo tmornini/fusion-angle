@@ -1,20 +1,17 @@
 import type { RequestContext } from './shared.ts';
-import type { SessionCredentials } from './session-credentials.ts';
-import { isCookieSession } from './session-credentials.ts';
+import type { SessionCredentials } from
+    './session-credentials.ts';
+import {
+    authParam,
+    refreshFromHeaders,
+    refusedDoor,
+} from './authentication.ts';
 
-interface TokenGrantResponse {
-    access_token: string;
-    refresh_token?: string;
-    token_type: string;
-    expires_in: number;
-}
-
-// Trade a live refresh token for a rotated credential pair via
-// the OAuth refresh grant. Cookie-session omits the body token
-// and reads the HttpOnly cookie. The non-cookie session
-// mode of the test composition root sends the stored
-// refresh in the body. A terminal 401 surfaces as
-// UnauthorizedError; non-401 faults propagate as-is.
+// Trade a live refresh token for a rotated credential pair
+// via the OAuth refresh grant. Both session modes send the
+// token on the cookie line and never in the body. A terminal
+// 401 surfaces as UnauthorizedError; non-401 faults
+// propagate as-is.
 export async function postSessionRefresh(
     ctx: RequestContext,
     refreshToken: string,
@@ -23,16 +20,30 @@ export async function postSessionRefresh(
     const body: Record<string, unknown> = {
         grant_type: 'refresh',
     };
-    if (!isCookieSession()) {
-        body.refresh_token = refreshToken;
-    }
     if (organization !== undefined) {
         body.organization = organization;
     }
-    const grant = await ctx.POST<TokenGrantResponse>(
-        'authentication/token', body);
+    const answered = await ctx.postForHeaders(
+        'authentication/token',
+        body,
+        [[
+            'cookie',
+            'refresh_token=' + refreshToken,
+        ]],
+    );
+    const refused = refusedDoor(answered);
+    if (refused !== null) throw refused;
+    const accessToken = authParam(
+        answered.headers.get('authentication-info'),
+        'access_token',
+    );
+    if (accessToken === null) {
+        throw new Error(
+            'authentication-info lacks access_token',
+        );
+    }
     return {
-        accessToken: grant.access_token,
-        refreshToken: grant.refresh_token ?? '',
+        accessToken,
+        refreshToken: refreshFromHeaders(answered.headers),
     };
 }

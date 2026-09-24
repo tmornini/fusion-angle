@@ -23,7 +23,13 @@ import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { refreshTokenFromSetCookie, framedRequest } from './http-fixtures.ts';
+import {
+    framedRequest,
+    presentedFields,
+    refreshTokenFromSetCookie,
+} from './http-fixtures.ts';
+import { basicAuthorization } from
+    '../api/authentication.ts';
 import { operationIdHeader } from './operation-id-header.ts';
 
 const BASE = 'http://localhost';
@@ -69,8 +75,12 @@ async function seedAuthorizationCodeMessagePair(
                 JSON.stringify(requestBody),
             ),
         },
-        requestBody, 'XXZruirZyAOoRpNxaDnpSA', { code },
+        requestBody, 'XXZruirZyAOoRpNxaDnpSA', undefined,
         seed.operationId, seed.requestId,
+        [{
+            name: 'authentication-info',
+            value: 'code="' + code + '"',
+        }],
     );
     await runWrite(
         db,
@@ -88,14 +98,20 @@ async function issuePair(db: MemoryDbAdapter): Promise<{
     const res = await handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                authorization: basicAuthorization(
+                    'the-code', '',
+                ),
+            },
             body: JSON.stringify({
                 grant_type: 'authorization_code',
-                code: 'the-code',
                 client_id: 'web',
             }),
         }));
-    const body = await res.json() as { access_token: string };
+    const body = await presentedFields(res) as {
+        access_token: string;
+    };
     return {
         access_token: body.access_token,
         refresh_token: refreshTokenFromSetCookie(res),

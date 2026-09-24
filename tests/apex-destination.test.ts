@@ -85,8 +85,17 @@ async () => {
         };
         assertStrictEquals(body.grant_type, 'refresh');
         return new Response(
-            JSON.stringify({ access_token: 'fresh-access' }),
-            { status: 200 },
+            JSON.stringify({
+                token_type: 'Bearer',
+                expires_in: 900,
+            }),
+            {
+                status: 200,
+                headers: {
+                    'authentication-info':
+                        'access_token="fresh-access"',
+                },
+            },
         );
     };
     assertStrictEquals(await probeRefreshSession(), true);
@@ -119,8 +128,17 @@ async () => {
     globalThis.fetch = async () => {
         posts += 1;
         return new Response(
-            JSON.stringify({ access_token: 'fresh-access' }),
-            { status: 200 },
+            JSON.stringify({
+                token_type: 'Bearer',
+                expires_in: 900,
+            }),
+            {
+                status: 200,
+                headers: {
+                    'authentication-info':
+                        'access_token="fresh-access"',
+                },
+            },
         );
     };
     const [a, b] = await Promise.all([

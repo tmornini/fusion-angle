@@ -7,6 +7,7 @@ import {
     PATCHWithEtag as httpPatchWithEtag,
     DELETE as httpDelete,
     POST as httpPost,
+    postForHeaders as httpPostForHeaders,
     type ClientFacadeAdapter,
 } from '../api/api.ts';
 import type { HttpFacade } from
@@ -61,6 +62,12 @@ export function wrapInPageAdapter(
         POST: (
             resource, payload, token, headerFields,
         ) => httpPost(
+            adapter, resource, payload, token,
+            headerFields,
+        ),
+        postForHeaders: (
+            resource, payload, token, headerFields,
+        ) => httpPostForHeaders(
             adapter, resource, payload, token,
             headerFields,
         ),

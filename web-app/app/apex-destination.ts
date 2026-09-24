@@ -3,12 +3,10 @@
 // see it. The existing refresh grant is the
 // probe — not a new door.
 
-import {
-    RequestError,
-    UnauthorizedError,
-} from '../../api/http-errors.ts';
 import { createRequestContext } from
     './adapters/shared.ts';
+import { authParam } from
+    './adapters/authentication.ts';
 import { getClientFacade } from
     './adapters/facade-holder.ts';
 import { runSingleFlightRefresh } from
@@ -37,26 +35,17 @@ export async function probeRefreshSession(
     );
     const access = await runSingleFlightRefresh(
         async () => {
-            try {
-                const body = await ctx.POST<{
-                    access_token?: unknown;
-                }>(
-                    'authentication/token',
-                    { grant_type: 'refresh' },
-                );
-                return typeof body.access_token
-                    === 'string'
-                    ? body.access_token
-                    : null;
-            } catch (err) {
-                if (
-                    err instanceof UnauthorizedError
-                    || err instanceof RequestError
-                ) {
-                    return null;
-                }
-                throw err;
-            }
+            const answered = await ctx.postForHeaders(
+                'authentication/token',
+                { grant_type: 'refresh' },
+            );
+            if (answered.status !== 200) return null;
+            return authParam(
+                answered.headers.get(
+                    'authentication-info',
+                ),
+                'access_token',
+            );
         },
     );
     return access !== null;

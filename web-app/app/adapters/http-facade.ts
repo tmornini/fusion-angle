@@ -11,6 +11,7 @@ import { runSingleFlightRefresh } from
 import { navigateTo } from '../navigation.ts';
 import { principalFromToken } from
     '../../../shared/access-token-decode.ts';
+import { authParam } from './authentication.ts';
 
 // Fetch transport for the server ZIP. Same RequestContext
 // verbs as the in-page facade, over real HTTP. No import of
@@ -74,6 +75,17 @@ export interface HttpFacade {
         headerFields?:
             readonly (readonly [string, string])[],
     ): Promise<T>;
+    postForHeaders(
+        resource: string,
+        payload: Record<string, unknown>,
+        token: string,
+        headerFields?:
+            readonly (readonly [string, string])[],
+    ): Promise<{
+        readonly status: number;
+        readonly headers: Headers;
+        readonly body: string;
+    }>;
 }
 
 async function unwrapResponse<T>(
@@ -198,13 +210,12 @@ export function createHttpFacade(
                 }),
             },
         );
+        await response.text();
         if (!response.ok) return null;
-        const body = await response.json() as {
-            access_token?: unknown;
-        };
-        return typeof body.access_token === 'string'
-            ? body.access_token
-            : null;
+        return authParam(
+            response.headers.get('authentication-info'),
+            'access_token',
+        );
     }
 
     async function postOrganizationExchange(
@@ -216,6 +227,9 @@ export function createHttpFacade(
         headers.set(
             'Content-Type', 'application/json',
         );
+        headers.set(
+            'Authorization', 'Bearer ' + flat,
+        );
         if (operationId !== undefined) {
             headers.set(OPERATION_ID_HEADER, operationId);
         }
@@ -226,19 +240,16 @@ export function createHttpFacade(
                 headers,
                 body: JSON.stringify({
                     grant_type: 'token-exchange',
-                    subject_token: flat,
-                    actor_token: flat,
                     organization,
                 }),
             },
         );
+        await response.text();
         if (!response.ok) return null;
-        const body = await response.json() as {
-            access_token?: unknown;
-        };
-        return typeof body.access_token === 'string'
-            ? body.access_token
-            : null;
+        return authParam(
+            response.headers.get('authentication-info'),
+            'access_token',
+        );
     }
 
     async function refreshAndScope(
@@ -375,6 +386,19 @@ export function createHttpFacade(
                 payload, headerFields,
             ),
         ),
+        postForHeaders: async (
+            resource, payload, token, headerFields,
+        ) => {
+            const response = await exchange(
+                'POST', resource, token,
+                payload, headerFields,
+            );
+            return {
+                status: response.status,
+                headers: response.headers,
+                body: await response.text(),
+            };
+        },
     };
     return facade;
 }

@@ -107,9 +107,16 @@ Deno.test(
             )) {
                 return new Response(
                     JSON.stringify({
-                        access_token: 'fresh',
+                        token_type: 'Bearer',
+                        expires_in: 900,
                     }),
-                    { status: 200 },
+                    {
+                        status: 200,
+                        headers: {
+                            'authentication-info':
+                                'access_token="fresh"',
+                        },
+                    },
                 );
             }
             ideas += 1;

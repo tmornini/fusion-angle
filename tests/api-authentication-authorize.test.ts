@@ -34,7 +34,11 @@ import {
     scryptDerive,
 } from '../server/scrypt-hash.ts';
 import { testHashPassword } from './mock-seed.ts';
-import { framedRequest } from './http-fixtures.ts';
+import {
+    framedRequest,
+    presentedFields,
+    withoutCredentialFields,
+} from './http-fixtures.ts';
 import { operationIdHeader } from './operation-id-header.ts';
 
 const BASE = 'http://localhost';
@@ -49,7 +53,13 @@ Deno.test.beforeEach(() => {
 });
 
 function jsonPost(path: string, body: unknown): Request {
-    const raw = JSON.stringify(body);
+    const record = body !== null
+        && typeof body === 'object'
+        && !Array.isArray(body)
+        ? body as Record<string, unknown>
+        : {};
+    const lifted = withoutCredentialFields(record);
+    const raw = JSON.stringify(lifted.body);
     return framedRequest(`${BASE}/${path}`, {
         method: 'POST',
         headers: {
@@ -58,6 +68,7 @@ function jsonPost(path: string, body: unknown): Request {
                 new TextEncoder().encode(raw).byteLength,
             ),
             'operation-id': generateIdentifier(),
+            ...lifted.headers,
         },
         body: raw,
     });
@@ -126,16 +137,16 @@ async () => {
         code_challenge: pkce.code_challenge,
         code_challenge_method: pkce.code_challenge_method,
     }));
-    assertStrictEquals(res.status, 201);
-    const { code } = await res.json() as { code: string };
+    assertStrictEquals(res.status, 200);
+    const { code } = await presentedFields(res) as { code: string };
     assert(code.length > 0);
     const tok = await handleRequest(db, token({
         grant_type: 'authorization_code', code,
         client_id: 'web',
         code_verifier: pkce.verifier,
     }));
-    assertStrictEquals(tok.status, 201);
-    const body = await tok.json() as { access_token: string };
+    assertStrictEquals(tok.status, 200);
+    const body = await presentedFields(tok) as { access_token: string };
     assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             , body.access_token, operationIdHeader())));
@@ -155,8 +166,8 @@ Deno.test('an expired authorization code is a 401', async () => {
         code_challenge: pkce.code_challenge,
         code_challenge_method: pkce.code_challenge_method,
     }));
-    assertStrictEquals(res.status, 201);
-    const { code } = await res.json() as { code: string };
+    assertStrictEquals(res.status, 200);
+    const { code } = await presentedFields(res) as { code: string };
     // 10 min TTL + 1 s past the bound.
     setClockForTest(() =>
         Date.now() + (10 * 60 + 1) * MS_PER_SECOND);
@@ -167,7 +178,7 @@ Deno.test('an expired authorization code is a 401', async () => {
         }));
         assertStrictEquals(tok.status, 401);
         assertEquals(
-            await tok.json(),
+            await presentedFields(tok),
             { error: 'invalid_grant' },
         );
     } finally {
@@ -187,7 +198,7 @@ async () => {
     }));
     assertStrictEquals(res.status, 401);
     assertEquals(
-        await res.json(), { error: 'invalid_grant' });
+        await presentedFields(res), { error: 'invalid_grant' });
     assert(await noStoredAuthorizeResponse(db));
 });
 
@@ -265,7 +276,7 @@ async () => {
     }));
     assertStrictEquals(res.status, 400);
     assertEquals(
-        await res.json(),
+        await presentedFields(res),
         { error: 'S256 code_challenge is required' },
     );
     assert(await noStoredAuthorizeResponse(db));
@@ -283,8 +294,8 @@ async () => {
         ),
         code_challenge_method: 'S256',
     }));
-    assertStrictEquals(res.status, 201);
-    const { code } = await res.json() as { code: string };
+    assertStrictEquals(res.status, 200);
+    const { code } = await presentedFields(res) as { code: string };
     assert(code.length > 0);
 });
 
@@ -302,7 +313,7 @@ async () => {
         ),
         code_challenge_method: 'S256',
     }));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     const rows = await deriveCredentialsFor(db, 'XXZruirZyAOoRpNxaDnpSA');
     const passwords = rows.filter(
         row => row.kind === 'password',

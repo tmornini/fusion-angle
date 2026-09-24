@@ -15,6 +15,8 @@ import {
     apiRequest, pairIdOf, storedPutBodyText,
     framedRequest,
 } from './http-fixtures.ts';
+import { basicAuthorization } from
+    '../api/authentication.ts';
 import {
     deriveIdentityPii,
     deriveIdentityPiiRows,
@@ -100,11 +102,14 @@ async function loginPassword(
     return handleRequest(db, framedRequest(
         BASE + '/authentication/authorize', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                authorization: basicAuthorization(
+                    username, 's3cret-password-ok',
+                ),
+            },
             body: JSON.stringify({
                 method: 'password',
-                username,
-                password: 's3cret-password-ok',
                 client_id: 'web',
                 code_challenge: bytesToBase64Url(
                     await sha256Bytes('pkce-verifier-test'),

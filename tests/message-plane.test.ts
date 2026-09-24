@@ -1,4 +1,5 @@
 import {
+    assert,
     assertNotStrictEquals,
     assertStrictEquals,
     assertThrows,
@@ -40,12 +41,30 @@ import {
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
 } from '../api/types.ts';
-import { sha256HexOfBytes } from '../shared/digest.ts';
+import {
+    sha256Bytes,
+    sha256HexOfBytes,
+} from '../shared/digest.ts';
+import { bytesToBase64Url } from
+    '../shared/base64url.ts';
+import { testHashPassword } from './mock-seed.ts';
+import {
+    seedClientRegistration,
+    seedIdentityCredential,
+    seedPersonIdentity,
+} from './identity-fixtures.ts';
+import { seedRootAdmin } from
+    './root-admin-fixture.ts';
+import { makeAssertionSigner } from
+    './client-assertion-fixtures.ts';
 import {
     generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
-import { apiRequest } from './http-fixtures.ts';
+import {
+    apiRequest,
+    framedRequest,
+} from './http-fixtures.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 
@@ -1536,5 +1555,439 @@ Deno.test(
             (await db.messagePairs.getAll()).length,
             before,
         );
+    },
+);
+
+const DOOR_PASSWORD = 'hunter2-s3cret';
+const DOOR_IDENTITY = 'XXZruirZyAOoRpNxaDnpSA';
+const DOOR_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
+const SECRET_BODY_NAMES = [
+    'username',
+    'password',
+    'code',
+    'code_verifier',
+    'refresh_token',
+    'subject_token',
+    'actor_token',
+    'client_assertion',
+] as const;
+
+async function passwordDoorDb() {
+    const db = memoryDbAdapter();
+    await db.postSchemaCreation();
+    await seedPersonIdentity(db, DOOR_IDENTITY, {
+        name: 'Demo',
+        email: 'demo@example.com',
+        phone: '555-0100',
+        bio: 'demo user',
+    });
+    await seedIdentityCredential(
+        db, DOOR_IDENTITY, 'WeXjAaAxGSpLpamfEuvcww', {
+            identity_id: DOOR_IDENTITY,
+            kind: 'password',
+            status: 'set',
+            secret: await testHashPassword(DOOR_PASSWORD),
+            at: '2026-06-03T00:00:00.000000Z',
+        },
+    );
+    return db;
+}
+
+function basicHeader(
+    userId: string,
+    password: string,
+): string {
+    const bytes = new TextEncoder().encode(
+        userId + ':' + password,
+    );
+    let binary = '';
+    for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+    }
+    return 'Basic ' + btoa(binary);
+}
+
+function doorRequest(
+    path: string,
+    body: Record<string, unknown>,
+    headers: Record<string, string>,
+): Request {
+    const raw = JSON.stringify(body);
+    return framedRequest('http://localhost' + path, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+            ...headers,
+        },
+        body: raw,
+    });
+}
+
+function quotedParam(
+    header: string | null,
+    name: string,
+): string {
+    if (header === null) {
+        throw new Error(name + ' header is absent');
+    }
+    const prefix = name + '="';
+    const at = header.indexOf(prefix);
+    if (at < 0) {
+        throw new Error(name + ' param is absent');
+    }
+    const end = header.indexOf('"', at + prefix.length);
+    if (end < 0) {
+        throw new Error(name + ' param is open');
+    }
+    return header.slice(at + prefix.length, end);
+}
+
+function requestBodyRecord(
+    wire: string,
+): Record<string, unknown> {
+    const text = wireBody(wire);
+    if (text === '') return {};
+    return JSON.parse(text) as Record<string, unknown>;
+}
+
+function bodyHoldsSecret(wire: string): boolean {
+    const body = requestBodyRecord(wire);
+    for (const name of SECRET_BODY_NAMES) {
+        if (name in body) return true;
+    }
+    return false;
+}
+
+Deno.test(
+    'a door body secret rides its line'
+        + ' and lands nothing',
+    async () => {
+        const db = await passwordDoorDb();
+        const authorize = {
+            method: 'password',
+            client_id: 'web',
+            code_challenge: 'abc',
+            code_challenge_method: 'S256',
+        };
+        const cases: readonly (readonly [
+            string,
+            string,
+            string,
+            Record<string, unknown>,
+        ])[] = [
+            [
+                'username',
+                'Authorization',
+                '/authentication/authorize',
+                {
+                    ...authorize,
+                    username: 'demo@example.com',
+                },
+            ],
+            [
+                'password',
+                'Authorization',
+                '/authentication/authorize',
+                {
+                    ...authorize,
+                    password: DOOR_PASSWORD,
+                },
+            ],
+            [
+                'code',
+                'Authorization',
+                '/authentication/token',
+                {
+                    grant_type: 'authorization_code',
+                    client_id: 'web',
+                    code: 'issued-code',
+                },
+            ],
+            [
+                'code_verifier',
+                'Authorization',
+                '/authentication/token',
+                {
+                    grant_type: 'authorization_code',
+                    client_id: 'web',
+                    code_verifier: 'verifier',
+                },
+            ],
+            [
+                'refresh_token',
+                'Cookie',
+                '/authentication/token',
+                {
+                    grant_type: 'refresh',
+                    refresh_token: 'refresh-value',
+                },
+            ],
+            [
+                'subject_token',
+                'Authorization',
+                '/authentication/token',
+                {
+                    grant_type: 'token-exchange',
+                    organization: DOOR_ORGANIZATION,
+                    subject_token: 'subject',
+                },
+            ],
+            [
+                'actor_token',
+                'Authorization',
+                '/authentication/token',
+                {
+                    grant_type: 'token-exchange',
+                    organization: DOOR_ORGANIZATION,
+                    actor_token: 'actor',
+                },
+            ],
+            [
+                'client_assertion',
+                'Authorization',
+                '/authentication/token',
+                {
+                    grant_type: 'client_credentials',
+                    client_id: 'web',
+                    client_assertion: 'assertion',
+                },
+            ],
+        ];
+        for (const [name, line, path, body] of cases) {
+            const before = (
+                await db.messagePairs.getAll()
+            ).length;
+            const response = await handleRequest(
+                db, doorRequest(path, body, {}),
+            );
+            const error = await response.json() as {
+                error: string,
+            };
+            assertStrictEquals(response.status, 400);
+            assertStrictEquals(
+                error.error,
+                name + ' rides the ' + line + ' line',
+            );
+            assertStrictEquals(
+                (await db.messagePairs.getAll()).length,
+                before,
+            );
+        }
+    },
+);
+
+Deno.test(
+    'doors present credentials on lines',
+    async () => {
+        const db = await passwordDoorDb();
+        await seedRootAdmin(db);
+        const verifier = 'pkce-verifier-ledger';
+        const challenge = bytesToBase64Url(
+            await sha256Bytes(verifier),
+        );
+        const authorized = await handleRequest(
+            db, doorRequest(
+                '/authentication/authorize',
+                {
+                    method: 'password',
+                    client_id: 'web',
+                    code_challenge: challenge,
+                    code_challenge_method: 'S256',
+                },
+                {
+                    authorization: basicHeader(
+                        'demo@example.com',
+                        DOOR_PASSWORD,
+                    ),
+                },
+            ),
+        );
+        const authorizedText = await authorized.text();
+        assertStrictEquals(authorized.status, 200);
+        assertStrictEquals(authorizedText, '');
+        const code = quotedParam(
+            authorized.headers.get(
+                'authentication-info',
+            ),
+            'code',
+        );
+        assert(code.length > 0);
+        const authorizeRow = (
+            await db.messagePairs.getAll()
+        ).find((row) =>
+            row.path === '/authentication/authorize/'
+        );
+        if (authorizeRow === undefined) {
+            throw new Error('authorize pair absent');
+        }
+        assertStrictEquals(
+            bodyHoldsSecret(authorizeRow.request),
+            false,
+        );
+        assertStrictEquals(
+            authorizeRow.response.includes(code),
+            false,
+        );
+        assertStrictEquals(
+            authorizeRow.secret.includes(
+                'code="' + code + '"',
+            ),
+            true,
+        );
+        const granted = await handleRequest(
+            db, doorRequest(
+                '/authentication/token',
+                {
+                    grant_type: 'authorization_code',
+                    client_id: 'web',
+                },
+                {
+                    authorization: basicHeader(
+                        code, verifier,
+                    ),
+                },
+            ),
+        );
+        const grantBody = await granted.json() as {
+            access_token?: string,
+            token_type?: string,
+            expires_in?: number,
+        };
+        assertStrictEquals(granted.status, 200);
+        assertStrictEquals(
+            grantBody.access_token, undefined,
+        );
+        assertStrictEquals(
+            grantBody.token_type, 'Bearer',
+        );
+        assertStrictEquals(
+            typeof grantBody.expires_in, 'number',
+        );
+        const access = quotedParam(
+            granted.headers.get('authentication-info'),
+            'access_token',
+        );
+        assert(access.length > 0);
+        const cookie = granted.headers.get('set-cookie')
+            ?? granted.headers.getSetCookie().join('\n');
+        assert(cookie.includes('refresh_token='));
+        const tokenRow = (
+            await db.messagePairs.getAll()
+        ).find((row) =>
+            row.path === '/authentication/token/'
+        );
+        if (tokenRow === undefined) {
+            throw new Error('token pair absent');
+        }
+        assertStrictEquals(
+            bodyHoldsSecret(tokenRow.request), false,
+        );
+        assertStrictEquals(
+            tokenRow.response.includes('set-cookie'),
+            false,
+        );
+        assertStrictEquals(
+            tokenRow.response.includes(access),
+            false,
+        );
+        assertStrictEquals(
+            tokenRow.secret.includes('set-cookie:'),
+            true,
+        );
+        assertStrictEquals(
+            tokenRow.secret.includes(access),
+            true,
+        );
+        const refreshValue = /refresh_token=([^;]+)/
+            .exec(cookie)?.[1];
+        if (refreshValue === undefined) {
+            throw new Error('refresh cookie absent');
+        }
+        const refreshed = await handleRequest(
+            db, doorRequest(
+                '/authentication/token',
+                { grant_type: 'refresh' },
+                {
+                    cookie: 'refresh_token='
+                        + refreshValue,
+                },
+            ),
+        );
+        await refreshed.text();
+        assertStrictEquals(refreshed.status, 200);
+        const beforeBody = (
+            await db.messagePairs.getAll()
+        ).length;
+        const bodyRefresh = await handleRequest(
+            db, doorRequest(
+                '/authentication/token',
+                {
+                    grant_type: 'refresh',
+                    refresh_token: refreshValue,
+                },
+                {
+                    cookie: 'refresh_token='
+                        + refreshValue,
+                },
+            ),
+        );
+        const bodyError = await bodyRefresh.json() as {
+            error: string,
+        };
+        assertStrictEquals(bodyRefresh.status, 400);
+        assertStrictEquals(
+            bodyError.error,
+            'refresh_token rides the Cookie line',
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length,
+            beforeBody,
+        );
+        const exchanged = await handleRequest(
+            db, doorRequest(
+                '/authentication/token',
+                {
+                    grant_type: 'token-exchange',
+                    organization: DOOR_ORGANIZATION,
+                },
+                { authorization: 'Bearer ' + access },
+            ),
+        );
+        await exchanged.text();
+        assertStrictEquals(exchanged.status, 200);
+        const signer = await makeAssertionSigner(
+            'ES256',
+        );
+        const now = Math.floor(Date.now() / 1000);
+        const clientId = 'uYaHKbNeVUcsFjuooOjMew';
+        const assertion = await signer.sign({
+            iss: clientId,
+            sub: clientId,
+            aud: 'fusion-angle',
+            exp: now + 300,
+            iat: now,
+            jti: 'assert-door-lines-1',
+        });
+        await seedClientRegistration(db, clientId, {
+            grant_types: 'client_credentials',
+            redirect_uris: '',
+            jwks: signer.jwks,
+            aud: 'fusion-angle',
+            status: 'active',
+        });
+        const client = await handleRequest(
+            db, doorRequest(
+                '/authentication/token',
+                {
+                    grant_type: 'client_credentials',
+                    client_id: clientId,
+                },
+                {
+                    authorization: 'Bearer ' + assertion,
+                },
+            ),
+        );
+        await client.text();
+        assertStrictEquals(client.status, 200);
     },
 );

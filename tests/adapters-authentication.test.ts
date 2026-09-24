@@ -133,7 +133,7 @@ async () => {
     // An upstream 500 / network fault is a BUG, not a wrong
     // password — it must surface, not collapse to null.
     const ctx = {
-        POST: async () => {
+        postForHeaders: async () => {
             throw new Error('upstream 500');
         },
     } as unknown as RequestContext;
@@ -146,31 +146,63 @@ async () => {
 
 Deno.test('postPasswordLogin sends S256 challenge and verifier',
 async () => {
-    const posted: Record<string, unknown>[] = [];
+    const posted: {
+        body: Record<string, unknown>;
+        headers?: readonly (readonly [string, string])[];
+    }[] = [];
     const ctx = {
-        POST: async (_path: string, body: unknown) => {
-            posted.push(body as Record<string, unknown>);
+        postForHeaders: async (
+            _path: string,
+            body: Record<string, unknown>,
+            headers?: readonly (readonly [string, string])[],
+        ) => {
+            posted.push({
+                body,
+                ...(headers !== undefined
+                    ? { headers }
+                    : {}),
+            });
             if (posted.length === 1) {
-                return { code: 'issued-code' };
+                return {
+                    status: 200,
+                    headers: new Headers({
+                        'authentication-info':
+                            'code="issued-code"',
+                    }),
+                    body: '',
+                };
             }
             return {
-                access_token: 'a',
-                refresh_token: 'r',
+                status: 200,
+                headers: new Headers({
+                    'authentication-info':
+                        'access_token="a"',
+                    'set-cookie':
+                        'refresh_token=r; HttpOnly',
+                }),
+                body: '{"token_type":"Bearer"}',
             };
         },
     } as unknown as RequestContext;
     await postPasswordLogin(ctx, 'a@b.c', 'pw');
-    const authorizeBody = posted[0]!;
-    const tokenBody = posted[1]!;
+    const authorizeBody = posted[0]!.body;
+    const tokenHeaders = posted[1]!.headers ?? [];
+    const authorization = tokenHeaders.find(
+        ([name]) => name === 'authorization',
+    )?.[1] ?? '';
+    const encoded = authorization.startsWith('Basic ')
+        ? authorization.slice('Basic '.length)
+        : '';
+    const decoded = atob(encoded);
+    const verifier = decoded.slice(
+        decoded.indexOf(':') + 1,
+    );
     assertStrictEquals(
         authorizeBody.code_challenge_method, 'S256');
-    assertStrictEquals(typeof tokenBody.code_verifier, 'string');
+    assertStrictEquals(typeof verifier, 'string');
+    assert(verifier.length > 0);
     assertStrictEquals(
         authorizeBody.code_challenge,
-        bytesToBase64Url(
-            await sha256Bytes(
-                tokenBody.code_verifier as string,
-            ),
-        ),
+        bytesToBase64Url(await sha256Bytes(verifier)),
     );
 });

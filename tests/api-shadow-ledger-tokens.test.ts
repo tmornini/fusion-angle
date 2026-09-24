@@ -34,6 +34,7 @@ import {
     apiRequest,
     pairIdOf,
     framedRequest,
+    withoutCredentialFields,
 } from './http-fixtures.ts';
 import {
     makeAssertionSigner,
@@ -432,11 +433,21 @@ Deno.test('a reused rotation 409s and a token-revocations PUT'
 function postToken(
     db: MemoryDbAdapter, body: unknown,
 ): Promise<Response> {
+    const record = body !== null
+        && typeof body === 'object'
+        && !Array.isArray(body)
+        ? body as Record<string, unknown>
+        : {};
+    const lifted = withoutCredentialFields(record);
+    const raw = JSON.stringify(lifted.body);
     return handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            headers: {
+                'Content-Type': 'application/json',
+                ...lifted.headers,
+            },
+            body: raw,
         },
     ));
 }
@@ -516,8 +527,12 @@ async function seedAuthorizationCodeMessagePair(
                 JSON.stringify(requestBody),
             ),
         },
-        requestBody, identityId, { code },
+        requestBody, identityId, undefined,
         seed.operationId, seed.requestId,
+        [{
+            name: 'authentication-info',
+            value: 'code="' + code + '"',
+        }],
     );
     await runWrite(
         db,
@@ -536,7 +551,7 @@ async () => {
         grant_type: 'authorization_code', code: AUTH_CODE,
         client_id: 'web',
     });
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     await assertRootEventMessagePair(db, CURRENT_ID);
     // Issued event is named by its jti; the spend marker is a
     // different prefix (authorization-codes/:hash).
@@ -570,7 +585,7 @@ Deno.test('a token-exchange grant (a real /authentication/token'
         grant_type: 'token-exchange',
         subject_token: subject, actor_token: subject,
     });
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     await assertRootEventMessagePair(db, CURRENT_ID);
 });
 
@@ -594,7 +609,7 @@ Deno.test('a client_credentials grant appends its root\'s own'
         grant_type: 'client_credentials',
         client_id: CLIENT_ID, client_assertion: assertion,
     });
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     await assertRootEventMessagePair(db, CLIENT_ID);
 });
 

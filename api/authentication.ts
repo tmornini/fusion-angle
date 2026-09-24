@@ -33,6 +33,7 @@ import {
     type ClientRegistrationEntity,
     type IdentityCredentialEntity,
     type IdentityPiiEntity,
+    type MessagePairEntity,
 } from './types.ts';
 import {
     pickString,
@@ -209,6 +210,162 @@ export function refreshTokenFromCookieHeader(
         return trimmed.slice(eq + 1).trim();
     }
     return '';
+}
+
+export function basicAuthorization(
+    userId: string,
+    password: string,
+): string {
+    if (userId.includes(':')) {
+        throw new Error('user-id contains a colon');
+    }
+    const bytes = new TextEncoder().encode(
+        userId + ':' + password,
+    );
+    let binary = '';
+    for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+    }
+    return 'Basic ' + btoa(binary);
+}
+
+export function parseBasic(
+    header: string | null,
+): {
+    readonly userId: string;
+    readonly password: string;
+} | null {
+    if (header === null || header === '') return null;
+    const space = header.indexOf(' ');
+    if (space <= 0) return null;
+    if (header.slice(0, space).toLowerCase() !== 'basic') {
+        return null;
+    }
+    const token = header.slice(space + 1).trim();
+    if (token === '') return null;
+    let binary: string;
+    try {
+        binary = atob(token);
+    } catch {
+        return null;
+    }
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    const colon = bytes.indexOf(0x3a);
+    if (colon < 0) return null;
+    const decoder = new TextDecoder();
+    return {
+        userId: decoder.decode(bytes.subarray(0, colon)),
+        password: decoder.decode(
+            bytes.subarray(colon + 1),
+        ),
+    };
+}
+
+function bearerCredential(header: string | null): string {
+    if (header === null) return '';
+    const space = header.indexOf(' ');
+    if (space <= 0) return '';
+    if (header.slice(0, space).toLowerCase() !== 'bearer') {
+        return '';
+    }
+    return header.slice(space + 1).trim();
+}
+
+const AUTHORIZATION_BODY_FIELDS = [
+    'username',
+    'password',
+    'code',
+    'code_verifier',
+    'subject_token',
+    'actor_token',
+    'client_assertion',
+] as const;
+
+function credentialRides(
+    body: Record<string, unknown>,
+): string | null {
+    for (const name of AUTHORIZATION_BODY_FIELDS) {
+        if (name in body) {
+            return name + ' rides the Authorization line';
+        }
+    }
+    if ('refresh_token' in body) {
+        return 'refresh_token rides the Cookie line';
+    }
+    return null;
+}
+
+function quotedAuthParam(
+    name: string,
+    value: string,
+): string {
+    if (value.includes('"') || value.includes('\\')) {
+        throw new Error(
+            name + ' contains a quote or backslash',
+        );
+    }
+    return name + '="' + value + '"';
+}
+
+function publicTokenBody(
+    response: TokenResponse,
+): {
+    readonly token_type: 'Bearer';
+    readonly expires_in: number;
+} {
+    return {
+        token_type: response.token_type,
+        expires_in: response.expires_in,
+    };
+}
+
+function tokenAnswerFields(
+    accessToken: string,
+    refreshCookie: string | undefined,
+): { readonly name: string; readonly value: string }[] {
+    const fields: {
+        readonly name: string;
+        readonly value: string;
+    }[] = [{
+        name: 'authentication-info',
+        value: quotedAuthParam(
+            'access_token', accessToken,
+        ),
+    }];
+    if (refreshCookie !== undefined) {
+        fields.push({
+            name: 'set-cookie',
+            value: refreshCookie,
+        });
+    }
+    return fields;
+}
+
+function codeFromSecret(secret: string): string | null {
+    const splitAt = secret.indexOf('\r\n\r\n');
+    const response = splitAt >= 0
+        ? secret.slice(splitAt + 4)
+        : (secret.startsWith('\r\n')
+            ? secret.slice(2)
+            : '');
+    if (response === '') return null;
+    const prefix = 'authentication-info: ';
+    for (const line of response.split('\r\n')) {
+        if (!line.startsWith(prefix)) continue;
+        const value = line.slice(prefix.length);
+        const marker = 'code="';
+        if (
+            !value.startsWith(marker)
+            || !value.endsWith('"')
+        ) {
+            return null;
+        }
+        return value.slice(marker.length, -1);
+    }
+    return null;
 }
 
 export function attachSetCookie(
@@ -442,8 +599,12 @@ async function issueTokenPair(
     const messagePair = seed === undefined
         ? undefined
         : await formAuthMessagePair(
-            seed, body, identityId, response,
+            seed, body, identityId,
+            publicTokenBody(response),
             seed.operationId, seed.requestId,
+            tokenAnswerFields(
+                response.access_token, undefined,
+            ),
         );
     // Copy the envelope id: hoisted header when the client
     // sent one, else formAuthMessagePair's named mint. Seedless
@@ -920,15 +1081,11 @@ async function grantRefresh(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthMessagePairSeed,
-    cookieHeader?: string | null,
+    request: Request,
 ): Promise<TokenResult> {
-    const fromCookie = refreshTokenFromCookieHeader(
-        cookieHeader ?? null,
+    const token = refreshTokenFromCookieHeader(
+        request.headers.get('cookie'),
     );
-    const fromBody = typeof body.refresh_token === 'string'
-        ? body.refresh_token
-        : '';
-    const token = fromCookie !== '' ? fromCookie : fromBody;
     const now = nowEpochSeconds();
     const verified = await verifyAccessToken(token, now);
     if (!verified.valid) {
@@ -975,8 +1132,15 @@ async function grantRefresh(
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(
-        seed, body, verified.claims.sub, response,
-            seed.operationId, seed.requestId,
+        seed, body, verified.claims.sub,
+        publicTokenBody(response),
+        seed.operationId, seed.requestId,
+        tokenAnswerFields(
+            response.access_token,
+            refreshSetCookie(
+                minted.refreshToken, request,
+            ),
+        ),
     );
     const outcome = await rotateRefreshJti(
         adapter, verified.claims.sub, verified.claims.jti,
@@ -1008,16 +1172,12 @@ async function grantRefresh(
 async function grantTokenExchange(
     adapter: DbAdapter,
     body: Record<string, unknown>,
-    seed?: AuthMessagePairSeed,
+    seed: AuthMessagePairSeed | undefined,
+    authorization: string | null,
 ): Promise<TokenResult> {
-    const subjectToken =
-        typeof body.subject_token === 'string'
-            ? body.subject_token
-            : '';
-    const actorToken =
-        typeof body.actor_token === 'string'
-            ? body.actor_token
-            : '';
+    const presented = bearerCredential(authorization);
+    const subjectToken = presented;
+    const actorToken = presented;
     const now = nowEpochSeconds();
     const sameToken = subjectToken === actorToken;
     const subjectV = await verifyAccessToken(
@@ -1108,11 +1268,12 @@ export async function exchangeBearerForOrganization(
     bearer: string,
     organization: Id,
 ): Promise<TokenResult> {
-    return grantTokenExchange(adapter, {
-        subject_token: bearer,
-        actor_token: bearer,
-        organization: organization,
-    });
+    return grantTokenExchange(
+        adapter,
+        { organization },
+        undefined,
+        'Bearer ' + bearer,
+    );
 }
 
 // client_credentials via private_key_jwt: a headless client
@@ -1127,14 +1288,14 @@ async function grantClientCredentials(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthMessagePairSeed,
+    request: Request,
 ): Promise<TokenResult> {
     const clientId = typeof body.client_id === 'string'
         ? body.client_id
         : '';
-    const assertion =
-        typeof body.client_assertion === 'string'
-            ? body.client_assertion
-            : '';
+    const assertion = bearerCredential(
+        request.headers.get('authorization'),
+    );
     // FLIPPED (clients elimination): the registration facet
     // derive replaces the raw clients row read. An absent OR
     // tombstoned facet ≡ the old null row -> the same 401
@@ -1187,8 +1348,14 @@ async function grantClientCredentials(
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(
-        seed, body, clientId, response,
-            seed.operationId, seed.requestId,
+        seed, body, clientId, publicTokenBody(response),
+        seed.operationId, seed.requestId,
+        tokenAnswerFields(
+            response.access_token,
+            refreshSetCookie(
+                minted.refreshToken, request,
+            ),
+        ),
     );
     const eventMessagePair = await formTokenEventMessagePair(
         refreshJti, {
@@ -1315,9 +1482,15 @@ async function authorizeCodeIssuer(
     adapter: DbAdapter,
     code: string,
 ): Promise<AuthorizeCodeIssuer | null> {
-    const hits = await adapter.messagePairs
-        .getAllWhereBody(AUTHORIZE_PREFIX, { code });
-    const messagePair = hits[0];
+    const pairs = await adapter.messagePairs
+        .getCollectionPairs(AUTHORIZE_PREFIX);
+    let messagePair: MessagePairEntity | undefined;
+    for (const pair of pairs) {
+        if (codeFromSecret(pair.secret) === code) {
+            messagePair = pair;
+            break;
+        }
+    }
     if (messagePair === undefined) return null;
     const requestBody = decodedBodyOf(messagePair.request);
     // code_challenge is optional on authorize (PKCE only when
@@ -1379,10 +1552,15 @@ async function grantAuthorizationCode(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthMessagePairSeed,
+    request: Request,
 ): Promise<TokenResult> {
-    const code = typeof body.code === 'string'
-        ? body.code
-        : '';
+    const basic = parseBasic(
+        request.headers.get('authorization'),
+    );
+    const code = basic === null ? '' : basic.userId;
+    const verifier = basic === null
+        ? ''
+        : basic.password;
     const invalid: TokenResult = failure(
         HTTP_UNAUTHORIZED, 'invalid or used authorization code',
     );
@@ -1412,10 +1590,6 @@ async function grantAuthorizationCode(
     // mismatch is the same shared 401. No challenge stored
     // preserves pre-PKCE redeem (password-loop demo).
     if (issuer.codeChallenge !== undefined) {
-        const verifier =
-            typeof body.code_verifier === 'string'
-                ? body.code_verifier
-                : '';
         if (verifier === '') return invalid;
         const derived = bytesToBase64Url(
             await sha256Bytes(verifier),
@@ -1449,8 +1623,15 @@ async function grantAuthorizationCode(
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(
-        seed, body, issuer.identityId, response,
-            seed.operationId, seed.requestId,
+        seed, body, issuer.identityId,
+        publicTokenBody(response),
+        seed.operationId, seed.requestId,
+        tokenAnswerFields(
+            response.access_token,
+            refreshSetCookie(
+                minted.refreshToken, request,
+            ),
+        ),
     );
     // Marker and issued event formed pre-tx against
     // `issuer.identityId` — a code's issuer cannot change
@@ -1511,22 +1692,33 @@ export async function postToken(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthMessagePairSeed,
-    cookieHeader?: string | null,
+    request: Request,
 ): Promise<TokenResult> {
+    const ridden = credentialRides(body);
+    if (ridden !== null) {
+        return failure(HTTP_BAD_REQUEST, ridden);
+    }
     const grantType = typeof body.grant_type === 'string'
         ? body.grant_type
         : '';
     switch (grantType) {
         case 'authorization_code':
-            return grantAuthorizationCode(adapter, body, seed);
+            return grantAuthorizationCode(
+                adapter, body, seed, request,
+            );
         case 'refresh':
             return grantRefresh(
-                adapter, body, seed, cookieHeader,
+                adapter, body, seed, request,
             );
         case 'token-exchange':
-            return grantTokenExchange(adapter, body, seed);
+            return grantTokenExchange(
+                adapter, body, seed,
+                request.headers.get('authorization'),
+            );
         case 'client_credentials':
-            return grantClientCredentials(adapter, body, seed);
+            return grantClientCredentials(
+                adapter, body, seed, request,
+            );
         default:
             return failure(
                 HTTP_BAD_REQUEST, 'unsupported grant_type: ' + grantType,
@@ -1616,6 +1808,7 @@ async function authorizePassword(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthMessagePairSeed,
+    request: Request,
 ): Promise<AuthorizeResult> {
     const challenge =
         typeof body.code_challenge === 'string'
@@ -1632,12 +1825,11 @@ async function authorizePassword(
             error: 'S256 code_challenge is required',
         };
     }
-    const username = typeof body.username === 'string'
-        ? body.username
-        : '';
-    const password = typeof body.password === 'string'
-        ? body.password
-        : '';
+    const basic = parseBasic(
+        request.headers.get('authorization'),
+    );
+    const username = basic === null ? '' : basic.userId;
+    const password = basic === null ? '' : basic.password;
     const denied: AuthorizeResult = {
         ok: false, status: HTTP_UNAUTHORIZED, error: 'invalid credentials',
     };
@@ -1673,8 +1865,12 @@ async function authorizePassword(
     const code = generateSecret();
     const response: AuthorizeResponse = { code };
     const messagePair = await formAuthMessagePair(
-        seed, body, identityId, response,
-            seed.operationId, seed.requestId,
+        seed, body, identityId, undefined,
+        seed.operationId, seed.requestId,
+        [{
+            name: 'authentication-info',
+            value: quotedAuthParam('code', code),
+        }],
     );
     let rehashMessagePair: MessagePair | undefined;
     if (secret.startsWith('$pbkdf2-sha256$')) {
@@ -1737,13 +1933,24 @@ export async function postAuthorize(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthMessagePairSeed,
+    request: Request,
 ): Promise<AuthorizeResult> {
+    const ridden = credentialRides(body);
+    if (ridden !== null) {
+        return {
+            ok: false,
+            status: HTTP_BAD_REQUEST,
+            error: ridden,
+        };
+    }
     const method = typeof body.method === 'string'
         ? body.method
         : '';
     switch (method) {
         case 'password':
-            return authorizePassword(adapter, body, seed);
+            return authorizePassword(
+                adapter, body, seed, request,
+            );
         case 'passkey':
         case 'provider':
         case 'oidc':

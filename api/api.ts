@@ -87,8 +87,6 @@ import {
 import {
     postToken,
     postAuthorize,
-    attachSetCookie,
-    refreshSetCookie,
     refreshClearCookie,
     refreshTokenFromCookieHeader,
     wireGrantError,
@@ -962,6 +960,17 @@ async function dispatched(
                         params, body, actor,
                         organization,
                     ),
+                ...(routePattern
+                    === 'identities/:id/token-revocations/:rid'
+                    ? {
+                        responseFields: [{
+                            name: 'set-cookie',
+                            value: refreshClearCookie(
+                                request,
+                            ),
+                        }],
+                    }
+                    : {}),
                 ...(echoMatchesHead
                     && echo !== null
                     && echo !== undefined
@@ -1512,15 +1521,6 @@ async function dispatched(
                     ) {
                         return written.response;
                     }
-                    if (
-                        routePattern
-                            === 'identities/:id/token-revocations/:rid'
-                    ) {
-                        return attachSetCookie(
-                            written.response,
-                            refreshClearCookie(request),
-                        );
-                    }
                     const putWiring = wiringForSegments(
                         matched.segments,
                     );
@@ -1704,13 +1704,17 @@ async function dispatched(
                         operationId: ctx.operationId,
                         requestId: received.requestId,
                     };
+                    const doorBody = body ?? {};
                     const dispatched =
                         routePattern === 'authentication/token'
                             ? await postToken(
-                                effective, body!, seed,
-                                request.headers.get('cookie'))
+                                effective, doorBody, seed,
+                                request,
+                            )
                             : await postAuthorize(
-                                effective, body!, seed);
+                                effective, doorBody, seed,
+                                request,
+                            );
                     if (!dispatched.ok) {
                         if (dispatched.status
                             === HTTP_UNAUTHORIZED) {
@@ -1780,29 +1784,7 @@ async function dispatched(
                             ],
                         });
                     }
-                    const written = dispatched.wire;
-                    const grantType =
-                        typeof body!.grant_type === 'string'
-                            ? body!.grant_type
-                            : '';
-                    const setsRefreshCookie =
-                        grantType === 'authorization_code'
-                        || grantType === 'refresh'
-                        || grantType === 'client_credentials';
-                    if (
-                        routePattern === 'authentication/token'
-                        && 'refreshToken' in dispatched
-                        && setsRefreshCookie
-                    ) {
-                        return attachSetCookie(
-                            written,
-                            refreshSetCookie(
-                                dispatched.refreshToken,
-                                request,
-                            ),
-                        );
-                    }
-                    return written;
+                    return dispatched.wire;
                 }
                 if (!matched.post) {
                     return Response.json(
@@ -1991,9 +1973,10 @@ function facadeHeaders(
     token: string,
     contentType: boolean,
 ): Record<string, string> {
-    const headers: Record<string, string> = {
-        'Authorization': 'Bearer ' + token,
-    };
+    const headers: Record<string, string> = {};
+    if (token !== '') {
+        headers['Authorization'] = 'Bearer ' + token;
+    }
     if (contentType) {
         headers['Content-Type'] = 'application/json';
     }
@@ -2327,13 +2310,13 @@ export async function DELETE(
     );
 }
 
-export async function POST<T>(
+async function postResponse(
     adapter: ClientFacadeAdapter,
     resource: string,
     payload: Record<string, unknown>,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
-): Promise<T> {
+): Promise<Response> {
     await adapter.simulateLatency();
     const headers = facadeHeaders(token, true);
     for (const [name, value] of headerFields ?? []) {
@@ -2343,17 +2326,51 @@ export async function POST<T>(
     headers['content-length'] = String(
         new TextEncoder().encode(body).byteLength,
     );
-    return unwrapResponse<T>(
-        await handleRequest(
-            adapter,
-            new Request(
-                `${BASE_URL}/${resource}`,
-                {
-                    method: 'POST',
-                    headers,
-                    body,
-                },
-            ),
+    return handleRequest(
+        adapter,
+        new Request(
+            `${BASE_URL}/${resource}`,
+            {
+                method: 'POST',
+                headers,
+                body,
+            },
         ),
     );
+}
+
+export async function POST<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: readonly (readonly [string, string])[],
+): Promise<T> {
+    return unwrapResponse<T>(
+        await postResponse(
+            adapter, resource, payload, token,
+            headerFields,
+        ),
+    );
+}
+
+export async function postForHeaders(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: readonly (readonly [string, string])[],
+): Promise<{
+    readonly status: number;
+    readonly headers: Headers;
+    readonly body: string;
+}> {
+    const response = await postResponse(
+        adapter, resource, payload, token, headerFields,
+    );
+    return {
+        status: response.status,
+        headers: response.headers,
+        body: await response.text(),
+    };
 }

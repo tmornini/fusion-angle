@@ -1,6 +1,10 @@
 import type { RequestContext } from './shared.ts';
 import { STORAGE_KEY_ACTIVE_ORGANIZATION_ID } from
     '../storage-keys.ts';
+import {
+    authParam,
+    refusedDoor,
+} from './authentication.ts';
 
 // localStorage slot for the active organization id — the
 // CLIENT-side org vessel. We persist the org id, NEVER the
@@ -24,14 +28,28 @@ export async function postOrganizationSessionExchange(
     subjectToken: string,
     organization: string,
 ): Promise<string> {
-    const res = await ctx.POST<{ access_token: string }>(
+    const answered = await ctx.postForHeaders(
         'authentication/token', {
             grant_type: 'token-exchange',
-            subject_token: subjectToken,
-            actor_token: subjectToken,
             organization: organization,
-        });
-    return res.access_token;
+        },
+        [[
+            'authorization',
+            'Bearer ' + subjectToken,
+        ]],
+    );
+    const refused = refusedDoor(answered);
+    if (refused !== null) throw refused;
+    const accessToken = authParam(
+        answered.headers.get('authentication-info'),
+        'access_token',
+    );
+    if (accessToken === null) {
+        throw new Error(
+            'authentication-info lacks access_token',
+        );
+    }
+    return accessToken;
 }
 
 // The switcher is an honest affordance only when there is a

@@ -4,6 +4,8 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { messageStore } from '../api/message-store.ts';
 import type { DbAdapter } from '../api/db.ts';
+import { basicAuthorization } from
+    '../api/authentication.ts';
 
 const BASE = 'http://localhost';
 
@@ -28,6 +30,81 @@ export function setCookieHeader(res: Response): string {
         return cookies.join('\n');
     }
     return res.headers.get('Set-Cookie') ?? '';
+}
+
+export function withoutCredentialFields(
+    body: Record<string, unknown>,
+): {
+    readonly body: Record<string, unknown>;
+    readonly headers: Record<string, string>;
+} {
+    const next: Record<string, unknown> = { ...body };
+    const headers: Record<string, string> = {};
+    if (
+        typeof next.username === 'string'
+        && typeof next.password === 'string'
+    ) {
+        headers['authorization'] = basicAuthorization(
+            next.username, next.password,
+        );
+        delete next.username;
+        delete next.password;
+    }
+    if (typeof next.code === 'string') {
+        const verifier = typeof next.code_verifier
+            === 'string'
+            ? next.code_verifier
+            : '';
+        headers['authorization'] = basicAuthorization(
+            next.code, verifier,
+        );
+        delete next.code;
+        delete next.code_verifier;
+    }
+    if (typeof next.client_assertion === 'string') {
+        headers['authorization'] = 'Bearer '
+            + next.client_assertion;
+        delete next.client_assertion;
+    }
+    if (
+        typeof next.subject_token === 'string'
+        && (
+            typeof next.actor_token !== 'string'
+            || next.actor_token === next.subject_token
+        )
+    ) {
+        headers['authorization'] = 'Bearer '
+            + next.subject_token;
+        delete next.subject_token;
+        delete next.actor_token;
+    }
+    if (typeof next.refresh_token === 'string') {
+        headers['cookie'] = 'refresh_token='
+            + next.refresh_token;
+        delete next.refresh_token;
+    }
+    return { body: next, headers };
+}
+
+export async function presentedFields(
+    response: Response,
+): Promise<Record<string, unknown>> {
+    const text = await response.text();
+    const body: Record<string, unknown> = text === ''
+        ? {}
+        : JSON.parse(text) as Record<string, unknown>;
+    const info = response.headers.get(
+        'authentication-info',
+    );
+    if (info === null) return body;
+    const code = /(?:^|\s)code="([^"]*)"/.exec(info);
+    const access = /(?:^|\s)access_token="([^"]*)"/
+        .exec(info);
+    if (code !== null) body.code = code[1];
+    if (access !== null) {
+        body.access_token = access[1];
+    }
+    return body;
 }
 
 export function refreshTokenFromSetCookie(

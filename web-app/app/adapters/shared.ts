@@ -128,6 +128,18 @@ export interface RequestContext {
         headerFields:
             readonly (readonly [string, string])[],
     ): Promise<T>;
+    // Door POST. Token is always empty, so the session
+    // bearer never rides the grant's authorization line.
+    postForHeaders(
+        resource: string,
+        body: Record<string, unknown>,
+        headerFields?:
+            readonly (readonly [string, string])[],
+    ): Promise<{
+        readonly status: number;
+        readonly headers: Headers;
+        readonly body: string;
+    }>;
 }
 
 // The recovery-free context: each verb runs directly on its
@@ -318,6 +330,18 @@ function openRequestContext(
                 tok => verbs.POST<T>(
                     resource, body, tok, headers,
                 ));
+        },
+        postForHeaders: (
+            resource: string,
+            body: Record<string, unknown>,
+            headerFields?:
+                readonly (readonly [string, string])[],
+        ) => {
+            recordApiRequest('POST', resource);
+            const headers = writeHeaders(headerFields);
+            return verbs.postForHeaders(
+                resource, body, '', headers,
+            );
         },
     };
     return ctx;

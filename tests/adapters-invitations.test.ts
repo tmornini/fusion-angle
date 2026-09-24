@@ -76,6 +76,21 @@ const AT = '2026-01-01T00:00:00.000000Z';
 
 // A fresh Map-backed fake per test — session-token adapters
 // used throughout this file read/write it lazily.
+function accessAnswer(token: string): {
+    readonly status: number;
+    readonly headers: Headers;
+    readonly body: string;
+} {
+    return {
+        status: 200,
+        headers: new Headers({
+            'authentication-info':
+                'access_token="' + token + '"',
+        }),
+        body: '',
+    };
+}
+
 function freshStorage(): Partial<Storage> {
     const store = new Map<string, string>();
     return {
@@ -894,21 +909,19 @@ Deno.test('cookie-session accept remints via refresh POST',
         const refreshBodies: unknown[] = [];
         const recording: RequestContext = {
             ...toccYYkLEABmlbpHJalgtQ,
-            POST: async <T>(
-                resource: string,
-                body: Record<string, unknown>,
-            ): Promise<T> => {
+            postForHeaders: async (
+                resource,
+                body,
+                headerFields,
+            ) => {
                 if (resource === 'authentication/token') {
                     refreshBodies.push(body);
-                    return {
-                        access_token: minted,
-                        token_type: 'Bearer',
-                        expires_in: 900,
-                    } as T;
+                    return accessAnswer(minted);
                 }
-                return toccYYkLEABmlbpHJalgtQ.POST(
-                    resource, body,
-                );
+                return toccYYkLEABmlbpHJalgtQ
+                    .postForHeaders(
+                        resource, body, headerFields,
+                    );
             },
         };
         await postInvitationAcceptance(
@@ -944,14 +957,17 @@ Deno.test('a failed re-mint after accept surfaces, seat kept',
         );
         const recording: RequestContext = {
             ...sarah,
-            POST: async <T>(
-                resource: string,
-                body: Record<string, unknown>,
-            ): Promise<T> => {
+            postForHeaders: (
+                resource,
+                body,
+                headerFields,
+            ) => {
                 if (resource === 'authentication/token') {
-                    throw refused;
+                    return Promise.reject(refused);
                 }
-                return sarah.POST(resource, body);
+                return sarah.postForHeaders(
+                    resource, body, headerFields,
+                );
             },
         };
         const err = await assertRejects(
@@ -1015,19 +1031,20 @@ Deno.test('the remint waits for an in-flight facade refresh',
         const refreshBodies: unknown[] = [];
         const recording: RequestContext = {
             ...sarah,
-            POST: async <T>(
-                resource: string,
-                body: Record<string, unknown>,
-            ): Promise<T> => {
+            postForHeaders: (
+                resource,
+                body,
+                headerFields,
+            ) => {
                 if (resource === 'authentication/token') {
                     refreshBodies.push(body);
-                    return {
-                        access_token: minted,
-                        token_type: 'Bearer',
-                        expires_in: 900,
-                    } as T;
+                    return Promise.resolve(
+                        accessAnswer(minted),
+                    );
                 }
-                return sarah.POST(resource, body);
+                return sarah.postForHeaders(
+                    resource, body, headerFields,
+                );
             },
         };
         const accepting = postInvitationAcceptance(
@@ -1080,20 +1097,23 @@ Deno.test('a re-minted token without the seat earns one more'
         const refreshBodies: unknown[] = [];
         const recording: RequestContext = {
             ...sarah,
-            POST: async <T>(
-                resource: string,
-                body: Record<string, unknown>,
-            ): Promise<T> => {
+            postForHeaders: (
+                resource,
+                body,
+                headerFields,
+            ) => {
                 if (resource === 'authentication/token') {
                     refreshBodies.push(body);
-                    return {
-                        access_token:
-                            tokens[refreshBodies.length - 1],
-                        token_type: 'Bearer',
-                        expires_in: 900,
-                    } as T;
+                    const token = tokens[
+                        refreshBodies.length - 1
+                    ] ?? fresh;
+                    return Promise.resolve(
+                        accessAnswer(token),
+                    );
                 }
-                return sarah.POST(resource, body);
+                return sarah.postForHeaders(
+                    resource, body, headerFields,
+                );
             },
         };
         await postInvitationAcceptance(
@@ -1127,19 +1147,20 @@ Deno.test('two re-minted tokens without the seat surface a'
         const refreshBodies: unknown[] = [];
         const recording: RequestContext = {
             ...sarah,
-            POST: async <T>(
-                resource: string,
-                body: Record<string, unknown>,
-            ): Promise<T> => {
+            postForHeaders: (
+                resource,
+                body,
+                headerFields,
+            ) => {
                 if (resource === 'authentication/token') {
                     refreshBodies.push(body);
-                    return {
-                        access_token: stale,
-                        token_type: 'Bearer',
-                        expires_in: 900,
-                    } as T;
+                    return Promise.resolve(
+                        accessAnswer(stale),
+                    );
                 }
-                return sarah.POST(resource, body);
+                return sarah.postForHeaders(
+                    resource, body, headerFields,
+                );
             },
         };
         const err = await assertRejects(

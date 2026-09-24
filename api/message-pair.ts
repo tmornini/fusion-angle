@@ -153,6 +153,9 @@ export interface WriteMessagePairInput {
     // Lines formed onto the response before the split.
     // Absent: the response carries no extra line.
     readonly responseFields?: readonly FieldLine[];
+    // Absent: DELETE stores 204 and every other verb
+    // stores 201. Auth doors pass 200.
+    readonly responseStatus?: number;
     readonly latchedHeadMessagePairId?: string;
     readonly pinnedDocumentMessagePairId?: string;
     // Required on every formed pair. Public writes supply
@@ -311,7 +314,7 @@ export async function formWriteMessagePair(
         }));
     const storedStatus = input.method === 'DELETE'
         ? HTTP_NO_CONTENT
-        : HTTP_CREATED;
+        : (input.responseStatus ?? HTTP_CREATED);
     const responseLines: FieldLine[] = [
         { name: 'date', value: DATE_PLACEHOLDER },
         { name: 'etag', value: strongEtagOf(id) },
@@ -383,6 +386,7 @@ export async function formAuthMessagePair(
     responseBody: unknown,
     operationId: string,
     requestId: string,
+    responseFields?: readonly FieldLine[],
 ): Promise<MessagePair> {
     return formWriteMessagePair({
         ...seed,
@@ -392,6 +396,10 @@ export async function formAuthMessagePair(
         responseBody,
         operationId,
         requestId,
+        responseStatus: HTTP_OK,
+        ...(responseFields !== undefined
+            ? { responseFields }
+            : {}),
     });
 }
 
@@ -891,10 +899,9 @@ function wireForPair(
     const row = stated.find((item) => item.id === pair.id);
     if (row === undefined) return answer.response;
     const stored = latin1(row.response);
-    const wire = pair.id === answer.answeredId
-        ? mergeSecret(stored, secretBytes(pair))
-        : stored;
-    return responseFromLatin1(wire);
+    return responseFromLatin1(
+        mergeSecret(stored, secretBytes(pair)),
+    );
 }
 
 function refusalDocument(
