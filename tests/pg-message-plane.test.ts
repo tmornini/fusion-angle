@@ -401,4 +401,91 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             );
         },
     );
+
+    // The four pinned digests are not copied here.
+    // Task 16's witness is tests/ledger-store.test.ts
+    // 'pinned row matches the four digests'.
+
+    Deno.test(
+        'fa_request_id_of returns the minted id'
+            + ' and null on the root',
+        async () => {
+            const token = await organizationToken();
+            const id = generateIdentifier();
+            const path = '/organizations/'
+                + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + id;
+            const created = await handleRequest(
+                db, req(
+                    'PUT', path, token,
+                    ideaDocument('Pinned'),
+                ),
+            );
+            assertStrictEquals(created.status, 201);
+            const minted = created.headers.get(
+                'request-id',
+            );
+            if (minted === null || minted === '') {
+                throw new Error(
+                    'the plane minted no request-id',
+                );
+            }
+            const stored = await sql.query<{
+                request_id: string | null,
+            }>`
+                SELECT fa_request_id_of(response)
+                    AS request_id
+                FROM fa_message_pairs
+                WHERE name = ${id}
+            `;
+            assertStrictEquals(stored.length, 1);
+            assertStrictEquals(
+                stored[0]!.request_id, minted,
+            );
+            const root = await sql.query<{
+                request_id: string | null,
+            }>`
+                SELECT fa_request_id_of(response)
+                    AS request_id
+                FROM fa_message_pairs
+                WHERE path = '/migrations/'
+                  AND name = '0000-root'
+            `;
+            assertStrictEquals(root.length, 1);
+            assertStrictEquals(
+                root[0]!.request_id, null,
+            );
+        },
+    );
+
+    Deno.test(
+        'body indexes are absent and'
+            + ' fa_message_body_bytes remains',
+        async () => {
+            const catalog = await sql.query<{
+                body_absent: boolean,
+                pairs_absent: boolean,
+                bytes_present: boolean,
+            }>`
+                SELECT to_regprocedure(
+                        'fa_message_body(bytea)'
+                    ) IS NULL AS body_absent,
+                    to_regclass(
+                        'fa_message_pairs_body'
+                    ) IS NULL AS pairs_absent,
+                    to_regprocedure(
+                        'fa_message_body_bytes(bytea)'
+                    ) IS NOT NULL AS bytes_present
+            `;
+            assertStrictEquals(catalog.length, 1);
+            const row = catalog[0]!;
+            assertStrictEquals(row.body_absent, true);
+            assertStrictEquals(
+                row.pairs_absent, true,
+            );
+            assertStrictEquals(
+                row.bytes_present, true,
+            );
+        },
+    );
 }
