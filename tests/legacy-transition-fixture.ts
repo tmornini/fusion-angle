@@ -47,9 +47,9 @@ export async function appendLegacyTransition(
         requesterIdentityId: actor,
         requestAt,
         organization,
-        responseStatus: 204,
         responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postWorkOrderTransitionOp(
         db, workOrderId, body, actor,

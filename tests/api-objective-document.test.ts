@@ -226,8 +226,9 @@ async () => {
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: body,
+        responseBody: body,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     // Phase Final Task 2: objectives ROW half stripped —
     // op returns the reconstructed entity; only pairs land.
@@ -293,8 +294,9 @@ async function putDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: at,
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: body,
+        responseBody: body,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -318,8 +320,9 @@ async function deleteDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: at,
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

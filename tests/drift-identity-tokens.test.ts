@@ -216,6 +216,7 @@ Deno.test('formTokenEventMessagePair stored body equals '
     };
     const messagePair = await formTokenEventMessagePair(
         JTI_G4_SYNTH, event, generateIdentifier(),
+        generateIdentifier(),
     );
     const stored = JSON.parse(
         storedMessageBodyText(messagePair.responseMessage),

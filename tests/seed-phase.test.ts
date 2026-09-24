@@ -39,9 +39,9 @@ Deno.test(
             requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
             requestAt: '2026-01-01T00:00:00.000000Z',
             organization: ORGANIZATION,
-            responseStatus: 201,
             responseBody: { title: 'T' },
             operationId: generateIdentifier(),
+            requestId: generateIdentifier(),
         });
         backend.refuseNextSuccessions(1);
         await assertRejects(

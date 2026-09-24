@@ -175,8 +175,9 @@ Deno.test('postWorkOrderDocumentOp returns the entity and the'
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     const written = await postWorkOrderDocumentOp(
         db, 'yAhMcJGxllmQkLemOQjCmA', body,

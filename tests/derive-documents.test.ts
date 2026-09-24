@@ -19,7 +19,6 @@ const AT = '2026-01-01T00:00:00.000000Z';
 // truthful to what appendMessagePairOnce actually persists.
 async function storedMessagePairAt(
     method: string,
-    status: number,
 ): Promise<MessagePairEntity> {
     const messagePair = await formWriteMessagePair({
         method,
@@ -33,9 +32,9 @@ async function storedMessagePairAt(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT,
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: status,
         responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     return {
         id: messagePair.id,
@@ -65,7 +64,7 @@ async function storedMessagePairAt(
 
 Deno.test('2-arg documentMessagePairsAt decodes a PUT pair',
 async () => {
-    const messagePair = await storedMessagePairAt('PUT', 200);
+    const messagePair = await storedMessagePairAt('PUT');
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
     const fromOne = documentMessagePairsAt(
         [messagePair], prefix,
@@ -77,7 +76,7 @@ async () => {
 
 Deno.test('documentMessagePairsAt excludes a POST pair at a'
 + ' document', async () => {
-    const messagePair = await storedMessagePairAt('POST', 200);
+    const messagePair = await storedMessagePairAt('POST');
     const messagePairs = documentMessagePairsAt(
         [messagePair],
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
@@ -87,7 +86,7 @@ Deno.test('documentMessagePairsAt excludes a POST pair at a'
 
 Deno.test('documentMessagePairsAt includes a PUT pair at a'
 + ' document', async () => {
-    const messagePair = await storedMessagePairAt('PUT', 200);
+    const messagePair = await storedMessagePairAt('PUT');
     const messagePairs = documentMessagePairsAt(
         [messagePair],
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
@@ -99,7 +98,7 @@ Deno.test('documentMessagePairsAt includes a PUT pair at a'
 Deno.test('documentMessagePairsAt includes a DELETE pair at a'
 + ' document', async () => {
     const messagePair = await storedMessagePairAt(
-        'DELETE', 204,
+        'DELETE',
     );
     const messagePairs = documentMessagePairsAt(
         [messagePair],
@@ -111,7 +110,7 @@ Deno.test('documentMessagePairsAt includes a DELETE pair at a'
 
 Deno.test('deriveDocumentsAt never sees a POST-only document',
 async () => {
-    const messagePair = await storedMessagePairAt('POST', 200);
+    const messagePair = await storedMessagePairAt('POST');
     const documents = deriveDocumentsAt(
         [messagePair],
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',

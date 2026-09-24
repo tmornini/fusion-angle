@@ -65,6 +65,9 @@ function tokenRequestSeed(): AuthMessagePairSeed {
         routePattern: 'authentication/token',
         routeSegments: ['authentication', 'token'],
         pathSegments: ['authentication', 'token'],
+        bodyBytes: new Uint8Array(),
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     };
 }
 

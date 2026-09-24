@@ -147,7 +147,6 @@ Deno.test('mint bakes claim roles from a seat, not a'
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200,
         responseBody: {
             id: 'XXZruirZyAOoRpNxaDnpSA',
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
@@ -155,6 +154,7 @@ Deno.test('mint bakes claim roles from a seat, not a'
             ...body,
         },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postMembershipDocumentOp(
         db, 'XXZruirZyAOoRpNxaDnpSA', body, SYSTEM_MEMBER_ID,

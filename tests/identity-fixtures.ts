@@ -53,11 +53,11 @@ async function identityDocumentMessagePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization: undefined,
-        responseStatus: spec.status,
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, undefined,
         ),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
 }
 
@@ -84,11 +84,11 @@ async function identityPiiDocumentMessagePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization: undefined,
-        responseStatus: spec.status,
         responseBody: spec.successBody?.(
             [id], pii, SYSTEM_MEMBER_ID, undefined,
         ),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
 }
 
@@ -119,11 +119,11 @@ async function identityCredentialDocumentMessagePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization: undefined,
-        responseStatus: spec.status,
         responseBody: spec.successBody?.(
             [id, cid], fields, SYSTEM_MEMBER_ID, undefined,
         ),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
 }
 
@@ -157,12 +157,12 @@ async function identityProviderDocumentMessagePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization: undefined,
-        responseStatus: spec.status,
         responseBody: spec.successBody?.(
             [identityId, id], body, SYSTEM_MEMBER_ID,
             undefined,
         ),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
 }
 
@@ -279,11 +279,11 @@ async function clientRegistrationDocumentMessagePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization: undefined,
-        responseStatus: spec.status,
         responseBody: spec.successBody?.(
             [id], fields, SYSTEM_MEMBER_ID, undefined,
         ),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
 }
 
@@ -320,9 +320,9 @@ export async function seedClientRegistrationTombstone(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization: undefined,
-        responseStatus: 204,
         responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

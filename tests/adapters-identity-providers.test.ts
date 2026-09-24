@@ -216,7 +216,6 @@ async () => {
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization: undefined,
-        responseStatus: 200,
         responseBody: identityProviderEntityOf({
             name: id,
             messagePairId: id,
@@ -224,6 +223,7 @@ async () => {
             body,
         }),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -260,7 +260,6 @@ async () => {
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization: undefined,
-        responseStatus: 200,
         responseBody: identityProviderEntityOf({
             name: id,
             messagePairId: id,
@@ -268,6 +267,7 @@ async () => {
             body: flatBody,
         }),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

@@ -143,13 +143,23 @@ async function seedAuthorizationCodeMessagePair(
         routePattern: 'authentication/authorize',
         routeSegments: ['authentication', 'authorize'],
         pathSegments: ['authentication', 'authorize'],
+        bodyBytes: new Uint8Array(),
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     };
     const requestBody = {
         method: 'password', username: 'seed@example.com',
         password: 'seed-password', client_id: 'web',
     };
     const messagePair = await formAuthMessagePair(
-        seed, requestBody, 'XXZruirZyAOoRpNxaDnpSA', 200, { code },
+        {
+            ...seed,
+            bodyBytes: new TextEncoder().encode(
+                JSON.stringify(requestBody),
+            ),
+        },
+        requestBody, 'XXZruirZyAOoRpNxaDnpSA', { code },
+        seed.operationId, seed.requestId,
     );
     await runWrite(
         db,

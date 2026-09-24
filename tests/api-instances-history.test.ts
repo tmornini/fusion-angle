@@ -218,9 +218,9 @@ async function appendInstancePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization,
-        responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

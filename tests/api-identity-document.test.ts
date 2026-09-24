@@ -158,8 +158,9 @@ async () => {
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
-        responseStatus: 200, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     const written = await postIdentityDocumentOp(
         db, 'gTMDzYjclgPKfPUYsUdtoQ', body,
@@ -216,9 +217,9 @@ async function putDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt,
         organization: undefined,
-        responseStatus: 200,
         responseBody: body,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -243,8 +244,9 @@ async function deleteDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt,
         organization: undefined,
-        responseStatus: 204, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

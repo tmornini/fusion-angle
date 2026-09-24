@@ -226,8 +226,9 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
         pathSegments: ['ideas', 'gZsGVjTnvrgHQLzbKnQckg'],
         headerFields: [], body, requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody,
+        responseBody,
         operationId,
+        requestId: generateIdentifier(),
     });
     const written = await route.put!(
         db, ['AjdvjuECVZEgZoFajaIEkg', 'gZsGVjTnvrgHQLzbKnQckg'], body
@@ -696,9 +697,10 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         pathSegments: [TEST_FAMILY, 'race'],
         headerFields: [], body: { v: 'genesis' },
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
-        organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseBody: { v: 'genesis' },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -719,10 +721,11 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         pathSegments: [TEST_FAMILY, 'race'],
         headerFields: [echo], body: { v: 'a' },
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
-        organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseBody: { v: 'a' },
         latchedHeadMessagePairId: genesis.id,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     const writerB = await formWriteMessagePair({
         method: 'PUT', pathname: '/' + TEST_PATTERN,
@@ -731,10 +734,11 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         pathSegments: [TEST_FAMILY, 'race'],
         headerFields: [echo], body: { v: 'b' },
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
-        organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseBody: { v: 'b' },
         latchedHeadMessagePairId: genesis.id,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await testDocumentOp(
         db, 'race', { v: 'a' }, 'XXZruirZyAOoRpNxaDnpSA', writerA,
@@ -871,9 +875,9 @@ async function putStatelessDocumentMessagePair(
         pathSegments: [STATELESS_FAMILY, id],
         headerFields: [], body, requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200,
         responseBody: { id, ...body },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -895,8 +899,9 @@ async function deleteStatelessDocumentMessagePair(
         headerFields: [], body: {},
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

@@ -94,7 +94,6 @@ import {
     deriveIdentityTokenEventsForJti,
 } from './derive-identity-tokens.ts';
 import {
-    HTTP_OK,
     HTTP_BAD_REQUEST,
     HTTP_UNAUTHORIZED,
     HTTP_FORBIDDEN,
@@ -443,7 +442,8 @@ async function issueTokenPair(
     const messagePair = seed === undefined
         ? undefined
         : await formAuthMessagePair(
-            seed, body, identityId, HTTP_OK, response,
+            seed, body, identityId, response,
+            seed.operationId, seed.requestId,
         );
     // Copy the envelope id: hoisted header when the client
     // sent one, else formAuthMessagePair's named mint. Seedless
@@ -451,11 +451,13 @@ async function issueTokenPair(
     // event pair alone.
     const operationId = messagePair?.operationId
         ?? generateIdentifier();
+    const requestId = messagePair?.requestId
+        ?? generateIdentifier();
     const eventMessagePair = await formTokenEventMessagePair(
         refreshJti, {
             jti: refreshJti, identity_id: identityId,
             action: 'issued', chain_id: chainId, at,
-        }, operationId,
+        }, operationId, requestId,
     );
     const pairs = [eventMessagePair];
     if (messagePair !== undefined) {
@@ -556,13 +558,14 @@ interface TokenEventWrite {
 async function formTokenEventWrites(
     appends: readonly Omit<IdentityTokenEntity, 'id'>[],
     operationId: string,
+    requestId: string,
 ): Promise<TokenEventWrite[]> {
     const writes: TokenEventWrite[] = [];
     for (const event of appends) {
         writes.push({
             event,
             messagePair: await formTokenEventMessagePair(
-                event.jti, event, operationId,
+                event.jti, event, operationId, requestId,
             ),
         });
     }
@@ -623,6 +626,7 @@ async function planRotationAttempt(
     presentedJti: string,
     newJti: string,
     operationId: string,
+    requestId: string,
 ): Promise<{
     readonly plan: RotationPlan;
     readonly writes: readonly TokenEventWrite[];
@@ -645,7 +649,7 @@ async function planRotationAttempt(
     return {
         plan,
         writes: await formTokenEventWrites(
-            appends, operationId,
+            appends, operationId, requestId,
         ),
     };
 }
@@ -691,6 +695,8 @@ export async function rotateRefreshJti(
 ): Promise<RotationOutcome> {
     const operationId = messagePair?.operationId
         ?? generateIdentifier();
+    const requestId = messagePair?.requestId
+        ?? generateIdentifier();
     const backed = backedWrite(adapter);
     for (
         let attempt = 0;
@@ -699,7 +705,7 @@ export async function rotateRefreshJti(
     ) {
         const provisional = await planRotationAttempt(
             adapter, identityId, presentedJti, newJti,
-            operationId,
+            operationId, requestId,
         );
         try {
             await backed.backend.transaction(
@@ -802,6 +808,7 @@ async function planRevocationAttempt(
     identityId: Id,
     jti: string,
     operationId: string,
+    requestId: string,
 ): Promise<{
     readonly writes: readonly TokenEventWrite[];
 }> {
@@ -813,7 +820,7 @@ async function planRevocationAttempt(
         : revocationAppends(rows, chainId, identityId, nowUtc());
     return {
         writes: await formTokenEventWrites(
-            appends, operationId,
+            appends, operationId, requestId,
         ),
     };
 }
@@ -847,13 +854,15 @@ export async function revokeTokenChain(
 ): Promise<void> {
     const operationId = messagePair?.operationId
         ?? generateIdentifier();
+    const requestId = messagePair?.requestId
+        ?? generateIdentifier();
     for (
         let attempt = 0;
         attempt < MAX_TOKEN_WRITE_ATTEMPTS;
         attempt++
     ) {
         const provisional = await planRevocationAttempt(
-            adapter, identityId, jti, operationId,
+            adapter, identityId, jti, operationId, requestId,
         );
         try {
             await adapter.readTransaction(async (view) => {
@@ -966,7 +975,8 @@ async function grantRefresh(
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(
-        seed, body, verified.claims.sub, HTTP_OK, response,
+        seed, body, verified.claims.sub, response,
+            seed.operationId, seed.requestId,
     );
     const outcome = await rotateRefreshJti(
         adapter, verified.claims.sub, verified.claims.jti,
@@ -1177,13 +1187,14 @@ async function grantClientCredentials(
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(
-        seed, body, clientId, HTTP_OK, response,
+        seed, body, clientId, response,
+            seed.operationId, seed.requestId,
     );
     const eventMessagePair = await formTokenEventMessagePair(
         refreshJti, {
             jti: refreshJti, identity_id: clientId,
             action: 'issued', chain_id: chainId, at,
-        }, messagePair.operationId,
+        }, messagePair.operationId, messagePair.requestId,
     );
     const ticketBody = { exp: verdict.exp };
     const ticketMessagePair = await formWriteMessagePair({
@@ -1204,9 +1215,9 @@ async function grantClientCredentials(
         requesterIdentityId: clientId,
         requestAt: at,
         organization: undefined,
-        responseStatus: HTTP_OK,
         responseBody: ticketBody,
         operationId: messagePair.operationId,
+        requestId: messagePair.requestId,
     });
     const existing = await adapter.readTransaction(
         async (view) => messageStore(view).getDocumentHead(
@@ -1438,7 +1449,8 @@ async function grantAuthorizationCode(
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(
-        seed, body, issuer.identityId, HTTP_OK, response,
+        seed, body, issuer.identityId, response,
+            seed.operationId, seed.requestId,
     );
     // Marker and issued event formed pre-tx against
     // `issuer.identityId` — a code's issuer cannot change
@@ -1447,13 +1459,13 @@ async function grantAuthorizationCode(
     const markerMessagePair =
         await formAuthorizationCodeMarkerPair(
             derivedId, refreshJti, issuer.identityId, at,
-            messagePair.operationId,
+            messagePair.operationId, messagePair.requestId,
         );
     const eventMessagePair = await formTokenEventMessagePair(
         refreshJti, {
             jti: refreshJti, identity_id: issuer.identityId,
             action: 'issued', chain_id: chainId, at,
-        }, messagePair.operationId,
+        }, messagePair.operationId, messagePair.requestId,
     );
     // The spend check and the marker write share one
     // client. A later grant then observes the marker and
@@ -1661,7 +1673,8 @@ async function authorizePassword(
     const code = generateSecret();
     const response: AuthorizeResponse = { code };
     const messagePair = await formAuthMessagePair(
-        seed, body, identityId, HTTP_OK, response,
+        seed, body, identityId, response,
+            seed.operationId, seed.requestId,
     );
     let rehashMessagePair: MessagePair | undefined;
     if (secret.startsWith('$pbkdf2-sha256$')) {
@@ -1693,7 +1706,6 @@ async function authorizePassword(
             requesterIdentityId: identityId,
             requestAt: at,
             organization: undefined,
-            responseStatus: HTTP_OK,
             responseBody: {
                 id: cid,
                 ...validateIdentityCredentialEntity(
@@ -1701,6 +1713,7 @@ async function authorizePassword(
                 ),
             },
             operationId: messagePair.operationId,
+            requestId: messagePair.requestId,
         });
     }
     const pairs = rehashMessagePair === undefined

@@ -122,7 +122,6 @@ async function seedRecordTypeBelowGate(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization,
-        responseStatus: 200,
         responseBody: {
             id,
             organization_id: organization,
@@ -132,6 +131,7 @@ async function seedRecordTypeBelowGate(
             state: body['state'],
         },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, messagePair,

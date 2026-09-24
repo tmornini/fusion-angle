@@ -18,7 +18,6 @@ import { validateIdentityTokenEntity } from './validators.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
-import { REQUEST_ID_HEADER } from './request-context.ts';
 import {
     familyRegistration,
     RECORD_TYPES_COLLECTION_PATTERN,
@@ -77,6 +76,7 @@ export interface MessagePair {
     readonly responseHash: string;
     readonly method: string;
     readonly operationId: string;
+    readonly requestId: string;
     // A document create: no head, so the statement is
     // genesis rather than blind.
     readonly genesis?: true;
@@ -103,11 +103,23 @@ export interface MessagePair {
 export interface AuthMessagePairSeed {
     readonly requestAt: string;
     readonly headerFields: readonly FieldLine[];
+    readonly bodyBytes: Uint8Array;
     readonly method: string;
     readonly pathname: string;
     readonly routePattern: string;
     readonly routeSegments: readonly string[];
     readonly pathSegments: readonly string[];
+    readonly operationId: string;
+    readonly requestId: string;
+}
+
+// The bytes and headers of the request the api was handed.
+// The answering row stores these. A synthesized pair does not.
+export interface ReceivedRequest {
+    readonly target: string;
+    readonly headerFields: readonly FieldLine[];
+    readonly bodyBytes: Uint8Array;
+    readonly requestId: string;
 }
 
 export interface WriteMessagePairInput {
@@ -127,7 +139,10 @@ export interface WriteMessagePairInput {
     // canonical organization-nested prefix — see
     // canonicalPath.
     readonly organization: Id | undefined;
-    readonly responseStatus: number;
+    // Present only for the answering row: the body bytes the
+    // gate read. Synthesized pairs omit it and build a request
+    // from `body`.
+    readonly bodyBytes?: Uint8Array;
     readonly responseBody: unknown | undefined;
     readonly latchedHeadMessagePairId?: string;
     readonly pinnedDocumentMessagePairId?: string;
@@ -135,10 +150,10 @@ export interface WriteMessagePairInput {
     // the hoisted Operation-ID; seed and inner PUTs pass
     // the envelope id here. Never minted for a public write.
     readonly operationId: string;
+    // The id the server minted for this request. Missing throws.
+    readonly requestId: string;
     readonly genesis?: true;
 }
-
-const RESPONSE_ID_FIELD = 'response-id';
 
 // Fallback for first path segments that are organization-
 // nested but not yet registered in family-registry.ts. A
@@ -230,6 +245,27 @@ export function storedPathAndNameOf(input: {
     };
 }
 
+function receivedRequestWire(
+    method: string,
+    target: string,
+    fields: readonly FieldLine[],
+    bodyBytes: Uint8Array,
+): string {
+    return storedWire({
+        startLine: {
+            kind: 'request',
+            method,
+            target,
+            version: 'HTTP/1.1',
+        },
+        fields,
+        body: bodyBytes.byteLength > 0
+            ? Octets.fromBytes(bodyBytes)
+            : undefined,
+        trailer: undefined,
+    });
+}
+
 export async function formWriteMessagePair(
     input: WriteMessagePairInput,
 ): Promise<MessagePair> {
@@ -239,17 +275,30 @@ export async function formWriteMessagePair(
                 + ' identifier',
         );
     }
+    if (
+        input.requestId === undefined
+        || input.requestId === ''
+    ) {
+        throw new Error('requestId is required');
+    }
     const id = generateIdentifier();
     const { path, name } = storedPathAndNameOf(input);
     const headerFields = headerFieldsWithOperationId(
         input.headerFields, input.operationId,
     );
-    const requestModel = buildRequestModel({
-        method: input.method,
-        target: input.pathname,
-        fields: headerFields,
-        body: input.body,
-    });
+    const requestMessage = input.bodyBytes !== undefined
+        ? receivedRequestWire(
+            input.method,
+            input.pathname,
+            headerFields,
+            input.bodyBytes,
+        )
+        : storedWire(buildRequestModel({
+            method: input.method,
+            target: input.pathname,
+            fields: headerFields,
+            body: input.body,
+        }));
     const storedStatus = input.method === 'DELETE'
         ? HTTP_NO_CONTENT
         : HTTP_CREATED;
@@ -260,14 +309,15 @@ export async function formWriteMessagePair(
             name: 'operation-id',
             value: input.operationId,
         },
-        { name: RESPONSE_ID_FIELD, value: id },
+        { name: 'request-id', value: input.requestId },
     ];
     const responseModel = buildResponseModel({
         status: storedStatus,
         fields: responseFields,
-        body: input.responseBody,
+        body: input.method === 'DELETE'
+            ? undefined
+            : input.responseBody,
     });
-    const requestMessage = storedWire(requestModel);
     const responseMessage = storedWire(responseModel);
     return {
         id,
@@ -282,6 +332,7 @@ export async function formWriteMessagePair(
         responseHash: await requestMessageHash(responseMessage),
         method: input.method,
         operationId: input.operationId,
+        requestId: input.requestId,
         ...(input.genesis === true
             ? { genesis: true as const }
             : {}),
@@ -308,23 +359,18 @@ export async function formAuthMessagePair(
     seed: AuthMessagePairSeed,
     body: Record<string, unknown>,
     requesterIdentityId: Id,
-    responseStatus: number,
     responseBody: unknown,
-    operationId?: string,
+    operationId: string,
+    requestId: string,
 ): Promise<MessagePair> {
-    const hoisted = seed.headerFields.find(
-        (f) => f.name === OPERATION_ID_HEADER,
-    )?.value;
     return formWriteMessagePair({
         ...seed,
         body,
         requesterIdentityId,
         organization: undefined,
-        responseStatus,
         responseBody,
-        operationId: operationId
-            ?? hoisted
-            ?? generateIdentifier(),
+        operationId,
+        requestId,
     });
 }
 
@@ -359,6 +405,7 @@ export async function formTokenEventMessagePair(
     name: Id,
     event: Omit<IdentityTokenEntity, 'id'>,
     operationId: string,
+    requestId: string,
 ): Promise<MessagePair> {
     const pathSegments = [
         TOKEN_EVENT_ROUTE_SEGMENTS[0]!,
@@ -378,12 +425,12 @@ export async function formTokenEventMessagePair(
         requesterIdentityId: event.identity_id,
         requestAt: event.at,
         organization: undefined,
-        responseStatus: HTTP_OK,
         responseBody: {
             ...validateIdentityTokenEntity(body),
             id: name,
         },
         operationId,
+        requestId,
     });
 }
 
@@ -405,6 +452,7 @@ export async function formAuthorizationCodeMarkerPair(
     identityId: Id,
     at: string,
     operationId: string,
+    requestId: string,
 ): Promise<MessagePair> {
     const pathSegments = [
         AUTH_CODE_MARKER_ROUTE_SEGMENTS[0]!,
@@ -424,9 +472,9 @@ export async function formAuthorizationCodeMarkerPair(
         requesterIdentityId: identityId,
         requestAt: at,
         organization: undefined,
-        responseStatus: HTTP_OK,
         responseBody: { jti, id: hash },
         operationId,
+        requestId,
     });
 }
 
@@ -534,21 +582,28 @@ export function attachDate(
     return response;
 }
 
-// The header fields worth storing in a pair's request message:
-// enumerated explicitly (never hoisted blindly). Stored
-// verbatim, including `authorization`.
-const HOISTED_HEADER_NAMES: readonly string[] = [
-    'authorization', 'content-type', 'idempotency-key',
-    REQUEST_ID_HEADER, IF_MATCH_HEADER, OPERATION_ID_HEADER,
-];
+// Every header the request carries, credential lines included.
+// Names are already lower-case. Repeats other than set-cookie
+// are already joined. content-length is the value that arrived.
+export function requestTarget(request: Request): string {
+    const url = new URL(request.url);
+    return url.pathname + url.search;
+}
 
-export function hoistedHeaderFields(request: Request): FieldLine[] {
+export function hoistedHeaderFields(
+    request: Request,
+): FieldLine[] {
     const fields: FieldLine[] = [];
-    for (const name of HOISTED_HEADER_NAMES) {
-        const value = request.headers.get(name);
-        if (value !== null) {
-            fields.push({ name, value });
-        }
+    request.headers.forEach((value, name) => {
+        if (name === 'set-cookie') return;
+        fields.push({ name, value });
+    });
+    const cookies = typeof request.headers.getSetCookie
+        === 'function'
+        ? request.headers.getSetCookie()
+        : [];
+    for (const value of cookies) {
+        fields.push({ name: 'set-cookie', value });
     }
     return fields;
 }

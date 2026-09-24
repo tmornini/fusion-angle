@@ -44,11 +44,11 @@ async function writePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: nextRequestAt(),
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: deleted ? 204 : 200,
         responseBody: deleted
             ? undefined
             : input.responseBody,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

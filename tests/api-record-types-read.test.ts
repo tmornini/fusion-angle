@@ -106,13 +106,13 @@ async function seedRecordTypePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization,
-        responseStatus: 200,
         responseBody: {
             id,
             organization_id: organization,
             ...body,
         },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, messagePair,

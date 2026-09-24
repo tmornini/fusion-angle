@@ -12,8 +12,6 @@ import {
     HTTP_NOT_FOUND,
     HTTP_FORBIDDEN,
     HTTP_CONFLICT,
-    HTTP_OK,
-    HTTP_NO_CONTENT,
 } from './http-errors.ts';
 import {
     pickString,
@@ -25,7 +23,9 @@ import {
     formWriteMessagePair,
     runWrite,
 } from './message-pair.ts';
-import type { MessagePair } from './message-pair.ts';
+import type {
+    MessagePair, ReceivedRequest,
+} from './message-pair.ts';
 import { formDocumentMessagePairFor } from './routes.ts';
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
@@ -307,11 +307,12 @@ export async function postOrganizationInvitationGrant(
     _roles: readonly string[],
     requestAt: string,
     operationId: string,
+    received?: ReceivedRequest,
 ): Promise<unknown> {
     requireWriteStamp(requestAt, operationId);
     return grantInvitation(
         db, param(params, 0), payload, actor,
-        requestAt, operationId,
+        requestAt, operationId, received,
     );
 }
 
@@ -327,6 +328,7 @@ export async function putInvitationOnIdentityNest(
     _roles: readonly string[],
     requestAt: string,
     operationId: string,
+    received?: ReceivedRequest,
 ): Promise<unknown> {
     requireWriteStamp(requestAt, operationId);
     const identityId = param(params, 0);
@@ -347,12 +349,12 @@ export async function putInvitationOnIdentityNest(
     if (transition.state === 'accepted') {
         return acceptInvitation(
             db, id, identityId, transition, actor,
-            requestAt, operationId,
+            requestAt, operationId, received,
         );
     }
     return declineInvitation(
         db, id, identityId, transition, actor,
-        requestAt, operationId,
+        requestAt, operationId, received,
     );
 }
 
@@ -368,6 +370,7 @@ export async function putInvitationOnOrganizationNest(
     _roles: readonly string[],
     requestAt: string,
     operationId: string,
+    received?: ReceivedRequest,
 ): Promise<unknown> {
     requireWriteStamp(requestAt, operationId);
     const organization = param(params, 0);
@@ -384,7 +387,7 @@ export async function putInvitationOnOrganizationNest(
     }
     return revokeInvitation(
         db, id, organization, transition, actor,
-        requestAt, operationId,
+        requestAt, operationId, received,
     );
 }
 
@@ -398,6 +401,7 @@ async function grantInvitation(
     actor: Id,
     requestAt: string,
     operationId: string,
+    received?: ReceivedRequest,
 ): Promise<unknown> {
     const email = typeof body.email === 'string'
         ? body.email : '';
@@ -442,9 +446,6 @@ async function grantInvitation(
             'no identity with that email', HTTP_NOT_FOUND);
     }
     const identityId = match.id;
-    const storedBody: Record<string, unknown> = { ...body };
-    delete storedBody.email;
-    storedBody.identity_id = identityId;
     const preOutcome = await grantOutcomeFor(
         db, organization, identityId);
     if (preOutcome.kind === 'member') {
@@ -463,20 +464,29 @@ async function grantInvitation(
             identity_id: identityId,
             at: grantAt, state: 'pending',
         };
+    if (received === undefined) {
+        throw new Error('requestId is required');
+    }
     const messagePair = await formWriteMessagePair({
-        method: 'POST', pathname: '/invitations',
+        method: 'POST',
+        pathname: received.target,
         routePattern: 'invitations',
         routeSegments: ['invitations'],
         pathSegments: ['invitations'],
-        headerFields: [],
-        body: storedBody, requesterIdentityId: actor,
-        requestAt, organization: undefined,
-        responseStatus: HTTP_OK, responseBody,
+        headerFields: received.headerFields,
+        body,
+        bodyBytes: received.bodyBytes,
+        requesterIdentityId: actor,
+        requestAt,
+        organization: undefined,
+        responseBody,
         operationId,
+        requestId: received.requestId,
     });
     const document = preOutcome.kind === 'fresh'
         ? await formInvitationDocumentMessagePair(
-            actor, requestAt, operationId, invitationId,
+            actor, requestAt, operationId,
+            received.requestId, invitationId,
             {
                 organization_id: organization,
                 identity_id: identityId,
@@ -566,6 +576,7 @@ async function formInvitationDocumentMessagePair(
     actor: Id,
     requestAt: string,
     operationId: string,
+    requestId: string,
     invitationId: Id,
     body: {
         readonly organization_id: Id;
@@ -585,9 +596,9 @@ async function formInvitationDocumentMessagePair(
         requesterIdentityId: actor,
         requestAt,
         organization: undefined,
-        responseStatus: HTTP_OK,
         responseBody: { id: invitationId, ...body },
         operationId,
+        requestId,
     });
 }
 
@@ -595,22 +606,27 @@ async function formInvitationOperationMessagePair(
     actor: Id,
     requestAt: string,
     operationId: string,
+    requestId: string,
     body: Record<string, unknown>,
     invitationId: Id,
     op: string,
+    received: ReceivedRequest,
 ): Promise<MessagePair> {
     return formWriteMessagePair({
         method: 'POST',
-        pathname: '/invitations/' + invitationId + '/' + op,
+        pathname: received.target,
         routePattern: 'invitations/:id/' + op,
         routeSegments: ['invitations', ':id', op],
         pathSegments: ['invitations', invitationId, op],
-        headerFields: [],
-        body, requesterIdentityId: actor,
-        requestAt, organization: undefined,
-        responseStatus: HTTP_NO_CONTENT,
+        headerFields: received.headerFields,
+        body,
+        bodyBytes: received.bodyBytes,
+        requesterIdentityId: actor,
+        requestAt,
+        organization: undefined,
         responseBody: undefined,
         operationId,
+        requestId,
     });
 }
 
@@ -626,6 +642,7 @@ async function acceptInvitation(
     actor: Id,
     requestAt: string,
     operationId: string,
+    received?: ReceivedRequest,
 ): Promise<undefined> {
     const inv = await loadInvitation(db, id);
     if (inv === null || inv.identity_id !== pathIdentityId) {
@@ -634,6 +651,9 @@ async function acceptInvitation(
                 + '/invitations/' + id,
             HTTP_NOT_FOUND,
         );
+    }
+    if (received === undefined) {
+        throw new Error('requestId is required');
     }
     if (inv.identity_id !== actor) {
         throw new ApiError(
@@ -659,10 +679,11 @@ async function acceptInvitation(
         acceptAt: transition.at,
     };
     const messagePair = await formInvitationOperationMessagePair(
-        actor, requestAt, operationId,
-        storedBody, id, 'acceptance');
+        actor, requestAt, operationId, received.requestId,
+        storedBody, id, 'acceptance', received);
     const terminal = await formInvitationDocumentMessagePair(
-        actor, requestAt, operationId, id,
+        actor, requestAt, operationId,
+        received.requestId, id,
         {
             organization_id: inv.organization_id,
             identity_id: inv.identity_id,
@@ -685,6 +706,7 @@ async function acceptInvitation(
         requestAt,
         organization: inv.organization_id,
         operationId,
+        requestId: received.requestId,
     });
     let conflict = false;
     let committed = false;
@@ -741,6 +763,7 @@ async function declineInvitation(
     actor: Id,
     requestAt: string,
     operationId: string,
+    received?: ReceivedRequest,
 ): Promise<undefined> {
     const inv = await loadInvitation(db, id);
     if (inv === null || inv.identity_id !== pathIdentityId) {
@@ -749,6 +772,9 @@ async function declineInvitation(
                 + '/invitations/' + id,
             HTTP_NOT_FOUND,
         );
+    }
+    if (received === undefined) {
+        throw new Error('requestId is required');
     }
     if (inv.identity_id !== actor) {
         throw new ApiError(
@@ -766,10 +792,11 @@ async function declineInvitation(
         declineAt: transition.at,
     };
     const messagePair = await formInvitationOperationMessagePair(
-        actor, requestAt, operationId,
-        storedBody, id, 'decline');
+        actor, requestAt, operationId, received.requestId,
+        storedBody, id, 'decline', received);
     const terminal = await formInvitationDocumentMessagePair(
-        actor, requestAt, operationId, id,
+        actor, requestAt, operationId,
+        received.requestId, id,
         {
             organization_id: inv.organization_id,
             identity_id: inv.identity_id,
@@ -820,8 +847,12 @@ async function revokeInvitation(
     actor: Id,
     requestAt: string,
     operationId: string,
+    received?: ReceivedRequest,
 ): Promise<undefined> {
     const inv = await loadInvitation(db, id);
+    if (received === undefined) {
+        throw new Error('requestId is required');
+    }
     if (
         inv === null
         || inv.organization_id !== pathOrganization
@@ -843,10 +874,11 @@ async function revokeInvitation(
         revokeAt: transition.at,
     };
     const messagePair = await formInvitationOperationMessagePair(
-        actor, requestAt, operationId,
-        storedBody, id, 'revocation');
+        actor, requestAt, operationId, received.requestId,
+        storedBody, id, 'revocation', received);
     const terminal = await formInvitationDocumentMessagePair(
-        actor, requestAt, operationId, id,
+        actor, requestAt, operationId,
+        received.requestId, id,
         {
             organization_id: inv.organization_id,
             identity_id: inv.identity_id,
@@ -911,10 +943,15 @@ async function revocationIsReplay(
         const parsed = JSON.parse(body.toText()) as {
             readonly revokeEventId?: string;
             readonly revokeAt?: string;
+            readonly eventId?: string;
+            readonly at?: string;
         };
+        const eventId = parsed.eventId
+            ?? parsed.revokeEventId;
+        const at = parsed.at ?? parsed.revokeAt;
         if (
-            parsed.revokeEventId === transition.eventId
-            && parsed.revokeAt === transition.at
+            eventId === transition.eventId
+            && at === transition.at
         ) {
             return true;
         }

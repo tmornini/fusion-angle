@@ -205,9 +205,9 @@ async () => {
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization: ORGANIZATION,
-        responseStatus: 204,
         responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postWorkOrderTransitionOp(
         db,

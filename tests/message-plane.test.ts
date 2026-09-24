@@ -32,6 +32,7 @@ import { HttpMessageError } from
 import {
     attemptFor,
     documentHeadAt,
+    formTokenEventMessagePair,
     formWriteMessagePair,
     runWrite,
 } from '../api/message-pair.ts';
@@ -96,9 +97,9 @@ async function plantDelete(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: nowUtc(),
         organization,
-        responseStatus: 204,
         responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -797,5 +798,280 @@ Deno.test(
             isIdentifier(ctx.requestId), true,
         );
         assertNotStrictEquals(ctx.requestId, carried);
+    },
+);
+
+function wireBody(wire: string): string {
+    const mark = '\r\n\r\n';
+    const at = wire.indexOf(mark);
+    return at === -1 ? '' : wire.slice(at + mark.length);
+}
+
+function receivedRequest(
+    method: string,
+    target: string,
+    token: string,
+    operationId: string,
+    raw: string,
+): Request {
+    const length = String(
+        new TextEncoder().encode(raw).byteLength,
+    );
+    return new Request('http://localhost' + target, {
+        method,
+        headers: {
+            authorization: 'Bearer ' + token,
+            'content-type': 'application/json',
+            'content-length': length,
+            'operation-id': operationId,
+            'x-trace': 'kept',
+        },
+        body: raw,
+    });
+}
+
+Deno.test(
+    'a received document keeps its body bytes'
+        + ' and both ids',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const token = await organizationToken();
+        const operationId = generateIdentifier();
+        const id = generateIdentifier();
+        const raw = '{"title":"t","position":'
+            + '9007199254740993,'
+            + '"problem_statement":"p",'
+            + '"target_users":"u",'
+            + '"proposed_solution":"s",'
+            + '"expected_outcome":"o",'
+            + '"success_metrics":"m",'
+            + '"state":"active"}';
+        const target = '/organizations/'
+            + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + id + '?kept=1';
+        const length = String(
+            new TextEncoder().encode(raw).byteLength,
+        );
+        const response = await handleRequest(
+            db, receivedRequest(
+                'PUT', target, token, operationId, raw,
+            ),
+        );
+        await response.text();
+        const requestId = response.headers.get(
+            'request-id',
+        );
+        assertStrictEquals(response.status, 201);
+        const stored = (await db.messagePairs.getAll())
+            .find((row) => row.name === id);
+        if (stored === undefined) {
+            throw new Error('document was not stored');
+        }
+        const request = stored.request;
+        assertStrictEquals(wireBody(request), raw);
+        assertStrictEquals(
+            request.includes(
+                'PUT ' + target + ' HTTP/1.1',
+            ),
+            true,
+        );
+        assertStrictEquals(
+            request.includes(
+                'content-length: ' + length,
+            ),
+            true,
+        );
+        assertStrictEquals(
+            request.includes('x-trace: kept'),
+            true,
+        );
+        const wire = stored.response;
+        assertStrictEquals(
+            wire.includes(
+                'operation-id: ' + operationId,
+            ),
+            true,
+        );
+        assertStrictEquals(
+            wire.includes('request-id: ' + requestId),
+            true,
+        );
+        assertStrictEquals(wire.includes('etag: '), true);
+        assertStrictEquals(
+            wire.includes('response-id:'),
+            false,
+        );
+    },
+);
+
+Deno.test(
+    'a received body keeps digits past 2^53',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const token = await organizationToken();
+        const operationId = generateIdentifier();
+        const id = generateIdentifier();
+        const raw =
+            '{"n":9007199254740993,"z":1,"a":2}';
+        const target = '/identities/'
+            + 'XXZruirZyAOoRpNxaDnpSA/tokens/'
+            + id + '/revocation?kept=1';
+        const length = String(
+            new TextEncoder().encode(raw).byteLength,
+        );
+        const response = await handleRequest(
+            db, receivedRequest(
+                'POST', target, token,
+                operationId, raw,
+            ),
+        );
+        await response.text();
+        const requestId = response.headers.get(
+            'request-id',
+        );
+        assertStrictEquals(response.status, 201);
+        const stored = (await db.messagePairs.getAll())
+            .find((row) => row.request.includes(id));
+        if (stored === undefined) {
+            throw new Error('revocation was not stored');
+        }
+        const request = stored.request;
+        assertStrictEquals(wireBody(request), raw);
+        assertStrictEquals(
+            request.includes(
+                'POST ' + target + ' HTTP/1.1',
+            ),
+            true,
+        );
+        assertStrictEquals(
+            request.includes(
+                'content-length: ' + length,
+            ),
+            true,
+        );
+        assertStrictEquals(
+            request.includes('x-trace: kept'),
+            true,
+        );
+        const wire = stored.response;
+        assertStrictEquals(
+            wire.includes(
+                'operation-id: ' + operationId,
+            ),
+            true,
+        );
+        assertStrictEquals(
+            wire.includes('request-id: ' + requestId),
+            true,
+        );
+        assertStrictEquals(
+            wire.includes('response-id:'),
+            false,
+        );
+    },
+);
+
+Deno.test(
+    'one request\'s answering row keeps the'
+        + ' received body and both ids',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const token = await organizationToken();
+        const operationId = generateIdentifier();
+        const id = generateIdentifier();
+        const raw = '{"kind": "person","id": "'
+            + id + '"}';
+        const target = '/identities/?kept=1';
+        const before = new Set(
+            (await db.messagePairs.getAll())
+                .map((row) => row.id),
+        );
+        const response = await handleRequest(
+            db, receivedRequest(
+                'POST', target, token, operationId, raw,
+            ),
+        );
+        await response.text();
+        const requestId = response.headers.get(
+            'request-id',
+        );
+        assertStrictEquals(response.status, 201);
+        const fresh = (await db.messagePairs.getAll())
+            .filter((row) => !before.has(row.id));
+        assertStrictEquals(fresh.length, 2);
+        const etag = response.headers.get('etag');
+        const answering = fresh.find(
+            (row) => '"'+ row.id + '"' === etag,
+        );
+        if (answering === undefined) {
+            throw new Error('answering row missing');
+        }
+        assertStrictEquals(
+            wireBody(answering.request), raw,
+        );
+        for (const row of fresh) {
+            assertStrictEquals(
+                row.response.includes(
+                    'operation-id: ' + operationId,
+                ),
+                true,
+            );
+            assertStrictEquals(
+                row.response.includes(
+                    'request-id: ' + requestId,
+                ),
+                true,
+            );
+            assertStrictEquals(
+                row.response.includes('response-id:'),
+                false,
+            );
+        }
+        const sibling = fresh.find(
+            (row) => row.id !== answering.id,
+        );
+        if (sibling === undefined) {
+            throw new Error('sibling row missing');
+        }
+        assertStrictEquals(
+            wireBody(sibling.request) === raw,
+            false,
+        );
+    },
+);
+
+Deno.test(
+    'a token event stores the ids it was given',
+    async () => {
+        const operationId = generateIdentifier();
+        const requestId = generateIdentifier();
+        const name = generateIdentifier();
+        const messagePair =
+            await formTokenEventMessagePair(
+                name,
+                {
+                    jti: name,
+                    identity_id: 'XXZruirZyAOoRpNxaDnpSA',
+                    action: 'issued',
+                    chain_id: generateIdentifier(),
+                    at: '2026-01-01T00:00:00.000000Z',
+                },
+                operationId,
+                requestId,
+            );
+        const wire = messagePair.responseMessage;
+        assertStrictEquals(
+            wire.includes(
+                'operation-id: ' + operationId,
+            ),
+            true,
+        );
+        assertStrictEquals(
+            wire.includes('request-id: ' + requestId),
+            true,
+        );
     },
 );

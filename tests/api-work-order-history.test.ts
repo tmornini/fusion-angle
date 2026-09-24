@@ -197,9 +197,9 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: nowUtc(),
         organization: STARK_ORGANIZATION,
-        responseStatus: 204,
         responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postWorkOrderTransitionOp(
         db, WORK_ORDER_ID, transitionBody,

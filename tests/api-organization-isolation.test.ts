@@ -611,9 +611,9 @@ async function seedChain(
         requesterIdentityId: identity,
         requestAt: T8_AT,
         organization,
-        responseStatus: 204,
         responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postWorkOrderTransitionOp(
         db, woId, body, identity,

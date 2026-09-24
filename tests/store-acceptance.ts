@@ -318,8 +318,8 @@ export function defineStoreAcceptance(
         );
     });
 
-    Deno.test(name + ': a write carries ETag and the'
-    + ' stored Response-ID', async () => {
+    Deno.test(name + ': a write carries the stored etag',
+    async () => {
         const { db, token } = await ready();
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -330,8 +330,17 @@ export function defineStoreAcceptance(
         const etag = put.headers.get('ETag');
         assert(etag !== null && etag.startsWith('"'));
         assertStrictEquals(
-            put.headers.get('Response-ID'),
+            put.headers.get('Response-ID'), null,
+        );
+        const stored = await db.messagePairs.getById(
             etag.slice(1, -1),
+        );
+        if (stored === undefined) {
+            throw new Error('stored pair missing');
+        }
+        assertStrictEquals(
+            stored.response.includes('etag: ' + etag),
+            true,
         );
     });
 

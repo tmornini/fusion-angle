@@ -23,6 +23,7 @@ import {
     canonicalPath,
     storedPathAndNameOf,
     hoistedHeaderFields,
+    requestTarget,
     documentHeadAt,
     writeAnswerOf,
     ownWireOf,
@@ -38,6 +39,7 @@ import {
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
 } from './message-pair.ts';
+import type { ReceivedRequest } from './message-pair.ts';
 import {
     bodyOctetsOf,
 } from './message-form.ts';
@@ -937,16 +939,19 @@ async function dispatched(
                 }
             }
             messagePair = await formWriteMessagePair({
-                method, pathname, routePattern,
+                method,
+                pathname: requestTarget(request),
+                routePattern,
                 routeSegments: matched.segments,
                 pathSegments,
                 headerFields: hoistedHeaderFields(request),
                 body,
+                bodyBytes: arrived.bodyBytes,
                 requesterIdentityId: actor,
                 requestAt: ctx.requestAt,
                 organization,
                 operationId: ctx.operationId,
-                responseStatus: spec.status,
+                requestId: ctx.requestId,
                 ...(isDocumentPut && head === null
                     ? { genesis: true as const }
                     : {}),
@@ -1316,6 +1321,12 @@ async function dispatched(
                 return written.response;
             }
         }
+        const received: ReceivedRequest = {
+            target: requestTarget(request),
+            headerFields: hoistedHeaderFields(request),
+            bodyBytes: arrived.bodyBytes,
+            requestId: ctx.requestId,
+        };
         switch (method) {
             case 'GET': {
                 if (!matched.get) {
@@ -1482,6 +1493,7 @@ async function dispatched(
                         request.headers.get(
                             OPERATION_ID_HEADER,
                         ) ?? '',
+                        received,
                     );
                 if (messagePair !== undefined) {
                     const written = requireWrite(
@@ -1565,6 +1577,7 @@ async function dispatched(
                         messagePair,
                         organization,
                         roles,
+                        received,
                     );
                 if (messagePair !== undefined) {
                     const written = requireWrite(
@@ -1633,6 +1646,7 @@ async function dispatched(
                     messagePair,
                     organization,
                     roles,
+                    received,
                 );
                 if (messagePair !== undefined) {
                     const written = requireWrite(
@@ -1679,10 +1693,15 @@ async function dispatched(
                 ) {
                     const seed: AuthMessagePairSeed = {
                         requestAt: ctx.requestAt,
-                        headerFields: hoistedHeaderFields(request),
-                        method, pathname, routePattern,
+                        headerFields: received.headerFields,
+                        bodyBytes: received.bodyBytes,
+                        method,
+                        pathname: received.target,
+                        routePattern,
                         routeSegments: matched.segments,
                         pathSegments,
+                        operationId: ctx.operationId,
+                        requestId: received.requestId,
                     };
                     const dispatched =
                         routePattern === 'authentication/token'
@@ -1808,6 +1827,7 @@ async function dispatched(
                     request.headers.get(
                         OPERATION_ID_HEADER,
                     ) ?? '',
+                    received,
                 );
                 if (messagePair !== undefined) {
                     const written = requireWrite(

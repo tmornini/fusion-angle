@@ -214,11 +214,11 @@ async function appendInstanceMessagePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization,
-        responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: method === 'DELETE'
             ? undefined
             : body,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

@@ -84,6 +84,9 @@ async function seedAuthorizationCodeMessagePair(
         routePattern: 'authentication/authorize',
         routeSegments: ['authentication', 'authorize'],
         pathSegments: ['authentication', 'authorize'],
+        bodyBytes: new Uint8Array(),
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     };
     const requestBody: Record<string, unknown> = {
         method: 'password', username: 'seed@example.com',
@@ -93,7 +96,14 @@ async function seedAuthorizationCodeMessagePair(
         requestBody.code_challenge = extras.code_challenge;
     }
     const messagePair = await formAuthMessagePair(
-        seed, requestBody, identityId, 200, { code },
+        {
+            ...seed,
+            bodyBytes: new TextEncoder().encode(
+                JSON.stringify(requestBody),
+            ),
+        },
+        requestBody, identityId, { code },
+        seed.operationId, seed.requestId,
     );
     await runWrite(
         db,
@@ -1064,9 +1074,9 @@ async () => {
         requesterIdentityId: 'uYaHKbNeVUcsFjuooOjMew',
         requestAt: nowUtc(),
         organization: undefined,
-        responseStatus: 200,
         responseBody: { exp: now - 60 },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

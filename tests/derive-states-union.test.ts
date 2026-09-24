@@ -106,9 +106,9 @@ async function leftoverMembershipMessagePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization,
-        responseStatus: 200,
         responseBody: { id, ...body },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, messagePair,
@@ -136,9 +136,9 @@ async function leftoverMemberParent(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization: undefined,
-        responseStatus: 200,
         responseBody: { id, ...body },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postMemberDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, messagePair,

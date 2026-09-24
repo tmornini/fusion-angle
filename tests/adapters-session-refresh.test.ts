@@ -21,6 +21,8 @@ import {
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import { refreshTokenFromSetCookie, framedRequest } from './http-fixtures.ts';
 import { operationIdHeader } from './operation-id-header.ts';
 
@@ -52,13 +54,23 @@ async function seedAuthorizationCodeMessagePair(
         routePattern: 'authentication/authorize',
         routeSegments: ['authentication', 'authorize'],
         pathSegments: ['authentication', 'authorize'],
+        bodyBytes: new Uint8Array(),
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     };
     const requestBody = {
         method: 'password', username: 'seed@example.com',
         password: 'seed-password', client_id: 'web',
     };
     const messagePair = await formAuthMessagePair(
-        seed, requestBody, 'XXZruirZyAOoRpNxaDnpSA', 200, { code },
+        {
+            ...seed,
+            bodyBytes: new TextEncoder().encode(
+                JSON.stringify(requestBody),
+            ),
+        },
+        requestBody, 'XXZruirZyAOoRpNxaDnpSA', { code },
+        seed.operationId, seed.requestId,
     );
     await runWrite(
         db,

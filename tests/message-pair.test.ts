@@ -22,9 +22,9 @@ const INPUT = {
     requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
     requestAt: '2026-01-01T00:00:00.000000Z',
     organization: 'AjdvjuECVZEgZoFajaIEkg',
-    responseStatus: 204,
     responseBody: undefined,
     operationId: generateIdentifier(),
+    requestId: generateIdentifier(),
 } as const;
 
 Deno.test('an org-owned pair stores at the org-nested prefix',
@@ -46,6 +46,7 @@ Deno.test('the PII route stores at the identity\'s own path'
         pathSegments: ['identities', 'ada', 'pii'],
         organization: 'AjdvjuECVZEgZoFajaIEkg',
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     assertStrictEquals(messagePair.path, '/identities/ada/');
     assertStrictEquals(messagePair.name, 'pii');
@@ -79,6 +80,7 @@ async () => {
             constraints: [],
         },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     assertStrictEquals(
         messagePair.path,
@@ -105,6 +107,7 @@ async () => {
             'record-types', 'rOEPOcVMQdJiiiMuiiEhlg',
         ],
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     assertStrictEquals(
         messagePair.path,
@@ -143,6 +146,7 @@ async () => {
     const messagePair = await formWriteMessagePair({
         ...INPUT,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     assertStrictEquals(
         'follows' in messagePair, false,

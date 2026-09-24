@@ -586,9 +586,9 @@ Deno.test(
             requesterIdentityId: actor,
             requestAt: AT,
             organization,
-            responseStatus: 204,
             responseBody: undefined,
             operationId: generateIdentifier(),
+            requestId: generateIdentifier(),
         });
         const err = await assertRejects(
             () => postFlowUndoOp(

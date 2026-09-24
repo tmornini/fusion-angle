@@ -136,9 +136,9 @@ async function appendLegacyTransition(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization: STARK_ORGANIZATION,
-        responseStatus: 204,
         responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postWorkOrderTransitionOp(
         db, 'yNSSnbrpacodQTzUEcdEVA', body, SYSTEM_MEMBER_ID,

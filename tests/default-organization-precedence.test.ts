@@ -77,9 +77,9 @@ async function seedDefaultOrganizationEvent(
         requesterIdentityId: identityId,
         requestAt: at,
         organization: undefined,
-        responseStatus: 204,
         responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -205,9 +205,9 @@ Deno.test(
             requesterIdentityId: SYSTEM_MEMBER_ID,
             requestAt: T2,
             organization: ORGANIZATION_TWO,
-            responseStatus: 204,
             responseBody: undefined,
             operationId: generateIdentifier(),
+            requestId: generateIdentifier(),
         });
         await runWrite(
             db,
