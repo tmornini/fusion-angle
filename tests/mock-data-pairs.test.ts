@@ -132,10 +132,9 @@ function messagePairJsonOf(message: string): {
 // document message pairs (Phase 10 Task 6: 12 human password
 // credentials + the system client-secret credential, one
 // identities/:id/credentials/:cid pair per row — formed by
-// seedHumanCredentials' OWN local pass-1/pass-2 split,
-// api/mock-data.ts, since a credential's hashed secret is
-// unknown until PBKDF2 resolves and so can never join this
-// file's shared pre-tx pass) + 0 role-grant document message
+// formSeedCredentialMessagePairs from the hashes
+// hashSeedCredentials (api/mock-data.ts) computes first,
+// before pass 1) + 0 role-grant document message
 // pairs (retired: membership type carries privilege; mint
 // bakes claims) + 859 legacy work-order historical-trace
 // transition operation message pairs (states-document

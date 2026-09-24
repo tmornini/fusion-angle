@@ -80,15 +80,13 @@
 // pipeline, UNTOUCHED — formSeedMessagePair is genesis
 // by construction. The 13 identity-credential document
 // message pairs (12 human passwords + the system client
-// secret) are the ONE exception: a credential's
-// hashed secret is unknown until PBKDF2 resolves inside
-// seedHumanCredentials (api/mock-data.ts), which runs AFTER this
-// file's shared pre-tx pass already completed — so those 13 pairs
-// are formed by seedHumanCredentials' OWN local pass-1/pass-2
-// split, calling formSeedMessagePair directly
-// (formSeedCredentialMessagePairs, below) rather than
-// riding buildMockDataInvocations /
-// formBootstrapMessagePair.
+// secret) are the ONE exception: a credential's body
+// embeds its hashed secret, so each seed path hashes
+// first, in hashSeedCredentials (api/mock-data.ts),
+// before pass 1, and forms those 13 pairs through
+// formSeedCredentialMessagePairs (below), which calls
+// formSeedMessagePair directly rather than riding
+// buildMockDataInvocations / formBootstrapMessagePair.
 //
 // Phase 11 Task 3 closed the historical-trace carve-out
 // itself (the work-order deferral's last piece, named above):
@@ -1107,8 +1105,9 @@ export function roleGrantSeedBody(
 // at} — the ONE shape every seeded credential (12 human
 // passwords + the system client secret, both mock-data and
 // bootstrap) shares. Hoisted (Phase 10 Task 6) so
-// formSeedCredentialMessagePairs (this file) and seedHumanCredentials
-// (mock-data.ts) share the SAME construction — the
+// formSeedCredentialMessagePairs (this file) and
+// postSeedCredentialsIn (mock-data.ts) share the SAME
+// construction — the
 // membershipSeedBody precedent above, for the credential ledger.
 // `secret` is the POST-HASH value only — the plaintext never
 // reaches this construction (scripture: We guard the
@@ -1430,12 +1429,9 @@ export function buildMockDataInvocations():
         // formed the SAME way
         // every other per-member invocation above is, over the
         // SAME body humanMemberPiiSeedBody hands the actual write
-        // (mock-data.ts) so the two can never drift. ORDERING
-        // (verification finding): mock-data.ts nests this
-        // invocation's write inside the SAME outer TABLE_NAMES
-        // transaction the human-members create already spans, so
-        // it commits BEFORE seedHumanCredentials' pii-presence
-        // filter runs.
+        // (mock-data.ts) so the two can never drift. ORDERING:
+        // the rehearsal writes this PII in its first wave and
+        // the credential documents in its last.
         const piiKey = seedMessagePairKey(
             'identities/:id/pii', member.id,
         );
@@ -1454,8 +1450,9 @@ export function buildMockDataInvocations():
     // documents only — NO membership and NO
     // default-organization invocation; the empty
     // membership ledger IS the point (TEST-PLAN
-    // B25–B29). Its credential pair rides
-    // seedHumanCredentials' own pass, like every human.
+    // B25–B29). Its credential is hashed first, in
+    // hashSeedCredentials, before pass 1, like every
+    // human's.
     // Its invitation pairs are formed by
     // formInvitationSeedMessagePairs below — the
     // invitations side channel has no
@@ -2568,15 +2565,16 @@ export async function formMockDataMessagePairs(
     return messagePairs;
 }
 
-// Pass 1 for seedHumanCredentials (mock-data.ts), called for
-// BOTH seed paths: the 13 (mock-data) / 2 (bootstrap) identity-
-// credential document message pairs, formed from their OWN
-// post-hash bodies — content unknown until PBKDF2 resolves
-// inside seedHumanCredentials, which runs AFTER
-// formMockDataMessagePairs / formBootstrapMessagePair above
-// already completed, so these pairs can never join either.
-// `requestAt` is minted once by the caller, this credential
-// batch's own arrival moment — the SAME
+// Pass 1 for the credential documents, called by BOTH seed
+// paths (rehearseMockData / rehearseBootstrap, mock-data.ts):
+// the 13 (mock-data) / 2 (bootstrap) identity-credential
+// document message pairs, formed from their OWN post-hash
+// bodies. The secrets are hashed first, in
+// hashSeedCredentials, before pass 1; these pairs form
+// here, beside formMockDataMessagePairs /
+// formBootstrapMessagePair, not inside either.
+// `requestAt` is the seed's shared arrival moment, minted
+// once by the caller — the SAME
 // pattern every other pass 1 shares. Calls the SAME formSeedMessagePair
 // every other family here does — untouched — so a seeded
 // credential pair can never drift from the shape the live PUT
@@ -2654,9 +2652,9 @@ export async function formSeedCredentialMessagePairs(
 // human-members loop now forms per member. Phase 10 Task 6:
 // ALSO forms the system member's OWN identities/:id
 // document message pair. The credential pairs stay OUTSIDE
-// this function — seedHumanCredentials' own local
-// pass-1/pass-2 split (formSeedCredentialMessagePairs) forms
-// them, for both seed paths.
+// this function — formSeedCredentialMessagePairs forms
+// them, for both seed paths, from the hashes
+// hashSeedCredentials computed first.
 export async function formBootstrapMessagePair(
     requestAt: string,
 ): Promise<{
