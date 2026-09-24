@@ -226,7 +226,7 @@ async function save(
         documentBody(name, eventId),
         { 'if-match': etag },
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
 }
 
 async function undo(
@@ -680,7 +680,7 @@ Deno.test(
             ),
             { 'if-match': etag },
         ));
-        assertStrictEquals(deleted.status, 201);
+        assertStrictEquals(deleted.status, 200);
 
         const undoAt = '2026-01-01T00:00:02.000000Z';
         const undone = await undo(
@@ -792,7 +792,7 @@ Deno.test(
             },
             { 'if-match': etag },
         ));
-        assertStrictEquals(flagged.status, 201);
+        assertStrictEquals(flagged.status, 200);
 
         const first = await undo(
             db, token, flowId, FLOWID_U1, AT,

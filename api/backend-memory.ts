@@ -312,6 +312,7 @@ function headsOf(
             response: typeof response === 'string'
                 ? Octets.fromLatin1(response).asBytes()
                 : new Uint8Array(0),
+            method: String(rec['method']),
         });
     }
     return heads;

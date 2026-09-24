@@ -270,7 +270,7 @@ Deno.test('leg 4: PUT /organizations/:id then wire + derive agree'
         'PUT', '/organizations/' + STARK_ORGANIZATION,
         adminToken, updatedFields,
     ));
-    assertStrictEquals(put.status, 201);
+    assertStrictEquals(put.status, 200);
     const putBody = await put.json() as OrganizationEntity;
     assertStrictEquals(putBody.name, 'Stark Industries Renamed');
 

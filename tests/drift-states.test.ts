@@ -518,7 +518,7 @@ async () => {
         tokenOrg2,
         ideaDocument('Foreign', 'deleted'),
     ));
-    assertStrictEquals(foreignDeleted.status, 201);
+    assertStrictEquals(foreignDeleted.status, 200);
 
     // Own history 200 with genesis.
     const ownRes = await handleRequest(db, req(
@@ -679,7 +679,7 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
             position: 2,
         },
     ));
-    assertStrictEquals(entityPut.status, 201);
+    assertStrictEquals(entityPut.status, 200);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     const freshClaimAt = nowUtc();
@@ -693,7 +693,7 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
             expireAt: freshClaimAt,
         },
     ));
-    assertStrictEquals(freshClaim.status, 201);
+    assertStrictEquals(freshClaim.status, 200);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     // An idempotent re-claim by the SAME actor, milliseconds
@@ -714,7 +714,7 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
             expireAt: repeatClaimAt,
         },
     ));
-    assertStrictEquals(repeatClaim.status, 201);
+    assertStrictEquals(repeatClaim.status, 200);
     const afterRepeat = await assertHistoryParity(
         db, STARK_ORGANIZATION, workOrderId,
     );
@@ -740,7 +740,7 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
             expireAt: takeoverExpireAt,
         },
     ));
-    assertStrictEquals(takeover.status, 201);
+    assertStrictEquals(takeover.status, 200);
     const finalHistory = await assertHistoryParity(
         db, STARK_ORGANIZATION, workOrderId,
     );
@@ -865,7 +865,7 @@ async () => {
             expireAt: claimAt,
         },
     ));
-    assertStrictEquals(claim.status, 201);
+    assertStrictEquals(claim.status, 200);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     // The named release: DELETE organizations/:id/work-orders/:id/claim.
@@ -984,7 +984,7 @@ async () => {
             )
         ).headers.get('ETag')! },
     ));
-    assertStrictEquals(deleted.status, 201);
+    assertStrictEquals(deleted.status, 200);
 
     const undoAt = '2026-02-03T00:00:00.000000Z';
     const undone = await handleRequest(db, req(
@@ -1246,7 +1246,7 @@ async () => {
         'PUT', '/ai-agents/' + aiMemberId, token,
         aiMemberDetail('Drift Bot 2'),
     ));
-    assertStrictEquals(updated.status, 201);
+    assertStrictEquals(updated.status, 200);
     const after = await handleRequest(
         db,
         req('GET', '/ai-agents/' + aiMemberId, token),

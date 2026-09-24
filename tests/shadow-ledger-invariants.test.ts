@@ -276,7 +276,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             + 'hwpssRPdIjwzeMdYPAhqrw', org1Token,
         ideaPutBody('hwpssRPdIjwzeMdYPAhqrw', 'Invariant Idea Revised'),
     ));
-    assertStrictEquals(secondIdea.status, 201);
+    assertStrictEquals(secondIdea.status, 200);
     assertStrictEquals(
         secondIdea.headers.get('Supersedes'), null,
     );
@@ -290,7 +290,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             state: 'in_review',
         },
     ));
-    assertStrictEquals(stateAppend.status, 201);
+    assertStrictEquals(stateAppend.status, 200);
 
     // Create POST (records, org 2) — Task 4's bundle: the
     // operation message pair, its synthesized

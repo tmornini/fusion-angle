@@ -368,7 +368,7 @@ async () => {
         'PUT', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
         typeBody('After', 2, 'active', 'updated'),
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     const echo = await second.json() as RecordTypePutEcho;
     assertStrictEquals(echo.name, 'After');
     assertStrictEquals(echo.position, 2);
@@ -417,7 +417,7 @@ Deno.test('stored PUT body equals recordTypeEntityOf of the'
         'PUT', DETAIL + id, adminToken,
         typeBody('Skewed', 1, 'archived'),
     ));
-    assertStrictEquals(skewed.status, 201);
+    assertStrictEquals(skewed.status, 200);
     const afterSkew = JSON.parse(
         await storedPutBodyText(db, prefix, id),
     );

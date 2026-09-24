@@ -422,7 +422,7 @@ Deno.test('stored PUT body equals objectiveDocumentEntityOf of'
             , token,
         documentFields(99, 'archived'),
     ));
-    assertStrictEquals(later.status, 201);
+    assertStrictEquals(later.status, 200);
     const after: Record<string, unknown> = JSON.parse(
         await storedPutBodyText(db, prefix, id),
     );

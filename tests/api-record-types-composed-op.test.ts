@@ -371,7 +371,7 @@ async () => {
             write_roles: ['admin'],
         },
     ));
-    assertStrictEquals(restrict.status, 201);
+    assertStrictEquals(restrict.status, 200);
 
     const edit = await handleRequest(db, apiRequest({
         method: 'POST',

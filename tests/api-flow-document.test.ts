@@ -258,7 +258,7 @@ Deno.test('postFlowDocumentOp returns the entity, exactly one'
         }),
         { 'if-match': await headEtag(db, token, 'bgwNLywXomEwlIMSFlkukQ') },
     ));
-    assertStrictEquals(update.status, 201);
+    assertStrictEquals(update.status, 200);
     const wire = await update.json() as { name: string };
     assertStrictEquals(wire.name, 'Renamed');
     const events = await deriveFlowStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
@@ -325,7 +325,7 @@ Deno.test('postFlowDocumentOp with revivals posts the restored'
         },
         { 'if-match': await headEtag(db, token, 'biDOZCyZATKcAVVOCbegTw') },
     ));
-    assertStrictEquals(update.status, 201);
+    assertStrictEquals(update.status, 200);
     // SIDECAR-KEEP (C3): pin graphDelta.deletions / revivals
     // on the flow document message pairs — no bulk states derive.
     const prefix = canonicalPath('AjdvjuECVZEgZoFajaIEkg', '/flows/'
@@ -508,7 +508,7 @@ Deno.test('e2e: a byte-identical resend converges (one event, one'
             + 'bZXXOWeDHCowVkWMhrZGgg', token, body, headers,
         operationId,
     ));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
     const firstId = pairIdOf(first);
     const eventsAfterFirst =
         await deriveFlowStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
@@ -576,7 +576,7 @@ async () => {
             db, token, 'bACksPDpiYvefaEzSXoaZg',
         ) },
     ));
-    assertStrictEquals(fresh.status, 201);
+    assertStrictEquals(fresh.status, 200);
     assertStrictEquals(fresh.headers.get('Follows'), null);
     assertStrictEquals(fresh.headers.get('Supersedes'), null);
 });
@@ -956,7 +956,7 @@ Deno.test('e2e: POST organizations/:id/flows/:id/undo forms a'
             db, token, 'cvdqOxjRwvTEYzWTrFDNFw',
         ) },
     ));
-    assertStrictEquals(firstSave.status, 201);
+    assertStrictEquals(firstSave.status, 200);
 
     // A SECOND save moves the head away from the one-node
     // graph — undo must revert THIS, landing back on the
@@ -969,7 +969,7 @@ Deno.test('e2e: POST organizations/:id/flows/:id/undo forms a'
             db, token, 'cvdqOxjRwvTEYzWTrFDNFw',
         ) },
     ));
-    assertStrictEquals(secondSave.status, 201);
+    assertStrictEquals(secondSave.status, 200);
 
     const requestsBeforeUndo = await db.messagePairs.getAll();
     const responsesBeforeUndo = await db.messagePairs.getAll();
@@ -1170,7 +1170,7 @@ async () => {
             db, token, 'biakjMJqdIlFhfVZBGhpKw',
         ) },
     ));
-    assertStrictEquals(before.status, 201);
+    assertStrictEquals(before.status, 200);
     const headEtagValue = await headEtag(
         db, token, 'biakjMJqdIlFhfVZBGhpKw',
     );
@@ -1228,7 +1228,7 @@ async () => {
         // The save won the race; the undo's write never landed
         // — its own event never posted.
         assertStrictEquals(flow.name, 'Saved');
-        assertStrictEquals(save.status, 201);
+        assertStrictEquals(save.status, 200);
         assertStrictEquals(undo.status, 412);
         const events = await deriveFlowStateHistory(db
             , 'AjdvjuECVZEgZoFajaIEkg', 'biakjMJqdIlFhfVZBGhpKw');
@@ -1360,7 +1360,7 @@ async () => {
             , token, saveBody,
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assertStrictEquals(saved.status, 201);
+    assertStrictEquals(saved.status, 200);
     assertStrictEquals(await documentMessagePairCount(db, flowId), 2);
     await assertStoredPutOmitsUndoHistory(
         db, flowId, 2, token,

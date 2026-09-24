@@ -120,7 +120,7 @@ async function seedIdeaLifecycle(
             ideaBody('Hist Idea', 'in_review'),
         ),
     );
-    assertStrictEquals(t.status, 201);
+    assertStrictEquals(t.status, 200);
 }
 
 function versionOf(res: Response): string {
@@ -155,7 +155,7 @@ Deno.test(
                 ideaBody('Hist Idea Revised', 'in_review'),
             ),
         );
-        assertStrictEquals(later.status, 201);
+        assertStrictEquals(later.status, 200);
         const v2 = versionOf(later);
         assertNotStrictEquals(xDyDkxEPwtcNmJVknUHDsg, v2);
 
@@ -378,7 +378,7 @@ async function seedProjectLifecycle(
             projectBody('Hist Project', 'under_review'),
         ),
     );
-    assertStrictEquals(t.status, 201);
+    assertStrictEquals(t.status, 200);
 }
 
 Deno.test(
@@ -505,7 +505,7 @@ async function seedRecordLifecycle(
             recordBody('Hist Record', 'archived'),
         ),
     );
-    assertStrictEquals(t.status, 201);
+    assertStrictEquals(t.status, 200);
 }
 
 Deno.test(
@@ -670,7 +670,7 @@ async function seedFlowLifecycle(
             ).headers.get('ETag')! },
         ),
     );
-    assertStrictEquals(t.status, 201);
+    assertStrictEquals(t.status, 200);
     return { ev1, ev2 };
 }
 
@@ -787,7 +787,7 @@ Deno.test(
                 { 'if-match': first.headers.get('ETag')! },
             ),
         );
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
         const etagB = versionOf(second);
         const third = await handleRequest(
             db,
@@ -804,7 +804,7 @@ Deno.test(
                 { 'if-match': second.headers.get('ETag')! },
             ),
         );
-        assertStrictEquals(third.status, 201);
+        assertStrictEquals(third.status, 200);
         const etagA2 = versionOf(third);
         assertNotStrictEquals(etagA, etagB);
         assertNotStrictEquals(etagB, etagA2);
@@ -924,7 +924,7 @@ async function seedObjectiveLifecycle(
             objectiveBody('archived'),
         ),
     );
-    assertStrictEquals(t.status, 201);
+    assertStrictEquals(t.status, 200);
 }
 
 Deno.test(

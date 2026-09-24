@@ -163,7 +163,7 @@ Deno.test(
             '2020-01-01T00:00:00.000000Z', laterEventId,
             skewedGraph, { 'if-match': etag },
         );
-        assertStrictEquals(res.status, 201);
+        assertStrictEquals(res.status, 200);
 
         // Genesis must still win the lifecycle reduction: the
         // flow stays visible despite the later-arriving

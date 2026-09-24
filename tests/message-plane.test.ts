@@ -111,6 +111,50 @@ async function plantDelete(
     );
 }
 
+function latestPutResponse(
+    rows: readonly {
+        id: string,
+        name: string,
+        method: string,
+        response: string,
+        response_at: string,
+    }[],
+    name: string,
+): string {
+    let best: {
+        id: string,
+        response: string,
+        response_at: string,
+    } | undefined;
+    for (const row of rows) {
+        if (row.name !== name || row.method !== 'PUT') {
+            continue;
+        }
+        if (
+            best === undefined
+            || row.response_at > best.response_at
+            || (
+                row.response_at === best.response_at
+                && row.id > best.id
+            )
+        ) {
+            best = row;
+        }
+    }
+    if (best === undefined) {
+        throw new Error('no stored PUT');
+    }
+    return best.response;
+}
+
+function startLine(response: string): string {
+    return response.slice(0, 13);
+}
+
+function storedStatus(response: string): number {
+    return Number(response.slice(9, 12));
+}
+
 Deno.test(
     'a document PUT after a DELETE lands 201',
     async () => {
@@ -138,6 +182,16 @@ Deno.test(
             ideaDocument('Back', 'active'),
         ));
         assertStrictEquals(again.status, 201);
+        const stored = latestPutResponse(
+            await db.messagePairs.getAll(),
+            'XufQcWIKhZshfJYOVNeUSw',
+        );
+        assertStrictEquals(
+            startLine(stored), 'HTTP/1.1 201 ',
+        );
+        assertStrictEquals(
+            again.status, storedStatus(stored),
+        );
         const head = await documentHeadAt(
             db,
             '/organizations/AjdvjuECVZEgZoFajaIEkg'
@@ -145,6 +199,52 @@ Deno.test(
             'XufQcWIKhZshfJYOVNeUSw',
         );
         assertStrictEquals(head?.method, 'PUT');
+    },
+);
+
+Deno.test(
+    'a genesis PUT stores 201 and a live PUT'
+        + ' stores 200',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const token = await organizationToken();
+        const id = generateIdentifier();
+        const path = '/organizations/'
+            + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + id;
+        const created = await handleRequest(db, req(
+            'PUT', path, token,
+            ideaDocument('Fresh', 'active'),
+        ));
+        const createdBytes = latestPutResponse(
+            await db.messagePairs.getAll(), id,
+        );
+        assertStrictEquals(created.status, 201);
+        assertStrictEquals(
+            startLine(createdBytes),
+            'HTTP/1.1 201 ',
+        );
+        assertStrictEquals(
+            created.status,
+            storedStatus(createdBytes),
+        );
+        const edited = await handleRequest(db, req(
+            'PUT', path, token,
+            ideaDocument('Edited', 'active'),
+        ));
+        const editedBytes = latestPutResponse(
+            await db.messagePairs.getAll(), id,
+        );
+        assertStrictEquals(edited.status, 200);
+        assertStrictEquals(
+            startLine(editedBytes),
+            'HTTP/1.1 200 ',
+        );
+        assertStrictEquals(
+            edited.status,
+            storedStatus(editedBytes),
+        );
     },
 );
 
@@ -1409,7 +1509,7 @@ Deno.test(
         );
         const secondEtag = second.headers.get('etag');
         await second.text();
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
         assertNotStrictEquals(secondEtag, firstEtag);
         const before = (
             await db.messagePairs.getAll()

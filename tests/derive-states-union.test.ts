@@ -324,7 +324,7 @@ async function saveFlowWithSidecars(
         },
         { 'if-match': etag },
     ));
-    assertStrictEquals(res.status, 201, 'flow save PUT failed');
+    assertStrictEquals(res.status, 200, 'flow save PUT failed');
 }
 
 function workOrderBody(

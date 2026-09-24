@@ -189,7 +189,7 @@ async () => {
             body: second,
         }),
     );
-    assertStrictEquals(secondPut.status, 201);
+    assertStrictEquals(secondPut.status, 200);
     const secondGet = await handleRequest(
         db,
         apiRequest({

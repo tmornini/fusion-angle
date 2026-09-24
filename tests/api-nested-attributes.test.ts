@@ -226,7 +226,7 @@ async () => {
             write_roles: ['admin'],
         }),
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     const echo = await second.json() as AttributeWireRow;
     assertStrictEquals(echo.name, 'Renamed');
     assertEquals(echo.read_roles, ['admin']);

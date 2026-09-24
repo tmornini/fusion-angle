@@ -213,7 +213,7 @@ Deno.test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
             )
         ).headers.get('ETag')! },
     ));
-    assertStrictEquals(saved.status, 201);
+    assertStrictEquals(saved.status, 200);
     const r2 = await headResponseId(db, token, 'cGVtCERtMGxhyNGAsQBBuQ');
     assertNotStrictEquals(r2, r1);
 
@@ -222,7 +222,7 @@ Deno.test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
             + 'cGVtCERtMGxhyNGAsQBBuQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
         { flow_response_id: r2 },
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     const secondId = pairIdOf(second);
     assert(secondId);
     assertNotStrictEquals(secondId, firstId);
@@ -427,7 +427,7 @@ Deno.test('e2e: a tag written once still resolves to the EXACT'
             )
         ).headers.get('ETag')! },
     ));
-    assertStrictEquals(save2.status, 201);
+    assertStrictEquals(save2.status, 200);
     const r2 = await headResponseId(db, token, 'cadVHBQlvTvWsTriyDUeTQ');
     assertNotStrictEquals(r2, r1);
 
@@ -443,7 +443,7 @@ Deno.test('e2e: a tag written once still resolves to the EXACT'
             )
         ).headers.get('ETag')! },
     ));
-    assertStrictEquals(save3.status, 201);
+    assertStrictEquals(save3.status, 200);
     const r3 = await headResponseId(db, token, 'cadVHBQlvTvWsTriyDUeTQ');
     assertNotStrictEquals(r3, r2);
 

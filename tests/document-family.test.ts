@@ -486,7 +486,7 @@ async () => {
             'PUT', path, token, { v: 'second' },
             { [IF_MATCH_HEADER]: strongEtagOf(pairId) },
         ));
-        assertStrictEquals(matched.status, 201);
+        assertStrictEquals(matched.status, 200);
         const stale = await handleRequest(db, req(
             'PUT', path, token, { v: 'third' },
             { [IF_MATCH_HEADER]: strongEtagOf(pairId) },
@@ -516,13 +516,13 @@ async () => {
             'PUT', path, token, { v: 'B' },
             { [IF_MATCH_HEADER]: tagA },
         ));
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
         const tagB = second.headers.get('ETag')!;
         const third = await handleRequest(db, req(
             'PUT', path, token, { v: 'A' },
             { [IF_MATCH_HEADER]: tagB },
         ));
-        assertStrictEquals(third.status, 201);
+        assertStrictEquals(third.status, 200);
         const tagA2 = third.headers.get('ETag')!;
         assertNotStrictEquals(tagA, tagB);
         assertNotStrictEquals(tagB, tagA2);
@@ -548,7 +548,7 @@ Deno.test('locked arm: a sibling route under the SAME family'
         const second = await handleRequest(db, req(
             'PUT', path, token, { v: 'second' },
         ));
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
     });
 });
 
@@ -613,7 +613,7 @@ Deno.test('locked arm: a matching echo stores no predecessor'
             { v: 'second' },
             { [IF_MATCH_HEADER]: firstEtag },
         ));
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
         assertStrictEquals(second.headers.get('Follows'), null);
         assertStrictEquals(second.headers.get('Supersedes'), null);
         const secondId = pairIdOf(second)!;
@@ -644,7 +644,7 @@ async () => {
             { [IF_MATCH_HEADER]: firstEtag },
         );
         const edit = await handleRequest(db, editRequest.clone());
-        assertStrictEquals(edit.status, 201);
+        assertStrictEquals(edit.status, 200);
         const afterEdit = (await db.messagePairs.getAll())
             .length;
         // The edit's If-Match names the genesis head. A resend
@@ -780,7 +780,7 @@ async () => {
         ]);
         const statuses =
             [first.status, second.status].sort();
-        assertEquals(statuses, [201, 412]);
+        assertEquals(statuses, [200, 412]);
         const loser = first.status === 412 ? first : second;
         const loserBody =
             await loser.json() as { error: string };

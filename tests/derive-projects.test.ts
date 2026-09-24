@@ -109,7 +109,7 @@ Deno.test(
         const res = await putProject(
             db, token, projectId, 'Tomb Title', 'deleted',
         );
-        assertStrictEquals(res.status, 201);
+        assertStrictEquals(res.status, 200);
         const projects = await getCollection(
             db, 'projects', STARK_ORGANIZATION,
         );

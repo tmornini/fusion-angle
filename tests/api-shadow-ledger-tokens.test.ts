@@ -180,7 +180,7 @@ Deno.test('a second PUT to the SAME identity-tokens/:jti id forms'
             action: 'rotated', at: AT2,
         },
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     assertNotStrictEquals(pairIdOf(second), firstId);
     assertStrictEquals(second.headers.get('Supersedes'), null);
     const domainRow = await deriveIdentityToken(

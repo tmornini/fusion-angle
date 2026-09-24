@@ -159,7 +159,7 @@ Deno.test('a state-unchanged edit succeeds and the wire reflects'
             + 'YHvbnJSZHECuziaHXcsKpw', token,
         ideaDocument('Second', 'active'),
     ));
-    assertStrictEquals(edit.status, 201);
+    assertStrictEquals(edit.status, 200);
     const getRes = await handleRequest(
         db, req('GET'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -352,7 +352,7 @@ async () => {
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id, token,
         ideaDocument('Revised', 'in_review'),
     ));
-    assertStrictEquals(later.status, 201);
+    assertStrictEquals(later.status, 200);
     const after = JSON.parse(
         await storedPutBodyText(db, prefix, id),
     );
