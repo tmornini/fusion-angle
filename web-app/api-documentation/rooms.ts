@@ -1585,9 +1585,9 @@ export const API_DOC_ROOMS:
         verb: 'POST',
         uri: '/api/authentication/authorize',
         body:
-            '{\n  "method": "password",\n  "username": "username",\n  "passw'
-            + 'ord": "password",\n  "code_challenge": "code_challenge",\n  "'
-            + 'code_challenge_method": "S256"\n}',
+            '{\n  "method": "password",\n  "client_id": "id",\n  "code_chall'
+            + 'enge": "code_challenge",\n  "code_challenge_method": "S256"\n'
+            + '}',
         headers:
         [
             'Operation-ID: on writes',
@@ -1604,8 +1604,8 @@ export const API_DOC_ROOMS:
         verb: 'POST',
         uri: '/api/authentication/token',
         body:
-            '{\n  "grant_type": "authorization_code",\n  "code": "code",\n  '
-            + '"code_verifier": "code_verifier"\n}',
+            '{\n  "grant_type": "authorization_code",\n  "client_id": "id"\n'
+            + '}',
         headers:
         [
             'Operation-ID: on writes',
