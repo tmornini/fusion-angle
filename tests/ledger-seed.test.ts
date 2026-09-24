@@ -38,6 +38,19 @@ import {
     runWrite,
     type MessagePair,
 } from '../api/message-pair.ts';
+import { sharedMockDb } from './mock-seed.ts';
+import { buildFlows } from '../api/mock-data/flows.ts';
+import {
+    buildRecords,
+    buildRecordAttributes,
+} from '../api/mock-data/records.ts';
+import { OBJECTIVE_SEEDS } from
+    '../api/mock-data/objectives.ts';
+import { mockProjectFlows } from
+    '../api/mock-data/seed-message-pairs.ts';
+import { STARK_ORGANIZATION } from
+    '../api/mock-data/seed-constants.ts';
+import type { MessagePairEntity } from '../api/types.ts';
 
 Deno.test(
     'a seed batch is half the binds the attempt leaves',
@@ -488,6 +501,84 @@ Deno.test(
         assertEquals(
             await adapterOver(backend).messagePairs.getAll(),
             before,
+        );
+    },
+);
+
+// Every mock-data row that shares the operation id of the
+// one row `anchor` picks.
+async function operationRowsOf(
+    anchor: (row: MessagePairEntity) => boolean,
+): Promise<MessagePairEntity[]> {
+    const rows = await (await sharedMockDb())
+        .messagePairs.getAll();
+    const found = rows.find(anchor);
+    if (found === undefined) {
+        throw new Error('no seed row matches the anchor');
+    }
+    return rows.filter(
+        (row) => row.operation_id === found.operation_id,
+    );
+}
+
+Deno.test(
+    'a flow creation\'s three rows share one id',
+    async () => {
+        const flow = buildFlows()[0]!;
+        const join = mockProjectFlows.find(
+            (pf) => pf.flow_id === flow.id,
+        )!;
+        const flows = '/organizations/' + STARK_ORGANIZATION
+            + '/flows/';
+        const rows = await operationRowsOf((row) =>
+            row.path === flows && row.name === flow.id
+            && row.method === 'POST');
+        assertEquals(
+            rows.map((row) => row.path + row.name).sort(),
+            [
+                flows + flow.id,
+                flows + flow.id,
+                '/organizations/' + STARK_ORGANIZATION
+                    + '/projects/' + join.project_id
+                    + '/flows/' + join.id,
+            ].sort(),
+        );
+    },
+);
+
+Deno.test(
+    'a record write\'s rows and an objective\'s share ids',
+    async () => {
+        const record = buildRecords()[0]!;
+        const attributes = buildRecordAttributes().filter(
+            (a) => a.record_id === record.id,
+        );
+        assertStrictEquals(
+            (await operationRowsOf((row) =>
+                row.name === record.id
+                && row.method === 'POST')).length,
+            2 + attributes.length,
+        );
+        const objective = OBJECTIVE_SEEDS[0]!;
+        assertStrictEquals(
+            (await operationRowsOf((row) =>
+                row.name === objective.id
+                && row.method === 'POST')).length,
+            3,
+        );
+    },
+);
+
+Deno.test(
+    'a single-pair operation keeps an id of its own',
+    async () => {
+        const ideas = '/organizations/' + STARK_ORGANIZATION
+            + '/ideas/';
+        assertStrictEquals(
+            (await operationRowsOf((row) =>
+                row.path === ideas
+                && row.method === 'PUT')).length,
+            1,
         );
     },
 );

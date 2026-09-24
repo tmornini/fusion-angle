@@ -1,6 +1,7 @@
 // Operator seed below HTTP. Flags seed an empty
 // database and print credentials once. Non-empty
-// refuses. formSeedMessagePair already mints operation_id.
+// refuses. Pass 1 mints one operation id per simulated
+// operation.
 
 import type { BackedDbAdapter } from
     '../api/db-backed.ts';

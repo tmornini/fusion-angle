@@ -1315,6 +1315,9 @@ interface MockDataInvocation {
     readonly organization: Id | undefined;
     readonly requesterIdentityId: Id;
     readonly body: Record<string, unknown>;
+    // The simulated operation this pair belongs to. Pairs
+    // one operation writes share its one id (Decision 2).
+    readonly operation: string;
 }
 
 // Dependency-ordered (matches postMockDataLoadIn's write order):
@@ -1394,26 +1397,32 @@ export function buildMockDataInvocations():
             const type = member.id === 'XXZruirZyAOoRpNxaDnpSA'
                 ? 'admin' as const
                 : 'member' as const;
+            const seatKey = seedMessagePairKey(
+                ORGANIZATION_MEMBER_DETAIL_PATTERN,
+                member.id + '-' + n,
+            );
             invocations.push({
-                key: seedMessagePairKey(
-                    ORGANIZATION_MEMBER_DETAIL_PATTERN,
-                    member.id + '-' + n,
-                ),
+                key: seatKey,
                 routePattern:
                     ORGANIZATION_MEMBER_DETAIL_PATTERN,
                 idParams: [organization, member.id],
                 organization,
                 requesterIdentityId: SYSTEM_MEMBER_ID,
                 body: seatSeedBody(type),
+                operation: seatKey,
             });
         });
+        const identityKey = seedMessagePairKey(
+            'identities/:id', member.id,
+        );
         invocations.push({
-            key: seedMessagePairKey('identities/:id', member.id),
+            key: identityKey,
             routePattern: 'identities/:id',
             idParams: [member.id],
             organization: undefined,
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: identityPersonSeedBody(member),
+            operation: identityKey,
         });
         // Phase 10 Task 2: the PII facet's own document
         // message pair, closing the intake decomposition's
@@ -1427,13 +1436,17 @@ export function buildMockDataInvocations():
         // transaction the human-members create already spans, so
         // it commits BEFORE seedHumanCredentials' pii-presence
         // filter runs.
+        const piiKey = seedMessagePairKey(
+            'identities/:id/pii', member.id,
+        );
         invocations.push({
-            key: seedMessagePairKey('identities/:id/pii', member.id),
+            key: piiKey,
             routePattern: 'identities/:id/pii',
             idParams: [member.id],
             organization: undefined,
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: humanMemberPiiSeedBody(member),
+            operation: piiKey,
         });
     });
     // The unaffiliated identity
@@ -1449,25 +1462,29 @@ export function buildMockDataInvocations():
     // WRITE_RESPONSE_SPECS entry, so they cannot ride
     // formSeedMessagePair.
     const unaffiliated = buildUnaffiliatedIdentity();
+    const unaffiliatedIdentityKey = seedMessagePairKey(
+        'identities/:id', unaffiliated.id,
+    );
     invocations.push({
-        key: seedMessagePairKey(
-            'identities/:id', unaffiliated.id,
-        ),
+        key: unaffiliatedIdentityKey,
         routePattern: 'identities/:id',
         idParams: [unaffiliated.id],
         organization: undefined,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: identityPersonSeedBody(unaffiliated),
+        operation: unaffiliatedIdentityKey,
     });
+    const unaffiliatedPiiKey = seedMessagePairKey(
+        'identities/:id/pii', unaffiliated.id,
+    );
     invocations.push({
-        key: seedMessagePairKey(
-            'identities/:id/pii', unaffiliated.id,
-        ),
+        key: unaffiliatedPiiKey,
         routePattern: 'identities/:id/pii',
         idParams: [unaffiliated.id],
         organization: undefined,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: humanMemberPiiSeedBody(unaffiliated),
+        operation: unaffiliatedPiiKey,
     });
     // The system identity's OWN identities/:id document
     // message pair — the last raw identities.put site the
@@ -1475,13 +1492,17 @@ export function buildMockDataInvocations():
     // human-member loop above forms this SAME pair per human
     // member already; the ai-members loop below forms its
     // OWN, per member).
+    const systemIdentityKey = seedMessagePairKey(
+        'identities/:id', SYSTEM_MEMBER_ID,
+    );
     invocations.push({
-        key: seedMessagePairKey('identities/:id', SYSTEM_MEMBER_ID),
+        key: systemIdentityKey,
         routePattern: 'identities/:id',
         idParams: [SYSTEM_MEMBER_ID],
         organization: undefined,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: identityDocumentBodyOf('service'),
+        operation: systemIdentityKey,
     });
     // Role grants retired: membership `type` seeds the
     // privilege (admin for current, member otherwise) and mint
@@ -1491,20 +1512,25 @@ export function buildMockDataInvocations():
     );
     ideas.forEach((idea, i) => {
         const genesis = ideaGenesisById.get(idea.id)!;
+        const key = seedMessagePairKey('ideas', idea.id);
         invocations.push({
-            key: seedMessagePairKey('ideas', idea.id),
+            key,
             routePattern: 'organizations/:id/ideas/:id',
             idParams: [assignOrganization(i), idea.id],
             organization: assignOrganization(i),
             requesterIdentityId: genesis.memberId,
             body: ideaSeedBody(idea, genesis.state, i),
+            operation: key,
         });
     });
     // Phase 12 Task 3 / Phase Final Task 2: the two seeded
     // organizations form their OWN organizations/:id document
     // message pairs (ROW half stripped — message-plane only).
+    const starkOrganizationKey = seedMessagePairKey(
+        'organizations/:id', STARK_ORGANIZATION,
+    );
     invocations.push({
-        key: seedMessagePairKey('organizations/:id', STARK_ORGANIZATION),
+        key: starkOrganizationKey,
         routePattern: 'organizations/:id',
         idParams: [STARK_ORGANIZATION],
         organization: undefined,
@@ -1513,9 +1539,13 @@ export function buildMockDataInvocations():
             'Stark Industries', 'acmecorp.com',
             daysFromNow(300, 0, 0),
         ),
+        operation: starkOrganizationKey,
     });
+    const org2OrganizationKey = seedMessagePairKey(
+        'organizations/:id', ORGANIZATION_TWO,
+    );
     invocations.push({
-        key: seedMessagePairKey('organizations/:id', ORGANIZATION_TWO),
+        key: org2OrganizationKey,
         routePattern: 'organizations/:id',
         idParams: [ORGANIZATION_TWO],
         organization: undefined,
@@ -1524,11 +1554,15 @@ export function buildMockDataInvocations():
             'Wayne Enterprises', 'wayne.example.com',
             daysFromNow(200, 0, 0),
         ),
+        operation: org2OrganizationKey,
     });
     for (const submission of buildIdeaSubmissions()) {
         const ideaIndex = ideaIndexById.get(submission.idea_id)!;
+        const key = seedMessagePairKey(
+            'idea-submissions', submission.id,
+        );
         invocations.push({
-            key: seedMessagePairKey('idea-submissions', submission.id),
+            key,
             routePattern:
                 'organizations/:id/ideas/:id/submissions/:sid',
             idParams: [
@@ -1538,13 +1572,15 @@ export function buildMockDataInvocations():
             organization: assignOrganization(ideaIndex),
             requesterIdentityId: submission.member_id,
             body: ideaSubmissionSeedBody(submission),
+            operation: key,
         });
     }
     for (const project of [...projects, projectOrg2(projects)]) {
         const genesis = projectGenesisById.get(project.id)!;
         const organization = projectOrganizationFor(project);
+        const key = seedMessagePairKey('projects', project.id);
         invocations.push({
-            key: seedMessagePairKey('projects', project.id),
+            key,
             routePattern: 'organizations/:id/projects/:id',
             idParams: [organization, project.id],
             organization,
@@ -1552,6 +1588,7 @@ export function buildMockDataInvocations():
             body: projectSeedBody(
                 project, genesis.state, organization,
             ),
+            operation: key,
         });
     }
     for (const flow of mockFlows) {
@@ -1562,14 +1599,18 @@ export function buildMockDataInvocations():
         const createBody = flowSeedBody(
             flow, event, projectFlow, flowRelations,
         );
+        const flowOperation = seedMessagePairKey(
+            'flows', flow.id,
+        );
         invocations.push({
-            key: seedMessagePairKey('flows', flow.id),
+            key: flowOperation,
             routePattern: 'organizations/:id/flows/',
             idParams: [STARK_ORGANIZATION],
             op: true,
             organization: STARK_ORGANIZATION,
             requesterIdentityId: event.member_id,
             body: createBody,
+            operation: flowOperation,
         });
         // Task 5: create appends THREE pairs — the operation
         // message pair above, plus a document message pair
@@ -1589,6 +1630,7 @@ export function buildMockDataInvocations():
             organization: STARK_ORGANIZATION,
             requesterIdentityId: event.member_id,
             body: seedFlowDocumentBody(b, flow.graph),
+            operation: flowOperation,
         });
         invocations.push({
             key: seedMessagePairKey(
@@ -1603,6 +1645,7 @@ export function buildMockDataInvocations():
             organization: STARK_ORGANIZATION,
             requesterIdentityId: event.member_id,
             body: b.projectFlow,
+            operation: flowOperation,
         });
     }
     // Task 6: the fifth seeded flow — organization
@@ -1611,10 +1654,11 @@ export function buildMockDataInvocations():
     // has no project_flows join row, so it drives through
     // postFlowDocumentOp's genesis document PUT instead of the
     // four-above's postFlowCreationOp.
+    const flowOrg2Key = seedMessagePairKey(
+        'flows/:id', seedIdentifier('seed-flow-org2'),
+    );
     invocations.push({
-        key: seedMessagePairKey(
-            'flows/:id', seedIdentifier('seed-flow-org2'),
-        ),
+        key: flowOrg2Key,
         routePattern: 'organizations/:id/flows/:id',
         idParams: [
             ORGANIZATION_TWO,
@@ -1623,6 +1667,7 @@ export function buildMockDataInvocations():
         organization: ORGANIZATION_TWO,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: flowOrg2SeedBody(),
+        operation: flowOrg2Key,
     });
     // Phase 5 Task 4: the entity/join gap closed — one document
     // message pair per seeded work order (hand-authored +
@@ -1640,8 +1685,9 @@ export function buildMockDataInvocations():
             ...workOrders, ...leadToCloseWorkload.workOrders,
         ]
     ) {
+        const key = seedMessagePairKey('work-orders/:id', wo.id);
         invocations.push({
-            key: seedMessagePairKey('work-orders/:id', wo.id),
+            key,
             routePattern:
                 'organizations/:id/work-orders/:id',
             idParams: [STARK_ORGANIZATION, wo.id],
@@ -1649,6 +1695,7 @@ export function buildMockDataInvocations():
             requesterIdentityId:
                 workOrderFirstEventMemberId.get(wo.id)!,
             body: workOrderDocumentSeedBody(wo),
+            operation: key,
         });
     }
     for (
@@ -1657,10 +1704,11 @@ export function buildMockDataInvocations():
             ...leadToCloseWorkload.flowWorkOrders,
         ]
     ) {
+        const key = seedMessagePairKey(
+            'flows/:id/work-orders/:woid', join.id,
+        );
         invocations.push({
-            key: seedMessagePairKey(
-                'flows/:id/work-orders/:woid', join.id,
-            ),
+            key,
             routePattern:
                 'organizations/:id/flows/:id/work-orders/:woid',
             idParams: [
@@ -1675,6 +1723,7 @@ export function buildMockDataInvocations():
                 join.work_order_id,
             )!,
             body: flowWorkOrderJoinSeedBody(join),
+            operation: key,
         });
     }
     // States-document retirement: every trace event (212 hand-
@@ -1703,10 +1752,11 @@ export function buildMockDataInvocations():
         ) {
             continue;
         }
+        const key = seedMessagePairKey(
+            'work-orders/:id/transition', event.id,
+        );
         invocations.push({
-            key: seedMessagePairKey(
-                'work-orders/:id/transition', event.id,
-            ),
+            key,
             routePattern:
                 'organizations/:id/work-orders/:id/transition',
             idParams: [STARK_ORGANIZATION, event.entity_id],
@@ -1714,17 +1764,20 @@ export function buildMockDataInvocations():
             organization: STARK_ORGANIZATION,
             requesterIdentityId: event.member_id,
             body: transitionSeedBody(event),
+            operation: key,
         });
     }
     for (const m of aiMembers) {
         const { id: _id, ...fields } = m;
+        const key = seedMessagePairKey('ai-agents/:id', m.id);
         invocations.push({
-            key: seedMessagePairKey('ai-agents/:id', m.id),
+            key,
             routePattern: 'ai-agents/:id',
             idParams: [m.id],
             organization: undefined,
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: fields,
+            operation: key,
         });
     }
     mockRecords.forEach((r, i) => {
@@ -1739,16 +1792,18 @@ export function buildMockDataInvocations():
         // Task 23: record document/op invocations ride the
         // nested record-types patterns (same storage documents
         // as the retired flat alias window; counts unchanged).
+        const recordOperation = seedMessagePairKey(
+            RECORD_TYPES_COLLECTION_PATTERN, r.id,
+        );
         invocations.push({
-            key: seedMessagePairKey(
-                RECORD_TYPES_COLLECTION_PATTERN, r.id,
-            ),
+            key: recordOperation,
             routePattern: RECORD_TYPES_COLLECTION_PATTERN,
             idParams: [organization],
             op: true,
             organization,
             requesterIdentityId: genesis.memberId,
             body: createBody,
+            operation: recordOperation,
         });
         // Phase 6 Task 4: create appends the document message
         // pair (at the type's own nested document) and one
@@ -1771,6 +1826,7 @@ export function buildMockDataInvocations():
             organization,
             requesterIdentityId: genesis.memberId,
             body: recordDocumentBodyOf(b),
+            operation: recordOperation,
         });
         for (const a of attributes) {
             // Task 8: attributes store under their type
@@ -1786,6 +1842,7 @@ export function buildMockDataInvocations():
                 body: recordAttributeDocumentBodyOf(
                     a as unknown as Record<string, unknown>,
                 ),
+                operation: recordOperation,
             });
         }
     });
@@ -1798,10 +1855,11 @@ export function buildMockDataInvocations():
     // by SYSTEM_MEMBER_ID), not a second, independently-picked
     // author.
     for (const join of mockFlowRecords) {
+        const key = seedMessagePairKey(
+            'flows/:id/records/:frid', join.id,
+        );
         invocations.push({
-            key: seedMessagePairKey(
-                'flows/:id/records/:frid', join.id,
-            ),
+            key,
             routePattern:
                 'organizations/:id/flows/:id/records/:frid',
             idParams: [
@@ -1812,6 +1870,7 @@ export function buildMockDataInvocations():
             requesterIdentityId: recordGenesisById
                 .get(join.record_id)!.memberId,
             body: flowRecordJoinSeedBody(join),
+            operation: key,
         });
     }
     for (const seed of OBJECTIVE_SEEDS) {
@@ -1822,14 +1881,18 @@ export function buildMockDataInvocations():
         const createBody = objectiveSeedBody(
             seed, STARK_ORGANIZATION, memberId,
         );
+        const objectiveOperation = seedMessagePairKey(
+            'objectives', seed.id,
+        );
         invocations.push({
-            key: seedMessagePairKey('objectives', seed.id),
+            key: objectiveOperation,
             routePattern: 'organizations/:id/objectives/',
             idParams: [STARK_ORGANIZATION],
             op: true,
             organization: STARK_ORGANIZATION,
             requesterIdentityId: memberId,
             body: createBody,
+            operation: objectiveOperation,
         });
         // Task 3: create appends the document message pair
         // (at the objective's own document) and the revision
@@ -1848,6 +1911,7 @@ export function buildMockDataInvocations():
             organization: STARK_ORGANIZATION,
             requesterIdentityId: memberId,
             body: objectiveDocumentBodyOf(b),
+            operation: objectiveOperation,
         });
         invocations.push({
             key: seedMessagePairKey(
@@ -1862,22 +1926,25 @@ export function buildMockDataInvocations():
             organization: STARK_ORGANIZATION,
             requesterIdentityId: memberId,
             body: objectiveRevisionBodyOf(b),
+            operation: objectiveOperation,
         });
     }
     const org2CreateBody = objectiveSeedBody(
         ORGANIZATION_TWO_OBJECTIVE,
         ORGANIZATION_TWO, SYSTEM_MEMBER_ID,
     );
+    const org2ObjectiveOperation = seedMessagePairKey(
+        'objectives', ORGANIZATION_TWO_OBJECTIVE.id,
+    );
     invocations.push({
-        key: seedMessagePairKey(
-            'objectives', ORGANIZATION_TWO_OBJECTIVE.id,
-        ),
+        key: org2ObjectiveOperation,
         routePattern: 'organizations/:id/objectives/',
         idParams: [ORGANIZATION_TWO],
         op: true,
         organization: ORGANIZATION_TWO,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: org2CreateBody,
+        operation: org2ObjectiveOperation,
     });
     const org2 = validateObjectiveCreateBody(org2CreateBody);
     invocations.push({
@@ -1892,6 +1959,7 @@ export function buildMockDataInvocations():
         organization: ORGANIZATION_TWO,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: objectiveDocumentBodyOf(org2),
+        operation: org2ObjectiveOperation,
     });
     invocations.push({
         key: seedMessagePairKey(
@@ -1907,6 +1975,7 @@ export function buildMockDataInvocations():
         organization: ORGANIZATION_TWO,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: objectiveRevisionBodyOf(org2),
+        operation: org2ObjectiveOperation,
     });
     // Phase 7 Task 5: the scores half of the seed deferral closes
     // LAST, landing WHOLE — baselines AND actuals, one document
@@ -1926,11 +1995,12 @@ export function buildMockDataInvocations():
     );
     const scoreRows = buildSeedScoreRows(scoreProjects, pools);
     for (const row of scoreRows.baselines) {
+        const key = seedMessagePairKey(
+            'projects/:id/objective-baseline-scores/:sid',
+            row.id,
+        );
         invocations.push({
-            key: seedMessagePairKey(
-                'projects/:id/objective-baseline-scores/:sid',
-                row.id,
-            ),
+            key,
             routePattern:
                 'organizations/:id/projects/:id'
                 + '/objective-baseline-scores/:sid',
@@ -1945,14 +2015,16 @@ export function buildMockDataInvocations():
             )!,
             requesterIdentityId: row.fields.member_id,
             body: row.fields,
+            operation: key,
         });
     }
     for (const row of scoreRows.actuals) {
+        const key = seedMessagePairKey(
+            'projects/:id/objective-actual-scores/:sid',
+            row.id,
+        );
         invocations.push({
-            key: seedMessagePairKey(
-                'projects/:id/objective-actual-scores/:sid',
-                row.id,
-            ),
+            key,
             routePattern:
                 'organizations/:id/projects/:id'
                 + '/objective-actual-scores/:sid',
@@ -1967,6 +2039,7 @@ export function buildMockDataInvocations():
             )!,
             requesterIdentityId: row.fields.member_id,
             body: row.fields,
+            operation: key,
         });
     }
     return invocations;
@@ -1984,15 +2057,13 @@ export function buildMockDataInvocations():
 // idParams for the path, but form as POST with {status:
 // 204} — name stays '' because pathAndNameOf keys on the
 // LAST segment.
+// The seed's request id is its operation's id. Pass 1 mints
+// no request id, and the landing drops the line (Decision
+// 3).
 export async function formSeedMessagePair(
     inv: MockDataInvocation, requestAt: string,
-    operationId?: string,
-    requestId?: string,
+    operationId: string,
 ): Promise<MessagePair> {
-    const envelopeId = operationId
-        ?? generateIdentifier();
-    const mintedRequestId = requestId
-        ?? generateIdentifier();
     const idParams = inv.idParams;
     const routeSegments = inv.routePattern.split('/');
     let paramIndex = 0;
@@ -2032,7 +2103,7 @@ export async function formSeedMessagePair(
         headerFields: [
             {
                 name: OPERATION_ID_HEADER,
-                value: envelopeId,
+                value: operationId,
             },
         ],
         body: inv.body,
@@ -2040,8 +2111,8 @@ export async function formSeedMessagePair(
         requestAt,
         organization: inv.organization,
         responseBody: response.body,
-        operationId: envelopeId,
-        requestId: mintedRequestId,
+        operationId,
+        requestId: operationId,
         // Fresh database: every seed pair is genesis.
     });
 }
@@ -2095,12 +2166,11 @@ export async function formDefaultOrganizationSeedMessagePair(
     identityId: Id,
     organizationId: Id,
     requestAt: string,
+    operationId: string,
 ): Promise<MessagePair> {
     const pathSegments = [
         'identities', identityId, 'default-organization',
     ];
-    const operationId = generateIdentifier();
-    const requestId = generateIdentifier();
     return formWriteMessagePair({
         method: 'PUT',
         pathname: '/' + pathSegments.join('/'),
@@ -2121,7 +2191,7 @@ export async function formDefaultOrganizationSeedMessagePair(
         organization: undefined,
         responseBody: undefined,
         operationId,
-        requestId,
+        requestId: operationId,
     });
 }
 
@@ -2148,7 +2218,6 @@ export async function formInvitationSeedMessagePairs(
     const granterId = 'XXZruirZyAOoRpNxaDnpSA';
     const grantAt = MOCK_SEED_TIMESTAMP;
     const operationId = generateIdentifier();
-    const requestId = generateIdentifier();
     const grantEventId =
         UNAFFILIATED_INVITATION_GRANT_EVENT_ID;
     const messagePairs = new Map<string, MessagePair>();
@@ -2178,7 +2247,7 @@ export async function formInvitationSeedMessagePairs(
                 state: 'pending',
             },
             operationId,
-            requestId,
+            requestId: operationId,
         }),
     );
     const documentBody = {
@@ -2207,7 +2276,7 @@ export async function formInvitationSeedMessagePairs(
                 ...documentBody,
             },
             operationId,
-            requestId,
+            requestId: operationId,
         }),
     );
     return messagePairs;
@@ -2261,7 +2330,6 @@ export async function formInstanceChainMessagePairs():
     // PATCH create would store. Seed writes this one
     // pair only (1498).
     const genesisId = generateIdentifier();
-    const genesisRequestId = generateIdentifier();
     const genesis = await formWriteMessagePair({
         method: 'PUT',
         pathname: instancePathname,
@@ -2275,11 +2343,10 @@ export async function formInstanceChainMessagePairs():
         organization: org,
         responseBody: { values: [] },
         operationId: genesisId,
-        requestId: genesisRequestId,
+        requestId: genesisId,
     });
 
     const bindingId = generateIdentifier();
-    const bindingRequestId = generateIdentifier();
     const binding = await formWriteMessagePair({
         method: 'PUT',
         pathname:
@@ -2305,11 +2372,10 @@ export async function formInstanceChainMessagePairs():
         organization: org,
         responseBody: undefined,
         operationId: bindingId,
-        requestId: bindingRequestId,
+        requestId: bindingId,
     });
 
     const reviewOpId = generateIdentifier();
-    const reviewRequestId = generateIdentifier();
     const reviewOp = await formWriteMessagePair({
         method: 'POST',
         pathname:
@@ -2332,7 +2398,7 @@ export async function formInstanceChainMessagePairs():
         organization: org,
         responseBody: undefined,
         operationId: reviewOpId,
-        requestId: reviewRequestId,
+        requestId: reviewOpId,
     });
 
     const reviewSet = seedSetFor(review.id);
@@ -2352,11 +2418,10 @@ export async function formInstanceChainMessagePairs():
         organization: org,
         responseBody: { values: reviewValues },
         operationId: reviewOpId,
-        requestId: reviewRequestId,
+        requestId: reviewOpId,
     });
 
     const completeOpId = generateIdentifier();
-    const completeRequestId = generateIdentifier();
     const completeOp = await formWriteMessagePair({
         method: 'POST',
         pathname:
@@ -2379,7 +2444,7 @@ export async function formInstanceChainMessagePairs():
         organization: org,
         responseBody: undefined,
         operationId: completeOpId,
-        requestId: completeRequestId,
+        requestId: completeOpId,
     });
 
     const completeSet = seedSetFor(complete.id);
@@ -2399,7 +2464,7 @@ export async function formInstanceChainMessagePairs():
         organization: org,
         responseBody: { values: completeValues },
         operationId: completeOpId,
-        requestId: completeRequestId,
+        requestId: completeOpId,
     });
 
     const messagePairs = new Map<string, MessagePair>();
@@ -2457,10 +2522,18 @@ export async function formMockDataMessagePairs(
     requestAt: string,
 ): Promise<ReadonlyMap<string, MessagePair>> {
     const messagePairs = new Map<string, MessagePair>();
+    const operationIds = new Map<string, string>();
     for (const inv of buildMockDataInvocations()) {
+        let operationId = operationIds.get(inv.operation);
+        if (operationId === undefined) {
+            operationId = generateIdentifier();
+            operationIds.set(inv.operation, operationId);
+        }
         messagePairs.set(
             inv.key,
-            await formSeedMessagePair(inv, requestAt),
+            await formSeedMessagePair(
+                inv, requestAt, operationId,
+            ),
         );
     }
     // One default-organization document per seeded human.
@@ -2474,6 +2547,7 @@ export async function formMockDataMessagePairs(
                 member.id,
                 memberPrimaryOrganization(member.id, index),
                 requestAt,
+                generateIdentifier(),
             ),
         );
     }
@@ -2535,8 +2609,10 @@ export async function formSeedCredentialMessagePairs(
                 body: identityCredentialSeedBody(
                     cred.identityId, 'password', cred.secret,
                 ),
+                operation: key,
             },
             requestAt,
+            generateIdentifier(),
         ));
     }
     const systemKey = seedMessagePairKey(
@@ -2553,8 +2629,10 @@ export async function formSeedCredentialMessagePairs(
                 SYSTEM_MEMBER_ID, 'client_secret',
                 systemCredential.secret,
             ),
+            operation: systemKey,
         },
         requestAt,
+        generateIdentifier(),
     ));
     return messagePairs;
 }
@@ -2589,67 +2667,85 @@ export async function formBootstrapMessagePair(
     readonly defaultOrganizationMessagePair: MessagePair;
     readonly organizationMessagePair: MessagePair;
 }> {
+    const identityKey = seedMessagePairKey(
+        'identities/:id',
+        'XXZruirZyAOoRpNxaDnpSA',
+    );
     const identityMessagePair = await formSeedMessagePair(
         {
-            key: seedMessagePairKey(
-                'identities/:id',
-                'XXZruirZyAOoRpNxaDnpSA',
-            ),
+            key: identityKey,
             routePattern: 'identities/:id',
             idParams: ['XXZruirZyAOoRpNxaDnpSA'],
             organization: undefined,
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: bootstrapCurrentIdentityBody(),
+            operation: identityKey,
         },
         requestAt,
+        generateIdentifier(),
+    );
+    const seatKey = seedMessagePairKey(
+        ORGANIZATION_MEMBER_DETAIL_PATTERN,
+        'current-0',
     );
     const seatMessagePair = await formSeedMessagePair(
         {
-            key: seedMessagePairKey(
-                ORGANIZATION_MEMBER_DETAIL_PATTERN,
-                'current-0',
-            ),
+            key: seatKey,
             routePattern:
                 ORGANIZATION_MEMBER_DETAIL_PATTERN,
             idParams: [STARK_ORGANIZATION, 'XXZruirZyAOoRpNxaDnpSA'],
             organization: STARK_ORGANIZATION,
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: seatSeedBody('admin', requestAt),
+            operation: seatKey,
         },
         requestAt,
+        generateIdentifier(),
+    );
+    const piiKey = seedMessagePairKey(
+        'identities/:id/pii',
+        'XXZruirZyAOoRpNxaDnpSA',
     );
     const piiMessagePair = await formSeedMessagePair(
         {
-            key: seedMessagePairKey(
-                'identities/:id/pii',
-                'XXZruirZyAOoRpNxaDnpSA',
-            ),
+            key: piiKey,
             routePattern: 'identities/:id/pii',
             idParams: ['XXZruirZyAOoRpNxaDnpSA'],
             organization: undefined,
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: bootstrapCurrentMemberPiiBody(),
+            operation: piiKey,
         },
         requestAt,
+        generateIdentifier(),
+    );
+    const systemIdentityKey = seedMessagePairKey(
+        'identities/:id', SYSTEM_MEMBER_ID,
     );
     const systemIdentityMessagePair = await formSeedMessagePair(
         {
-            key: seedMessagePairKey('identities/:id', SYSTEM_MEMBER_ID),
+            key: systemIdentityKey,
             routePattern: 'identities/:id',
             idParams: [SYSTEM_MEMBER_ID],
             organization: undefined,
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: identityDocumentBodyOf('service'),
+            operation: systemIdentityKey,
         },
         requestAt,
+        generateIdentifier(),
     );
     const defaultOrganizationMessagePair =
         await formDefaultOrganizationSeedMessagePair(
             'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION, requestAt,
+            generateIdentifier(),
         );
+    const organizationKey = seedMessagePairKey(
+        'organizations/:id', STARK_ORGANIZATION,
+    );
     const organizationMessagePair = await formSeedMessagePair(
         {
-            key: seedMessagePairKey('organizations/:id', STARK_ORGANIZATION),
+            key: organizationKey,
             routePattern: 'organizations/:id',
             idParams: [STARK_ORGANIZATION],
             organization: undefined,
@@ -2658,8 +2754,10 @@ export async function formBootstrapMessagePair(
                 'Stark Industries', 'acmecorp.com',
                 daysFromNow(300, 0, 0),
             ),
+            operation: organizationKey,
         },
         requestAt,
+        generateIdentifier(),
     );
     return {
         identityMessagePair,
