@@ -1025,9 +1025,11 @@ skew tests, which went with item 8's trio.
    Today: boot gates on
    the marker row (`assertSchemaMarker`,
    `server/postgres-gate.ts:67`, called at
-   `server/boot.ts:106`), and the seed stamps it last
-   (`api/backend-postgres.ts:107-113`) and refuses on it
-   (`server/seed.ts:119-125`). Follows item 2.
+   `server/boot.ts:106`), and the seed's one transaction
+   writes `schema_marker` last
+   (`api/backend-postgres.ts:97-100`); the seed refuses
+   on `fa_message_pairs`' presence, not the marker
+   (`server/seed.ts:104-128`). Follows item 2.
 4. `/status` — `{ up: boolean, components: { postgres:
    boolean } }`, 200 when every component is up and 503
    when any is not, built for more components.
