@@ -366,6 +366,6 @@ Deno.test('a same-body answer is status 200 from the'
     const src = Deno.readTextFileSync('api/api.ts');
     assertMatch(
         src,
-        /responseFromLatin1\(\s*stored\.response, 200,?\s*\)/,
+        /responseFromHead\(/,
     );
 });

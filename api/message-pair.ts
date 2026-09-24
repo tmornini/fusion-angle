@@ -630,16 +630,52 @@ export function requestHeaderFields(
 }
 
 // The stored bytes, parsed and returned unchanged.
-// A status override is the matched answer's 200.
 export function responseFromStored(
     stored: MessagePairEntity,
 ): Response {
     return responseFromLatin1(stored.response);
 }
 
+export function responseFromHead(
+    wire: string,
+    requestId: string,
+): Response {
+    const model = parseWire(wire);
+    if (model.startLine.kind !== 'response') {
+        throw new Error(
+            'stored response message has no status line',
+        );
+    }
+    const headers = new Headers();
+    let wroteRequestId = false;
+    for (const field of model.fields) {
+        if (field.name === 'date') continue;
+        if (field.name === 'request-id') {
+            if (wroteRequestId) continue;
+            headers.append('request-id', requestId);
+            wroteRequestId = true;
+            continue;
+        }
+        headers.append(field.name, field.value);
+    }
+    if (!wroteRequestId) {
+        headers.append('request-id', requestId);
+    }
+    const body = HttpMessage.fromModel(model).body();
+    if (!body.exists()) {
+        return new Response(null, {
+            status: HTTP_OK,
+            headers,
+        });
+    }
+    return new Response(body.toText(), {
+        status: HTTP_OK,
+        headers,
+    });
+}
+
 export function responseFromLatin1(
     wire: string,
-    statusOverride?: number,
 ): Response {
     const model = parseWire(wire);
     if (model.startLine.kind !== 'response') {
@@ -651,8 +687,7 @@ export function responseFromLatin1(
     for (const field of model.fields) {
         headers.append(field.name, field.value);
     }
-    const status = statusOverride
-        ?? model.startLine.status;
+    const status = model.startLine.status;
     const body = HttpMessage.fromModel(model).body();
     if (!body.exists()) {
         return new Response(null, { status, headers });
@@ -903,6 +938,22 @@ function bindOf(
     };
 }
 
+function currentRequestId(
+    source: WriteRow | MessagePair,
+    ownResponse: Uint8Array,
+): string {
+    if ('requestMessage' in source) {
+        return source.requestId;
+    }
+    const model = parseWire(latin1(ownResponse));
+    for (const field of model.fields) {
+        if (field.name === 'request-id') {
+            return field.value;
+        }
+    }
+    return '';
+}
+
 function answerOf(
     rows: readonly (WriteRow | MessagePair)[],
     stated: readonly StatementAnswer[],
@@ -930,8 +981,12 @@ function answerOf(
             throw new Error('matched row has no head');
         }
         return {
-            response: responseFromLatin1(
-                latin1(row.headResponse), 200,
+            response: responseFromHead(
+                latin1(row.headResponse),
+                currentRequestId(
+                    rows[index]!,
+                    row.response,
+                ),
             ),
             outcome,
             answeredId: row.headId,

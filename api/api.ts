@@ -27,7 +27,7 @@ import {
     documentHeadAt,
     writeAnswerOf,
     ownWireOf,
-    responseFromLatin1,
+    responseFromHead,
     attemptFor,
     runWrite,
     attachEtag,
@@ -1260,8 +1260,9 @@ async function dispatched(
                                 .getById(livePut);
                         if (stored !== undefined) {
                             return attachEtag(
-                                responseFromLatin1(
-                                    stored.response, 200,
+                                responseFromHead(
+                                    stored.response,
+                                    ctx.requestId,
                                 ),
                                 stored.id,
                             );

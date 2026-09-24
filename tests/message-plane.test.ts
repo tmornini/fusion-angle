@@ -36,7 +36,10 @@ import {
     formWriteMessagePair,
     runWrite,
 } from '../api/message-pair.ts';
-import { nowUtc } from '../api/types.ts';
+import {
+    DEFAULT_LOCK_TIMEOUT,
+    nowUtc,
+} from '../api/types.ts';
 import { sha256HexOfBytes } from '../shared/digest.ts';
 import {
     generateIdentifier,
@@ -1239,6 +1242,199 @@ Deno.test(
         assertStrictEquals(stored.secret, '');
         assertStrictEquals(
             stored.secret_hash, EMPTY_SHA256,
+        );
+    },
+);
+
+function flowDocument(
+    name: string,
+    state: string,
+    stateEventId: string,
+    stateAt: string,
+) {
+    return {
+        name,
+        is_locked: false,
+        is_auto_layout: false,
+        is_auto_fit: false,
+        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        state,
+        state_at: stateAt,
+        state_event_id: stateEventId,
+        graph: { nodes: [], edges: [] },
+        graphDelta: {
+            nodes: [],
+            edges: [],
+            deletions: [],
+            memberEvents: [],
+            attributeEvents: [],
+        },
+        revivals: [],
+    };
+}
+
+Deno.test(
+    'a second PUT with the same body answers'
+        + ' this transmission',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const token = await organizationToken();
+        const id = generateIdentifier();
+        const path = '/organizations/'
+            + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + id;
+        const body = ideaDocument('Same', 'active');
+        const firstOperation = generateIdentifier();
+        const first = await handleRequest(
+            db, apiRequest({
+                method: 'PUT',
+                path,
+                token,
+                body,
+                operationId: firstOperation,
+            }),
+        );
+        const firstRequestId = first.headers.get(
+            'request-id',
+        );
+        const headEtag = first.headers.get('etag');
+        await first.text();
+        if (
+            firstRequestId === null
+            || headEtag === null
+        ) {
+            throw new Error(
+                'head answer omitted an id',
+            );
+        }
+        assertStrictEquals(first.status, 201);
+        assertStrictEquals(
+            first.headers.get('operation-id'),
+            firstOperation,
+        );
+        const before = (
+            await db.messagePairs.getAll()
+        ).length;
+        const secondOperation = generateIdentifier();
+        const second = await handleRequest(
+            db, apiRequest({
+                method: 'PUT',
+                path,
+                token,
+                body,
+                operationId: secondOperation,
+            }),
+        );
+        const secondRequestId = second.headers.get(
+            'request-id',
+        );
+        await second.text();
+        assertStrictEquals(second.status, 200);
+        assertStrictEquals(
+            secondRequestId !== null
+                && isIdentifier(secondRequestId),
+            true,
+        );
+        assertNotStrictEquals(
+            secondRequestId, firstRequestId,
+        );
+        assertStrictEquals(
+            second.headers.get('date'), null,
+        );
+        assertStrictEquals(
+            second.headers.get('etag'), headEtag,
+        );
+        assertStrictEquals(
+            second.headers.get('operation-id'),
+            firstOperation,
+        );
+        assertNotStrictEquals(
+            second.headers.get('operation-id'),
+            secondOperation,
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length,
+            before,
+        );
+    },
+);
+
+Deno.test(
+    'a resent latch answers 412 when the body'
+        + ' equals the head',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const token = await organizationToken();
+        const id = generateIdentifier();
+        const path = '/organizations/'
+            + 'AjdvjuECVZEgZoFajaIEkg/flows/'
+            + id;
+        const first = await handleRequest(
+            db, apiRequest({
+                method: 'PUT',
+                path,
+                token,
+                body: flowDocument(
+                    'Original',
+                    'active',
+                    generateIdentifier(),
+                    '2026-01-01T00:00:00.000000Z',
+                ),
+            }),
+        );
+        const firstEtag = first.headers.get('etag');
+        await first.text();
+        if (firstEtag === null) {
+            throw new Error(
+                'head answer omitted an etag',
+            );
+        }
+        assertStrictEquals(first.status, 201);
+        const head = flowDocument(
+            'Renamed',
+            'updated',
+            generateIdentifier(),
+            '2026-01-01T00:00:01.000000Z',
+        );
+        const second = await handleRequest(
+            db, apiRequest({
+                method: 'PUT',
+                path,
+                token,
+                body: head,
+                headers: { 'if-match': firstEtag },
+            }),
+        );
+        const secondEtag = second.headers.get('etag');
+        await second.text();
+        assertStrictEquals(second.status, 201);
+        assertNotStrictEquals(secondEtag, firstEtag);
+        const before = (
+            await db.messagePairs.getAll()
+        ).length;
+        const third = await handleRequest(
+            db, apiRequest({
+                method: 'PUT',
+                path,
+                token,
+                body: head,
+                headers: { 'if-match': firstEtag },
+            }),
+        );
+        const error = await third.json() as {
+            error: string,
+        };
+        assertStrictEquals(third.status, 412);
+        assertStrictEquals(
+            error.error,
+            'If-Match does not match the current'
+                + ' document at ' + path,
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length,
+            before,
         );
     },
 );
