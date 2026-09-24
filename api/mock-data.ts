@@ -584,8 +584,8 @@ async function postMockDataLoadIn(
     // nothing, so organization_id rides in the seed body
     // instead of the (route-only) omission. ideaGenesis is
     // imported from seed-message-pairs.ts — pass 1 there needs
-    // the SAME array to form each idea's pair before this
-    // transaction opens.
+    // the SAME array to form each idea's pair before the
+    // rehearsal's writes.
     const ideaGenesisById = new Map(
         ideaGenesis.map(g => [g.entityId, g]),
     );
@@ -698,8 +698,8 @@ async function postMockDataLoadIn(
 
     // mockFlowRecords (the flow-record join rows) is imported
     // from seed-message-pairs.ts — pass 1 there needs the SAME
-    // array to form each join's pair before this transaction
-    // opens.
+    // array to form each join's pair before the rehearsal's
+    // writes.
 
     // One genesis row per seeded Record: its initial
     // state and the member credited with creating it.
@@ -722,8 +722,8 @@ async function postMockDataLoadIn(
 
     // mockProjectFlows is imported from
     // seed-message-pairs.ts — pass 1 there needs the SAME
-    // array to form each flow's pair before this transaction
-    // opens.
+    // array to form each flow's pair before the rehearsal's
+    // writes.
 
     const leadToCloseData = buildLeadToCloseWorkload();
 
@@ -1131,8 +1131,8 @@ async function postMockDataLoadIn(
 
     // The baseline/actual-score rows — hoisted VERBATIM into a
     // pure builder (Phase 7 Task 5) so pass 1 (seed-message-
-    // pairs.ts) forms each row's message pair before this
-    // transaction opens, the SAME split every other seeded
+    // pairs.ts) forms each row's message pair before the
+    // rehearsal's writes, the SAME split every other seeded
     // family already uses. buildScoreSeedProjects resolves each
     // project's organization_id/state PURELY (never a DB read
     // back). This closes the scores half of the Phase 0 seed
