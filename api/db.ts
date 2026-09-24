@@ -178,6 +178,12 @@ export interface StorageBackend {
         mode: TxMode,
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R>;
+    // The seed's one transaction: the schema first, `fn`,
+    // then the marker. A throw rolls back all three, so a
+    // failed seed leaves no table.
+    seedTransaction<R>(
+        fn: (tx: Tx) => Promise<R>,
+    ): Promise<R>;
     ensureTable(): Promise<void>;
     executeLedger(
         attempt: Attempt,

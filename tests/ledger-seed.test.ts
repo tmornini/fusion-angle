@@ -1,5 +1,6 @@
 import {
     assertEquals,
+    assertRejects,
     assertStrictEquals,
     assertStringIncludes,
     assertThrows,
@@ -18,6 +19,8 @@ import {
     withoutRequestIdLine,
 } from '../api/ledger-seed.ts';
 import { rootBind } from '../api/ledger-root.ts';
+import { MemoryStorageBackend } from
+    '../api/backend-memory.ts';
 import {
     generateIdentifier,
     NIL_IDENTIFIER,
@@ -183,5 +186,47 @@ Deno.test(
             Error,
             'seed row carries no request-id line',
         );
+    },
+);
+
+Deno.test(
+    'a seed transaction that throws leaves no table',
+    async () => {
+        const backend = new MemoryStorageBackend();
+        await assertRejects(
+            () => backend.seedTransaction(async (tx) => {
+                await backend.executeLedger(
+                    'composed',
+                    [rootBind(generateIdentifier())],
+                    undefined,
+                    tx,
+                );
+                throw new Error('stop the seed');
+            }),
+            Error,
+            'stop the seed',
+        );
+        assertStrictEquals(await backend.hasSchema(), false);
+    },
+);
+
+Deno.test(
+    'a seed transaction creates the table with its rows',
+    async () => {
+        const backend = new MemoryStorageBackend();
+        const answers = await backend.seedTransaction(
+            (tx) => backend.executeLedger(
+                'composed',
+                [rootBind(generateIdentifier())],
+                undefined,
+                tx,
+            ),
+        );
+        assertStrictEquals(answers[0]?.outcome, 'land');
+        assertStrictEquals(await backend.hasSchema(), true);
+        const rows = await backend.read(
+            (tx) => tx.getAll(),
+        );
+        assertStrictEquals(rows.length, 1);
     },
 );
