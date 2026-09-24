@@ -17,6 +17,7 @@ import {
     SEED_ROWS_PER_STATEMENT,
     type RehearsedStatement,
     withoutRequestIdLine,
+    rehearse,
 } from '../api/ledger-seed.ts';
 import { rootBind } from '../api/ledger-root.ts';
 import { MemoryStorageBackend } from
@@ -28,6 +29,13 @@ import {
 import type { StatementBind } from
     '../shared/ledger-statement.ts';
 import { Octets } from '../shared/http-message/octets.ts';
+import type { DbAdapter } from '../api/db.ts';
+import {
+    attemptFor,
+    formWriteMessagePair,
+    runWrite,
+    type MessagePair,
+} from '../api/message-pair.ts';
 
 Deno.test(
     'a seed batch is half the binds the attempt leaves',
@@ -230,3 +238,95 @@ Deno.test(
         assertStrictEquals(rows.length, 1);
     },
 );
+
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
+const IDEA = 'XufQcWIKhZshfJYOVNeUSw';
+
+function ideaPair(
+    method: 'PUT' | 'DELETE',
+    title: string,
+    genesis: boolean,
+): Promise<MessagePair> {
+    const operationId = generateIdentifier();
+    const body = method === 'DELETE' ? undefined : { title };
+    return formWriteMessagePair({
+        method,
+        pathname: '/organizations/' + ORGANIZATION
+            + '/ideas/' + IDEA,
+        routePattern: 'organizations/:id/ideas/:id',
+        routeSegments: [
+            'organizations', ':id', 'ideas', ':id',
+        ],
+        pathSegments: [
+            'organizations', ORGANIZATION, 'ideas', IDEA,
+        ],
+        headerFields: [],
+        body,
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+        requestAt: '2026-09-23T00:00:00.000000Z',
+        organization: ORGANIZATION,
+        responseBody: body,
+        operationId,
+        requestId: operationId,
+        ...(genesis ? { genesis: true as const } : {}),
+    });
+}
+
+async function write(
+    db: DbAdapter,
+    pair: MessagePair,
+): Promise<void> {
+    await runWrite(db, attemptFor([pair]), [pair]);
+}
+
+Deno.test(
+    'the rehearsal records each statement and predecessor',
+    async () => {
+        const first = await ideaPair('PUT', 'Fresh', true);
+        const second = await ideaPair('PUT', 'Again', false);
+        const statements = await rehearse(
+            new MemoryStorageBackend(),
+            async (db) => {
+                await write(db, first);
+                await write(db, second);
+            },
+        );
+        assertStrictEquals(statements.length, 2);
+        assertEquals(
+            statements.map((s) => s.rows.map((r) => r.id)),
+            [[first.id], [second.id]],
+        );
+        assertEquals(
+            statements.map((s) => s.supersedes),
+            [[NIL_IDENTIFIER], [first.id]],
+        );
+    },
+);
+
+Deno.test('a matched row fails the rehearsal', async () => {
+    const first = await ideaPair('PUT', 'Same', true);
+    const resend = await ideaPair('PUT', 'Same', false);
+    await assertRejects(
+        () => rehearse(
+            new MemoryStorageBackend(),
+            async (db) => {
+                await write(db, first);
+                await write(db, resend);
+            },
+        ),
+        Error,
+        'seed statement returned matched',
+    );
+});
+
+Deno.test('a refused row fails the rehearsal', async () => {
+    const scratch = new MemoryStorageBackend();
+    await scratch.ensureTable();
+    scratch.refuseNextSuccessions(1);
+    const pair = await ideaPair('PUT', 'Fresh', true);
+    await assertRejects(
+        () => rehearse(scratch, (db) => write(db, pair)),
+        Error,
+        'seed statement returned refused',
+    );
+});

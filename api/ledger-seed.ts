@@ -10,6 +10,17 @@ import type { StatementBind } from
     '../shared/ledger-statement.ts';
 import { NIL_IDENTIFIER } from '../shared/identifier.ts';
 import { Octets } from '../shared/http-message/octets.ts';
+import type {
+    StorageBackend,
+    Tx,
+    TxMode,
+} from './db.ts';
+import { BackedDbAdapter } from './db-backed.ts';
+import { SuccessionConflict } from './ledger-statement.ts';
+import type {
+    Attempt,
+    StatementAnswer,
+} from '../shared/ledger-statement.ts';
 
 // The bind limit Postgres allows one statement.
 export const POSTGRES_BIND_LIMIT = 65535;
@@ -123,4 +134,110 @@ export function withoutRequestIdLine(
             suffix.slice(0, at) + suffix.slice(end),
         ).asBytes(),
     };
+}
+
+// Records what the seed's live ops write. It keeps
+// openClient's verdict beneath the adapter: a matched,
+// stale, or refused row fails the seed. A conflict must
+// not reach runWrite, which would retry and answer
+// refused.
+export class RehearsalBackend implements StorageBackend {
+    readonly #scratch: StorageBackend;
+    readonly #statements: RehearsedStatement[] = [];
+
+    constructor(scratch: StorageBackend) {
+        this.#scratch = scratch;
+    }
+
+    statements(): readonly RehearsedStatement[] {
+        return this.#statements;
+    }
+
+    read<R>(fn: (tx: Tx) => Promise<R>): Promise<R> {
+        return this.#scratch.read(fn);
+    }
+
+    transaction<R>(
+        mode: TxMode,
+        fn: (tx: Tx) => Promise<R>,
+    ): Promise<R> {
+        return this.#scratch.transaction(mode, fn);
+    }
+
+    seedTransaction<R>(
+        fn: (tx: Tx) => Promise<R>,
+    ): Promise<R> {
+        return this.#scratch.seedTransaction(fn);
+    }
+
+    ensureTable(): Promise<void> {
+        return this.#scratch.ensureTable();
+    }
+
+    async executeLedger(
+        attempt: Attempt,
+        rows: readonly StatementBind[],
+        now: string | undefined,
+        tx: Tx | undefined,
+    ): Promise<StatementAnswer[]> {
+        let answers: StatementAnswer[];
+        try {
+            answers = await this.#scratch.executeLedger(
+                attempt, rows, now, tx,
+            );
+        } catch (error) {
+            if (error instanceof SuccessionConflict) {
+                throw new Error(
+                    'seed statement returned refused',
+                );
+            }
+            throw error;
+        }
+        for (const answer of answers) {
+            if (answer.outcome !== 'land') {
+                throw new Error(
+                    'seed statement returned '
+                        + answer.outcome,
+                );
+            }
+        }
+        this.#statements.push({
+            rows: [...rows],
+            supersedes: answers.map(
+                (answer) => answer.supersedes,
+            ),
+        });
+        return answers;
+    }
+
+    hasSchema(): Promise<boolean> {
+        return this.#scratch.hasSchema();
+    }
+
+    postSchemaCreation(): Promise<void> {
+        return this.#scratch.postSchemaCreation();
+    }
+
+    deleteSchema(): Promise<void> {
+        return this.#scratch.deleteSchema();
+    }
+}
+
+// Run the seed's live ops on a scratch backend and return
+// every statement they executed, in order. The scratch
+// root is the scratch's own statement, not the seed's.
+export async function rehearse(
+    scratch: StorageBackend,
+    run: (db: BackedDbAdapter) => Promise<void>,
+): Promise<readonly RehearsedStatement[]> {
+    const backend = new RehearsalBackend(scratch);
+    const db = new BackedDbAdapter(
+        backend,
+        async () => {},
+        async () => {},
+        () => {},
+    );
+    await db.ensureTable();
+    await run(db);
+    return backend.statements();
 }
