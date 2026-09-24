@@ -2,8 +2,8 @@
 
 - Date: 2026-09-23
 - Status: awaiting review, pre-plan
-- Worktree: `.worktrees/ledger-seed`
-- Base: `message-plane` at `93943c58`
+- Worktree: `.worktrees/ledger-store`
+- Base: `ledger-store` at `b8d819f9`
 - Ships: the seed as one transaction beneath the
   adapter, rehearsed through the live ops and landed
   by depth in batches of the one statement
@@ -36,18 +36,30 @@ The live request that creates a flow threads one id
 through its operation, document, and join rows; the
 seed gives them three.
 
+Every seed response carries a `request-id`. The
+former requires one and writes the line
+(`api/message-pair.ts:294-298`, `:331`).
+`formSeedMessagePair` mints one when the caller
+passes none
+(`api/mock-data/seed-message-pairs.ts:1994-1995`).
+The default-organization former, the invitation
+former, and the instance chain mint their own
+(`:2101`, `:2149`, `:2264`, `:2282`, `:2312`,
+`:2359`). The root's response has none
+(`api/ledger-root.ts:29-35`).
+
 The seed drives the live ops, one statement per
 operation, inside the transaction. Where it writes
 around them, it writes what no live request writes,
 or skips a law the live handler enforces. The WO01
 instance chain lands its genesis as "the inner PUT a
 public PATCH create would store"
-(`seed-message-pairs.ts:2256-2258`) without the
+(`seed-message-pairs.ts:2260-2262`) without the
 PATCH pair beside it. It lands each value-bearing
 transition as two statements, its revision without
 the `If-Match` the live op latches
-(`seed-message-pairs.ts:2220-2225`;
-`api/routes.ts:2468-2515`). It injects each pair's
+(`seed-message-pairs.ts:2224-2229`;
+`api/routes.ts:2478-2526`). It injects each pair's
 `requestAt` as the stamp
 (`api/mock-data.ts:951-981`), which the memory
 backend honors (`api/backend-memory.ts:60-65`) and
@@ -56,7 +68,7 @@ Two direct writes skip a law their live handler
 enforces: the default organization's membership
 check (`api/organization-requests.ts:118-126`) and
 the invitation's duplicate-grant check
-(`api/invitations-domain.ts:488-501`).
+(`api/invitations-domain.ts:498-512`).
 
 The comment on the returned plaintexts names PBKDF2
 and a column that is not there
@@ -111,12 +123,13 @@ not even the table.
    per-pair mints are refused.
 
    No reader decides this. The flow undo
-   (`api/derive-flows.ts:292-319`) and the
-   PATCH-revision join (`api/api.ts:303-321`) are the
-   only code that relates pairs by operation id.
-   Neither changes under either choice: the seed
-   writes no pair under `/undo`, and every seeded
-   flow has one document pair
+   (`api/derive-flows.ts:292-319`) relates pairs by
+   operation id. The PATCH-revision join retired
+   with the message plane (its §6): the handler
+   takes the revision's id from the statement's
+   answer. The undo does not change under either
+   choice. The seed writes no pair under `/undo`,
+   and every seeded flow has one document pair
    (`api/mock-data/flows.ts:26-31`).
 
 3. **Seed pairs present no credentials.** `secret`
@@ -127,8 +140,15 @@ not even the table.
    whose own pairs land too, and the seed runs
    without the signing key
    (`tests/pg-seed.test.ts:433`). This is a named
-   departure from Axiom, beside the closed one: seed
-   pairs carry no `request-id` line.
+   departure from Axiom. Beside it, a seed pair
+   carries no `request-id` line. The message plane
+   handed that off. The landed former requires the
+   id and writes the line, and today's seed mints
+   one per pair. The rehearsal records the
+   handler's binds, then drops that line from the
+   response before the row is planned. The
+   statement hashes the bytes it stores. The root
+   already has none.
 
 4. **The marker is the transaction's last
    statement.** `schema_marker` stays until item 3.
@@ -144,17 +164,15 @@ not even the table.
    `PUT`, `DELETE`, `PUT` is an ordinary chain of
    three. The DELETE lands at depth 2. The PUT lands
    at depth 3, supersedes the DELETE, and stores 201
-   under the message plane's §8. The gate's head
-   read skips a DELETE head
-   (`documentHeadMessagePairId`,
-   `api/api.ts:806-814`), which is the message
-   plane's second defect found on the base. The seed
-   never passes that read. The statement's head read
-   takes a DELETE head
-   (`api/ledger-statement-sql.ts:71`). A re-created
-   document whose response has no body matches the
-   DELETE's empty body, classifies `matched`, and
-   fails the seed. Today's seed deletes nothing.
+   under the message plane's §8. The gate treats a
+   DELETE head as a head, so that PUT is not a
+   genesis (`api/api.ts:816-829`, `:933-935`). The
+   statement's head read takes a DELETE head
+   (`api/ledger-statement-sql.ts:67-75`). A
+   re-created document whose response has no body
+   matches the DELETE's empty body, classifies
+   `matched`, and fails the seed. Today's seed
+   deletes nothing.
 
 6. **The plaintext comment says what is true.** Both
    comments become
@@ -188,19 +206,19 @@ not even the table.
    (`api/mock-data.ts:136-149`) retires. The instance
    chain's genesis drives the PATCH create (public
    PUT is 405, and PATCH creates,
-   `api/routes.ts:3288-3290`). Its
+   `api/routes.ts:3299-3301`). Its
    review and complete transitions drive the
    organization-scoped value-bearing transition op,
    which lands its POST and its latched revision as
-   one statement (`api/routes.ts:2468-2515`). The
+   one statement (`api/routes.ts:2478-2526`). The
    default organizations drive
    `putIdentityDefaultOrganization`
    (`api/organization-requests.ts:96`), the
    invitation drives `postOrganizationInvitationGrant`
    (`api/invitations-domain.ts:300`), and the two
    organization documents drive their route's PUT
-   (`api/routes.ts:5725-5745`). The pass-1 instance
-   former (`seed-message-pairs.ts:2226-2438`) retires
+   (`api/routes.ts:5746-5767`). The pass-1 instance
+   former (`seed-message-pairs.ts:2230-2454`) retires
    with them.
 
 9. **Carried in, and not reopened.** The store's
@@ -219,8 +237,14 @@ not even the table.
    shortfall fails the seed. Chains land by depth.
    Seed pairs keep a request, in canonical form,
    until item 1. Seed pairs and the root carry no
-   `request-id` line. The message plane's §8 status
-   rule applies to seed PUTs.
+   `request-id` line (Decision 3). The message
+   plane's §8 status rule applies to seed PUTs.
+   The statement on this base already overwrites a
+   modifying PUT to 200
+   (`api/ledger-statement-sql.ts:93-103`). Today's
+   seed lands through that statement, so the
+   instance chain's revisions already store 200. A
+   PUT after a DELETE stores 201.
 
 ## Found on the base
 
@@ -248,16 +272,19 @@ not even the table.
    naming a first organization answers 201, a PUT
    naming a second answers 200, and a GET still
    answers the first. The route stores a 204 with no
-   body (`api/routes.ts:3439-3441`), its state in the
+   body (`api/routes.ts:3448-3452`), its state in the
    request. The statement's sameness test compares
    response bodies (store spec §5), so the second
    PUT is `matched` and lands nothing. The binding
-   PUT stores the same shape (`:3225-3227`) and is
+   PUT stores the same shape (`:3236-3238`) and is
    not affected: a rebind to another instance answers
-   409 before the statement (`:2522-2524`), so a
+   409 before the statement (`:2594-2600`), so a
    matched binding is a true resend. The seed sets
    each default once and never meets this. It is not
    fixed here.
+7. **Seed responses carry a minted `request-id`.**
+   Stated in Problem. Decision 3 drops the line
+   from the rows that land.
 
 ## Out of scope
 
@@ -265,9 +292,8 @@ Items 1, 2, and 3. Emptying seed requests, which
 item 1 does. Retiring `schema_marker`, which item 3
 does. Credential lines in seed pairs (Decision 3).
 The default-organization defect (Found on the base,
-6). The gate's DELETE-head defect, which the message
-plane fixes and the seed never passes. The ops
-themselves: the seed calls them as the routes do.
+6). The ops themselves: the seed calls them as the
+routes do.
 The driver's multi-row helper, which TODO item 0
 measured on a table of its own: the seed binds the
 one INSERT text.
@@ -281,7 +307,8 @@ one INSERT text.
 3. **Rehearse.** Pass 2 drives each operation
    through its live op on a scratch memory backend,
    which records every statement's rows and each
-   row's `supersedes`. A row that does not land
+   row's `supersedes`, then drops each response's
+   `request-id` line. A row that does not land
    fails the seed here, before any DDL.
 4. **Plan.** Each recorded statement takes a depth.
    Statements pack whole into batches of at most R
@@ -303,7 +330,10 @@ its body, the pairs its op takes, and its operation
 id. Every pair one
 operation forms carries that id (Decision 2).
 `formSeedMessagePair` and the other formers take the
-id from the operation and mint none.
+id from the operation and mint none. Pass 1 mints
+no request id. The live former still requires one
+while it forms a row, and Decision 3 drops the
+line before the row is planned.
 
 The seed run's id is minted once, here. It is the
 root's `operation_id` and `operation-id`, and no
@@ -326,23 +356,24 @@ The ops read what they read on the live path,
 against the rehearsal's own rows:
 
 - flow creation's head diff
-  (`api/routes.ts:1466-1485`);
-- the flow graph's live-agent law (`:1519`, called
-  at `:1540`);
+  (`api/routes.ts:1475-1489`);
+- the flow graph's live-agent law (`:1528`, called
+  at `:1549`);
 - the flow-record binding's record probe
-  (`:2696-2708`);
+  (`:2707-2714`);
 - the value-bearing transition's instance head and
-  latch (`:2468-2515`);
+  latch (`:2478-2526`);
 - the default organization's membership check
   (`api/organization-requests.ts:118-126`);
 - the invitation's duplicate-grant check
-  (`api/invitations-domain.ts:488-501`).
+  (`api/invitations-domain.ts:498-512`).
 
 Each execution of the statement is recorded: its
-rows, exactly the binds the handler formed, salts
+rows, the binds the handler formed, salts
 included, and each row's `supersedes` from the
-answer. The rehearsal's stamps, digests, bells, and
-root are discarded.
+answer. The recorded response then loses its
+`request-id` line (Decision 3). The rehearsal's
+stamps, digests, bells, and root are discarded.
 
 Measured on the base: 703 to 725 ms for mock data,
 1,418 recorded statements holding 1,453 rows
@@ -388,7 +419,7 @@ beneath the adapter (`api/backend-postgres.ts:75-88`)
 and runs, in order:
 
 1. `POSTGRES_SCHEMA`, the DDL, `schema_marker`'s
-   table included (`api/schema-postgres.ts:268`).
+   table included (`api/schema-postgres.ts:233`).
 2. Each batch, as one execution of the statement
    with attempt `composed`. The root is the first
    row of the first batch: `rootBind` with the seed
@@ -404,12 +435,12 @@ transaction rolls back the DDL with the rows.
 The attempt is `composed` because `$1` governs every
 row of a statement. Under `genesis`, every row
 supersedes the nil uuid
-(`api/ledger-statement-sql.ts:97-102`), so a
+(`api/ledger-statement-sql.ts:108-113`), so a
 version-2 row would meet its own genesis in the
 succession index. `composed`, `blind`, and
 `in-order` are one class in the SQL. `composed`
 names a statement of several rows (`attemptFor`,
-`api/message-pair.ts:727-743`).
+`api/message-pair.ts:771-787`).
 
 The landing injects no stamp. Each backend stamps by
 its own clock, and depth orders every chain. On
@@ -456,7 +487,7 @@ Each simulated operation has one id, minted in pass
 - the instance's PATCH and the PUT it creates.
 
 The mints at `seed-message-pairs.ts:1992-1993`,
-`:2100`, and `:2147` take the operation's id. The
+`:2100`, and `:2148` take the operation's id. The
 root carries the seed run's.
 
 ## 6. The seed verb
@@ -559,16 +590,20 @@ plan measures `./test` before and after.
 
 Docs that change when this ships: `SCHEMA.md`,
 "What the DDL buys you" item 7 (`:60-63`), and
-"Operator tools" (`:123-128`), which say the seed
+"Operator tools" (`:144-149`), which say the seed
 stamps the marker last and a failed seed reads as
 empty.
 
 ## For the next brainstorms
 
-The message plane's tip moved while this spec was
-written, from `93943c58` to `4e5044a8`, which adds
-its plan. Its spec is unchanged. The plan keeps the
-formers' `operationId` parameter for the seed.
+The message plane is implemented on this base, at
+`b8d819f9`. Its handoff stands. Its plan keeps the
+formers' `operationId` parameter for the seed. The
+landed former also requires `requestId` and writes
+the line; Decision 3 drops that line from the rows
+that land. On this base the shape is unchanged:
+1,453 mock-data pairs, 1,450 operation ids, depths
+1,451 / 1 / 1, and bootstrap's 8 rows.
 
 Item 1 inherits:
 
