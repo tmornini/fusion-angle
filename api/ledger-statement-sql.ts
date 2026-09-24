@@ -11,6 +11,10 @@ const CAST = [
     'bytea', 'uuid', 'text',
 ] as const;
 
+// $1 is the attempt class. Each row's binds follow it.
+export const LEADING_PARAMETERS = 1;
+export const PARAMETERS_PER_ROW = CAST.length;
+
 const STAMP_TEXT =
     'YYYY-MM-DD"T"HH24:MI:SS.US"Z"';
 
@@ -19,7 +23,8 @@ function tuples(rowCount: number): string {
     for (let row = 0; row < rowCount; row++) {
         const binds: string[] = [];
         for (let field = 0; field < CAST.length; field++) {
-            const n = 2 + row * CAST.length + field;
+            const n = LEADING_PARAMETERS + 1
+                + row * PARAMETERS_PER_ROW + field;
             binds.push(
                 '$' + String(n) + '::' + CAST[field]!,
             );
