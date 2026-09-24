@@ -17,7 +17,10 @@ import { OPERATION_ID_HEADER } from
     '../api/message-pair.ts';
 import { UnauthorizedError } from
     '../api/http-errors.ts';
-import { DEV_TOKEN } from './token-fixtures.ts';
+import {
+    DEV_TOKEN,
+    organizationToken,
+} from './token-fixtures.ts';
 import { isIdentifier } from '../shared/identifier.ts';
 import { postPasswordLogin } from
     '../web-app/app/adapters/authentication.ts';
@@ -170,6 +173,96 @@ Deno.test(
 );
 
 Deno.test(
+    'a 401 raw exchange carries the failing'
+        + ' operation-id',
+    async () => {
+        const seen: {
+            url: string;
+            operationId: string | null;
+            requestId: string | null;
+            grant: string;
+        }[] = [];
+        const token = await organizationToken();
+        let ideas = 0;
+        await withMockFetch(async (input, init) => {
+            const headers = new Headers(init?.headers);
+            const raw = init?.body;
+            let grant = '';
+            if (typeof raw === 'string' && raw !== '') {
+                const parsed = JSON.parse(raw) as {
+                    grant_type?: unknown;
+                };
+                if (typeof parsed.grant_type === 'string') {
+                    grant = parsed.grant_type;
+                }
+            }
+            seen.push({
+                url: String(input),
+                operationId: headers.get(
+                    OPERATION_ID_HEADER,
+                ),
+                requestId: headers.get('request-id'),
+                grant,
+            });
+            if (String(input).endsWith(
+                '/authentication/token',
+            )) {
+                return new Response(
+                    JSON.stringify({
+                        token_type: 'Bearer',
+                        expires_in: 900,
+                    }),
+                    {
+                        status: 200,
+                        headers: {
+                            'authentication-info':
+                                'access_token="fresh"',
+                        },
+                    },
+                );
+            }
+            ideas += 1;
+            if (ideas === 1) {
+                return new Response(
+                    JSON.stringify({
+                        error: 'invalid_token',
+                    }),
+                    { status: 401 },
+                );
+            }
+            return new Response('[]', { status: 200 });
+        }, async () => {
+            const ctx =
+                createRecoveringRequestContext(
+                    createHttpFacade(
+                        'http://example.test',
+                    ),
+                    token,
+                );
+            await ctx.GET(
+                'organizations/'
+                + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
+            );
+            assertStrictEquals(seen.length, 4);
+            for (const row of seen) {
+                assertStrictEquals(
+                    row.operationId, ctx.operationId,
+                );
+                assertStrictEquals(
+                    row.requestId, null,
+                );
+            }
+        });
+        assertStrictEquals(seen[1]!.grant, 'refresh');
+        assertStrictEquals(
+            seen[2]!.grant, 'token-exchange',
+        );
+        assertStrictEquals(seen[0]!.grant, '');
+        assertStrictEquals(seen[3]!.grant, '');
+    },
+);
+
+Deno.test(
     'createRequestContext accepts the fetch facade',
     async () => {
         const operationIds: (string | null)[] = [];
@@ -186,26 +279,31 @@ Deno.test(
                 createHttpFacade('http://example.test'),
                 DEV_TOKEN,
             );
+            const idea = 'organizations/'
+                + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + 'AjdvjuECVZEgZoFajaIEkg';
             await ctx.GET(
                 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
             );
-            await ctx.PUT(
+            await ctx.PUT(idea, { name: 'x' });
+            await ctx.PATCH(idea, { name: 'y' });
+            await ctx.POST(
                 'organizations/'
-                + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
-                + 'AjdvjuECVZEgZoFajaIEkg',
-                { name: 'x' },
+                + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
+                { name: 'z' },
             );
-            assertStrictEquals(operationIds.length, 2);
-            assertStrictEquals(
-                operationIds[0], ctx.operationId,
-            );
-            assertStrictEquals(
-                operationIds[1], ctx.operationId,
-            );
+            await ctx.DELETE(idea);
+            assertStrictEquals(operationIds.length, 5);
+            for (const operationId of operationIds) {
+                assertStrictEquals(
+                    operationId, ctx.operationId,
+                );
+            }
         });
-        assertStrictEquals(requestIds[0], null);
-        assertStrictEquals(requestIds[1], null);
+        for (const requestId of requestIds) {
+            assertStrictEquals(requestId, null);
+        }
         assert(operationIds[0] !== null);
         assertStrictEquals(
             isIdentifier(operationIds[0]!), true,

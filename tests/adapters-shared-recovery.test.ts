@@ -57,7 +57,10 @@ import {
     attemptFor,
     formAuthMessagePair,
     formWriteMessagePair,
+    OPERATION_ID_HEADER,
 } from '../api/message-pair.ts';
+import type { HttpFacade } from
+    '../web-app/app/adapters/http-facade.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
 import {
@@ -605,3 +608,163 @@ Deno.test('a concurrent facade refresh and remint present'
     assertStrictEquals(revoked.length, 0);
     assertNotStrictEquals(getSessionCredentials(), null);
 }));
+
+Deno.test(
+    'a 401 recovery carries the failing'
+        + ' operation-id',
+    () => withLocalStorageAsync(
+        freshStorage(),
+        async () => {
+            const organization = 'AjdvjuECVZEgZoFajaIEkg';
+            const dead = await expiredToken();
+            const flat = await devToken();
+            const scoped = await organizationToken();
+            const refresh = await devToken();
+            putSessionCredentials({
+                accessToken: dead,
+                refreshToken: refresh,
+            });
+            putSessionToken(dead);
+            const seen: {
+                kind: string;
+                operationId: string | null;
+                requestId: string | null;
+            }[] = [];
+            let reads = 0;
+            function record(
+                kind: string,
+                fields:
+                    | readonly (readonly [string, string])[]
+                    | undefined,
+            ): void {
+                let operationId: string | null = null;
+                let requestId: string | null = null;
+                for (const [name, value] of fields ?? []) {
+                    const key = name.toLowerCase();
+                    if (key === OPERATION_ID_HEADER) {
+                        operationId = value;
+                    }
+                    if (key === 'request-id') {
+                        requestId = value;
+                    }
+                }
+                seen.push({
+                    kind, operationId, requestId,
+                });
+            }
+            const unused = (): never => {
+                throw new Error('unused verb');
+            };
+            const facade: HttpFacade = {
+                GET: <T>(
+                    resource: string,
+                    _token: string,
+                    fields?:
+                        readonly (readonly [
+                            string,
+                            string,
+                        ])[],
+                ): Promise<T> => {
+                    if (resource.endsWith(
+                        '/organizations/',
+                    )) {
+                        record('re-scope', fields);
+                        return Promise.resolve([{
+                            id: organization,
+                        }] as T);
+                    }
+                    if (resource.endsWith(
+                        '/default-organization',
+                    )) {
+                        record('re-scope', fields);
+                        return Promise.resolve({
+                            organization_id: organization,
+                        } as T);
+                    }
+                    record('read', fields);
+                    reads += 1;
+                    if (reads === 1) {
+                        return Promise.reject(
+                            new UnauthorizedError(
+                                'invalid_token',
+                            ),
+                        );
+                    }
+                    return Promise.resolve([] as T);
+                },
+                GETWithEtag: unused,
+                PUT: unused,
+                PUTWithEtag: unused,
+                PATCH: unused,
+                PATCHWithEtag: unused,
+                DELETE: unused,
+                POST: unused,
+                postForHeaders: (
+                    _resource, payload, _token, fields,
+                ) => {
+                    const grant = payload.grant_type;
+                    const kind = grant === 'refresh'
+                        ? 'refresh'
+                        : 'exchange';
+                    record(kind, fields);
+                    const access = grant === 'refresh'
+                        ? flat
+                        : scoped;
+                    const headers = new Headers();
+                    headers.set(
+                        'authentication-info',
+                        'access_token="' + access + '"',
+                    );
+                    if (grant === 'refresh') {
+                        headers.append(
+                            'set-cookie',
+                            'refresh_token=' + refresh
+                                + '; HttpOnly',
+                        );
+                    }
+                    return Promise.resolve({
+                        status: 200,
+                        headers,
+                        body: '',
+                    });
+                },
+            };
+            const ctx = createRecoveringRequestContext(
+                facade, dead,
+            );
+            const rows = await ctx.GET(
+                'organizations/' + organization
+                    + '/ideas/',
+            );
+            assert(Array.isArray(rows));
+            const kinds = seen.map((row) => row.kind);
+            assertEquals(
+                kinds.filter((kind) => kind === 'read'),
+                ['read', 'read'],
+            );
+            assertEquals(
+                kinds.filter((kind) =>
+                    kind === 'refresh'),
+                ['refresh'],
+            );
+            assertEquals(
+                kinds.filter((kind) =>
+                    kind === 're-scope'),
+                ['re-scope', 're-scope'],
+            );
+            assertEquals(
+                kinds.filter((kind) =>
+                    kind === 'exchange'),
+                ['exchange'],
+            );
+            for (const row of seen) {
+                assertStrictEquals(
+                    row.operationId, ctx.operationId,
+                );
+                assertStrictEquals(
+                    row.requestId, null,
+                );
+            }
+        },
+    ),
+);
