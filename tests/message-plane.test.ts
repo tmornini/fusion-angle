@@ -311,6 +311,26 @@ Deno.test(
 );
 
 Deno.test(
+    'canonical form trims a field value',
+    () => {
+        const model = parseWire(
+            'GET / HTTP/1.0\r\n'
+            + 'Host:  example.com \r\n'
+            + 'X-Trace:  two \r\n'
+            + 'X-Trace: one \r\n'
+            + '\r\n',
+        );
+        assertStrictEquals(
+            serializeWire(model),
+            'GET / HTTP/1.1\r\n'
+            + 'host: example.com\r\n'
+            + 'x-trace: two, one\r\n'
+            + '\r\n',
+        );
+    },
+);
+
+Deno.test(
     'parse refuses a content-length mismatch',
     () => {
         assertThrows(
