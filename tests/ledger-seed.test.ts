@@ -15,6 +15,7 @@ import {
     POSTGRES_BIND_LIMIT,
     SEED_ROWS_PER_STATEMENT,
     type RehearsedStatement,
+    withoutRequestIdLine,
 } from '../api/ledger-seed.ts';
 import { rootBind } from '../api/ledger-root.ts';
 import {
@@ -23,6 +24,7 @@ import {
 } from '../shared/identifier.ts';
 import type { StatementBind } from
     '../shared/ledger-statement.ts';
+import { Octets } from '../shared/http-message/octets.ts';
 
 Deno.test(
     'a seed batch is half the binds the attempt leaves',
@@ -126,6 +128,60 @@ Deno.test(
             () => packSeedBatches([long], [1], 3),
             Error,
             'seed statement exceeds the batch row limit',
+        );
+    },
+);
+
+function suffixed(suffix: string): StatementBind {
+    return {
+        ...rootBind(generateIdentifier()),
+        responseSuffix: Octets.fromLatin1(suffix).asBytes(),
+    };
+}
+
+function latin1(bytes: Uint8Array): string {
+    return Octets.fromBytes(bytes).toLatin1();
+}
+
+Deno.test('the request-id line leaves a seed row', () => {
+    const bind = suffixed(
+        '\r\netag: "e"\r\noperation-id: o\r\n'
+            + 'request-id: r\r\n\r\n{"a":1}',
+    );
+    const kept = withoutRequestIdLine(bind);
+    assertStrictEquals(
+        latin1(kept.responseSuffix),
+        '\r\netag: "e"\r\noperation-id: o\r\n\r\n{"a":1}',
+    );
+    assertEquals(kept.responsePrefix, bind.responsePrefix);
+});
+
+Deno.test('a body that names request-id keeps its bytes', () => {
+    const body = '\r\nrequest-id: in-body';
+    const kept = withoutRequestIdLine(
+        suffixed('\r\nrequest-id: r\r\n\r\n' + body),
+    );
+    assertStrictEquals(
+        latin1(kept.responseSuffix), '\r\n\r\n' + body,
+    );
+});
+
+Deno.test(
+    'a seed row without a request-id line fails the plan',
+    () => {
+        assertThrows(
+            () => withoutRequestIdLine(
+                suffixed('\r\netag: "e"\r\n\r\n'),
+            ),
+            Error,
+            'seed row carries no request-id line',
+        );
+        assertThrows(
+            () => withoutRequestIdLine(
+                suffixed('\r\n\r\n\r\nrequest-id: body'),
+            ),
+            Error,
+            'seed row carries no request-id line',
         );
     },
 );

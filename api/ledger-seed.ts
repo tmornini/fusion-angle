@@ -9,6 +9,7 @@ import {
 import type { StatementBind } from
     '../shared/ledger-statement.ts';
 import { NIL_IDENTIFIER } from '../shared/identifier.ts';
+import { Octets } from '../shared/http-message/octets.ts';
 
 // The bind limit Postgres allows one statement.
 export const POSTGRES_BIND_LIMIT = 65535;
@@ -91,4 +92,35 @@ export function packSeedBatches(
         }
     }
     return batches;
+}
+
+const REQUEST_ID_LINE = '\r\nrequest-id: ';
+const LINE_END = '\r\n';
+const HEAD_END = '\r\n\r\n';
+
+// A seed row stores no request-id line (Decision 3). The
+// former writes the line after the date, so it sits in
+// the suffix, before the blank line.
+export function withoutRequestIdLine(
+    bind: StatementBind,
+): StatementBind {
+    const suffix = Octets.fromBytes(
+        bind.responseSuffix,
+    ).toLatin1();
+    const headEnd = suffix.indexOf(HEAD_END);
+    const at = suffix.indexOf(REQUEST_ID_LINE);
+    if (headEnd < 0 || at < 0 || at > headEnd) {
+        throw new Error(
+            'seed row carries no request-id line',
+        );
+    }
+    const end = suffix.indexOf(
+        LINE_END, at + LINE_END.length,
+    );
+    return {
+        ...bind,
+        responseSuffix: Octets.fromLatin1(
+            suffix.slice(0, at) + suffix.slice(end),
+        ).asBytes(),
+    };
 }
