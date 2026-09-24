@@ -2822,6 +2822,21 @@ Off the critical path; each with its oracle.
   bullet's to settle. Oracle: a boot without it refuses,
   as a boot without `FA_POSTGRES_URL` does, and a
   request log line carries it
+- JEV joins the list of available AI agents, and that
+  list becomes one. `api/provider-models.ts` calls
+  `PROVIDER_MODELS` the single source of truth, and the
+  AI-member gate checks `model` against it, but it is not
+  yet the only list: the seeded roster
+  (`api/mock-data/ai-members.ts`) spells four of its names
+  again as agent names, and TEST-PLAN AA7a enumerates
+  them. Make the catalog the one list first: the roster
+  takes each agent's name from its `model` id, and AA7a
+  names the catalog rather than copying it. Then JEV
+  lands as one entry there, its provider and `api_name`
+  supplied, never invented. Oracle: JEV appears in
+  `PROVIDER_MODELS` and in the AI form's Model picker, and
+  no model name is spelled outside `api/provider-models.ts`
+  but in test fixtures
 
 ## Sequencing
 
