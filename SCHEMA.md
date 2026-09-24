@@ -66,7 +66,8 @@ same rows in an in-process Map keyed by table name.
    (`api/write-authorizer.ts`) enforce organization.
 9. **`operation_id` groups one client operation** —
    the client mints operation-id once per operation,
-   on every request. The root carries the seed run's id.
+   on every request, and the server never mints one
+   for a request. The root carries the seed run's id.
    Every row a seeded operation writes carries that
    operation's one id. A seedless exchange mints an id,
    because that write is not a client request.
