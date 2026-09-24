@@ -301,27 +301,6 @@ function limitedHeaders(
         : {};
 }
 
-// The revision pair an instance PATCH wrote beside its wire
-// pair: same document, same operation, the other id. An
-// operation id names one write, so the join is an identity.
-async function revisionMessagePairIdForPatch(
-    db: DbAdapter,
-    wireMessagePairId: string,
-): Promise<string | undefined> {
-    const wireReq = await db.messagePairs.getById(
-        wireMessagePairId,
-    );
-    const siblings = await db.messagePairs.getDocumentHistory(
-        wireReq.path, wireReq.name,
-    );
-    const revision = siblings.find(
-        (row) =>
-            row.operation_id === wireReq.operation_id
-            && row.id !== wireMessagePairId,
-    );
-    return revision?.id;
-}
-
 // The one catch shared by both pre-dispatch ownership regions
 // (handleRequest, below) so their redaction discipline cannot
 // diverge: fenceRequest membership/role reads, and the write
@@ -1600,19 +1579,20 @@ async function dispatched(
                     if (
                         routePattern
                             === INSTANCE_DETAIL_PATTERN
-                        && written.answeredId !== null
+                        && written.outcome === 'land'
                     ) {
-                        const revisionId =
-                            await revisionMessagePairIdForPatch(
-                                effective, messagePair.id,
-                            );
-                        if (
-                            revisionId !== undefined
-                        ) {
+                        const revision = written.rows.find(
+                            (row) =>
+                                row.id !== messagePair.id,
+                        );
+                        if (revision !== undefined) {
                             return attachEtag(
-                                written.response, revisionId,
+                                written.response, revision.id,
                             );
                         }
+                        written.response.headers.delete(
+                            'etag',
+                        );
                     }
                     return written.response;
                 }

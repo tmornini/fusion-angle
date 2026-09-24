@@ -35,9 +35,14 @@ import {
     documentHeadAt,
     formTokenEventMessagePair,
     formWriteMessagePair,
+    IF_MATCH_HEADER,
     runWrite,
+    writeAnswerOf,
 } from '../api/message-pair.ts';
+import type { MessagePair } from
+    '../api/message-pair.ts';
 import {
+    DEFAULT_ATTRIBUTE_ACL_ROLES,
     DEFAULT_LOCK_TIMEOUT,
     MS_PER_SECOND,
     nowUtc,
@@ -71,6 +76,12 @@ import {
 } from './http-fixtures.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { INSTANCE_DETAIL_PATTERN } from
+    '../api/family-registry.ts';
+import {
+    postInstancePatchOp,
+    routes,
+} from '../api/routes.ts';
 
 function ideaDocument(title: string, state: string) {
     return {
@@ -2297,5 +2308,228 @@ Deno.test(
         assertStrictEquals(
             unknownText, '{"error":"invalid_grant"}',
         );
+    },
+);
+
+Deno.test(
+    'a PATCH etag names the revision',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const token = await organizationToken();
+        const typeId = generateIdentifier();
+        const attributeId = generateIdentifier();
+        const instanceId = generateIdentifier();
+        const typePath = '/organizations/'
+            + 'AjdvjuECVZEgZoFajaIEkg/record-types/'
+            + typeId;
+        const INSTANCES = typePath + '/instances/';
+        async function landed(
+            request: Request,
+        ): Promise<Response> {
+            const response = await handleRequest(
+                db, request,
+            );
+            const text = await response.text();
+            assertStrictEquals(
+                response.status, 201, text,
+            );
+            return response;
+        }
+        await landed(apiRequest({
+            method: 'PUT',
+            path: typePath,
+            token,
+            body: {
+                name: 'Rental',
+                description: 'Rental desc',
+                position: 1,
+                state: 'active',
+            },
+        }));
+        await landed(apiRequest({
+            method: 'PUT',
+            path: typePath + '/attributes/'
+                + attributeId,
+            token,
+            body: {
+                name: 'Title',
+                attribute_type: 'text',
+                sort_order: 0,
+                options: [],
+                constraints: [],
+                read_roles: [
+                    ...DEFAULT_ATTRIBUTE_ACL_ROLES,
+                ],
+                write_roles: [
+                    ...DEFAULT_ATTRIBUTE_ACL_ROLES,
+                ],
+            },
+        }));
+        const created = await landed(apiRequest({
+            method: 'PATCH',
+            path: INSTANCES + instanceId,
+            token,
+            body: {
+                set: [{
+                    attribute_id: attributeId,
+                    value: 'Hello',
+                }],
+            },
+        }));
+        const headEtag = created.headers.get('etag');
+        if (headEtag === null) {
+            throw new Error('create omitted an etag');
+        }
+        const operationId = generateIdentifier();
+        const detail = routes.find((row) =>
+            row.segments.join('/')
+                === INSTANCE_DETAIL_PATTERN,
+        );
+        if (detail?.patch === undefined) {
+            throw new Error(
+                'instance detail has no PATCH',
+            );
+        }
+        const patch = detail.patch;
+        let wire: MessagePair | undefined;
+        let revisionEtag: string | null = null;
+        // The answer map keys the gate's pair object.
+        detail.patch = (
+            adapter, params, payload, actor,
+            messagePair, organization, roles,
+        ) => {
+            if (
+                messagePair?.operationId
+                    === operationId
+            ) {
+                wire = messagePair;
+            }
+            return postInstancePatchOp(
+                adapter, params, payload, actor,
+                messagePair, organization, roles,
+            );
+        };
+        try {
+            const response = await landed(
+                apiRequest({
+                    method: 'PATCH',
+                    path: INSTANCES + instanceId,
+                    token,
+                    operationId,
+                    body: {
+                        set: [{
+                            attribute_id: attributeId,
+                            value: 'World',
+                        }],
+                    },
+                    headers: {
+                        [IF_MATCH_HEADER]: headEtag,
+                    },
+                }),
+            );
+            const pair = wire;
+            if (pair === undefined) {
+                throw new Error(
+                    'wire pair was not formed',
+                );
+            }
+            const answer = writeAnswerOf(pair);
+            if (answer === undefined) {
+                throw new Error(
+                    'patch stored no answer',
+                );
+            }
+            const revision = answer.rows.find(
+                (row) => row.id !== pair.id,
+            );
+            if (revision === undefined) {
+                throw new Error(
+                    'revision row missing',
+                );
+            }
+            assertNotStrictEquals(
+                revision.id, pair.id,
+            );
+            assertStrictEquals(
+                response.headers.get('etag'),
+                '"' + revision.id + '"',
+            );
+            revisionEtag = response.headers.get('etag');
+            const src = Deno.readTextFileSync(
+                'api/api.ts',
+            );
+            assert(!src.includes(
+                'revisionMessagePairIdForPatch',
+            ));
+        } finally {
+            detail.patch = patch;
+        }
+        if (revisionEtag === null) {
+            throw new Error('revision omitted an etag');
+        }
+        const loneOperation = generateIdentifier();
+        let lone: MessagePair | undefined;
+        detail.patch = (
+            adapter, _params, _payload, _actor,
+            messagePair,
+        ) => {
+            if (messagePair === undefined) {
+                throw new Error(
+                    'instance PATCH requires a formed pair',
+                );
+            }
+            if (
+                messagePair.operationId === loneOperation
+            ) {
+                lone = messagePair;
+            }
+            return runWrite(
+                adapter,
+                attemptFor([messagePair]),
+                [messagePair],
+            );
+        };
+        try {
+            const alone = await landed(apiRequest({
+                method: 'PATCH',
+                path: INSTANCES + instanceId,
+                token,
+                operationId: loneOperation,
+                body: {
+                    set: [{
+                        attribute_id: attributeId,
+                        value: 'Alone',
+                    }],
+                },
+                headers: {
+                    [IF_MATCH_HEADER]: revisionEtag,
+                },
+            }));
+            const pair = lone;
+            if (pair === undefined) {
+                throw new Error(
+                    'wire pair was not formed',
+                );
+            }
+            const answer = writeAnswerOf(pair);
+            if (answer === undefined) {
+                throw new Error(
+                    'patch stored no answer',
+                );
+            }
+            assertStrictEquals(answer.outcome, 'land');
+            assertStrictEquals(answer.rows.length, 1);
+            const only = answer.rows[0];
+            if (only === undefined) {
+                throw new Error('wire row missing');
+            }
+            assertStrictEquals(only.id, pair.id);
+            assertStrictEquals(
+                alone.headers.get('etag'), null,
+            );
+        } finally {
+            detail.patch = patch;
+        }
     },
 );
