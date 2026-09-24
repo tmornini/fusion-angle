@@ -996,14 +996,14 @@ Deno.test(
         const token = await organizationToken();
         const operationId = generateIdentifier();
         const id = generateIdentifier();
-        const raw = '{"title":"t","position":'
-            + '9007199254740993,'
-            + '"problem_statement":"p",'
-            + '"target_users":"u",'
-            + '"proposed_solution":"s",'
-            + '"expected_outcome":"o",'
-            + '"success_metrics":"m",'
-            + '"state":"active"}';
+        const raw = '{ "title" : "t" ,'
+            + ' "position" : 9007199254740993 ,'
+            + ' "problem_statement" : "p" ,'
+            + ' "target_users" : "u" ,'
+            + ' "proposed_solution" : "s" ,'
+            + ' "expected_outcome" : "o" ,'
+            + ' "success_metrics" : "m" ,'
+            + ' "state" : "active" }';
         const target = '/organizations/'
             + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
             + id + '?kept=1';
