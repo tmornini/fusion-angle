@@ -19,6 +19,11 @@ import type { FieldLine } from '../shared/http-message/types.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import {
+    mergeSecret,
+    secretBytes as secretOfLines,
+    splitCredentials,
+} from '../shared/http-message/credentials.ts';
+import {
     familyRegistration,
     RECORD_TYPES_COLLECTION_PATTERN,
     RECORD_TYPE_DETAIL_PATTERN,
@@ -71,6 +76,7 @@ export interface MessagePair {
     readonly requesterIdentityId: Id;
     readonly requestMessage: string;   // serializeWire
     readonly requestHash: string;
+    readonly secret: Uint8Array;
     readonly responseStatus: number;
     readonly responseMessage: string;
     readonly responseHash: string;
@@ -144,6 +150,9 @@ export interface WriteMessagePairInput {
     // from `body`.
     readonly bodyBytes?: Uint8Array;
     readonly responseBody: unknown | undefined;
+    // Lines formed onto the response before the split.
+    // Absent: the response carries no extra line.
+    readonly responseFields?: readonly FieldLine[];
     readonly latchedHeadMessagePairId?: string;
     readonly pinnedDocumentMessagePairId?: string;
     // Required on every formed pair. Public writes supply
@@ -286,23 +295,24 @@ export async function formWriteMessagePair(
     const headerFields = headerFieldsWithOperationId(
         input.headerFields, input.operationId,
     );
+    const requestSplit = splitCredentials(headerFields);
     const requestMessage = input.bodyBytes !== undefined
         ? receivedRequestWire(
             input.method,
             input.pathname,
-            headerFields,
+            requestSplit.kept,
             input.bodyBytes,
         )
         : storedWire(buildRequestModel({
             method: input.method,
             target: input.pathname,
-            fields: headerFields,
+            fields: requestSplit.kept,
             body: input.body,
         }));
     const storedStatus = input.method === 'DELETE'
         ? HTTP_NO_CONTENT
         : HTTP_CREATED;
-    const responseFields = [
+    const responseLines: FieldLine[] = [
         { name: 'date', value: DATE_PLACEHOLDER },
         { name: 'etag', value: strongEtagOf(id) },
         {
@@ -311,14 +321,24 @@ export async function formWriteMessagePair(
         },
         { name: 'request-id', value: input.requestId },
     ];
+    if (input.responseFields !== undefined) {
+        for (const field of input.responseFields) {
+            responseLines.push(field);
+        }
+    }
+    const responseSplit = splitCredentials(responseLines);
     const responseModel = buildResponseModel({
         status: storedStatus,
-        fields: responseFields,
+        fields: responseSplit.kept,
         body: input.method === 'DELETE'
             ? undefined
             : input.responseBody,
     });
     const responseMessage = storedWire(responseModel);
+    const secret = secretOfLines([
+        ...requestSplit.hoisted,
+        ...responseSplit.hoisted,
+    ]);
     return {
         id,
         requestAt: input.requestAt,
@@ -327,6 +347,7 @@ export async function formWriteMessagePair(
         requesterIdentityId: input.requesterIdentityId,
         requestMessage,
         requestHash: await requestMessageHash(requestMessage),
+        secret,
         responseStatus: storedStatus,
         responseMessage,
         responseHash: await requestMessageHash(responseMessage),
@@ -582,15 +603,15 @@ export function attachDate(
     return response;
 }
 
-// Every header the request carries, credential lines included.
-// Names are already lower-case. Repeats other than set-cookie
-// are already joined. content-length is the value that arrived.
 export function requestTarget(request: Request): string {
     const url = new URL(request.url);
     return url.pathname + url.search;
 }
 
-export function hoistedHeaderFields(
+// Every header the request carries. Names are already
+// lower-case, one line per name. set-cookie stays its
+// own lines: the Headers iterator would join them.
+export function requestHeaderFields(
     request: Request,
 ): FieldLine[] {
     const fields: FieldLine[] = [];
@@ -834,7 +855,11 @@ function wireForPair(
     if (answer.outcome !== 'land') return answer.response;
     const row = stated.find((item) => item.id === pair.id);
     if (row === undefined) return answer.response;
-    return responseFromLatin1(latin1(row.response));
+    const stored = latin1(row.response);
+    const wire = pair.id === answer.answeredId
+        ? mergeSecret(stored, secretBytes(pair))
+        : stored;
+    return responseFromLatin1(wire);
 }
 
 function refusalDocument(
@@ -924,7 +949,10 @@ function answerOf(
         })));
     }
     return {
-        response: responseFromLatin1(latin1(row.response)),
+        response: responseFromLatin1(mergeSecret(
+            latin1(row.response),
+            secretBytes(rows[index]!),
+        )),
         outcome,
         answeredId: row.id,
         bells,

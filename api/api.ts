@@ -22,7 +22,7 @@ import {
     formWriteMessagePair,
     canonicalPath,
     storedPathAndNameOf,
-    hoistedHeaderFields,
+    requestHeaderFields,
     requestTarget,
     documentHeadAt,
     writeAnswerOf,
@@ -944,7 +944,7 @@ async function dispatched(
                 routePattern,
                 routeSegments: matched.segments,
                 pathSegments,
-                headerFields: hoistedHeaderFields(request),
+                headerFields: requestHeaderFields(request),
                 body,
                 bodyBytes: arrived.bodyBytes,
                 requesterIdentityId: actor,
@@ -1323,7 +1323,7 @@ async function dispatched(
         }
         const received: ReceivedRequest = {
             target: requestTarget(request),
-            headerFields: hoistedHeaderFields(request),
+            headerFields: requestHeaderFields(request),
             bodyBytes: arrived.bodyBytes,
             requestId: ctx.requestId,
         };

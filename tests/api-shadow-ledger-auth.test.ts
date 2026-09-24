@@ -601,7 +601,14 @@ Deno.test('an Authorization header sent alongside the token grant is'
         r => r.path === '/authentication/token/');
     assert(row);
     assert(
-        row!.request.includes('some-stale-caller-token'));
+        row!.secret.includes('some-stale-caller-token'),
+    );
+    assertStrictEquals(
+        row!.request.includes(
+            'some-stale-caller-token',
+        ),
+        false,
+    );
 });
 
 Deno.test('a reused (already-rotated-away) refresh token grant is a'

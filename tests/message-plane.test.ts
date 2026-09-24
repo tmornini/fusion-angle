@@ -1075,3 +1075,170 @@ Deno.test(
         );
     },
 );
+
+function probeWrite(name: string) {
+    return {
+        method: 'PUT',
+        pathname: '/organizations/'
+            + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + name,
+        routePattern: 'organizations/:id/ideas/:id',
+        routeSegments: [
+            'organizations', ':id', 'ideas', ':id',
+        ],
+        pathSegments: [
+            'organizations',
+            'AjdvjuECVZEgZoFajaIEkg',
+            'ideas',
+            name,
+        ],
+        headerFields: [] as {
+            readonly name: string,
+            readonly value: string,
+        }[],
+        body: undefined,
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+        requestAt: nowUtc(),
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
+        responseBody: undefined,
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
+    };
+}
+
+Deno.test(
+    'an authenticated PUT hoists the bearer'
+        + ' into secret',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const token = await organizationToken();
+        const operationId = generateIdentifier();
+        const id = generateIdentifier();
+        const raw = '{"title":"t","position":1,'
+            + '"problem_statement":"p",'
+            + '"target_users":"u",'
+            + '"proposed_solution":"s",'
+            + '"expected_outcome":"o",'
+            + '"success_metrics":"m",'
+            + '"state":"active"}';
+        const target = '/organizations/'
+            + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + id;
+        const response = await handleRequest(
+            db, receivedRequest(
+                'PUT', target, token, operationId, raw,
+            ),
+        );
+        await response.text();
+        const stored = (await db.messagePairs.getAll())
+            .find((row) => row.name === id);
+        if (stored === undefined) {
+            throw new Error('document was not stored');
+        }
+        const bearer = 'authorization: Bearer '
+            + token + '\r\n\r\n';
+        assertStrictEquals(stored.secret, bearer);
+        assertStrictEquals(
+            stored.request.includes('authorization:'),
+            false,
+        );
+        assertStrictEquals(
+            stored.request.includes(token),
+            false,
+        );
+        assertStrictEquals(
+            stored.secret_hash,
+            await sha256HexOfBytes(
+                Octets.fromLatin1(bearer).asBytes(),
+            ),
+        );
+        const secret = Octets.fromLatin1(
+            stored.secret,
+        ).asBytes();
+        const merged = mergeSecret(
+            stored.request, secret,
+        );
+        const model = parseWire(stored.request);
+        assertStrictEquals(
+            merged,
+            serializeWire({
+                ...model,
+                fields: [
+                    ...model.fields,
+                    {
+                        name: 'authorization',
+                        value: 'Bearer ' + token,
+                    },
+                ],
+            }),
+        );
+        assertStrictEquals(
+            response.headers.get('authorization'),
+            null,
+        );
+    },
+);
+
+Deno.test(
+    'response credential lines hoist into'
+        + ' the secret block',
+    async () => {
+        const info = 'code="c"';
+        const cookie = 'refresh_token=r; HttpOnly';
+        const pair = await formWriteMessagePair({
+            ...probeWrite(generateIdentifier()),
+            responseFields: [
+                { name: 'set-cookie', value: cookie },
+                {
+                    name: 'authentication-info',
+                    value: info,
+                },
+            ],
+        });
+        assertStrictEquals(
+            pair.responseMessage.includes('set-cookie'),
+            false,
+        );
+        assertStrictEquals(
+            pair.responseMessage.includes(
+                'authentication-info',
+            ),
+            false,
+        );
+        assertStrictEquals(
+            pair.requestMessage.includes('set-cookie'),
+            false,
+        );
+        assertStrictEquals(
+            new TextDecoder().decode(pair.secret),
+            '\r\nauthentication-info: ' + info + '\r\n'
+                + 'set-cookie: ' + cookie + '\r\n',
+        );
+    },
+);
+
+Deno.test(
+    'a pair with no credential line stores'
+        + ' an empty secret',
+    async () => {
+        const db = memoryDbAdapter();
+        await db.postSchemaCreation();
+        const pair = await formWriteMessagePair(
+            probeWrite(generateIdentifier()),
+        );
+        assertStrictEquals(pair.secret.byteLength, 0);
+        await runWrite(
+            db, attemptFor([pair]), [pair],
+        );
+        const stored = (await db.messagePairs.getAll())
+            .find((row) => row.id === pair.id);
+        if (stored === undefined) {
+            throw new Error('pair was not stored');
+        }
+        assertStrictEquals(stored.secret, '');
+        assertStrictEquals(
+            stored.secret_hash, EMPTY_SHA256,
+        );
+    },
+);

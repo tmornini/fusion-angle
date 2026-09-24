@@ -421,27 +421,27 @@ Deno.test('every stored request message re-hashes to its own'
     }
 });
 
-// End-to-end spot check on verbatim storage: every write in
-// the mixed batch above rode a real 'Authorization: Bearer'
-// header (organizationToken mints a real HMAC JWT), so a live
-// bearer JWT MUST appear in stored request messages — pairs
-// hold the wire bytes. Mock-data seed pairs carry no header
-// fields (api/mock-data/seed-message-pairs.ts); the mixed
+// End-to-end spot check: every write in the mixed batch
+// above rode a real Authorization bearer
+// (organizationToken mints a real HMAC JWT). That line
+// is hoisted into secret; the stored request does not
+// keep it. Mock-data seed pairs carry no header fields
+// (api/mock-data/seed-message-pairs.ts); the mixed
 // batch is the live-traffic half.
 const BEARER_JWT =
     /Bearer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/;
 
-Deno.test('stored request messages carry the live bearer JWT',
+Deno.test('stored secrets carry the live bearer JWT',
 async () => {
     const db = await seededWithMixedBatch();
     const requests = await db.messagePairs.getAll();
     assert(requests.length > 0);
     const withBearer = requests.filter(
-        row => BEARER_JWT.test(row.request),
+        row => BEARER_JWT.test(row.secret),
     );
     assert(
         withBearer.length > 0,
-        'no stored request carried a bearer JWT',
+        'no stored secret carried a bearer JWT',
     );
 });
 
