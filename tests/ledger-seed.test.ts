@@ -18,7 +18,9 @@ import {
     type RehearsedStatement,
     withoutRequestIdLine,
     rehearse,
+    postSeedLanding,
 } from '../api/ledger-seed.ts';
+import { BackedDbAdapter } from '../api/db-backed.ts';
 import { rootBind } from '../api/ledger-root.ts';
 import { MemoryStorageBackend } from
     '../api/backend-memory.ts';
@@ -330,3 +332,162 @@ Deno.test('a refused row fails the rehearsal', async () => {
         'seed statement returned refused',
     );
 });
+
+function adapterOver(
+    backend: MemoryStorageBackend,
+): BackedDbAdapter {
+    return new BackedDbAdapter(
+        backend, async () => {}, async () => {}, () => {},
+    );
+}
+
+async function recreatedChain(): Promise<{
+    readonly pairs: readonly MessagePair[];
+    readonly statements: readonly RehearsedStatement[];
+}> {
+    const pairs = [
+        await ideaPair('PUT', 'Fresh', true),
+        await ideaPair('DELETE', '', false),
+        await ideaPair('PUT', 'Back', false),
+    ];
+    const statements = await rehearse(
+        new MemoryStorageBackend(),
+        async (db) => {
+            for (const pair of pairs) await write(db, pair);
+        },
+    );
+    return { pairs, statements };
+}
+
+Deno.test(
+    'a re-created document lands by depth and stores 201',
+    async () => {
+        const { pairs, statements } = await recreatedChain();
+        assertEquals(depthsOf(statements), [1, 2, 3]);
+        const backend = new MemoryStorageBackend();
+        const seedRunId = generateIdentifier();
+        await postSeedLanding(
+            backend, { seedRunId, statements },
+        );
+        assertStrictEquals(backend.statementExecutions(), 3);
+        const rows = new Map(
+            (await adapterOver(backend).messagePairs.getAll())
+                .map((row) => [row.id, row]),
+        );
+        const [put, removal, again] = pairs;
+        assertStrictEquals(
+            rows.get(put!.id)?.supersedes, NIL,
+        );
+        assertStrictEquals(
+            rows.get(removal!.id)?.supersedes, put!.id,
+        );
+        assertStrictEquals(
+            rows.get(again!.id)?.supersedes, removal!.id,
+        );
+        assertStrictEquals(
+            rows.get(again!.id)?.response
+                .startsWith('HTTP/1.1 201 '),
+            true,
+        );
+    },
+);
+
+Deno.test(
+    'the root carries the run id; no row keeps request-id',
+    async () => {
+        const { statements } = await recreatedChain();
+        const backend = new MemoryStorageBackend();
+        const seedRunId = generateIdentifier();
+        await postSeedLanding(
+            backend, { seedRunId, statements },
+        );
+        const rows = await adapterOver(backend)
+            .messagePairs.getAll();
+        const carriers = rows.filter(
+            (row) => row.operation_id === seedRunId,
+        );
+        assertStrictEquals(carriers.length, 1);
+        assertStrictEquals(carriers[0]!.path, '/migrations/');
+        for (const row of rows) {
+            assertStrictEquals(
+                row.response.includes('\r\nrequest-id: '),
+                false,
+            );
+            assertStrictEquals(row.secret, '');
+        }
+    },
+);
+
+Deno.test(
+    'a failed landing leaves no table, then a retry lands',
+    async () => {
+        const { statements } = await recreatedChain();
+        const backend = new MemoryStorageBackend();
+        const rehearsal = {
+            seedRunId: generateIdentifier(),
+            statements,
+        };
+        backend.refuseNextSuccessions(1);
+        await assertRejects(
+            () => postSeedLanding(backend, rehearsal),
+        );
+        assertStrictEquals(await backend.hasSchema(), false);
+        await postSeedLanding(backend, rehearsal);
+        assertStrictEquals(await backend.hasSchema(), true);
+        assertStrictEquals(
+            (await adapterOver(backend).messagePairs.getAll())
+                .length,
+            4,
+        );
+    },
+);
+
+Deno.test(
+    'a matched rehearsal leaves the target without a table',
+    async () => {
+        const backend = new MemoryStorageBackend();
+        const first = await ideaPair('PUT', 'Same', true);
+        const resend = await ideaPair('PUT', 'Same', false);
+        await assertRejects(
+            async () => {
+                const statements = await rehearse(
+                    new MemoryStorageBackend(),
+                    async (db) => {
+                        await write(db, first);
+                        await write(db, resend);
+                    },
+                );
+                await postSeedLanding(backend, {
+                    seedRunId: generateIdentifier(),
+                    statements,
+                });
+            },
+            Error,
+            'seed statement returned matched',
+        );
+        assertStrictEquals(await backend.hasSchema(), false);
+    },
+);
+
+Deno.test(
+    'a landing onto an existing table changes nothing',
+    async () => {
+        const { statements } = await recreatedChain();
+        const backend = new MemoryStorageBackend();
+        await backend.ensureTable();
+        const before = await adapterOver(backend)
+            .messagePairs.getAll();
+        await assertRejects(
+            () => postSeedLanding(backend, {
+                seedRunId: generateIdentifier(),
+                statements,
+            }),
+            Error,
+            'seed statement returned matched',
+        );
+        assertEquals(
+            await adapterOver(backend).messagePairs.getAll(),
+            before,
+        );
+    },
+);

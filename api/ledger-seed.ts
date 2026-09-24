@@ -21,6 +21,7 @@ import type {
     Attempt,
     StatementAnswer,
 } from '../shared/ledger-statement.ts';
+import { rootBind } from './ledger-root.ts';
 
 // The bind limit Postgres allows one statement.
 export const POSTGRES_BIND_LIMIT = 65535;
@@ -240,4 +241,64 @@ export async function rehearse(
     await db.ensureTable();
     await run(db);
     return backend.statements();
+}
+
+// A rehearsed seed: the run's id, for the root, and every
+// statement the live ops executed.
+export interface SeedRehearsal {
+    readonly seedRunId: string;
+    readonly statements: readonly RehearsedStatement[];
+}
+
+// One transaction beneath the adapter: the schema, the
+// root and every batch by depth, then the marker. Every
+// row must land on its rehearsed predecessor, or nothing
+// exists afterwards, not even the table.
+export async function postSeedLanding(
+    backend: StorageBackend,
+    rehearsal: SeedRehearsal,
+): Promise<void> {
+    const statements: RehearsedStatement[] = [
+        {
+            rows: [rootBind(rehearsal.seedRunId)],
+            supersedes: [NIL_IDENTIFIER],
+        },
+        ...rehearsal.statements.map((statement) => ({
+            rows: statement.rows.map(withoutRequestIdLine),
+            supersedes: statement.supersedes,
+        })),
+    ];
+    const batches = packSeedBatches(
+        statements,
+        depthsOf(statements),
+        SEED_ROWS_PER_STATEMENT,
+    );
+    await backend.seedTransaction(async (tx) => {
+        for (const batch of batches) {
+            assertLanded(
+                await backend.executeLedger(
+                    'composed', batch.rows, undefined, tx,
+                ),
+                batch.supersedes,
+            );
+        }
+    });
+}
+
+function assertLanded(
+    answers: readonly StatementAnswer[],
+    supersedes: readonly string[],
+): void {
+    answers.forEach((answer, index) => {
+        if (answer.outcome !== 'land') {
+            throw new Error(
+                'seed statement returned ' + answer.outcome,
+            );
+        }
+        if (answer.supersedes !== supersedes[index]) {
+            throw new Error(
+                'seed row landed on another predecessor',
+            );
+        }
+    });
 }
