@@ -295,7 +295,7 @@ in their bodies.
 **(O) The base is measured.** `./test` on `989ca41a`,
 three runs, all green: 36.70 s, 36.43 s, 36.57 s
 (median 36.57 s). After seed: 63.58 s, 62.51 s, 61.62 s
-(median 62.57 s), all runs passing.
+(median 62.51 s), all runs passing.
 
 ---
 
