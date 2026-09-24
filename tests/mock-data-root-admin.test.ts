@@ -12,7 +12,6 @@ import { seededMockDb } from './mock-seed.ts';
 
 Deno.test('bootstrap seeds current as admin', async () => {
     const db = memoryDbAdapter();
-    await db.postSchemaCreation();
     await postBootstrap(db);
     const rows = await deriveMembershipsForIdentity(
         db, 'XXZruirZyAOoRpNxaDnpSA',

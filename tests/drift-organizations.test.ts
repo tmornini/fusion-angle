@@ -77,7 +77,6 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 
 async function bootstrappedDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
-    await db.postSchemaCreation();
     await postBootstrap(db);
     return db;
 }

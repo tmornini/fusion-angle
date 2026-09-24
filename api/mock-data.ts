@@ -1,5 +1,14 @@
 import type { DbAdapter } from './db.ts';
 import type { BackedDbAdapter } from './db-backed.ts';
+import { MemoryStorageBackend } from
+    './backend-memory.ts';
+import {
+    postSeedLanding,
+    rehearse,
+    type SeedRehearsal,
+} from './ledger-seed.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 import {
     postIdeaDocumentOp,
@@ -160,51 +169,34 @@ function requireMessagePair(
     return messagePair;
 }
 
-// The seeded admin credential set, returned to the caller so a
-// one-time reveal can surface the plaintext password. The
-// plaintext is never stored — only its PBKDF2 hash lands in the
-// identity_credentials.secret column.
+// The seeded sign-ins, returned so the operator
+// sees each password once. The seed never stores a
+// plaintext: each password's hash lands in its
+// identities/:id/credentials/:cid document, and the
+// plaintexts live only in this return value.
 export interface SeededIdentityCredential {
     readonly identityId: string;
     readonly username: string;
     readonly password: string;
 }
 
-// The freshly-seeded human sign-ins, surfaced in-band exactly
-// once. Only PBKDF2 hashes land in identity_credentials.secret;
-// these plaintexts live only in this return value. DEMO-ONLY:
-// the in-band plaintext return is deleted at the server tier.
+// The seeded sign-ins, returned so the operator
+// sees each password once. The seed never stores a
+// plaintext: each password's hash lands in its
+// identities/:id/credentials/:cid document, and the
+// plaintexts live only in this return value.
 export interface SeededCredentials {
     readonly identities:
         readonly SeededIdentityCredential[];
 }
 
-// Mint a fresh crypto-grade password for EVERY login-capable
-// person identity (one with a PII email), hash it into the
-// credential ledger, and return the plaintexts in-band for a
-// one-time reveal. A placeholder string would not verify
-// through the real /authentication/authorize loop. The system
-// identity signs with a client_secret — generated, hashed, and
-// discarded, never revealed. Both seed paths call this AFTER
-// the entity seed commits, NEVER inside it: PBKDF2 hashing is
-// async crypto. Formed pre-tx — crypto, hashing, and timers
-// never run inside an open transaction (AGENTS.md §
-// Transaction bodies await only row ops). So every hash is
-// computed up front, then the credential rows land together in
-// one transaction of pure row ops. Phase 10 Task 6: each
-// credential row ALSO forms its OWN message pair, re-pointed
-// onto postIdentityCredentialDocumentOp — its OWN local pass-1/
-// pass-2 split (formSeedCredentialMessagePairs, seed-message-pairs.ts),
-// since a credential's body embeds the post-hash secret computed
-// HERE, after formMockDataMessagePairs / formBootstrapMessagePair
-// already ran. The write transaction is one table; a nested
-// view.transaction re-enters the same tx.
-//
-// Phase Final Task 1(d): recipients are the in-memory
-// person/PII list (buildMembers / bootstrap PII body) — never
-// a post-tx identityPii/identities row scan. Stripping the
-// identity-spine row halves must not drop 1514→1503 /
-// 14→13 or empty SeededCredentials on the wire.
+// Mint a password for every login-capable person
+// identity and a client secret for the system identity,
+// and hash them all first: the credential documents
+// embed the hashes (Sequence, step 1). A placeholder
+// would not verify through /authentication/authorize.
+// Recipients are the in-memory person list, never a
+// row scan.
 
 const SEED_PASSWORD_CREDENTIAL_BY_IDENTITY:
     Readonly<Record<string, string>> = {
@@ -263,13 +255,26 @@ type PasswordHasher = (
     plaintext: string,
 ) => Promise<string>;
 
-export async function seedHumanCredentials(
-    adapter: BackedDbAdapter,
+interface SeedCredentialPlan {
+    readonly humans: readonly {
+        readonly id: string;
+        readonly identityId: string;
+        readonly username: string;
+        readonly password: string;
+        readonly secret: string;
+    }[];
+    readonly system: {
+        readonly id: string;
+        readonly secret: string;
+    };
+}
+
+async function hashSeedCredentials(
     recipients: readonly CredentialRecipient[],
-    hashPasswordFn: PasswordHasher = hashPassword,
-): Promise<SeededCredentials> {
-    const planned = await Promise.all(
-        recipients.map(async recipient => {
+    hash: PasswordHasher,
+): Promise<SeedCredentialPlan> {
+    const humans = await Promise.all(
+        recipients.map(async (recipient) => {
             const password = generateSecret();
             return {
                 id: seedPasswordCredentialId(
@@ -277,73 +282,69 @@ export async function seedHumanCredentials(
                 identityId: recipient.identityId,
                 username: recipient.email,
                 password,
-                secret: await hashPasswordFn(password),
+                secret: await hash(password),
             };
         }));
-    const systemCredentialId =
-        'cFiyyRHxbIEVqeVFNPmDnw';
-    const systemSecret = await hashPasswordFn(
-        generateSecret());
-    // Pass 1 (no tx): each credential's message pair, formed from
-    // the SAME post-hash secret pass 2 below writes — the row
-    // content is unknown until PBKDF2 resolves above, so this
-    // batch cannot join either seed path's own pre-tx pass (both
-    // already ran before this function was even called).
-    // requestAt is minted once, this credential batch's own
-    // arrival moment.
-    const requestAt = nowUtc();
-    const credentialMessagePairs = await formSeedCredentialMessagePairs(
-        planned,
-        { id: systemCredentialId, secret: systemSecret },
-        requestAt,
-    );
-    // Pass 2: message-plane only (Phase Final Task 2 stripped
-    // the identity_credentials ROW half).
-    // postIdentityCredential DocumentOp is the SAME op
-    // every live PUT identities/:id/credentials/:cid rides.
-    await adapter.backend.transaction(
-        'readwrite',
-        async (tx) => {
-            const view = adapter.openClient(tx);
-            await Promise.all([
-                ...planned.map(cred =>
-                    postIdentityCredentialDocumentOp(
-                        view,
+    const systemCredentialId = 'cFiyyRHxbIEVqeVFNPmDnw';
+    return {
+        humans,
+        system: {
+            id: systemCredentialId,
+            secret: await hash(generateSecret()),
+        },
+    };
+}
+
+// Pass 2's last wave: the credential documents, through
+// the op every live PUT identities/:id/credentials/:cid
+// rides.
+async function postSeedCredentialsIn(
+    adapter: DbAdapter,
+    plan: SeedCredentialPlan,
+    credentialPairs: ReadonlyMap<string, MessagePair>,
+): Promise<void> {
+    await Promise.all([
+        ...plan.humans.map((cred) =>
+            postIdentityCredentialDocumentOp(
+                adapter,
+                cred.id,
+                identityCredentialSeedBody(
+                    cred.identityId, 'password',
+                    cred.secret,
+                ),
+                SYSTEM_MEMBER_ID,
+                requireMessagePair(
+                    credentialPairs,
+                    seedMessagePairKey(
+                        'identities/:id/credentials/:cid',
                         cred.id,
-                        identityCredentialSeedBody(
-                            cred.identityId, 'password',
-                            cred.secret,
-                        ),
-                        SYSTEM_MEMBER_ID,
-                        requireMessagePair(
-                            credentialMessagePairs,
-                            seedMessagePairKey(
-                                'identities/:id/credentials/:cid',
-                                cred.id,
-                            ),
-                        ),
-                    )),
-                postIdentityCredentialDocumentOp(
-                    view,
-                    systemCredentialId,
-                    identityCredentialSeedBody(
-                        SYSTEM_MEMBER_ID, 'client_secret',
-                        systemSecret,
-                    ),
-                    SYSTEM_MEMBER_ID,
-                    requireMessagePair(
-                        credentialMessagePairs,
-                        seedMessagePairKey(
-                            'identities/:id/credentials/:cid',
-                            systemCredentialId,
-                        ),
                     ),
                 ),
-            ]);
-        },
-    );
+            )),
+        postIdentityCredentialDocumentOp(
+            adapter,
+            plan.system.id,
+            identityCredentialSeedBody(
+                SYSTEM_MEMBER_ID, 'client_secret',
+                plan.system.secret,
+            ),
+            SYSTEM_MEMBER_ID,
+            requireMessagePair(
+                credentialPairs,
+                seedMessagePairKey(
+                    'identities/:id/credentials/:cid',
+                    plan.system.id,
+                ),
+            ),
+        ),
+    ]);
+}
+
+function revealedCredentials(
+    plan: SeedCredentialPlan,
+): SeededCredentials {
     return {
-        identities: planned.map(cred => ({
+        identities: plan.humans.map((cred) => ({
             identityId: cred.identityId,
             username: cred.username,
             password: cred.password,
@@ -357,37 +358,20 @@ export type PostMockDataLoadOptions = {
     readonly hashPassword?: PasswordHasher;
 };
 
-export async function postMockDataLoad(
-    adapter: BackedDbAdapter,
+// A rehearsed seed and the sign-ins it minted. The
+// plaintexts leave only after the landing commits.
+export interface RehearsedSeed {
+    readonly rehearsal: SeedRehearsal;
+    readonly credentials: SeededCredentials;
+}
+
+// Hash, form, and rehearse (Sequence, steps 1 to 3). The
+// live ops run on scratch memory; nothing touches the
+// target.
+export async function rehearseMockData(
     options?: PostMockDataLoadOptions,
-): Promise<SeededCredentials> {
-    // Pass 1 (no tx): every pair-wired op-invocation's message
-    // pair, formed up front — formWriteMessagePair's hashing is async
-    // crypto. Formed pre-tx — crypto, hashing, and timers
-    // never run inside an open transaction (AGENTS.md §
-    // Transaction bodies await only row ops). requestAt is
-    // minted once, the seed's own arrival moment, and shared
-    // by every pair.
-    const messagePairs = await formMockDataMessagePairs(nowUtc());
-    // Pass 2: seed the whole demo dataset in one transaction —
-    // row ops only — so a mid-seed failure leaves no
-    // half-populated schema. The credentials seed runs after it
-    // commits — its PBKDF2 hashing is ALSO async crypto and
-    // cannot run inside the tx. The schema marker stamps LAST,
-    // so a failed seed leaves hasSchema() false: the datastore
-    // reads as empty and the seed can be retried cleanly.
-    await adapter.ensureTable();
-    await adapter.backend.transaction(
-        'readwrite',
-        (tx) => postMockDataLoadIn(
-            adapter.openClient(tx), messagePairs,
-        ),
-    );
-    // Task 1(d): same buildMembers (+ the unaffiliated
-    // identity) enumeration that pass 2 used for PII — no
-    // row read after strip.
-    const creds = await seedHumanCredentials(
-        adapter,
+): Promise<RehearsedSeed> {
+    const credentials = await hashSeedCredentials(
         [
             ...buildMembers(),
             buildUnaffiliatedIdentity(),
@@ -395,10 +379,42 @@ export async function postMockDataLoad(
             identityId: member.id,
             email: member.email,
         })),
-        options?.hashPassword,
+        options?.hashPassword ?? hashPassword,
     );
-    await adapter.postSchemaCreation();
-    return creds;
+    const seedRunId = generateIdentifier();
+    const requestAt = nowUtc();
+    const messagePairs =
+        await formMockDataMessagePairs(requestAt);
+    const credentialPairs =
+        await formSeedCredentialMessagePairs(
+            credentials.humans, credentials.system,
+            requestAt,
+        );
+    const statements = await rehearse(
+        new MemoryStorageBackend(),
+        async (db) => {
+            await postMockDataLoadIn(db, messagePairs);
+            await postSeedCredentialsIn(
+                db, credentials, credentialPairs,
+            );
+        },
+    );
+    return {
+        rehearsal: { seedRunId, statements },
+        credentials: revealedCredentials(credentials),
+    };
+}
+
+// Plan and land (steps 4 and 5) in one transaction
+// beneath the adapter. The caller reveals the sign-ins
+// after this resolves.
+export async function postMockDataLoad(
+    adapter: BackedDbAdapter,
+    options?: PostMockDataLoadOptions,
+): Promise<SeededCredentials> {
+    const seed = await rehearseMockData(options);
+    await postSeedLanding(adapter.backend, seed.rehearsal);
+    return seed.credentials;
 }
 
 async function postMockDataLoadIn(
@@ -1136,78 +1152,60 @@ async function postMockDataLoadIn(
     ]);
 }
 
-export async function postBootstrap(
-    adapter: BackedDbAdapter,
+export async function rehearseBootstrap(
     options?: PostMockDataLoadOptions,
-): Promise<SeededCredentials> {
-    // Pass 1 (no tx): the lone 'XXZruirZyAOoRpNxaDnpSA' human-member create's
-    // bundle, formed up front — see postMockDataLoad's pass 1
-    // for why. Formed pre-tx — crypto, hashing, and timers
-    // never run inside an open transaction (AGENTS.md §
-    // Transaction bodies await only row ops). Bootstrap's
-    // body embeds nowUtc() (there is
-    // no fixed seed timestamp here), so it is minted ONCE inside
-    // formBootstrapMessagePair and reused verbatim by pass 2
-    // below — never a second, independently timestamped body.
-    // Task 5: ALSO forms
-    // bootstrap's own membership pair — closed the SAME way
-    // postMockDataLoad's own membership sites are. Phase 10
-    // Task 2: ALSO forms the current member's PII document
-    // message pair, closing the intake decomposition's
-    // bootstrap side. Task 6: ALSO forms the system
-    // member's own identities/:id document message pair —
-    // closed the SAME way postMockDataLoad's own
-    // system-identity site is. The credential pairs are
-    // NOT here — seedHumanCredentials forms those itself,
-    // below, since their content is unknown until PBKDF2
-    // resolves. Phase 11 Task 8: ALSO forms bootstrap's
-    // own default-organization document message pair —
-    // the mock-data seed's own per-member
-    // precedent, mirrored here for bootstrap's lone identity.
-    const {
-        identityMessagePair,
-        seatMessagePair,
-        piiMessagePair,
-        systemIdentityMessagePair,
-        defaultOrganizationMessagePair,
-        organizationMessagePair,
-    } = await formBootstrapMessagePair(nowUtc());
-    // Pass 2: seed the pristine bootstrap data in one
-    // transaction. Credentials seed after it commits — PBKDF2
-    // hashing is ALSO async crypto and cannot run inside the tx.
-    // The schema marker stamps LAST so a failed bootstrap leaves
-    // the anonymous plane open for retry.
-    await adapter.ensureTable();
-    await adapter.backend.transaction(
-        'readwrite',
-        (tx) => postBootstrapIn(
-            adapter.openClient(tx),
-            identityMessagePair, seatMessagePair,
-            piiMessagePair,
-            systemIdentityMessagePair,
-            defaultOrganizationMessagePair,
-            organizationMessagePair,
-        ),
-    );
-    // Task 1(d): bootstrap's lone human is 'XXZruirZyAOoRpNxaDnpSA' with
-    // the same PII body pass 2 wrote — no row read.
-    const bootstrapPii = bootstrapCurrentMemberPiiBody();
-    const bootstrapEmail = bootstrapPii['email'];
+): Promise<RehearsedSeed> {
+    const bootstrapEmail =
+        bootstrapCurrentMemberPiiBody()['email'];
     if (typeof bootstrapEmail !== 'string') {
-        throw new Error(
-            'bootstrap PII body lacks email',
-        );
+        throw new Error('bootstrap PII body lacks email');
     }
-    const creds = await seedHumanCredentials(
-        adapter,
+    const credentials = await hashSeedCredentials(
         [{
             identityId: 'XXZruirZyAOoRpNxaDnpSA',
             email: bootstrapEmail,
         }],
-        options?.hashPassword,
+        options?.hashPassword ?? hashPassword,
     );
-    await adapter.postSchemaCreation();
-    return creds;
+    const seedRunId = generateIdentifier();
+    const requestAt = nowUtc();
+    const bootstrap =
+        await formBootstrapMessagePair(requestAt);
+    const credentialPairs =
+        await formSeedCredentialMessagePairs(
+            credentials.humans, credentials.system,
+            requestAt,
+        );
+    const statements = await rehearse(
+        new MemoryStorageBackend(),
+        async (db) => {
+            await postBootstrapIn(
+                db,
+                bootstrap.identityMessagePair,
+                bootstrap.seatMessagePair,
+                bootstrap.piiMessagePair,
+                bootstrap.systemIdentityMessagePair,
+                bootstrap.defaultOrganizationMessagePair,
+                bootstrap.organizationMessagePair,
+            );
+            await postSeedCredentialsIn(
+                db, credentials, credentialPairs,
+            );
+        },
+    );
+    return {
+        rehearsal: { seedRunId, statements },
+        credentials: revealedCredentials(credentials),
+    };
+}
+
+export async function postBootstrap(
+    adapter: BackedDbAdapter,
+    options?: PostMockDataLoadOptions,
+): Promise<SeededCredentials> {
+    const seed = await rehearseBootstrap(options);
+    await postSeedLanding(adapter.backend, seed.rehearsal);
+    return seed.credentials;
 }
 
 export async function postBootstrapIn(

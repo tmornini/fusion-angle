@@ -38,7 +38,14 @@ import {
     runWrite,
     type MessagePair,
 } from '../api/message-pair.ts';
-import { sharedMockDb } from './mock-seed.ts';
+import {
+    sharedMockDb,
+    testHashPassword,
+} from './mock-seed.ts';
+import {
+    rehearseBootstrap,
+    rehearseMockData,
+} from '../api/mock-data.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import {
     buildRecords,
@@ -580,5 +587,72 @@ Deno.test(
                 && row.method === 'PUT')).length,
             1,
         );
+    },
+);
+
+Deno.test(
+    'mock data lands every rehearsed row in three'
+        + ' statements',
+    async () => {
+        const backend = new MemoryStorageBackend();
+        const seed = await rehearseMockData({
+            hashPassword: testHashPassword,
+        });
+        await postSeedLanding(backend, seed.rehearsal);
+        assertStrictEquals(backend.statementExecutions(), 3);
+        const landed = new Map(
+            (await adapterOver(backend).messagePairs.getAll())
+                .map((row) => [row.id, row]),
+        );
+        let rehearsed = 0;
+        for (const statement of seed.rehearsal.statements) {
+            statement.rows.forEach((row, index) => {
+                rehearsed += 1;
+                assertStrictEquals(
+                    landed.get(row.id)?.supersedes,
+                    statement.supersedes[index],
+                );
+            });
+        }
+        assertStrictEquals(landed.size, rehearsed + 1);
+    },
+);
+
+Deno.test('bootstrap lands in one statement', async () => {
+    const backend = new MemoryStorageBackend();
+    const seed = await rehearseBootstrap({
+        hashPassword: testHashPassword,
+    });
+    await postSeedLanding(backend, seed.rehearsal);
+    assertStrictEquals(backend.statementExecutions(), 1);
+    assertStrictEquals(
+        (await adapterOver(backend).messagePairs.getAll())
+            .length,
+        9,
+    );
+});
+
+Deno.test(
+    'a mock-data seed keeps no request-id and no secret',
+    async () => {
+        const db = await sharedMockDb();
+        const rows = await db.messagePairs.getAll();
+        const root = rows.filter(
+            (row) => row.path === '/migrations/',
+        );
+        assertStrictEquals(root.length, 1);
+        assertStrictEquals(
+            rows.filter((row) =>
+                row.operation_id === root[0]!.operation_id,
+            ).length,
+            1,
+        );
+        for (const row of rows) {
+            assertStrictEquals(
+                row.response.includes('\r\nrequest-id: '),
+                false,
+            );
+            assertStrictEquals(row.secret, '');
+        }
     },
 );

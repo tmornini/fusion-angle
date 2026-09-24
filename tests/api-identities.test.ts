@@ -113,7 +113,7 @@ Deno.test('PUT then GET an identity round-trips', async () => {
 
 Deno.test('bootstrap seeds an identity per member, id-equal',
 async () => {
-    const db = await freshDb();
+    const db = memoryDbAdapter();
     const { postBootstrap } =
         await import('../api/mock-data.ts');
     await postBootstrap(db);
