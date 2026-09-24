@@ -20,6 +20,7 @@ import {
     runWrite,
     attemptFor,
     formAuthMessagePair,
+    formWriteMessagePair,
     responseFromStored,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
@@ -534,10 +535,38 @@ async function seedAuthorizationCodeMessagePair(
             value: 'code="' + code + '"',
         }],
     );
+    const codeName = await sha256Hex(code);
+    const codePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/authentication/authorization-codes/'
+            + codeName,
+        routePattern:
+            'authentication/authorization-codes/:hash',
+        routeSegments: [
+            'authentication',
+            'authorization-codes',
+            ':hash',
+        ],
+        pathSegments: [
+            'authentication',
+            'authorization-codes',
+            codeName,
+        ],
+        headerFields: [],
+        body: undefined,
+        requesterIdentityId: identityId,
+        requestAt: seed.requestAt,
+        organization: undefined,
+        responseBody: { client_id: clientId },
+        operationId: seed.operationId,
+        requestId: seed.requestId,
+        genesis: true,
+        emptyRequest: true,
+    });
     await runWrite(
         db,
-        attemptFor([messagePair]),
-        [messagePair],
+        attemptFor([codePair, messagePair]),
+        [codePair, messagePair],
     );
 }
 
@@ -553,27 +582,29 @@ async () => {
     });
     assertStrictEquals(res.status, 200);
     await assertRootEventMessagePair(db, CURRENT_ID);
-    // Issued event is named by its jti; the spend marker is a
-    // different prefix (authorization-codes/:hash).
+    // Issued event is named by its jti. The code document
+    // is /authentication/authorization-codes/:hash.
     const [root] = await deriveIdentityTokensFor(db, CURRENT_ID);
     assertStrictEquals(root!.id, root!.jti);
     assertNotStrictEquals(root!.id, await sha256Hex(AUTH_CODE));
     const derivedId = await sha256Hex(AUTH_CODE);
-    const marker = await db.messagePairs.getDocumentHistory(
-        '/identities/' + CURRENT_ID + '/authorization-codes/',
+    const spent = await db.messagePairs.getDocumentHistory(
+        '/authentication/authorization-codes/',
         derivedId,
     );
-    assert(marker.length > 0, 'marker document');
+    assert(
+        spent.some((row) => row.method === 'DELETE'),
+        'code document deleted',
+    );
     const requests = await db.messagePairs.getAll();
     const operationMessagePair = requests.find(
         r => r.path === '/authentication/token/',
     );
     assert(operationMessagePair);
     assertStrictEquals(operationMessagePair!.name, '');
-    // 3 bootstrap + the seeded authorize pair + the spend
-    // marker + the root's own event pair + the grant's own
-    // operation message pair.
-    assertStrictEquals(requests.length, 7);
+    // 3 bootstrap + seeded authorize + code document
+    // + its DELETE + the issued event + the grant pair.
+    assertStrictEquals(requests.length, 8);
 });
 
 Deno.test('a token-exchange grant (a real /authentication/token'

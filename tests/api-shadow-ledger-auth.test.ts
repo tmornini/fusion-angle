@@ -260,15 +260,14 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // seedRootAdmin: org + membership (2; role-grants retired)
-    // + identity + pii + credential (3) + authorize + token
-    // + token-event + spend marker + pbkdf2-to-scrypt rehash
-    // (5) = 10.
-    assertStrictEquals(requests.length, 11);
-    // The AUTH hops stay operation documents (name ''); the
-    // token grant's issued event and spend marker ride their
-    // own documents, so they carry non-empty names. Indices
-    // 5–6 are authorize + token.
+    // seedRootAdmin: org + membership (2)
+    // + identity + pii + credential (3)
+    // + rehash + authorize + code document
+    // + code DELETE + issued event + token = 12.
+    assertStrictEquals(requests.length, 12);
+    // The AUTH hops stay operation documents (name '');
+    // the issued event and the code document carry
+    // non-empty names.
     const authHops = requests.slice(5).filter(
         row => row.path === '/authentication/authorize/'
             || row.path === '/authentication/token/',
@@ -303,8 +302,21 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     );
     assert(tokenEventResponse);
     assertNotStrictEquals(tokenEventResponse!.name, '');
-    // Response rows carry no predecessor columns.
+    const codePut = responses.find((row) =>
+        row.path === '/authentication/authorization-codes/'
+        && row.method === 'PUT'
+    );
+    const codeDelete = responses.find((row) =>
+        row.path === '/authentication/authorization-codes/'
+        && row.method === 'DELETE'
+    );
+    assert(codePut !== undefined);
+    assert(codeDelete !== undefined);
+    assertStrictEquals(codeDelete.supersedes, codePut.id);
+    // The code DELETE is the one successor. Every other
+    // row in this slice is a genesis.
     for (const row of responses.slice(6)) {
+        if (row.id === codeDelete.id) continue;
         assertStrictEquals(row.supersedes, NIL_IDENTIFIER);
         assertStrictEquals('follows' in row, false);
     }
@@ -416,14 +428,11 @@ async () => {
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // 13: the fixture's own identity + pii + credential pairs
-    // (3) + seedRootAdmin's 2 fixture pairs + authorize +
-    // token (the token hop's own event pair, spend marker,
-    // plus pbkdf2 rehash, brings fullLoginFlow's count to 10)
-    // + refresh's own operation message pair + refresh's
-    // rotate-branch event pairs (2: the retired root, the
-    // issued successor — Phase 13 Task 5).
-    assertStrictEquals(requests.length, 14);
+    // fullLoginFlow is 12 (code document PUT and DELETE
+    // replace the spend marker). Refresh adds its own
+    // pair plus the retired root and the issued
+    // successor.
+    assertStrictEquals(requests.length, 15);
     const cookieLine = 'cookie: refresh_token='
         + first.refresh_token;
     const refreshRequest = requests.find(

@@ -101,10 +101,6 @@ export interface EntityStore<
     getHeadPair(path: string, name: string): Promise<T | null>;
     // The live PUT heads of a collection, (response_at, id).
     getCollectionHeadPairs(path: string): Promise<T[]>;
-    getAllWhereBody(
-        path: string,
-        containment: Record<string, unknown>,
-    ): Promise<T[]>;
     getById(id: string): Promise<T>;
     // Writes the row if its id is absent and reports whether
     // it did. A later append of the same id changes nothing.
@@ -145,10 +141,6 @@ export interface Tx {
     getDocumentHistory<T extends { id: string }>(
         path: string,
         name: string,
-    ): Promise<T[]>;
-    getWhereBody<T extends { id: string }>(
-        path: string,
-        containment: Record<string, unknown>,
     ): Promise<T[]>;
     append<T extends { id: string }>(
         row: T,

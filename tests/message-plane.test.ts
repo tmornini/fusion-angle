@@ -39,10 +39,14 @@ import {
 } from '../api/message-pair.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
+    MS_PER_SECOND,
     nowUtc,
+    resetClock,
+    setClockForTest,
 } from '../api/types.ts';
 import {
     sha256Bytes,
+    sha256Hex,
     sha256HexOfBytes,
 } from '../shared/digest.ts';
 import { bytesToBase64Url } from
@@ -1989,5 +1993,309 @@ Deno.test(
         );
         await client.text();
         assertStrictEquals(client.status, 200);
+    },
+);
+
+const CODE_COLLECTION =
+    '/authentication/authorization-codes/';
+
+function responseHeader(
+    wire: string,
+    name: string,
+): string {
+    const end = wire.indexOf('\r\n\r\n');
+    const block = end < 0 ? wire : wire.slice(0, end);
+    const prefix = name + ': ';
+    for (const line of block.split('\r\n')) {
+        if (line.startsWith(prefix)) {
+            return line.slice(prefix.length);
+        }
+    }
+    throw new Error(name + ' is absent');
+}
+
+function grantDoor(
+    code: string,
+    verifier: string,
+): Request {
+    return doorRequest(
+        '/authentication/token',
+        {
+            grant_type: 'authorization_code',
+            client_id: 'web',
+        },
+        {
+            authorization: basicHeader(code, verifier),
+        },
+    );
+}
+
+async function authorizeDoor(
+    db: DbAdapter,
+): Promise<{
+    readonly code: string;
+    readonly challenge: string;
+    readonly verifier: string;
+}> {
+    const verifier = 'pkce-verifier-code-document';
+    const challenge = bytesToBase64Url(
+        await sha256Bytes(verifier),
+    );
+    const response = await handleRequest(
+        db, doorRequest(
+            '/authentication/authorize',
+            {
+                method: 'password',
+                client_id: 'web',
+                code_challenge: challenge,
+                code_challenge_method: 'S256',
+            },
+            {
+                authorization: basicHeader(
+                    'demo@example.com',
+                    DOOR_PASSWORD,
+                ),
+            },
+        ),
+    );
+    const text = await response.text();
+    assertStrictEquals(response.status, 200);
+    assertStrictEquals(text, '');
+    return {
+        code: quotedParam(
+            response.headers.get(
+                'authentication-info',
+            ),
+            'code',
+        ),
+        challenge,
+        verifier,
+    };
+}
+
+function codeDocument(
+    rows: readonly {
+        path: string;
+        name: string;
+        method: string;
+        request: string;
+        response: string;
+        operation_id: string;
+        response_at: string;
+    }[],
+    name: string,
+): {
+    path: string;
+    name: string;
+    method: string;
+    request: string;
+    response: string;
+    operation_id: string;
+    response_at: string;
+} {
+    const row = rows.find((item) =>
+        item.path === CODE_COLLECTION
+        && item.name === name
+    );
+    if (row === undefined) {
+        throw new Error(
+            'no code document at ' + CODE_COLLECTION,
+        );
+    }
+    return row;
+}
+
+Deno.test(
+    'authorize lands the authorization code document',
+    async () => {
+        const db = await passwordDoorDb();
+        const before = (
+            await db.messagePairs.getAll()
+        ).length;
+        const issued = await authorizeDoor(db);
+        const rows = await db.messagePairs.getAll();
+        const grew = rows.length - before;
+        assert(grew === 2 || grew === 3);
+        const name = await sha256Hex(issued.code);
+        const codeRow = codeDocument(rows, name);
+        const authorizeRow = rows.find((row) =>
+            row.path === '/authentication/authorize/'
+            && row.operation_id
+                === codeRow.operation_id
+        );
+        if (authorizeRow === undefined) {
+            throw new Error('authorize pair absent');
+        }
+        assertStrictEquals(codeRow.method, 'PUT');
+        assertStrictEquals(codeRow.request, '');
+        assertStrictEquals(
+            storedStatus(codeRow.response), 201,
+        );
+        const body = JSON.parse(
+            wireBody(codeRow.response),
+        ) as Record<string, unknown>;
+        assertStrictEquals(body.client_id, 'web');
+        assertStrictEquals(
+            body.code_challenge, issued.challenge,
+        );
+        assertStrictEquals('code' in body, false);
+        assertStrictEquals(
+            responseHeader(
+                codeRow.response, 'operation-id',
+            ),
+            responseHeader(
+                authorizeRow.response, 'operation-id',
+            ),
+        );
+        assertStrictEquals(
+            responseHeader(
+                codeRow.response, 'request-id',
+            ),
+            responseHeader(
+                authorizeRow.response, 'request-id',
+            ),
+        );
+    },
+);
+
+Deno.test(
+    'an old code document answers 401',
+    async () => {
+        const db = await passwordDoorDb();
+        await seedRootAdmin(db);
+        const issued = await authorizeDoor(db);
+        const name = await sha256Hex(issued.code);
+        const codeRow = codeDocument(
+            await db.messagePairs.getAll(), name,
+        );
+        const issuedMs = Date.parse(
+            codeRow.response_at,
+        );
+        setClockForTest(() =>
+            issuedMs + (10 * 60 + 1) * MS_PER_SECOND);
+        try {
+            const before = (
+                await db.messagePairs.getAll()
+            ).length;
+            const granted = await handleRequest(
+                db, grantDoor(
+                    issued.code, issued.verifier,
+                ),
+            );
+            const text = await granted.text();
+            assertStrictEquals(granted.status, 401);
+            assertStrictEquals(
+                text, '{"error":"invalid_grant"}',
+            );
+            assertStrictEquals(
+                (await db.messagePairs.getAll()).length,
+                before,
+            );
+        } finally {
+            resetClock();
+        }
+    },
+);
+
+Deno.test(
+    'a second authorization code redemption'
+        + ' answers 401',
+    async () => {
+        const db = await passwordDoorDb();
+        await seedRootAdmin(db);
+        const issued = await authorizeDoor(db);
+        const first = await handleRequest(
+            db, grantDoor(issued.code, issued.verifier),
+        );
+        await first.text();
+        assertStrictEquals(first.status, 200);
+        const before = (
+            await db.messagePairs.getAll()
+        ).length;
+        const second = await handleRequest(
+            db, grantDoor(issued.code, issued.verifier),
+        );
+        const text = await second.text();
+        assertStrictEquals(second.status, 401);
+        assertStrictEquals(
+            text, '{"error":"invalid_grant"}',
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length,
+            before,
+        );
+    },
+);
+
+Deno.test(
+    'a DELETE head matches an unknown code',
+    async () => {
+        const db = await passwordDoorDb();
+        const issued = await authorizeDoor(db);
+        const name = await sha256Hex(issued.code);
+        const head = await documentHeadAt(
+            db, CODE_COLLECTION, name,
+        );
+        if (head === null) {
+            throw new Error(
+                'no code document at ' + CODE_COLLECTION,
+            );
+        }
+        assertStrictEquals(head.method, 'PUT');
+        const planted = await formWriteMessagePair({
+            method: 'DELETE',
+            pathname: CODE_COLLECTION + name,
+            routePattern:
+                'authentication/authorization-codes/:hash',
+            routeSegments: [
+                'authentication',
+                'authorization-codes',
+                ':hash',
+            ],
+            pathSegments: [
+                'authentication',
+                'authorization-codes',
+                name,
+            ],
+            headerFields: [],
+            body: undefined,
+            requesterIdentityId: DOOR_IDENTITY,
+            requestAt: nowUtc(),
+            organization: undefined,
+            responseBody: undefined,
+            operationId: generateIdentifier(),
+            requestId: generateIdentifier(),
+            latchedHeadMessagePairId: head.id,
+        });
+        const plantedWrite = await runWrite(
+            db, attemptFor([planted]), [planted],
+        );
+        assertStrictEquals(plantedWrite.outcome, 'land');
+        const unknown = await handleRequest(
+            db, grantDoor('never-issued-code', ''),
+        );
+        const unknownText = await unknown.text();
+        const spent = await handleRequest(
+            db, grantDoor(issued.code, issued.verifier),
+        );
+        const spentText = await spent.text();
+        assertStrictEquals(unknown.status, 401);
+        assertStrictEquals(spent.status, 401);
+        const unknownBytes = new TextEncoder()
+            .encode(unknownText);
+        const spentBytes = new TextEncoder()
+            .encode(spentText);
+        assertStrictEquals(
+            unknownBytes.byteLength,
+            spentBytes.byteLength,
+        );
+        for (let i = 0; i < unknownBytes.byteLength; i++) {
+            assertStrictEquals(
+                unknownBytes[i], spentBytes[i],
+            );
+        }
+        assertStrictEquals(
+            unknownText, '{"error":"invalid_grant"}',
+        );
     },
 );

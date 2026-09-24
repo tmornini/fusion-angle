@@ -34,14 +34,14 @@ import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
-    authorizationCodeSpent,
     basicAuthorization,
     deriveAuthorizationCodeId,
 } from '../api/authentication.ts';
 import {
     deriveIdentityTokensFor,
 } from '../api/derive-identity-tokens.ts';
-import { sha256Bytes } from '../shared/digest.ts';
+import { sha256Bytes, sha256Hex } from
+    '../shared/digest.ts';
 import { bytesToBase64Url } from '../shared/base64url.ts';
 import {
     seedClientRegistration,
@@ -115,10 +115,44 @@ async function seedAuthorizationCodeMessagePair(
             value: 'code="' + code + '"',
         }],
     );
+    const codeName = await sha256Hex(code);
+    const codeBody: Record<string, unknown> = {
+        client_id: clientId,
+    };
+    if (extras.code_challenge !== undefined) {
+        codeBody.code_challenge = extras.code_challenge;
+    }
+    const codePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/authentication/authorization-codes/'
+            + codeName,
+        routePattern:
+            'authentication/authorization-codes/:hash',
+        routeSegments: [
+            'authentication',
+            'authorization-codes',
+            ':hash',
+        ],
+        pathSegments: [
+            'authentication',
+            'authorization-codes',
+            codeName,
+        ],
+        headerFields: [],
+        body: undefined,
+        requesterIdentityId: identityId,
+        requestAt: seed.requestAt,
+        organization: undefined,
+        responseBody: codeBody,
+        operationId: seed.operationId,
+        requestId: seed.requestId,
+        genesis: true,
+        emptyRequest: true,
+    });
     await runWrite(
         db,
-        attemptFor([messagePair]),
-        [messagePair],
+        attemptFor([codePair, messagePair]),
+        [codePair, messagePair],
     );
 }
 
@@ -477,13 +511,8 @@ Deno.test('an unknown code is a 401', async () => {
     assertStrictEquals(res.status, 401);
 });
 
-// GATE 3 (Phase 13 Task 7): the code-spend guard's three 401
-// classes — unknown (never issued), spent (replayed), raced
-// (lost a concurrent exchange) — all carry the SAME byte-exact
-// body. The message-plane guard (authorizeCodeIssuer /
-// authorizationCodeSpent, api/authentication.ts) makes no
-// distinction between them at the wire, exactly as the retired
-// codeState-driven guard never did either.
+// Unknown, spent, and raced codes answer the same 401
+// body. The grant does not distinguish them on the wire.
 Deno.test('GATE 3: unknown / spent / raced code all 401 with the'
 + ' SAME byte-exact body', async () => {
     const db = await freshDb();
@@ -532,14 +561,13 @@ Deno.test('GATE 3: unknown / spent / raced code all 401 with the'
     assertEquals(
         await presentedFields(raced), { error: INVALID_CODE_ERROR });
 
-    // The derived id itself: a live-minted spend is visible on
-    // the message plane by exactly that id, the SAME value the
-    // guard above already checked internally.
     const derivedId =
         await deriveAuthorizationCodeId('the-code-spent');
-    assertStrictEquals(
-        await authorizationCodeSpent(db, derivedId, 'XXZruirZyAOoRpNxaDnpSA'),
-        true);
+    const spentHead = await db.messagePairs.getHead(
+        '/authentication/authorization-codes/',
+        derivedId,
+    );
+    assertStrictEquals(spentHead?.method, 'DELETE');
 });
 
 Deno.test(
@@ -566,19 +594,11 @@ Deno.test(
             );
         const prefix = '/identities/'
             + identityId + '/tokens/';
-        const markerPrefix = '/identities/'
-            + identityId + '/authorization-codes/';
-        const marker = await db.messagePairs
-            .getDocumentHistory(
-                markerPrefix, derivedId,
-            );
-        assert(marker.length > 0, 'marker document');
-        assertStrictEquals(
-            await authorizationCodeSpent(
-                db, derivedId, identityId,
-            ),
-            true,
+        const spentHead = await db.messagePairs.getHead(
+            '/authentication/authorization-codes/',
+            derivedId,
         );
+        assertStrictEquals(spentHead?.method, 'DELETE');
         const issued = (await deriveIdentityTokensFor(
             db, identityId,
         )).filter(r => r.action === 'issued');

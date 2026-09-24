@@ -40,10 +40,6 @@ import {
     formTokenEventMessagePair,
 } from '../api/message-pair.ts';
 import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
-import {
-    authorizationCodeSpent,
-    deriveAuthorizationCodeId,
-} from '../api/authentication.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
 
@@ -66,17 +62,10 @@ const GHOST_JTI = generateIdentifier();
 const JTI_OMIT = generateIdentifier();
 const CHAIN_OMIT = generateIdentifier();
 
-// Phase 13 Task 6/7 shipped two ledger-derived reads that replace
-// row-plane lookups on Commandment II hot paths: the by-jti fold
-// (deriveIdentityTokenEventsForJti, tokenRevocationReason's
-// SECOND read — now the jti document's PUT history) and the
-// code-spend guard (authorizationCodeSpent,
-// grantAuthorizationCode's PRE-tx fast-fail + IN-TX re-check —
-// now the authorization-codes marker prefix). Both run PRE-TX
-// AND IN-TX — the pre-tx-vs-in-tx PARITY legs below prove the
-// two call sites see identical results (the membershipExistsFor
-// precedent). One head per jti: the issued event is named by
-// its jti; the spend marker is a different prefix.
+// The by-jti fold (deriveIdentityTokenEventsForJti,
+// tokenRevocationReason's second read) is the jti
+// document's PUT history. One head per jti: the issued
+// event is named by its jti.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -499,80 +488,6 @@ Deno.test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
         refresh_token: refreshToken,
     });
     assertStrictEquals(refreshRes.status, 401);
-});
-
-// -- 5: GATE 3 (Phase 13 Task 7) — the code-spend guard's -------
-// -- pre-tx-vs-in-tx PARITY ------------------------------------------
-
-const CODE_PASSWORD = 's3cret-gate3';
-const CODE_EMAIL = 'gate3-code@example.com';
-
-async function dbWithCodeLoginUser(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    await seedRootAdmin(db);
-    await seedPersonIdentity(db, 'XXZruirZyAOoRpNxaDnpSA', {
-        name: 'Gate 3', email: CODE_EMAIL,
-        phone: '', bio: '',
-    });
-    await seedIdentityCredential(
-        db, 'XXZruirZyAOoRpNxaDnpSA', 'cred-gate3', {
-            identity_id: 'XXZruirZyAOoRpNxaDnpSA', kind: 'password',
-            status: 'set',
-            secret: await testHashPassword(CODE_PASSWORD),
-            at: AT,
-        },
-    );
-    return db;
-}
-
-Deno.test('authorizationCodeSpent: byte-identical pre-tx (the plain'
-+ ' adapter) vs in-tx (an open db.transaction view sharing'
-+ ' grantAuthorizationCode\'s own table list) — the'
-+ ' membershipExistsFor / deriveIdentityTokenEventsForJti'
-+ ' precedent', async () => {
-    const db = await dbWithCodeLoginUser();
-    const pkce = await s256Fields();
-    const authorizeRes = await authorize(db, {
-        method: 'password', username: CODE_EMAIL,
-        password: CODE_PASSWORD, client_id: 'web',
-        code_challenge: pkce.code_challenge,
-        code_challenge_method: pkce.code_challenge_method,
-    });
-    assertStrictEquals(authorizeRes.status, 200);
-    const { code } = await presentedFields(authorizeRes) as {
-        code: string;
-    };
-    const derivedId = await deriveAuthorizationCodeId(code);
-
-    const preTxBefore = await authorizationCodeSpent(
-        db, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
-    );
-    const inTxBefore = await db.readTransaction(
-        (view) => authorizationCodeSpent(
-            view, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
-        ),
-    );
-    assertStrictEquals(inTxBefore, preTxBefore);
-    assertStrictEquals(preTxBefore, false);
-
-    const grantRes = await tokenGrant(db, {
-        grant_type: 'authorization_code', code,
-        client_id: 'web',
-        code_verifier: pkce.verifier,
-    });
-    assertStrictEquals(grantRes.status, 200);
-
-    const preTxAfter = await authorizationCodeSpent(
-        db, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
-    );
-    const inTxAfter = await db.readTransaction(
-        (view) => authorizationCodeSpent(
-            view, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
-        ),
-    );
-    assertStrictEquals(inTxAfter, preTxAfter);
-    assertStrictEquals(preTxAfter, true);
 });
 
 // -- 6: NESTED WIRE — collection under the identity; flat

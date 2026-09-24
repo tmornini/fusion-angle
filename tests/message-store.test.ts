@@ -124,23 +124,3 @@ async () => {
         { name: 'b' },
     ]);
 });
-
-Deno.test('seam getAllWhereBody matches one JSON fact',
-async () => {
-    const db = await freshDb();
-    await writePair(db, {
-        method: 'PUT',
-        name: 'XufQcWIKhZshfJYOVNeUSw',
-        responseBody: { code: 'abc', n: 1 },
-    });
-    await writePair(db, {
-        method: 'PUT',
-        name: 'YHvbnJSZHECuziaHXcsKpw',
-        responseBody: { code: 'zzz', n: 2 },
-    });
-    const hits = await db.messagePairs.getAllWhereBody(
-        COLLECTION, { code: 'abc' },
-    );
-    assertStrictEquals(hits.length, 1);
-    assertStrictEquals(hits[0]!.name, 'XufQcWIKhZshfJYOVNeUSw');
-});

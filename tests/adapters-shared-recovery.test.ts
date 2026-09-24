@@ -56,6 +56,7 @@ import {
     runWrite,
     attemptFor,
     formAuthMessagePair,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
@@ -77,6 +78,7 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { sha256Hex } from '../shared/digest.ts';
 import { deleteRefreshChannel } from
     '../web-app/app/adapters/session-refresh-mutex.ts';
 import { deleteNotificationChannel } from
@@ -168,10 +170,38 @@ async function seedAuthorizationCodeMessagePair(
             value: 'code="' + code + '"',
         }],
     );
+    const codeName = await sha256Hex(code);
+    const codePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/authentication/authorization-codes/'
+            + codeName,
+        routePattern:
+            'authentication/authorization-codes/:hash',
+        routeSegments: [
+            'authentication',
+            'authorization-codes',
+            ':hash',
+        ],
+        pathSegments: [
+            'authentication',
+            'authorization-codes',
+            codeName,
+        ],
+        headerFields: [],
+        body: undefined,
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+        requestAt: seed.requestAt,
+        organization: undefined,
+        responseBody: { client_id: 'web' },
+        operationId: seed.operationId,
+        requestId: seed.requestId,
+        genesis: true,
+        emptyRequest: true,
+    });
     await runWrite(
         db,
-        attemptFor([messagePair]),
-        [messagePair],
+        attemptFor([codePair, messagePair]),
+        [codePair, messagePair],
     );
 }
 

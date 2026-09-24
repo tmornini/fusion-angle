@@ -281,35 +281,6 @@ Deno.test('schema has no operation indexes', () => {
     );
 });
 
-Deno.test('getWhereBody uses message_body containment',
-async () => {
-    const fake = fakeClient();
-    const backend = new PostgresBackend(fake.sql);
-    await backend.transaction('readonly',
-        (tx) => tx.getWhereBody('/authentication/authorize/',
-            { code: 'abc' },
-        ),
-    );
-    const text = fake.calls[0]!.text;
-    assertMatch(text, /FROM fa_message_pairs/);
-    assertMatch(text, /path = \$1/);
-    assertMatch(
-        text, /fa_message_body\(response\) @>/,
-    );
-    assertMatch(text, new RegExp(
-        'ORDER BY fa_message_pairs\\.response_at, '
-        + 'fa_message_pairs\\.id',
-    ));
-    assertEquals(
-        fake.calls[0]!.values[0],
-        '/authentication/authorize/',
-    );
-    assertEquals(
-        fake.calls[0]!.values[1],
-        { code: 'abc' },
-    );
-});
-
 Deno.test('put writes BYTEA via Octets.fromLatin1',
 async () => {
     const fake = fakeClient();
@@ -416,11 +387,10 @@ Deno.test(
             await tx.getDocumentHistory(
                 path, MESSAGE_PAIR_ROW.name,
             );
-            await tx.getWhereBody(path, { code: 'abc' });
             await tx.getHeadPair(path, MESSAGE_PAIR_ROW.name);
             await tx.getCollectionHeadPairs(path);
         });
-        assertStrictEquals(fake.calls.length, 7);
+        assertStrictEquals(fake.calls.length, 6);
         for (const call of fake.calls) {
             assertMatch(call.text, ZULU_RESPONSE_AT);
         }

@@ -165,6 +165,10 @@ export interface WriteMessagePairInput {
     // The id the server minted for this request. Missing throws.
     readonly requestId: string;
     readonly genesis?: true;
+    // The stored request is zero bytes. buildRequestModel
+    // is not called. Callers that received a request leave
+    // this unset.
+    readonly emptyRequest?: true;
 }
 
 // Fallback for first path segments that are organization-
@@ -299,19 +303,21 @@ export async function formWriteMessagePair(
         input.headerFields, input.operationId,
     );
     const requestSplit = splitCredentials(headerFields);
-    const requestMessage = input.bodyBytes !== undefined
-        ? receivedRequestWire(
-            input.method,
-            input.pathname,
-            requestSplit.kept,
-            input.bodyBytes,
-        )
-        : storedWire(buildRequestModel({
-            method: input.method,
-            target: input.pathname,
-            fields: requestSplit.kept,
-            body: input.body,
-        }));
+    const requestMessage = input.emptyRequest === true
+        ? ''
+        : input.bodyBytes !== undefined
+            ? receivedRequestWire(
+                input.method,
+                input.pathname,
+                requestSplit.kept,
+                input.bodyBytes,
+            )
+            : storedWire(buildRequestModel({
+                method: input.method,
+                target: input.pathname,
+                fields: requestSplit.kept,
+                body: input.body,
+            }));
     const storedStatus = input.method === 'DELETE'
         ? HTTP_NO_CONTENT
         : (input.responseStatus ?? HTTP_CREATED);
@@ -419,9 +425,7 @@ const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
     TOKEN_EVENT_ROUTE_PATTERN.split('/');
 
 // Synthesizes ONE token event pair at the jti's own
-// document — `name` is always the jti. The authorization-
-// code spend marker is a different prefix
-// (formAuthorizationCodeMarkerPair). The SAME document,
+// document — `name` is always the jti. The SAME document,
 // method, and response shape a real PUT
 // identities/:id/tokens/:jti stores; the response `id` is
 // the name (identityTokenEntityOf: GET wins). Formed PRE-TX
@@ -458,50 +462,6 @@ export async function formTokenEventMessagePair(
             ...validateIdentityTokenEntity(body),
             id: name,
         },
-        operationId,
-        requestId,
-    });
-}
-
-// The authorization-code spend marker: a document at
-// identities/:id/authorization-codes/:hash whose body is
-// `{ jti }` and whose response is `{ jti, id: hash }`.
-// Global plane. Formed PRE-TX. Not a public HTTP route —
-// grantAuthorizationCode appends it beside the issued
-// event, marker first so a crash after the marker still
-// fails a replay closed.
-const AUTH_CODE_MARKER_ROUTE_PATTERN =
-    'identities/:id/authorization-codes/:hash';
-const AUTH_CODE_MARKER_ROUTE_SEGMENTS: readonly string[] =
-    AUTH_CODE_MARKER_ROUTE_PATTERN.split('/');
-
-export async function formAuthorizationCodeMarkerPair(
-    hash: string,
-    jti: string,
-    identityId: Id,
-    at: string,
-    operationId: string,
-    requestId: string,
-): Promise<MessagePair> {
-    const pathSegments = [
-        AUTH_CODE_MARKER_ROUTE_SEGMENTS[0]!,
-        identityId,
-        AUTH_CODE_MARKER_ROUTE_SEGMENTS[2]!,
-        hash,
-    ];
-    const body = { jti };
-    return formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/' + pathSegments.join('/'),
-        routePattern: AUTH_CODE_MARKER_ROUTE_PATTERN,
-        routeSegments: AUTH_CODE_MARKER_ROUTE_SEGMENTS,
-        pathSegments,
-        headerFields: [],
-        body,
-        requesterIdentityId: identityId,
-        requestAt: at,
-        organization: undefined,
-        responseBody: { jti, id: hash },
         operationId,
         requestId,
     });
@@ -1130,6 +1090,8 @@ function ifMatchOf(
         if (pair.pinnedDocumentMessagePairId !== undefined) {
             return null;
         }
+        // A zero-byte request has no If-Match line.
+        if (pair.requestMessage === '') return null;
         return ifMatchFromMessagePair(pair) ?? null;
     }
     if (

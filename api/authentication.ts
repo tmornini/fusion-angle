@@ -33,7 +33,6 @@ import {
     type ClientRegistrationEntity,
     type IdentityCredentialEntity,
     type IdentityPiiEntity,
-    type MessagePairEntity,
 } from './types.ts';
 import {
     pickString,
@@ -67,11 +66,10 @@ import {
 } from '../shared/ledger-reduction.ts';
 import {
     attemptFor,
+    documentHeadAt,
     runWrite,
     ownWireOf,
-    canonicalPath,
     formAuthMessagePair,
-    formAuthorizationCodeMarkerPair,
     formTokenEventMessagePair,
     formWriteMessagePair,
 } from './message-pair.ts';
@@ -342,30 +340,6 @@ function tokenAnswerFields(
         });
     }
     return fields;
-}
-
-function codeFromSecret(secret: string): string | null {
-    const splitAt = secret.indexOf('\r\n\r\n');
-    const response = splitAt >= 0
-        ? secret.slice(splitAt + 4)
-        : (secret.startsWith('\r\n')
-            ? secret.slice(2)
-            : '');
-    if (response === '') return null;
-    const prefix = 'authentication-info: ';
-    for (const line of response.split('\r\n')) {
-        if (!line.startsWith(prefix)) continue;
-        const value = line.slice(prefix.length);
-        const marker = 'code="';
-        if (
-            !value.startsWith(marker)
-            || !value.endsWith('"')
-        ) {
-            return null;
-        }
-        return value.slice(marker.length, -1);
-    }
-    return null;
 }
 
 export function attachSetCookie(
@@ -1412,41 +1386,24 @@ async function grantClientCredentials(
         : replay;
 }
 
-// GATE 3: the presented code's sha256 digest, pre-tx always —
-// formed pre-tx — crypto, hashing, and timers never run inside
-// an open transaction (AGENTS.md § Transaction bodies await
-// only row ops). It names the spend marker document at
-// /identities/<id>/authorization-codes/:hash, not the issued
-// token event (named by its jti). authorizeCodeIssuer matches
-// the LIVE code against the authorize response family's stored
-// `code` field (pairs are stored verbatim).
+// sha256(code), the name of the code document at
+// /authentication/authorization-codes/.
 export async function deriveAuthorizationCodeId(
     code: string,
 ): Promise<string> {
     return sha256Hex(code);
 }
 
-const AUTHORIZE_PREFIX =
-    canonicalPath(undefined, '/authentication/authorize/');
+const AUTHORIZATION_CODES_PATH =
+    '/authentication/authorization-codes/';
+const AUTHORIZATION_CODE_ROUTE =
+    'authentication/authorization-codes/:hash';
+const AUTHORIZATION_CODE_SEGMENTS: readonly string[] = [
+    'authentication',
+    'authorization-codes',
+    ':hash',
+];
 
-function authorizationCodesPrefixFor(
-    identityId: Id,
-): string {
-    return canonicalPath(
-        undefined,
-        '/identities/' + identityId
-            + '/authorization-codes/',
-    );
-}
-
-// A stored message's JSON body — the ONE local decode this file
-// needs for both the request and response side of the authorize
-// scan below. derive-documents.ts's requestBodyOf and derive-
-// identity-spine.ts's responseBodyOf already do these identical
-// three lines, each private to its own module; a third copy here
-// stays below the exploratory-duplication threshold (Commandment
-// IX) rather than forcing a shared extraction across three
-// unrelated modules for a task that touches only this one.
 function decodedBodyOf(message: string): Record<string, unknown> {
     const model = parseWire(message);
     const body = HttpMessage.fromModel(model).body();
@@ -1455,99 +1412,10 @@ function decodedBodyOf(message: string): Record<string, unknown> {
         : {};
 }
 
-interface AuthorizeCodeIssuer {
-    readonly identityId: Id;
-    readonly clientId: Id;
-    readonly issuedAt: string;
-    // Present only when authorize request carried
-    // code_challenge (PKCE S256). Absent means the client
-    // never sent one — grant skips verifier check so the
-    // password-loop demo keeps working without PKCE.
-    readonly codeChallenge?: string;
-}
-
-// PRE-TX (i), gate 3: the code -> identity/client point-match
-// over the WHOLE '/authentication/authorize/' response family.
-// That path holds operation documents (name always ''), so no
-// per-name head reduction applies here — deriveDocumentsAt's
-// latest-per-name would wrongly collapse every distinct code's
-// pair down to a single latest one. Every stored pair at this
-// prefix is a genuine 2xx: authorizePassword forms a pair ONLY on
-// success (grant-first, pinned), so no status re-check is needed.
-// A miss — no stored pair's response `code` field equals the
-// presented code — returns null; the caller's 401 is
-// byte-identical whether the code was never issued or has already
-// been spent (authorizationCodeSpent decides that, second).
-async function authorizeCodeIssuer(
-    adapter: DbAdapter,
-    code: string,
-): Promise<AuthorizeCodeIssuer | null> {
-    const pairs = await adapter.messagePairs
-        .getCollectionPairs(AUTHORIZE_PREFIX);
-    let messagePair: MessagePairEntity | undefined;
-    for (const pair of pairs) {
-        if (codeFromSecret(pair.secret) === code) {
-            messagePair = pair;
-            break;
-        }
-    }
-    if (messagePair === undefined) return null;
-    const requestBody = decodedBodyOf(messagePair.request);
-    // code_challenge is optional on authorize (PKCE only when
-    // the client sent one). Soft read — pickString would throw
-    // on the password-loop path that omits it.
-    const challenge = requestBody.code_challenge;
-    const codeChallenge =
-        typeof challenge === 'string' && challenge !== ''
-            ? challenge
-            : undefined;
-    return {
-        identityId: messagePair.requester_identity_id,
-        clientId: pickString(requestBody, 'client_id'),
-        // Issue instant is the authorize pair's response
-        // stamp. The pair is already fetched for
-        // identity and client.
-        issuedAt: messagePair.response_at,
-        ...(codeChallenge !== undefined
-            ? { codeChallenge }
-            : {}),
-    };
-}
-
-// PRE-TX (ii) fast-fail AND the in-tx re-check share this ONE
-// function — adapter-shaped (the membershipExistsFor /
-// deriveIdentityTokenEventsForJti precedent), `dbOrView` is
-// whichever face is in scope: the plain adapter pre-tx, the
-// open transaction view in-tx. A genuine marker already lives
-// at identities/<identityId>/authorization-codes/<derivedId>
-// exactly when this code has been spent. Marker-first append
-// so a crash after the marker still fails a replay closed.
-export async function authorizationCodeSpent(
-    dbOrView: DbAdapter,
-    derivedId: Id,
-    identityId: Id,
-): Promise<boolean> {
-    const spent = await dbOrView.messagePairs
-        .getDocumentHistory(
-            authorizationCodesPrefixFor(identityId),
-            derivedId,
-        );
-    return spent.length > 0;
-}
-
-// authorization_code grant: consume an ISSUED code, then issue a
-// token pair. A consumed (replay), raced, or unknown code is a
-// clean 401 that mints nothing and appends nothing (grant-first).
-// PRE-tx: authorizeCodeIssuer resolves (identity, client) from the
-// matched authorize pair, then authorizationCodeSpent fast-fails
-// an already-spent code — both before mintPair's HMAC signing or
-// formAuthMessagePair/formTokenEventMessagePair's hashing run. Then ONE
-// tx RE-RUNS the spend check on the OPEN VIEW: a concurrent
-// consumer may have won the race between the pre-tx read and
-// here, in which case this call aborts (401, mints nothing
-// further, appends nothing — the pre-minted response and pairs
-// above are simply discarded, wasted crypto on the losing side of
-// the race) exactly as the retired codeState-driven version did.
+// authorization_code grant: one redemption of the code
+// document. No head, or a DELETE head, is 401 before
+// mint. The spend is a latched DELETE in the same
+// statement as the issued event and this grant.
 async function grantAuthorizationCode(
     adapter: DbAdapter,
     body: Record<string, unknown>,
@@ -1565,65 +1433,68 @@ async function grantAuthorizationCode(
         HTTP_UNAUTHORIZED, 'invalid or used authorization code',
     );
     const derivedId = await deriveAuthorizationCodeId(code);
-    const issuer = await authorizeCodeIssuer(adapter, code);
-    if (issuer === null) return invalid;
+    const head = await documentHeadAt(
+        adapter, AUTHORIZATION_CODES_PATH, derivedId,
+    );
+    if (head === null || head.method === 'DELETE') {
+        return invalid;
+    }
+    const stored = await adapter.messagePairs.getById(
+        head.id,
+    );
     if (
-        msSinceUtc(issuer.issuedAt)
+        msSinceUtc(stored.response_at)
         >= AUTHORIZATION_CODE_TTL_SECONDS * MS_PER_SECOND
     ) {
         return invalid;
     }
+    const storedBody = decodedBodyOf(stored.response);
+    const issuerId = stored.requester_identity_id;
+    const clientId = pickString(storedBody, 'client_id');
+    const challenge = storedBody.code_challenge;
+    const codeChallenge =
+        typeof challenge === 'string' && challenge !== ''
+            ? challenge
+            : undefined;
     // Bind the code to the client that issued it (OAuth 2.1
-    // §4.1.3): redeeming client_id must match authorize's.
-    // Absent or wrong client_id is the same shared 401 as
-    // unknown/spent/expired — grant-first, no mint.
+    // §4.1.3). Absent or wrong client_id is the same 401
+    // as unknown, spent, or expired. No mint.
     const redeemingClientId =
         typeof body.client_id === 'string'
             ? body.client_id
             : '';
-    if (redeemingClientId !== issuer.clientId) {
+    if (redeemingClientId !== clientId) {
         return invalid;
     }
-    // PKCE S256 (RFC 7636): when authorize stored a
-    // code_challenge, require code_verifier and verify
-    // base64url(sha256(verifier)) === challenge. Missing or
-    // mismatch is the same shared 401. No challenge stored
-    // preserves pre-PKCE redeem (password-loop demo).
-    if (issuer.codeChallenge !== undefined) {
+    // PKCE S256 (RFC 7636): a stored code_challenge requires
+    // code_verifier. Missing or mismatch is the same 401.
+    // No challenge preserves redeem without PKCE.
+    if (codeChallenge !== undefined) {
         if (verifier === '') return invalid;
         const derived = bytesToBase64Url(
             await sha256Bytes(verifier),
         );
-        if (derived !== issuer.codeChallenge) {
+        if (derived !== codeChallenge) {
             return invalid;
         }
-    }
-    if (await authorizationCodeSpent(
-        adapter, derivedId, issuer.identityId,
-    )) {
-        return invalid;
     }
     const refreshJti = generateIdentifier();
     const chainId = generateIdentifier();
     const at = nowUtc();
-    const name = await nameFor(adapter, issuer.identityId);
-    const claims = await subjectClaims(
-        adapter, issuer.identityId,
-    );
-    // act.sub = the acting client (RFC 8693), mirroring
-    // grantTokenExchange's own act:{sub: actor}. sub stays
-    // the user; issuer.clientId is already verified equal to
-    // the redeeming client_id above.
+    const name = await nameFor(adapter, issuerId);
+    const claims = await subjectClaims(adapter, issuerId);
+    // act.sub = the acting client (RFC 8693). sub stays
+    // the user. clientId is already the redeeming client.
     const minted = await mintPair(
-        issuer.identityId, name, refreshJti,
-        { sub: issuer.clientId }, {
+        issuerId, name, refreshJti,
+        { sub: clientId }, {
             organizations: claims.organizations,
             roles: claims.roles,
         },
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(
-        seed, body, issuer.identityId,
+        seed, body, issuerId,
         publicTokenBody(response),
         seed.operationId, seed.requestId,
         tokenAnswerFields(
@@ -1633,48 +1504,40 @@ async function grantAuthorizationCode(
             ),
         ),
     );
-    // Marker and issued event formed pre-tx against
-    // `issuer.identityId` — a code's issuer cannot change
-    // between the pre-tx read and the in-tx write below (its
-    // own authorize pair is immutable once appended).
-    const markerMessagePair =
-        await formAuthorizationCodeMarkerPair(
-            derivedId, refreshJti, issuer.identityId, at,
-            messagePair.operationId, messagePair.requestId,
-        );
+    const codePair = await formWriteMessagePair({
+        method: 'DELETE',
+        pathname: AUTHORIZATION_CODES_PATH + derivedId,
+        routePattern: AUTHORIZATION_CODE_ROUTE,
+        routeSegments: AUTHORIZATION_CODE_SEGMENTS,
+        pathSegments: [
+            'authentication',
+            'authorization-codes',
+            derivedId,
+        ],
+        headerFields: [],
+        body: undefined,
+        requesterIdentityId: issuerId,
+        requestAt: at,
+        organization: undefined,
+        responseBody: undefined,
+        operationId: messagePair.operationId,
+        requestId: messagePair.requestId,
+        emptyRequest: true,
+        latchedHeadMessagePairId: head.id,
+    });
     const eventMessagePair = await formTokenEventMessagePair(
         refreshJti, {
-            jti: refreshJti, identity_id: issuer.identityId,
+            jti: refreshJti, identity_id: issuerId,
             action: 'issued', chain_id: chainId, at,
         }, messagePair.operationId, messagePair.requestId,
     );
-    // The spend check and the marker write share one
-    // client. A later grant then observes the marker and
-    // 401s, instead of both reading unspent and both
-    // minting. openClient still fails a row that does
-    // not land.
-    const backed = backedWrite(adapter);
-    const spent = await backed.backend.transaction(
-        'readwrite',
-        async (tx) => {
-            const view = backed.openClient(tx);
-            if (await authorizationCodeSpent(
-                view, derivedId, issuer.identityId,
-            )) {
-                return true;
-            }
-            const pairs = [
-                markerMessagePair,
-                eventMessagePair,
-                messagePair,
-            ];
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-            return false;
-        },
+    const pairs = [
+        codePair, eventMessagePair, messagePair,
+    ];
+    const written = await runWrite(
+        adapter, attemptFor(pairs), pairs,
     );
-    if (spent) return invalid;
+    if (written.outcome !== 'land') return invalid;
     return {
         ok: true,
         response,
@@ -1872,6 +1735,38 @@ async function authorizePassword(
             value: quotedAuthParam('code', code),
         }],
     );
+    const codeName = await deriveAuthorizationCodeId(code);
+    const codeBody: Record<string, unknown> = {
+        client_id: pickString(body, 'client_id'),
+    };
+    const presentedChallenge = body.code_challenge;
+    if (
+        typeof presentedChallenge === 'string'
+        && presentedChallenge !== ''
+    ) {
+        codeBody.code_challenge = presentedChallenge;
+    }
+    const codePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: AUTHORIZATION_CODES_PATH + codeName,
+        routePattern: AUTHORIZATION_CODE_ROUTE,
+        routeSegments: AUTHORIZATION_CODE_SEGMENTS,
+        pathSegments: [
+            'authentication',
+            'authorization-codes',
+            codeName,
+        ],
+        headerFields: [],
+        body: undefined,
+        requesterIdentityId: identityId,
+        requestAt: seed.requestAt,
+        organization: undefined,
+        responseBody: codeBody,
+        operationId: messagePair.operationId,
+        requestId: messagePair.requestId,
+        genesis: true,
+        emptyRequest: true,
+    });
     let rehashMessagePair: MessagePair | undefined;
     if (secret.startsWith('$pbkdf2-sha256$')) {
         const at = nowUtc();
@@ -1913,8 +1808,8 @@ async function authorizePassword(
         });
     }
     const pairs = rehashMessagePair === undefined
-        ? [messagePair]
-        : [rehashMessagePair, messagePair];
+        ? [codePair, messagePair]
+        : [rehashMessagePair, codePair, messagePair];
     await runWrite(
         adapter, attemptFor(pairs), pairs,
     );

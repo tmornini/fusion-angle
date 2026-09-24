@@ -16,12 +16,23 @@ import {
 import { connectPostgres } from
     '../api/postgres-client.ts';
 import { nowUtc } from '../api/types.ts';
+import { basicAuthorization } from
+    '../api/authentication.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { bytesToBase64Url } from
+    '../shared/base64url.ts';
+import { sha256Bytes, sha256Hex } from
+    '../shared/digest.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
 import { leafHashHex } from '../shared/pair-root.ts';
 import { apiRequest } from './http-fixtures.ts';
+import {
+    seedIdentityCredential,
+    seedPersonIdentity,
+} from './identity-fixtures.ts';
+import { testHashPassword } from './mock-seed.ts';
 import { organizationToken } from
     './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
@@ -272,6 +283,121 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 Number(latin1(
                     rows[3]!.response_hex,
                 ).slice(9, 12)),
+            );
+        },
+    );
+
+    Deno.test(
+        'two concurrent redemptions of one code',
+        async () => {
+            const identity = 'XXZruirZyAOoRpNxaDnpSA';
+            await seedPersonIdentity(db, identity, {
+                name: 'Demo',
+                email: 'demo@example.com',
+                phone: '555-0100',
+                bio: 'demo user',
+            });
+            await seedIdentityCredential(
+                db, identity, 'WeXjAaAxGSpLpamfEuvcww', {
+                    identity_id: identity,
+                    kind: 'password',
+                    status: 'set',
+                    secret: await testHashPassword(
+                        'hunter2-s3cret',
+                    ),
+                    at: '2026-06-03T00:00:00.000000Z',
+                },
+            );
+            const verifier = 'pkce-verifier-race';
+            const challenge = bytesToBase64Url(
+                await sha256Bytes(verifier),
+            );
+            const authorized = await handleRequest(
+                db, apiRequest({
+                    method: 'POST',
+                    path: '/authentication/authorize',
+                    body: {
+                        method: 'password',
+                        client_id: 'web',
+                        code_challenge: challenge,
+                        code_challenge_method: 'S256',
+                    },
+                    headers: {
+                        authorization: basicAuthorization(
+                            'demo@example.com',
+                            'hunter2-s3cret',
+                        ),
+                    },
+                    operationId: generateIdentifier(),
+                }),
+            );
+            const info = authorized.headers.get(
+                'authentication-info',
+            );
+            await authorized.text();
+            assertStrictEquals(authorized.status, 200);
+            const code = /code="([^"]*)"/.exec(
+                info ?? '',
+            )?.[1];
+            if (code === undefined || code === '') {
+                throw new Error('authorize minted no code');
+            }
+            const [left, right] = await Promise.all([
+                handleRequest(db, apiRequest({
+                    method: 'POST',
+                    path: '/authentication/token',
+                    body: {
+                        grant_type: 'authorization_code',
+                        client_id: 'web',
+                    },
+                    headers: {
+                        authorization: basicAuthorization(
+                            code, verifier,
+                        ),
+                    },
+                    operationId: generateIdentifier(),
+                })),
+                handleRequest(db, apiRequest({
+                    method: 'POST',
+                    path: '/authentication/token',
+                    body: {
+                        grant_type: 'authorization_code',
+                        client_id: 'web',
+                    },
+                    headers: {
+                        authorization: basicAuthorization(
+                            code, verifier,
+                        ),
+                    },
+                    operationId: generateIdentifier(),
+                })),
+            ]);
+            await left.text();
+            await right.text();
+            const statuses = [left.status, right.status];
+            assertStrictEquals(
+                statuses.filter((s) => s === 200).length,
+                1,
+            );
+            assertStrictEquals(
+                statuses.filter((s) => s === 401).length,
+                1,
+            );
+            const name = await sha256Hex(code);
+            const rows = await sql.query<{
+                method: string,
+            }>`
+                SELECT method
+                FROM fa_message_pairs
+                WHERE path =
+                    '/authentication/authorization-codes/'
+                  AND name = ${name}
+            `;
+            assertStrictEquals(
+                rows.filter((row) =>
+                    row.method === 'DELETE'
+                ).length,
+                1,
             );
         },
     );

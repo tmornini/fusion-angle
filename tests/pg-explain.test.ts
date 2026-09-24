@@ -393,24 +393,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
     });
 
-    Deno.test('body containment uses fa_message_pairs_body',
-    async () => {
-        const plans = await sql.query<
-            Record<string, unknown>
-        >`
-            EXPLAIN
-            SELECT * FROM fa_message_pairs
-            WHERE path = ${AUTH_COLLECTION}
-              AND fa_message_body(response) @>
-                  ${AUTH_CONTAINMENT}::jsonb
-            ORDER BY response_at, id
-        `;
-        assertIndexPlan(
-            explainText(plans),
-            ['fa_message_pairs_body'],
-        );
-    });
-
     Deno.test('getHead uses the document index and pkey',
     async () => {
         const plans = await sql.query<
