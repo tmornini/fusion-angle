@@ -22,7 +22,7 @@ function probeOrigin(): string {
 
 void (async function redirectRoot(): Promise<void> {
     putClient(createAppClient(
-        createHttpFacade(probeOrigin()),
+        createHttpFacade(probeOrigin(), fetch),
     ));
     const dest = await resolveApexLocation(
         probeRefreshSession,

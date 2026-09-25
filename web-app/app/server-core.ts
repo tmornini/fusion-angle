@@ -20,7 +20,7 @@ document.addEventListener(
     'DOMContentLoaded',
     async () => {
         const client = createAppClient(
-            createHttpFacade(serverOrigin()),
+            createHttpFacade(serverOrigin(), fetch),
         );
         client.setCookieSession(true);
         putClient(client);

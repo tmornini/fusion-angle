@@ -22,7 +22,10 @@ import { principalFromToken } from
 // The tab's one client: each test's transport binds it, as
 // the client binds its own.
 const client = createAppClient(
-    createHttpFacade('http://example.test'),
+    createHttpFacade(
+        'http://example.test',
+        (input, init) => globalThis.fetch(input, init),
+    ),
 );
 
 // The single-flight mutex opens ONE refresh channel per
@@ -86,6 +89,7 @@ async () => {
     }, async () => {
         const facade = createHttpFacade(
             'http://example.test',
+            (input, init) => globalThis.fetch(input, init),
         )(client);
         const [a, b] = await Promise.all([
             facade.GET('members', 'dead-access'),
@@ -255,6 +259,7 @@ async () => {
     }, async () => {
         const facade = createHttpFacade(
             'http://example.test',
+            (input, init) => globalThis.fetch(input, init),
         )(client);
         const rows = await facade.GET(
             'organizations/' + org + '/flows/x',

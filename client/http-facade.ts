@@ -182,8 +182,15 @@ export type HttpTransport = (
 
 export function createHttpFacade(
     origin: string,
+    fetch: typeof globalThis.fetch,
 ): HttpTransport {
     return (client) => {
+        // Bound once as a local, then called with no
+        // receiver. A property call (`deps.fetch(url)`)
+        // hands Chrome's `fetch` a receiver and throws
+        // "Illegal invocation" (Review Focus 1).
+        const send = fetch;
+
         function exchange(
             method: string,
             resource: string,
@@ -192,7 +199,7 @@ export function createHttpFacade(
             extra: readonly (readonly [string, string])[]
                 | undefined,
         ): Promise<Response> {
-            return fetch(origin + '/api/' + resource, {
+            return send(origin + '/api/' + resource, {
                 method,
                 credentials: 'same-origin',
                 headers: requestHeaders(
@@ -209,20 +216,12 @@ export function createHttpFacade(
         async function postCookieRefresh(
             operationId: string | undefined,
         ): Promise<string | null> {
-            const headers = new Headers();
-            headers.set('Content-Type', 'application/json');
-            if (operationId !== undefined) {
-                headers.set(OPERATION_ID_HEADER, operationId);
-            }
-            const response = await fetch(
-                origin + '/api/authentication/token', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers,
-                    body: JSON.stringify({
-                        grant_type: 'refresh',
-                    }),
-                },
+            const response = await exchange(
+                'POST', 'authentication/token', '',
+                { grant_type: 'refresh' },
+                operationId === undefined
+                    ? undefined
+                    : [[OPERATION_ID_HEADER, operationId]],
             );
             await response.text();
             if (!response.ok) return null;
@@ -237,26 +236,12 @@ export function createHttpFacade(
             organization: string,
             operationId: string | undefined,
         ): Promise<string | null> {
-            const headers = new Headers();
-            headers.set(
-                'Content-Type', 'application/json',
-            );
-            headers.set(
-                'Authorization', 'Bearer ' + flat,
-            );
-            if (operationId !== undefined) {
-                headers.set(OPERATION_ID_HEADER, operationId);
-            }
-            const response = await fetch(
-                origin + '/api/authentication/token', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers,
-                    body: JSON.stringify({
-                        grant_type: 'token-exchange',
-                        organization,
-                    }),
-                },
+            const response = await exchange(
+                'POST', 'authentication/token', flat,
+                { grant_type: 'token-exchange', organization },
+                operationId === undefined
+                    ? undefined
+                    : [[OPERATION_ID_HEADER, operationId]],
             );
             await response.text();
             if (!response.ok) return null;

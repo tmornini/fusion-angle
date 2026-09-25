@@ -170,7 +170,10 @@ Deno.test(
             }
             return Promise.resolve(new Response('[]'));
         };
-        const client = createAppClient(createHttpFacade(''));
+        const client = createAppClient(createHttpFacade(
+            '',
+            (input, init) => globalThis.fetch(input, init),
+        ));
         client.setCookieSession(true);
         const flat = await reachableToken(
             'XXZruirZyAOoRpNxaDnpSA', [],
@@ -204,3 +207,135 @@ Deno.test(
         }
     },
 );
+
+Deno.test(
+    'the cookie refresh and the exchange ride the transport',
+    async () => {
+        const flat = await reachableToken(
+            'XXZruirZyAOoRpNxaDnpSA',
+            ['AjdvjuECVZEgZoFajaIEkg'],
+        );
+        const scoped = await organizationToken();
+        const dead = await organizationToken();
+        const seen: {
+            method: string;
+            url: string;
+            headers: Headers;
+            receiver: unknown;
+        }[] = [];
+        function scripted(
+            this: unknown,
+            input: RequestInfo | URL,
+            init?: RequestInit,
+        ): Promise<Response> {
+            seen.push({
+                method: init?.method ?? 'GET',
+                url: String(input),
+                headers: new Headers(init?.headers),
+                receiver: this,
+            });
+            const body = String(init?.body ?? '');
+            if (seen.length === 1) {
+                return Promise.resolve(new Response(
+                    JSON.stringify({ error: 'expired' }),
+                    { status: 401 },
+                ));
+            }
+            if (body.includes('"refresh"')) {
+                return Promise.resolve(new Response('', {
+                    headers: {
+                        'authentication-info':
+                            'access_token="' + flat + '"',
+                    },
+                }));
+            }
+            if (body.includes('"token-exchange"')) {
+                return Promise.resolve(new Response('', {
+                    headers: {
+                        'authentication-info':
+                            'access_token="' + scoped + '"',
+                    },
+                }));
+            }
+            return Promise.resolve(new Response('[]'));
+        }
+        const client = createAppClient(
+            createHttpFacade('https://origin.test', scripted),
+        );
+        try {
+            await client.requestContext(dead)
+                .GET('organizations/');
+        } finally {
+            client.deleteRefreshChannel();
+        }
+        assertEquals(
+            seen.map((s) => [s.method, s.url]),
+            [
+                ['GET', 'https://origin.test/api/organizations/'],
+                ['POST', 'https://origin.test/api/authentication/token'],
+                ['POST', 'https://origin.test/api/authentication/token'],
+                ['GET', 'https://origin.test/api/organizations/'],
+            ],
+        );
+        const [, refresh, exchange] = seen;
+        assertStrictEquals(
+            refresh!.headers.get('content-type'),
+            'application/json',
+        );
+        assert(refresh!.headers.get('operation-id') !== null);
+        assertStrictEquals(
+            refresh!.headers.get('authorization'), null,
+        );
+        assertStrictEquals(
+            exchange!.headers.get('authorization'),
+            'Bearer ' + flat,
+        );
+        assertStrictEquals(
+            exchange!.headers.get('operation-id'),
+            refresh!.headers.get('operation-id'),
+        );
+        assertStrictEquals(client.getSessionToken(), scoped);
+        for (const s of seen) {
+            assertStrictEquals(s.receiver, undefined);
+        }
+    },
+);
+
+Deno.test('a cookie refresh on one client leaves another',
+async () => {
+    const other = inPageClient(memoryDbAdapter());
+    const kept = await reachableToken(generateIdentifier(), []);
+    other.putSessionToken(kept);
+    const fresh = await reachableToken(generateIdentifier(), []);
+    let calls = 0;
+    const client = createAppClient(createHttpFacade(
+        '',
+        (_input, init) => {
+            calls += 1;
+            if (calls === 1) {
+                return Promise.resolve(new Response(
+                    JSON.stringify({ error: 'expired' }),
+                    { status: 401 },
+                ));
+            }
+            if (String(init?.body ?? '').includes('"refresh"')) {
+                return Promise.resolve(new Response('', {
+                    headers: {
+                        'authentication-info':
+                            'access_token="' + fresh + '"',
+                    },
+                }));
+            }
+            return Promise.resolve(new Response('[]'));
+        },
+    ));
+    try {
+        await client.requestContext(
+            await reachableToken('XXZruirZyAOoRpNxaDnpSA', []),
+        ).GET('organizations/');
+    } finally {
+        client.deleteRefreshChannel();
+    }
+    assertStrictEquals(client.getSessionToken(), fresh);
+    assertStrictEquals(other.getSessionToken(), kept);
+});

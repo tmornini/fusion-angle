@@ -19,7 +19,10 @@ import {
 let probeClient: Client | undefined;
 
 function installProbeFacade(): void {
-    probeClient = createAppClient(createHttpFacade(''));
+    probeClient = createAppClient(createHttpFacade(
+        '',
+        (input, init) => globalThis.fetch(input, init),
+    ));
     putClient(probeClient);
 }
 

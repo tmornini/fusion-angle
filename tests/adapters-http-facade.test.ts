@@ -24,7 +24,10 @@ import { createAppClient } from '../web-app/app/client.ts';
 // The tab's one client: each test's transport binds it, as
 // the client binds its own.
 const client = createAppClient(
-    createHttpFacade('http://example.test'),
+    createHttpFacade(
+        'http://example.test',
+        (input, init) => globalThis.fetch(input, init),
+    ),
 );
 
 // The single-flight mutex opens ONE refresh channel per
@@ -67,6 +70,7 @@ Deno.test(
         }, async () => {
             const facade = createHttpFacade(
                 'http://example.test',
+                (input, init) => globalThis.fetch(input, init),
             )(client);
             await facade.PUT(
                 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -314,6 +318,7 @@ Deno.test(
         ), async () => {
             const facade = createHttpFacade(
                 'http://example.test',
+                (input, init) => globalThis.fetch(input, init),
             )(client);
             const err = await assertRejects(
                 () => facade.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
@@ -349,6 +354,7 @@ Deno.test(
         }, async () => {
             const facade = createHttpFacade(
                 'http://example.test',
+                (input, init) => globalThis.fetch(input, init),
             )(client);
             await assertRejects(
                 () => facade.POST(
