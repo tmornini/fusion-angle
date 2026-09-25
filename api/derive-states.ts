@@ -11,9 +11,10 @@ import type {
 } from '../shared/types.ts';
 import { MS_PER_SECOND } from '../shared/types.ts';
 import {
-    pickString, pickNumber, asObject,
+    pickString, pickNumber,
     asWorkOrderFlowGraph,
 } from './validators.ts';
+import { asObject } from '../shared/json-assert.ts';
 import { canonicalPath } from './message-pair.ts';
 import {
     documentMessagePairsAt,

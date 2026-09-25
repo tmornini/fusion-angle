@@ -9,9 +9,9 @@ import type {
     AttributeType,
 } from '../../../shared/types.ts';
 import {
-    asBoolean,
     asStoredGraph,
 } from '../../../api/validators.ts';
+import { asBoolean } from '../../../shared/json-assert.ts';
 import type { RequestContext } from './shared.ts';
 import {
     organizationCollection,

@@ -22,14 +22,16 @@ import {
     buildSaveEvents,
 } from './flow-mutations.ts';
 import {
+    asStoredGraph,
+} from '../../../api/validators.ts';
+import {
     parseOrThrow,
     asObject,
     asArray,
     asString,
     asNumber,
     asBoolean,
-    asStoredGraph,
-} from '../../../api/validators.ts';
+} from '../../../shared/json-assert.ts';
 import {
     getFlowGraph,
     getProjectFlowEntities,

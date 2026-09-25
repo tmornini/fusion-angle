@@ -89,8 +89,8 @@ import {
     pickBoolean,
     pickNumber,
     asStoredGraph,
-    asObject,
 } from './validators.ts';
+import { asObject } from '../shared/json-assert.ts';
 import {
     attemptFor,
     runWrite,
