@@ -2902,6 +2902,23 @@ Off the critical path; each with its oracle.
   the adapter each driver fault class with a known
   password in the URL and finds the password in no
   message
+- One rehearsal per test process, if measurement earns
+  it. `tests/` calls `seededMockDb()` at 59 sites, and
+  `sharedMockDb()` seeds once per worker that uses it;
+  each builds the identical dataset from nothing: hash,
+  form, rehearse, land. A landing onto an absent table
+  is a pure function of the rehearsal, and fresh memory
+  backends share nothing, so the harness could rehearse
+  once per process and land that one rehearsal into each
+  new backend (a memory landing measured 130 ms). This is
+  a test-only cache, and the product seed never keeps
+  its rehearsal. It waits on the rehearsal-serialization
+  bullet above, which shrinks what it could save: land
+  that, re-measure `./test`, and build this only if the
+  per-seed rehearsal is still a cost worth a cache.
+  Oracle: `./test` measured before and after this change
+  alone, three runs each, and every test that mutates
+  its seeded database still gets its own backend
 
 ## Sequencing
 
