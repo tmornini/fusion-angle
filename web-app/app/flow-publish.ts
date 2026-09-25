@@ -5,7 +5,7 @@ import type {
 import { asStoredGraph } from '../../shared/flow-graph-body.ts';
 import { asBoolean } from '../../shared/json-assert.ts';
 import type { RequestContext } from '../../client/shared.ts';
-import { organizationCollection } from '../../client/shared.ts';
+import { getFlowsWithGraphs } from '../../client/flow-queries.ts';
 import { shouldShowMemberHazard } from './flow-graph.ts';
 import type { ValidationResult } from '../../client/validation.ts';
 
@@ -79,9 +79,7 @@ export interface FlowsForCreation {
 export async function getFlowsForCreation(
     ctx: RequestContext,
 ): Promise<FlowsForCreation> {
-    const flows = await ctx.GET<FlowWithGraph[]>(
-        organizationCollection(ctx, 'flows'),
-    );
+    const flows = await getFlowsWithGraphs(ctx);
     const ready: FlowPickerEntry[] = [];
     const notReady: NotReadyFlowEntry[] = [];
     for (const flow of flows) {

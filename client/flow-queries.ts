@@ -191,6 +191,16 @@ export async function getFlowWithGraph(
     );
 }
 
+// Every flow the organization holds, each with its graph —
+// the rows the work-order picker judges readiness from.
+export async function getFlowsWithGraphs(
+    ctx: RequestContext,
+): Promise<FlowWithGraph[]> {
+    return ctx.GET<FlowWithGraph[]>(
+        organizationCollection(ctx, 'flows'),
+    );
+}
+
 export async function getFlowGraph(
     ctx: RequestContext,
     flowId: string,
