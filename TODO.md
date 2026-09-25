@@ -1027,7 +1027,7 @@ skew tests, which went with item 8's trio.
    `server/postgres-gate.ts:67`, called at
    `server/boot.ts:106`), and the seed's one transaction
    writes `schema_marker` last
-   (`api/backend-postgres.ts:97-100`); the seed refuses
+   (`api/backend-postgres.ts:100-102`); the seed refuses
    on `fa_message_pairs`' presence, not the marker
    (`server/seed.ts:104-128`). Follows item 2.
 4. `/status` — `{ up: boolean, components: { postgres:
