@@ -35,7 +35,7 @@ import {
 import {
     RequestError,
     HTTP_NOT_FOUND,
-} from '../../api/http-errors.ts';
+} from '../../shared/http-errors.ts';
 import {
     sessionContext,
     getHumanMember,

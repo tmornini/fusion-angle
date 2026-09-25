@@ -12,7 +12,7 @@ import { deriveMembershipsForIdentity } from
 import {
     HTTP_NOT_FOUND,
     RequestError,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     deleteHumanMemberSeat,
     featuredHumanMembers,

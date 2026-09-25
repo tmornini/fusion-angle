@@ -24,7 +24,7 @@ import {
     RequestError,
     HTTP_NOT_FOUND,
     HTTP_FORBIDDEN,
-} from '../../../api/http-errors.ts';
+} from '../../../shared/http-errors.ts';
 
 export {
     SystemMember,

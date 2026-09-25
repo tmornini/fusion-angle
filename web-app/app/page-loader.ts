@@ -1,5 +1,5 @@
 import { UnauthorizedError } from
-    '../../api/http-errors.ts';
+    '../../shared/http-errors.ts';
 import { log } from './logger.ts';
 import { $ } from './dom.ts';
 import { setHtml } from './safe-html.ts';

@@ -16,7 +16,7 @@ import {
 import { OPERATION_ID_HEADER } from
     '../api/message-pair.ts';
 import { UnauthorizedError } from
-    '../api/http-errors.ts';
+    '../shared/http-errors.ts';
 import {
     DEV_TOKEN,
     organizationToken,

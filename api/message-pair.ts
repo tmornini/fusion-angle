@@ -34,7 +34,7 @@ import {
 import {
     HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT,
     errorJson,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import type { NotificationEvent } from
     './notifications.ts';
 import { Octets } from

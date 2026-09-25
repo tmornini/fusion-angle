@@ -2,7 +2,7 @@ import type { RequestContext } from './shared.ts';
 import {
     RequestError,
     UnauthorizedError,
-} from '../../../api/http-errors.ts';
+} from '../../../shared/http-errors.ts';
 import type {
     SessionCredentials,
 } from './session-credentials.ts';

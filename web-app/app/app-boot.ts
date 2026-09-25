@@ -19,7 +19,7 @@ import {
 import {
     RequestError,
     HTTP_FORBIDDEN,
-} from '../../api/http-errors.ts';
+} from '../../shared/http-errors.ts';
 import { principalFromToken } from
     '../../shared/access-token-decode.ts';
 import {

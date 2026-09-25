@@ -13,7 +13,7 @@ import {
     RequestError,
     HTTP_NOT_FOUND,
     HTTP_CONFLICT,
-} from '../../../api/http-errors.ts';
+} from '../../../shared/http-errors.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';

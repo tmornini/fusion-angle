@@ -29,7 +29,7 @@ import {
     HTTP_CONFLICT,
     RequestError,
     UnauthorizedError,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     createRequestContext,
     type RequestContext,

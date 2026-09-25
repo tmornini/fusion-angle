@@ -11,7 +11,7 @@ import {
     HTTP_NOT_FOUND,
     HTTP_PAYLOAD_TOO_LARGE,
     HTTP_UNAUTHORIZED,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     CONTENT_SECURITY_POLICY,
     HASHED_CACHE_CONTROL,

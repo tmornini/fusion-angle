@@ -9,7 +9,7 @@ import { ValidationError } from '../shared/types.ts';
 import {
     ApiError,
     HTTP_FORBIDDEN,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import type { AttributeSchemaRow } from
     '../api/record-constraints.ts';
 import {

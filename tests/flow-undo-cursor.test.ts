@@ -13,7 +13,7 @@ import {
 } from '../api/db-memory.ts';
 import {
     ApiError, HTTP_PRECONDITION_FAILED,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import { handleRequest, RequestError } from '../api/api.ts';
 import { postFlowUndoOp } from '../api/routes.ts';
 import {

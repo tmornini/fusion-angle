@@ -142,7 +142,7 @@ import {
     HTTP_CONFLICT,
     HTTP_PRECONDITION_FAILED,
     HTTP_PRECONDITION_REQUIRED,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     reduceCreateGraphDelta,
 } from './flow-graph-relations.ts';

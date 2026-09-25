@@ -106,7 +106,7 @@ import {
     HTTP_PRECONDITION_FAILED,
     HTTP_PRECONDITION_REQUIRED,
     errorJson,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     AUTHENTICATION_ROUTES,
     authenticateRequest,
@@ -155,7 +155,7 @@ export {
     HTTP_UNPROCESSABLE_ENTITY,
     HTTP_INTERNAL_ERROR,
     HTTP_NOT_IMPLEMENTED,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 
 const routeTable: readonly Route[] = routes;
 

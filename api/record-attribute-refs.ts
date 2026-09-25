@@ -5,7 +5,7 @@ import {
 import {
     ApiError,
     HTTP_CONFLICT,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 import {
     relationFailClosed,

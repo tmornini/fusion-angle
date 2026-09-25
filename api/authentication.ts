@@ -97,7 +97,7 @@ import {
     HTTP_UNAUTHORIZED,
     HTTP_FORBIDDEN,
     HTTP_NOT_IMPLEMENTED,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 
 // The OAuth 2.1 token + authorize logic, kept out of the route
 // table. Each function returns a RESULT (success | failure) — an

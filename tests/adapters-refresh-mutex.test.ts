@@ -21,7 +21,7 @@ import {
 import { runSingleFlightRefresh } from
     '../web-app/app/adapters/session-refresh-mutex.ts';
 import { UnauthorizedError } from
-    '../api/http-errors.ts';
+    '../shared/http-errors.ts';
 import {
     expiredToken,
     organizationToken,

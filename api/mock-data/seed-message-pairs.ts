@@ -153,7 +153,7 @@ import {
 } from '../../shared/identifier.ts';
 import {
     HTTP_NO_CONTENT,
-} from '../http-errors.ts';
+} from '../../shared/http-errors.ts';
 import {
     WRITE_RESPONSE_SPECS,
     flowCreateDocumentBody,

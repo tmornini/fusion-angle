@@ -28,7 +28,7 @@ import {
 import {
     ApiError,
     HTTP_PRECONDITION_FAILED,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';

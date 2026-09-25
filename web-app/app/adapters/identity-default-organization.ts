@@ -2,7 +2,7 @@ import type { RequestContext } from './shared.ts';
 import {
     RequestError,
     HTTP_NOT_FOUND,
-} from '../../../api/http-errors.ts';
+} from '../../../shared/http-errors.ts';
 
 // Keyed by the caller's own id — the server authorizes an
 // identity's default organization by tree ownership. PUT

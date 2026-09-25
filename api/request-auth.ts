@@ -16,7 +16,7 @@ import type {
 import {
     HTTP_FORBIDDEN,
     HTTP_UNAUTHORIZED,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     projectClaimRolesForOrganization,
     isPermitted,

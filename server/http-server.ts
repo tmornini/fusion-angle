@@ -16,7 +16,7 @@ import {
     HTTP_NOT_FOUND,
     HTTP_PAYLOAD_TOO_LARGE,
     HTTP_TOO_MANY_REQUESTS,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import { OPERATION_ID_HEADER } from
     '../api/message-pair.ts';
 import { REQUEST_ID_HEADER } from

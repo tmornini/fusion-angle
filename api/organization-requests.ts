@@ -13,7 +13,7 @@ import {
     HTTP_BAD_REQUEST,
     HTTP_FORBIDDEN,
     HTTP_NOT_FOUND,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import { param } from './document-family.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
 import {

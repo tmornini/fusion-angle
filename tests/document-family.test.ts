@@ -56,7 +56,7 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { ApiError, HTTP_PRECONDITION_FAILED } from
-    '../api/http-errors.ts';
+    '../shared/http-errors.ts';
 import {
     apiRequest,
     pairIdOf,

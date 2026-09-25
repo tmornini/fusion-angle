@@ -7,7 +7,7 @@ import {
     ApiError,
     HTTP_GATEWAY_TIMEOUT,
     HTTP_INTERNAL_ERROR,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     MissingTableError,
     EntityNotFoundError,

@@ -7,7 +7,7 @@ import {
     errorJson,
     HTTP_BAD_REQUEST,
     HTTP_LENGTH_REQUIRED,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 
 // The server half of the request vessel (Office of the
 // Context): one context enters at the gate and rides the

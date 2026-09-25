@@ -4,7 +4,7 @@ import {
 } from '../../../shared/types.ts';
 import {
     UnauthorizedError,
-} from '../../../api/http-errors.ts';
+} from '../../../shared/http-errors.ts';
 import { OPERATION_ID_HEADER } from
     '../../../api/message-pair.ts';
 import {

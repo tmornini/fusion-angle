@@ -12,7 +12,7 @@ import {
     HTTP_NOT_FOUND,
     HTTP_FORBIDDEN,
     HTTP_CONFLICT,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     pickString,
     validateTimestampField,

@@ -22,7 +22,7 @@ import type {
     PutHandler,
     WriteResponseSpec,
 } from './routes.ts';
-import { HTTP_OK } from './http-errors.ts';
+import { HTTP_OK } from '../shared/http-errors.ts';
 import { liveHeadId, messageStore } from
     './message-store.ts';
 import { flowStoredEntityOf } from './derive-flows.ts';

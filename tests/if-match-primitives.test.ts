@@ -1,7 +1,7 @@
 import { assertStrictEquals } from '@std/assert';
 import {
     HTTP_PRECONDITION_REQUIRED,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     parseIfMatch,
     strongEtagOf,

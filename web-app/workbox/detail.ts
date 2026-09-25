@@ -53,7 +53,7 @@ import type {
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
-} from '../../api/http-errors.ts';
+} from '../../shared/http-errors.ts';
 
 /* ── Module state ────────── */
 
