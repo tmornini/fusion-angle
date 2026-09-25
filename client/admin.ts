@@ -21,7 +21,7 @@ export type {
     OrganizationEntity,
 } from '../shared/types.ts';
 
-async function getOrganizationEntity(
+export async function getOrganizationEntity(
     ctx: RequestContext,
 ): Promise<OrganizationEntity> {
     // The active org — the tenant the session is scoped to —
