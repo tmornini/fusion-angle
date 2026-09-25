@@ -51,13 +51,11 @@ import {
     postProjectArchival,
     validateProjectForApproval,
     validateProjectForArchival,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import { Project } from '../../shared/types.ts';
 import { ProjectView } from '../app/project-view.ts';
-import type {
-    FlowListItem,
-} from '../app/adapters/index.ts';
+import type { FlowListItem } from '../../client/index.ts';
 import type {
     ProjectEntity,
     ProjectState,

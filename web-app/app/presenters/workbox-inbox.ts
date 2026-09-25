@@ -9,7 +9,7 @@ import {
     memberName,
     type WorkOrder,
     type TransitionEvent,
-} from '../adapters/index.ts';
+} from '../../../client/index.ts';
 import type { Member } from '../../../shared/types.ts';
 import {
     SECONDS_PER_DAY,

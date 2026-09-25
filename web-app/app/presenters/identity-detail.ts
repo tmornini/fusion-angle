@@ -17,7 +17,7 @@ import {
     UNNAMED_SERVICE_NAME,
     type ServiceFacet,
     type ClientRegistration,
-} from '../adapters/index.ts';
+} from '../../../client/index.ts';
 import {
     Identity,
     type MemberPii,

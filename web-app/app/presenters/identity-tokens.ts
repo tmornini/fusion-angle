@@ -7,7 +7,7 @@ import { mutedEmptyNote } from './empty-note.ts';
 import type {
     TokenEvent,
     TokenChain,
-} from '../adapters/index.ts';
+} from '../../../client/index.ts';
 
 function actionBadgeClass(
     action: TokenEvent['action'],

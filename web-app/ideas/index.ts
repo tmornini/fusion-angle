@@ -24,7 +24,7 @@ import {
     subscribeIdeaChanges,
     sessionContext,
     type IdeaWithSubmitter,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import { isIdeaState } from '../../shared/types.ts';
 import {
     IdeaListPresenter,

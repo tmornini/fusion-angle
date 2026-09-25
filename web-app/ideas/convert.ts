@@ -21,7 +21,7 @@ import {
     postIdeaConversion,
     createRequestContext,
     sessionContext,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import { type IdeaEntity } from '../../shared/types.ts';
 import {

@@ -14,9 +14,7 @@ import {
     iconX,
     iconBrain,
 } from '../icons.ts';
-import {
-    type AIMemberDraft,
-} from '../adapters/index.ts';
+import { type AIMemberDraft } from '../../../client/index.ts';
 import { AIMember } from '../../../shared/types.ts';
 import {
     findProviderModel,

@@ -21,20 +21,22 @@ import { navigateTo } from '../app/navigation.ts';
 import { initTabs } from '../app/dialog.ts';
 import { initDropdown } from '../app/theme-toggle.ts';
 import {
+    getFlowsForCreation,
+    type NotReadyFlowEntry,
+} from '../app/flow-publish.ts';
+import {
     getWorkOrders,
     getWorkOrderHistories,
     projectTransitions,
     activeClaimFromHistory,
     getMemberMap,
-    getFlowsForCreation,
     putWorkOrder,
     sessionContext,
     subscribeWorkOrderChanges,
-    type NotReadyFlowEntry,
     type RequestContext,
     type WorkOrder,
     type TransitionEvent,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import { type Member } from '../../shared/types.ts';
 import {

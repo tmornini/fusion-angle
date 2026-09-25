@@ -15,9 +15,7 @@ import {
     iconClock,
 } from '../icons.ts';
 import { buildPageUrl } from '../navigation.ts';
-import type {
-    RecordWithCounts,
-} from '../adapters/index.ts';
+import type { RecordWithCounts } from '../../../client/index.ts';
 import type {
     RecordModel,
     RecordState,

@@ -18,7 +18,7 @@ import {
     subscribeProjectChanges,
     subscribeProjectScoreChanges,
     subscribeObjectiveChanges,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import {
     isProjectState,
     type Project,

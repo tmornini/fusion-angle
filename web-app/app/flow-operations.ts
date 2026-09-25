@@ -20,7 +20,7 @@ import {
     putFlow,
     enqueueFlowSave,
     notifyFlowChange,
-} from './adapters/index.ts';
+} from '../../client/index.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import { nowUtc } from '../../shared/types.ts';
 import { getRenderableFlowGraph } from './flow-graph-layout.ts';

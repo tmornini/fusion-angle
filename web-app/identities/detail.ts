@@ -22,7 +22,7 @@ import {
     subscribeIdentityChanges,
     type ServiceFacet,
     type ClientRegistration,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import {
     Identity,
     type MemberPii,

@@ -42,14 +42,14 @@ import {
     getRecordInstances,
     subscribeWorkOrderChanges,
     RecordTransitionViolations,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import type {
     NodeAttribute,
 } from '../../shared/types.ts';
 import type {
     RecordAttribute,
     RequestContext,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,

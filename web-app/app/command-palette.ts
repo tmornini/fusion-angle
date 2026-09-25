@@ -17,18 +17,20 @@ import {
     iconX,
 } from './icons.ts';
 import {
+    putLocation,
+} from './adapters/index.ts';
+import {
     getIdeas,
     getProjects,
     getHumanMembers,
     featuredHumanMembers,
     sessionContext,
-    putLocation,
     subscribeIdeaChanges,
     subscribeProjectChanges,
     subscribeHumanMemberChanges,
     type IdeaWithSubmitter,
     MEMBER_WITHOUT_PII_NAME,
-} from './adapters/index.ts';
+} from '../../client/index.ts';
 import {
     Project,
     HumanMember,

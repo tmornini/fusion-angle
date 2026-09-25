@@ -12,7 +12,7 @@ import {
 import type {
     OrganizationStats,
     GeneralInfoDraft,
-} from '../adapters/index.ts';
+} from '../../../client/index.ts';
 import type { Organization } from '../organization-view.ts';
 
 export type GeneralInfoFieldKey =

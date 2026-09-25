@@ -13,7 +13,7 @@ import {
     postInvitationDecline,
     subscribeInvitationChanges,
     type InvitationView,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import {
     InvitationListPresenter,
 } from '../app/presenters/index.ts';

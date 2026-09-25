@@ -48,7 +48,7 @@ import {
     subscribeAIMemberChanges,
     getAdminSeatIds,
     deleteHumanMemberSeat,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import {
     HumanMember,
     AIMember,

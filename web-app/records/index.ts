@@ -21,7 +21,7 @@ import {
     putRecord,
     subscribeRecordChanges,
     type RecordWithCounts,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import { isRecordState } from '../../shared/types.ts';
 import {
     RecordListPresenter,

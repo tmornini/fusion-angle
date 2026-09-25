@@ -10,7 +10,7 @@ import {
     sessionContext,
     getProviderEvents,
     subscribeIdentityProviderChanges,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import {
     IdentityProvidersPresenter,
 } from '../app/presenters/index.ts';

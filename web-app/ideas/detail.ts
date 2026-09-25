@@ -33,7 +33,7 @@ import {
     subscribeIdeaChanges,
     sessionContext,
     type IdeaWithSubmitter,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import type { IdeaEntity } from '../../shared/types.ts';
 
 const { signal } = createPageAbort();

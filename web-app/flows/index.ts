@@ -24,22 +24,24 @@ import {
     handleDialogClick,
 } from '../app/dialog.ts';
 import {
-    sessionContext,
-    getProjects,
-    getFlowsWithProjectNames,
-    putFlow,
     postFlowFromMermaid,
     postFlowFromZip,
     getBackupFromZip,
     computeFlowBackupResolution,
     postFlowFromBackup,
+} from '../app/flow-export.ts';
+import {
+    sessionContext,
+    getProjects,
+    putFlow,
     subscribeFlowChanges,
-} from '../app/adapters/index.ts';
+    getFlowsWithProjectNames,
+} from '../../client/index.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import type {
     Backup,
     ImportResolution,
-} from '../app/adapters/index.ts';
+} from '../app/flow-export.ts';
 import {
     FlowPresenter,
 } from '../app/presenters/index.ts';

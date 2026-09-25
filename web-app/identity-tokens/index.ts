@@ -10,7 +10,7 @@ import {
     sessionContext,
     getTokenChainsFor,
     subscribeIdentityTokenChanges,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import {
     IdentityTokensPresenter,
 } from '../app/presenters/index.ts';

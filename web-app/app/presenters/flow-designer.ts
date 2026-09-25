@@ -8,7 +8,7 @@ import {
     sessionContext,
     putFlow,
     enqueueFlowSave,
-} from '../adapters/index.ts';
+} from '../../../client/index.ts';
 import {
     HumanMember,
     AIMember,
@@ -28,9 +28,7 @@ import type {
 import type {
     MemberId,
 } from '../../../shared/types.ts';
-import {
-    type RecordAttribute,
-} from '../adapters/index.ts';
+import { type RecordAttribute } from '../../../client/index.ts';
 import {
     buildGraphSvg,
     buildConnectPreview,

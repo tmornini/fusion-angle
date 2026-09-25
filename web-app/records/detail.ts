@@ -28,7 +28,7 @@ import {
     patchRecordInstance,
     deleteRecordInstance,
     activeOrganization,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import { getFlowEntities } from '../../client/flows.ts';
 import {
@@ -53,7 +53,7 @@ import type {
 import type {
     RecordAttribute,
     RecordInstance,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,

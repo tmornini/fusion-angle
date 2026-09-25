@@ -12,7 +12,7 @@ import {
     getIdeaEntities,
     postIdeaCreation,
     putIdeaSubmission,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import {
     nextPosition,

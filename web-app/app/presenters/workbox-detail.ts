@@ -11,7 +11,7 @@ import {
     type HistoryEntry,
     type HistoryFieldValue,
     type ClaimStatus,
-} from '../adapters/index.ts';
+} from '../../../client/index.ts';
 import {
     type ConstraintViolation,
 } from '../../../shared/record-constraints.ts';

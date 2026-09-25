@@ -32,7 +32,7 @@ import {
     putWorkOrder,
     type WorkOrder,
     type TransitionEvent,
-} from '../web-app/app/adapters/index.ts';
+} from '../client/index.ts';
 import {
     buildInboxItems,
     type ActiveClaim,

@@ -13,9 +13,7 @@ import {
 import {
     DISPLAY_ABSENT,
 } from '../web-app/app/format.ts';
-import type {
-    IdeaWithSubmitter,
-} from '../web-app/app/adapters/index.ts';
+import type { IdeaWithSubmitter } from '../client/index.ts';
 import {
     IdeaPresenter,
     IdeaEditPresenter,

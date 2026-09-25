@@ -6,11 +6,11 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
+import { getFlowStats } from '../app/flow-stats.ts';
 import {
     sessionContext,
-    getFlowStats,
     subscribeFlowChanges,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import {
     FlowStatsPresenter,
     type FlowStatsUi,

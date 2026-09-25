@@ -32,7 +32,7 @@ Deno.test(
         g['document'] = { addEventListener: () => {} };
         try {
             const adapters = await import(
-                '../web-app/app/adapters/index.ts'
+                '../client/index.ts'
             ) as Record<string, unknown>;
             const { subscribeOnce } = await import(
                 '../client/channels.ts'

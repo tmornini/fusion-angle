@@ -15,17 +15,13 @@ import {
     iconCopy,
     iconDownload,
 } from '../icons.ts';
-import type {
-    RecordAttribute,
-} from '../adapters/index.ts';
+import type { RecordAttribute } from '../../../client/index.ts';
 import type {
     GraphNode,
     GraphEdge,
     NodeAttribute,
 } from '../../../shared/types.ts';
-import {
-    MEMBER_WITHOUT_PII_NAME,
-} from '../adapters/index.ts';
+import { MEMBER_WITHOUT_PII_NAME } from '../../../client/index.ts';
 import {
     HumanMember,
     AIMember,

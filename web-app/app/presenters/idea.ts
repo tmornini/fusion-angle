@@ -31,9 +31,7 @@ import {
     iconSave,
     iconX,
 } from '../icons.ts';
-import type {
-    IdeaWithSubmitter,
-} from '../adapters/index.ts';
+import type { IdeaWithSubmitter } from '../../../client/index.ts';
 import type {
     Idea,
     IdeaState,

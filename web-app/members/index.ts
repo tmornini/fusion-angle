@@ -37,7 +37,7 @@ import {
     subscribeHumanMemberChanges,
     subscribeAIMemberChanges,
     HumanMemberPiiIntakeFailedError,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import {
     ManagedMembersPresenter,

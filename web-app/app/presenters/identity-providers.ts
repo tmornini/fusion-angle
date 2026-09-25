@@ -3,9 +3,7 @@ import {
 } from '../safe-html.ts';
 import { formatDateTime } from '../format.ts';
 import { mutedEmptyNote } from './empty-note.ts';
-import type {
-    ProviderEvent,
-} from '../adapters/index.ts';
+import type { ProviderEvent } from '../../../client/index.ts';
 
 function actionBadgeClass(
     action: ProviderEvent['action'],

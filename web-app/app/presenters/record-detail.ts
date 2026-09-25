@@ -17,7 +17,7 @@ import type {
 import type {
     RecordAttribute,
     WorkOrder,
-} from '../adapters/index.ts';
+} from '../../../client/index.ts';
 import type { RecordModel } from '../../../shared/types.ts';
 import {
     ATTRIBUTE_TYPES,

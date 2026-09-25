@@ -39,8 +39,7 @@ import type {
     GraphNode, GraphEdge, RecordEntity,
     NodeAttribute,
 } from '../shared/types.ts';
-import type { RecordAttribute } from
-    '../web-app/app/adapters/index.ts';
+import type { RecordAttribute } from '../client/index.ts';
 import {
     makeHumanMember as buildHumanMember,
     makeAIMember as buildAIMember,

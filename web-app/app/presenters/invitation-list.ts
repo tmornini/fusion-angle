@@ -8,7 +8,7 @@ import {
 import {
     type InvitationView,
     type SentInvitation,
-} from '../adapters/index.ts';
+} from '../../../client/index.ts';
 import { type InvitationState } from '../../../shared/types.ts';
 
 function stateBadge(state: InvitationState): SafeHtml {

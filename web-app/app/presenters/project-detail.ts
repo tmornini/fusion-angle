@@ -21,9 +21,7 @@ import {
     toDateInputValue,
     DISPLAY_ABSENT,
 } from '../format.ts';
-import type {
-    ProjectFieldsPatch,
-} from '../adapters/index.ts';
+import type { ProjectFieldsPatch } from '../../../client/index.ts';
 import type { ProjectState } from '../../../shared/types.ts';
 import type { ProjectView } from '../project-view.ts';
 import {
