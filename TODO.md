@@ -2876,6 +2876,32 @@ Off the critical path; each with its oracle.
   concurrent 146 ms, a memory seed is back at or under
   the base's 692 ms, and `./test` and the Postgres seed
   are re-measured
+- No error-message allowlist. `safeErrorMessage`
+  (`server/postgres-gate.ts:101-121`) prints a message
+  only if a set names it, else `seed failed` (seed,
+  `server/seed.ts:41`), or boot's and wipe's fallback
+  (`postgres-gate.ts:126`, `server/postgres-wipe.ts:37`),
+  so a fault the seed's own code raises — a rehearsed row
+  that does not land, a row on another predecessor —
+  reaches the operator as `seed failed` and a code, the
+  evidence destroyed. Two classes replace it. A
+  precondition refusal names itself: the database is
+  not empty, a required env is missing, Postgres is
+  unreachable, a concurrent seed won, the flags are
+  wrong. Everything else is a bug and crashes with its
+  message and stack. The allowlist kept secrets off
+  stderr; that duty moves to the gate: no secret enters
+  an error message, and the Postgres adapter enriches a
+  driver fault without the URL or password. First check
+  what the driver's own messages carry (connection,
+  authentication, and constraint errors); a secret found
+  there is fixed at the adapter, not filtered at print.
+  Oracle: the allowlist and its fallback are gone; each
+  named refusal prints its own message; a forced
+  rehearsal fault prints its message; and a pin feeds
+  the adapter each driver fault class with a known
+  password in the URL and finds the password in no
+  message
 
 ## Sequencing
 
