@@ -73,8 +73,7 @@ export function wireOrganizationSwitcher(activeOrganizationId: string): void {
 async function setActiveOrganizationAsDefault(
     organization: string,
 ): Promise<void> {
-    const { sessionContext } =
-        await import('../../client/shared.ts');
+    const { sessionContext } = await import('./client.ts');
     const { putIdentityDefaultOrganization } =
         await import('../../client/identity-default-organization.ts');
     await putIdentityDefaultOrganization(sessionContext(), organization);

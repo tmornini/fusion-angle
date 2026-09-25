@@ -18,7 +18,6 @@ import {
     handleDialogClick, closeDialog,
 } from '../app/dialog.ts';
 import {
-    sessionContext,
     getIdentityRoster,
     postIdentityCreation,
     subscribeIdentityChanges,
@@ -26,6 +25,7 @@ import {
     type IdentityRosterRow,
     type RequestContext,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import {
     IdentityRosterPresenter,

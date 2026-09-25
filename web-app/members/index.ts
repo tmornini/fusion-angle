@@ -27,7 +27,6 @@ import {
     handleDialogClick, closeDialog,
 } from '../app/dialog.ts';
 import {
-    sessionContext,
     getMembers,
     fillHumanMemberProfile,
     postHumanMemberCreation,
@@ -38,6 +37,7 @@ import {
     subscribeAIMemberChanges,
     HumanMemberPiiIntakeFailedError,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import {
     ManagedMembersPresenter,

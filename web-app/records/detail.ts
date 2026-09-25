@@ -13,7 +13,6 @@ import {
     closeDialog,
 } from '../app/dialog.ts';
 import {
-    sessionContext,
     getRecord,
     getRecordModel,
     getRecordAttributesByRecord,
@@ -29,6 +28,7 @@ import {
     deleteRecordInstance,
     activeOrganization,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import { getFlowEntities } from '../../client/flows.ts';
 import {

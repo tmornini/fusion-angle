@@ -20,8 +20,8 @@ import {
     getProjectEntities,
     postIdeaConversion,
     createRequestContext,
-    sessionContext,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import { type IdeaEntity } from '../../shared/types.ts';
 import {

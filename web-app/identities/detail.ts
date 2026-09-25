@@ -10,7 +10,6 @@ import {
     openDialog, closeDialog, handleDialogClick,
 } from '../app/dialog.ts';
 import {
-    sessionContext,
     getIdentity,
     getMemberPii,
     getServiceFacet,
@@ -23,6 +22,7 @@ import {
     type ServiceFacet,
     type ClientRegistration,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import {
     Identity,
     type MemberPii,

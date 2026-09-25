@@ -31,12 +31,12 @@ import {
     postFlowFromBackup,
 } from '../app/flow-export.ts';
 import {
-    sessionContext,
     getProjects,
     putFlow,
     subscribeFlowChanges,
     getFlowsWithProjectNames,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import type {
     Backup,

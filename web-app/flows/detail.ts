@@ -23,7 +23,6 @@ import {
     getFlowZip,
 } from '../app/flow-export.ts';
 import {
-    sessionContext,
     getHumanMembers,
     getAIMembers,
     getRecordEntities,
@@ -35,6 +34,7 @@ import {
     awaitFlowSave,
     type RequestContext,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import { getRenderableFlowGraph } from '../app/flow-graph-layout.ts';
 import type {
     GraphEdge,

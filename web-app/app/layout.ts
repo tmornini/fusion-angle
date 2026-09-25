@@ -25,7 +25,7 @@ import {
     mutateInvitationsBell,
 } from './invitations-indicator.ts';
 import { navigateTo } from './navigation.ts';
-import { sessionContext } from '../../client/shared.ts';
+import { sessionContext } from './client.ts';
 import type {
     OrganizationEntity,
 } from '../../shared/types.ts';

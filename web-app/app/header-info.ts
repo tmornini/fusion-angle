@@ -10,7 +10,7 @@ interface HeaderData {
 
 async function getHeaderData(
 ): Promise<HeaderData> {
-    const { sessionContext } = await import('../../client/index.ts');
+    const { sessionContext } = await import('./client.ts');
     const { getDashboardStats } = await import('./dashboard.ts');
     const { getOrganization } =
         await import('./organization-view.ts');

@@ -37,7 +37,6 @@ import {
     HTTP_NOT_FOUND,
 } from '../../shared/http-errors.ts';
 import {
-    sessionContext,
     getHumanMember,
     getHumanMemberProfile,
     putHumanMember,
@@ -49,6 +48,7 @@ import {
     getAdminSeatIds,
     deleteHumanMemberSeat,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import {
     HumanMember,
     AIMember,

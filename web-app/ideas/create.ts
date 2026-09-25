@@ -8,11 +8,11 @@ import {
 import { showToast } from '../app/toast.ts';
 import { navigateTo } from '../app/navigation.ts';
 import {
-    sessionContext,
     getIdeaEntities,
     postIdeaCreation,
     putIdeaSubmission,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import {
     nextPosition,

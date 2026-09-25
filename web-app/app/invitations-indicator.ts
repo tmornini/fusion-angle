@@ -35,7 +35,8 @@ async function renderBell(
     bell: HTMLElement,
     badge: HTMLElement | null,
 ): Promise<void> {
-    const { sessionContext, getInvitations } =
+    const { sessionContext } = await import('./client.ts');
+    const { getInvitations } =
         await import('../../client/index.ts');
     const pending = (await getInvitations(sessionContext()))
         .filter(inv => inv.state === 'pending');

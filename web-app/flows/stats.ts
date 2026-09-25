@@ -8,9 +8,9 @@ import {
 } from '../app/loading-states.ts';
 import { getFlowStats } from '../app/flow-stats.ts';
 import {
-    sessionContext,
     subscribeFlowChanges,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import {
     FlowStatsPresenter,
     type FlowStatsUi,

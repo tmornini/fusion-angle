@@ -9,7 +9,6 @@ import {
 } from '../app/loading-states.ts';
 import { getDashboardGauges } from '../app/dashboard.ts';
 import {
-    sessionContext,
     startDashboardScoringReads,
     getObjectiveScoringInputs,
     subscribeProjectScoreChanges,
@@ -18,6 +17,7 @@ import {
     subscribeProjectChanges,
     type DashboardScoringBundle,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import {
     buildObjectiveAggregates,
     buildObjectiveTrendlines,

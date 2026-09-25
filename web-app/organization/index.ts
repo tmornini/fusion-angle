@@ -25,7 +25,6 @@ import {
 import {
     getOrganizationSeats,
     getOrganizationStats,
-    sessionContext,
     putOrganizationGeneralInfo,
     type OrganizationStats,
     type GeneralInfoDraft,
@@ -44,6 +43,7 @@ import {
     postInvitationRevocation,
     subscribeInvitationChanges,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import {
     getOrganization,

@@ -27,9 +27,9 @@ import {
 } from '../../client/session-token.ts';
 import { getClientFacade } from '../../client/facade-holder.ts';
 import {
-    sessionContext,
     createRequestContext,
 } from '../../client/shared.ts';
+import { sessionContext } from './client.ts';
 import {
     getOrganizations,
 } from '../../client/organizations.ts';

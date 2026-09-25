@@ -35,7 +35,6 @@ import {
     getFlowsByProject,
     postFlowCreation,
     subscribeProjectChanges,
-    sessionContext,
     type RequestContext,
     getProjectScoring,
     postProjectBaselineScoring,
@@ -52,6 +51,7 @@ import {
     validateProjectForApproval,
     validateProjectForArchival,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import { Project } from '../../shared/types.ts';
 import { ProjectView } from '../app/project-view.ts';

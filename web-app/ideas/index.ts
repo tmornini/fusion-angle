@@ -22,9 +22,9 @@ import {
     getIdeas,
     putIdea,
     subscribeIdeaChanges,
-    sessionContext,
     type IdeaWithSubmitter,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import { isIdeaState } from '../../shared/types.ts';
 import {
     IdeaListPresenter,

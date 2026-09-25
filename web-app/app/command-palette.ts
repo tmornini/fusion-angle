@@ -24,13 +24,13 @@ import {
     getProjects,
     getHumanMembers,
     featuredHumanMembers,
-    sessionContext,
     subscribeIdeaChanges,
     subscribeProjectChanges,
     subscribeHumanMemberChanges,
     type IdeaWithSubmitter,
     MEMBER_WITHOUT_PII_NAME,
 } from '../../client/index.ts';
+import { sessionContext } from './client.ts';
 import {
     Project,
     HumanMember,

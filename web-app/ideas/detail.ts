@@ -31,9 +31,9 @@ import {
     postIdeaStateChange,
     putIdea,
     subscribeIdeaChanges,
-    sessionContext,
     type IdeaWithSubmitter,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import type { IdeaEntity } from '../../shared/types.ts';
 
 const { signal } = createPageAbort();

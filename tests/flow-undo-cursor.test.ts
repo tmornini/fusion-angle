@@ -32,9 +32,9 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     createRequestContext,
-    sessionContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { sessionContext } from '../web-app/app/client.ts';
 import {
     postFlowCreation,
     putFlow,

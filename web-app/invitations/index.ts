@@ -7,13 +7,13 @@ import {
 } from '../app/loading-states.ts';
 import { log } from '../app/logger.ts';
 import {
-    sessionContext,
     getInvitations,
     postInvitationAcceptance,
     postInvitationDecline,
     subscribeInvitationChanges,
     type InvitationView,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import {
     InvitationListPresenter,
 } from '../app/presenters/index.ts';

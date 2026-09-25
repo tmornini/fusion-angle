@@ -7,10 +7,10 @@ import {
 import { navigateTo } from '../app/navigation.ts';
 import { ICON_SIZE, iconArrowLeft } from '../app/icons.ts';
 import {
-    sessionContext,
     getProviderEvents,
     subscribeIdentityProviderChanges,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import {
     IdentityProvidersPresenter,
 } from '../app/presenters/index.ts';

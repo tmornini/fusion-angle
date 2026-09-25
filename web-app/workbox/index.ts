@@ -31,12 +31,12 @@ import {
     activeClaimFromHistory,
     getMemberMap,
     putWorkOrder,
-    sessionContext,
     subscribeWorkOrderChanges,
     type RequestContext,
     type WorkOrder,
     type TransitionEvent,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import { type Member } from '../../shared/types.ts';
 import {

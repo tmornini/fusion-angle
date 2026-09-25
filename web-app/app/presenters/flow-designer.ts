@@ -5,10 +5,10 @@ import type { SafeHtml } from '../safe-html.ts';
 import { $required } from '../dom.ts';
 import { showToast } from '../toast.ts';
 import {
-    sessionContext,
     putFlow,
     enqueueFlowSave,
 } from '../../../client/index.ts';
+import { sessionContext } from '../client.ts';
 import {
     HumanMember,
     AIMember,

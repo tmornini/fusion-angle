@@ -12,13 +12,13 @@ import { ICON_SIZE, iconFolderKanban } from '../app/icons.ts';
 import { navigateTo } from '../app/navigation.ts';
 import {
     createRequestContext,
-    sessionContext,
     getProjects,
     putProjectPosition,
     subscribeProjectChanges,
     subscribeProjectScoreChanges,
     subscribeObjectiveChanges,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import {
     isProjectState,
     type Project,

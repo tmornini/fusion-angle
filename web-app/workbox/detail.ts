@@ -35,7 +35,6 @@ import {
     putWorkOrderBinding,
     deleteWorkOrderClaim,
     getCurrentHumanMember,
-    sessionContext,
     getRecordForWorkOrder,
     getRecordAttributesByRecord,
     getRecordInstance,
@@ -43,6 +42,7 @@ import {
     subscribeWorkOrderChanges,
     RecordTransitionViolations,
 } from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import type {
     NodeAttribute,
 } from '../../shared/types.ts';
