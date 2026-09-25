@@ -13,6 +13,7 @@ import {
     requiredEnvBy,
     safeErrorMessage,
 } from './postgres-gate.ts';
+import { logStampUtc } from './log-stamp.ts';
 
 const enc = new TextEncoder();
 
@@ -76,7 +77,7 @@ export async function wipeMain(
     } catch (error: unknown) {
         Deno.stderr.writeSync(enc.encode(
             JSON.stringify({
-                at: new Date().toISOString(),
+                at: logStampUtc(),
                 level: 'error',
                 message: wipeErrorMessage(error),
             }) + '\n',

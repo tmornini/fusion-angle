@@ -30,6 +30,7 @@ import {
     scryptHash,
     scryptDerive,
 } from './scrypt-hash.ts';
+import { logStampUtc } from './log-stamp.ts';
 
 const enc = new TextEncoder();
 
@@ -96,7 +97,7 @@ export async function seedMain(
             );
             Deno.stderr.writeSync(enc.encode(
                 JSON.stringify({
-                    at: new Date().toISOString(),
+                    at: logStampUtc(),
                     level: 'info',
                     message: 'seeded',
                     mode: parsed.mode,
@@ -114,7 +115,7 @@ export async function seedMain(
             message: string;
             code?: string;
         } = {
-            at: new Date().toISOString(),
+            at: logStampUtc(),
             level: 'error',
             message,
         };

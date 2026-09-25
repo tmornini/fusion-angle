@@ -28,6 +28,7 @@ import {
     scryptHash,
     scryptDerive,
 } from './scrypt-hash.ts';
+import { logStampUtc } from './log-stamp.ts';
 
 const enc = new TextEncoder();
 
@@ -153,7 +154,7 @@ export async function main(
         );
         Deno.stdout.writeSync(enc.encode(
             JSON.stringify({
-                at: new Date().toISOString(),
+                at: logStampUtc(),
                 level: 'info',
                 message: 'listening',
                 port: running.port,
@@ -166,7 +167,7 @@ export async function main(
         // cannot ride a raw message into the logs.
         Deno.stderr.writeSync(enc.encode(
             JSON.stringify({
-                at: new Date().toISOString(),
+                at: logStampUtc(),
                 level: 'error',
                 message: bootErrorMessage(error),
             }) + '\n',
